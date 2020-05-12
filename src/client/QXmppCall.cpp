@@ -102,18 +102,9 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
     if (nameParts.size() < 4) {
         return;
     }
-    if (nameParts[0] == u"send" &&
-        nameParts[1] == u"rtp" &&
+    if (nameParts[0] == u"recv" ||
+        nameParts[1] == u"rtp" ||
         nameParts[2] == u"src") {
-        if (nameParts.size() != 4) {
-            return;
-        }
-        int sessionId = nameParts[3].toInt();
-        auto stream = findStreamById(sessionId);
-        stream->d->addRtpSender(pad);
-    } else if (nameParts[0] == u"recv" ||
-               nameParts[1] == u"rtp" ||
-               nameParts[2] == u"src") {
         if (nameParts.size() != 6) {
             return;
         }
@@ -300,6 +291,10 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             return;
         }
 
+        if (useDtls && content.transportFingerprintSetup() == u"passive") {
+            stream->d->toDtlsClientMode();
+        }
+
         // check for call establishment
         setState(QXmppCall::ActiveState);
 
@@ -374,7 +369,8 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         iq.setType(QXmppIq::Set);
         iq.setAction(QXmppJingleIq::ContentAccept);
         iq.setSid(q->sid());
-        iq.addContent(localContent(stream));
+        iq.addContent(localContent(stream, u"active"_s));
+        stream->d->toDtlsClientMode();
         manager->client()->sendIq(std::move(iq));
 
     } else if (iq.action() == QXmppJingleIq::TransportInfo) {
@@ -406,7 +402,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
         return nullptr;
     }
 
-    auto *stream = new QXmppCallStream(pipeline, rtpbin, media, creator, name, ++nextId);
+    auto *stream = new QXmppCallStream(pipeline, rtpbin, media, creator, name, ++nextId, useDtls);
 
     // Fill local payload payload types
     auto &codecs = media == AUDIO_MEDIA ? audioCodecs : videoCodecs;
@@ -439,7 +435,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
     return stream;
 }
 
-QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream) const
+QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream, QString dtlsSetup) const
 {
     QXmppJingleIq::Content content;
     content.setCreator(stream->creator());
@@ -455,6 +451,13 @@ QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream) c
     content.setTransportUser(stream->d->connection->localUser());
     content.setTransportPassword(stream->d->connection->localPassword());
     content.setTransportCandidates(stream->d->connection->localCandidates());
+
+    // encryption
+    if (useDtls) {
+        content.setTransportFingerprint(stream->d->digest);
+        content.setTransportFingerprintHash(u"sha-256"_s);
+        content.setTransportFingerprintSetup(dtlsSetup);
+    }
 
     return content;
 }
@@ -483,7 +486,7 @@ void QXmppCallPrivate::sendInvite()
     iq.setAction(QXmppJingleIq::SessionInitiate);
     iq.setInitiator(ownJid);
     iq.setSid(sid);
-    iq.addContent(localContent(stream));
+    iq.addContent(localContent(stream, u"actpass"_s));
     manager->client()->send(std::move(iq));
 }
 
@@ -539,13 +542,14 @@ void QXmppCallPrivate::terminate(QXmppJingleIq::Reason::Type reasonType)
 /// \note THIS API IS NOT FINALIZED YET
 ///
 
-QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *parent)
+QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, bool useDtls, QXmppCallManager *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppCallPrivate>(this))
 {
     d->direction = direction;
     d->jid = jid;
     d->ownJid = parent->client()->configuration().jid();
+    d->useDtls = true;
     d->manager = parent;
 }
 
@@ -567,7 +571,8 @@ void QXmppCall::accept()
         iq.setAction(QXmppJingleIq::SessionAccept);
         iq.setResponder(d->ownJid);
         iq.setSid(d->sid);
-        iq.addContent(d->localContent(stream));
+        iq.addContent(d->localContent(stream, u"active"_s));
+        stream->d->toDtlsClientMode();
         d->manager->client()->sendIq(std::move(iq));
 
         // notify user
@@ -645,7 +650,7 @@ void QXmppCall::onLocalCandidatesChanged(QXmppCallStream *stream)
     iq.setType(QXmppIq::Set);
     iq.setAction(QXmppJingleIq::TransportInfo);
     iq.setSid(d->sid);
-    iq.addContent(d->localContent(stream));
+    iq.addContent(d->localContent(stream, {}));
     d->manager->client()->sendIq(std::move(iq));
 }
 
@@ -701,6 +706,13 @@ void QXmppCall::addVideo()
     iq.setType(QXmppIq::Set);
     iq.setAction(QXmppJingleIq::ContentAdd);
     iq.setSid(d->sid);
-    iq.addContent(d->localContent(stream));
+    iq.addContent(d->localContent(stream, u"actpass"_s));
     d->manager->client()->sendIq(std::move(iq));
+}
+
+// Returns if the call is encrypted
+
+bool QXmppCall::isEncrypted() const
+{
+    return d->useDtls;
 }

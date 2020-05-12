@@ -60,7 +60,7 @@ public:
     QXmppCallStream *findStreamByMedia(QStringView media);
     QXmppCallStream *findStreamByName(QStringView name);
     QXmppCallStream *findStreamById(int id);
-    QXmppJingleIq::Content localContent(QXmppCallStream *stream) const;
+    QXmppJingleIq::Content localContent(QXmppCallStream *stream, QString dtlsSetup) const;
 
     bool handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
     void handleRequest(const QXmppJingleIq &iq);
@@ -73,6 +73,7 @@ public:
     QXmppCall::Direction direction;
     QString jid;
     QString ownJid;
+    bool useDtls;
     QXmppCallManager *manager;
     QString sid;
     QXmppCall::State state;
