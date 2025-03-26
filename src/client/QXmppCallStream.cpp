@@ -222,11 +222,7 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
 
     gst_element_sync_state_with_parent(encoderBin);
 
-#if GST_CHECK_VERSION(1, 20, 0)
     addRtcpSender(gst_element_request_pad_simple(rtpbin, u"send_rtcp_src_%1"_s.arg(id).toLatin1().data()));
-#else
-    addRtcpSender(gst_element_get_request_pad(rtpbin, u"send_rtcp_src_%1"_s.arg(id).toLatin1().data()));
-#endif
 }
 
 void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec &codec)

@@ -333,7 +333,7 @@ target_link_libraries(${QXMPP_TARGET}
 )
 
 if(WITH_GSTREAMER)
-    find_package(GStreamer REQUIRED)
+    find_package(GStreamer 1.20 REQUIRED)
     find_package(GLIB2 REQUIRED)
     find_package(GObject REQUIRED)
 
