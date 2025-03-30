@@ -14,6 +14,7 @@
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
+#include "GstWrapper.h"
 #include "StringLiterals.h"
 
 #include <gst/gst.h>
@@ -21,7 +22,8 @@
 #include <QDomElement>
 #include <QTimer>
 
-/// \cond
+using namespace QXmpp::Private;
+
 QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
     : turnPort(0),
       q(qq)
@@ -29,20 +31,7 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
     // Initialize GStreamer
     gst_init(nullptr, nullptr);
 
-    supportsDtls = true;
-    GstElementFactory *factory;
-    factory = gst_element_factory_find("dtlssrtpenc");
-    if (!factory) {
-        supportsDtls = false;
-    } else {
-        g_object_unref(factory);
-    }
-    factory = gst_element_factory_find("dtlssrtpdec");
-    if (!factory) {
-        supportsDtls = false;
-    } else {
-        g_object_unref(factory);
-    }
+    supportsDtls = checkGstFeature("dtlsdec"_L1) && checkGstFeature("dtlsenc"_L1);
 }
 
 QXmppCall *QXmppCallManagerPrivate::findCall(const QString &sid) const
@@ -64,7 +53,6 @@ QXmppCall *QXmppCallManagerPrivate::findCall(const QString &sid, QXmppCall::Dire
     }
     return nullptr;
 }
-/// \endcond
 
 ///
 /// Constructs a QXmppCallManager object to handle incoming and outgoing

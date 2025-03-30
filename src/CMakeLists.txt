@@ -346,6 +346,7 @@ if(WITH_GSTREAMER)
 
     target_sources(${QXMPP_TARGET}
         PRIVATE
+        client/GstWrapper.cpp
         client/QXmppCall.cpp
         client/QXmppCallManager.cpp
         client/QXmppCallStream.cpp
