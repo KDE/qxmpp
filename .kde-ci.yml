@@ -2,4 +2,4 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 Options:
-  cmake-options: '-DBUILD_OMEMO=ON'
+  cmake-options: '-DBUILD_OMEMO=ON -DBUILD_INTERNAL_TESTS=ON'
