@@ -29,7 +29,9 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
       q(qq)
 {
     // Initialize GStreamer
-    gst_init(nullptr, nullptr);
+    if (!gst_is_initialized()) {
+        gst_init(nullptr, nullptr);
+    }
 
     supportsDtls = checkGstFeature("dtlsdec"_L1) && checkGstFeature("dtlsenc"_L1);
 }
