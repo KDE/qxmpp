@@ -18,6 +18,9 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/modules")
 
 # Qt
+if(BUILD_WITH_QT6)
+    set(QT_VERSION_MAJOR 6)
+endif()
 if(NOT DEFINED QT_VERSION_MAJOR)
     find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network Xml)
 endif()
@@ -32,6 +35,7 @@ endif()
 
 include(GNUInstallDirs)
 
+option(BUILD_WITH_QT6 "Force build with Qt 6")
 option(BUILD_SHARED "Build shared library" ON)
 option(BUILD_TESTS "Build tests." ON)
 option(BUILD_INTERNAL_TESTS "Build internal tests." OFF)
