@@ -57,8 +57,6 @@ public:
     GstPad *sendPad;
     GstPad *receivePad;
     GstPad *internalReceivePad;
-    GstPad *internalRtpPad;
-    GstPad *internalRtcpPad;
     GstElement *encoderBin;
     GstElement *decoderBin;
     GstElement *iceReceiveBin;
