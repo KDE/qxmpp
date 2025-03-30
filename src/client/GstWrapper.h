@@ -79,6 +79,14 @@ using GstSamplePtr = CustomUniquePtr<GstSample, [](GstSample *p) { gst_sample_un
 using GstBufferPtr = CustomUniquePtr<GstBuffer, [](GstBuffer *p) { gst_buffer_unref(p); }>;
 using GCharPtr = CustomUniquePtr<gchar, [](gchar *p) { g_free(p); }>;
 
+enum class GstDtlsConnectionState {
+    New,
+    Closed,
+    Failed,
+    Connecting,
+    Connected,
+};
+
 bool checkGstFeature(QLatin1String feature);
 
 }  // namespace QXmpp::Private

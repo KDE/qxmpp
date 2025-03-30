@@ -63,12 +63,12 @@ public:
     GstElement *iceSendBin;
     GstElement *apprtpsrc;
     GstElement *apprtcpsrc;
-    GstElement *apprtpsink;
-    GstElement *apprtcpsink;
-    GstElement *dtlsrtpencoder;
-    GstElement *dtlsrtcpencoder;
-    GstElement *dtlsrtpdecoder;
-    GstElement *dtlsrtcpdecoder;
+    GstElement *appRtpSink;
+    GstElement *appRtcpSink;
+    GstElement *dtlsSrtpEncoder;
+    GstElement *dtlsSrtcpEncoder;
+    GstElement *dtlsSrtpDecoder;
+    GstElement *dtlsSrtcpDecoder;
     QByteArray digest;
 
     std::function<void(GstPad *)> sendPadCB;
