@@ -8,6 +8,8 @@
 #include "QXmppCall.h"
 #include "QXmppJingleIq.h"
 
+#include "GstWrapper.h"
+
 #include <gst/gst.h>
 
 #include <QList>
@@ -29,6 +31,8 @@ class QXmppCallPrivate : public QObject
 {
     Q_OBJECT
 public:
+    using GstElementPtr = QXmpp::Private::GstElementPtr;
+
     struct GstCodec {
         int pt;
         QString name;
@@ -78,7 +82,7 @@ public:
     QString sid;
     QXmppCall::State state;
 
-    GstElement *pipeline;
+    GstElementPtr pipeline;
     GstElement *rtpbin;
 
     // Media streams

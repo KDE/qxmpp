@@ -8,6 +8,7 @@
 #include "QXmppCall_p.h"
 #include "QXmppStun.h"
 
+#include "GstWrapper.h"
 #include "StringLiterals.h"
 
 #include <cstring>
@@ -16,6 +17,8 @@
 #include <QRandomGenerator>
 #include <QSslCertificate>
 #include <QUuid>
+
+using namespace QXmpp::Private;
 
 QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstElement *pipeline_,
                                                GstElement *rtpbin_, QString media_, QString creator_,
@@ -43,8 +46,8 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     iceSendBin = gst_bin_new(u"send_%1"_s.arg(id).toLatin1().data());
     gst_bin_add_many(GST_BIN(pipeline), iceReceiveBin, iceSendBin, nullptr);
 
-    internalRtpPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
-    internalRtcpPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
+    GstPad *internalRtpPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
+    GstPad *internalRtcpPad = gst_ghost_pad_new_no_target(nullptr, GST_PAD_SINK);
     if (!gst_element_add_pad(iceSendBin, internalRtpPad) ||
         !gst_element_add_pad(iceSendBin, internalRtcpPad)) {
         qFatal("Failed to add pads to send bin");
@@ -63,15 +66,17 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
 
         g_object_set(dtlsrtpdecoder, "async-handling", true, "connection-id", dtlsRtpId.toLatin1().data(), nullptr);
         g_object_set(dtlsrtcpdecoder, "async-handling", true, "connection-id", dtlsRtcpId.toLatin1().data(), nullptr);
-        gchar *pem;
-        g_object_get(dtlsrtpdecoder, "pem", &pem, nullptr);
-        /* Copy the certificate to the RTCP decoder so that they both share the same fingerprint. */
-        // g_object_set(dtlsrtcpdecoder, "pem", pem, nullptr); //TODO why does this fail?
-        /* Calculate the fingerprint to transmit to the remote party. */
-        QSslCertificate certificate(pem);
-        digest = certificate.digest(QCryptographicHash::Sha256);
-        g_free(pem);
 
+        /* Copy the certificate to the RTCP decoder so that they both share the same fingerprint. */
+        GCharPtr pem;
+        g_object_get(dtlsrtpdecoder, "pem", pem.reassignRef(), nullptr);
+        g_object_set(dtlsrtcpdecoder, "pem", pem.get(), nullptr);  // TODO why does this fail?
+
+        /* Calculate the fingerprint to transmit to the remote party. */
+        QSslCertificate certificate(pem.get());
+        digest = certificate.digest(QCryptographicHash::Sha256);
+
+        // Setup encoders
         dtlsrtpencoder = gst_element_factory_make("dtlssrtpenc", nullptr);
         dtlsrtcpencoder = gst_element_factory_make("dtlssrtpenc", nullptr);
         if (!dtlsrtpencoder || !dtlsrtcpencoder) {
@@ -149,48 +154,36 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     }
 
     /* Trigger creation of necessary pads */
-    GstPad *dummyPad = gst_element_request_pad_simple(rtpbin, u"send_rtp_sink_%1"_s.arg(id).toLatin1().data());
-    gst_object_unref(dummyPad);
+    GstPadPtr dummyPad = gst_element_request_pad_simple(rtpbin, u"send_rtp_sink_%1"_s.arg(id).toLatin1().data());
+    dummyPad.reset();
 
     /* Link pads - receiving side */
-    GstPad *rtpRecvPad = gst_element_get_static_pad(apprtpsrc, "src");
-    GstPad *rtcpRecvPad = gst_element_get_static_pad(apprtcpsrc, "src");
+    GstPadPtr rtpRecvPad = gst_element_get_static_pad(apprtpsrc, "src");
+    GstPadPtr rtcpRecvPad = gst_element_get_static_pad(apprtcpsrc, "src");
 
     if (useDtls) {
-        GstPad *dtlsRtpSinkPad = gst_element_get_static_pad(dtlsrtpdecoder, "sink");
-        GstPad *dtlsRtcpSinkPad = gst_element_get_static_pad(dtlsrtcpdecoder, "sink");
+        GstPadPtr dtlsRtpSinkPad = gst_element_get_static_pad(dtlsrtpdecoder, "sink");
+        GstPadPtr dtlsRtcpSinkPad = gst_element_get_static_pad(dtlsrtcpdecoder, "sink");
         gst_pad_link(rtpRecvPad, dtlsRtpSinkPad);
         gst_pad_link(rtcpRecvPad, dtlsRtcpSinkPad);
-        gst_object_unref(dtlsRtpSinkPad);
-        gst_object_unref(dtlsRtcpSinkPad);
-        gst_object_unref(rtpRecvPad);
-        gst_object_unref(rtcpRecvPad);
         rtpRecvPad = gst_element_get_static_pad(dtlsrtpdecoder, "rtp_src");
         rtcpRecvPad = gst_element_get_static_pad(dtlsrtcpdecoder, "rtcp_src");
     }
 
-    GstPad *rtpSinkPad = gst_element_request_pad_simple(rtpbin, u"recv_rtp_sink_%1"_s.arg(id).toLatin1().data());
-    GstPad *rtcpSinkPad = gst_element_request_pad_simple(rtpbin, u"recv_rtcp_sink_%1"_s.arg(id).toLatin1().data());
+    GstPadPtr rtpSinkPad = gst_element_request_pad_simple(rtpbin, u"recv_rtp_sink_%1"_s.arg(id).toLatin1().data());
+    GstPadPtr rtcpSinkPad = gst_element_request_pad_simple(rtpbin, u"recv_rtcp_sink_%1"_s.arg(id).toLatin1().data());
     gst_pad_link(rtpRecvPad, rtpSinkPad);
     gst_pad_link(rtcpRecvPad, rtcpSinkPad);
-    gst_object_unref(rtpSinkPad);
-    gst_object_unref(rtcpSinkPad);
-    gst_object_unref(rtpRecvPad);
-    gst_object_unref(rtcpRecvPad);
 
     /* Link pads - sending side */
-    GstPad *rtpSendPad = gst_element_get_static_pad(apprtpsink, "sink");
-    GstPad *rtcpSendPad = gst_element_get_static_pad(apprtcpsink, "sink");
+    GstPadPtr rtpSendPad = gst_element_get_static_pad(apprtpsink, "sink");
+    GstPadPtr rtcpSendPad = gst_element_get_static_pad(apprtcpsink, "sink");
 
     if (useDtls) {
-        GstPad *dtlsRtpSrcPad = gst_element_get_static_pad(dtlsrtpencoder, "src");
-        GstPad *dtlsRtcpSrcPad = gst_element_get_static_pad(dtlsrtcpencoder, "src");
+        GstPadPtr dtlsRtpSrcPad = gst_element_get_static_pad(dtlsrtpencoder, "src");
+        GstPadPtr dtlsRtcpSrcPad = gst_element_get_static_pad(dtlsrtcpencoder, "src");
         gst_pad_link(dtlsRtpSrcPad, rtpSendPad);
         gst_pad_link(dtlsRtcpSrcPad, rtcpSendPad);
-        gst_object_unref(dtlsRtpSrcPad);
-        gst_object_unref(dtlsRtcpSrcPad);
-        gst_object_unref(rtpSendPad);
-        gst_object_unref(rtcpSendPad);
         rtpSendPad = gst_element_request_pad_simple(dtlsrtpencoder, u"rtp_sink_%1"_s.arg(id).toLatin1().data());
         rtcpSendPad = gst_element_request_pad_simple(dtlsrtcpencoder, u"rtcp_sink_%1"_s.arg(id).toLatin1().data());
     }
@@ -199,8 +192,6 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
         !gst_ghost_pad_set_target(GST_GHOST_PAD(internalRtcpPad), rtcpSendPad)) {
         qFatal("Failed to link rtp send pads to internal ghost pads");
     }
-    gst_object_unref(rtpSendPad);
-    gst_object_unref(rtcpSendPad);
 
     // We need frequent RTCP reports for the bandwidth controller
     GstElement *rtpSession;
@@ -210,14 +201,12 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     gst_element_sync_state_with_parent(iceReceiveBin);
     gst_element_sync_state_with_parent(iceSendBin);
 
-    GstPad *rtpbinRtpSendPad = gst_element_get_static_pad(rtpbin, u"send_rtp_src_%1"_s.arg(id).toLatin1().data());
-    GstPad *rtpbinRtcpSendPad = gst_element_request_pad_simple(rtpbin, u"send_rtcp_src_%1"_s.arg(id).toLatin1().data());
+    GstPadPtr rtpbinRtpSendPad = gst_element_get_static_pad(rtpbin, u"send_rtp_src_%1"_s.arg(id).toLatin1().data());
+    GstPadPtr rtpbinRtcpSendPad = gst_element_request_pad_simple(rtpbin, u"send_rtcp_src_%1"_s.arg(id).toLatin1().data());
     if (gst_pad_link(rtpbinRtpSendPad, internalRtpPad) != GST_PAD_LINK_OK ||
         gst_pad_link(rtpbinRtcpSendPad, internalRtcpPad) != GST_PAD_LINK_OK) {
         qFatal("Failed to link rtp pads");
     }
-    gst_object_unref(rtpbinRtpSendPad);
-    gst_object_unref(rtpbinRtcpSendPad);
 }
 
 QXmppCallStreamPrivate::~QXmppCallStreamPrivate()
@@ -235,8 +224,8 @@ QXmppCallStreamPrivate::~QXmppCallStreamPrivate()
 
 GstFlowReturn QXmppCallStreamPrivate::sendDatagram(GstElement *appsink, int component)
 {
-    GstSample *sample;
-    g_signal_emit_by_name(appsink, "pull-sample", &sample);
+    GstSamplePtr sample;
+    g_signal_emit_by_name(appsink, "pull-sample", sample.reassignRef());
     if (!sample) {
         qFatal("Could not get sample");
         return GST_FLOW_ERROR;
@@ -256,7 +245,6 @@ GstFlowReturn QXmppCallStreamPrivate::sendDatagram(GstElement *appsink, int comp
     datagram.resize(mapInfo.size);
     std::memcpy(datagram.data(), mapInfo.data, mapInfo.size);
     gst_buffer_unmap(buffer, &mapInfo);
-    gst_sample_unref(sample);
 
     if (connection->component(component)->isConnected() &&
         connection->component(component)->sendDatagram(datagram) != datagram.size()) {
@@ -267,7 +255,7 @@ GstFlowReturn QXmppCallStreamPrivate::sendDatagram(GstElement *appsink, int comp
 
 void QXmppCallStreamPrivate::datagramReceived(const QByteArray &datagram, GstElement *appsrc)
 {
-    GstBuffer *buffer = gst_buffer_new_and_alloc(datagram.size());
+    GstBufferPtr buffer = gst_buffer_new_and_alloc(datagram.size());
     GstMapInfo mapInfo;
     if (!gst_buffer_map(buffer, &mapInfo, GST_MAP_WRITE)) {
         qFatal("Could not map buffer");
@@ -276,8 +264,7 @@ void QXmppCallStreamPrivate::datagramReceived(const QByteArray &datagram, GstEle
     std::memcpy(mapInfo.data, datagram.data(), mapInfo.size);
     gst_buffer_unmap(buffer, &mapInfo);
     GstFlowReturn ret;
-    g_signal_emit_by_name(appsrc, "push-buffer", buffer, &ret);
-    gst_buffer_unref(buffer);
+    g_signal_emit_by_name(appsrc, "push-buffer", buffer.get(), &ret);
 }
 
 void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
@@ -328,12 +315,11 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
         return;
     }
 
-    GstPad *targetPad = gst_element_get_static_pad(queue, "sink");
+    GstPadPtr targetPad = gst_element_get_static_pad(queue, "sink");
     if (!gst_ghost_pad_set_target(GST_GHOST_PAD(sendPad), targetPad)) {
         qFatal("Failed to set send pad");
         return;
     }
-    gst_object_unref(targetPad);
 
     if (sendPadCB && (dtlsHandshakeComplete || !useDtls)) {
         sendPadCB(sendPad);
@@ -382,17 +368,15 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
 
     gst_bin_add_many(GST_BIN(decoderBin), depay, decoder, queue, nullptr);
 
-    GstPad *targetPad = gst_element_get_static_pad(depay, "sink");
+    GstPadPtr targetPad = gst_element_get_static_pad(depay, "sink");
     if (!gst_ghost_pad_set_target(GST_GHOST_PAD(internalReceivePad), targetPad)) {
         qFatal("Failed to set receive pad");
     }
-    gst_object_unref(targetPad);
 
     targetPad = gst_element_get_static_pad(queue, "src");
     if (!gst_ghost_pad_set_target(GST_GHOST_PAD(receivePad), targetPad)) {
         qFatal("Failed to set receive pad");
     }
-    gst_object_unref(targetPad);
 
     if (gst_pad_link(pad, internalReceivePad) != GST_PAD_LINK_OK ||
         !gst_element_link_many(depay, decoder, queue, nullptr)) {

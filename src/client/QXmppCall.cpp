@@ -28,6 +28,7 @@
 #include <QTimer>
 
 using namespace std::chrono_literals;
+using namespace QXmpp::Private;
 
 /// \cond
 QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
@@ -54,7 +55,7 @@ QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
     }
     // We do not want to build up latency over time
     g_object_set(rtpbin, "drop-on-latency", true, "async-handling", true, "latency", 25, nullptr);
-    if (!gst_bin_add(GST_BIN(pipeline), rtpbin)) {
+    if (!gst_bin_add(GST_BIN(pipeline.get()), rtpbin)) {
         qFatal("Could not add rtpbin to the pipeline");
     }
     g_signal_connect_swapped(rtpbin, "pad-added",
@@ -85,7 +86,6 @@ QXmppCallPrivate::~QXmppCallPrivate()
         qFatal("Unable to set the pipeline to the null state");
     }
     qDeleteAll(streams);
-    gst_object_unref(pipeline);
 }
 
 void QXmppCallPrivate::ssrcActive(uint sessionId, uint ssrc)
@@ -148,13 +148,7 @@ GstCaps *QXmppCallPrivate::ptMap(uint sessionId, uint pt)
 
 bool QXmppCallPrivate::isFormatSupported(const QString &codecName)
 {
-    GstElementFactory *factory;
-    factory = gst_element_factory_find(codecName.toLatin1().data());
-    if (!factory) {
-        return false;
-    }
-    g_object_unref(factory);
-    return true;
+    return GstElementFactoryPtr(gst_element_factory_find(codecName.toLatin1().data())) != nullptr;
 }
 
 bool QXmppCallPrivate::isCodecSupported(const GstCodec &codec)
