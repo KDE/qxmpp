@@ -327,6 +327,9 @@ set_target_properties(qxmppprivate PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
+# for export header
+target_compile_definitions(qxmppprivate PRIVATE ${QXMPP_TARGET}_EXPORTS)
+
 #
 # public shared/static library
 #
@@ -344,9 +347,6 @@ set_target_properties(${QXMPP_TARGET} PROPERTIES
 )
 
 target_link_libraries(${QXMPP_TARGET} PUBLIC qxmppprivate)
-
-# for export header to work
-target_compile_definitions(${QXMPP_TARGET} PRIVATE qxmppprivate_EXPORTS)
 
 #
 # optional dependencies
@@ -414,7 +414,7 @@ set(QXMPP_CUSTOM_EXPORT_CONTENT "
 #define QXMPP_VERSION_PATCH ${PROJECT_VERSION_PATCH}
 ")
 
-generate_export_header(qxmppprivate
+generate_export_header(${QXMPP_TARGET}
     BASE_NAME qxmpp
     CUSTOM_CONTENT_FROM_VARIABLE QXMPP_CUSTOM_EXPORT_CONTENT
 )
