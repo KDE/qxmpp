@@ -42,9 +42,7 @@ private:
 #endif
 
     // outgoing client
-#if BUILD_INTERNAL_TESTS
     Q_SLOT void csiManager();
-#endif
 
     Q_SLOT void credentialsSerialization();
 };
@@ -237,9 +235,7 @@ void tst_QXmppClient::testTaskStore()
 
 void tst_QXmppClient::colorGeneration()
 {
-#ifdef BUILD_INTERNAL_TESTS
     QCOMPARE(QString::number(generateColorAngle(u"Romeo")), u"327.255");
-#endif
 
     auto rgb = QXmppColorGeneration::generateRgb(u"Romeo");
     QCOMPARE(rgb.red, quint8(0.865 * 255));
@@ -255,7 +251,6 @@ void tst_QXmppClient::colorGenerationQColor()
 }
 #endif
 
-#if BUILD_INTERNAL_TESTS
 void tst_QXmppClient::csiManager()
 {
     TestClient client;
@@ -292,7 +287,6 @@ void tst_QXmppClient::csiManager()
     csi.onSessionOpened(session);
     client.expectNoPacket();
 }
-#endif
 
 void tst_QXmppClient::credentialsSerialization()
 {
