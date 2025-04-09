@@ -323,6 +323,9 @@ target_include_directories(qxmppprivate
     PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}
 )
+set_target_properties(qxmppprivate PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 
 #
 # public shared/static library
@@ -341,6 +344,9 @@ set_target_properties(${QXMPP_TARGET} PROPERTIES
 )
 
 target_link_libraries(${QXMPP_TARGET} PUBLIC qxmppprivate)
+
+# for export header to work
+target_compile_definitions(${QXMPP_TARGET} PRIVATE qxmppprivate_EXPORTS)
 
 #
 # optional dependencies

@@ -41,6 +41,7 @@ target_include_directories(qxmppomemoprivate
     ${CMAKE_CURRENT_BINARY_DIR}
     ${PROJECT_BINARY_DIR}/src
 )
+set_target_properties(qxmppprivate PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 #
 # public shared/static library
@@ -54,7 +55,15 @@ endif()
 
 target_link_libraries(${QXMPPOMEMO_TARGET} PUBLIC qxmppomemoprivate)
 
+# for export header to work
+target_compile_definitions(${QXMPPOMEMO_TARGET} PRIVATE qxmppomemoprivate_EXPORTS)
+
+# export header
 generate_export_header(qxmppomemoprivate BASE_NAME qxmppomemo)
+
+#
+# installation
+#
 
 install(
     FILES ${OMEMO_INSTALL_HEADER_FILES} ${CMAKE_CURRENT_BINARY_DIR}/qxmppomemo_export.h
