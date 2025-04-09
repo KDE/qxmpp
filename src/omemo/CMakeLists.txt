@@ -20,13 +20,12 @@ set(OMEMO_SOURCE_FILES
     QXmppOmemoStorage.cpp
 )
 
-if(BUILD_SHARED)
-    add_library(${QXMPPOMEMO_TARGET} SHARED ${OMEMO_SOURCE_FILES})
-else()
-    add_library(${QXMPPOMEMO_TARGET} STATIC ${OMEMO_SOURCE_FILES})
-endif()
+#
+# object base library for internal unit tests
+#
 
-target_link_libraries(${QXMPPOMEMO_TARGET}
+add_library(qxmppomemoprivate OBJECT ${OMEMO_SOURCE_FILES})
+target_link_libraries(qxmppomemoprivate
     PUBLIC
     ${QXMPP_TARGET}
     Qt${QT_VERSION_MAJOR}::Core
@@ -34,7 +33,7 @@ target_link_libraries(${QXMPPOMEMO_TARGET}
     PkgConfig::OmemoC
     qca-qt${QT_VERSION_MAJOR}
 )
-target_include_directories(${QXMPPOMEMO_TARGET}
+target_include_directories(qxmppomemoprivate
     INTERFACE
     $<INSTALL_INTERFACE:include/${QXMPP_TARGET}/Omemo>
     PRIVATE
@@ -43,7 +42,19 @@ target_include_directories(${QXMPPOMEMO_TARGET}
     ${PROJECT_BINARY_DIR}/src
 )
 
-generate_export_header(${QXMPPOMEMO_TARGET} BASE_NAME qxmppomemo)
+#
+# public shared/static library
+#
+
+if(BUILD_SHARED)
+    add_library(${QXMPPOMEMO_TARGET} SHARED)
+else()
+    add_library(${QXMPPOMEMO_TARGET} STATIC)
+endif()
+
+target_link_libraries(${QXMPPOMEMO_TARGET} PUBLIC qxmppomemoprivate)
+
+generate_export_header(qxmppomemoprivate BASE_NAME qxmppomemo)
 
 install(
     FILES ${OMEMO_INSTALL_HEADER_FILES} ${CMAKE_CURRENT_BINARY_DIR}/qxmppomemo_export.h
@@ -57,7 +68,7 @@ set_target_properties(${QXMPPOMEMO_TARGET} PROPERTIES
 )
 
 install(
-    TARGETS ${QXMPPOMEMO_TARGET}
+    TARGETS ${QXMPPOMEMO_TARGET} qxmppomemoprivate
     EXPORT QXmppOmemoTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -73,7 +84,7 @@ install(
 )
 
 export(
-    TARGETS ${QXMPPOMEMO_TARGET}
+    TARGETS ${QXMPPOMEMO_TARGET} qxmppomemoprivate
     FILE QXmppOmemo.cmake
 )
 

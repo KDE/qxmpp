@@ -303,19 +303,18 @@ set(SOURCE_FILES
     server/QXmppServerPlugin.cpp
 )
 
-if(BUILD_SHARED)
-    add_library(${QXMPP_TARGET} SHARED ${SOURCE_FILES})
-else()
-    add_library(${QXMPP_TARGET} STATIC ${SOURCE_FILES})
-endif()
+#
+# object base library for internal unit tests
+#
 
-set_target_properties(${QXMPP_TARGET} PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${SO_VERSION}
-    EXPORT_NAME QXmpp
+add_library(qxmppprivate OBJECT ${SOURCE_FILES})
+target_link_libraries(qxmppprivate
+    PUBLIC
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Network
+    Qt${QT_VERSION_MAJOR}::Xml
 )
-
-target_include_directories(${QXMPP_TARGET}
+target_include_directories(qxmppprivate
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/base>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/client>
@@ -325,12 +324,27 @@ target_include_directories(${QXMPP_TARGET}
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(${QXMPP_TARGET}
-    PUBLIC
-    Qt${QT_VERSION_MAJOR}::Core
-    Qt${QT_VERSION_MAJOR}::Network
-    Qt${QT_VERSION_MAJOR}::Xml
+#
+# public shared/static library
+#
+
+if(BUILD_SHARED)
+    add_library(${QXMPP_TARGET} SHARED)
+else()
+    add_library(${QXMPP_TARGET} STATIC)
+endif()
+
+set_target_properties(${QXMPP_TARGET} PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${SO_VERSION}
+    EXPORT_NAME QXmpp
 )
+
+target_link_libraries(${QXMPP_TARGET} PUBLIC qxmppprivate)
+
+#
+# optional dependencies
+#
 
 if(WITH_GSTREAMER)
     find_package(GStreamer REQUIRED)
@@ -344,21 +358,21 @@ if(WITH_GSTREAMER)
         client/QXmppCallStream.h
     )
 
-    target_sources(${QXMPP_TARGET}
+    target_sources(qxmppprivate
         PRIVATE
         client/QXmppCall.cpp
         client/QXmppCallManager.cpp
         client/QXmppCallStream.cpp
     )
 
-    target_link_libraries(${QXMPP_TARGET}
+    target_link_libraries(qxmppprivate
         PRIVATE
         ${GLIB2_LIBRARIES}
         ${GOBJECT_LIBRARIES}
         ${GSTREAMER_LIBRARY}
     )
 
-    target_include_directories(${QXMPP_TARGET}
+    target_include_directories(qxmppprivate
         PRIVATE
         ${GLIB2_INCLUDE_DIR}
         ${GOBJECT_INCLUDE_DIR}
@@ -368,16 +382,19 @@ endif()
 
 if(BUILD_OMEMO)
     # required to be used in QXmppMessage
-    target_sources(${QXMPP_TARGET} PRIVATE base/QXmppOmemoDataBase.cpp)
+    target_sources(qxmppprivate PRIVATE base/QXmppOmemoDataBase.cpp)
 endif()
 
 if(WITH_QCA)
-    target_sources(${QXMPP_TARGET} PRIVATE client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp client/QcaInitializer.cpp)
+    target_sources(qxmppprivate PRIVATE client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp client/QcaInitializer.cpp)
     set(INSTALL_HEADER_FILES ${INSTALL_HEADER_FILES} client/QXmppEncryptedFileSharingProvider.h)
-    target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt${QT_VERSION_MAJOR})
+    target_link_libraries(qxmppprivate PRIVATE qca-qt${QT_VERSION_MAJOR})
 endif()
 
+#
 # qxmpp_export.h generation
+#
+
 if(BUILD_SHARED)
     set(QXMPP_BUILD_SHARED true)
 else()
@@ -391,13 +408,17 @@ set(QXMPP_CUSTOM_EXPORT_CONTENT "
 #define QXMPP_VERSION_PATCH ${PROJECT_VERSION_PATCH}
 ")
 
-generate_export_header(${QXMPP_TARGET}
+generate_export_header(qxmppprivate
     BASE_NAME qxmpp
     CUSTOM_CONTENT_FROM_VARIABLE QXMPP_CUSTOM_EXPORT_CONTENT
 )
 
+#
+# installation
+#
+
 install(
-    TARGETS ${QXMPP_TARGET}
+    TARGETS ${QXMPP_TARGET} qxmppprivate
     EXPORT QXmppTarget
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -413,7 +434,7 @@ install(
 )
 
 export(
-    TARGETS ${QXMPP_TARGET}
+    TARGETS ${QXMPP_TARGET} qxmppprivate
     FILE QXmpp.cmake
 )
 
