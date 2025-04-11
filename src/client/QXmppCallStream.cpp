@@ -170,7 +170,7 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     }
 
     GstPad *rtpSinkPad = gst_element_request_pad_simple(rtpbin, u"recv_rtp_sink_%1"_s.arg(id).toLatin1().data());
-    GstPad *rtcpSinkPad = gst_element_request_pad_simple(rtpbin, u"recv_rtp_sink_%1"_s.arg(id).toLatin1().data());
+    GstPad *rtcpSinkPad = gst_element_request_pad_simple(rtpbin, u"recv_rtcp_sink_%1"_s.arg(id).toLatin1().data());
     gst_pad_link(rtpRecvPad, rtpSinkPad);
     gst_pad_link(rtcpRecvPad, rtcpSinkPad);
     gst_object_unref(rtpSinkPad);
