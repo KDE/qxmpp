@@ -27,18 +27,11 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
       q(parent),
       pipeline(pipeline_),
       rtpBin(rtpBin_),
-      sendPad(nullptr),
-      receivePad(nullptr),
-      encoderBin(nullptr),
-      decoderBin(nullptr),
-      sendPadCB(nullptr),
-      receivePadCB(nullptr),
       media(std::move(media_)),
       creator(std::move(creator_)),
       name(std::move(name_)),
       id(id_),
-      useDtls(useDtls_),
-      dtlsHandshakeComplete(false)
+      useDtls(useDtls_)
 {
     localSsrc = QRandomGenerator::global()->generate();
 

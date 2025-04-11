@@ -52,23 +52,23 @@ public:
 
     quint32 localSsrc;
 
-    GstElement *pipeline;
-    GstElement *rtpBin;
-    GstPad *sendPad;
-    GstPad *receivePad;
-    GstPad *internalReceivePad;
-    GstElement *encoderBin;
-    GstElement *decoderBin;
-    GstElement *iceReceiveBin;
-    GstElement *iceSendBin;
-    GstElement *appRtpSrc;
-    GstElement *appRtcpSrc;
-    GstElement *appRtpSink;
-    GstElement *appRtcpSink;
-    GstElement *dtlsSrtpEncoder;
-    GstElement *dtlsSrtcpEncoder;
-    GstElement *dtlsSrtpDecoder;
-    GstElement *dtlsSrtcpDecoder;
+    GstElement *pipeline = nullptr;
+    GstElement *rtpBin = nullptr;
+    GstPad *sendPad = nullptr;
+    GstPad *receivePad = nullptr;
+    GstPad *internalReceivePad = nullptr;
+    GstElement *encoderBin = nullptr;
+    GstElement *decoderBin = nullptr;
+    GstElement *iceReceiveBin = nullptr;
+    GstElement *iceSendBin = nullptr;
+    GstElement *appRtpSrc = nullptr;
+    GstElement *appRtcpSrc = nullptr;
+    GstElement *appRtpSink = nullptr;
+    GstElement *appRtcpSink = nullptr;
+    GstElement *dtlsSrtpEncoder = nullptr;
+    GstElement *dtlsSrtcpEncoder = nullptr;
+    GstElement *dtlsSrtpDecoder = nullptr;
+    GstElement *dtlsSrtcpDecoder = nullptr;
     QByteArray digest;
 
     std::function<void(GstPad *)> sendPadCB;
@@ -80,7 +80,7 @@ public:
     QString name;
     int id;
     bool useDtls;
-    bool dtlsHandshakeComplete;
+    bool dtlsHandshakeComplete = false;
 
     QList<QXmppJinglePayloadType> payloadTypes;
 };
