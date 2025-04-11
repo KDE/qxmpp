@@ -286,7 +286,7 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         }
 
         if (useDtls && content.transportFingerprintSetup() == u"passive") {
-            stream->d->toDtlsClientMode();
+            stream->d->enableDtlsClientMode();
         }
 
         // check for call establishment
@@ -364,7 +364,7 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         iq.setAction(QXmppJingleIq::ContentAccept);
         iq.setSid(q->sid());
         iq.addContent(localContent(stream, u"active"_s));
-        stream->d->toDtlsClientMode();
+        stream->d->enableDtlsClientMode();
         manager->client()->sendIq(std::move(iq));
 
     } else if (iq.action() == QXmppJingleIq::TransportInfo) {
@@ -566,7 +566,7 @@ void QXmppCall::accept()
         iq.setResponder(d->ownJid);
         iq.setSid(d->sid);
         iq.addContent(d->localContent(stream, u"active"_s));
-        stream->d->toDtlsClientMode();
+        stream->d->enableDtlsClientMode();
         d->manager->client()->sendIq(std::move(iq));
 
         // notify user

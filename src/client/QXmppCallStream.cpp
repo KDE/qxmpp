@@ -467,7 +467,7 @@ void QXmppCallStream::setSendPadCallback(std::function<void(GstPad *)> cb)
     }
 }
 
-void QXmppCallStreamPrivate::toDtlsClientMode()
+void QXmppCallStreamPrivate::enableDtlsClientMode()
 {
     gst_element_set_state(dtlsSrtpEncoder, GST_STATE_READY);
     gst_element_set_state(dtlsSrtcpEncoder, GST_STATE_READY);

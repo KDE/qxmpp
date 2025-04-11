@@ -46,7 +46,7 @@ public:
 
     void addEncoder(QXmppCallPrivate::GstCodec &codec);
     void addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec &codec);
-    void toDtlsClientMode();
+    void enableDtlsClientMode();
 
     QXmppCallStream *q;
 
