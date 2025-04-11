@@ -69,6 +69,14 @@ using GstSamplePtr = CustomUniquePtr<GstSample, GstSample, gst_sample_unref>;
 using GstBufferPtr = CustomUniquePtr<GstBuffer, GstBuffer, gst_buffer_unref>;
 using GCharPtr = CustomUniquePtr<gchar, void, g_free>;
 
+enum class GstDtlsConnectionState {
+    New,
+    Closed,
+    Failed,
+    Connecting,
+    Connected,
+};
+
 bool checkGstFeature(QLatin1String feature);
 GCharPtr getCharProperty(gpointer object, QLatin1String propertyName);
 int getIntProperty(gpointer, QLatin1String propertyName, int defaultValue = -1);
