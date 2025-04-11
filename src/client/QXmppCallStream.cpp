@@ -135,9 +135,9 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     g_object_set(appRtcpSrc, "is-live", true, nullptr);
 
     connect(connection->component(RTP_COMPONENT), &QXmppIceComponent::datagramReceived,
-            [&](const QByteArray &datagram) { datagramReceived(datagram, appRtpSrc); });
+            q, [&](const QByteArray &datagram) { datagramReceived(datagram, appRtpSrc); });
     connect(connection->component(RTCP_COMPONENT), &QXmppIceComponent::datagramReceived,
-            [&](const QByteArray &datagram) { datagramReceived(datagram, appRtcpSrc); });
+            q, [&](const QByteArray &datagram) { datagramReceived(datagram, appRtcpSrc); });
 
     if (!gst_bin_add(GST_BIN(iceReceiveBin), appRtpSrc) ||
         !gst_bin_add(GST_BIN(iceReceiveBin), appRtcpSrc) ||
