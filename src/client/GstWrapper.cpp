@@ -6,7 +6,9 @@
 
 #include <gst/gst.h>
 
-bool QXmpp::Private::checkGstFeature(QLatin1String name)
+namespace QXmpp::Private {
+
+bool checkGstFeature(QLatin1String name)
 {
     if (auto *gstFeature = gst_registry_lookup_feature(gst_registry_get(), name.latin1())) {
         gst_object_unref(gstFeature);
@@ -14,3 +16,19 @@ bool QXmpp::Private::checkGstFeature(QLatin1String name)
     }
     return false;
 }
+
+GCharPtr getCharProperty(gpointer object, QLatin1String propertyName)
+{
+    GCharPtr value;
+    g_object_get(object, propertyName.data(), value.reassignRef(), nullptr);
+    return std::move(value);
+}
+
+int getIntProperty(gpointer object, QLatin1String propertyName, int defaultValue)
+{
+    int value = defaultValue;
+    g_object_get(object, propertyName.data(), &value, nullptr);
+    return value;
+}
+
+}  // namespace QXmpp::Private

@@ -69,7 +69,7 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
 
         /* Copy the certificate to the RTCP decoder so that they both share the same fingerprint. */
         GCharPtr pem;
-        g_object_get(dtlsrtpdecoder, "pem", pem.reassignRef(), nullptr);
+        pem = getCharProperty(dtlsrtpdecoder, "pem"_L1);
         g_object_set(dtlsrtcpdecoder, "pem", pem.get(), nullptr);  // TODO why does this fail?
 
         /* Calculate the fingerprint to transmit to the remote party. */

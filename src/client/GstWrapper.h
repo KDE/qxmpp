@@ -56,6 +56,10 @@ public:
         }
         m_ptr = ptr;
     }
+
+    // gobject properties
+    CustomUniquePtr<gchar, void, g_free> getCharProperty(QLatin1String name) { return getCharProperty(m_ptr, name); };
+    int getIntProperty(QLatin1String name) { return getIntProperty(m_ptr, name); }
 };
 
 using GstElementPtr = CustomUniquePtr<GstElement, void, gst_object_unref>;
@@ -66,6 +70,8 @@ using GstBufferPtr = CustomUniquePtr<GstBuffer, GstBuffer, gst_buffer_unref>;
 using GCharPtr = CustomUniquePtr<gchar, void, g_free>;
 
 bool checkGstFeature(QLatin1String feature);
+GCharPtr getCharProperty(gpointer object, QLatin1String propertyName);
+int getIntProperty(gpointer, QLatin1String propertyName, int defaultValue = -1);
 
 }  // namespace QXmpp::Private
 
