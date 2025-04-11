@@ -448,7 +448,8 @@ QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream, Q
 
     // encryption
     if (useDtls) {
-        content.setTransportFingerprint(stream->d->digest);
+        Q_ASSERT(!stream->d->ownCertificateDigest.isEmpty());
+        content.setTransportFingerprint(stream->d->ownCertificateDigest);
         content.setTransportFingerprintHash(u"sha-256"_s);
         content.setTransportFingerprintSetup(dtlsSetup);
     }

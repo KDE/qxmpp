@@ -16,6 +16,7 @@
 
 class QXmppIceConnection;
 
+//
 //  W A R N I N G
 //  -------------
 //
@@ -47,6 +48,8 @@ public:
     void addEncoder(QXmppCallPrivate::GstCodec &codec);
     void addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec &codec);
     void enableDtlsClientMode();
+    void onDtlsConnectionStateChanged(QXmpp::Private::GstDtlsConnectionState);
+    void onPeerCertificateReceived(QXmpp::Private::GCharPtr pem);
 
     QXmppCallStream *q;
 
@@ -65,11 +68,11 @@ public:
     GstElement *appRtcpSrc = nullptr;
     GstElement *appRtpSink = nullptr;
     GstElement *appRtcpSink = nullptr;
+    // DTLS-SRTP
     GstElement *dtlsSrtpEncoder = nullptr;
     GstElement *dtlsSrtcpEncoder = nullptr;
     GstElement *dtlsSrtpDecoder = nullptr;
     GstElement *dtlsSrtcpDecoder = nullptr;
-    QByteArray digest;
 
     std::function<void(GstPad *)> sendPadCB;
     std::function<void(GstPad *)> receivePadCB;
@@ -78,8 +81,12 @@ public:
     QString media;
     QString creator;
     QString name;
+
     int id;
+
     bool useDtls;
+    QByteArray ownCertificateDigest;
+    QByteArray peerCertificateDigest;
     bool dtlsHandshakeComplete = false;
 
     QList<QXmppJinglePayloadType> payloadTypes;

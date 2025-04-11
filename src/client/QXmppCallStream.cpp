@@ -60,14 +60,30 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
         g_object_set(dtlsSrtpDecoder, "async-handling", true, "connection-id", dtlsRtpId.toLatin1().data(), nullptr);
         g_object_set(dtlsSrtcpDecoder, "async-handling", true, "connection-id", dtlsRtcpId.toLatin1().data(), nullptr);
 
-        /* Copy the certificate to the RTCP decoder so that they both share the same fingerprint. */
-        GCharPtr pem;
-        pem = getCharProperty(dtlsSrtpDecoder, "pem"_L1);
-        g_object_set(dtlsSrtcpDecoder, "pem", pem.get(), nullptr);  // TODO why does this fail?
+        // setting a certificate is not supported
+        // assert that both factories use the same certificate automatically
+        Q_ASSERT(QSslCertificate(getCharProperty(dtlsSrtpDecoder, "pem"_L1).get()) ==
+                 QSslCertificate(getCharProperty(dtlsSrtcpDecoder, "pem"_L1).get()));
 
         /* Calculate the fingerprint to transmit to the remote party. */
+        GCharPtr pem = getCharProperty(dtlsSrtpDecoder, "pem"_L1);
         QSslCertificate certificate(pem.get());
-        digest = certificate.digest(QCryptographicHash::Sha256);
+        ownCertificateDigest = certificate.digest(QCryptographicHash::Sha256);
+
+        qDebug() << "[CallStream] Own fingerprint is:" << ownCertificateDigest.toHex();
+
+        // peer certificate received
+        g_signal_connect_swapped(
+            dtlsSrtpDecoder, "notify::peer-pem", G_CALLBACK(+[](QXmppCallStreamPrivate *p) {
+                p->onPeerCertificateReceived(getCharProperty(p->dtlsSrtpDecoder, "peer-pem"_L1));
+            }),
+            this);
+
+        g_signal_connect_swapped(
+            dtlsSrtpDecoder, "notify::connection-state", G_CALLBACK(+[](QXmppCallStreamPrivate *p) {
+                p->onDtlsConnectionStateChanged(GstDtlsConnectionState(getIntProperty(p->dtlsSrtpDecoder, "connection-state"_L1)));
+            }),
+            this);
 
         // Setup encoders
         dtlsSrtpEncoder = gst_element_factory_make("dtlssrtpenc", nullptr);
@@ -468,4 +484,16 @@ void QXmppCallStreamPrivate::enableDtlsClientMode()
     g_object_set(dtlsSrtcpEncoder, "is-client", true, nullptr);
     gst_element_set_state(dtlsSrtpEncoder, GST_STATE_PLAYING);
     gst_element_set_state(dtlsSrtcpEncoder, GST_STATE_PLAYING);
+}
+
+void QXmppCallStreamPrivate::onDtlsConnectionStateChanged(GstDtlsConnectionState state)
+{
+    qDebug() << "[CallStream] DTLS Connection State:" << int(state);
+}
+
+void QXmppCallStreamPrivate::onPeerCertificateReceived(GCharPtr pem)
+{
+    QSslCertificate peerCertificate(pem.get());
+    peerCertificateDigest = peerCertificate.digest(QCryptographicHash::Sha256);
+    qDebug() << "[CallStream] Peer PEM:" << peerCertificateDigest.toHex();
 }
