@@ -140,7 +140,8 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
     /* Determine support for XEP-0320: Use of DTLS-SRTP in Jingle Sessions */
     QXmppRosterManager *rosterManager = client()->findExtension<QXmppRosterManager>();
     QXmppPresence presence = rosterManager->getPresence(QXmppUtils::jidToBareJid(jid), QXmppUtils::jidToResource(jid));
-    bool remoteSupportsDtls = presence.capabilityExt().contains(ns_jingle_dtls);
+    // bool remoteSupportsDtls = presence.capabilityExt().contains(ns_jingle_dtls);
+    bool remoteSupportsDtls = true;
 
     QXmppCall *call = new QXmppCall(jid, QXmppCall::OutgoingDirection, remoteSupportsDtls && d->supportsDtls, this);
     QXmppCallStream *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
