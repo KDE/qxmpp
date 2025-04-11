@@ -37,7 +37,7 @@ class QXmppCallStreamPrivate : public QObject
     Q_OBJECT
 
 public:
-    QXmppCallStreamPrivate(QXmppCallStream *parent, GstElement *pipeline_, GstElement *rtpbin_,
+    QXmppCallStreamPrivate(QXmppCallStream *parent, GstElement *pipeline_, GstElement *rtpBin_,
                            QString media_, QString creator_, QString name_, int id_, bool useDtls_);
     ~QXmppCallStreamPrivate();
 
@@ -53,7 +53,7 @@ public:
     quint32 localSsrc;
 
     GstElement *pipeline;
-    GstElement *rtpbin;
+    GstElement *rtpBin;
     GstPad *sendPad;
     GstPad *receivePad;
     GstPad *internalReceivePad;
@@ -61,14 +61,14 @@ public:
     GstElement *decoderBin;
     GstElement *iceReceiveBin;
     GstElement *iceSendBin;
-    GstElement *apprtpsrc;
-    GstElement *apprtcpsrc;
-    GstElement *apprtpsink;
-    GstElement *apprtcpsink;
-    GstElement *dtlsrtpencoder;
-    GstElement *dtlsrtcpencoder;
-    GstElement *dtlsrtpdecoder;
-    GstElement *dtlsrtcpdecoder;
+    GstElement *appRtpSrc;
+    GstElement *appRtcpSrc;
+    GstElement *appRtpSink;
+    GstElement *appRtcpSink;
+    GstElement *dtlsSrtpEncoder;
+    GstElement *dtlsSrtcpEncoder;
+    GstElement *dtlsSrtpDecoder;
+    GstElement *dtlsSrtcpDecoder;
     QByteArray digest;
 
     std::function<void(GstPad *)> sendPadCB;
