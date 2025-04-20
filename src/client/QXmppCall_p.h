@@ -65,12 +65,11 @@ public:
     QXmppJingleIq::Content localContent(QXmppCallStream *stream) const;
 
     bool handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
-    void handleRequest(const QXmppJingleIq &iq);
+    std::variant<QXmppIq, QXmppStanza::Error> handleRequest(QXmppJingleIq &&iq);
     bool handleTransport(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
     void setState(QXmppCall::State state);
-    bool sendAck(const QXmppJingleIq &iq);
     void sendInvite();
-    void terminate(QXmppJingleReason reason);
+    void terminate(QXmppJingleReason reason, bool delay = false);
 
     QXmppCall::Direction direction;
     QString jid;
