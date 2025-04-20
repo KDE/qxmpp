@@ -62,9 +62,6 @@ public:
     static bool isCodecSupported(const GstCodec &codec);
 
     QXmppCallStream *createStream(const QString &media, const QString &creator, const QString &name);
-    QXmppCallStream *findStreamByMedia(QStringView media);
-    QXmppCallStream *findStreamByName(QStringView name);
-    QXmppCallStream *findStreamById(int id);
     QXmppJingleIq::Content localContent(QXmppCallStream *stream) const;
 
     bool handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
