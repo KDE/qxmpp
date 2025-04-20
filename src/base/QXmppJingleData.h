@@ -602,6 +602,7 @@ public:
 
     /// \cond
     static bool isJingleIq(const QDomElement &element);
+    static bool checkIqType(QStringView tagName, QStringView xmlns);
     /// \endcond
 
 protected:
