@@ -18,6 +18,7 @@
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
+#include "Algorithms.h"
 #include "StringLiterals.h"
 
 #include <chrono>
@@ -41,8 +42,8 @@ QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
 {
     qRegisterMetaType<QXmppCall::State>();
 
-    filterGStreamerFormats(videoCodecs);
-    filterGStreamerFormats(audioCodecs);
+    removeIf(videoCodecs, std::not_fn(isCodecSupported));
+    removeIf(audioCodecs, std::not_fn(isCodecSupported));
 
     pipeline = gst_pipeline_new(nullptr);
     if (!pipeline) {
@@ -160,12 +161,6 @@ bool QXmppCallPrivate::isCodecSupported(const GstCodec &codec)
         isFormatSupported(codec.gstDepay) &&
         isFormatSupported(codec.gstEnc) &&
         isFormatSupported(codec.gstDec);
-}
-
-void QXmppCallPrivate::filterGStreamerFormats(QList<GstCodec> &formats)
-{
-    auto removedRange = std::ranges::remove_if(formats, std::not_fn(isCodecSupported));
-    formats.erase(removedRange.begin(), removedRange.end());
 }
 
 QXmppCallStream *QXmppCallPrivate::findStreamByMedia(QStringView media)
