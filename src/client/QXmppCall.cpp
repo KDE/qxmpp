@@ -19,6 +19,7 @@
 #include "QXmppUtils.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <chrono>
@@ -250,19 +251,16 @@ bool QXmppCallPrivate::handleTransport(QXmppCallStream *stream, const QXmppJingl
     return true;
 }
 
-void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
+std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJingleIq &&iq)
 {
+    using Error = QXmppStanza::Error;
     const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().constFirst();
 
-    if (iq.action() == QXmppJingleIq::SessionAccept) {
-
+    switch (iq.action()) {
+    case QXmppJingleIq::SessionAccept: {
         if (direction == QXmppCall::IncomingDirection) {
-            q->warning(u"Ignoring Session-Accept for an incoming call"_s);
-            return;
+            return Error { Error::Cancel, Error::BadRequest, u"'session-accept' for outgoing call"_s };
         }
-
-        // send ack
-        sendAck(iq);
 
         // check content description and transport
         auto stream = find(streams, content.name(), &QXmppCallStream::name);
@@ -271,34 +269,28 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             !handleTransport(*stream, content)) {
 
             // terminate call
-            terminate({ QXmppJingleReason::FailedApplication, {}, {} });
-            return;
+            terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
+            return {};
         }
 
         // check for call establishment
         setState(QXmppCall::ActiveState);
-
-    } else if (iq.action() == QXmppJingleIq::SessionInfo) {
-
+        break;
+    }
+    case QXmppJingleIq::SessionInfo: {
         // notify user
-        QTimer::singleShot(0, q, [this]() {
+        later(q, [this] {
             Q_EMIT q->ringing();
         });
-
-    } else if (iq.action() == QXmppJingleIq::SessionTerminate) {
-
-        // send ack
-        sendAck(iq);
-
+        break;
+    }
+    case QXmppJingleIq::SessionTerminate: {
         // terminate
         q->info(u"Remote party %1 terminated call %2"_s.arg(iq.from(), iq.sid()));
         q->terminated();
-
-    } else if (iq.action() == QXmppJingleIq::ContentAccept) {
-
-        // send ack
-        sendAck(iq);
-
+        break;
+    }
+    case QXmppJingleIq::ContentAccept: {
         // check content description and transport
         auto stream = find(streams, content.name(), &QXmppCallStream::name);
         if (!stream ||
@@ -306,23 +298,34 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
             !handleTransport(*stream, content)) {
 
             // FIXME: what action?
-            return;
+            return {};
         }
-
-    } else if (iq.action() == QXmppJingleIq::ContentAdd) {
-
-        // send ack
-        sendAck(iq);
-
+        break;
+    }
+    case QXmppJingleIq::ContentAdd: {
         // check media stream does not exist yet
         if (contains(streams, content.name(), &QXmppCallStream::name)) {
-            return;
+            return Error { Error::Cancel, Error::Conflict, u"Media stream already exists."_s };
         }
 
         // create media stream
         auto *stream = createStream(content.descriptionMedia(), content.creator(), content.name());
         if (!stream) {
-            return;
+            // reject content
+            later(this, [this, name = content.name()]() {
+                QXmppJingleIq::Content content;
+                content.setName(name);
+
+                QXmppJingleIq iq;
+                iq.setTo(jid);
+                iq.setType(QXmppIq::Set);
+                iq.setAction(QXmppJingleIq::ContentReject);
+                iq.setSid(sid);
+                iq.setContents({ std::move(content) });
+                iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
+                manager->client()->sendIq(std::move(iq));
+            });
+            return {};
         }
         streams << stream;
 
@@ -330,40 +333,54 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         if (!handleDescription(stream, content) ||
             !handleTransport(stream, content)) {
 
-            QXmppJingleIq iq;
-            iq.setTo(q->jid());
-            iq.setType(QXmppIq::Set);
-            iq.setAction(QXmppJingleIq::ContentReject);
-            iq.setSid(q->sid());
-            iq.setActionReason(QXmppJingleReason(QXmppJingleReason::FailedApplication, {}, {}));
-            manager->client()->sendIq(std::move(iq));
+            // reject content
+            later(this, [this, name = content.name()]() {
+                QXmppJingleIq::Content content;
+                content.setName(name);
+
+                QXmppJingleIq iq;
+                iq.setTo(jid);
+                iq.setType(QXmppIq::Set);
+                iq.setAction(QXmppJingleIq::ContentReject);
+                iq.setSid(sid);
+                iq.setContents({ std::move(content) });
+                iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
+                manager->client()->sendIq(std::move(iq));
+            });
+
             streams.removeAll(stream);
             delete stream;
-            return;
+            return {};
         }
 
         // accept content
-        QXmppJingleIq iq;
-        iq.setTo(q->jid());
-        iq.setType(QXmppIq::Set);
-        iq.setAction(QXmppJingleIq::ContentAccept);
-        iq.setSid(q->sid());
-        iq.addContent(localContent(stream));
-        manager->client()->sendIq(std::move(iq));
-
-    } else if (iq.action() == QXmppJingleIq::TransportInfo) {
-
-        // send ack
-        sendAck(iq);
-
+        later(this, [this, stream] {
+            QXmppJingleIq iq;
+            iq.setTo(q->jid());
+            iq.setType(QXmppIq::Set);
+            iq.setAction(QXmppJingleIq::ContentAccept);
+            iq.setSid(q->sid());
+            iq.addContent(localContent(stream));
+            manager->client()->sendIq(std::move(iq));
+        });
+        break;
+    }
+    case QXmppJingleIq::TransportInfo: {
         // check content transport
         auto stream = find(streams, content.name(), &QXmppCallStream::name);
         if (!stream ||
             !handleTransport(*stream, content)) {
             // FIXME: what action?
-            return;
+            return {};
         }
+        break;
     }
+    default:
+        return Error { Error::Cancel, Error::UnexpectedRequest, u"Unexpected jingle action."_s };
+    }
+
+    // send acknowledgement
+    return {};
 }
 
 QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QString &creator, const QString &name)
@@ -458,18 +475,6 @@ QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream) c
     return content;
 }
 
-///
-/// Sends an acknowledgement for a Jingle IQ.
-///
-bool QXmppCallPrivate::sendAck(const QXmppJingleIq &iq)
-{
-    QXmppIq ack;
-    ack.setId(iq.id());
-    ack.setTo(iq.from());
-    ack.setType(QXmppIq::Result);
-    return manager->client()->sendLegacy(ack);
-}
-
 void QXmppCallPrivate::sendInvite()
 {
     // create audio stream
@@ -502,7 +507,7 @@ void QXmppCallPrivate::setState(QXmppCall::State newState)
 ///
 /// Request graceful call termination
 ///
-void QXmppCallPrivate::terminate(QXmppJingleReason reason)
+void QXmppCallPrivate::terminate(QXmppJingleReason reason, bool delay)
 {
     if (state == QXmppCall::DisconnectingState ||
         state == QXmppCall::FinishedState) {
@@ -519,10 +524,19 @@ void QXmppCallPrivate::terminate(QXmppJingleReason reason)
 
     setState(QXmppCall::DisconnectingState);
 
-    manager->client()->sendIq(std::move(iq)).then(q, [this](auto result) {
-        // terminate on both success or error
-        q->terminated();
-    });
+    if (delay) {
+        later(this, [this, iq = std::move(iq)]() mutable {
+            manager->client()->sendIq(std::move(iq)).then(q, [this](auto result) {
+                // terminate on both success or error
+                q->terminated();
+            });
+        });
+    } else {
+        manager->client()->sendIq(std::move(iq)).then(q, [this](auto result) {
+            // terminate on both success or error
+            q->terminated();
+        });
+    }
 
     // schedule forceful termination in 5s
     QTimer::singleShot(5s, q, &QXmppCall::terminated);
