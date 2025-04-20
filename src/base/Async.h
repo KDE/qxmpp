@@ -15,6 +15,12 @@
 
 namespace QXmpp::Private {
 
+template<typename Function>
+auto later(QObject *context, Function function)
+{
+    QMetaObject::invokeMethod(context, std::forward<Function>(function), Qt::QueuedConnection);
+}
+
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
 template<typename T>
 QFuture<T> makeReadyFuture(T &&value) { return QtFuture::makeReadyValueFuture(std::move(value)); }

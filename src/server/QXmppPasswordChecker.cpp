@@ -4,11 +4,14 @@
 
 #include "QXmppPasswordChecker.h"
 
+#include "Async.h"
+
 #include <QCryptographicHash>
 #include <QTimer>
 
-/// Returns the requested domain.
+using namespace QXmpp::Private;
 
+/// Returns the requested domain.
 QString QXmppPasswordRequest::domain() const
 {
     return m_domain;
@@ -91,7 +94,7 @@ void QXmppPasswordReply::finish()
 /// Delay marking reply as finished.
 void QXmppPasswordReply::finishLater()
 {
-    QTimer::singleShot(0, this, &QXmppPasswordReply::finish);
+    later(this, [this] { finish(); });
 }
 
 /// Returns true when the reply has finished.
