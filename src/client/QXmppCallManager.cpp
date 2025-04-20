@@ -39,24 +39,6 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
     supportsDtls = checkGstFeature("dtlsdec"_L1) && checkGstFeature("dtlsenc"_L1);
 }
 
-QXmppCall *QXmppCallManagerPrivate::findCall(const QString &sid) const
-{
-    if (auto call = std::ranges::find(calls, sid, &QXmppCall::sid); call != calls.end()) {
-        return *call;
-    }
-    return nullptr;
-}
-
-QXmppCall *QXmppCallManagerPrivate::findCall(const QString &sid, QXmppCall::Direction direction) const
-{
-    for (auto *call : calls) {
-        if (call->sid() == sid && call->direction() == direction) {
-            return call;
-        }
-    }
-    return nullptr;
-}
-
 ///
 /// \class QXmppCallManager
 ///
@@ -379,14 +361,13 @@ void QXmppCallManager::onJingleIqReceived(const QXmppJingleIq &iq)
         return;
 
     } else {
-
         // for all other requests, require a valid call
-        QXmppCall *call = d->findCall(iq.sid());
+        auto call = find(d->calls, iq.sid(), &QXmppCall::sid);
         if (!call) {
             warning(u"Remote party %1 sent a request for an unknown call %2"_s.arg(iq.from(), iq.sid()));
             return;
         }
-        call->d->handleRequest(iq);
+        call.value()->d->handleRequest(iq);
     }
 }
 
@@ -396,10 +377,8 @@ void QXmppCallManager::onPresenceReceived(const QXmppPresence &presence)
         return;
     }
 
-    for (auto *call : std::as_const(d->calls)) {
-        if (presence.from() == call->jid()) {
-            // the remote party has gone away, terminate call
-            call->d->terminate({ QXmppJingleReason::Gone, {}, {} });
-        }
+    if (auto call = find(std::as_const(d->calls), presence.from(), &QXmppCall::jid)) {
+        // the remote party has gone away, terminate call
+        call.value()->d->terminate({ QXmppJingleReason::Gone, {}, {} });
     }
 }
