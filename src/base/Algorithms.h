@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <functional>
 #include <optional>
+#include <ranges>
 #include <variant>
 
 namespace QXmpp::Private {
@@ -59,6 +60,23 @@ template<typename Vec, typename T>
 auto contains(const Vec &vec, const T &value)
 {
     return std::find(std::begin(vec), std::end(vec), value) != std::end(vec);
+}
+
+template<typename Container, typename... Args>
+auto find(const Container &container, Args &&...args) -> std::optional<typename Container::value_type>
+{
+    auto it = std::ranges::find(container, std::forward<Args>(args)...);
+    if (it != std::end(container)) {
+        return *it;
+    }
+    return {};
+}
+
+template<typename Container, typename... Args>
+auto removeIf(Container &container, Args &&...args)
+{
+    auto removedRange = std::ranges::remove_if(container, std::forward<Args>(args)...);
+    container.erase(removedRange.begin(), removedRange.end());
 }
 
 template<typename T, typename Function>
