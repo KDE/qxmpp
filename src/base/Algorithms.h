@@ -94,10 +94,11 @@ auto transformFilter(const InputVector &input, Converter convert)
     return output;
 }
 
-template<typename Vec, typename T>
-auto contains(const Vec &vec, const T &value)
+// std::ranges::contains is C++23
+template<typename Container, typename... Args>
+auto contains(const Container &container, Args &&...args) -> bool
 {
-    return std::find(std::begin(vec), std::end(vec), value) != std::end(vec);
+    return std::ranges::find(container, std::forward<Args>(args)...) != std::end(container);
 }
 
 template<typename Container, typename... Args>
