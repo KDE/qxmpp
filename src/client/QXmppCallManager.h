@@ -64,7 +64,7 @@ protected:
 private:
     void onCallDestroyed(QObject *object);
     void onDisconnected();
-    void onJingleIqReceived(const QXmppJingleIq &iq);
+    std::variant<QXmppIq, QXmppStanza::Error> handleIq(QXmppJingleIq &&iq);
     void onPresenceReceived(const QXmppPresence &presence);
 
     const std::unique_ptr<QXmppCallManagerPrivate> d;
