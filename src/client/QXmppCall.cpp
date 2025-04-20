@@ -22,7 +22,6 @@
 #include "StringLiterals.h"
 
 #include <chrono>
-#include <ranges>
 
 // gstreamer
 #include <gst/gst.h>
@@ -115,20 +114,16 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
 
         int sessionId = nameParts[3].toInt();
         int pt = nameParts[5].toInt();
-        auto stream = findStreamById(sessionId);
+        auto *stream = find(streams, sessionId, &QXmppCallStream::id).value();
+
+        // add decoder for codec
         if (stream->media() == VIDEO_MEDIA) {
-            for (auto &codec : videoCodecs) {
-                if (codec.pt == pt) {
-                    stream->d->addDecoder(pad, codec);
-                    return;
-                }
+            if (auto codec = find(videoCodecs, pt, &GstCodec::pt)) {
+                stream->d->addDecoder(pad, *codec);
             }
         } else if (stream->media() == AUDIO_MEDIA) {
-            for (auto &codec : audioCodecs) {
-                if (codec.pt == pt) {
-                    stream->d->addDecoder(pad, codec);
-                    return;
-                }
+            if (auto codec = find(audioCodecs, pt, &GstCodec::pt)) {
+                stream->d->addDecoder(pad, *codec);
             }
         }
     }
@@ -136,15 +131,13 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
 
 GstCaps *QXmppCallPrivate::ptMap(uint sessionId, uint pt)
 {
-    auto stream = findStreamById(sessionId);
-    for (auto &payloadType : stream->d->payloadTypes) {
-        if (payloadType.id() == pt) {
-            return gst_caps_new_simple("application/x-rtp",
-                                       "media", G_TYPE_STRING, stream->media().toLatin1().data(),
-                                       "clock-rate", G_TYPE_INT, payloadType.clockrate(),
-                                       "encoding-name", G_TYPE_STRING, payloadType.name().toLatin1().data(),
-                                       nullptr);
-        }
+    auto *stream = find(streams, sessionId, &QXmppCallStream::id).value();
+    if (auto payloadType = find(stream->d->payloadTypes, pt, &QXmppJinglePayloadType::id)) {
+        return gst_caps_new_simple("application/x-rtp",
+                                   "media", G_TYPE_STRING, stream->media().toLatin1().data(),
+                                   "clock-rate", G_TYPE_INT, payloadType->clockrate(),
+                                   "encoding-name", G_TYPE_STRING, payloadType->name().toLatin1().data(),
+                                   nullptr);
     }
     q->warning(u"Remote party %1 transmits wrong %2 payload for call %3"_s.arg(jid, stream->media(), sid));
     return nullptr;
@@ -161,33 +154,6 @@ bool QXmppCallPrivate::isCodecSupported(const GstCodec &codec)
         isFormatSupported(codec.gstDepay) &&
         isFormatSupported(codec.gstEnc) &&
         isFormatSupported(codec.gstDec);
-}
-
-QXmppCallStream *QXmppCallPrivate::findStreamByMedia(QStringView media)
-{
-    if (auto stream = std::ranges::find(streams, media, &QXmppCallStream::media);
-        stream != streams.end()) {
-        return *stream;
-    }
-    return nullptr;
-}
-
-QXmppCallStream *QXmppCallPrivate::findStreamByName(QStringView name)
-{
-    if (auto stream = std::ranges::find(streams, name, &QXmppCallStream::name);
-        stream != streams.end()) {
-        return *stream;
-    }
-    return nullptr;
-}
-
-QXmppCallStream *QXmppCallPrivate::findStreamById(int id)
-{
-    if (auto stream = std::ranges::find(streams, id, &QXmppCallStream::id);
-        stream != streams.end()) {
-        return *stream;
-    }
-    return nullptr;
 }
 
 bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content)
@@ -299,10 +265,10 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         sendAck(iq);
 
         // check content description and transport
-        QXmppCallStream *stream = findStreamByName(content.name());
+        auto stream = find(streams, content.name(), &QXmppCallStream::name);
         if (!stream ||
-            !handleDescription(stream, content) ||
-            !handleTransport(stream, content)) {
+            !handleDescription(*stream, content) ||
+            !handleTransport(*stream, content)) {
 
             // terminate call
             terminate({ QXmppJingleReason::FailedApplication, {}, {} });
@@ -334,10 +300,10 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         sendAck(iq);
 
         // check content description and transport
-        QXmppCallStream *stream = findStreamByName(content.name());
+        auto stream = find(streams, content.name(), &QXmppCallStream::name);
         if (!stream ||
-            !handleDescription(stream, content) ||
-            !handleTransport(stream, content)) {
+            !handleDescription(*stream, content) ||
+            !handleTransport(*stream, content)) {
 
             // FIXME: what action?
             return;
@@ -349,13 +315,12 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         sendAck(iq);
 
         // check media stream does not exist yet
-        QXmppCallStream *stream = findStreamByName(content.name());
-        if (stream) {
+        if (contains(streams, content.name(), &QXmppCallStream::name)) {
             return;
         }
 
         // create media stream
-        stream = createStream(content.descriptionMedia(), content.creator(), content.name());
+        auto *stream = createStream(content.descriptionMedia(), content.creator(), content.name());
         if (!stream) {
             return;
         }
@@ -392,9 +357,9 @@ void QXmppCallPrivate::handleRequest(const QXmppJingleIq &iq)
         sendAck(iq);
 
         // check content transport
-        QXmppCallStream *stream = findStreamByName(content.name());
+        auto stream = find(streams, content.name(), &QXmppCallStream::name);
         if (!stream ||
-            !handleTransport(stream, content)) {
+            !handleTransport(*stream, content)) {
             // FIXME: what action?
             return;
         }
@@ -418,15 +383,14 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
     auto *stream = new QXmppCallStream(pipeline, rtpBin, media, creator, name, ++nextId, useDtls, q);
 
     // Fill local payload payload types
-    auto &codecs = media == AUDIO_MEDIA ? audioCodecs : videoCodecs;
-    for (auto &codec : codecs) {
+    stream->d->payloadTypes = transform<QList<QXmppJinglePayloadType>>(media == AUDIO_MEDIA ? audioCodecs : videoCodecs, [](const auto &codec) {
         QXmppJinglePayloadType payloadType;
         payloadType.setId(codec.pt);
         payloadType.setName(codec.name);
         payloadType.setChannels(codec.channels);
         payloadType.setClockrate(codec.clockrate);
-        stream->d->payloadTypes.append(payloadType);
-    }
+        return payloadType;
+    });
 
     // ICE connection
     stream->d->connection->setIceControlling(direction == QXmppCall::OutgoingDirection);
@@ -509,8 +473,7 @@ bool QXmppCallPrivate::sendAck(const QXmppJingleIq &iq)
 void QXmppCallPrivate::sendInvite()
 {
     // create audio stream
-    QXmppCallStream *stream = findStreamByMedia(AUDIO_MEDIA);
-    Q_ASSERT(stream);
+    auto *stream = find(streams, AUDIO_MEDIA, &QXmppCallStream::media).value();
 
     QXmppJingleIq iq;
     iq.setTo(jid);
@@ -629,7 +592,7 @@ GstElement *QXmppCall::pipeline() const
 ///
 QXmppCallStream *QXmppCall::audioStream() const
 {
-    return d->findStreamByMedia(AUDIO_MEDIA);
+    return find(d->streams, AUDIO_MEDIA, &QXmppCallStream::media).value_or(nullptr);
 }
 
 ///
@@ -639,7 +602,7 @@ QXmppCallStream *QXmppCall::audioStream() const
 ///
 QXmppCallStream *QXmppCall::videoStream() const
 {
-    return d->findStreamByMedia(VIDEO_MEDIA);
+    return find(d->streams, VIDEO_MEDIA, &QXmppCallStream::media).value_or(nullptr);
 }
 
 void QXmppCall::terminated()
@@ -719,14 +682,13 @@ void QXmppCall::addVideo()
         return;
     }
 
-    QXmppCallStream *stream = d->findStreamByMedia(VIDEO_MEDIA);
-    if (stream) {
+    if (contains(d->streams, VIDEO_MEDIA, &QXmppCallStream::media)) {
         return;
     }
 
     // create video stream
     QString creator = (d->direction == QXmppCall::OutgoingDirection) ? u"initiator"_s : u"responder"_s;
-    stream = d->createStream(VIDEO_MEDIA.toString(), creator, u"webcam"_s);
+    auto *stream = d->createStream(VIDEO_MEDIA.toString(), creator, u"webcam"_s);
     d->streams << stream;
 
     // build request

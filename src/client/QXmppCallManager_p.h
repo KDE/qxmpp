@@ -30,8 +30,6 @@ class QXmppCallManagerPrivate
 {
 public:
     explicit QXmppCallManagerPrivate(QXmppCallManager *qq);
-    QXmppCall *findCall(const QString &sid) const;
-    QXmppCall *findCall(const QString &sid, QXmppCall::Direction direction) const;
 
     QList<QXmppCall *> calls;
     QList<QPair<QHostAddress, quint16>> stunServers;
