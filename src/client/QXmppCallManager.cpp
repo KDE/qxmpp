@@ -12,20 +12,22 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppIqHandling.h"
 #include "QXmppJingleIq.h"
 #include "QXmppRosterManager.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "GstWrapper.h"
 #include "StringLiterals.h"
 
 #include <gst/gst.h>
 
 #include <QDomElement>
-#include <QTimer>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
@@ -107,17 +109,9 @@ QStringList QXmppCallManager::discoveryFeatures() const
 
 bool QXmppCallManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() == u"iq") {
-        // XEP-0166: Jingle
-        if (QXmppJingleIq::isJingleIq(element)) {
-            QXmppJingleIq jingleIq;
-            jingleIq.parse(element);
-            onJingleIqReceived(jingleIq);
-            return true;
-        }
-    }
-
-    return false;
+    return handleIqRequests<QXmppJingleIq>(element, client(), [this](auto &&iq) {
+        return handleIq(std::move(iq));
+    });
 }
 
 void QXmppCallManager::onRegistered(QXmppClient *client)
@@ -297,14 +291,18 @@ void QXmppCallManager::onDisconnected()
     }
 }
 
-void QXmppCallManager::onJingleIqReceived(const QXmppJingleIq &iq)
+std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingleIq &&iq)
 {
+    using Error = QXmppStanza::Error;
 
     if (iq.type() != QXmppIq::Set) {
-        return;
+        return Error { Error::Cancel, Error::BadRequest, u"Jingle IQ only supports type 'set'."_s };
     }
 
-    if (iq.action() == QXmppJingleIq::SessionInitiate) {
+    switch (iq.action()) {
+    case QXmppJingleIq::SessionInitiate: {
+        // incoming new call
+
         const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().constFirst();
         bool dtlsRequested = !content.transportFingerprint().isEmpty();
 
@@ -314,33 +312,30 @@ void QXmppCallManager::onJingleIqReceived(const QXmppJingleIq &iq)
         call->d->sid = iq.sid();
 
         if (dtlsRequested && !d->supportsDtls) {
-            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS is not supported."_s, {} });
-            return;
+            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS is not supported."_s, {} }, true);
+            return {};
         }
         if (!dtlsRequested && d->dtlsRequired) {
-            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS required."_s, {} });
-            return;
+            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS required."_s, {} }, true);
+            return {};
         }
 
         auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
         if (!stream) {
-            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} });
-            return;
+            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
+            return {};
         }
         call->d->streams << stream;
-
-        // send ack
-        call->d->sendAck(iq);
 
         // check content description and transport
         if (!call->d->handleDescription(stream, content) ||
             !call->d->handleTransport(stream, content)) {
 
             // terminate call
-            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} });
+            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
             call->terminated();
             delete call;
-            return;
+            return {};
         }
 
         // register call
@@ -348,26 +343,29 @@ void QXmppCallManager::onJingleIqReceived(const QXmppJingleIq &iq)
         connect(call, &QObject::destroyed,
                 this, &QXmppCallManager::onCallDestroyed);
 
-        // send ringing indication
-        QXmppJingleIq ringing;
-        ringing.setTo(call->jid());
-        ringing.setType(QXmppIq::Set);
-        ringing.setSid(call->sid());
-        ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
-        client()->sendIq(std::move(ringing));
+        later(this, [this, call] {
+            // send ringing indication
+            QXmppJingleIq ringing;
+            ringing.setTo(call->jid());
+            ringing.setType(QXmppIq::Set);
+            ringing.setSid(call->sid());
+            ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
+            client()->sendIq(std::move(ringing));
 
-        // notify user
-        Q_EMIT callReceived(call);
-        return;
-
-    } else {
+            // notify user
+            Q_EMIT callReceived(call);
+        });
+        return {};
+    }
+    default: {
         // for all other requests, require a valid call
         auto call = find(d->calls, iq.sid(), &QXmppCall::sid);
         if (!call) {
             warning(u"Remote party %1 sent a request for an unknown call %2"_s.arg(iq.from(), iq.sid()));
-            return;
+            return Error { Error::Cancel, Error::ItemNotFound, u"Unknown call."_s };
         }
-        call.value()->d->handleRequest(iq);
+        return call.value()->d->handleRequest(std::move(iq));
+    }
     }
 }
 
