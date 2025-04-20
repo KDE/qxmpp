@@ -30,6 +30,7 @@ class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
 public:
     QXmppCallManager();
     ~QXmppCallManager() override;
+
     void setStunServers(const QList<QPair<QHostAddress, quint16>> &servers);
     void setStunServer(const QHostAddress &host, quint16 port = 3478);
     void setTurnServer(const QHostAddress &host, quint16 port = 3478);
@@ -61,10 +62,10 @@ protected:
     /// \endcond
 
 private:
-    void _q_callDestroyed(QObject *object);
-    void _q_disconnected();
-    void _q_jingleIqReceived(const QXmppJingleIq &iq);
-    void _q_presenceReceived(const QXmppPresence &presence);
+    void onCallDestroyed(QObject *object);
+    void onDisconnected();
+    void onJingleIqReceived(const QXmppJingleIq &iq);
+    void onPresenceReceived(const QXmppPresence &presence);
 
     const std::unique_ptr<QXmppCallManagerPrivate> d;
     friend class QXmppCall;
