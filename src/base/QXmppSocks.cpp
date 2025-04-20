@@ -9,7 +9,6 @@
 #include <QDataStream>
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <QTimer>
 
 const static char SocksVersion = 5;
 
