@@ -14,6 +14,7 @@
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppIbbIq.h"
+#include "QXmppJingleData.h"
 #include "QXmppMamIq.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppPingIq.h"
@@ -23,6 +24,7 @@
 #include "QXmppRosterIq.h"
 #include "QXmppSessionIq.h"
 #include "QXmppStartTlsPacket.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 #include "QXmppVersionIq.h"
@@ -510,6 +512,13 @@ bool QXmppIbbOpenIq::isIbbOpenIq(const QDomElement &element)
 bool QXmppIbbCloseIq::isIbbCloseIq(const QDomElement &element)
 {
     return isIqType(element, u"close", ns_ibb);
+}
+
+// JingleIq
+
+bool QXmppJingleIq::isJingleIq(const QDomElement &element)
+{
+    return QXmpp::isIqElement<QXmppJingleIq>(element);
 }
 
 // MamIq
