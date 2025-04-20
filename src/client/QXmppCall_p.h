@@ -60,7 +60,6 @@ public:
     GstCaps *ptMap(uint sessionId, uint pt);
     static bool isFormatSupported(const QString &codecName);
     static bool isCodecSupported(const GstCodec &codec);
-    static void filterGStreamerFormats(QList<GstCodec> &formats);
 
     QXmppCallStream *createStream(const QString &media, const QString &creator, const QString &name);
     QXmppCallStream *findStreamByMedia(QStringView media);
