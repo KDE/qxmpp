@@ -130,7 +130,7 @@ bool QXmppCallManager::handleStanza(const QDomElement &element)
         if (QXmppJingleIq::isJingleIq(element)) {
             QXmppJingleIq jingleIq;
             jingleIq.parse(element);
-            _q_jingleIqReceived(jingleIq);
+            onJingleIqReceived(jingleIq);
             return true;
         }
     }
@@ -141,19 +141,19 @@ bool QXmppCallManager::handleStanza(const QDomElement &element)
 void QXmppCallManager::onRegistered(QXmppClient *client)
 {
     connect(client, &QXmppClient::disconnected,
-            this, &QXmppCallManager::_q_disconnected);
+            this, &QXmppCallManager::onDisconnected);
 
     connect(client, &QXmppClient::presenceReceived,
-            this, &QXmppCallManager::_q_presenceReceived);
+            this, &QXmppCallManager::onPresenceReceived);
 }
 
 void QXmppCallManager::onUnregistered(QXmppClient *client)
 {
     disconnect(client, &QXmppClient::disconnected,
-               this, &QXmppCallManager::_q_disconnected);
+               this, &QXmppCallManager::onDisconnected);
 
     disconnect(client, &QXmppClient::presenceReceived,
-               this, &QXmppCallManager::_q_presenceReceived);
+               this, &QXmppCallManager::onPresenceReceived);
 }
 /// \endcond
 
@@ -209,7 +209,7 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
 
         // register call
         d->calls << call;
-        connect(call, &QObject::destroyed, this, &QXmppCallManager::_q_callDestroyed);
+        connect(call, &QObject::destroyed, this, &QXmppCallManager::onCallDestroyed);
         Q_EMIT callStarted(call);
 
         call->d->sendInvite();
@@ -302,28 +302,20 @@ void QXmppCallManager::setDtlsRequired(bool dtlsRequired)
     d->dtlsRequired = dtlsRequired;
 }
 
-///
-/// Handles call destruction.
-///
-void QXmppCallManager::_q_callDestroyed(QObject *object)
+void QXmppCallManager::onCallDestroyed(QObject *object)
 {
     d->calls.removeAll(static_cast<QXmppCall *>(object));
 }
 
-///
-/// Handles disconnection from server.
-///
-void QXmppCallManager::_q_disconnected()
+// Handles disconnection from server.
+void QXmppCallManager::onDisconnected()
 {
     for (auto *call : std::as_const(d->calls)) {
         call->d->terminate({ QXmppJingleReason::Gone, {}, {} });
     }
 }
 
-///
-/// Handles a Jingle IQ.
-///
-void QXmppCallManager::_q_jingleIqReceived(const QXmppJingleIq &iq)
+void QXmppCallManager::onJingleIqReceived(const QXmppJingleIq &iq)
 {
 
     if (iq.type() != QXmppIq::Set) {
@@ -372,7 +364,7 @@ void QXmppCallManager::_q_jingleIqReceived(const QXmppJingleIq &iq)
         // register call
         d->calls << call;
         connect(call, &QObject::destroyed,
-                this, &QXmppCallManager::_q_callDestroyed);
+                this, &QXmppCallManager::onCallDestroyed);
 
         // send ringing indication
         QXmppJingleIq ringing;
@@ -398,10 +390,7 @@ void QXmppCallManager::_q_jingleIqReceived(const QXmppJingleIq &iq)
     }
 }
 
-///
-/// Handles a presence.
-///
-void QXmppCallManager::_q_presenceReceived(const QXmppPresence &presence)
+void QXmppCallManager::onPresenceReceived(const QXmppPresence &presence)
 {
     if (presence.type() != QXmppPresence::Unavailable) {
         return;
