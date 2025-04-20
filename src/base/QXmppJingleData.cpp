@@ -1338,12 +1338,6 @@ void QXmppJingleIq::setRtpSessionState(const std::optional<RtpSessionState> &rtp
 }
 
 /// \cond
-bool QXmppJingleIq::isJingleIq(const QDomElement &element)
-{
-    QDomElement jingleElement = element.firstChildElement(u"jingle"_s);
-    return (jingleElement.namespaceURI() == ns_jingle);
-}
-
 void QXmppJingleIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement jingleElement = element.firstChildElement(u"jingle"_s);
