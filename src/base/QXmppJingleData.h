@@ -407,7 +407,7 @@ private:
 
 ///
 /// \brief The QXmppJingleIq class represents an IQ used for initiating media
-/// sessions as specified by \xep{0166}: Jingle.
+/// sessions as specified by \xep{0166, Jingle}.
 ///
 /// \ingroup Stanzas
 ///
@@ -599,6 +599,8 @@ public:
     void setRtpSessionState(const std::optional<RtpSessionState> &rtpSessionState);
 
     /// \cond
+    static constexpr std::tuple<QStringView, QStringView> PayloadXmlTag = { u"jingle", QXmpp::Private::ns_jingle };
+    [[deprecated("Use QXmpp::isIqType()")]]
     static bool isJingleIq(const QDomElement &element);
     /// \endcond
 
