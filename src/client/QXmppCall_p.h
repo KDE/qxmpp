@@ -52,7 +52,7 @@ public:
         QList<Property> encProps;
     };
 
-    explicit QXmppCallPrivate(QXmppCall *qq);
+    explicit QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager, QXmppCall *qq);
     ~QXmppCallPrivate();
 
     void ssrcActive(uint sessionId, uint ssrc);
@@ -80,14 +80,14 @@ public:
     bool useDtls = false;
     QXmppCallManager *manager;
     QString sid;
-    QXmppCall::State state;
+    QXmppCall::State state = QXmppCall::ConnectingState;
 
     GstElementPtr pipeline;
     GstElement *rtpBin;
 
     // Media streams
     QList<QXmppCallStream *> streams;
-    int nextId;
+    int nextId = 0;
 
     // Supported codecs
     QList<GstCodec> videoCodecs = {

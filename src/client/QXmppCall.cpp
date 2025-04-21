@@ -33,11 +33,10 @@
 using namespace std::chrono_literals;
 using namespace QXmpp::Private;
 
-QXmppCallPrivate::QXmppCallPrivate(QXmppCall *qq)
-    : direction(QXmppCall::IncomingDirection),
-      manager(0),
-      state(QXmppCall::ConnectingState),
-      nextId(0),
+QXmppCallPrivate::QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager, QXmppCall *qq)
+    : direction(direction),
+      jid(jid),
+      manager(manager),
       q(qq)
 {
     qRegisterMetaType<QXmppCall::State>();
@@ -560,14 +559,11 @@ bool QXmppCallPrivate::isOwn(QXmppCallStream *stream) const
 /// \note THIS API IS NOT FINALIZED YET
 ///
 
-QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *parent)
-    : QXmppLoggable(parent),
-      d(std::make_unique<QXmppCallPrivate>(this))
+QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager)
+    : QXmppLoggable(manager),
+      d(std::make_unique<QXmppCallPrivate>(jid, direction, manager, this))
 {
-    d->direction = direction;
-    d->jid = jid;
-    d->ownJid = parent->client()->configuration().jid();
-    d->manager = parent;
+    d->ownJid = manager->client()->configuration().jid();
 }
 
 QXmppCall::~QXmppCall() = default;
