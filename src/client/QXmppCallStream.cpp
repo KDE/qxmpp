@@ -313,20 +313,20 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
         return;
     }
 
-    GstElement *pay = gst_element_factory_make(codec.gstPay.toLatin1().data(), nullptr);
+    GstElement *pay = gst_element_factory_make(codec.gstPay.data(), nullptr);
     if (!pay) {
         qFatal("Failed to create payloader");
         return;
     }
     g_object_set(pay, "pt", codec.pt, "ssrc", localSsrc, nullptr);
 
-    GstElement *encoder = gst_element_factory_make(codec.gstEnc.toLatin1().data(), nullptr);
+    GstElement *encoder = gst_element_factory_make(codec.gstEnc.data(), nullptr);
     if (!encoder) {
         qFatal("Failed to create encoder");
         return;
     }
     for (auto &encProp : std::as_const(codec.encProps)) {
-        g_object_set(encoder, encProp.name.toLatin1().data(), encProp.value, nullptr);
+        g_object_set(encoder, encProp.name.data(), encProp.value, nullptr);
     }
 
     gst_bin_add_many(GST_BIN(encoderBin), queue, encoder, pay, nullptr);
@@ -370,13 +370,13 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
     gst_element_add_pad(decoderBin, internalReceivePad);
 
     // Create new elements
-    GstElement *depay = gst_element_factory_make(codec.gstDepay.toLatin1().data(), nullptr);
+    GstElement *depay = gst_element_factory_make(codec.gstDepay.data(), nullptr);
     if (!depay) {
         qFatal("Failed to create depayloader");
         return;
     }
 
-    GstElement *decoder = gst_element_factory_make(codec.gstDec.toLatin1().data(), nullptr);
+    GstElement *decoder = gst_element_factory_make(codec.gstDec.data(), nullptr);
     if (!decoder) {
         qFatal("Failed to create decoder");
         return;
