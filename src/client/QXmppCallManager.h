@@ -71,6 +71,7 @@ private:
     friend class QXmppCall;
     friend class QXmppCallPrivate;
     friend class QXmppCallManagerPrivate;
+    friend class tst_QXmppCallManager;
 };
 
 #endif
