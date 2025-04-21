@@ -140,16 +140,37 @@ public:
 private:
     void onLoggerMessage(QXmppLogger::MessageType type, const QString &text)
     {
-        if (type != QXmppLogger::SentMessage ||
-            text == u"<r xmlns=\"urn:xmpp:sm:3\"/>") {
+        if (text == u"<r xmlns=\"urn:xmpp:sm:3\"/>") {
             return;
         }
 
         if (debugEnabled) {
-            qDebug().noquote() << "LOG:" << text;
+            QStringView typeString;
+            switch (type) {
+            case QXmppLogger::DebugMessage:
+                typeString = u"DEBUG";
+                break;
+            case QXmppLogger::InformationMessage:
+                typeString = u"INFO";
+                break;
+            case QXmppLogger::WarningMessage:
+                typeString = u"WARNING";
+                break;
+            case QXmppLogger::ReceivedMessage:
+                typeString = u"RECEIVED";
+                break;
+            case QXmppLogger::SentMessage:
+                typeString = u"SENT";
+                break;
+            default:
+                Q_UNREACHABLE();
+            }
+            qDebug().noquote() << typeString << text;
         }
 
-        m_sentPackets << text;
+        if (type == QXmppLogger::SentMessage) {
+            m_sentPackets << text;
+        }
     }
 
     bool debugEnabled;
