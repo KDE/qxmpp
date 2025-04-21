@@ -170,7 +170,7 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
 
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
-    discoManager->requestDiscoInfo(jid).then(this, [this, call](auto result) {
+    discoManager->requestDiscoInfo(jid).then(call, [this, call](auto result) {
         if (auto *error = std::get_if<QXmppError>(&result)) {
             warning(u"Error fetching service discovery features for calling %1: %2"_s
                         .arg(call->jid(), error->description));
@@ -201,6 +201,7 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         call->d->sendInvite();
     });
 
+    // user must take ownership (or deleted with CallManager)
     return call;
 }
 
@@ -322,7 +323,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
         bool dtlsRequested = !content.transportFingerprint().isEmpty();
 
         // build call
-        QXmppCall *call = new QXmppCall(iq.from(), QXmppCall::IncomingDirection, this);
+        auto call = std::unique_ptr<QXmppCall>(new QXmppCall(iq.from(), QXmppCall::IncomingDirection, this));
         call->d->useDtls = d->supportsDtls && dtlsRequested;
         call->d->sid = iq.sid();
 
@@ -348,16 +349,17 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
             // terminate call
             call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
             call->terminated();
-            delete call;
             return {};
         }
 
-        // register call
-        d->calls << call;
-        connect(call, &QObject::destroyed,
-                this, &QXmppCallManager::onCallDestroyed);
+        // from now on the user must take over ownership (or call is deleted with CallManager)
+        auto *newCall = call.release();
 
-        later(call, [this, call] {
+        // register call
+        d->calls << newCall;
+        connect(newCall, &QObject::destroyed, this, &QXmppCallManager::onCallDestroyed);
+
+        later(this, [this, call = newCall] {
             // send ringing indication
             auto ringing = call->d->createIq(QXmppJingleIq::SessionInfo);
             ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
