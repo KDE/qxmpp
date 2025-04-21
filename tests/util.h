@@ -174,6 +174,14 @@ static void parsePacket(T &packet, const QByteArray &xml)
     packet.parse(xmlToDom(xml));
 }
 
+template<typename T>
+static T parseInto(const QDomElement &el)
+{
+    T packet;
+    packet.parse(el);
+    return packet;
+}
+
 template<class T>
 static void serializePacket(T &packet, const QByteArray &xml)
 {
