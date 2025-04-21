@@ -350,10 +350,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
 
         later(this, [this, call] {
             // send ringing indication
-            QXmppJingleIq ringing;
-            ringing.setTo(call->jid());
-            ringing.setType(QXmppIq::Set);
-            ringing.setSid(call->sid());
+            auto ringing = call->d->createIq(QXmppJingleIq::SessionInfo);
             ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
             client()->sendIq(std::move(ringing));
 
