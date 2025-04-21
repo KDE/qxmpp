@@ -63,6 +63,7 @@ public:
 
     QXmppCallStream *createStream(const QString &media, const QString &creator, const QString &name);
     QXmppJingleIq::Content localContent(QXmppCallStream *stream) const;
+    QXmppJingleIq createIq(QXmppJingleIq::Action action) const;
 
     bool handleDescription(QXmppCallStream *stream, const QXmppJingleIq::Content &content);
     std::variant<QXmppIq, QXmppStanza::Error> handleRequest(QXmppJingleIq &&iq);
