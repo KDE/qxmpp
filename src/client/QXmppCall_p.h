@@ -76,7 +76,6 @@ public:
 
     QXmppCall::Direction direction;
     QString jid;
-    QString ownJid;
     bool useDtls = false;
     QXmppCallManager *manager;
     QString sid;
