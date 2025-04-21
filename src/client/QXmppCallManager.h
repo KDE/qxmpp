@@ -7,20 +7,14 @@
 #ifndef QXMPPCALLMANAGER_H
 #define QXMPPCALLMANAGER_H
 
-#include "QXmppCall.h"
 #include "QXmppClientExtension.h"
 #include "QXmppLogger.h"
 
-#include <QIODevice>
-#include <QMetaType>
-#include <QObject>
-
 class QHostAddress;
+class QXmppCall;
 class QXmppCallManagerPrivate;
 class QXmppIq;
-class QXmppJingleCandidate;
 class QXmppJingleIq;
-class QXmppJinglePayloadType;
 class QXmppPresence;
 
 class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
@@ -44,9 +38,9 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-    Q_SIGNAL void callAdded(QXmppCall *call);
+    Q_SIGNAL void callReceived(std::unique_ptr<QXmppCall> &call);
 
-    QXmppCall *call(const QString &jid);
+    std::unique_ptr<QXmppCall> call(const QString &jid);
 
 protected:
     /// \cond
