@@ -4,19 +4,77 @@
 
 #include "QXmppCallManager.h"
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppServer.h"
 
+#include "Async.h"
+#include "TestClient.h"
 #include "util.h"
 
 #include <QBuffer>
+
+using namespace QXmpp::Private;
+using Error = QXmppStanza::Error;
 
 class tst_QXmppCallManager : public QObject
 {
     Q_OBJECT
 
 private:
+    Q_SLOT void callInvalidJid();
+    Q_SLOT void invalidSid();
     Q_SLOT void testCall();
 };
+
+void tst_QXmppCallManager::callInvalidJid()
+{
+    TestClient client;
+    client.addNewExtension<QXmppDiscoveryManager>();
+    auto *manager = client.addNewExtension<QXmppCallManager>();
+
+    QXmppCall *call = manager->call(QString());
+    QVERIFY(!call);
+
+    call = manager->call("test@localhost/r1");
+    QVERIFY(call);
+    QCOMPARE(call->sid(), QString());
+    QCOMPARE(call->jid(), u"test@localhost/r1");
+    QCOMPARE(call->direction(), QXmppCall::OutgoingDirection);
+}
+
+void tst_QXmppCallManager::invalidSid()
+{
+    const auto xml =
+        u"<iq from='romeo@montague.lit/orchard' id='ph37a419' to='juliet@capulet.lit/balcony' type='set'>"
+        "<jingle xmlns='urn:xmpp:jingle:1' action='session-initiate' initiator='romeo@montague.lit/orchard' sid='%1'>"
+        "<content creator='initiator' name='voice'>"
+        "<description xmlns='urn:xmpp:jingle:apps:rtp:1' media='audio'>"
+        "<payload-type id='96' name='speex' clockrate='16000' />"
+        "<payload-type id='97' name='speex' clockrate='8000' />"
+        "<payload-type id='18' name='G729' />"
+        "<payload-type id='0' name='PCMU' clockrate='8000'/>"
+        "<payload-type id='103' name='L16' clockrate='16000' channels='2' />"
+        "<payload-type id='98' name='x-ISAC' clockrate='8000' />"
+        "</description>"
+        "<transport xmlns='urn:xmpp:jingle:transports:ice-udp:1' pwd='asd88fgpdd777uzjYhagZg' ufrag='8hhy'>"
+        "<candidate component='1' foundation='1' generation='0' id='el0747fg11' ip='10.0.1.1' network='1' port='8998' priority='2130706431' protocol='udp' type='host' />"
+        "<candidate component='1' foundation='2' generation='0' id='y3s2b30v3r' ip='192.0.2.3' network='1' port='45664' priority='1694498815' protocol='udp' rel-addr='10.0.1.1' rel-port='8998' type='srflx' />"
+        "</transport>"
+        "</content>"
+        "</jingle></iq>"_s;
+
+    TestClient client;
+    auto *manager = client.addNewExtension<QXmppCallManager>();
+
+    QVERIFY(manager->handleStanza(xmlToDom(xml.arg("abc1"))));
+    QCoreApplication::processEvents();
+    client.expect(u"<iq id='ph37a419' to='romeo@montague.lit/orchard' type='result'/>"_s);
+    client.expect(u"<iq id='qxmpp3' to='romeo@montague.lit/orchard' type='set'><jingle xmlns='urn:xmpp:jingle:1' action='session-info' sid='abc1'><ringing xmlns='urn:xmpp:jingle:apps:rtp:info:1'/></jingle></iq>"_s);
+    // same sid
+    auto error = expectVariant<Error>(manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml.arg("abc1")))));
+    QCOMPARE(error.type(), Error::Cancel);
+    QCOMPARE(error.condition(), Error::Conflict);
+}
 
 void tst_QXmppCallManager::testCall()
 {
@@ -31,7 +89,7 @@ void tst_QXmppCallManager::testCall()
     const quint16 testPort = 12345;
 
     QXmppLogger logger;
-    logger.setLoggingType(QXmppLogger::StdoutLogging);
+    // logger.setLoggingType(QXmppLogger::StdoutLogging);
 
     // prepare server
     TestPasswordChecker passwordChecker;
