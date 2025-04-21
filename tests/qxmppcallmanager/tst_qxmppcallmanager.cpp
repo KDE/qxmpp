@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppCall.h"
 #include "QXmppCallManager.h"
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppServer.h"
 
-#include "Async.h"
 #include "TestClient.h"
 #include "util.h"
 
@@ -33,7 +33,7 @@ void tst_QXmppCallManager::callInvalidJid()
     client.addNewExtension<QXmppDiscoveryManager>();
     auto *manager = client.addNewExtension<QXmppCallManager>();
 
-    QXmppCall *call = manager->call(QString());
+    auto call = manager->call(QString());
     QVERIFY(!call);
 
     call = manager->call("test@localhost/r1");
@@ -67,6 +67,13 @@ void tst_QXmppCallManager::invalidSid()
     TestClient client;
     auto *manager = client.addNewExtension<QXmppCallManager>();
 
+    // take over ownership of all incoming calls (so they are not deleted)
+    std::vector<std::unique_ptr<QXmppCall>> calls;
+    connect(manager, &QXmppCallManager::callReceived, this, [&](std::unique_ptr<QXmppCall> &call) {
+        calls.push_back(std::move(call));
+    });
+
+    // start first call
     QVERIFY(manager->handleStanza(xmlToDom(xml.arg("abc1"))));
     QCoreApplication::processEvents();
     client.expect(u"<iq id='ph37a419' to='romeo@montague.lit/orchard' type='result'/>"_s);
@@ -134,7 +141,7 @@ void tst_QXmppCallManager::testCall()
         QSKIP("Skipping because 'QXMPP_TESTS_SKIP_CALL_MANAGER' was set.");
     }
 
-    QXmppCall *receiverCall = nullptr;
+    std::unique_ptr<QXmppCall> receiverCall;
 
     const QString testDomain("localhost");
     const QHostAddress testHost(QHostAddress::LocalHost);
@@ -176,9 +183,9 @@ void tst_QXmppCallManager::testCall()
     // prepare receiver
     QXmppClient receiver;
     auto *receiverManager = new QXmppCallManager;
-    connect(receiverManager, &QXmppCallManager::callAdded, this, [&receiverCall](QXmppCall *call) {
-        receiverCall = call;
-        call->accept();
+    connect(receiverManager, &QXmppCallManager::callReceived, this, [&receiverCall](std::unique_ptr<QXmppCall> &call) {
+        receiverCall = std::move(call);
+        receiverCall->accept();
     });
     receiver.addExtension(receiverManager);
     receiver.setLogger(&logger);
@@ -196,9 +203,9 @@ void tst_QXmppCallManager::testCall()
     // connect call
     qDebug() << "======== CONNECT ========";
     QEventLoop loop;
-    QXmppCall *senderCall = senderManager->call(receiver.configuration().jid());
+    auto senderCall = senderManager->call(receiver.configuration().jid());
     QVERIFY(senderCall);
-    connect(senderCall, &QXmppCall::connected, &loop, &QEventLoop::quit);
+    connect(senderCall.get(), &QXmppCall::connected, &loop, &QEventLoop::quit);
     loop.exec();
     QVERIFY(receiverCall);
 
@@ -215,7 +222,7 @@ void tst_QXmppCallManager::testCall()
 
     // hangup call
     qDebug() << "======== HANGUP ========";
-    connect(senderCall, &QXmppCall::finished, &loop, &QEventLoop::quit);
+    connect(senderCall.get(), &QXmppCall::finished, &loop, &QEventLoop::quit);
     senderCall->hangup();
     loop.exec();
 
