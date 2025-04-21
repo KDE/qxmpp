@@ -78,6 +78,17 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
 ///
 
 ///
+/// \fn QXmppCallManager::callAdded()
+///
+/// This signal is emitted when a new call is initiated or when an incoming call is received.
+///
+/// \note Incoming calls need to be accepted or rejected using QXmppCall::accept() or
+/// QXmppCall::hangup().
+///
+/// \since QXmpp 1.11
+///
+
+///
 /// Constructs a QXmppCallManager object to handle incoming and outgoing
 /// Voice-Over-IP calls.
 ///
@@ -185,7 +196,7 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         // register call
         d->calls << call;
         connect(call, &QObject::destroyed, this, &QXmppCallManager::onCallDestroyed);
-        Q_EMIT callStarted(call);
+        Q_EMIT callAdded(call);
 
         call->d->sendInvite();
     });
@@ -346,14 +357,14 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
         connect(call, &QObject::destroyed,
                 this, &QXmppCallManager::onCallDestroyed);
 
-        later(this, [this, call] {
+        later(call, [this, call] {
             // send ringing indication
             auto ringing = call->d->createIq(QXmppJingleIq::SessionInfo);
             ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
             client()->sendIq(std::move(ringing));
 
             // notify user
-            Q_EMIT callReceived(call);
+            Q_EMIT callAdded(call);
         });
         return {};
     }
