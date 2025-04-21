@@ -490,7 +490,7 @@ void QXmppCallPrivate::sendInvite()
     auto *stream = find(streams, AUDIO_MEDIA, &QXmppCallStream::media).value();
 
     auto iq = createIq(QXmppJingleIq::SessionInitiate);
-    iq.setInitiator(ownJid);
+    iq.setInitiator(manager->client()->configuration().jid());
     iq.addContent(localContent(stream));
     manager->client()->send(std::move(iq));
 }
@@ -563,7 +563,6 @@ QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCa
     : QXmppLoggable(manager),
       d(std::make_unique<QXmppCallPrivate>(jid, direction, manager, this))
 {
-    d->ownJid = manager->client()->configuration().jid();
 }
 
 QXmppCall::~QXmppCall() = default;
@@ -579,7 +578,7 @@ void QXmppCall::accept()
 
         // accept incoming call
         auto iq = d->createIq(QXmppJingleIq::SessionAccept);
-        iq.setResponder(d->ownJid);
+        iq.setResponder(d->manager->client()->configuration().jid());
         iq.addContent(d->localContent(stream));
         d->manager->client()->sendIq(std::move(iq));
 
