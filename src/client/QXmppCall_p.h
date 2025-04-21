@@ -72,6 +72,8 @@ public:
     void sendInvite();
     void terminate(QXmppJingleReason reason, bool delay = false);
 
+    bool isOwn(QXmppCallStream *stream) const;
+
     QXmppCall::Direction direction;
     QString jid;
     QString ownJid;
