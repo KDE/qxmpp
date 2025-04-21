@@ -303,6 +303,11 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
     case QXmppJingleIq::SessionInitiate: {
         // incoming new call
 
+        // do not ack and use FailedApplication reason to not interfere with other calls with the same ID
+        if (iq.sid().isEmpty() || contains(d->calls, iq.sid(), &QXmppCall::sid)) {
+            return Error { Error::Cancel, Error::Conflict, u"Invalid 'sid' value."_s };
+        }
+
         const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().constFirst();
         bool dtlsRequested = !content.transportFingerprint().isEmpty();
 
