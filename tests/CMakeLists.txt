@@ -86,7 +86,7 @@ if(WITH_QCA)
 endif()
 
 if(WITH_GSTREAMER)
-    add_simple_test(qxmppcallmanager)
+    add_simple_test(qxmppcallmanager TestClient.h)
 endif()
 
 if(BUILD_OMEMO)
