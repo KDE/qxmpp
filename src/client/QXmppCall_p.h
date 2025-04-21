@@ -16,6 +16,7 @@
 #include <gst/gst.h>
 
 #include <QList>
+#include <QPointer>
 
 //
 //  W A R N I N G
@@ -53,7 +54,7 @@ public:
         QList<Property> encProps;
     };
 
-    explicit QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager, QXmppCall *qq);
+    explicit QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall *qq);
     ~QXmppCallPrivate();
 
     void ssrcActive(uint sessionId, uint ssrc);
@@ -78,7 +79,7 @@ public:
     QXmppCall::Direction direction;
     QString jid;
     bool useDtls = false;
-    QXmppCallManager *manager;
+    QPointer<QXmppCallManager> manager;
     QString sid;
     QXmppCall::State state = QXmppCall::ConnectingState;
 

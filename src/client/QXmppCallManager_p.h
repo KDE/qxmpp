@@ -31,6 +31,8 @@ class QXmppCallManagerPrivate
 public:
     explicit QXmppCallManagerPrivate(QXmppCallManager *qq);
 
+    void addCall(QXmppCall *call);
+
     QList<QXmppCall *> calls;
     QList<QPair<QHostAddress, quint16>> stunServers;
     QHostAddress turnHost;

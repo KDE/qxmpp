@@ -33,7 +33,7 @@
 using namespace std::chrono_literals;
 using namespace QXmpp::Private;
 
-QXmppCallPrivate::QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager, QXmppCall *qq)
+QXmppCallPrivate::QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall *qq)
     : direction(direction),
       jid(jid),
       manager(manager),
@@ -253,6 +253,8 @@ bool QXmppCallPrivate::handleTransport(QXmppCallStream *stream, const QXmppJingl
 std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJingleIq &&iq)
 {
     using Error = QXmppStanza::Error;
+
+    Q_ASSERT(manager);  // we are called only from the manager
     const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().constFirst();
 
     switch (iq.action()) {
@@ -345,6 +347,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
 
         // accept content
         later(this, [this, stream] {
+            Q_ASSERT(manager);
             auto iq = createIq(QXmppJingleIq::ContentAccept);
             iq.addContent(localContent(stream));
             manager->client()->sendIq(std::move(iq));
@@ -412,6 +415,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
 
     connect(stream->d, &QXmppCallStreamPrivate::peerCertificateReceived, this, [this, stream](bool fingerprintMatches) {
         if (!fingerprintMatches) {
+            Q_ASSERT(manager);
             auto reason = QXmppJingleReason { QXmppJingleReason::SecurityError, u"DTLS certificate fingerprint mismatch"_s, {} };
 
             if (streams.size() > 1 && isOwn(stream)) {
@@ -475,6 +479,8 @@ QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream) c
 
 QXmppJingleIq QXmppCallPrivate::createIq(QXmppJingleIq::Action action) const
 {
+    Q_ASSERT(manager);
+
     QXmppJingleIq iq;
     iq.setFrom(manager->client()->configuration().jid());
     iq.setTo(jid);
@@ -486,6 +492,8 @@ QXmppJingleIq QXmppCallPrivate::createIq(QXmppJingleIq::Action action) const
 
 void QXmppCallPrivate::sendInvite()
 {
+    Q_ASSERT(manager);
+
     // create audio stream
     auto *stream = find(streams, AUDIO_MEDIA, &QXmppCallStream::media).value();
 
@@ -527,6 +535,7 @@ void QXmppCallPrivate::terminate(QXmppJingleReason reason, bool delay)
 
     if (delay) {
         later(this, [this, iq = std::move(iq)]() mutable {
+            Q_ASSERT(manager);
             manager->client()->sendIq(std::move(iq)).then(q, [this](auto result) {
                 // terminate on both success or error
                 q->terminated();
@@ -560,7 +569,7 @@ bool QXmppCallPrivate::isOwn(QXmppCallStream *stream) const
 ///
 
 QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager)
-    : QXmppLoggable(manager),
+    : QXmppLoggable(nullptr),
       d(std::make_unique<QXmppCallPrivate>(jid, direction, manager, this))
 {
 }
@@ -573,6 +582,7 @@ QXmppCall::~QXmppCall() = default;
 void QXmppCall::accept()
 {
     if (d->direction == IncomingDirection && d->state == ConnectingState) {
+        Q_ASSERT(d->manager);
         Q_ASSERT(d->streams.size() == 1);
         QXmppCallStream *stream = d->streams.first();
 

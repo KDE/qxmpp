@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include <QXmppCall.h>
 #include <QXmppCallManager.h>
 #include <QXmppClient.h>
 #include <QXmppRosterManager.h>
@@ -100,6 +101,9 @@ int main(int argc, char *argv[])
 
     client.connectToServer(config);
 
+    // our call
+    std::unique_ptr<QXmppCall> activeCall;
+
     auto setupCall = [&app, callManager](QXmppCall *call) {
         if (call->audioStream()) {
             setupCallStream(call);
@@ -115,16 +119,16 @@ int main(int argc, char *argv[])
         QObject::connect(call, &QXmppCall::ringing, [=]() {
             qDebug() << "[Call] Ringing" << call->jid() << "...";
         });
-        QObject::connect(call, &QXmppCall::finished, [=]() {
-            qDebug() << "[Call] Call with" << call->jid() << "ended. (Deleting)";
-            call->deleteLater();
+        QObject::connect(call, &QXmppCall::finished, [&activeCall]() {
+            qDebug() << "[Call] Call with" << activeCall->jid() << "ended. (Deleting)";
+            activeCall.release()->deleteLater();
         });
     };
 
     // on connect
-    QObject::connect(&client, &QXmppClient::connected, &app, [=, &config] {
+    QObject::connect(&client, &QXmppClient::connected, &app, [&] {
         // wait 1 second for presence of other clients to arrive
-        QTimer::singleShot(1s, [=, &config] {
+        QTimer::singleShot(1s, &app, [&] {
             // other resources of our account
             auto otherResources = rosterManager->getResources(config.jidBare());
             otherResources.removeOne(config.resource());
@@ -134,19 +138,22 @@ int main(int argc, char *argv[])
             }
 
             // call first JID
-            auto *call = callManager->call(config.jidBare() + u'/' + otherResources.first());
-            Q_ASSERT(call != nullptr);
+            activeCall = callManager->call(config.jidBare() + u'/' + otherResources.first());
+            Q_ASSERT(activeCall != nullptr);
+
+            setupCall(activeCall.get());
         });
     });
 
     // on call
-    QObject::connect(callManager, &QXmppCallManager::callAdded, &app, [=](QXmppCall *call) {
-        if (call->direction() == QXmppCall::IncomingDirection) {
-            qDebug() << "[Call] Received incoming call from" << call->jid() << "-" << "Accepting.";
-            call->accept();
-        }
+    QObject::connect(callManager, &QXmppCallManager::callReceived, &app, [&](std::unique_ptr<QXmppCall> &call) {
+        // take over ownership
+        activeCall = std::move(call);
 
-        setupCall(call);
+        qDebug() << "[Call] Received incoming call from" << activeCall->jid() << "-" << "Accepting.";
+        activeCall->accept();
+
+        setupCall(activeCall.get());
     });
 
     // disconnect from server to avoid having multiple open dead sessions when testing
