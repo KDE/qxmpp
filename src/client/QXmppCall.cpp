@@ -316,11 +316,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
                 QXmppJingleIq::Content content;
                 content.setName(name);
 
-                QXmppJingleIq iq;
-                iq.setTo(jid);
-                iq.setType(QXmppIq::Set);
-                iq.setAction(QXmppJingleIq::ContentReject);
-                iq.setSid(sid);
+                auto iq = createIq(QXmppJingleIq::ContentReject);
                 iq.setContents({ std::move(content) });
                 iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
                 manager->client()->sendIq(std::move(iq));
@@ -338,11 +334,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
                 QXmppJingleIq::Content content;
                 content.setName(name);
 
-                QXmppJingleIq iq;
-                iq.setTo(jid);
-                iq.setType(QXmppIq::Set);
-                iq.setAction(QXmppJingleIq::ContentReject);
-                iq.setSid(sid);
+                auto iq = createIq(QXmppJingleIq::ContentReject);
                 iq.setContents({ std::move(content) });
                 iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
                 manager->client()->sendIq(std::move(iq));
@@ -355,11 +347,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
 
         // accept content
         later(this, [this, stream] {
-            QXmppJingleIq iq;
-            iq.setTo(q->jid());
-            iq.setType(QXmppIq::Set);
-            iq.setAction(QXmppJingleIq::ContentAccept);
-            iq.setSid(q->sid());
+            auto iq = createIq(QXmppJingleIq::ContentAccept);
             iq.addContent(localContent(stream));
             manager->client()->sendIq(std::move(iq));
         });
@@ -475,17 +463,24 @@ QXmppJingleIq::Content QXmppCallPrivate::localContent(QXmppCallStream *stream) c
     return content;
 }
 
+QXmppJingleIq QXmppCallPrivate::createIq(QXmppJingleIq::Action action) const
+{
+    QXmppJingleIq iq;
+    iq.setFrom(manager->client()->configuration().jid());
+    iq.setTo(jid);
+    iq.setType(QXmppIq::Set);
+    iq.setAction(action);
+    iq.setSid(sid);
+    return iq;
+}
+
 void QXmppCallPrivate::sendInvite()
 {
     // create audio stream
     auto *stream = find(streams, AUDIO_MEDIA, &QXmppCallStream::media).value();
 
-    QXmppJingleIq iq;
-    iq.setTo(jid);
-    iq.setType(QXmppIq::Set);
-    iq.setAction(QXmppJingleIq::SessionInitiate);
+    auto iq = createIq(QXmppJingleIq::SessionInitiate);
     iq.setInitiator(ownJid);
-    iq.setSid(sid);
     iq.addContent(localContent(stream));
     manager->client()->send(std::move(iq));
 }
@@ -515,11 +510,7 @@ void QXmppCallPrivate::terminate(QXmppJingleReason reason, bool delay)
     }
 
     // hangup call
-    QXmppJingleIq iq;
-    iq.setTo(jid);
-    iq.setType(QXmppIq::Set);
-    iq.setAction(QXmppJingleIq::SessionTerminate);
-    iq.setSid(sid);
+    auto iq = createIq(QXmppJingleIq::SessionTerminate);
     iq.setActionReason(std::move(reason));
 
     setState(QXmppCall::DisconnectingState);
@@ -572,12 +563,8 @@ void QXmppCall::accept()
         QXmppCallStream *stream = d->streams.first();
 
         // accept incoming call
-        QXmppJingleIq iq;
-        iq.setTo(d->jid);
-        iq.setType(QXmppIq::Set);
-        iq.setAction(QXmppJingleIq::SessionAccept);
+        auto iq = d->createIq(QXmppJingleIq::SessionAccept);
         iq.setResponder(d->ownJid);
-        iq.setSid(d->sid);
         iq.addContent(d->localContent(stream));
         d->manager->client()->sendIq(std::move(iq));
 
@@ -651,11 +638,7 @@ void QXmppCall::hangup()
 ///
 void QXmppCall::onLocalCandidatesChanged(QXmppCallStream *stream)
 {
-    QXmppJingleIq iq;
-    iq.setTo(d->jid);
-    iq.setType(QXmppIq::Set);
-    iq.setAction(QXmppJingleIq::TransportInfo);
-    iq.setSid(d->sid);
+    auto iq = d->createIq(QXmppJingleIq::TransportInfo);
     iq.addContent(d->localContent(stream));
     d->manager->client()->sendIq(std::move(iq));
 }
@@ -706,11 +689,7 @@ void QXmppCall::addVideo()
     d->streams << stream;
 
     // build request
-    QXmppJingleIq iq;
-    iq.setTo(d->jid);
-    iq.setType(QXmppIq::Set);
-    iq.setAction(QXmppJingleIq::ContentAdd);
-    iq.setSid(d->sid);
+    auto iq = d->createIq(QXmppJingleIq::ContentAdd);
     iq.addContent(d->localContent(stream));
     d->manager->client()->sendIq(std::move(iq));
 }
