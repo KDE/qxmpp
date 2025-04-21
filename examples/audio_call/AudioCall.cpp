@@ -139,15 +139,12 @@ int main(int argc, char *argv[])
         });
     });
 
-    // on outgoing call
-    QObject::connect(callManager, &QXmppCallManager::callStarted, &app, [=](QXmppCall *call) {
-        setupCall(call);
-    });
-
-    // on incoming call
-    QObject::connect(callManager, &QXmppCallManager::callReceived, &app, [=](QXmppCall *call) {
-        qDebug() << "[Call] Received incoming call from" << call->jid() << "-" << "Accepting.";
-        call->accept();
+    // on call
+    QObject::connect(callManager, &QXmppCallManager::callAdded, &app, [=](QXmppCall *call) {
+        if (call->direction() == QXmppCall::IncomingDirection) {
+            qDebug() << "[Call] Received incoming call from" << call->jid() << "-" << "Accepting.";
+            call->accept();
+        }
 
         setupCall(call);
     });

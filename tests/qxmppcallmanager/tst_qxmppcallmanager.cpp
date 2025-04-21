@@ -176,7 +176,7 @@ void tst_QXmppCallManager::testCall()
     // prepare receiver
     QXmppClient receiver;
     auto *receiverManager = new QXmppCallManager;
-    connect(receiverManager, &QXmppCallManager::callReceived, this, [&receiverCall](QXmppCall *call) {
+    connect(receiverManager, &QXmppCallManager::callAdded, this, [&receiverCall](QXmppCall *call) {
         receiverCall = call;
         call->accept();
     });

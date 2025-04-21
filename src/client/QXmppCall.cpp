@@ -582,9 +582,6 @@ void QXmppCall::accept()
         iq.addContent(d->localContent(stream));
         d->manager->client()->sendIq(std::move(iq));
 
-        // notify user
-        Q_EMIT d->manager->callStarted(this);
-
         // check for call establishment
         d->setState(QXmppCall::ActiveState);
     }

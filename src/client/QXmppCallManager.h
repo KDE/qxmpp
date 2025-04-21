@@ -44,14 +44,7 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-    /// This signal is emitted when a new incoming call is received.
-    ///
-    /// To accept the call, invoke the call's QXmppCall::accept() method.
-    /// To refuse the call, invoke the call's QXmppCall::hangup() method.
-    Q_SIGNAL void callReceived(QXmppCall *call);
-
-    /// This signal is emitted when a call (incoming or outgoing) is started.
-    Q_SIGNAL void callStarted(QXmppCall *call);
+    Q_SIGNAL void callAdded(QXmppCall *call);
 
     QXmppCall *call(const QString &jid);
 
