@@ -412,12 +412,23 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
     QObject::connect(stream->d->connection, &QXmppIceConnection::disconnected,
                      q, &QXmppCall::hangup);
 
-    connect(stream->d, &QXmppCallStreamPrivate::peerCertificateReceived, this, [this](bool fingerprintMatches) {
+    connect(stream->d, &QXmppCallStreamPrivate::peerCertificateReceived, this, [this, stream](bool fingerprintMatches) {
         if (!fingerprintMatches) {
-            q->warning(u"DTLS handshake returned unexpected certificate fingerprint."_s);
+            auto reason = QXmppJingleReason { QXmppJingleReason::SecurityError, u"DTLS certificate fingerprint mismatch"_s, {} };
 
-            // TODO: only cancel this stream (e.g. only video)
-            terminate({ QXmppJingleReason::SecurityError, {}, {} });
+            if (streams.size() > 1 && isOwn(stream)) {
+                q->warning(u"DTLS handshake returned unexpected certificate fingerprint."_s);
+                auto iq = createIq(QXmppJingleIq::ContentRemove);
+                iq.setContents({ localContent(stream) });
+                iq.setActionReason(reason);
+                manager->client()->sendIq(std::move(iq));
+
+                streams.removeAll(stream);
+                stream->deleteLater();
+            } else {
+                q->warning(u"DTLS handshake returned unexpected certificate fingerprint. Terminating call."_s);
+                terminate(std::move(reason));
+            }
         } else {
             q->debug(u"DTLS handshake returned certificate with expected fingerprint."_s);
         }
@@ -531,6 +542,14 @@ void QXmppCallPrivate::terminate(QXmppJingleReason reason, bool delay)
 
     // schedule forceful termination in 5s
     QTimer::singleShot(5s, q, &QXmppCall::terminated);
+}
+
+bool QXmppCallPrivate::isOwn(QXmppCallStream *stream) const
+{
+    bool outgoingCall = direction == QXmppCall::OutgoingDirection;
+    bool initiatorsStream = stream->d->creator == u"initiator";
+
+    return outgoingCall && initiatorsStream || !outgoingCall && !initiatorsStream;
 }
 
 ///
