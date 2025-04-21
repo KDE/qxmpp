@@ -41,6 +41,12 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
     supportsDtls = checkGstFeature("dtlsdec"_L1) && checkGstFeature("dtlsenc"_L1);
 }
 
+void QXmppCallManagerPrivate::addCall(QXmppCall *call)
+{
+    calls.append(call);
+    QObject::connect(call, &QObject::destroyed, q, &QXmppCallManager::onCallDestroyed);
+}
+
 ///
 /// \class QXmppCallManager
 ///
@@ -59,7 +65,18 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
 /// auto *callManager = client->addNewExtension<QXmppCallManager>();
 /// ```
 ///
-/// ### XEP-0320: Use of DTLS-SRTP in Jingle Sessions
+/// ## Call interaction
+///
+/// Incoming calls are exposed via the callReceived() signal. You can take ownership of the call,
+/// so it does not vanish. You can accept or reject (hangup) the call.
+///
+/// Outgoing calls are created using call().
+///
+/// In both cases you are responsible for taking ownership of the call. Note that QXmppCalls in
+/// another state than finished require the QXmppCallManager to be active, though. You must not
+/// delete the QXmppCallManager until all QXmppCalls are in finished state.
+///
+/// ## XEP-0320: Use of DTLS-SRTP in Jingle Sessions
 ///
 /// DTLS-SRTP allows to encrypt peer-to-peer calls. Internally, a TLS handshake is done to
 /// negotiate keys for SRTP (Secure RTP). By default DTLS is not enforced, this can be done using
@@ -78,14 +95,28 @@ QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
 ///
 
 ///
-/// \fn QXmppCallManager::callAdded()
+/// \fn QXmppCallManager::callReceived()
 ///
-/// This signal is emitted when a new call is initiated or when an incoming call is received.
+/// This signal is emitted when an incoming call is received.
+///
+/// You can take over ownership of the call by moving out the unique pointer. However, this is
+/// only possible for one slot connected to this signal, all other slots after that will receive a
+/// nullptr.
+/// ```
+/// std::vector<std::unique_ptr<QXmppCall>> myActiveCalls;
+/// connect(manager, &QXmppCallManager::callReceived, this, [&](std::unique_ptr<QXmppCall> &call) {
+///     // take over ownership
+///     myActiveCalls.push_back(std::move(call));
+///     // call is now nullptr
+/// });
+/// ```
+/// Note that you do not need to continue to use the unique pointer for memory management, you can
+/// also use QObject-parent ownership or another ownership model.
 ///
 /// \note Incoming calls need to be accepted or rejected using QXmppCall::accept() or
 /// QXmppCall::hangup().
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.11, previously this signal had a different signature.
 ///
 
 ///
@@ -147,9 +178,9 @@ void QXmppCallManager::onUnregistered(QXmppClient *client)
 ///
 /// Initiates a new outgoing call to the specified recipient.
 ///
-/// \param jid
+/// \since QXmpp 1.11, previously this function had a different signature.
 ///
-QXmppCall *QXmppCallManager::call(const QString &jid)
+std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
 {
     if (jid.isEmpty()) {
         warning(u"Refusing to call an empty jid"_s);
@@ -166,11 +197,11 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         return nullptr;
     }
 
-    QXmppCall *call = new QXmppCall(jid, QXmppCall::OutgoingDirection, this);
+    auto call = std::unique_ptr<QXmppCall>(new QXmppCall(jid, QXmppCall::OutgoingDirection, this));
 
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
-    discoManager->info(jid).then(this, [this, call](auto result) {
+    discoManager->info(jid).then(call.get(), [this, call = call.get()](auto result) {
         if (auto *error = std::get_if<QXmppError>(&result)) {
             warning(u"Error fetching service discovery features for calling %1: %2"_s
                         .arg(call->jid(), error->description));
@@ -194,14 +225,11 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         call->d->sid = QXmppUtils::generateStanzaHash();
 
         // register call
-        d->calls << call;
-        connect(call, &QObject::destroyed, this, &QXmppCallManager::onCallDestroyed);
-        Q_EMIT callAdded(call);
+        d->addCall(call);
 
         call->d->sendInvite();
     });
 
-    // user must take ownership (or deleted with CallManager)
     return call;
 }
 
@@ -352,21 +380,21 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
             return {};
         }
 
-        // from now on the user must take over ownership (or call is deleted with CallManager)
-        auto *newCall = call.release();
-
         // register call
-        d->calls << newCall;
-        connect(newCall, &QObject::destroyed, this, &QXmppCallManager::onCallDestroyed);
+        d->addCall(call.get());
 
-        later(this, [this, call = newCall] {
+        later(this, [this, call = std::move(call)]() mutable {
             // send ringing indication
             auto ringing = call->d->createIq(QXmppJingleIq::SessionInfo);
             ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
             client()->sendIq(std::move(ringing));
 
             // notify user
-            Q_EMIT callAdded(call);
+            Q_EMIT callReceived(call);
+
+            if (call) {
+                // nobody took ownership of call
+            }
         });
         return {};
     }
