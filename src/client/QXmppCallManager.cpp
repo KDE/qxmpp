@@ -238,6 +238,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
         }
 
         call->d->useDtls = d->supportsDtls && contains(remoteFeatures, ns_jingle_dtls);
+        call->d->videoSupported = contains(remoteFeatures, ns_jingle_rtp_video);
 
         if (!call->d->useDtls && d->dtlsRequired) {
             warning(u"Remote does not support DTLS, but required locally."_s);
