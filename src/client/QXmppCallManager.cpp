@@ -206,18 +206,38 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
     discoManager->info(jid).then(call.get(), [this, call = call.get()](auto result) {
-        if (auto *error = std::get_if<QXmppError>(&result)) {
-            warning(u"Error fetching service discovery features for calling %1: %2"_s
-                        .arg(call->jid(), error->description));
+        auto failure = [&](QString error) {
+            warning(error);
             call->terminated();
+        };
+
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            failure(u"Error fetching service discovery features for calling %1: %2"_s
+                        .arg(call->jid(), error->description));
             return;
         }
 
         // determine supported features of remote
         auto &&info = std::get<QXmppDiscoInfo>(std::move(result));
-        bool remoteSupportsDtls = contains(info.features(), ns_jingle_dtls);
+        const auto remoteFeatures = info.features();
+        if (!contains(remoteFeatures, ns_jingle)) {
+            failure(u"Remote does not support Jingle"_s);
+            return;
+        }
+        if (!contains(remoteFeatures, ns_jingle_rtp)) {
+            failure(u"Remote does not support Jingle RTP"_s);
+            return;
+        }
+        if (!contains(remoteFeatures, ns_jingle_rtp_audio)) {
+            failure(u"Remote does not support Jingle RTP audio"_s);
+            return;
+        }
+        if (!contains(remoteFeatures, ns_jingle_ice_udp)) {
+            failure(u"Remote does not support Jingle ICE-UDP"_s);
+            return;
+        }
 
-        call->d->useDtls = d->supportsDtls && remoteSupportsDtls;
+        call->d->useDtls = d->supportsDtls && contains(remoteFeatures, ns_jingle_dtls);
 
         if (!call->d->useDtls && d->dtlsRequired) {
             warning(u"Remote does not support DTLS, but required locally."_s);
