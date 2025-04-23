@@ -67,8 +67,9 @@ void QXmppCallManagerPrivate::addCall(QXmppCall *call)
 ///
 /// ## Call interaction
 ///
-/// Incoming calls are exposed via the callReceived() signal. You can take ownership of the call,
-/// so it does not vanish. You can accept or reject (hangup) the call.
+/// Incoming calls are exposed via the callReceived() signal. You can take ownership of the call by
+/// moving the unique_ptr, otherwise the call manager will decline and delete the call. You can
+/// accept or reject (hangup) the call.
 ///
 /// Outgoing calls are created using call().
 ///
@@ -110,8 +111,11 @@ void QXmppCallManagerPrivate::addCall(QXmppCall *call)
 ///     // call is now nullptr
 /// });
 /// ```
-/// Note that you do not need to continue to use the unique pointer for memory management, you can
+/// Note that you do not need to continue to use a unique pointer for memory management, you can
 /// also use QObject-parent ownership or another ownership model.
+///
+/// \note If you do not take ownership of the call, the call manager will automatically decline
+/// the call.
 ///
 /// \note Incoming calls need to be accepted or rejected using QXmppCall::accept() or
 /// QXmppCall::hangup().
@@ -393,7 +397,15 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
             Q_EMIT callReceived(call);
 
             if (call) {
-                // nobody took ownership of call
+                // nobody took over the call
+
+                // take ownership, delete on finished
+                auto *rawCall = call.release();
+                rawCall->setParent(this);
+                connect(rawCall, &QXmppCall::finished, rawCall, &QObject::deleteLater);
+
+                // decline call
+                rawCall->d->terminate({ QXmppJingleReason::Decline, {}, {} });
             }
         });
         return {};
