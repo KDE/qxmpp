@@ -702,6 +702,11 @@ void QXmppCall::addVideo()
         return;
     }
 
+    if (!d->videoSupported) {
+        warning(u"Cannot add video, remote does not support video."_s);
+        return;
+    }
+
     if (contains(d->streams, VIDEO_MEDIA, &QXmppCallStream::media)) {
         return;
     }
@@ -724,4 +729,14 @@ void QXmppCall::addVideo()
 bool QXmppCall::isEncrypted() const
 {
     return d->useDtls;
+}
+
+///
+/// Returns whether the remote also supports video calls.
+///
+/// \since QXmpp 1.11
+///
+bool QXmppCall::videoSupported() const
+{
+    return d->videoSupported;
 }
