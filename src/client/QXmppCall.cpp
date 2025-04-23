@@ -572,6 +572,8 @@ QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCa
     : QXmppLoggable(nullptr),
       d(std::make_unique<QXmppCallPrivate>(jid, direction, manager, this))
 {
+    // relay logging (we dont want a direct parent because of our ownership model)
+    connect(this, &QXmppLoggable::logMessage, manager, &QXmppLoggable::logMessage);
 }
 
 QXmppCall::~QXmppCall() = default;
