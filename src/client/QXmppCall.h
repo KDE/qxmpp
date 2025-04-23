@@ -59,6 +59,10 @@ public:
 
     bool isEncrypted() const;
 
+    void accept();
+    void hangup();
+    void addVideo();
+
     /// \brief This signal is emitted when a call is connected.
     ///
     /// Once this signal is emitted, you can connect a QAudioOutput and
@@ -80,10 +84,6 @@ public:
 
     /// \brief This signal is emitted when a stream is created.
     Q_SIGNAL void streamCreated(QXmppCallStream *stream);
-
-    Q_SLOT void accept();
-    Q_SLOT void hangup();
-    Q_SLOT void addVideo();
 
 private:
     void onLocalCandidatesChanged(QXmppCallStream *stream);
