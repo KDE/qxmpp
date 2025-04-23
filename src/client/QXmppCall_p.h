@@ -79,6 +79,7 @@ public:
     QXmppCall::Direction direction;
     QString jid;
     bool useDtls = false;
+    bool videoSupported = false;
     QPointer<QXmppCallManager> manager;
     QString sid;
     QXmppCall::State state = QXmppCall::ConnectingState;
