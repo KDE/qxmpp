@@ -58,6 +58,7 @@ public:
     QXmppCallStream *videoStream() const;
 
     bool isEncrypted() const;
+    bool videoSupported() const;
 
     void accept();
     void hangup();
