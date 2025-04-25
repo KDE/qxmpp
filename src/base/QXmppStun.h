@@ -134,7 +134,7 @@ private:
     QByteArray m_nonce;
     quint32 m_priority = 0;
     QString m_realm;
-    quint8 m_requestedTransport;
+    quint8 m_requestedTransport = 0;
     QByteArray m_reservationToken;
     QString m_software;
     QString m_username;
