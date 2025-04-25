@@ -1070,8 +1070,8 @@ void QXmppJingleReason::toXml(QXmlStreamWriter *writer) const
 
     XmlWriter(writer).write(Element {
         XmlTag,
-        OptionalTextElement { u"text", d->m_text },
         Element { d->m_type },
+        OptionalTextElement { u"text", d->m_text },
         OptionalEnumElement { d->m_rtpErrorCondition, ns_jingle_rtp_errors },
     });
 }
