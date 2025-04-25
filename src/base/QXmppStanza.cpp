@@ -21,7 +21,15 @@
 #include <QDomElement>
 #include <QXmlStreamWriter>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
+
+constexpr auto JINGLE_ERROR_CONDITIONS = to_array<QStringView>({
+    u"out-of-order",
+    u"tie-break",
+    u"unknown-session",
+    u"unsupported-info",
+});
 
 uint QXmppStanza::s_uniqeIdNo = 0;
 
@@ -312,6 +320,9 @@ public:
     QString by;
     QString redirectionUri;
 
+    // XEP-0166: Jingle
+    std::optional<JingleErrorCondition> jingleErrorCondition;
+
     // XEP-0363: HTTP File Upload
     bool fileTooLarge = false;
     qint64 maxFileSize;
@@ -491,6 +502,26 @@ void QXmppStanza::Error::setRedirectionUri(const QString &redirectionUri)
 }
 
 ///
+/// Returns an additional \xep{0166, Jingle}-specific error condition.
+///
+/// \since QXmpp 1.11
+///
+std::optional<QXmpp::JingleErrorCondition> QXmppStanza::Error::jingleErrorCondition() const
+{
+    return d->jingleErrorCondition;
+}
+
+///
+/// Sets an additional \xep{0166, Jingle}-specific error condition.
+///
+/// \since QXmpp 1.11
+///
+void QXmppStanza::Error::setJingleErrorCondition(std::optional<QXmpp::JingleErrorCondition> condition)
+{
+    d->jingleErrorCondition = condition;
+}
+
+///
 /// Returns true, if an HTTP File Upload failed, because the file was too
 /// large.
 ///
@@ -593,6 +624,8 @@ void QXmppStanza::Error::parse(const QDomElement &errorElement)
             }
         }
     }
+
+    d->jingleErrorCondition = enumFromString<JingleErrorCondition>(JINGLE_ERROR_CONDITIONS, firstChildElement(errorElement, {}, ns_jingle_errors).tagName());
 }
 
 void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
@@ -628,6 +661,11 @@ void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
         writer->writeDefaultNamespace(toString65(ns_stanza));
         writer->writeCharacters(d->text);
         writer->writeEndElement();
+    }
+
+    // XEP-0166: Jingle
+    if (d->jingleErrorCondition) {
+        writeEmptyElement(writer, JINGLE_ERROR_CONDITIONS.at(size_t(d->jingleErrorCondition.value())), ns_jingle_errors);
     }
 
     // XEP-0363: HTTP File Upload
