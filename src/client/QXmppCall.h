@@ -18,6 +18,7 @@ class QHostAddress;
 class QXmppCallPrivate;
 class QXmppCallManager;
 class QXmppCallManagerPrivate;
+class QXmppError;
 
 class QXMPP_EXPORT QXmppCall : public QXmppLoggable
 {
@@ -52,6 +53,7 @@ public:
     QString jid() const;
     QString sid() const;
     QXmppCall::State state() const;
+    std::optional<QXmppError> error() const;
 
     GstElement *pipeline() const;
     QXmppCallStream *audioStream() const;
@@ -90,7 +92,8 @@ private:
     void onLocalCandidatesChanged(QXmppCallStream *stream);
     void terminated();
 
-    QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager);
+    QXmppCall(const QString &jid, Direction direction, QXmppCallManager *manager);
+    QXmppCall(const QString &jid, Direction direction, State state, QXmppError &&error, QXmppCallManager *manager);
 
     const std::unique_ptr<QXmppCallPrivate> d;
     friend class QXmppCallManager;

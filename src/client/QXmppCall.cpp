@@ -33,10 +33,12 @@
 using namespace std::chrono_literals;
 using namespace QXmpp::Private;
 
-QXmppCallPrivate::QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall *qq)
+QXmppCallPrivate::QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall::State state, QXmppError &&error, QXmppCall *qq)
     : direction(direction),
       jid(jid),
       manager(manager),
+      state(state),
+      error(std::move(error)),
       q(qq)
 {
     qRegisterMetaType<QXmppCall::State>();
@@ -270,6 +272,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
             !handleTransport(*stream, content)) {
 
             // terminate call
+            error = { u"Remote formats or transport unsupported"_s, {} };
             terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
             return {};
         }
@@ -288,6 +291,12 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
     case QXmppJingleIq::SessionTerminate: {
         // terminate
         q->info(u"Remote party %1 terminated call %2"_s.arg(iq.from(), iq.sid()));
+        if (auto reason = iq.actionReason()) {
+            if (reason->type() != QXmppJingleReason::None && reason->type() != QXmppJingleReason::Success) {
+                // error occurred
+                error = { u"Remote terminated call."_s, reason.value() };
+            }
+        }
         q->terminated();
         break;
     }
@@ -429,6 +438,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
                 stream->deleteLater();
             } else {
                 q->warning(u"DTLS handshake returned unexpected certificate fingerprint. Terminating call."_s);
+                error = { u"DTLS certificate mismatch"_s, {} };
                 terminate(std::move(reason));
             }
         } else {
@@ -568,9 +578,14 @@ bool QXmppCallPrivate::isOwn(QXmppCallStream *stream) const
 /// \note THIS API IS NOT FINALIZED YET
 ///
 
-QXmppCall::QXmppCall(const QString &jid, QXmppCall::Direction direction, QXmppCallManager *manager)
+QXmppCall::QXmppCall(const QString &jid, Direction direction, QXmppCallManager *manager)
+    : QXmppCall(jid, direction, ConnectingState, {}, manager)
+{
+}
+
+QXmppCall::QXmppCall(const QString &jid, Direction direction, State state, QXmppError &&error, QXmppCallManager *manager)
     : QXmppLoggable(nullptr),
-      d(std::make_unique<QXmppCallPrivate>(jid, direction, manager, this))
+      d(std::make_unique<QXmppCallPrivate>(jid, direction, manager, state, std::move(error), this))
 {
     // relay logging (we dont want a direct parent because of our ownership model)
     connect(this, &QXmppLoggable::logMessage, manager, &QXmppLoggable::logMessage);
@@ -690,6 +705,19 @@ QString QXmppCall::sid() const
 QXmppCall::State QXmppCall::state() const
 {
     return d->state;
+}
+
+///
+/// Returns the error of the call if any occurred.
+///
+/// \since QXmpp 1.11
+///
+std::optional<QXmppError> QXmppCall::error() const
+{
+    if (!d->error.description.isEmpty()) {
+        return d->error;
+    }
+    return {};
 }
 
 ///
