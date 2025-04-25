@@ -37,26 +37,26 @@ static const char *jingle_actions[] = {
     "transport-replace",
 };
 
-static const char *jingle_reasons[] = {
-    "",
-    "alternative-session",
-    "busy",
-    "cancel",
-    "connectivity-error",
-    "decline",
-    "expired",
-    "failed-application",
-    "failed-transport",
-    "general-error",
-    "gone",
-    "incompatible-parameters",
-    "media-error",
-    "security-error",
-    "success",
-    "timeout",
-    "unsupported-applications",
-    "unsupported-transports",
-};
+constexpr auto JINGLE_REASON_TYPES = to_array<QStringView>({
+    {},
+    u"alternative-session",
+    u"busy",
+    u"cancel",
+    u"connectivity-error",
+    u"decline",
+    u"expired",
+    u"failed-application",
+    u"failed-transport",
+    u"general-error",
+    u"gone",
+    u"incompatible-parameters",
+    u"media-error",
+    u"security-error",
+    u"success",
+    u"timeout",
+    u"unsupported-applications",
+    u"unsupported-transports",
+});
 
 constexpr auto JINGLE_RTP_ERROR_CONDITIONS = to_array<QStringView>({
     {},
@@ -993,16 +993,16 @@ void QXmppJingleReason::setRtpErrorCondition(RtpErrorCondition rtpErrorCondition
 /// \cond
 void QXmppJingleReason::parse(const QDomElement &element)
 {
-    d->m_text = element.firstChildElement(u"text"_s).text();
-    for (int i = AlternativeSession; i <= UnsupportedTransports; i++) {
-        if (!element.firstChildElement(QString::fromLocal8Bit(jingle_reasons[i])).isNull()) {
-            d->m_type = static_cast<Type>(i);
-            break;
-        }
+    // the reason type element must be the first child element
+    auto reasonTypeEl = element.firstChildElement();
+    if (reasonTypeEl.namespaceURI() != ns_jingle) {
+        return;
     }
-
-    auto child = firstChildElement(element, {}, ns_jingle_rtp_errors);
-    d->m_rtpErrorCondition = enumFromString<RtpErrorCondition>(JINGLE_RTP_ERROR_CONDITIONS, child.tagName())
+    // actually 'None' would also be an error: type is required
+    d->m_type = enumFromString<Type>(JINGLE_REASON_TYPES, reasonTypeEl.tagName()).value_or(None);
+    d->m_text = element.firstChildElement(u"text"_s).text();
+    d->m_rtpErrorCondition = enumFromString<RtpErrorCondition>(JINGLE_RTP_ERROR_CONDITIONS,
+                                                               firstChildElement(element, {}, ns_jingle_rtp_errors).tagName())
                                  .value_or(NoErrorCondition);
 }
 
@@ -1015,19 +1015,10 @@ void QXmppJingleReason::toXml(QXmlStreamWriter *writer) const
     writer->writeStartElement(QSL65("reason"));
     writer->writeDefaultNamespace(toString65(ns_jingle));
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeEmptyElement(jingle_reasons[d->m_type]);
-#else
-    writer->writeEmptyElement(QString::fromUtf8(jingle_reasons[d->m_type]));
-#endif
-    if (!d->m_text.isEmpty()) {
-        writeXmlTextElement(writer, u"text", d->m_text);
-    }
-
+    writer->writeEmptyElement(toString65(JINGLE_REASON_TYPES.at(d->m_type)));
+    writeOptionalXmlTextElement(writer, u"text", d->m_text);
     if (d->m_rtpErrorCondition != NoErrorCondition) {
-        writer->writeStartElement(toString65(JINGLE_RTP_ERROR_CONDITIONS.at(d->m_rtpErrorCondition)));
-        writer->writeDefaultNamespace(toString65(ns_jingle_rtp_errors));
-        writer->writeEndElement();
+        writeEmptyElement(writer, JINGLE_RTP_ERROR_CONDITIONS.at(d->m_rtpErrorCondition), ns_jingle_rtp_errors);
     }
 
     writer->writeEndElement();
