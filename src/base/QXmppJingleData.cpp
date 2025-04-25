@@ -1015,14 +1015,14 @@ void QXmppJingleReason::toXml(QXmlStreamWriter *writer) const
     writer->writeStartElement(QSL65("reason"));
     writer->writeDefaultNamespace(toString65(ns_jingle));
 
-    if (!d->m_text.isEmpty()) {
-        writeXmlTextElement(writer, u"text", d->m_text);
-    }
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     writer->writeEmptyElement(jingle_reasons[d->m_type]);
 #else
     writer->writeEmptyElement(QString::fromUtf8(jingle_reasons[d->m_type]));
 #endif
+    if (!d->m_text.isEmpty()) {
+        writeXmlTextElement(writer, u"text", d->m_text);
+    }
 
     if (d->m_rtpErrorCondition != NoErrorCondition) {
         writer->writeStartElement(toString65(JINGLE_RTP_ERROR_CONDITIONS.at(d->m_rtpErrorCondition)));
