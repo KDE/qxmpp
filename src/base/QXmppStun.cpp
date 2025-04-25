@@ -240,23 +240,8 @@ static void setBodyLength(QByteArray &buffer, qint16 length)
 }
 
 /// Constructs a new QXmppStunMessage.
-
 QXmppStunMessage::QXmppStunMessage()
-    : errorCode(0),
-      changedPort(0),
-      mappedPort(0),
-      otherPort(0),
-      sourcePort(0),
-      xorMappedPort(0),
-      xorPeerPort(0),
-      xorRelayedPort(0),
-      useCandidate(false),
-      m_cookie(STUN_MAGIC),
-      m_type(0),
-      m_changeRequest(0),
-      m_channelNumber(0),
-      m_lifetime(0),
-      m_priority(0)
+    : m_cookie(STUN_MAGIC)
 {
     m_id = QByteArray(STUN_ID_SIZE, 0);
 }

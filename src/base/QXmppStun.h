@@ -100,39 +100,39 @@ public:
     static quint16 peekType(const QByteArray &buffer, quint32 &cookie, QByteArray &id);
 
     // attributes
-    int errorCode;
+    int errorCode = 0;
     QString errorPhrase;
     QByteArray iceControlling;
     QByteArray iceControlled;
     QHostAddress changedHost;
-    quint16 changedPort;
+    quint16 changedPort = 0;
     QHostAddress mappedHost;
-    quint16 mappedPort;
+    quint16 mappedPort = 0;
     QHostAddress otherHost;
-    quint16 otherPort;
+    quint16 otherPort = 0;
     QHostAddress sourceHost;
-    quint16 sourcePort;
+    quint16 sourcePort = 0;
     QHostAddress xorMappedHost;
-    quint16 xorMappedPort;
+    quint16 xorMappedPort = 0;
     QHostAddress xorPeerHost;
-    quint16 xorPeerPort;
+    quint16 xorPeerPort = 0;
     QHostAddress xorRelayedHost;
-    quint16 xorRelayedPort;
-    bool useCandidate;
+    quint16 xorRelayedPort = 0;
+    bool useCandidate = false;
 
 private:
     quint32 m_cookie;
     QByteArray m_id;
-    quint16 m_type;
+    quint16 m_type = 0;
 
     // attributes
     QSet<quint16> m_attributes;
-    quint32 m_changeRequest;
-    quint16 m_channelNumber;
+    quint32 m_changeRequest = 0;
+    quint16 m_channelNumber = 0;
     QByteArray m_data;
-    quint32 m_lifetime;
+    quint32 m_lifetime = 0;
     QByteArray m_nonce;
-    quint32 m_priority;
+    quint32 m_priority = 0;
     QString m_realm;
     quint8 m_requestedTransport;
     QByteArray m_reservationToken;
