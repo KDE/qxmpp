@@ -1556,6 +1556,7 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
         "<description xmlns='urn:xmpp:jingle:apps:rtp:1' media='audio'/>"
         "</propose>");
     QXmppJingleMessageInitiationElement proposeElement;
+    QVERIFY(!proposeElement.containsTieBreak());
     proposeElement.setType(JmiType::Propose);
 
     parsePacket(proposeElement, proposeXml);
