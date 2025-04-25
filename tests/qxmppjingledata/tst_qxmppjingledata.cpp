@@ -1582,8 +1582,8 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
     const QByteArray rejectXml(
         "<reject xmlns='urn:xmpp:jingle-message:0' id='a73sjjvkla37jfea'>"
         "<reason xmlns=\"urn:xmpp:jingle:1\">"
-        "<text>Busy</text>"
         "<busy/>"
+        "<text>Busy</text>"
         "</reason>"
         "<tie-break/>"
         "</reject>");
@@ -1602,8 +1602,8 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
     const QByteArray retractXml(
         "<retract xmlns='urn:xmpp:jingle-message:0' id='a73sjjvkla37jfea'>"
         "<reason xmlns=\"urn:xmpp:jingle:1\">"
-        "<text>Retracted</text>"
         "<cancel/>"
+        "<text>Retracted</text>"
         "</reason>"
         "</retract>");
     QXmppJingleMessageInitiationElement retractElement;
@@ -1620,8 +1620,8 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
     const QByteArray finishXml(
         "<finish xmlns='urn:xmpp:jingle-message:0' id='a73sjjvkla37jfea'>"
         "<reason xmlns=\"urn:xmpp:jingle:1\">"
-        "<text>Success</text>"
         "<success/>"
+        "<text>Success</text>"
         "</reason>"
         "<migrated to='989a46a6-f202-4910-a7c3-83c6ba3f3947'/>"
         "</finish>");
