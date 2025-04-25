@@ -653,7 +653,7 @@ QXmppCall::Direction QXmppCall::direction() const
 ///
 void QXmppCall::hangup()
 {
-    d->terminate({ QXmppJingleReason::None, {}, {} });
+    d->terminate({ QXmppJingleReason::Success, {}, {} });
 }
 
 ///
