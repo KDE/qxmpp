@@ -186,19 +186,23 @@ void QXmppCallManager::onUnregistered(QXmppClient *client)
 ///
 std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
 {
+    auto errorCall = [&](QXmppError &&error) {
+        warning(error.description);
+        return std::unique_ptr<QXmppCall> {
+            new QXmppCall(jid, QXmppCall::OutgoingDirection, QXmppCall::FinishedState, std::move(error), this)
+        };
+    };
+
     if (jid.isEmpty()) {
-        warning(u"Refusing to call an empty jid"_s);
-        return nullptr;
+        return errorCall({ u"Refusing to call an empty jid"_s, {} });
     }
 
     if (jid == client()->configuration().jid()) {
-        warning(u"Refusing to call self"_s);
-        return nullptr;
+        return errorCall({ u"Refusing to call self"_s, {} });
     }
 
     if (d->dtlsRequired && !d->supportsDtls) {
-        warning(u"DTLS encryption for calls is required, but not supported locally."_s);
-        return nullptr;
+        return errorCall({ u"DTLS encryption for calls is required, but not supported locally."_s, {} });
     }
 
     auto call = std::unique_ptr<QXmppCall>(new QXmppCall(jid, QXmppCall::OutgoingDirection, this));
@@ -206,9 +210,10 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
     discoManager->info(jid).then(call.get(), [this, call = call.get()](auto result) {
-        auto failure = [&](QString error) {
-            warning(error);
-            call->terminated();
+        auto failure = [&](QString &&text) {
+            warning(text);
+            call->d->error = QXmppError { std::move(text), {} };
+            call->d->setState(QXmppCall::FinishedState);
         };
 
         if (auto *error = std::get_if<QXmppError>(&result)) {
@@ -241,8 +246,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
         call->d->videoSupported = contains(remoteFeatures, ns_jingle_rtp_video);
 
         if (!call->d->useDtls && d->dtlsRequired) {
-            warning(u"Remote does not support DTLS, but required locally."_s);
-            call->terminated();
+            failure(u"Remote does not support DTLS, but required locally."_s);
             return;
         }
 
@@ -452,6 +456,8 @@ void QXmppCallManager::onPresenceReceived(const QXmppPresence &presence)
 
     if (auto call = find(std::as_const(d->calls), presence.from(), &QXmppCall::jid)) {
         // the remote party has gone away, terminate call
-        call.value()->d->terminate({ QXmppJingleReason::Gone, {}, {} });
+        auto &callObject = call.value();
+        callObject->d->error = { u"Received unavailable presence"_s, {} };
+        callObject->d->terminate({ QXmppJingleReason::Gone, {}, {} });
     }
 }
