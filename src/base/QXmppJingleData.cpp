@@ -2703,16 +2703,14 @@ bool QXmppJingleRtpHeaderExtensionProperty::isJingleRtpHeaderExtensionProperty(c
 class QXmppJingleMessageInitiationElementPrivate : public QSharedData
 {
 public:
-    QXmppJingleMessageInitiationElementPrivate() = default;
-
-    QXmppJingleMessageInitiationElement::Type type { QXmppJingleMessageInitiationElement::Type::None };
+    QXmppJingleMessageInitiationElement::Type type = QXmppJingleMessageInitiationElement::Type::None;
     QString id;
 
     std::optional<QXmppJingleDescription> description;
     std::optional<QXmppJingleReason> reason;
     QString migratedTo;
 
-    bool containsTieBreak;
+    bool containsTieBreak = false;
 };
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleReason)
