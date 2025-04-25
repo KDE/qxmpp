@@ -25,6 +25,17 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
+template<>
+struct Enums::Data<JingleErrorCondition> {
+    using enum JingleErrorCondition;
+    static constexpr auto Values = makeValues<JingleErrorCondition>({
+        { OutOfOrder, u"out-of-order" },
+        { TieBreak, u"tie-break" },
+        { UnknownSession, u"unknown-session" },
+        { UnsupportedInfo, u"unsupported-info" },
+    });
+};
+
 class QXmppExtendedAddressPrivate : public QSharedData
 {
 public:
@@ -156,6 +167,9 @@ public:
     QString text;
     QString by;
     QString redirectionUri;
+
+    // XEP-0166: Jingle
+    std::optional<JingleErrorCondition> jingleErrorCondition;
 
     // XEP-0363: HTTP File Upload
     bool fileTooLarge = false;
@@ -336,6 +350,26 @@ void QXmppStanza::Error::setRedirectionUri(const QString &redirectionUri)
 }
 
 ///
+/// Returns an additional \xep{0166, Jingle}-specific error condition.
+///
+/// \since QXmpp 1.11
+///
+std::optional<QXmpp::JingleErrorCondition> QXmppStanza::Error::jingleErrorCondition() const
+{
+    return d->jingleErrorCondition;
+}
+
+///
+/// Sets an additional \xep{0166, Jingle}-specific error condition.
+///
+/// \since QXmpp 1.11
+///
+void QXmppStanza::Error::setJingleErrorCondition(std::optional<QXmpp::JingleErrorCondition> condition)
+{
+    d->jingleErrorCondition = condition;
+}
+
+///
 /// Returns true, if an HTTP File Upload failed, because the file was too
 /// large.
 ///
@@ -438,6 +472,9 @@ void QXmppStanza::Error::parse(const QDomElement &errorElement)
             }
         }
     }
+
+    d->jingleErrorCondition = Enums::fromString<JingleErrorCondition>(
+        firstChildElement(errorElement, {}, ns_jingle_errors).tagName());
 }
 
 void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
@@ -473,6 +510,8 @@ void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
                 Characters { d->text },
             },
         },
+        // XEP-0166: Jingle
+        OptionalEnumElement { d->jingleErrorCondition, ns_jingle_errors },
         // XEP-0363: HTTP File Upload
         OptionalContent {
             d->fileTooLarge,
