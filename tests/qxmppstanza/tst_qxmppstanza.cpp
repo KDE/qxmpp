@@ -11,6 +11,8 @@
 #include <QDateTime>
 #include <QObject>
 
+using namespace QXmpp;
+
 class QXmppStanzaStub : public QXmppStanza
 {
 public:
@@ -30,6 +32,7 @@ private:
     Q_SLOT void testErrorFileTooLarge();
     Q_SLOT void testErrorRetry();
     Q_SLOT void testErrorEnums();
+    Q_SLOT void errorJingleCondition();
 
     Q_SLOT void testEncryption();
     Q_SLOT void testSenderKey();
@@ -399,6 +402,22 @@ void tst_QXmppStanza::testErrorEnums()
 
     QCOMPARE(err.condition(), QXmppStanza::Error::NoCondition);
     QCOMPARE(err.type(), QXmppStanza::Error::NoType);
+}
+
+void tst_QXmppStanza::errorJingleCondition()
+{
+    const auto xml = "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/><unknown-session xmlns='urn:xmpp:jingle:errors:1'/></error>";
+    QXmppStanza::Error error;
+    parsePacket(error, xml);
+    QCOMPARE(error.type(), QXmppStanza::Error::Cancel);
+    QCOMPARE(error.condition(), QXmppStanza::Error::ItemNotFound);
+    QCOMPARE(error.jingleErrorCondition(), JingleErrorCondition::UnknownSession);
+
+    QXmppStanza::Error error2;
+    error2.setType(QXmppStanza::Error::Cancel);
+    error2.setCondition(QXmppStanza::Error::ItemNotFound);
+    error2.setJingleErrorCondition(JingleErrorCondition::UnknownSession);
+    serializePacket(error2, xml);
 }
 
 void tst_QXmppStanza::testEncryption()

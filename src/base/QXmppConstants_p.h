@@ -139,6 +139,7 @@ inline constexpr QStringView ns_captcha = u"urn:xmpp:captcha";
 inline constexpr QStringView ns_jingle = u"urn:xmpp:jingle:1";
 inline constexpr QStringView ns_jingle_raw_udp = u"urn:xmpp:jingle:transports:raw-udp:1";
 inline constexpr QStringView ns_jingle_ice_udp = u"urn:xmpp:jingle:transports:ice-udp:1";
+inline constexpr QStringView ns_jingle_errors = u"urn:xmpp:jingle:errors:1";
 // XEP-0167: Jingle RTP Sessions
 inline constexpr QStringView ns_jingle_rtp = u"urn:xmpp:jingle:apps:rtp:1";
 inline constexpr QStringView ns_jingle_rtp_audio = u"urn:xmpp:jingle:apps:rtp:audio";

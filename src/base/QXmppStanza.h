@@ -27,6 +27,22 @@
 class QXmppE2eeMetadata;
 class QXmppExtendedAddressPrivate;
 
+namespace QXmpp {
+
+///
+/// \xep{0166, Jingle}-specific error condition, used in QXmppStanza::Error.
+///
+/// \since QXmpp 1.11
+///
+enum class JingleErrorCondition {
+    OutOfOrder,
+    TieBreak,
+    UnknownSession,
+    UnsupportedInfo,
+};
+
+}  // namespace QXmpp
+
 ///
 /// \brief Represents an extended address as defined by \xep{0033, Extended
 /// Stanza Addressing}.
@@ -170,6 +186,10 @@ public:
 
         QString redirectionUri() const;
         void setRedirectionUri(const QString &redirectionUri);
+
+        // XEP-0166: Jingle
+        std::optional<QXmpp::JingleErrorCondition> jingleErrorCondition() const;
+        void setJingleErrorCondition(std::optional<QXmpp::JingleErrorCondition>);
 
         // XEP-0363: HTTP File Upload
         bool fileTooLarge() const;
