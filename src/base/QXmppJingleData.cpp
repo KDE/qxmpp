@@ -1048,15 +1048,14 @@ void QXmppJingleReason::setRtpErrorCondition(RtpErrorCondition rtpErrorCondition
 /// \cond
 void QXmppJingleReason::parse(const QDomElement &element)
 {
-    d->m_text = element.firstChildElement(u"text"_s).text();
-    // TODO: use first child element for parsing
-    for (int i = AlternativeSession; i <= UnsupportedTransports; i++) {
-        if (!element.firstChildElement(Enums::toString(Type(i)).toString()).isNull()) {
-            d->m_type = static_cast<Type>(i);
-            break;
-        }
+    // the reason type element must be the first child element
+    auto reasonTypeEl = element.firstChildElement();
+    if (reasonTypeEl.namespaceURI() != ns_jingle) {
+        return;
     }
-
+    // actually 'None' would also be an error: type is required
+    d->m_type = Enums::fromString<Type>(reasonTypeEl.tagName()).value_or(None);
+    d->m_text = element.firstChildElement(u"text"_s).text();
     auto child = firstChildElement(element, {}, ns_jingle_rtp_errors);
     d->m_rtpErrorCondition = Enums::fromString<RtpErrorCondition>(child.tagName())
                                  .value_or(NoErrorCondition);
