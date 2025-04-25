@@ -34,7 +34,8 @@ void tst_QXmppCallManager::callInvalidJid()
     auto *manager = client.addNewExtension<QXmppCallManager>();
 
     auto call = manager->call(QString());
-    QVERIFY(!call);
+    QCOMPARE(call->state(), QXmppCall::FinishedState);
+    QVERIFY(call->error().has_value());
 
     call = manager->call("test@localhost/r1");
     QVERIFY(call);
