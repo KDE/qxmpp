@@ -8,6 +8,7 @@
 #define QXMPPCALL_P_H
 
 #include "QXmppCall.h"
+#include "QXmppError.h"
 #include "QXmppJingleIq.h"
 
 #include "GstWrapper.h"
@@ -54,7 +55,7 @@ public:
         QList<Property> encProps;
     };
 
-    explicit QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall *qq);
+    explicit QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall::State state, QXmppError &&error, QXmppCall *qq);
     ~QXmppCallPrivate();
 
     void ssrcActive(uint sessionId, uint ssrc);
@@ -83,6 +84,7 @@ public:
     QPointer<QXmppCallManager> manager;
     QString sid;
     QXmppCall::State state = QXmppCall::ConnectingState;
+    QXmppError error;
 
     GstElementPtr pipeline;
     GstElement *rtpBin;
