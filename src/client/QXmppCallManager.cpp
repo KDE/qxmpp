@@ -10,13 +10,13 @@
 #include "QXmppCallManager_p.h"
 #include "QXmppCall_p.h"
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppJingleIq.h"
 #include "QXmppRosterManager.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
-#include "Constants.h"
 #include "GstWrapper.h"
 #include "StringLiterals.h"
 

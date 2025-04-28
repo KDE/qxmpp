@@ -5,11 +5,11 @@
 #include "QXmppCarbonManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppMessage.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

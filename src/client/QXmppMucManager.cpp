@@ -5,12 +5,11 @@
 #include "QXmppMucManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMucIq.h"
 #include "QXmppUtils.h"
-
-#include "Constants.h"
 
 #include <QDomElement>
 #include <QMap>

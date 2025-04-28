@@ -6,11 +6,11 @@
 #include "QXmppJingleMessageInitiationManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppMessage.h"
 #include "QXmppPromise.h"
 #include "QXmppUtils.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QUuid>

@@ -5,6 +5,18 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+//
+//  W A R N I N G
+//  -------------
+//
+// This file is not part of the QXmpp API.
+//
+// This header file may change from version to version without notice,
+// or even be removed.
+//
+// We mean it.
+//
+
 #include <QStringView>
 
 namespace QXmpp::Private {

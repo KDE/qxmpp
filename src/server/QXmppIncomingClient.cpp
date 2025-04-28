@@ -5,13 +5,13 @@
 #include "QXmppIncomingClient.h"
 
 #include "QXmppBindIq.h"
+#include "QXmppConstants_p.h"
 #include "QXmppPasswordChecker.h"
 #include "QXmppSasl_p.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"

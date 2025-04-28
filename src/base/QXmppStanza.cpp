@@ -8,13 +8,13 @@
 
 #include "QXmppStanza.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppStanza_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDateTime>

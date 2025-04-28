@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppConstants_p.h"
 #include "QXmppOmemoDeviceBundle_p.h"
 #include "QXmppOmemoDeviceElement_p.h"
 #include "QXmppOmemoDeviceList_p.h"
@@ -11,7 +12,6 @@
 #include "QXmppOmemoItems_p.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

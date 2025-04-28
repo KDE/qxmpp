@@ -20,6 +20,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppBookmarkSet.h
     base/QXmppByteStreamIq.h
     base/QXmppColorGeneration.h
+    base/QXmppConstants_p.h
     base/QXmppDataForm.h
     base/QXmppDataFormBase.h
     base/QXmppDiscoveryIq.h

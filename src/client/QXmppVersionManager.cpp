@@ -5,10 +5,10 @@
 #include "QXmppVersionManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppVersionIq.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
