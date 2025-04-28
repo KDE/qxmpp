@@ -469,11 +469,6 @@ QDomElement QXmpp::Private::nextSiblingElement(const QDomElement &el, QStringVie
     return {};
 }
 
-std::vector<QString> QXmpp::Private::parseTextElements(DomChildElements elements)
-{
-    return transform<std::vector<QString>>(elements, &QDomElement::text);
-}
-
 QByteArray QXmpp::Private::serializeXml(const void *packet, void (*toXml)(const void *, QXmlStreamWriter *))
 {
     QByteArray data;

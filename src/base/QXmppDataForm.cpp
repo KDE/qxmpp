@@ -831,11 +831,7 @@ void QXmppDataForm::parse(const QDomElement &element)
         case Field::ListMultiField:
         case Field::JidMultiField:
         case Field::TextMultiField: {
-            QStringList values;
-            for (const auto &element : iterChildElements(fieldElement, u"value")) {
-                values << element.text();
-            }
-            field.setValue(values);
+            field.setValue(parseTextElements<QStringList>(fieldElement, u"value", ns_data));
             break;
         }
         default:
