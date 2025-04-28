@@ -12,6 +12,8 @@
 
 #include "TestClient.h"
 
+using namespace QXmpp::Private;
+
 struct Tester {
     Tester()
     {

@@ -16,6 +16,7 @@
 #include <QSysInfo>
 
 using namespace QXmpp;
+using namespace QXmpp::Private;
 
 class QXmppVersionManagerPrivate
 {

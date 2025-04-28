@@ -17,6 +17,8 @@
 
 #include <QDomElement>
 
+using namespace QXmpp::Private;
+
 class QXmppRegistrationManagerPrivate
 {
 public:
@@ -43,9 +45,7 @@ QXmppRegistrationManagerPrivate::QXmppRegistrationManagerPrivate()
 {
 }
 
-///
 /// Default constructor.
-///
 QXmppRegistrationManager::QXmppRegistrationManager()
     : d(std::make_unique<QXmppRegistrationManagerPrivate>())
 {

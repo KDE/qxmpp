@@ -14,6 +14,8 @@
 
 #include <QDomElement>
 
+using namespace QXmpp::Private;
+
 /// Constructs a QXmppMessageReceiptManager to handle incoming and outgoing
 /// message delivery receipts.
 QXmppMessageReceiptManager::QXmppMessageReceiptManager()

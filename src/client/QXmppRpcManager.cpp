@@ -12,25 +12,20 @@
 
 #include "StringLiterals.h"
 
-/// Constructs a QXmppRpcManager.
+using namespace QXmpp::Private;
 
+/// Constructs a QXmppRpcManager.
 QXmppRpcManager::QXmppRpcManager()
 {
 }
 
 /// Adds a local interface which can be queried using RPC.
-///
-/// \param interface
-
 void QXmppRpcManager::addInvokableInterface(QXmppInvokable *interface)
 {
     m_interfaces[QString::fromUtf8(interface->metaObject()->className())] = interface;
 }
 
 /// Invokes a remote interface using RPC.
-///
-/// \param iq
-
 void QXmppRpcManager::invokeInterfaceMethod(const QXmppRpcInvokeIq &iq)
 {
     QXmppStanza::Error error;
@@ -74,11 +69,12 @@ void QXmppRpcManager::invokeInterfaceMethod(const QXmppRpcInvokeIq &iq)
     client()->sendPacket(errorIq);
 }
 
+///
 /// Calls a remote method using RPC with the specified arguments.
 ///
 /// \note This method blocks until the response is received, and it may
 /// cause XMPP stanzas to be lost!
-
+///
 QXmppRemoteMethodResult QXmppRpcManager::callRemoteMethod(const QString &jid,
                                                           const QString &interface,
                                                           const QVariant &arg1,
