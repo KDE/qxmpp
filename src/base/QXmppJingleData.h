@@ -7,6 +7,7 @@
 #ifndef QXMPPJINGLEIQ_H
 #define QXMPPJINGLEIQ_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppIq.h"
 
 #include <variant>
@@ -71,6 +72,7 @@ public:
     void setSessionParams(const QString &sessionParams);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"crypto", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -95,6 +97,7 @@ public:
     void setCryptoElements(const QVector<QXmppJingleRtpCryptoElement> &cryptoElements);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"encryption", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -122,6 +125,7 @@ public:
     void setParameters(const QVector<QXmppSdpParameter> &parameters);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"rtcp-fb", QXmpp::Private::ns_jingle_rtcp_fb };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -143,6 +147,7 @@ public:
     void setValue(uint64_t value);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"rtcp-fb-trr-int", QXmpp::Private::ns_jingle_rtcp_fb };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -182,6 +187,7 @@ public:
     void setParameters(const QVector<QXmppSdpParameter> &parameters);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"rtp-hdrext", QXmpp::Private::ns_jingle_rtp_hdrext };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -194,7 +200,7 @@ private:
 
 ///
 /// \brief The QXmppJinglePayloadType class represents a payload type
-/// as specified by \xep{0167}: Jingle RTP Sessions and RFC 5245.
+/// as specified by \xep{0167, Jingle RTP Sessions} and RFC 5245.
 ///
 class QXMPP_EXPORT QXmppJinglePayloadType
 {
@@ -231,6 +237,7 @@ public:
     void setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"payload-type", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -262,6 +269,7 @@ public:
     void setPayloadTypes(const QList<QXmppJinglePayloadType> &payloadTypes);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"payload-type", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -272,7 +280,7 @@ private:
 
 ///
 /// \brief The QXmppJingleCandidate class represents a transport candidate
-/// as specified by \xep{0176}: Jingle ICE-UDP Transport Method.
+/// as specified by \xep{0176, Jingle ICE-UDP Transport Method}.
 ///
 class QXMPP_EXPORT QXmppJingleCandidate
 {
@@ -390,6 +398,7 @@ public:
     void setRtpErrorCondition(RtpErrorCondition rtpErrorCondition);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"reason", QXmpp::Private::ns_jingle };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
@@ -460,6 +469,8 @@ public:
     class QXMPP_EXPORT Content
     {
     public:
+        static constexpr std::tuple XmlTag = { u"content", QXmpp::Private::ns_jingle };
+
         Content();
         Content(const QXmppJingleIq::Content &other);
         Content(QXmppJingleIq::Content &&);

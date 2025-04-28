@@ -630,11 +630,11 @@ void QXmppJingleIq::Content::parse(const QDomElement &element)
     d->description.setSsrc(parseInt<uint32_t>(descriptionElement.attribute(u"ssrc"_s)).value_or(0));
     d->isRtpMultiplexingSupported = !descriptionElement.firstChildElement(u"rtcp-mux"_s).isNull();
     d->rtpEncryption = parseElement<QXmppJingleRtpEncryption>(firstChildElement(descriptionElement, u"encryption", ns_jingle_rtp));
-    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(descriptionElement, u"feedback", ns_jingle_rtcp_fb);
-    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(descriptionElement, u"rtcp-fb-trr-int", ns_jingle_rtcp_fb);
-    d->rtpHeaderExtensionProperties = parseChildElements<QVector<QXmppJingleRtpHeaderExtensionProperty>>(descriptionElement, u"rtp-hdrext", ns_jingle_rtp_hdrext);
+    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(descriptionElement);
+    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(descriptionElement);
+    d->rtpHeaderExtensionProperties = parseChildElements<QVector<QXmppJingleRtpHeaderExtensionProperty>>(descriptionElement);
     d->isRtpHeaderExtensionMixingAllowed = !firstChildElement(descriptionElement, u"extmap-allow-mixed", ns_jingle_rtp_hdrext).isNull();
-    d->description.setPayloadTypes(parseChildElements<QList<QXmppJinglePayloadType>>(descriptionElement, u"payload-type", ns_jingle_rtp));
+    d->description.setPayloadTypes(parseChildElements<QList<QXmppJinglePayloadType>>(descriptionElement));
 
     // transport
     QDomElement transportElement = element.firstChildElement(u"transport"_s);
@@ -1320,10 +1320,10 @@ void QXmppJingleIq::parseElementFromChild(const QDomElement &element)
         d->mujiGroupChatJid = mujiElement.attribute(u"room"_s);
     }
 
-    d->contents = parseChildElements<QList<Content>>(jingleElement, u"content", ns_jingle);
+    d->contents = parseChildElements<QList<Content>>(jingleElement);
 
     // reason
-    setActionReason(parseOptionalChildElement<QXmppJingleReason>(jingleElement, u"reason", ns_jingle));
+    setActionReason(parseOptionalChildElement<QXmppJingleReason>(jingleElement));
 
     for (const auto &childElement : iterChildElements(jingleElement, {}, ns_jingle_rtp_info)) {
         const auto elementTag = childElement.tagName();
@@ -1837,8 +1837,8 @@ void QXmppJinglePayloadType::parse(const QDomElement &element)
         d->parameters.insert(child.attribute(u"name"_s), child.attribute(u"value"_s));
     }
 
-    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(element, u"feedback", ns_jingle_rtcp_fb);
-    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(element, u"rtcp-fb-trr-int", ns_jingle_rtcp_fb);
+    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(element);
+    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(element);
 }
 
 void QXmppJinglePayloadType::toXml(QXmlStreamWriter *writer) const
@@ -2006,7 +2006,7 @@ void QXmppJingleDescription::parse(const QDomElement &element)
     d->type = element.namespaceURI();
     d->media = element.attribute(u"media"_s);
     d->ssrc = element.attribute(u"ssrc"_s).toULong();
-    d->payloadTypes = parseChildElements<QList<QXmppJinglePayloadType>>(element, u"payload-type", ns_jingle_rtp);
+    d->payloadTypes = parseChildElements<QList<QXmppJinglePayloadType>>(element);
 }
 
 void QXmppJingleDescription::toXml(QXmlStreamWriter *writer) const
@@ -2337,7 +2337,7 @@ void QXmppJingleRtpEncryption::setCryptoElements(const QVector<QXmppJingleRtpCry
 void QXmppJingleRtpEncryption::parse(const QDomElement &element)
 {
     d->isRequired = parseBoolean(element.attribute(u"required"_s)).value_or(false);
-    d->cryptoElements = parseChildElements<QVector<QXmppJingleRtpCryptoElement>>(element, u"crypto", ns_jingle_rtp);
+    d->cryptoElements = parseChildElements<QVector<QXmppJingleRtpCryptoElement>>(element);
 }
 
 void QXmppJingleRtpEncryption::toXml(QXmlStreamWriter *writer) const
