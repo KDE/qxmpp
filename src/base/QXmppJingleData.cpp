@@ -19,23 +19,23 @@ using namespace QXmpp::Private;
 
 static const int RTP_COMPONENT = 1;
 
-static const char *jingle_actions[] = {
-    "content-accept",
-    "content-add",
-    "content-modify",
-    "content-reject",
-    "content-remove",
-    "description-info",
-    "security-info",
-    "session-accept",
-    "session-info",
-    "session-initiate",
-    "session-terminate",
-    "transport-accept",
-    "transport-info",
-    "transport-reject",
-    "transport-replace",
-};
+constexpr auto JINGLE_ACTIONS = to_array<QStringView>({
+    u"content-accept",
+    u"content-add",
+    u"content-modify",
+    u"content-reject",
+    u"content-remove",
+    u"description-info",
+    u"security-info",
+    u"session-accept",
+    u"session-info",
+    u"session-initiate",
+    u"session-terminate",
+    u"transport-accept",
+    u"transport-info",
+    u"transport-reject",
+    u"transport-replace",
+});
 
 constexpr auto JINGLE_REASON_TYPES = to_array<QStringView>({
     {},
@@ -1297,14 +1297,8 @@ bool QXmppJingleIq::checkIqType(QStringView tagName, QStringView xmlns)
 
 void QXmppJingleIq::parseElementFromChild(const QDomElement &element)
 {
-    QDomElement jingleElement = element.firstChildElement(u"jingle"_s);
-    const auto action = jingleElement.attribute(u"action"_s).toStdString();
-    for (int i = ContentAccept; i <= TransportReplace; i++) {
-        if (action == jingle_actions[i]) {
-            d->action = static_cast<Action>(i);
-            break;
-        }
-    }
+    auto jingleElement = element.firstChildElement();
+    d->action = enumFromString<QXmppJingleIq::Action>(JINGLE_ACTIONS, jingleElement.attribute(u"action"_s)).value_or(ContentAccept);
     d->initiator = jingleElement.attribute(u"initiator"_s);
     d->responder = jingleElement.attribute(u"responder"_s);
     d->sid = jingleElement.attribute(u"sid"_s);
@@ -1348,7 +1342,7 @@ void QXmppJingleIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("jingle"));
     writer->writeDefaultNamespace(toString65(ns_jingle));
-    writeOptionalXmlAttribute(writer, u"action", QString::fromLocal8Bit(jingle_actions[d->action]));
+    writeOptionalXmlAttribute(writer, u"action", JINGLE_ACTIONS.at(size_t(d->action)));
     writeOptionalXmlAttribute(writer, u"initiator", d->initiator);
     writeOptionalXmlAttribute(writer, u"responder", d->responder);
     writeOptionalXmlAttribute(writer, u"sid", d->sid);
