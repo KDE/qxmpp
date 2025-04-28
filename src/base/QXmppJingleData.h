@@ -678,6 +678,7 @@ public:
 
         bool operator==(const External &other) const { return other.uri == uri; }
 
+        void parse(const QDomElement &el);
         void toXml(QXmlStreamWriter *writer) const;
     };
 
