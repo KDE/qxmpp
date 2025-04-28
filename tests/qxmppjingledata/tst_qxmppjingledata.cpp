@@ -1055,10 +1055,7 @@ void tst_QXmppJingleData::testSession()
         " initiator=\"romeo@montague.lit/orchard\""
         " sid=\"a73sjjvkla37jfea\">"
         "<muji xmlns=\"urn:xmpp:jingle:muji:0\" room=\"darkcave@chat.shakespeare.lit\"/>"
-        "<content creator=\"initiator\" name=\"this-is-a-stub\">"
-        "<description xmlns=\"urn:xmpp:jingle:apps:stub:0\"/>"
-        "<transport xmlns=\"urn:xmpp:jingle:transports:stub:0\"/>"
-        "</content>"
+        "<content creator=\"initiator\" name=\"this-is-a-stub\"/>"
         "</jingle>"
         "</iq>");
 

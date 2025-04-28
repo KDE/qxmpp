@@ -72,23 +72,15 @@ struct MixData {
             return QXmppError { u"Invalid element."_s, {} };
         }
 
-        MixData d;
-
-        for (const auto &itemEl : iterChildElements(el, u"item")) {
-            Item item;
-            item.parse(itemEl);
-            d.items.push_back(std::move(item));
-        }
-
-        return d;
+        return MixData {
+            parseChildElements<QList<Item>>(el, u"item", ns_qxmpp_export),
+        };
     }
 
     void toXml(QXmlStreamWriter &writer) const
     {
         writer.writeStartElement(QSL65("mix"));
-        for (const auto &item : items) {
-            item.toXml(&writer);
-        }
+        writeElements(&writer, items);
         writer.writeEndElement();
     }
 };

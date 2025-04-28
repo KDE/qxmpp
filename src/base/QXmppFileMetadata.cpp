@@ -68,18 +68,6 @@ QXmppFileMetadata::QXmppFileMetadata()
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFileMetadata)
 
 /// \cond
-template<typename ElementType>
-QVector<ElementType> parseChildElements(const QDomElement &el, QStringView tagName, QStringView namespaceUri)
-{
-    QVector<ElementType> vec;
-    for (const auto &subEl : iterChildElements(el, tagName, namespaceUri)) {
-        ElementType parsedElement;
-        parsedElement.parse(subEl);
-        vec.push_back(std::move(parsedElement));
-    }
-    return vec;
-}
-
 bool QXmppFileMetadata::parse(const QDomElement &el)
 {
     if (el.isNull()) {
@@ -94,7 +82,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
         d->desc = descEl.text();
     }
 
-    d->hashes = parseChildElements<QXmppHash>(el, u"hash", ns_hashes);
+    d->hashes = parseChildElements<QVector<QXmppHash>>(el, u"hash", ns_hashes);
 
     if (auto heightEl = firstChildElement(el, u"height"); !heightEl.isNull()) {
         d->height = firstChildElement(el, u"height").text().toUInt();
@@ -111,12 +99,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
     if (auto sizeEl = firstChildElement(el, u"size"); !sizeEl.isNull()) {
         d->size = sizeEl.text().toULong();
     }
-    for (const auto &thumbEl : iterChildElements(el, u"thumbnail")) {
-        QXmppThumbnail thumbnail;
-        if (thumbnail.parse(thumbEl)) {
-            d->thumbnails.append(std::move(thumbnail));
-        }
-    }
+    d->thumbnails = parseChildElements<QVector<QXmppThumbnail>>(el, u"thumbnail", ns_thumbs);
     if (auto widthEl = firstChildElement(el, u"width"); !widthEl.isNull()) {
         d->width = widthEl.text().toUInt();
     }
@@ -135,9 +118,7 @@ void QXmppFileMetadata::toXml(QXmlStreamWriter *writer) const
         writer->writeTextElement(QSL65("desc"), *d->desc);
     }
 
-    for (const auto &hash : d->hashes) {
-        hash.toXml(writer);
-    }
+    writeElements(writer, d->hashes);
 
     if (d->height) {
         writer->writeTextElement(QSL65("height"), QString::number(*d->height));
@@ -154,9 +135,7 @@ void QXmppFileMetadata::toXml(QXmlStreamWriter *writer) const
     if (d->size) {
         writer->writeTextElement(QSL65("size"), QString::number(*d->size));
     }
-    for (const auto &thumbnail : d->thumbnails) {
-        thumbnail.toXml(writer);
-    }
+    writeElements(writer, d->thumbnails);
     if (d->width) {
         writer->writeTextElement(QSL65("width"), QString::number(*d->width));
     }

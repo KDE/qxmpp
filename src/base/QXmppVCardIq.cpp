@@ -891,23 +891,9 @@ void QXmppVCardIq::parseElementFromChild(const QDomElement &nodeRecv)
     QByteArray base64data = photoElement.firstChildElement(u"BINVAL"_s).text().toLatin1();
     d->photo = QByteArray::fromBase64(base64data);
     d->photoType = photoElement.firstChildElement(u"TYPE"_s).text();
-
-    for (const auto &child : iterChildElements(cardElement)) {
-        if (child.tagName() == u"ADR") {
-            QXmppVCardAddress address;
-            address.parse(child);
-            d->addresses << address;
-        } else if (child.tagName() == u"EMAIL") {
-            QXmppVCardEmail email;
-            email.parse(child);
-            d->emails << email;
-        } else if (child.tagName() == u"TEL") {
-            QXmppVCardPhone phone;
-            phone.parse(child);
-            d->phones << phone;
-        }
-    }
-
+    d->addresses = parseChildElements<QList<QXmppVCardAddress>>(cardElement, u"ADR", ns_vcard);
+    d->emails = parseChildElements<QList<QXmppVCardEmail>>(cardElement, u"EMAIL", ns_vcard);
+    d->phones = parseChildElements<QList<QXmppVCardPhone>>(cardElement, u"TEL", ns_vcard);
     d->organization.parse(cardElement);
 }
 
@@ -921,37 +907,20 @@ void QXmppVCardIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     if (d->birthday.isValid()) {
         writeXmlTextElement(writer, u"BDAY", d->birthday.toString(u"yyyy-MM-dd"_s));
     }
-    if (!d->description.isEmpty()) {
-        writeXmlTextElement(writer, u"DESC", d->description);
-    }
-    for (const QXmppVCardEmail &email : d->emails) {
-        email.toXml(writer);
-    }
-    if (!d->fullName.isEmpty()) {
-        writeXmlTextElement(writer, u"FN", d->fullName);
-    }
-    if (!d->nickName.isEmpty()) {
-        writeXmlTextElement(writer, u"NICKNAME", d->nickName);
-    }
+    writeOptionalXmlTextElement(writer, u"DESC", d->description);
+    writeElements(writer, d->emails);
+    writeOptionalXmlTextElement(writer, u"FN", d->fullName);
+    writeOptionalXmlTextElement(writer, u"NICKNAME", d->nickName);
     if (!d->firstName.isEmpty() ||
         !d->lastName.isEmpty() ||
         !d->middleName.isEmpty()) {
         writer->writeStartElement(QSL65("N"));
-        if (!d->firstName.isEmpty()) {
-            writeXmlTextElement(writer, u"GIVEN", d->firstName);
-        }
-        if (!d->lastName.isEmpty()) {
-            writeXmlTextElement(writer, u"FAMILY", d->lastName);
-        }
-        if (!d->middleName.isEmpty()) {
-            writeXmlTextElement(writer, u"MIDDLE", d->middleName);
-        }
+        writeOptionalXmlTextElement(writer, u"GIVEN", d->firstName);
+        writeOptionalXmlTextElement(writer, u"FAMILY", d->lastName);
+        writeOptionalXmlTextElement(writer, u"MIDDLE", d->middleName);
         writer->writeEndElement();
     }
-
-    for (const QXmppVCardPhone &phone : d->phones) {
-        phone.toXml(writer);
-    }
+    writeElements(writer, d->phones);
     if (!photo().isEmpty()) {
         writer->writeStartElement(QSL65("PHOTO"));
         QString photoType = d->photoType;
@@ -962,9 +931,7 @@ void QXmppVCardIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         writeXmlTextElement(writer, u"BINVAL", QString::fromUtf8(d->photo.toBase64()));
         writer->writeEndElement();
     }
-    if (!d->url.isEmpty()) {
-        writeXmlTextElement(writer, u"URL", d->url);
-    }
+    writeOptionalXmlTextElement(writer, u"URL", d->url);
 
     d->organization.toXml(writer);
 

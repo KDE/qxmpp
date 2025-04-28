@@ -229,12 +229,10 @@ void QXmppBitsOfBinaryDataList::parse(const QDomElement &element)
     clear();
 
     // parse all <data/> elements
-    for (const auto &child : iterChildElements(element)) {
-        if (QXmppBitsOfBinaryData::isBitsOfBinaryData(child)) {
-            QXmppBitsOfBinaryData data;
-            data.parseElementFromChild(child);
-            append(data);
-        }
+    for (const auto &dataEl : iterChildElements(element, u"data", ns_bob)) {
+        QXmppBitsOfBinaryData data;
+        data.parseElementFromChild(dataEl);
+        append(std::move(data));
     }
 }
 

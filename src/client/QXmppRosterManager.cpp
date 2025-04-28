@@ -38,15 +38,9 @@ struct RosterData {
             return QXmppError { u"Invalid element."_s, {} };
         }
 
-        RosterData d;
-
-        for (const auto &itemEl : iterChildElements(el, u"item", ns_roster)) {
-            QXmppRosterIq::Item item;
-            item.parse(itemEl);
-            d.items.push_back(std::move(item));
-        }
-
-        return d;
+        return RosterData {
+            parseChildElements<QList<QXmppRosterIq::Item>>(el, u"item", ns_roster),
+        };
     }
 
     void toXml(QXmlStreamWriter &writer) const

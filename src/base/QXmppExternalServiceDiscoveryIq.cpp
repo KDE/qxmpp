@@ -427,24 +427,14 @@ bool QXmppExternalServiceDiscoveryIq::checkIqType(const QString &tagName, const 
 /// \cond
 void QXmppExternalServiceDiscoveryIq::parseElementFromChild(const QDomElement &element)
 {
-    for (const auto &el : iterChildElements(firstChildElement(element, u"services"))) {
-        if (QXmppExternalService::isExternalService(el)) {
-            QXmppExternalService service;
-            service.parse(el);
-            d->externalServices.append(std::move(service));
-        }
-    }
+    d->externalServices = parseChildElements<QVector<QXmppExternalService>>(element.firstChildElement(), u"service", ns_external_service_discovery);
 }
 
 void QXmppExternalServiceDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("services"));
     writer->writeDefaultNamespace(toString65(ns_external_service_discovery));
-
-    for (const QXmppExternalService &item : d->externalServices) {
-        item.toXml(writer);
-    }
-
+    writeElements(writer, d->externalServices);
     writer->writeEndElement();
 }
 /// \endcond
