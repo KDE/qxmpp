@@ -127,22 +127,14 @@ bool QXmppOmemoDeviceElement::isOmemoDeviceElement(const QDomElement &element)
 
 void QXmppOmemoDeviceList::parse(const QDomElement &element)
 {
-    for (const auto &device : iterChildElements(element, u"device")) {
-        QXmppOmemoDeviceElement deviceElement;
-        deviceElement.parse(device);
-        append(deviceElement);
-    }
+    *this = parseChildElements<QXmppOmemoDeviceList>(element, u"device", ns_omemo_2);
 }
 
 void QXmppOmemoDeviceList::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("devices"));
     writer->writeDefaultNamespace(toString65(ns_omemo_2));
-
-    for (const auto &device : *this) {
-        device.toXml(writer);
-    }
-
+    writeElements(writer, *this);
     writer->writeEndElement();
 }
 

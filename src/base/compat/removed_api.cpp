@@ -187,11 +187,7 @@ void QXmppPubSubIq::parseElementFromChild(const QDomElement &element)
     case QXmppPubSubIq::ItemsQuery:
     case QXmppPubSubIq::PublishQuery:
     case QXmppPubSubIq::RetractQuery:
-        for (const auto &childElement : iterChildElements(queryElement, u"item")) {
-            QXmppPubSubItem item;
-            item.parse(childElement);
-            d->items << item;
-        }
+        d->items = parseChildElements<QList<QXmppPubSubItem>>(queryElement, u"item", ns_pubsub);
         break;
     case QXmppPubSubIq::SubscriptionQuery:
         d->subscriptionId = queryElement.attribute(u"subid"_s);
@@ -217,9 +213,7 @@ void QXmppPubSubIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     case QXmppPubSubIq::ItemsQuery:
     case QXmppPubSubIq::PublishQuery:
     case QXmppPubSubIq::RetractQuery:
-        for (const auto &item : d->items) {
-            item.toXml(writer);
-        }
+        writeElements(writer, d->items);
         break;
     case QXmppPubSubIq::SubscriptionQuery:
         writeOptionalXmlAttribute(writer, u"subid", d->subscriptionId);

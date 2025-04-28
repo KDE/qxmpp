@@ -13,6 +13,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Algorithms.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 
@@ -1029,14 +1030,8 @@ void QXmppStanza::parse(const QDomElement &element)
     auto error = parseOptionalChildElement<Error>(element, u"error", element.namespaceURI());
     d->error = error ? error->d : decltype(d->error) {};
 
-    // XEP-0033: Extended Stanza Addressing
-    for (const auto &addressElement : iterChildElements(firstChildElement(element, u"addresses"), u"address")) {
-        QXmppExtendedAddress address;
-        address.parse(addressElement);
-        if (address.isValid()) {
-            d->extendedAddresses << address;
-        }
-    }
+    d->extendedAddresses = parseChildElements<QList<QXmppExtendedAddress>>(firstChildElement(element, u"addresses", ns_extended_addressing), u"address", ns_extended_addressing);
+    removeIf(d->extendedAddresses, [](const auto &address) { return !address.isValid(); });
 }
 
 void QXmppStanza::extensionsToXml(QXmlStreamWriter *xmlWriter, QXmpp::SceMode sceMode) const

@@ -8,6 +8,8 @@
 
 #include "QXmppGlobal.h"
 
+#include "Algorithms.h"
+
 #include <array>
 #include <functional>
 #include <optional>
@@ -92,6 +94,12 @@ inline void writeOptional(QXmlStreamWriter *writer, const std::optional<T> &valu
 {
     if (value) {
         value->toXml(writer);
+    }
+}
+void writeElements(QXmlStreamWriter *writer, const auto &elements)
+{
+    for (const auto &element : elements) {
+        element.toXml(writer);
     }
 }
 
@@ -196,6 +204,22 @@ template<typename T>
 auto parseOptionalChildElement(const QDomElement &parentEl, QStringView tagName, QStringView xmlns)
 {
     return parseOptionalElement<T>(firstChildElement(parentEl, tagName, xmlns));
+}
+
+// Parse all child elements matching the tag name and namespace into a container.
+template<typename Container>
+auto parseChildElements(const QDomElement &parentEl, QStringView tagName, QStringView xmlns)
+    -> Container
+{
+    using T = typename Container::value_type;
+
+    Container elements;
+    for (const auto &childEl : iterChildElements(parentEl, tagName, xmlns)) {
+        if (auto parsedEl = parseElement<T>(childEl)) {
+            elements.push_back(std::move(*parsedEl));
+        }
+    }
+    return elements;
 }
 
 template<typename Container = QList<QString>>

@@ -258,9 +258,7 @@ void Bind2Request::toXml(QXmlStreamWriter *writer) const
     if (carbonsEnable) {
         writeEmptyElement(writer, u"enable", ns_carbons);
     }
-    if (smEnable) {
-        smEnable->toXml(writer);
-    }
+    writeOptional(writer, smEnable);
     writer->writeEndElement();
 }
 
@@ -280,12 +278,8 @@ void Bind2Bound::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("bound"));
     writer->writeDefaultNamespace(toString65(ns_bind2));
-    if (smFailed) {
-        smFailed->toXml(writer);
-    }
-    if (smEnabled) {
-        smEnabled->toXml(writer);
-    }
+    writeOptional(writer, smFailed);
+    writeOptional(writer, smEnabled);
     writer->writeEndElement();
 }
 
@@ -397,9 +391,7 @@ void StreamFeature::toXml(QXmlStreamWriter *writer) const
     }
     if (bind2Feature || fast || streamResumptionAvailable) {
         writer->writeStartElement(QSL65("inline"));
-        if (bind2Feature) {
-            bind2Feature->toXml(writer);
-        }
+        writeOptional(writer, bind2Feature);
         writeOptional(writer, fast);
         if (streamResumptionAvailable) {
             writeEmptyElement(writer, u"sm", ns_stream_management);
@@ -455,15 +447,9 @@ void Authenticate::toXml(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(toString65(ns_sasl_2));
     writer->writeAttribute(QSL65("mechanism"), mechanism);
     writeOptionalXmlTextElement(writer, u"initial-response", QString::fromUtf8(initialResponse.toBase64()));
-    if (userAgent) {
-        userAgent->toXml(writer);
-    }
-    if (bindRequest) {
-        bindRequest->toXml(writer);
-    }
-    if (smResume) {
-        smResume->toXml(writer);
-    }
+    writeOptional(writer, userAgent);
+    writeOptional(writer, bindRequest);
+    writeOptional(writer, smResume);
     writeOptional(writer, tokenRequest);
     writeOptional(writer, fast);
     writer->writeEndElement();
@@ -537,15 +523,9 @@ void Success::toXml(QXmlStreamWriter *writer) const
         writer->writeTextElement(QSL65("additional-data"), serializeBase64(*additionalData));
     }
     writeXmlTextElement(writer, u"authorization-identifier", authorizationIdentifier);
-    if (bound) {
-        bound->toXml(writer);
-    }
-    if (smResumed) {
-        smResumed->toXml(writer);
-    }
-    if (smFailed) {
-        smFailed->toXml(writer);
-    }
+    writeOptional(writer, bound);
+    writeOptional(writer, smResumed);
+    writeOptional(writer, smFailed);
     writeOptional(writer, token);
     writer->writeEndElement();
 }
