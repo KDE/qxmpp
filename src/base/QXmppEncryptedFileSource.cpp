@@ -152,24 +152,13 @@ bool QXmppEncryptedFileSource::parse(const QDomElement &el)
         return false;
     }
     d->iv = QByteArray::fromBase64(ivEl.text().toUtf8());
-
-    for (const auto &childEl : iterChildElements(el, u"hash", ns_hashes)) {
-        QXmppHash hash;
-        if (!hash.parse(childEl)) {
-            return false;
-        }
-        d->hashes.push_back(std::move(hash));
-    }
+    d->hashes = parseChildElements<QVector<QXmppHash>>(el, u"hash", ns_hashes);
 
     auto sourcesEl = el.firstChildElement(u"sources"_s);
     if (sourcesEl.isNull()) {
         return false;
     }
-    for (const auto &childEl : iterChildElements(sourcesEl, u"url-data", ns_url_data)) {
-        QXmppHttpFileSource source;
-        source.parse(childEl);
-        d->httpSources.push_back(std::move(source));
-    }
+    d->httpSources = parseChildElements<QVector<QXmppHttpFileSource>>(sourcesEl, u"url-data", ns_url_data);
 
     return true;
 }

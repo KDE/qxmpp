@@ -502,11 +502,7 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
             d->isPreparingMujiSession = true;
         }
 
-        for (const auto &contentElement : iterChildElements(element, u"content")) {
-            QXmppJingleIq::Content content;
-            content.parse(contentElement);
-            d->mujiContents.append(content);
-        }
+        d->mujiContents = parseChildElements<QVector<QXmppJingleIq::Content>>(element, u"content", {});
         // XEP-0283: Moved
     } else if (element.tagName() == u"moved" && element.namespaceURI() == ns_moved) {
         d->oldJid = element.firstChildElement(u"old-jid"_s).text();

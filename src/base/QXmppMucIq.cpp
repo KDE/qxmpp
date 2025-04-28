@@ -228,20 +228,14 @@ bool QXmppMucAdminIq::isMucAdminIq(const QDomElement &element)
 void QXmppMucAdminIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
-    for (const auto &child : iterChildElements(queryElement, u"item")) {
-        QXmppMucItem item;
-        item.parse(child);
-        m_items << item;
-    }
+    m_items = parseChildElements<QList<QXmppMucItem>>(queryElement, u"item", ns_muc_admin);
 }
 
 void QXmppMucAdminIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("query"));
     writer->writeDefaultNamespace(toString65(ns_muc_admin));
-    for (const QXmppMucItem &item : m_items) {
-        item.toXml(writer);
-    }
+    writeElements(writer, m_items);
     writer->writeEndElement();
 }
 /// \endcond

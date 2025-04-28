@@ -127,14 +127,7 @@ void QXmppTrustMessageElement::parse(const QDomElement &element)
 {
     d->usage = element.attribute(u"usage"_s);
     d->encryption = element.attribute(u"encryption"_s);
-
-    for (const auto &keyOwnerElement : iterChildElements(element, u"key-owner")) {
-        if (QXmppTrustMessageKeyOwner::isTrustMessageKeyOwner(keyOwnerElement)) {
-            QXmppTrustMessageKeyOwner keyOwner;
-            keyOwner.parse(keyOwnerElement);
-            d->keyOwners.append(keyOwner);
-        }
-    }
+    d->keyOwners = parseChildElements<QList<QXmppTrustMessageKeyOwner>>(element, u"key-owner", ns_tm);
 }
 
 void QXmppTrustMessageElement::toXml(QXmlStreamWriter *writer) const
@@ -143,11 +136,7 @@ void QXmppTrustMessageElement::toXml(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(toString65(ns_tm));
     writer->writeAttribute(QSL65("usage"), d->usage);
     writer->writeAttribute(QSL65("encryption"), d->encryption);
-
-    for (const auto &keyOwner : d->keyOwners) {
-        keyOwner.toXml(writer);
-    }
-
+    writeElements(writer, d->keyOwners);
     writer->writeEndElement();
 }
 /// \endcond

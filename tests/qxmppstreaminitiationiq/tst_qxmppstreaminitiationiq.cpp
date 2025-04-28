@@ -88,6 +88,7 @@ void tst_QXmppStreamInitiationIq::testOffer()
 
     QXmppStreamInitiationIq iq;
     parsePacket(iq, xml);
+    QVERIFY(!iq.featureForm().isNull());
     QVERIFY(!iq.fileInfo().isNull());
     QCOMPARE(iq.fileInfo().name(), u"test.txt"_s);
     QCOMPARE(iq.fileInfo().size(), qint64(1022));

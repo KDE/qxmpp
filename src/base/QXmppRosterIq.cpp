@@ -124,13 +124,7 @@ void QXmppRosterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
     setVersion(queryElement.attribute(u"ver"_s));
-
-    for (const auto &itemElement : iterChildElements(queryElement, u"item")) {
-        QXmppRosterIq::Item item;
-        item.parse(itemElement);
-        d->items.append(item);
-    }
-
+    d->items = parseChildElements<QList<Item>>(queryElement, u"item", ns_roster);
     setMixAnnotate(!firstChildElement(queryElement, u"annotate", ns_mix_roster).isNull());
 }
 

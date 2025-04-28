@@ -24,39 +24,25 @@ using Disposition = QXmppFileShare::Disposition;
 namespace QXmpp::Private {
 
 struct FileSources {
-    static FileSources fromSourcesDom(const QDomElement &el);
+    static FileSources fromDom(const QDomElement &el);
     void innerToXml(QXmlStreamWriter *writer) const;
 
     QVector<QXmppHttpFileSource> httpSources;
     QVector<QXmppEncryptedFileSource> encryptedSources;
 };
 
-FileSources FileSources::fromSourcesDom(const QDomElement &el)
+FileSources FileSources::fromDom(const QDomElement &el)
 {
-    FileSources sources;
-    for (const auto &sourceEl : iterChildElements(el, u"url-data", ns_url_data)) {
-        QXmppHttpFileSource source;
-        if (source.parse(sourceEl)) {
-            sources.httpSources.push_back(std::move(source));
-        }
-    }
-    for (const auto &sourceEl : iterChildElements(el, u"encrypted", ns_esfs)) {
-        QXmppEncryptedFileSource source;
-        if (source.parse(sourceEl)) {
-            sources.encryptedSources.push_back(std::move(source));
-        }
-    }
-    return sources;
+    return {
+        parseChildElements<QVector<QXmppHttpFileSource>>(el, u"url-data", ns_url_data),
+        parseChildElements<QVector<QXmppEncryptedFileSource>>(el, u"encrypted", ns_esfs),
+    };
 }
 
 void FileSources::innerToXml(QXmlStreamWriter *writer) const
 {
-    for (const auto &source : httpSources) {
-        source.toXml(writer);
-    }
-    for (const auto &source : encryptedSources) {
-        source.toXml(writer);
-    }
+    writeElements(writer, httpSources);
+    writeElements(writer, encryptedSources);
 }
 
 }  // namespace QXmpp::Private
@@ -162,7 +148,7 @@ std::optional<QXmppFileSourcesAttachment> QXmppFileSourcesAttachment::fromDom(co
     }
     QXmppFileSourcesAttachment result;
     result.d->id = el.attribute(u"id"_s);
-    result.d->sources = FileSources::fromSourcesDom(el);
+    result.d->sources = FileSources::fromDom(el);
     return result;
 }
 
@@ -331,7 +317,7 @@ bool QXmppFileShare::parse(const QDomElement &el)
 
         // sources
         if (auto sourcesEl = firstChildElement(el, u"sources", ns_sfs); !sourcesEl.isNull()) {
-            d->sources = FileSources::fromSourcesDom(sourcesEl);
+            d->sources = FileSources::fromDom(sourcesEl);
         }
         return true;
     }
