@@ -334,18 +334,11 @@ bool QXmppPubSubEventBase::parseExtension(const QDomElement &eventElement, QXmpp
             d->retractIds = parseSingleAttributeElements(eventTypeElement, u"retract", ns_pubsub_event, u"id"_s);
             break;
         case Subscription: {
-            QXmppPubSubSubscription subscription;
-            subscription.parse(eventTypeElement);
-            d->subscription = subscription;
+            d->subscription = parseElement<QXmppPubSubSubscription>(eventTypeElement).value_or(QXmppPubSubSubscription());
             break;
         }
         case Configuration:
-            if (auto formElement = firstChildElement(eventTypeElement, u"x"_s, ns_data);
-                !formElement.isNull()) {
-                QXmppDataForm form;
-                form.parse(formElement);
-                d->configurationForm = form;
-            }
+            d->configurationForm = parseOptionalChildElement<QXmppDataForm>(eventTypeElement);
             break;
         case Purge:
             break;

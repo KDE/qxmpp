@@ -469,8 +469,6 @@ public:
     class QXMPP_EXPORT Content
     {
     public:
-        static constexpr std::tuple XmlTag = { u"content", QXmpp::Private::ns_jingle };
-
         Content();
         Content(const QXmppJingleIq::Content &other);
         Content(QXmppJingleIq::Content &&);
@@ -543,6 +541,7 @@ public:
         void setTransportFingerprintSetup(const QString &setup);
 
         /// \cond
+        static constexpr std::tuple XmlTag = { u"content", QXmpp::Private::ns_jingle };
         void parse(const QDomElement &element);
         void toXml(QXmlStreamWriter *writer) const;
 

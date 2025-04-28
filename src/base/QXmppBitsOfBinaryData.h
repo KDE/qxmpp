@@ -5,6 +5,7 @@
 #ifndef QXMPPBITSOFBINARYDATA_H
 #define QXMPPBITSOFBINARYDATA_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <QSharedDataPointer>
@@ -43,6 +44,7 @@ public:
     bool static isBitsOfBinaryData(const QDomElement &element);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"data", QXmpp::Private::ns_bob };
     void parseElementFromChild(const QDomElement &dataElement);
     void toXmlElementFromChild(QXmlStreamWriter *writer) const;
     /// \endcond

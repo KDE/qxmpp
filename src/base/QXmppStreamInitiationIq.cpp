@@ -80,8 +80,9 @@ void QXmppStreamInitiationIq::parseElementFromChild(const QDomElement &element)
         m_profile = None;
     }
 
-    m_featureForm = parseOptionalChildElement<QXmppDataForm>(firstChildElement(siElement, u"feature", ns_feature_negotiation), u"x", ns_data).value_or(QXmppDataForm());
-    m_fileInfo = parseOptionalChildElement<QXmppTransferFileInfo>(siElement, u"file", ns_stream_initiation_file_transfer).value_or(QXmppTransferFileInfo());
+    auto featureElement = firstChildElement(siElement, u"feature", ns_feature_negotiation);
+    m_featureForm = parseOptionalChildElement<QXmppDataForm>(featureElement).value_or(QXmppDataForm());
+    m_fileInfo = parseOptionalChildElement<QXmppTransferFileInfo>(siElement).value_or(QXmppTransferFileInfo());
 }
 
 void QXmppStreamInitiationIq::toXmlElementFromChild(QXmlStreamWriter *writer) const

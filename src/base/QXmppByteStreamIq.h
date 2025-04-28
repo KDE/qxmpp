@@ -5,6 +5,7 @@
 #ifndef QXMPPBYTESTREAMIQ_H
 #define QXMPPBYTESTREAMIQ_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppIq.h"
 
 #include <QHostAddress>
@@ -32,6 +33,12 @@ public:
 
         QString zeroconf() const;
         void setZeroconf(const QString &zeroconf);
+
+        /// \cond
+        static constexpr std::tuple XmlTag = { u"streamhost", QXmpp::Private::ns_bytestreams };
+        static std::optional<StreamHost> fromDom(const QDomElement &el);
+        void toXml(QXmlStreamWriter *writer) const;
+        /// \endcond
 
     private:
         QString m_host;
