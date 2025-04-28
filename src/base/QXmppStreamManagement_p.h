@@ -5,6 +5,7 @@
 #ifndef QXMPPSTREAMMANAGEMENT_P_H
 #define QXMPPSTREAMMANAGEMENT_P_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 #include "QXmppSendResult.h"
 #include "QXmppStanza.h"
@@ -34,7 +35,12 @@ class XmppSocket;
 
 namespace QXmpp::Private {
 
+struct SmFeature {
+    static constexpr std::tuple XmlTag = { u"sm", QXmpp::Private::ns_stream_management };
+};
+
 struct SmEnable {
+    static constexpr std::tuple XmlTag = { u"enable", QXmpp::Private::ns_stream_management };
     static std::optional<SmEnable> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *w) const;
 
@@ -43,6 +49,7 @@ struct SmEnable {
 };
 
 struct SmEnabled {
+    static constexpr std::tuple XmlTag = { u"enabled", QXmpp::Private::ns_stream_management };
     static std::optional<SmEnabled> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *w) const;
 
@@ -53,6 +60,7 @@ struct SmEnabled {
 };
 
 struct SmResume {
+    static constexpr std::tuple XmlTag = { u"resume", QXmpp::Private::ns_stream_management };
     static std::optional<SmResume> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *w) const;
 
@@ -61,6 +69,7 @@ struct SmResume {
 };
 
 struct SmResumed {
+    static constexpr std::tuple XmlTag = { u"resumed", QXmpp::Private::ns_stream_management };
     static std::optional<SmResumed> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *w) const;
 
@@ -69,6 +78,7 @@ struct SmResumed {
 };
 
 struct SmFailed {
+    static constexpr std::tuple XmlTag = { u"failed", QXmpp::Private::ns_stream_management };
     static std::optional<SmFailed> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *w) const;
 
@@ -76,6 +86,7 @@ struct SmFailed {
 };
 
 struct SmAck {
+    static constexpr std::tuple XmlTag = { u"a", QXmpp::Private::ns_stream_management };
     static std::optional<SmAck> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *w) const;
 
@@ -83,6 +94,7 @@ struct SmAck {
 };
 
 struct SmRequest {
+    static constexpr std::tuple XmlTag = { u"r", QXmpp::Private::ns_stream_management };
     static std::optional<SmRequest> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *w) const;
 };
