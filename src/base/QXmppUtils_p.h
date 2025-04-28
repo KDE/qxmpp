@@ -136,6 +136,44 @@ struct DomChildElements {
 
 inline DomChildElements iterChildElements(const QDomElement &el, QStringView tagName = {}, QStringView namespaceUri = {}) { return DomChildElements { el, tagName, namespaceUri }; }
 
+template<typename T>
+concept DomParsableV1 = requires(T t) {
+    { t.parse(QDomElement()) } -> std::same_as<void>;
+};
+
+template<typename T>
+concept DomParsableV2 = requires(T t) {
+    { t.parse(QDomElement()) } -> std::same_as<bool>;
+};
+
+template<typename T>
+concept DomParsableV3 = requires {
+    { T::fromDom(QDomElement()) } -> std::same_as<std::optional<T>>;
+};
+
+template<typename T>
+concept DomParsable = DomParsableV1<T> || DomParsableV2<T> || DomParsableV3<T>;
+
+// Parse T from a QDomElement.
+template<typename T>
+auto parseElement(const QDomElement &el) -> std::optional<T>
+    requires DomParsable<T>
+{
+    if constexpr (DomParsableV3<T>) {
+        return T::fromDom(el);
+    } else if constexpr (DomParsableV2<T>) {
+        T element;
+        if (!element.parse(el)) {
+            return {};
+        }
+        return element;
+    } else if constexpr (DomParsableV1<T>) {
+        T element;
+        element.parse(el);
+        return element;
+    }
+}
+
 std::vector<QString> parseTextElements(DomChildElements elements);
 
 // Parse T with T::parse() if DOM element is not null (no namespace check).
@@ -145,10 +183,7 @@ auto parseOptionalElement(const QDomElement &domEl) -> std::optional<T>
     if (domEl.isNull()) {
         return {};
     }
-
-    T element;
-    element.parse(domEl);
-    return element;
+    return parseElement<T>(domEl);
 }
 
 // Parse T with T::parse() with first child element with the correct tag name and namespace.
