@@ -261,9 +261,6 @@ public:
     quint32 ssrc() const;
     void setSsrc(quint32 ssrc);
 
-    QString type() const;
-    void setType(const QString &type);
-
     void addPayloadType(const QXmppJinglePayloadType &payload);
     const QList<QXmppJinglePayloadType> &payloadTypes() const;
     void setPayloadTypes(const QList<QXmppJinglePayloadType> &payloadTypes);

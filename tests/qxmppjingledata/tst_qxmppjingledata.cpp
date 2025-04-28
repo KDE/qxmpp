@@ -1561,7 +1561,6 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
 
     parsePacket(proposeElement, proposeXml);
     QCOMPARE(proposeElement.id(), u"ca3cf894-5325-482f-a412-a6e9f832298d"_s);
-    QCOMPARE(proposeElement.description()->type(), u"urn:xmpp:jingle:apps:rtp:1"_s);
     QCOMPARE(proposeElement.description()->media(), u"audio"_s);
     QCOMPARE(proposeElement.containsTieBreak(), false);  // single check if containsTieBreak is set correctly when unused
     QCOMPARE(proposeElement.reason(), std::nullopt);     // single check if reason is set correctly when unused

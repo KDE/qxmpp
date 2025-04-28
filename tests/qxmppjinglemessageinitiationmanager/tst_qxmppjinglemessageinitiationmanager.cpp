@@ -257,7 +257,6 @@ void tst_QXmppJingleMessageInitiationManager::testPropose()
     QXmppJingleDescription description;
     description.setMedia(u"audio"_s);
     description.setSsrc(123);
-    description.setType(ns_jingle_rtp.toString());
 
     connect(&m_logger, &QXmppLogger::message, this, [&, jid, description](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
@@ -273,7 +272,6 @@ void tst_QXmppJingleMessageInitiationManager::testPropose()
                 QVERIFY(jmiElement->description());
                 QCOMPARE(jmiElement->description()->media(), description.media());
                 QCOMPARE(jmiElement->description()->ssrc(), description.ssrc());
-                QCOMPARE(jmiElement->description()->type(), description.type());
 
                 SKIP_IF_INTEGRATION_TESTS_DISABLED()
 
@@ -504,7 +502,6 @@ void tst_QXmppJingleMessageInitiationManager::testHandleProposeJmiElement()
     QXmppJingleDescription description;
     description.setMedia("audio");
     description.setSsrc(321);
-    description.setType("abcd");
 
     jmiElement.setId("ca3cf123-5325-482f-a412-a6e9f832298d");
     jmiElement.setDescription(description);
@@ -528,7 +525,6 @@ void tst_QXmppJingleMessageInitiationManager::testHandleProposeJmiElement()
             QVERIFY(description.has_value());
             QCOMPARE(description->media(), jmiElement.description()->media());
             QCOMPARE(description->ssrc(), jmiElement.description()->ssrc());
-            QCOMPARE(description->type(), jmiElement.description()->type());
         }
     });
 
