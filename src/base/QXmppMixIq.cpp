@@ -621,7 +621,7 @@ void QXmppMixIq::parseElementFromChild(const QDomElement &element)
         }
 
         d->nick = firstChildElement(child, u"nick").text();
-        d->invitation = parseOptionalChildElement<QXmppMixInvitation>(child, u"invitation", ns_mix_misc);
+        d->invitation = parseOptionalChildElement<QXmppMixInvitation>(child);
         d->subscriptions = listToMixNodes(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
     }
 }

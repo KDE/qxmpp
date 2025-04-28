@@ -51,6 +51,7 @@ public:
     bool operator==(const QXmppTransferFileInfo &other) const;
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"file", QXmpp::Private::ns_stream_initiation_file_transfer };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

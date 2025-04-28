@@ -5,6 +5,7 @@
 #ifndef QXMPPEXTERNALSERVICE_H
 #define QXMPPEXTERNALSERVICE_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <optional>
@@ -76,6 +77,9 @@ public:
 
     static bool isExternalService(const QDomElement &);
 
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"service", QXmpp::Private::ns_external_service_discovery };
+    /// \endcond
     void parse(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 

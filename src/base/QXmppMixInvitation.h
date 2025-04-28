@@ -5,6 +5,7 @@
 #ifndef QXMPPMIXINVITATION_H
 #define QXMPPMIXINVITATION_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppElement.h"
 
 #include <QSharedDataPointer>
@@ -35,6 +36,7 @@ public:
     void setToken(const QString &token);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"invitation", QXmpp::Private::ns_mix_misc };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

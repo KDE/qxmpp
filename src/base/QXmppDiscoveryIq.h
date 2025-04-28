@@ -40,6 +40,12 @@ public:
         QString type() const;
         void setType(const QString &type);
 
+        /// \cond
+        static constexpr std::tuple XmlTag = { u"identity", QXmpp::Private::ns_disco_info };
+        static std::optional<Identity> fromDom(const QDomElement &el);
+        void toXml(QXmlStreamWriter *writer) const;
+        /// \endcond
+
     private:
         QSharedDataPointer<QXmppDiscoveryIdentityPrivate> d;
     };
@@ -63,6 +69,12 @@ public:
 
         QString node() const;
         void setNode(const QString &node);
+
+        /// \cond
+        static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_disco_items };
+        static std::optional<Item> fromDom(const QDomElement &el);
+        void toXml(QXmlStreamWriter *writer) const;
+        /// \endcond
 
     private:
         QSharedDataPointer<QXmppDiscoveryItemPrivate> d;

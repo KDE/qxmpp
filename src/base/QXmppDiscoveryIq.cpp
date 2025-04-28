@@ -156,6 +156,38 @@ void QXmppDiscoveryIq::Identity::setType(const QString &type)
     d->type = type;
 }
 
+/// \cond
+std::optional<QXmppDiscoveryIq::Identity> QXmppDiscoveryIq::Identity::fromDom(const QDomElement &el)
+{
+    QXmppDiscoveryIq::Identity identity;
+    identity.setLanguage(el.attribute(u"xml:lang"_s));
+    identity.setCategory(el.attribute(u"category"_s));
+    identity.setName(el.attribute(u"name"_s));
+    identity.setType(el.attribute(u"type"_s));
+
+    // FIXME: for some reason the language does not found,
+    // so we are forced to use QDomNamedNodeMap
+    QDomNamedNodeMap m(el.attributes());
+    for (int i = 0; i < m.size(); ++i) {
+        if (m.item(i).nodeName() == u"xml:lang") {
+            identity.setLanguage(m.item(i).nodeValue());
+            break;
+        }
+    }
+    return identity;
+}
+
+void QXmppDiscoveryIq::Identity::toXml(QXmlStreamWriter *writer) const
+{
+    writer->writeStartElement(QSL65(u"identity"));
+    writeOptionalXmlAttribute(writer, u"xml:lang", d->language);
+    writeOptionalXmlAttribute(writer, u"category", d->category);
+    writeOptionalXmlAttribute(writer, u"name", d->name);
+    writeOptionalXmlAttribute(writer, u"type", d->type);
+    writer->writeEndElement();
+}
+/// \endcond
+
 class QXmppDiscoveryItemPrivate : public QSharedData
 {
 public:
@@ -233,6 +265,26 @@ void QXmppDiscoveryIq::Item::setNode(const QString &node)
 {
     d->node = node;
 }
+
+/// \cond
+std::optional<QXmppDiscoveryIq::Item> QXmppDiscoveryIq::Item::fromDom(const QDomElement &el)
+{
+    QXmppDiscoveryIq::Item item;
+    item.setJid(el.attribute(u"jid"_s));
+    item.setName(el.attribute(u"name"_s));
+    item.setNode(el.attribute(u"node"_s));
+    return item;
+}
+
+void QXmppDiscoveryIq::Item::toXml(QXmlStreamWriter *writer) const
+{
+    writer->writeStartElement(QSL65("item"));
+    writeOptionalXmlAttribute(writer, u"jid", d->jid);
+    writeOptionalXmlAttribute(writer, u"name", d->name);
+    writeOptionalXmlAttribute(writer, u"node", d->node);
+    writer->writeEndElement();
+}
+/// \endcond
 
 class QXmppDiscoveryIqPrivate : public QSharedData
 {
@@ -458,37 +510,9 @@ void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
     }
 
     d->features = parseSingleAttributeElements(queryElement, u"feature", ns_disco_info, u"var"_s);
-
-    for (const auto &itemElement : iterChildElements(queryElement)) {
-        if (itemElement.tagName() == u"identity") {
-            QXmppDiscoveryIq::Identity identity;
-            identity.setLanguage(itemElement.attribute(u"xml:lang"_s));
-            identity.setCategory(itemElement.attribute(u"category"_s));
-            identity.setName(itemElement.attribute(u"name"_s));
-            identity.setType(itemElement.attribute(u"type"_s));
-
-            // FIXME: for some reason the language does not found,
-            // so we are forced to use QDomNamedNodeMap
-            QDomNamedNodeMap m(itemElement.attributes());
-            for (int i = 0; i < m.size(); ++i) {
-                if (m.item(i).nodeName() == u"xml:lang") {
-                    identity.setLanguage(m.item(i).nodeValue());
-                    break;
-                }
-            }
-
-            d->identities.append(identity);
-        } else if (itemElement.tagName() == u"item") {
-            QXmppDiscoveryIq::Item item;
-            item.setJid(itemElement.attribute(u"jid"_s));
-            item.setName(itemElement.attribute(u"name"_s));
-            item.setNode(itemElement.attribute(u"node"_s));
-            d->items.append(item);
-        } else if (itemElement.tagName() == u"x" &&
-                   itemElement.namespaceURI() == ns_data) {
-            d->form.parse(itemElement);
-        }
-    }
+    d->identities = parseChildElements<QList<Identity>>(queryElement);
+    d->items = parseChildElements<QList<Item>>(queryElement);
+    d->form = parseOptionalChildElement<QXmppDataForm>(queryElement).value_or(QXmppDataForm());
 }
 
 void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
@@ -498,28 +522,10 @@ void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     writeOptionalXmlAttribute(writer, u"node", d->queryNode);
 
     if (d->queryType == InfoQuery) {
-        for (const auto &identity : d->identities) {
-            writer->writeStartElement(QSL65(u"identity"));
-            writeOptionalXmlAttribute(writer, u"xml:lang", identity.language());
-            writeOptionalXmlAttribute(writer, u"category", identity.category());
-            writeOptionalXmlAttribute(writer, u"name", identity.name());
-            writeOptionalXmlAttribute(writer, u"type", identity.type());
-            writer->writeEndElement();
-        }
-
-        for (const auto &feature : d->features) {
-            writer->writeStartElement(QSL65("feature"));
-            writeOptionalXmlAttribute(writer, u"var", feature);
-            writer->writeEndElement();
-        }
+        writeElements(writer, d->identities);
+        writeSingleAttributeElements(writer, u"feature", u"var", d->features);
     } else {
-        for (const auto &item : d->items) {
-            writer->writeStartElement(QSL65("item"));
-            writeOptionalXmlAttribute(writer, u"jid", item.jid());
-            writeOptionalXmlAttribute(writer, u"name", item.name());
-            writeOptionalXmlAttribute(writer, u"node", item.node());
-            writer->writeEndElement();
-        }
+        writeElements(writer, d->items);
     }
 
     d->form.toXml(writer);

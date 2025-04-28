@@ -89,6 +89,28 @@ void QXmppByteStreamIq::StreamHost::setZeroconf(const QString &zeroconf)
     m_zeroconf = zeroconf;
 }
 
+/// \cond
+std::optional<QXmppByteStreamIq::StreamHost> QXmppByteStreamIq::StreamHost::fromDom(const QDomElement &el)
+{
+    StreamHost streamHost;
+    streamHost.setHost(el.attribute(u"host"_s));
+    streamHost.setJid(el.attribute(u"jid"_s));
+    streamHost.setPort(parseInt<quint16>(el.attribute(u"port"_s)).value_or(0));
+    streamHost.setZeroconf(el.attribute(u"zeroconf"_s));
+    return streamHost;
+}
+
+void QXmppByteStreamIq::StreamHost::toXml(QXmlStreamWriter *writer) const
+{
+    writer->writeStartElement(QSL65("streamhost"));
+    writeOptionalXmlAttribute(writer, u"host", m_host);
+    writeOptionalXmlAttribute(writer, u"jid", m_jid);
+    writeOptionalXmlAttribute(writer, u"port", QString::number(m_port));
+    writeOptionalXmlAttribute(writer, u"zeroconf", m_zeroconf);
+    writer->writeEndElement();
+}
+/// \endcond
+
 ///
 /// \class QXmppByteStreamIq
 ///
@@ -198,14 +220,7 @@ void QXmppByteStreamIq::parseElementFromChild(const QDomElement &element)
         m_mode = None;
     }
 
-    for (const auto &hostElement : iterChildElements(queryElement, u"streamhost")) {
-        StreamHost streamHost;
-        streamHost.setHost(hostElement.attribute(u"host"_s));
-        streamHost.setJid(hostElement.attribute(u"jid"_s));
-        streamHost.setPort(parseInt<quint16>(hostElement.attribute(u"port"_s)).value_or(0));
-        streamHost.setZeroconf(hostElement.attribute(u"zeroconf"_s));
-        m_streamHosts.append(streamHost);
-    }
+    m_streamHosts = parseChildElements<QList<StreamHost>>(queryElement);
     m_activate = firstChildElement(queryElement, u"activate").text();
     m_streamHostUsed = firstChildElement(queryElement, u"streamhost-used").attribute(u"jid"_s);
 }
@@ -222,14 +237,7 @@ void QXmppByteStreamIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         modeStr = u"udp"_s;
     }
     writeOptionalXmlAttribute(writer, u"mode", modeStr);
-    for (const auto &streamHost : m_streamHosts) {
-        writer->writeStartElement(QSL65("streamhost"));
-        writeOptionalXmlAttribute(writer, u"host", streamHost.host());
-        writeOptionalXmlAttribute(writer, u"jid", streamHost.jid());
-        writeOptionalXmlAttribute(writer, u"port", QString::number(streamHost.port()));
-        writeOptionalXmlAttribute(writer, u"zeroconf", streamHost.zeroconf());
-        writer->writeEndElement();
-    }
+    writeElements(writer, m_streamHosts);
     if (!m_activate.isEmpty()) {
         writeXmlTextElement(writer, u"activate", m_activate);
     }

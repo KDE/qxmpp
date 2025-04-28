@@ -6,6 +6,7 @@
 #ifndef QXMPPDATAFORM_H
 #define QXMPPDATAFORM_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppStanza.h"
 
 #if QXMPP_DEPRECATED_SINCE(1, 1)
@@ -45,6 +46,9 @@ public:
         void setContentType(const QMimeType &contentType);
 
         bool operator==(const MediaSource &other) const;
+        /// \cond
+        static constexpr std::tuple XmlTag = { u"uri", QXmpp::Private::ns_media_element };
+        /// \endcond
 
     private:
         QSharedDataPointer<QXmppDataFormMediaSourcePrivate> d;
@@ -155,6 +159,12 @@ public:
 
         bool operator==(const Field &other) const;
 
+        /// \cond
+        static constexpr std::tuple XmlTag = { u"field", QXmpp::Private::ns_data };
+        static std::optional<Field> fromDom(const QDomElement &el);
+        void toXml(QXmlStreamWriter *writer) const;
+        /// \endcond
+
     private:
         QSharedDataPointer<QXmppDataFormFieldPrivate> d;
     };
@@ -203,6 +213,7 @@ public:
     bool isNull() const;
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_data };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
