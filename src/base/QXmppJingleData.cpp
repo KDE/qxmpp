@@ -630,10 +630,10 @@ void QXmppJingleIq::Content::parse(const QDomElement &element)
     d->description.setSsrc(parseInt<uint32_t>(descriptionElement.attribute(u"ssrc"_s)).value_or(0));
     d->isRtpMultiplexingSupported = !descriptionElement.firstChildElement(u"rtcp-mux"_s).isNull();
     d->rtpEncryption = parseElement<QXmppJingleRtpEncryption>(firstChildElement(descriptionElement, u"encryption", ns_jingle_rtp));
-    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(descriptionElement, u"feedback", ns_jingle_rtp_feedback_negotiation);
-    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(descriptionElement, u"rtcp-fb-trr-int", ns_jingle_rtp_feedback_negotiation);
-    d->rtpHeaderExtensionProperties = parseChildElements<QVector<QXmppJingleRtpHeaderExtensionProperty>>(descriptionElement, u"rtp-hdrext", ns_jingle_rtp_header_extensions_negotiation);
-    d->isRtpHeaderExtensionMixingAllowed = !firstChildElement(descriptionElement, u"extmap-allow-mixed", ns_jingle_rtp_header_extensions_negotiation).isNull();
+    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(descriptionElement, u"feedback", ns_jingle_rtcp_fb);
+    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(descriptionElement, u"rtcp-fb-trr-int", ns_jingle_rtcp_fb);
+    d->rtpHeaderExtensionProperties = parseChildElements<QVector<QXmppJingleRtpHeaderExtensionProperty>>(descriptionElement, u"rtp-hdrext", ns_jingle_rtp_hdrext);
+    d->isRtpHeaderExtensionMixingAllowed = !firstChildElement(descriptionElement, u"extmap-allow-mixed", ns_jingle_rtp_hdrext).isNull();
     d->description.setPayloadTypes(parseChildElements<QList<QXmppJinglePayloadType>>(descriptionElement, u"payload-type", ns_jingle_rtp));
 
     // transport
@@ -684,7 +684,7 @@ void QXmppJingleIq::Content::toXml(QXmlStreamWriter *writer) const
         writeElements(writer, d->rtpFeedbackIntervals);
         writeElements(writer, d->rtpHeaderExtensionProperties);
         if (d->isRtpHeaderExtensionMixingAllowed) {
-            writeEmptyElement(writer, u"extmap-allow-mixed", ns_jingle_rtp_header_extensions_negotiation);
+            writeEmptyElement(writer, u"extmap-allow-mixed", ns_jingle_rtp_hdrext);
         }
 
         writeElements(writer, d->description.payloadTypes());
@@ -1837,8 +1837,8 @@ void QXmppJinglePayloadType::parse(const QDomElement &element)
         d->parameters.insert(child.attribute(u"name"_s), child.attribute(u"value"_s));
     }
 
-    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(element, u"feedback", ns_jingle_rtp_feedback_negotiation);
-    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(element, u"rtcp-fb-trr-int", ns_jingle_rtp_feedback_negotiation);
+    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(element, u"feedback", ns_jingle_rtcp_fb);
+    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(element, u"rtcp-fb-trr-int", ns_jingle_rtcp_fb);
 }
 
 void QXmppJinglePayloadType::toXml(QXmlStreamWriter *writer) const
@@ -2468,13 +2468,13 @@ void QXmppJingleRtpFeedbackProperty::parse(const QDomElement &element)
 {
     d->type = element.attribute(u"type"_s);
     d->subtype = element.attribute(u"subtype"_s);
-    d->parameters = parseChildElements<QVector<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtp_feedback_negotiation);
+    d->parameters = parseChildElements<QVector<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtcp_fb);
 }
 
 void QXmppJingleRtpFeedbackProperty::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("rtcp-fb"));
-    writer->writeDefaultNamespace(toString65(ns_jingle_rtp_feedback_negotiation));
+    writer->writeDefaultNamespace(toString65(ns_jingle_rtcp_fb));
     writeOptionalXmlAttribute(writer, u"type", d->type);
 
     // If there are parameters, they must be used instead of the subtype.
@@ -2498,7 +2498,7 @@ void QXmppJingleRtpFeedbackProperty::toXml(QXmlStreamWriter *writer) const
 bool QXmppJingleRtpFeedbackProperty::isJingleRtpFeedbackProperty(const QDomElement &element)
 {
     return element.tagName() == u"rtcp-fb" &&
-        element.namespaceURI() == ns_jingle_rtp_feedback_negotiation;
+        element.namespaceURI() == ns_jingle_rtcp_fb;
 }
 
 ///
@@ -2548,7 +2548,7 @@ void QXmppJingleRtpFeedbackInterval::parse(const QDomElement &element)
 void QXmppJingleRtpFeedbackInterval::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("rtcp-fb-trr-int"));
-    writer->writeDefaultNamespace(toString65(ns_jingle_rtp_feedback_negotiation));
+    writer->writeDefaultNamespace(toString65(ns_jingle_rtcp_fb));
     writeOptionalXmlAttribute(writer, u"value", QString::number(m_value));
     writer->writeEndElement();
 }
@@ -2564,7 +2564,7 @@ void QXmppJingleRtpFeedbackInterval::toXml(QXmlStreamWriter *writer) const
 bool QXmppJingleRtpFeedbackInterval::isJingleRtpFeedbackInterval(const QDomElement &element)
 {
     return element.tagName() == u"rtcp-fb-trr-int" &&
-        element.namespaceURI() == ns_jingle_rtp_feedback_negotiation;
+        element.namespaceURI() == ns_jingle_rtcp_fb;
 }
 
 class QXmppJingleRtpHeaderExtensionPropertyPrivate : public QSharedData
@@ -2690,19 +2690,19 @@ void QXmppJingleRtpHeaderExtensionProperty::setParameters(const QVector<QXmppSdp
 /// \cond
 void QXmppJingleRtpHeaderExtensionProperty::parse(const QDomElement &element)
 {
-    if (element.tagName() == u"rtp-hdrext" && element.namespaceURI() == ns_jingle_rtp_header_extensions_negotiation) {
+    if (element.tagName() == u"rtp-hdrext" && element.namespaceURI() == ns_jingle_rtp_hdrext) {
         d->id = element.attribute(u"id"_s).toUInt();
         d->uri = element.attribute(u"uri"_s);
         d->senders = enumFromString<Senders>(JINGLE_RTP_HEADER_EXTENSIONS_SENDERS, element.attribute(u"senders"_s))
                          .value_or(Both);
-        d->parameters = parseChildElements<QVector<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtp_header_extensions_negotiation);
+        d->parameters = parseChildElements<QVector<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtp_hdrext);
     }
 }
 
 void QXmppJingleRtpHeaderExtensionProperty::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("rtp-hdrext"));
-    writer->writeDefaultNamespace(toString65(ns_jingle_rtp_header_extensions_negotiation));
+    writer->writeDefaultNamespace(toString65(ns_jingle_rtp_hdrext));
     writeOptionalXmlAttribute(writer, u"id", QString::number(d->id));
     writeOptionalXmlAttribute(writer, u"uri", d->uri);
     if (d->senders != QXmppJingleRtpHeaderExtensionProperty::Both) {
@@ -2723,7 +2723,7 @@ void QXmppJingleRtpHeaderExtensionProperty::toXml(QXmlStreamWriter *writer) cons
 bool QXmppJingleRtpHeaderExtensionProperty::isJingleRtpHeaderExtensionProperty(const QDomElement &element)
 {
     return element.tagName() == u"rtp-hdrext" &&
-        element.namespaceURI() == ns_jingle_rtp_header_extensions_negotiation;
+        element.namespaceURI() == ns_jingle_rtp_hdrext;
 }
 
 class QXmppJingleMessageInitiationElementPrivate : public QSharedData
@@ -2917,7 +2917,7 @@ void QXmppJingleMessageInitiationElement::parse(const QDomElement &element)
 void QXmppJingleMessageInitiationElement::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(jmiElementTypeToString(d->type));
-    writer->writeDefaultNamespace(toString65(ns_jingle_message_initiation));
+    writer->writeDefaultNamespace(toString65(ns_jingle_message));
 
     writeOptionalXmlAttribute(writer, u"id", d->id);
 
@@ -2949,7 +2949,7 @@ QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleMessageInitiationElement)
 ///
 bool QXmppJingleMessageInitiationElement::isJingleMessageInitiationElement(const QDomElement &element)
 {
-    return stringToJmiElementType(element.tagName()).has_value() && element.hasAttribute(u"id"_s) && element.namespaceURI() == ns_jingle_message_initiation;
+    return stringToJmiElementType(element.tagName()).has_value() && element.hasAttribute(u"id"_s) && element.namespaceURI() == ns_jingle_message;
 }
 
 ///
