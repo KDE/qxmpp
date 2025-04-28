@@ -80,6 +80,13 @@ void writeXmlTextElement(QXmlStreamWriter *stream, QStringView name, QStringView
 void writeXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns, QStringView value);
 void writeOptionalXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView value);
 void writeEmptyElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns);
+template<typename Container>
+void writeTextElements(QXmlStreamWriter *writer, QStringView name, const Container &values)
+{
+    for (const auto &value : values) {
+        writeXmlTextElement(writer, name, value);
+    }
+}
 template<typename T>
 inline void writeOptional(QXmlStreamWriter *writer, const std::optional<T> &value)
 {
@@ -174,8 +181,6 @@ auto parseElement(const QDomElement &el) -> std::optional<T>
     }
 }
 
-std::vector<QString> parseTextElements(DomChildElements elements);
-
 // Parse T with T::parse() if DOM element is not null (no namespace check).
 template<typename T>
 auto parseOptionalElement(const QDomElement &domEl) -> std::optional<T>
@@ -191,6 +196,13 @@ template<typename T>
 auto parseOptionalChildElement(const QDomElement &parentEl, QStringView tagName, QStringView xmlns)
 {
     return parseOptionalElement<T>(firstChildElement(parentEl, tagName, xmlns));
+}
+
+template<typename Container = QList<QString>>
+auto parseTextElements(const QDomElement &parent, QStringView tagName, QStringView xmlns)
+    -> Container
+{
+    return transform<Container>(iterChildElements(parent, tagName, xmlns), &QDomElement::text);
 }
 
 QByteArray serializeXml(const void *packet, void (*toXml)(const void *, QXmlStreamWriter *));
