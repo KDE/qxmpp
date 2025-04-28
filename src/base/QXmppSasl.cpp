@@ -296,7 +296,7 @@ std::optional<FastFeature> FastFeature::fromDom(const QDomElement &el)
     }
 
     return FastFeature {
-        .mechanisms = parseTextElements(iterChildElements(el, u"mechanism", ns_fast)),
+        .mechanisms = parseTextElements<std::vector<QString>>(el, u"mechanism", ns_fast),
         .tls0rtt = parseBoolean(el.attribute(QStringLiteral("tls-0rtt"))).value_or(false),
     };
 }
@@ -305,11 +305,7 @@ void FastFeature::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("fast"));
     writer->writeDefaultNamespace(toString65(ns_fast));
-    for (const auto &mechanism : mechanisms) {
-        writer->writeStartElement(QSL65("mechanism"));
-        writer->writeCharacters(mechanism);
-        writer->writeEndElement();
-    }
+    writeTextElements(writer, u"mechanism", mechanisms);
     writer->writeEndElement();
 }
 
@@ -383,11 +379,7 @@ std::optional<StreamFeature> StreamFeature::fromDom(const QDomElement &el)
     }
 
     StreamFeature feature;
-
-    for (const auto &mechEl : iterChildElements(el, u"mechanism", ns_sasl_2)) {
-        feature.mechanisms.push_back(mechEl.text());
-    }
-
+    feature.mechanisms = parseTextElements<QList<QString>>(el, u"mechanism", ns_sasl_2);
     if (auto inlineEl = firstChildElement(el, u"inline", ns_sasl_2); !inlineEl.isNull()) {
         feature.bind2Feature = Bind2Feature::fromDom(firstChildElement(inlineEl, u"bind", ns_bind2));
         feature.fast = FastFeature::fromDom(firstChildElement(inlineEl, u"fast", ns_fast));
@@ -602,9 +594,7 @@ std::optional<Continue> Continue::fromDom(const QDomElement &el)
         }
     }
 
-    for (const auto &taskEl : iterChildElements(firstChildElement(el, u"tasks", ns_sasl_2))) {
-        output.tasks.push_back(taskEl.text());
-    }
+    output.tasks = parseTextElements<std::vector<QString>>(firstChildElement(el, u"tasks", ns_sasl_2), u"task", ns_sasl_2);
     // tasks are mandatory
     if (output.tasks.empty()) {
         return {};
@@ -621,9 +611,7 @@ void Continue::toXml(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(toString65(ns_sasl_2));
     writeOptionalXmlTextElement(writer, u"additional-data", serializeBase64(additionalData));
     writer->writeStartElement(QSL65("tasks"));
-    for (const auto &task : tasks) {
-        writer->writeTextElement(QSL65("task"), task);
-    }
+    writeTextElements(writer, u"task", tasks);
     writer->writeEndElement();
     writeOptionalXmlTextElement(writer, u"text", text);
     writer->writeEndElement();

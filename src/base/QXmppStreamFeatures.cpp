@@ -311,17 +311,11 @@ void QXmppStreamFeatures::parse(const QDomElement &element)
     d->preApprovedSubscriptionsSupported = !firstChildElement(element, u"sub", ns_pre_approval).isNull();
     d->rosterVersioningSupported = !firstChildElement(element, u"ver", ns_rosterver).isNull();
 
-    // parse advertised compression methods
     auto compression = firstChildElement(element, u"compression", ns_compressFeature);
-    for (const auto &subElement : iterChildElements(compression, u"method")) {
-        d->compressionMethods << subElement.text();
-    }
+    d->compressionMethods = parseTextElements(compression, u"method", ns_compressFeature);
 
-    // parse advertised SASL Authentication mechanisms
     auto mechs = firstChildElement(element, u"mechanisms", ns_sasl);
-    for (const auto &subElement : iterChildElements(mechs, u"mechanism")) {
-        d->authMechanisms << subElement.text();
-    }
+    d->authMechanisms = parseTextElements(mechs, u"mechanism", ns_sasl);
 
     d->sasl2Feature = Sasl2::StreamFeature::fromDom(firstChildElement(element, u"authentication", ns_sasl_2));
 }

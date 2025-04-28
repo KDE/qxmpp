@@ -418,10 +418,7 @@ void QXmppRosterIq::Item::parse(const QDomElement &element)
     const QString approved = element.attribute(u"approved"_s);
     d->approved = (approved == u"1" || approved == u"true");
 
-    // groups
-    for (const auto &groupElement : iterChildElements(element, u"group")) {
-        d->groups << groupElement.text();
-    }
+    d->groups = parseTextElements<QSet<QString>>(element, u"group", ns_roster);
 
     // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
     auto channelElement = firstChildElement(element, u"channel", ns_mix_roster);
@@ -450,11 +447,7 @@ void QXmppRosterIq::Item::toXml(QXmlStreamWriter *writer, bool external) const
         writer->writeAttribute(QSL65("approved"), u"true"_s);
     }
 
-    QSet<QString>::const_iterator i = d->groups.constBegin();
-    while (i != d->groups.constEnd()) {
-        writeXmlTextElement(writer, u"group", *i);
-        ++i;
-    }
+    writeTextElements(writer, u"group", d->groups);
 
     // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
     if (d->isMixChannel) {
