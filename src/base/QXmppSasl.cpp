@@ -243,7 +243,7 @@ std::optional<Bind2Request> Bind2Request::fromDom(const QDomElement &el)
         firstChildElement(el, u"tag", ns_bind2).text(),
         !firstChildElement(el, u"inactive", ns_csi).isNull(),
         !firstChildElement(el, u"enable", ns_carbons).isNull(),
-        SmEnable::fromDom(firstChildElement(el, u"enable", ns_stream_management)),
+        parseOptionalChildElement<SmEnable>(el),
     };
 }
 
@@ -269,8 +269,8 @@ std::optional<Bind2Bound> Bind2Bound::fromDom(const QDomElement &el)
     }
 
     return Bind2Bound {
-        .smFailed = SmFailed::fromDom(firstChildElement(el, u"failed", ns_stream_management)),
-        .smEnabled = SmEnabled::fromDom(firstChildElement(el, u"enabled", ns_stream_management)),
+        .smFailed = parseOptionalChildElement<SmFailed>(el),
+        .smEnabled = parseOptionalChildElement<SmEnabled>(el),
     };
 }
 
@@ -375,9 +375,9 @@ std::optional<StreamFeature> StreamFeature::fromDom(const QDomElement &el)
     StreamFeature feature;
     feature.mechanisms = parseTextElements<QList<QString>>(el, u"mechanism", ns_sasl_2);
     if (auto inlineEl = firstChildElement(el, u"inline", ns_sasl_2); !inlineEl.isNull()) {
-        feature.bind2Feature = Bind2Feature::fromDom(firstChildElement(inlineEl, u"bind", ns_bind2));
-        feature.fast = FastFeature::fromDom(firstChildElement(inlineEl, u"fast", ns_fast));
-        feature.streamResumptionAvailable = !firstChildElement(inlineEl, u"sm", ns_stream_management).isNull();
+        feature.bind2Feature = parseOptionalChildElement<Bind2Feature>(inlineEl);
+        feature.fast = parseOptionalChildElement<FastFeature>(inlineEl);
+        feature.streamResumptionAvailable = hasChild<SmFeature>(inlineEl);
     }
     return feature;
 }
@@ -433,11 +433,11 @@ std::optional<Authenticate> Authenticate::fromDom(const QDomElement &el)
     return Authenticate {
         el.attribute(u"mechanism"_s),
         parseBase64(firstChildElement(el, u"initial-response", ns_sasl_2).text()).value_or(QByteArray()),
-        UserAgent::fromDom(firstChildElement(el, u"user-agent", ns_sasl_2)),
-        Bind2Request::fromDom(firstChildElement(el, u"bind", ns_bind2)),
-        SmResume::fromDom(firstChildElement(el, u"resume", ns_stream_management)),
-        FastTokenRequest::fromDom(firstChildElement(el, u"request-token", ns_fast)),
-        FastRequest::fromDom(firstChildElement(el, u"fast", ns_fast)),
+        parseOptionalChildElement<UserAgent>(el),
+        parseOptionalChildElement<Bind2Request>(el),
+        parseOptionalChildElement<SmResume>(el),
+        parseOptionalChildElement<FastTokenRequest>(el),
+        parseOptionalChildElement<FastRequest>(el),
     };
 }
 
@@ -507,10 +507,10 @@ std::optional<Success> Success::fromDom(const QDomElement &el)
     }
 
     output.authorizationIdentifier = firstChildElement(el, u"authorization-identifier", ns_sasl_2).text();
-    output.bound = Bind2Bound::fromDom(firstChildElement(el, u"bound", ns_bind2));
-    output.smResumed = SmResumed::fromDom(firstChildElement(el, u"resumed", ns_stream_management));
-    output.smFailed = SmFailed::fromDom(firstChildElement(el, u"failed", ns_stream_management));
-    output.token = FastToken::fromDom(firstChildElement(el, u"token", ns_fast));
+    output.bound = parseOptionalChildElement<Bind2Bound>(el);
+    output.smResumed = parseOptionalChildElement<SmResumed>(el);
+    output.smFailed = parseOptionalChildElement<SmFailed>(el);
+    output.token = parseOptionalChildElement<FastToken>(el);
 
     return output;
 }

@@ -8,6 +8,7 @@
 #ifndef QXMPPSASL_P_H
 #define QXMPPSASL_P_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 #include "QXmppLogger.h"
 #include "QXmppNonza.h"
@@ -63,6 +64,7 @@ QString errorConditionToString(ErrorCondition);
 std::optional<ErrorCondition> errorConditionFromString(QStringView);
 
 struct Auth {
+    static constexpr std::tuple XmlTag = { u"auth", ns_sasl };
     static std::optional<Auth> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
 
@@ -71,6 +73,7 @@ struct Auth {
 };
 
 struct Challenge {
+    static constexpr std::tuple XmlTag = { u"challenge", ns_sasl };
     static std::optional<Challenge> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
 
@@ -78,6 +81,7 @@ struct Challenge {
 };
 
 struct Failure {
+    static constexpr std::tuple XmlTag = { u"failure", ns_sasl };
     static std::optional<Failure> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
 
@@ -86,6 +90,7 @@ struct Failure {
 };
 
 struct Response {
+    static constexpr std::tuple XmlTag = { u"response", ns_sasl };
     static std::optional<Response> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
 
@@ -93,6 +98,7 @@ struct Response {
 };
 
 struct Success {
+    static constexpr std::tuple XmlTag = { u"success", ns_sasl };
     static std::optional<Success> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
 };
@@ -100,6 +106,7 @@ struct Success {
 }  // namespace Sasl
 
 struct Bind2Feature {
+    static constexpr std::tuple XmlTag = { u"bind", ns_bind2 };
     static std::optional<Bind2Feature> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -107,6 +114,7 @@ struct Bind2Feature {
 };
 
 struct Bind2Request {
+    static constexpr std::tuple XmlTag = { u"bind", ns_bind2 };
     static std::optional<Bind2Request> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -118,6 +126,7 @@ struct Bind2Request {
 };
 
 struct Bind2Bound {
+    static constexpr std::tuple XmlTag = { u"bound", ns_bind2 };
     static std::optional<Bind2Bound> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -127,6 +136,7 @@ struct Bind2Bound {
 };
 
 struct FastFeature {
+    static constexpr std::tuple XmlTag = { u"fast", ns_fast };
     static std::optional<FastFeature> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -135,6 +145,7 @@ struct FastFeature {
 };
 
 struct FastTokenRequest {
+    static constexpr std::tuple XmlTag = { u"request-token", ns_fast };
     static std::optional<FastTokenRequest> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -142,6 +153,7 @@ struct FastTokenRequest {
 };
 
 struct FastToken {
+    static constexpr std::tuple XmlTag = { u"token", ns_fast };
     static std::optional<FastToken> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -150,6 +162,7 @@ struct FastToken {
 };
 
 struct FastRequest {
+    static constexpr std::tuple XmlTag = { u"fast", ns_fast };
     static std::optional<FastRequest> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -160,6 +173,7 @@ struct FastRequest {
 namespace Sasl2 {
 
 struct StreamFeature {
+    static constexpr std::tuple XmlTag = { u"authentication", QXmpp::Private::ns_sasl_2 };
     static std::optional<StreamFeature> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -170,6 +184,7 @@ struct StreamFeature {
 };
 
 struct UserAgent {
+    static constexpr std::tuple XmlTag = { u"user-agent", QXmpp::Private::ns_sasl_2 };
     static std::optional<UserAgent> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -179,6 +194,7 @@ struct UserAgent {
 };
 
 struct Authenticate {
+    static constexpr std::tuple XmlTag = { u"authenticate", QXmpp::Private::ns_sasl_2 };
     static std::optional<Authenticate> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -192,6 +208,7 @@ struct Authenticate {
 };
 
 struct Challenge {
+    static constexpr std::tuple XmlTag = { u"challenge", QXmpp::Private::ns_sasl_2 };
     static std::optional<Challenge> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -199,6 +216,7 @@ struct Challenge {
 };
 
 struct Response {
+    static constexpr std::tuple XmlTag = { u"response", QXmpp::Private::ns_sasl_2 };
     static std::optional<Response> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -206,6 +224,7 @@ struct Response {
 };
 
 struct Success {
+    static constexpr std::tuple XmlTag = { u"success", QXmpp::Private::ns_sasl_2 };
     static std::optional<Success> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -219,6 +238,7 @@ struct Success {
 };
 
 struct Failure {
+    static constexpr std::tuple XmlTag = { u"failure", QXmpp::Private::ns_sasl_2 };
     static std::optional<Failure> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -228,6 +248,7 @@ struct Failure {
 };
 
 struct Continue {
+    static constexpr std::tuple XmlTag = { u"continue", QXmpp::Private::ns_sasl_2 };
     static std::optional<Continue> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
@@ -237,6 +258,7 @@ struct Continue {
 };
 
 struct Abort {
+    static constexpr std::tuple XmlTag = { u"abort", QXmpp::Private::ns_sasl_2 };
     static std::optional<Abort> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 
