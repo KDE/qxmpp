@@ -4,6 +4,7 @@
 
 #include "QXmppMovedManager.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMovedItem_p.h"
@@ -15,7 +16,6 @@
 #include "QXmppUtils_p.h"
 
 #include "Async.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QUrl>

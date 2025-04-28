@@ -4,10 +4,10 @@
 
 #include "QXmppPubSubEvent.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

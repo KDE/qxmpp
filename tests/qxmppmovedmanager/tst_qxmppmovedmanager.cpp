@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMovedManager.h"
 #include "QXmppPubSubManager.h"
-
-#include "Constants.h"
 #ifdef BUILD_INTERNAL_TESTS
 #include "QXmppMovedItem_p.h"
 #endif

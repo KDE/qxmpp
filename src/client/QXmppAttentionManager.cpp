@@ -8,11 +8,10 @@
 #include <QTimer>
 // QXmpp
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppMessage.h"
 #include "QXmppRosterManager.h"
 #include "QXmppUtils.h"
-
-#include "Constants.h"
 
 ///
 /// \class QXmppAttentionManager

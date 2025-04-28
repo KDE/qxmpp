@@ -3,13 +3,13 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppConstants_p.h"
 #include "QXmppDataFormBase.h"
 #include "QXmppMixConfigItem.h"
 #include "QXmppMixInfoItem.h"
 #include "QXmppMixParticipantItem.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 using namespace QXmpp::Private;

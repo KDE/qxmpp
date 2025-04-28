@@ -4,6 +4,7 @@
 
 #include "QXmppServer.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppDialback.h"
 #include "QXmppIncomingClient.h"
 #include "QXmppIncomingServer.h"
@@ -13,7 +14,6 @@
 #include "QXmppServerPlugin.h"
 #include "QXmppUtils.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>

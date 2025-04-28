@@ -4,12 +4,12 @@
 
 #include "QXmppBlockingManager.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "Async.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

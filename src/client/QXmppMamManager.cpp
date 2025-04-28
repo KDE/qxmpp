@@ -6,6 +6,7 @@
 #include "QXmppMamManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppMamIq.h"
@@ -15,7 +16,6 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <unordered_map>

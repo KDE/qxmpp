@@ -6,12 +6,12 @@
 #include "QXmppAccountMigrationManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppPromise.h"
 #include "QXmppTask.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>
