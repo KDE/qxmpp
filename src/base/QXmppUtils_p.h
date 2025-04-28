@@ -150,6 +150,18 @@ inline auto nextSiblingElement(const QDomElement &el)
     return nextSiblingElement(el, tag, ns);
 }
 
+inline auto hasChild(const QDomElement &el, QStringView tagName = {}, QStringView xmlns = {})
+{
+    return !firstChildElement(el, tagName, xmlns).isNull();
+}
+
+template<typename T>
+inline auto hasChild(const QDomElement &el)
+    requires HasXmlTag<T>
+{
+    return !firstChildElement<T>(el).isNull();
+}
+
 struct DomChildElements {
     QDomElement parent;
     QStringView tagName;
