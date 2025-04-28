@@ -331,9 +331,7 @@ bool QXmppPubSubEventBase::parseExtension(const QDomElement &eventElement, QXmpp
             break;
         case Retract:
             // parse retract ids
-            for (const auto &retract : iterChildElements(eventTypeElement, u"retract")) {
-                d->retractIds << retract.attribute(u"id"_s);
-            }
+            d->retractIds = parseSingleAttributeElements(eventTypeElement, u"retract", ns_pubsub_event, u"id"_s);
             break;
         case Subscription: {
             QXmppPubSubSubscription subscription;

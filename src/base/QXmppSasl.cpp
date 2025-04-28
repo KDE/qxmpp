@@ -210,9 +210,7 @@ std::optional<Bind2Feature> Bind2Feature::fromDom(const QDomElement &el)
     Bind2Feature bind2;
 
     auto inlineElement = firstChildElement(el, u"inline", ns_bind2);
-    for (const auto &featureEl : iterChildElements(inlineElement, u"feature", ns_bind2)) {
-        bind2.features.push_back(featureEl.attribute(u"var"_s));
-    }
+    bind2.features = parseSingleAttributeElements<std::vector<QString>>(inlineElement, u"feature", ns_bind2, u"var"_s);
 
     return bind2;
 }
