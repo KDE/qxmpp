@@ -3421,6 +3421,11 @@ void QXmppCallInviteElement::Jingle::toXml(QXmlStreamWriter *writer) const
     }
 }
 
+void QXmppCallInviteElement::External::parse(const QDomElement &el)
+{
+    uri = el.attribute(u"uri"_s);
+}
+
 void QXmppCallInviteElement::External::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeEmptyElement(u"external"_s);
