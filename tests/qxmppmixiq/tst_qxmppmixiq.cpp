@@ -590,7 +590,7 @@ void tst_QXmppMixIq::testListToMixNodes()
 {
     QVERIFY(!listToMixNodes({}));
     const QXmppMixConfigItem::Nodes nodes = { QXmppMixConfigItem::Node::AllowedJids | QXmppMixConfigItem::Node::BannedJids };
-    const QVector<QString> nodeList = { u"urn:xmpp:mix:nodes:allowed"_s, u"urn:xmpp:mix:nodes:banned"_s };
+    const QList<QString> nodeList = { u"urn:xmpp:mix:nodes:allowed"_s, u"urn:xmpp:mix:nodes:banned"_s };
     QCOMPARE(listToMixNodes(nodeList), nodes);
 }
 
@@ -598,7 +598,7 @@ void tst_QXmppMixIq::testMixNodesToList()
 {
     QVERIFY(mixNodesToList({}).isEmpty());
     const QXmppMixConfigItem::Nodes nodes = { QXmppMixConfigItem::Node::AllowedJids | QXmppMixConfigItem::Node::BannedJids };
-    const QVector<QString> nodeList = { u"urn:xmpp:mix:nodes:allowed"_s, u"urn:xmpp:mix:nodes:banned"_s };
+    const QList<QString> nodeList = { u"urn:xmpp:mix:nodes:allowed"_s, u"urn:xmpp:mix:nodes:banned"_s };
     QCOMPARE(mixNodesToList(nodes), nodeList);
 }
 

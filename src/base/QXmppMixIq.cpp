@@ -111,40 +111,16 @@ bool QXmppMixSubscriptionUpdateIq::isMixSubscriptionUpdateIq(const QDomElement &
 void QXmppMixSubscriptionUpdateIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement child = element.firstChildElement();
-
-    QVector<QString> additions;
-    QVector<QString> removals;
-
-    for (const auto &node : iterChildElements(child, u"subscribe")) {
-        additions << node.attribute(u"node"_s);
-    }
-    for (const auto &node : iterChildElements(child, u"unsubscribe")) {
-        removals << node.attribute(u"node"_s);
-    }
-
-    m_additions = listToMixNodes(additions);
-    m_removals = listToMixNodes(removals);
+    m_additions = listToMixNodes(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
+    m_removals = listToMixNodes(parseSingleAttributeElements(child, u"unsubscribe", ns_mix, u"node"_s));
 }
 
 void QXmppMixSubscriptionUpdateIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("update-subscription"));
     writer->writeDefaultNamespace(toString65(ns_mix));
-
-    const auto additions = mixNodesToList(m_additions);
-    for (const auto &addition : additions) {
-        writer->writeStartElement(QSL65("subscribe"));
-        writer->writeAttribute(QSL65("node"), addition);
-        writer->writeEndElement();
-    }
-
-    const auto removals = mixNodesToList(m_removals);
-    for (const auto &removal : removals) {
-        writer->writeStartElement(QSL65("unsubscribe"));
-        writer->writeAttribute(QSL65("node"), removal);
-        writer->writeEndElement();
-    }
-
+    writeSingleAttributeElements(writer, u"subscribe", u"node", mixNodesToList(m_additions));
+    writeSingleAttributeElements(writer, u"unsubscribe", u"node", mixNodesToList(m_removals));
     writer->writeEndElement();
 }
 
@@ -508,7 +484,7 @@ void QXmppMixIq::setChannelJid(const QString &channelJid)
 ///
 QStringList QXmppMixIq::nodes() const
 {
-    return mixNodesToList(d->subscriptions).toList();
+    return mixNodesToList(d->subscriptions);
 }
 
 ///
@@ -521,7 +497,7 @@ QStringList QXmppMixIq::nodes() const
 ///
 void QXmppMixIq::setNodes(const QStringList &nodes)
 {
-    d->subscriptions = listToMixNodes(nodes.toVector());
+    d->subscriptions = listToMixNodes(nodes);
 }
 
 ///
@@ -646,13 +622,7 @@ void QXmppMixIq::parseElementFromChild(const QDomElement &element)
 
         d->nick = firstChildElement(child, u"nick").text();
         d->invitation = parseOptionalChildElement<QXmppMixInvitation>(child, u"invitation", ns_mix_misc);
-
-        QVector<QString> subscriptions;
-        for (const auto &node : iterChildElements(child, u"subscribe")) {
-            subscriptions << node.attribute(u"node"_s);
-        }
-
-        d->subscriptions = listToMixNodes(subscriptions);
+        d->subscriptions = listToMixNodes(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
     }
 }
 
@@ -682,20 +652,9 @@ void QXmppMixIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         writeOptionalXmlAttribute(writer, u"id", d->participantId);
     }
 
-    const auto subscriptions = mixNodesToList(d->subscriptions);
-    for (const auto &subscription : subscriptions) {
-        writer->writeStartElement(QSL65("subscribe"));
-        writer->writeAttribute(QSL65("node"), subscription);
-        writer->writeEndElement();
-    }
-
-    if (!d->nick.isEmpty()) {
-        writer->writeTextElement(QSL65("nick"), d->nick);
-    }
-
-    if (d->invitation) {
-        d->invitation->toXml(writer);
-    }
+    writeSingleAttributeElements(writer, u"subscribe", u"node", mixNodesToList(d->subscriptions));
+    writeOptionalXmlTextElement(writer, u"nick", d->nick);
+    writeOptional(writer, d->invitation);
 
     writer->writeEndElement();
 
@@ -714,9 +673,9 @@ namespace QXmpp::Private {
 ///
 /// \return the list of nodes
 ///
-QVector<QString> mixNodesToList(QXmppMixConfigItem::Nodes nodes)
+QList<QString> mixNodesToList(QXmppMixConfigItem::Nodes nodes)
 {
-    QVector<QString> nodeList;
+    QList<QString> nodeList;
 
     for (auto itr = NODES.cbegin(); itr != NODES.cend(); ++itr) {
         if (nodes.testFlag(itr.key())) {
@@ -734,7 +693,7 @@ QVector<QString> mixNodesToList(QXmppMixConfigItem::Nodes nodes)
 ///
 /// \return the nodes flag
 ///
-QXmppMixConfigItem::Nodes listToMixNodes(const QVector<QString> &nodeList)
+QXmppMixConfigItem::Nodes listToMixNodes(const QList<QString> &nodeList)
 {
     QXmppMixConfigItem::Nodes nodes;
 

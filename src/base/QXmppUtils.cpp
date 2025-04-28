@@ -361,6 +361,13 @@ void QXmpp::Private::writeEmptyElement(QXmlStreamWriter *writer, QStringView nam
     writer->writeEndElement();
 }
 
+void QXmpp::Private::writeSingleAttributeElement(QXmlStreamWriter *writer, QStringView name, QStringView attribute, QStringView value)
+{
+    writer->writeStartElement(toString65(name));
+    writer->writeAttribute(toString65(attribute), toString65(value));
+    writer->writeEndElement();
+}
+
 std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
 {
     if (auto result = QByteArray::fromBase64Encoding(text.toUtf8())) {
