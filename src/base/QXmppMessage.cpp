@@ -9,6 +9,7 @@
 #include "QXmppMessage.h"
 
 #include "QXmppBitsOfBinaryDataList.h"
+#include "QXmppConstants_p.h"
 #include "QXmppFallback.h"
 #include "QXmppFileShare.h"
 #include "QXmppGlobal_p.h"
@@ -17,7 +18,6 @@
 #include "QXmppMixInvitation.h"
 
 #include "Algorithms.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 #ifdef BUILD_OMEMO
 #include "QXmppOmemoElement_p.h"

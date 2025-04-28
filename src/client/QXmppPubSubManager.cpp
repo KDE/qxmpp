@@ -7,6 +7,7 @@
 #include "QXmppPubSubManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppPubSubAffiliation.h"
 #include "QXmppPubSubBaseItem.h"
 #include "QXmppPubSubEventHandler.h"
@@ -17,7 +18,6 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

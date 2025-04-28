@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppConfiguration.h"
+#include "QXmppConstants_p.h"
 #include "QXmppCredentials.h"
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSaslManager_p.h"
@@ -13,7 +14,6 @@
 
 #include "Algorithms.h"
 #include "Async.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
 

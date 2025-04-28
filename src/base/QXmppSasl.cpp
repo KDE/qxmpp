@@ -5,13 +5,13 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppConstants_p.h"
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSasl_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

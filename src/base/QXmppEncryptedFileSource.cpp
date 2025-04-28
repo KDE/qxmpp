@@ -5,10 +5,10 @@
 
 #include "QXmppEncryptedFileSource.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppHttpFileSource.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <optional>

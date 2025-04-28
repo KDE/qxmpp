@@ -5,13 +5,13 @@
 #include "QXmppUploadRequestManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppHttpUploadIq.h"
 
 #include "Async.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

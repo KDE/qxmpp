@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppPubSubAffiliation.h"
 #include "QXmppPubSubIq_p.h"
@@ -10,7 +11,6 @@
 #include "QXmppResultSet.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QSharedData>

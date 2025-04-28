@@ -7,6 +7,7 @@
 #include "QXmppOutgoingClient.h"
 
 #include "QXmppBindIq.h"
+#include "QXmppConstants_p.h"
 #include "QXmppMessage.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppOutgoingClient_p.h"
@@ -18,7 +19,6 @@
 
 #include "Algorithms.h"
 #include "Async.h"
-#include "Constants.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 

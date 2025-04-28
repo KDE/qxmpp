@@ -12,12 +12,12 @@
 #include "QXmppCallStream_p.h"
 #include "QXmppCall_p.h"
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppJingleIq.h"
 #include "QXmppStun.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <chrono>

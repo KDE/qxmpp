@@ -8,6 +8,7 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppClient_p.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeExtension.h"
@@ -26,7 +27,6 @@
 #include "QXmppVersionManager.h"
 
 #include "Async.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
 

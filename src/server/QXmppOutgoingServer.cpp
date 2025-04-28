@@ -4,12 +4,12 @@
 
 #include "QXmppOutgoingServer.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppDialback.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
-#include "Constants.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"

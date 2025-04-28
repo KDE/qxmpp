@@ -6,13 +6,13 @@
 #include "QXmppRegistrationManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppRegisterIq.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppUtils.h"
 
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>

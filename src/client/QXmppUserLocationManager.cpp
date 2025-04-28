@@ -5,10 +5,9 @@
 
 #include "QXmppUserLocationManager.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppGeolocItem.h"
 #include "QXmppPep_p.h"
-
-#include "Constants.h"
 
 using namespace QXmpp::Private;
 

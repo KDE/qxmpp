@@ -6,12 +6,12 @@
 
 #include "QXmppClient.h"
 #include "QXmppClient_p.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppIqHandling.h"
 
 #include "Async.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>

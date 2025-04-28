@@ -4,13 +4,13 @@
 
 #include "QXmppFileMetadata.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppHash.h"
 #include "QXmppThumbnail.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Constants.h"
 #include "StringLiterals.h"
 
 #include <utility>

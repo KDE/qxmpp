@@ -6,13 +6,13 @@
 #ifndef QXMPPOMEMOMANAGER_P_H
 #define QXMPPOMEMOMANAGER_P_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppOmemoDeviceBundle_p.h"
 #include "QXmppOmemoManager.h"
 #include "QXmppOmemoStorage.h"
 #include "QXmppPubSubManager.h"
 
-#include "Constants.h"
 #include "OmemoLibWrappers.h"
 #include "QcaInitializer_p.h"
 
