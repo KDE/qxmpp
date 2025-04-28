@@ -16,6 +16,8 @@
 #include <QUuid>
 
 using namespace QXmpp;
+using namespace QXmpp::Private;
+
 using Jmi = QXmppJingleMessageInitiation;
 using JmiManager = QXmppJingleMessageInitiationManager;
 using JmiElement = QXmppJingleMessageInitiationElement;

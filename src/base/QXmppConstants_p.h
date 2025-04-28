@@ -24,7 +24,6 @@ namespace QXmpp::Private {
 constexpr quint16 XMPP_DEFAULT_PORT = 5222;
 constexpr quint16 XMPPS_DEFAULT_PORT = 5223;
 constexpr quint16 XMPP_SERVER_DEFAULT_PORT = 5269;
-}  // namespace QXmpp::Private
 
 // QXmpp
 inline constexpr QStringView ns_qxmpp_credentials = u"org.qxmpp.credentials";
@@ -267,5 +266,7 @@ inline constexpr QStringView ns_reply = u"urn:xmpp:reply:0";
 inline constexpr QStringView ns_call_invites = u"urn:xmpp:call-invites:0";
 // XEP-0484: Fast Authentication Streamlining Tokens
 inline constexpr auto ns_fast = u"urn:xmpp:fast:0";
+
+}  // namespace QXmpp::Private
 
 #endif  // CONSTANTS_H

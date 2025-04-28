@@ -13,6 +13,8 @@
 #include "QXmppRosterManager.h"
 #include "QXmppUtils.h"
 
+using namespace QXmpp::Private;
+
 ///
 /// \class QXmppAttentionManager
 ///

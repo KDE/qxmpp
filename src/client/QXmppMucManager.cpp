@@ -14,6 +14,8 @@
 #include <QDomElement>
 #include <QMap>
 
+using namespace QXmpp::Private;
+
 class QXmppMucManagerPrivate
 {
 public:

@@ -13,6 +13,8 @@
 #include <QUuid>
 
 using namespace QXmpp;
+using namespace QXmpp::Private;
+
 using CallInviteType = QXmppCallInviteElement::Type;
 
 class QXmppCallInvitePrivate

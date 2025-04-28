@@ -25,6 +25,8 @@
 #include <QSslKey>
 #include <QSslSocket>
 
+using namespace QXmpp::Private;
+
 static void helperToXmlAddDomElement(QXmlStreamWriter *stream, const QDomElement &element, const QVector<QStringView> &omitNamespaces)
 {
     stream->writeStartElement(element.tagName());

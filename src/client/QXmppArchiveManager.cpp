@@ -10,6 +10,8 @@
 
 #include <QDomElement>
 
+using namespace QXmpp::Private;
+
 /// \cond
 QStringList QXmppArchiveManager::discoveryFeatures() const
 {
