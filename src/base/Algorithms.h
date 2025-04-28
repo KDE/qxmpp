@@ -14,13 +14,23 @@
 namespace QXmpp::Private {
 
 template<typename T>
-constexpr bool HasShrinkToFit = requires(const T &t) {
+concept HasShrinkToFit = requires(const T &t) {
     t.shrink_to_fit();
 };
 
 template<typename T>
-constexpr bool HasSqueeze = requires(const T &t) {
+concept HasSqueeze = requires(const T &t) {
     t.squeeze();
+};
+
+template<typename T>
+concept HasPushBack = requires(T t, T::value_type value) {
+    t.push_back(value);
+};
+
+template<typename T>
+concept HasInsert = requires(T t, T::value_type value) {
+    t.insert(value);
 };
 
 template<typename OutputVector, typename InputVector, typename Converter>
@@ -31,7 +41,13 @@ auto transform(const InputVector &input, Converter convert)
         output.reserve(input.size());
     }
     for (const auto &value : input) {
-        output.push_back(std::invoke(convert, value));
+        if constexpr (HasPushBack<OutputVector>) {
+            output.push_back(std::invoke(convert, value));
+        } else if constexpr (HasInsert<OutputVector>) {
+            output.insert(std::invoke(convert, value));
+        } else {
+            static_assert(false, "OutputVector must support push_back() or insert()");
+        }
     }
     return output;
 }
