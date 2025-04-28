@@ -273,7 +273,7 @@ QXmppJingleMessageInitiationManager::~QXmppJingleMessageInitiationManager() = de
 /// \cond
 QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
 {
-    return { ns_jingle_message_initiation.toString() };
+    return { ns_jingle_message.toString() };
 }
 /// \endcond
 
