@@ -26,25 +26,6 @@ static void makeUnique(T &vec)
     vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
 }
 
-// IQ parsing helpers
-static QVector<QString> parseItems(const QDomElement &el)
-{
-    QVector<QString> jids;
-    for (const auto &item : iterChildElements(el, u"item")) {
-        jids.append(item.attribute(u"jid"_s));
-    }
-    return jids;
-}
-
-static void serializeItems(QXmlStreamWriter *writer, const QVector<QString> &jids)
-{
-    for (const auto &jid : jids) {
-        writer->writeStartElement(QSL65("item"));
-        writer->writeAttribute(QSL65("jid"), jid);
-        writer->writeEndElement();
-    }
-}
-
 // IQs
 class BlocklistIq : public QXmppIq
 {
@@ -53,13 +34,13 @@ public:
 
     void parseElementFromChild(const QDomElement &el) override
     {
-        jids = parseItems(el.firstChildElement());
+        jids = parseSingleAttributeElements<QVector<QString>>(el.firstChildElement(), u"item", ns_blocking, u"jid"_s);
     }
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override
     {
         writer->writeStartElement(QSL65("blocklist"));
         writer->writeDefaultNamespace(toString65(ns_blocking));
-        serializeItems(writer, jids);
+        writeSingleAttributeElements(writer, u"item", u"jid", jids);
         writer->writeEndElement();
     }
     static bool checkIqType(const QString &tagName, const QString &xmlns)
@@ -80,13 +61,13 @@ public:
 
     void parseElementFromChild(const QDomElement &el) override
     {
-        jids = parseItems(el.firstChildElement());
+        jids = parseSingleAttributeElements<QVector<QString>>(el.firstChildElement(), u"item", ns_blocking, u"jid"_s);
     }
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override
     {
         writer->writeStartElement(QSL65("block"));
         writer->writeDefaultNamespace(toString65(ns_blocking));
-        serializeItems(writer, jids);
+        writeSingleAttributeElements(writer, u"item", u"jid", jids);
         writer->writeEndElement();
     }
     static bool checkIqType(const QString &tagName, const QString &xmlns)
@@ -107,14 +88,14 @@ public:
 
     void parseElementFromChild(const QDomElement &el) override
     {
-        jids = parseItems(el.firstChildElement());
+        jids = parseSingleAttributeElements<QVector<QString>>(el.firstChildElement(), u"item", ns_blocking, u"jid"_s);
     }
 
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override
     {
         writer->writeStartElement(QSL65("unblock"));
         writer->writeDefaultNamespace(toString65(ns_blocking));
-        serializeItems(writer, jids);
+        writeSingleAttributeElements(writer, u"item", u"jid", jids);
         writer->writeEndElement();
     }
 

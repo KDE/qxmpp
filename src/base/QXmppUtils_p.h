@@ -82,6 +82,14 @@ void writeXmlTextElement(QXmlStreamWriter *stream, QStringView name, QStringView
 void writeXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns, QStringView value);
 void writeOptionalXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView value);
 void writeEmptyElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns);
+void writeSingleAttributeElement(QXmlStreamWriter *writer, QStringView name, QStringView attribute, QStringView value);
+template<typename Container>
+void writeSingleAttributeElements(QXmlStreamWriter *writer, QStringView name, QStringView attribute, const Container &values)
+{
+    for (const auto &value : values) {
+        writeSingleAttributeElement(writer, name, attribute, value);
+    }
+}
 template<typename Container>
 void writeTextElements(QXmlStreamWriter *writer, QStringView name, const Container &values)
 {
@@ -298,6 +306,14 @@ auto parseTextElements(const QDomElement &parent, QStringView tagName, QStringVi
     -> Container
 {
     return transform<Container>(iterChildElements(parent, tagName, xmlns), &QDomElement::text);
+}
+
+template<typename Container = QList<QString>>
+auto parseSingleAttributeElements(const QDomElement &parent, QStringView tagName, QStringView xmlns, const QString &attribute)
+{
+    return transform<Container>(iterChildElements(parent, tagName, xmlns), [=](const QDomElement &el) {
+        return el.attribute(attribute);
+    });
 }
 
 QByteArray serializeXml(const void *packet, void (*toXml)(const void *, QXmlStreamWriter *));

@@ -75,8 +75,8 @@ private:
 
 namespace QXmpp::Private {
 
-QXMPP_EXPORT QVector<QString> mixNodesToList(QXmppMixConfigItem::Nodes nodes);
-QXMPP_EXPORT QXmppMixConfigItem::Nodes listToMixNodes(const QVector<QString> &nodeList);
+QXMPP_EXPORT QList<QString> mixNodesToList(QXmppMixConfigItem::Nodes nodes);
+QXMPP_EXPORT QXmppMixConfigItem::Nodes listToMixNodes(const QList<QString> &nodeList);
 
 }  // namespace QXmpp::Private
 

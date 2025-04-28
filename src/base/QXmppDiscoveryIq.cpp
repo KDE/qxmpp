@@ -457,10 +457,10 @@ void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
         d->queryType = InfoQuery;
     }
 
+    d->features = parseSingleAttributeElements(queryElement, u"feature", ns_disco_info, u"var"_s);
+
     for (const auto &itemElement : iterChildElements(queryElement)) {
-        if (itemElement.tagName() == u"feature") {
-            d->features.append(itemElement.attribute(u"var"_s));
-        } else if (itemElement.tagName() == u"identity") {
+        if (itemElement.tagName() == u"identity") {
             QXmppDiscoveryIq::Identity identity;
             identity.setLanguage(itemElement.attribute(u"xml:lang"_s));
             identity.setCategory(itemElement.attribute(u"category"_s));
