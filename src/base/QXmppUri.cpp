@@ -11,14 +11,11 @@
 #include "StringLiterals.h"
 
 #include <array>
-#include <ranges>
 
 #include <QUrlQuery>
 
 using namespace QXmpp::Private;
 using namespace QXmpp::Uri;
-
-using std::ranges::transform;
 
 constexpr QStringView SCHEME = u"xmpp";
 constexpr QChar QUERY_ITEM_DELIMITER = u';';
@@ -334,9 +331,7 @@ CustomQuery parseCustomQuery(const QUrlQuery &q)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     return CustomQuery { queryName, queryItems };
 #else
-    QList<std::pair<QString, QString>> queryItemsStdPair;
-    queryItemsStdPair.reserve(queryItems.size());
-    transform(queryItems, std::back_inserter(queryItemsStdPair), [](const auto &pair) { return std::pair { pair.first, pair.second }; });
+    auto queryItemsStdPair = transform<QList<std::pair<QString, QString>>>(queryItems, [](const auto &pair) { return std::pair { pair.first, pair.second }; });
     return CustomQuery { queryName, queryItemsStdPair };
 #endif
 }
