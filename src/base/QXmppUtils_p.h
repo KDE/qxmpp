@@ -121,9 +121,34 @@ QString serializeBoolean(bool);
 // DOM
 //
 
+template<typename T>
+concept HasXmlTag = requires {
+    { T::XmlTag };
+    { std::get<0>(T::XmlTag) };
+    { std::get<1>(T::XmlTag) };
+    { std::is_constructible_v<QStringView, decltype(std::get<0>(T::XmlTag))> };
+    { std::is_constructible_v<QStringView, decltype(std::get<1>(T::XmlTag))> };
+};
+
 QXMPP_EXPORT bool isIqType(const QDomElement &, QStringView tagName, QStringView xmlns);
 QXMPP_EXPORT QDomElement firstChildElement(const QDomElement &, QStringView tagName = {}, QStringView xmlNs = {});
 QXMPP_EXPORT QDomElement nextSiblingElement(const QDomElement &, QStringView tagName = {}, QStringView xmlNs = {});
+
+template<typename T>
+inline auto firstChildElement(const QDomElement &el)
+    requires HasXmlTag<T>
+{
+    auto [tag, ns] = T::XmlTag;
+    return firstChildElement(el, tag, ns);
+}
+
+template<typename T>
+inline auto nextSiblingElement(const QDomElement &el)
+    requires HasXmlTag<T>
+{
+    auto [tag, ns] = T::XmlTag;
+    return nextSiblingElement(el, tag, ns);
+}
 
 struct DomChildElements {
     QDomElement parent;
@@ -150,6 +175,14 @@ struct DomChildElements {
 };
 
 inline DomChildElements iterChildElements(const QDomElement &el, QStringView tagName = {}, QStringView namespaceUri = {}) { return DomChildElements { el, tagName, namespaceUri }; }
+
+template<typename T>
+inline auto iterChildElements(const QDomElement &el)
+    requires HasXmlTag<T>
+{
+    auto [tag, ns] = T::XmlTag;
+    return iterChildElements(el, tag, ns);
+}
 
 template<typename T>
 concept DomParsableV1 = requires(T t) {
@@ -202,19 +235,45 @@ auto parseOptionalElement(const QDomElement &domEl) -> std::optional<T>
 // Parse T with T::parse() with first child element with the correct tag name and namespace.
 template<typename T>
 auto parseOptionalChildElement(const QDomElement &parentEl, QStringView tagName, QStringView xmlns)
+    requires(!HasXmlTag<T>)
 {
     return parseOptionalElement<T>(firstChildElement(parentEl, tagName, xmlns));
+}
+
+template<typename T>
+auto parseOptionalChildElement(const QDomElement &parentEl)
+    requires HasXmlTag<T>
+{
+    auto [tag, ns] = T::XmlTag;
+    return parseOptionalElement<T>(firstChildElement(parentEl, tag, ns));
 }
 
 // Parse all child elements matching the tag name and namespace into a container.
 template<typename Container>
 auto parseChildElements(const QDomElement &parentEl, QStringView tagName, QStringView xmlns)
     -> Container
+    requires(!HasXmlTag<typename Container::value_type>)
 {
     using T = typename Container::value_type;
 
     Container elements;
     for (const auto &childEl : iterChildElements(parentEl, tagName, xmlns)) {
+        if (auto parsedEl = parseElement<T>(childEl)) {
+            elements.push_back(std::move(*parsedEl));
+        }
+    }
+    return elements;
+}
+
+template<typename Container>
+auto parseChildElements(const QDomElement &parentEl) -> Container
+    requires HasXmlTag<typename Container::value_type>
+{
+    using T = typename Container::value_type;
+    auto [tag, ns] = T::XmlTag;
+
+    Container elements;
+    for (const auto &childEl : iterChildElements(parentEl, tag, ns)) {
         if (auto parsedEl = parseElement<T>(childEl)) {
             elements.push_back(std::move(*parsedEl));
         }
