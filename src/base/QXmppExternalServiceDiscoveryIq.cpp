@@ -321,9 +321,6 @@ void QXmppExternalService::parse(const QDomElement &el)
 ///
 /// Translates the external service to XML using the provided XML stream writer.
 ///
-/// \param writer
-///
-
 void QXmppExternalService::toXml(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(QSL65("service"));
@@ -427,7 +424,7 @@ bool QXmppExternalServiceDiscoveryIq::checkIqType(const QString &tagName, const 
 /// \cond
 void QXmppExternalServiceDiscoveryIq::parseElementFromChild(const QDomElement &element)
 {
-    d->externalServices = parseChildElements<QVector<QXmppExternalService>>(element.firstChildElement(), u"service", ns_external_service_discovery);
+    d->externalServices = parseChildElements<QVector<QXmppExternalService>>(element.firstChildElement());
 }
 
 void QXmppExternalServiceDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const

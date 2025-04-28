@@ -628,6 +628,150 @@ bool QXmppDataForm::Field::operator==(const QXmppDataForm::Field &other) const
         d->mediaSize == other.mediaSize();
 }
 
+/// \cond
+std::optional<QXmppDataForm::Field> QXmppDataForm::Field::fromDom(const QDomElement &el)
+{
+    QXmppDataForm::Field field;
+
+    /* field type */
+    field.setType(fieldTypeFromString(el.attribute(u"type"_s)).value_or(Field::TextSingleField));
+
+    /* field attributes */
+    field.setLabel(el.attribute(u"label"_s));
+    field.setKey(el.attribute(u"var"_s));
+
+    /* field value(s) */
+    switch (field.type()) {
+    case Field::BooleanField: {
+        const auto valueStr = el.firstChildElement(u"value"_s).text();
+        field.setValue(valueStr == u"1" || valueStr == u"true");
+        break;
+    }
+    case Field::ListMultiField:
+    case Field::JidMultiField:
+    case Field::TextMultiField: {
+        field.setValue(parseTextElements<QStringList>(el, u"value", ns_data));
+        break;
+    }
+    default:
+        field.setValue(el.firstChildElement(u"value"_s).text());
+    }
+
+    /* field media */
+    if (const auto mediaElement = firstChildElement(el, u"media", ns_media_element);
+        !mediaElement.isNull()) {
+        field.mediaSize().setHeight(mediaElement.attribute(u"height"_s, u"-1"_s).toInt());
+        field.mediaSize().setWidth(mediaElement.attribute(u"width"_s, u"-1"_s).toInt());
+
+        QMimeDatabase database;
+
+        for (const auto &element : iterChildElements<MediaSource>(mediaElement)) {
+            field.mediaSources() << MediaSource(
+                QUrl(element.text()),
+                database.mimeTypeForName(element.attribute(u"type"_s)));
+        }
+    }
+
+    /* field options */
+    switch (field.type()) {
+    case Field::ListMultiField:
+    case Field::ListSingleField: {
+        QList<QPair<QString, QString>> options;
+        for (const auto &element : iterChildElements(el, u"option")) {
+            options << qMakePair(element.attribute(u"label"_s),
+                                 firstChildElement(element, u"value").text());
+        }
+        field.setOptions(options);
+        break;
+    }
+    default:
+        break;
+    }
+
+    /* other properties */
+    field.setDescription(firstChildElement(el, u"description").text());
+    field.setRequired(!firstChildElement(el, u"required").isNull());
+
+    return field;
+}
+
+void QXmppDataForm::Field::toXml(QXmlStreamWriter *writer) const
+{
+    writer->writeStartElement(QSL65("field"));
+
+    /* field type */
+    writer->writeAttribute(QSL65("type"), fieldTypeToString(d->type));
+
+    /* field attributes */
+    writeOptionalXmlAttribute(writer, u"label", d->label);
+    writeOptionalXmlAttribute(writer, u"var", d->key);
+
+    /* field value(s) */
+    switch (d->type) {
+    case Field::BooleanField:
+        writeXmlTextElement(writer, u"value", d->value.toBool() ? u"1" : u"0");
+        break;
+    case Field::ListMultiField:
+    case Field::JidMultiField:
+    case Field::TextMultiField: {
+        writeTextElements(writer, u"value", d->value.toStringList());
+        break;
+    }
+    default:
+        if (const auto value = d->value.toString(); !value.isEmpty()) {
+            writeXmlTextElement(writer, u"value", value);
+        }
+    }
+
+    /* field media */
+    if (!d->mediaSources.isEmpty()) {
+        writer->writeStartElement(QSL65("media"));
+        writer->writeDefaultNamespace(toString65(ns_media_element));
+
+        // media width and height
+        if (d->mediaSize.width() > 0) {
+            writeOptionalXmlAttribute(writer, u"width", QString::number(d->mediaSize.width()));
+        }
+        if (d->mediaSize.height() > 0) {
+            writeOptionalXmlAttribute(writer, u"height", QString::number(d->mediaSize.height()));
+        }
+
+        for (const auto &source : d->mediaSources) {
+            writer->writeStartElement(QSL65("uri"));
+            writeOptionalXmlAttribute(writer, u"type", source.contentType().name());
+            writer->writeCharacters(source.uri().toString());
+            writer->writeEndElement();
+        }
+
+        writer->writeEndElement();
+    }
+
+    /* field options */
+    switch (d->type) {
+    case Field::ListMultiField:
+    case Field::ListSingleField: {
+        for (const auto &option : d->options) {
+            writer->writeStartElement(QSL65("option"));
+            writeOptionalXmlAttribute(writer, u"label", option.first);
+            writeXmlTextElement(writer, u"value", option.second);
+            writer->writeEndElement();
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    /* other properties */
+    writeOptionalXmlTextElement(writer, u"description", d->description);
+    if (d->required) {
+        writer->writeEmptyElement(u"required"_s);
+    }
+
+    writer->writeEndElement();
+}
+/// \endcond
+
 class QXmppDataFormPrivate : public QSharedData
 {
 public:
@@ -810,71 +954,7 @@ void QXmppDataForm::parse(const QDomElement &element)
     /* form properties */
     d->title = firstChildElement(element, u"title").text();
     d->instructions = firstChildElement(element, u"instructions").text();
-
-    for (const auto &fieldElement : iterChildElements(element, u"field")) {
-        QXmppDataForm::Field field;
-
-        /* field type */
-        field.setType(fieldTypeFromString(fieldElement.attribute(u"type"_s)).value_or(Field::TextSingleField));
-
-        /* field attributes */
-        field.setLabel(fieldElement.attribute(u"label"_s));
-        field.setKey(fieldElement.attribute(u"var"_s));
-
-        /* field value(s) */
-        switch (field.type()) {
-        case Field::BooleanField: {
-            const auto valueStr = fieldElement.firstChildElement(u"value"_s).text();
-            field.setValue(valueStr == u"1" || valueStr == u"true");
-            break;
-        }
-        case Field::ListMultiField:
-        case Field::JidMultiField:
-        case Field::TextMultiField: {
-            field.setValue(parseTextElements<QStringList>(fieldElement, u"value", ns_data));
-            break;
-        }
-        default:
-            field.setValue(fieldElement.firstChildElement(u"value"_s).text());
-        }
-
-        /* field media */
-        if (const auto mediaElement = firstChildElement(fieldElement, u"media", ns_media_element);
-            !mediaElement.isNull()) {
-            field.mediaSize().setHeight(mediaElement.attribute(u"height"_s, u"-1"_s).toInt());
-            field.mediaSize().setWidth(mediaElement.attribute(u"width"_s, u"-1"_s).toInt());
-
-            QMimeDatabase database;
-
-            for (const auto &element : iterChildElements(mediaElement, u"uri")) {
-                field.mediaSources() << MediaSource(
-                    QUrl(element.text()),
-                    database.mimeTypeForName(element.attribute(u"type"_s)));
-            }
-        }
-
-        /* field options */
-        switch (field.type()) {
-        case Field::ListMultiField:
-        case Field::ListSingleField: {
-            QList<QPair<QString, QString>> options;
-            for (const auto &element : iterChildElements(fieldElement, u"option")) {
-                options << qMakePair(element.attribute(u"label"_s),
-                                     firstChildElement(element, u"value").text());
-            }
-            field.setOptions(options);
-            break;
-        }
-        default:
-            break;
-        }
-
-        /* other properties */
-        field.setDescription(firstChildElement(fieldElement, u"description").text());
-        field.setRequired(!firstChildElement(fieldElement, u"required").isNull());
-
-        d->fields.append(field);
-    }
+    d->fields = parseChildElements<QList<Field>>(element);
 }
 
 void QXmppDataForm::toXml(QXmlStreamWriter *writer) const
@@ -896,94 +976,7 @@ void QXmppDataForm::toXml(QXmlStreamWriter *writer) const
     if (!d->instructions.isEmpty()) {
         writer->writeTextElement(QSL65("instructions"), d->instructions);
     }
-
-    for (const auto &field : d->fields) {
-        writer->writeStartElement(QSL65("field"));
-
-        /* field type */
-        writer->writeAttribute(QSL65("type"), fieldTypeToString(field.type()));
-
-        /* field attributes */
-        writeOptionalXmlAttribute(writer, u"label", field.label());
-        writeOptionalXmlAttribute(writer, u"var", field.key());
-
-        /* field value(s) */
-        switch (field.type()) {
-        case Field::BooleanField:
-            writeXmlTextElement(writer, u"value", field.value().toBool() ? u"1" : u"0");
-            break;
-        case Field::ListMultiField:
-        case Field::JidMultiField:
-        case Field::TextMultiField: {
-            const auto values = field.value().toStringList();
-            for (const QString &value : values) {
-                writeXmlTextElement(writer, u"value", value);
-            }
-            break;
-        }
-        default:
-            if (const auto value = field.value().toString(); !value.isEmpty()) {
-                writeXmlTextElement(writer, u"value", value);
-            }
-        }
-
-        /* field media */
-        if (!field.mediaSources().isEmpty()) {
-            writer->writeStartElement(QSL65("media"));
-            writer->writeDefaultNamespace(toString65(ns_media_element));
-
-            // media width and height
-            if (field.mediaSize().width() > 0) {
-                writeOptionalXmlAttribute(
-                    writer,
-                    u"width"_s,
-                    QString::number(field.mediaSize().width()));
-            }
-            if (field.mediaSize().height() > 0) {
-                writeOptionalXmlAttribute(
-                    writer,
-                    u"height"_s,
-                    QString::number(field.mediaSize().height()));
-            }
-
-            const auto sources = field.mediaSources();
-            for (const auto &source : sources) {
-                writer->writeStartElement(QSL65("uri"));
-                writeOptionalXmlAttribute(writer, u"type", source.contentType().name());
-                writer->writeCharacters(source.uri().toString());
-                writer->writeEndElement();
-            }
-
-            writer->writeEndElement();
-        }
-
-        /* field options */
-        switch (field.type()) {
-        case Field::ListMultiField:
-        case Field::ListSingleField: {
-            const auto options = field.options();
-            for (const auto &option : options) {
-                writer->writeStartElement(QSL65("option"));
-                writeOptionalXmlAttribute(writer, u"label", option.first);
-                writeXmlTextElement(writer, u"value", option.second);
-                writer->writeEndElement();
-            }
-            break;
-        }
-        default:
-            break;
-        }
-
-        /* other properties */
-        if (!field.description().isEmpty()) {
-            writeXmlTextElement(writer, u"description", field.description());
-        }
-        if (field.isRequired()) {
-            writeXmlTextElement(writer, u"required", u"");
-        }
-
-        writer->writeEndElement();
-    }
+    writeElements(writer, d->fields);
 
     writer->writeEndElement();
 }

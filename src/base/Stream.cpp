@@ -150,28 +150,26 @@ std::variant<StreamErrorElement, QXmppError> StreamErrorElement::fromDom(const Q
     }
 
     std::optional<StreamErrorElement::Condition> condition;
-    QString errorText;
 
-    for (const auto &subEl : iterChildElements(el, {}, ns_stream_error)) {
-        auto tagName = subEl.tagName();
-        if (tagName == u"text") {
-            errorText = subEl.text();
-        } else if (auto conditionEnum = enumFromString<StreamError>(STREAM_ERROR_CONDITIONS, tagName)) {
-            condition = conditionEnum;
-        } else if (tagName == u"see-other-host") {
-            if (auto [host, port] = parseHostAddress(subEl.text()); !host.isEmpty()) {
-                condition = SeeOtherHost { host, quint16(port > 0 ? port : XMPP_DEFAULT_PORT) };
-            }
-        }
+    auto conditionEl = el.firstChildElement();
+    if (conditionEl.namespaceURI() != ns_stream_error) {
+        return QXmppError { u"Invalid xmlns on stream error condition."_s, {} };
     }
-
-    if (!condition) {
+    if (auto conditionEnum = enumFromString<StreamError>(STREAM_ERROR_CONDITIONS, conditionEl.tagName())) {
+        condition = conditionEnum;
+    } else if (conditionEl.tagName() == u"see-other-host") {
+        if (auto [host, port] = parseHostAddress(conditionEl.text()); !host.isEmpty()) {
+            condition = SeeOtherHost { host, quint16(port > 0 ? port : XMPP_DEFAULT_PORT) };
+        } else {
+            return QXmppError { u"Stream error condition of <see-other-host/> requires valid redirection host."_s, {} };
+        }
+    } else {
         return QXmppError { u"Stream error is missing valid error condition."_s, {} };
     }
 
     return StreamErrorElement {
         std::move(*condition),
-        std::move(errorText),
+        firstChildElement(el, u"text", ns_stream_error).text(),
     };
 }
 
