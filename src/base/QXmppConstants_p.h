@@ -174,9 +174,9 @@ inline constexpr QStringView ns_carbons = u"urn:xmpp:carbons:2";
 // XEP-0283: Moved
 inline constexpr QStringView ns_moved = u"urn:xmpp:moved:1";
 // XEP-0293: Jingle RTP Feedback Negotiation
-inline constexpr QStringView ns_jingle_rtp_feedback_negotiation = u"urn:xmpp:jingle:apps:rtp:rtcp-fb:0";
+inline constexpr QStringView ns_jingle_rtcp_fb = u"urn:xmpp:jingle:apps:rtp:rtcp-fb:0";
 // XEP-0294: Jingle RTP Header Extensions Negotiation
-inline constexpr QStringView ns_jingle_rtp_header_extensions_negotiation = u"urn:xmpp:jingle:apps:rtp:rtp-hdrext:0";
+inline constexpr QStringView ns_jingle_rtp_hdrext = u"urn:xmpp:jingle:apps:rtp:rtp-hdrext:0";
 // XEP-0297: Stanza Forwarding
 inline constexpr QStringView ns_forwarding = u"urn:xmpp:forward:0";
 // XEP-0300: Use of Cryptographic Hash Functions in XMPP
@@ -196,7 +196,7 @@ inline constexpr QStringView ns_message_processing_hints = u"urn:xmpp:hints";
 // XEP-0352: Client State Indication
 inline constexpr QStringView ns_csi = u"urn:xmpp:csi:0";
 // XEP-0353: Jingle Message Initiation
-inline constexpr QStringView ns_jingle_message_initiation = u"urn:xmpp:jingle-message:0";
+inline constexpr QStringView ns_jingle_message = u"urn:xmpp:jingle-message:0";
 // XEP-0357: Push Notifications
 inline constexpr QStringView ns_push = u"urn:xmpp:push:0";
 // XEP-0359: Unique and Stable Stanza IDs
