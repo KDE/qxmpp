@@ -33,46 +33,80 @@ void handleSignal(int signal)
 }
 #endif
 
-void setupCallStream(QXmppCall *call)
+void setupAudioStream(GstElement *pipeline, QXmppCallStream *stream)
 {
-    auto *gstPipeline = call->pipeline();
-    auto *stream = call->audioStream();
+    Q_ASSERT(stream);
+    Q_ASSERT(stream->media() == u"audio");
 
-    qDebug() << "[AudioCall] Start to setup call stream" << stream->media();
-    if (stream->media() == u"audio") {
-        // output receiving audio
-        stream->setReceivePadCallback([gstPipeline](GstPad *receivePad) {
-            GstElement *output = gst_parse_bin_from_description("audioresample ! audioconvert ! autoaudiosink", true, nullptr);
-            if (!gst_bin_add(GST_BIN(gstPipeline), output)) {
-                qFatal("[AudioCall] Failed to add audio playback to pipeline");
-                return;
-            }
+    qDebug() << "[AVCall] Begin audio stream setup";
+    // output receiving audio
+    stream->setReceivePadCallback([pipeline](GstPad *receivePad) {
+        GstElement *output = gst_parse_bin_from_description("audioresample ! audioconvert ! autoaudiosink", true, nullptr);
+        if (!gst_bin_add(GST_BIN(pipeline), output)) {
+            qFatal("[AVCall] Failed to add audio playback to pipeline");
+            return;
+        }
 
-            if (gst_pad_link(receivePad, gst_element_get_static_pad(output, "sink")) != GST_PAD_LINK_OK) {
-                qFatal("[AudioCall] Failed to link receive pad to audio playback.");
-            }
-            gst_element_sync_state_with_parent(output);
+        if (gst_pad_link(receivePad, gst_element_get_static_pad(output, "sink")) != GST_PAD_LINK_OK) {
+            qFatal("[AVCall] Failed to link receive pad to audio playback.");
+        }
+        gst_element_sync_state_with_parent(output);
 
-            qDebug() << "[AudioCall] Audio playback (receive pad) set up.";
-        });
+        qDebug() << "[AVCall] Audio playback (receive pad) set up.";
+    });
 
-        // record and send microphone
-        stream->setSendPadCallback([gstPipeline](GstPad *sendPad) {
-            GstElement *output = gst_parse_bin_from_description("autoaudiosrc ! audioconvert ! audioresample ! queue max-size-time=1000000", true, nullptr);
-            if (!gst_bin_add(GST_BIN(gstPipeline), output)) {
-                qFatal("[AudioCall] Failed to add audio recorder to pipeline");
-                return;
-            }
+    // record and send microphone
+    stream->setSendPadCallback([pipeline](GstPad *sendPad) {
+        GstElement *output = gst_parse_bin_from_description("autoaudiosrc ! audioconvert ! audioresample ! queue max-size-time=1000000", true, nullptr);
+        if (!gst_bin_add(GST_BIN(pipeline), output)) {
+            qFatal("[AVCall] Failed to add audio recorder to pipeline");
+            return;
+        }
 
-            if (gst_pad_link(gst_element_get_static_pad(output, "src"), sendPad) != GST_PAD_LINK_OK) {
-                qFatal("[AudioCall] Failed to link audio recorder output to send pad.");
-            }
-            gst_element_sync_state_with_parent(output);
+        if (gst_pad_link(gst_element_get_static_pad(output, "src"), sendPad) != GST_PAD_LINK_OK) {
+            qFatal("[AVCall] Failed to link audio recorder output to send pad.");
+        }
+        gst_element_sync_state_with_parent(output);
 
-            qDebug() << "[Call] Audio recorder (send pad) set up.";
-        });
-    }
-};
+        qDebug() << "[AVCall] Audio recorder (send pad) set up.";
+    });
+}
+
+void setupVideoStream(GstElement *pipeline, QXmppCallStream *stream)
+{
+    Q_ASSERT(stream);
+    Q_ASSERT(stream->media() == u"video");
+
+    qDebug() << "[AVCall] Begin video stream setup";
+    stream->setReceivePadCallback([pipeline](GstPad *receivePad) {
+        GstElement *output = gst_parse_bin_from_description("autovideosink", true, nullptr);
+        if (!gst_bin_add(GST_BIN(pipeline), output)) {
+            qFatal("[AVCall] Failed to add video playback to pipeline");
+            return;
+        }
+
+        if (gst_pad_link(receivePad, gst_element_get_static_pad(output, "sink")) != GST_PAD_LINK_OK) {
+            qFatal("[AVCall] Failed to link receive pad to video playback.");
+        }
+        gst_element_sync_state_with_parent(output);
+
+        qDebug() << "[AVCall] Video playback (receive pad) set up.";
+    });
+    stream->setSendPadCallback([pipeline](GstPad *sendPad) {
+        GstElement *output = gst_parse_bin_from_description("videotestsrc", true, nullptr);
+        if (!gst_bin_add(GST_BIN(pipeline), output)) {
+            qFatal("[AVCall] Failed to add video test source to pipeline");
+            return;
+        }
+
+        if (gst_pad_link(gst_element_get_static_pad(output, "src"), sendPad) != GST_PAD_LINK_OK) {
+            qFatal("[AVCall] Failed to link video test source to send pad.");
+        }
+        gst_element_sync_state_with_parent(output);
+
+        qDebug() << "[AVCall] Video test source (send pad) set up.";
+    });
+}
 
 int main(int argc, char *argv[])
 {
@@ -104,17 +138,32 @@ int main(int argc, char *argv[])
     // our call
     std::unique_ptr<QXmppCall> activeCall;
 
-    auto setupCall = [&app, callManager](QXmppCall *call) {
-        if (call->audioStream()) {
-            setupCallStream(call);
+    auto setupCall = [&](QXmppCall *call) {
+        if (auto *audioStream = call->audioStream()) {
+            setupAudioStream(call->pipeline(), audioStream);
+        }
+        if (auto *videoStream = call->videoStream()) {
+            setupVideoStream(call->pipeline(), videoStream);
         }
 
         QObject::connect(call, &QXmppCall::streamCreated, call, [call](QXmppCallStream *stream) {
-            setupCallStream(call);
+            if (stream->media() == u"audio") {
+                setupAudioStream(call->pipeline(), stream);
+            } else if (stream->media() == u"video") {
+                setupVideoStream(call->pipeline(), stream);
+            } else {
+                qDebug() << "[AVCall]" << "Unknown stream added to call";
+            }
         });
 
         QObject::connect(call, &QXmppCall::connected, &app, [=]() {
             qDebug() << "[Call] Call to" << call->jid() << "connected!";
+
+            if (call->videoSupported()) {
+                QTimer::singleShot(5s, call, [call] {
+                    call->addVideo();
+                });
+            }
         });
         QObject::connect(call, &QXmppCall::ringing, [=]() {
             qDebug() << "[Call] Ringing" << call->jid() << "...";
