@@ -179,8 +179,7 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
             return;
         }
 
-        QXmppCallStream *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
-        call->d->streams << stream;
+        auto *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
         call->d->sid = QXmppUtils::generateStanzaHash();
 
         // register call
@@ -330,7 +329,6 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
             call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
             return {};
         }
-        call->d->streams << stream;
 
         // check content description and transport
         if (!call->d->handleDescription(stream, content) ||
