@@ -55,7 +55,7 @@ public:
         QList<Property> encProps;
     };
 
-    explicit QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall::State state, QXmppError &&error, QXmppCall *qq);
+    explicit QXmppCallPrivate(const QString &jid, const QString &sid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall::State state, QXmppError &&error, QXmppCall *qq);
     ~QXmppCallPrivate();
 
     void ssrcActive(uint sessionId, uint ssrc);
