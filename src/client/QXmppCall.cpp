@@ -33,10 +33,11 @@
 using namespace std::chrono_literals;
 using namespace QXmpp::Private;
 
-QXmppCallPrivate::QXmppCallPrivate(const QString &jid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall::State state, QXmppError &&error, QXmppCall *qq)
+QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmppCall::Direction direction, QPointer<QXmppCallManager> manager, QXmppCall::State state, QXmppError &&error, QXmppCall *qq)
     : direction(direction),
       jid(jid),
       manager(manager),
+      sid(sid),
       state(state),
       error(std::move(error)),
       q(qq)
@@ -576,14 +577,14 @@ bool QXmppCallPrivate::isOwn(QXmppCallStream *stream) const
 /// \note THIS API IS NOT FINALIZED YET
 ///
 
-QXmppCall::QXmppCall(const QString &jid, Direction direction, QXmppCallManager *manager)
-    : QXmppCall(jid, direction, ConnectingState, {}, manager)
+QXmppCall::QXmppCall(const QString &jid, const QString &sid, Direction direction, QXmppCallManager *manager)
+    : QXmppCall(jid, sid, direction, ConnectingState, {}, manager)
 {
 }
 
-QXmppCall::QXmppCall(const QString &jid, Direction direction, State state, QXmppError &&error, QXmppCallManager *manager)
+QXmppCall::QXmppCall(const QString &jid, const QString &sid, Direction direction, State state, QXmppError &&error, QXmppCallManager *manager)
     : QXmppLoggable(nullptr),
-      d(std::make_unique<QXmppCallPrivate>(jid, direction, manager, state, std::move(error), this))
+      d(std::make_unique<QXmppCallPrivate>(jid, sid, direction, manager, state, std::move(error), this))
 {
     // relay logging (we dont want a direct parent because of our ownership model)
     connect(this, &QXmppLoggable::logMessage, manager, &QXmppLoggable::logMessage);
