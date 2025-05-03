@@ -42,7 +42,7 @@ public:
 
     Q_SIGNAL void callReceived(std::unique_ptr<QXmppCall> &call);
 
-    std::unique_ptr<QXmppCall> call(const QString &jid);
+    std::unique_ptr<QXmppCall> call(const QString &jid, const QString &proposedSid = {});
 
 protected:
     /// \cond
