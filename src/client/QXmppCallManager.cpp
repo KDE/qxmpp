@@ -208,14 +208,19 @@ void QXmppCallManager::onUnregistered(QXmppClient *client)
 ///
 /// Initiates a new outgoing call to the specified recipient.
 ///
+/// \param jid Full-JID of the recipient.
+/// \param proposedSid Session ID of the call. If empty, a new session ID will be generated. Must be unique.
+///
 /// \since QXmpp 1.11, previously this function had a different signature.
 ///
-std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
+std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, const QString &proposedSid)
 {
+    auto sid = proposedSid;
+
     auto errorCall = [&](QXmppError &&error) {
         warning(error.description);
         return std::unique_ptr<QXmppCall> {
-            new QXmppCall(jid, QXmppCall::OutgoingDirection, QXmppCall::FinishedState, std::move(error), this)
+            new QXmppCall(jid, sid, QXmppCall::OutgoingDirection, QXmppCall::FinishedState, std::move(error), this)
         };
     };
 
@@ -227,11 +232,19 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
         return errorCall({ u"Refusing to call self"_s, {} });
     }
 
+    // verify session id is unique
+    if (sid.isEmpty()) {
+        sid = QXmppUtils::generateStanzaUuid();
+    }
+    if (contains(d->calls, sid, &QXmppCall::sid)) {
+        return errorCall({ u"Call with the same 'sid' already in progress."_s, {} });
+    }
+
     if (d->dtlsRequired && !d->supportsDtls) {
         return errorCall({ u"DTLS encryption for calls is required, but not supported locally."_s, {} });
     }
 
-    auto call = std::unique_ptr<QXmppCall>(new QXmppCall(jid, QXmppCall::OutgoingDirection, this));
+    auto call = std::unique_ptr<QXmppCall>(new QXmppCall(jid, sid, QXmppCall::OutgoingDirection, this));
 
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
@@ -277,7 +290,6 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
         }
 
         auto *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
-        call->d->sid = QXmppUtils::generateStanzaHash();
 
         // register call
         d->addCall(call);
@@ -344,9 +356,8 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
         bool dtlsRequested = !content.transportFingerprint().isEmpty();
 
         // build call
-        auto call = std::unique_ptr<QXmppCall>(new QXmppCall(iq.from(), QXmppCall::IncomingDirection, this));
+        auto call = std::unique_ptr<QXmppCall>(new QXmppCall(iq.from(), iq.sid(), QXmppCall::IncomingDirection, this));
         call->d->useDtls = d->supportsDtls && dtlsRequested;
-        call->d->sid = iq.sid();
 
         if (dtlsRequested && !d->supportsDtls) {
             call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS is not supported."_s, {} }, true);
