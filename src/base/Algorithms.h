@@ -55,19 +55,22 @@ auto transform(const InputVector &input, Converter convert)
 template<typename OutputVector, typename InputVector, typename Converter>
 auto transformFilter(const InputVector &input, Converter convert)
 {
+    using OutputValue = typename OutputVector::value_type;
     OutputVector output;
     if constexpr (std::ranges::sized_range<InputVector>) {
         output.reserve(input.size());
     }
     for (const auto &value : input) {
-        if (const std::optional<std::decay_t<decltype(value)>> result = std::invoke(convert, value)) {
+        if (const std::optional<OutputValue> result = std::invoke(convert, value)) {
             output.push_back(*result);
         }
     }
-    if constexpr (HasShrinkToFit<InputVector>) {
-        output.shrink_to_fit();
-    } else if constexpr (HasSqueeze<InputVector>) {
-        output.squeeze();
+    if constexpr (std::ranges::sized_range<InputVector>) {
+        if constexpr (HasShrinkToFit<OutputVector>) {
+            output.shrink_to_fit();
+        } else if constexpr (HasSqueeze<OutputVector>) {
+            output.squeeze();
+        }
     }
     return output;
 }
