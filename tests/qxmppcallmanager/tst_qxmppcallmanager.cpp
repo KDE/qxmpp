@@ -39,7 +39,7 @@ void tst_QXmppCallManager::callInvalidJid()
 
     call = manager->call("test@localhost/r1");
     QVERIFY(call);
-    QCOMPARE(call->sid(), QString());
+    QCOMPARE(call->sid().size(), 36);
     QCOMPARE(call->jid(), u"test@localhost/r1");
     QCOMPARE(call->direction(), QXmppCall::OutgoingDirection);
 }
