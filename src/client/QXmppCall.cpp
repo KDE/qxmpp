@@ -322,7 +322,6 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
             });
             return {};
         }
-        streams << stream;
 
         // check content description
         if (!handleDescription(stream, content) ||
@@ -433,6 +432,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
         }
     });
 
+    streams << stream;
     Q_EMIT q->streamCreated(stream);
 
     return stream;
@@ -700,7 +700,6 @@ void QXmppCall::addVideo()
     // create video stream
     QString creator = (d->direction == QXmppCall::OutgoingDirection) ? u"initiator"_s : u"responder"_s;
     auto *stream = d->createStream(VIDEO_MEDIA.toString(), creator, u"webcam"_s);
-    d->streams << stream;
 
     // build request
     auto iq = d->createIq(QXmppJingleIq::ContentAdd);
