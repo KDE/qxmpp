@@ -34,17 +34,14 @@ public:
     QXmppStunMessage request() const;
     QXmppStunMessage response() const;
 
-Q_SIGNALS:
-    void finished();
-    void writeStun(const QXmppStunMessage &request);
+    Q_SLOT void readStun(const QXmppStunMessage &response);
 
-public Q_SLOTS:
-    void readStun(const QXmppStunMessage &response);
-
-private Q_SLOTS:
-    void retry();
+    Q_SIGNAL void finished();
+    Q_SIGNAL void writeStun(const QXmppStunMessage &request);
 
 private:
+    Q_SLOT void retry();
+
     QXmppStunMessage m_request;
     QXmppStunMessage m_response;
     QTimer *m_retryTimer;
@@ -62,12 +59,10 @@ public:
     virtual QXmppJingleCandidate localCandidate(int component) const = 0;
     virtual qint64 writeDatagram(const QByteArray &data, const QHostAddress &host, quint16 port) = 0;
 
-public Q_SLOTS:
-    virtual void disconnectFromHost() = 0;
+    Q_SLOT virtual void disconnectFromHost() = 0;
 
-Q_SIGNALS:
     /// \brief This signal is emitted when a data packet is received.
-    void datagramReceived(const QByteArray &data, const QHostAddress &host, quint16 port);
+    Q_SIGNAL void datagramReceived(const QByteArray &data, const QHostAddress &host, quint16 port);
 };
 
 //
@@ -100,25 +95,22 @@ public:
     QXmppJingleCandidate localCandidate(int component) const override;
     qint64 writeDatagram(const QByteArray &data, const QHostAddress &host, quint16 port) override;
 
-Q_SIGNALS:
+    Q_SLOT void connectToHost();
+    Q_SLOT void disconnectFromHost() override;
+
     /// \brief This signal is emitted once TURN allocation succeeds.
-    void connected();
+    Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when TURN allocation fails.
-    void disconnected();
-
-public Q_SLOTS:
-    void connectToHost();
-    void disconnectFromHost() override;
-
-private Q_SLOTS:
-    void readyRead();
-    void refresh();
-    void refreshChannels();
-    void transactionFinished();
-    void writeStun(const QXmppStunMessage &message);
+    Q_SIGNAL void disconnected();
 
 private:
+    Q_SLOT void readyRead();
+    Q_SLOT void refresh();
+    Q_SLOT void refreshChannels();
+    Q_SLOT void transactionFinished();
+    Q_SLOT void writeStun(const QXmppStunMessage &message);
+
     void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
     void setState(AllocationState state);
 
@@ -160,13 +152,11 @@ public:
     QXmppJingleCandidate localCandidate(int component) const override;
     qint64 writeDatagram(const QByteArray &data, const QHostAddress &host, quint16 port) override;
 
-public Q_SLOTS:
-    void disconnectFromHost() override;
-
-private Q_SLOTS:
-    void readyRead();
+    Q_SLOT void disconnectFromHost() override;
 
 private:
+    Q_SLOT void readyRead();
+
     QUdpSocket *m_socket;
 };
 

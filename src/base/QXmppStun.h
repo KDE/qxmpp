@@ -159,34 +159,31 @@ public:
     static QList<QHostAddress> discoverAddresses();
     static QList<QUdpSocket *> reservePorts(const QList<QHostAddress> &addresses, int count, QObject *parent = nullptr);
 
-public Q_SLOTS:
-    void close();
-    void connectToHost();
-    qint64 sendDatagram(const QByteArray &datagram);
+    Q_SLOT void close();
+    Q_SLOT void connectToHost();
+    Q_SLOT qint64 sendDatagram(const QByteArray &datagram);
 
-private Q_SLOTS:
-    void checkCandidates();
-    void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
-    void turnConnected();
-    void transactionFinished();
-    void updateGatheringState();
-    void writeStun(const QXmppStunMessage &request);
-
-Q_SIGNALS:
     /// \brief This signal is emitted once ICE negotiation succeeds.
-    void connected();
+    Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when a data packet is received.
-    void datagramReceived(const QByteArray &datagram);
+    Q_SIGNAL void datagramReceived(const QByteArray &datagram);
 
     /// This signal is emitted when the gathering state of local candidates changes.
-    void gatheringStateChanged();
+    Q_SIGNAL void gatheringStateChanged();
 
     /// \brief This signal is emitted when the list of local candidates changes.
-    void localCandidatesChanged();
+    Q_SIGNAL void localCandidatesChanged();
 
 private:
     QXmppIceComponent(int component, QXmppIcePrivate *config, QObject *parent = nullptr);
+
+    Q_SLOT void checkCandidates();
+    Q_SLOT void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
+    Q_SLOT void turnConnected();
+    Q_SLOT void transactionFinished();
+    Q_SLOT void updateGatheringState();
+    Q_SLOT void writeStun(const QXmppStunMessage &request);
 
     const std::unique_ptr<QXmppIceComponentPrivate> d;
     friend class QXmppIceComponentPrivate;
@@ -269,6 +266,9 @@ public:
     bool bind(const QList<QHostAddress> &addresses);
     bool isConnected() const;
 
+    Q_SLOT void close();
+    Q_SLOT void connectToHost();
+
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
     ///
     /// Returns the ICE gathering state, that is the discovery of local
@@ -278,33 +278,27 @@ public:
     ///
     GatheringState gatheringState() const;
 
-Q_SIGNALS:
     /// \brief This signal is emitted once ICE negotiation succeeds.
-    void connected();
+    Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when ICE negotiation fails.
-    void disconnected();
+    Q_SIGNAL void disconnected();
 
     ///
     /// \brief This signal is emitted when the gathering state of local candidates changes.
     ///
     /// \since QXmpp 0.9.3
     ///
-    void gatheringStateChanged();
+    Q_SIGNAL void gatheringStateChanged();
 
     /// \brief This signal is emitted when the list of local candidates changes.
-    void localCandidatesChanged();
-
-public Q_SLOTS:
-    void close();
-    void connectToHost();
-
-private Q_SLOTS:
-    void slotConnected();
-    void slotGatheringStateChanged();
-    void slotTimeout();
+    Q_SIGNAL void localCandidatesChanged();
 
 private:
+    Q_SLOT void slotConnected();
+    Q_SLOT void slotGatheringStateChanged();
+    Q_SLOT void slotTimeout();
+
     const std::unique_ptr<QXmppIceConnectionPrivate> d;
 };
 
