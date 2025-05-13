@@ -266,6 +266,9 @@ public:
     bool bind(const QList<QHostAddress> &addresses);
     bool isConnected() const;
 
+    Q_SLOT void close();
+    Q_SLOT void connectToHost();
+
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
     ///
     /// Returns the ICE gathering state, that is the discovery of local
@@ -290,9 +293,6 @@ public:
 
     /// \brief This signal is emitted when the list of local candidates changes.
     Q_SIGNAL void localCandidatesChanged();
-
-    Q_SLOT void close();
-    Q_SLOT void connectToHost();
 
 private:
     Q_SLOT void slotConnected();

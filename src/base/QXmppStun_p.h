@@ -34,10 +34,10 @@ public:
     QXmppStunMessage request() const;
     QXmppStunMessage response() const;
 
+    Q_SLOT void readStun(const QXmppStunMessage &response);
+
     Q_SIGNAL void finished();
     Q_SIGNAL void writeStun(const QXmppStunMessage &request);
-
-    Q_SLOT void readStun(const QXmppStunMessage &response);
 
 private:
     Q_SLOT void retry();
@@ -95,14 +95,14 @@ public:
     QXmppJingleCandidate localCandidate(int component) const override;
     qint64 writeDatagram(const QByteArray &data, const QHostAddress &host, quint16 port) override;
 
+    Q_SLOT void connectToHost();
+    Q_SLOT void disconnectFromHost() override;
+
     /// \brief This signal is emitted once TURN allocation succeeds.
     Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when TURN allocation fails.
     Q_SIGNAL void disconnected();
-
-    Q_SLOT void connectToHost();
-    Q_SLOT void disconnectFromHost() override;
 
 private:
     Q_SLOT void readyRead();
