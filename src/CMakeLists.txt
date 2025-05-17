@@ -85,11 +85,13 @@ set(INSTALL_HEADER_FILES
     base/QXmppStreamError.h
     base/QXmppStreamFeatures.h
     base/QXmppStun.h
+    base/QXmppStunServer.h
     base/QXmppTask.h
     base/QXmppThumbnail.h
     base/QXmppTrustMessageElement.h
     base/QXmppTrustMessageKeyOwner.h
     base/QXmppTrustMessages.h
+    base/QXmppTurnServer.h
     base/QXmppUserTuneItem.h
     base/QXmppUtils.h
     base/QXmppUtils_p.h
