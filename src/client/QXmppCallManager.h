@@ -17,6 +17,11 @@ class QXmppIq;
 class QXmppJingleIq;
 class QXmppPresence;
 
+namespace QXmpp {
+struct StunServer;
+struct TurnServer;
+}  // namespace QXmpp
+
 class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -25,11 +30,8 @@ public:
     QXmppCallManager();
     ~QXmppCallManager() override;
 
-    void setStunServers(const QList<QPair<QHostAddress, quint16>> &servers);
-    void setStunServer(const QHostAddress &host, quint16 port = 3478);
-    void setTurnServer(const QHostAddress &host, quint16 port = 3478);
-    void setTurnUser(const QString &user);
-    void setTurnPassword(const QString &password);
+    void setFallbackStunServers(const QList<QXmpp::StunServer> &);
+    void setFallbackTurnServer(const std::optional<QXmpp::TurnServer> &);
     bool dtlsRequired() const;
     void setDtlsRequired(bool);
 
