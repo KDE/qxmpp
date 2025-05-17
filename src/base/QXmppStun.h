@@ -19,6 +19,11 @@ class QXmppIceComponentPrivate;
 class QXmppIceConnectionPrivate;
 class QXmppIcePrivate;
 
+namespace QXmpp {
+struct StunServer;
+struct TurnServer;
+}  // namespace QXmpp
+
 ///
 /// \internal
 ///
@@ -257,11 +262,20 @@ public:
     void setRemoteUser(const QString &user);
     void setRemotePassword(const QString &password);
 
+    void setStunServers(const QList<QXmpp::StunServer> &servers);
+    void setTurnServer(const QXmpp::TurnServer &);
+#if QXMPP_DEPRECATED_SINCE(1, 11)
+    [[deprecated("Use setStunServers(QList<StunServer>)")]]
     void setStunServers(const QList<QPair<QHostAddress, quint16>> &servers);
+    [[deprecated("Use setStunServers(QList<StunServer>)")]]
     void setStunServer(const QHostAddress &host, quint16 port = 3478);
+    [[deprecated("Use setTurnServer(TurnServer)")]]
     void setTurnServer(const QHostAddress &host, quint16 port = 3478);
+    [[deprecated("Use setTurnServer(TurnServer)")]]
     void setTurnUser(const QString &user);
+    [[deprecated("Use setTurnServer(TurnServer)")]]
     void setTurnPassword(const QString &password);
+#endif
 
     bool bind(const QList<QHostAddress> &addresses);
     bool isConnected() const;
