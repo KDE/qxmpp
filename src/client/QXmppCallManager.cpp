@@ -12,16 +12,20 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppIqHandling.h"
 #include "QXmppJingleIq.h"
 #include "QXmppRosterManager.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
+#include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
 #include "Async.h"
 #include "GstWrapper.h"
+#include "Iq.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <gst/gst.h>
 
@@ -29,6 +33,136 @@
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
+
+QXmppTask<ServicesResult> QXmpp::Private::requestExternalServices(QXmppClient *client, const QString &jid)
+{
+    QXmppExternalServiceDiscoveryIq request;
+    request.setType(QXmppIq::Get);
+    request.setTo(jid);
+
+    return chainIq(client->sendIq(std::move(request)), client, [](QXmppExternalServiceDiscoveryIq &&iq) -> ServicesResult {
+        return iq.externalServices();
+    });
+}
+
+QXmppTask<ServiceResult> QXmpp::Private::requestCredentials(QXmppClient *client, const QString &jid, const QString &type, const QString &host)
+{
+    struct ExtDiscoCredentials {
+        QXmppExternalService service;
+
+        void parse(const QDomElement &el)
+        {
+            auto credentialsEl = el.firstChildElement();
+            service = parseOptionalChildElement<QXmppExternalService>(credentialsEl)
+                          .value_or(QXmppExternalService());
+        }
+        void toXml(XmlWriter &w) const
+        {
+            w.write(Element { { u"credentials", ns_external_service_discovery }, service });
+        }
+    };
+
+    QXmppExternalService s;
+    s.setHost(host);
+    s.setType(type);
+
+    CompatIq iq { GetIq<ExtDiscoCredentials> {
+        generateSequentialStanzaId(),
+        {},
+        jid,
+        {},
+        { std::move(s) },
+    } };
+
+    return chain<ServiceResult>(client->sendIq(std::move(iq)), client, [](QXmppClient::IqResult result) {
+        return map<ServiceResult>(
+            [](ExtDiscoCredentials &&c) { return c.service; },
+            parseIqResponseFlat<ExtDiscoCredentials>(std::move(result)));
+    });
+}
+
+QXmppTask<StunTurnResult> QXmpp::Private::requestStunTurnConfig(QXmppClient *client, QXmppLoggable *q)
+{
+    QXmppPromise<StunTurnResult> p;
+    requestExternalServices(client, client->configuration().domain()).then(q, [p, client, q](const auto &result) mutable {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            qWarning() << u"Could not fetch STUN/TURN external services from server: %1"_s.arg(error->description);
+            p.finish(*error);
+            return;
+        }
+
+        const auto &services = std::get<QVector<QXmppExternalService>>(result);
+        // STUN (all)
+        auto stunServers = transformFilter<QList<StunServerConfig>>(services, [](const auto &service) -> std::optional<StunServerConfig> {
+            if (service.type() == u"stun" && service.port()) {
+                return StunServerConfig {
+                    { QHostAddress(service.host()), quint16(service.port().value()) },
+                    service.expires(),
+                };
+            }
+            return {};
+        });
+
+        // TURN (only one; prefer with credentials)
+        std::optional<TurnServerConfig> turnServer;
+        bool credentialsAvailable = false;
+        for (const auto &service : std::as_const(services)) {
+            if (service.type() == u"turn" && service.port()) {
+                turnServer = {
+                    TurnServer {
+                        QHostAddress(service.host()),
+                        quint16(service.port().value()),
+                        service.username().value_or(QString()),
+                        service.password().value_or(QString()),
+                    },
+                    service.expires(),
+                };
+                credentialsAvailable = service.username() && service.password();
+
+                // prefer TURN server with credentials
+                if (credentialsAvailable) {
+                    break;
+                }
+            }
+        }
+
+        // request TURN credentials (if not provided already)
+        if (turnServer && !credentialsAvailable) {
+            // request credentials for TURN server
+            requestCredentials(client, client->configuration().domain(), u"turn"_s, turnServer->server.host.toString())
+                .then(q, [q, stunServers = std::move(stunServers), p](auto &&result) mutable {
+                    if (auto *error = std::get_if<QXmppError>(&result)) {
+                        qWarning() << u"Could not fetch credentials for TURN server: %1"_s.arg(error->description);
+                        p.finish(StunTurnConfig { std::move(stunServers), {} });
+                        return;
+                    }
+
+                    auto &&service = std::get<QXmppExternalService>(std::move(result));
+                    if (!service.username() || !service.password() || !service.port()) {
+                        qWarning() << u"Server did not return credentials for TURN server upon explicit request"_s;
+                        p.finish(StunTurnConfig { std::move(stunServers), {} });
+                        return;
+                    }
+
+                    p.finish(StunTurnConfig {
+                        std::move(stunServers),
+                        TurnServerConfig {
+                            TurnServer {
+                                QHostAddress(service.host()),
+                                quint16(service.port().value()),
+                                service.username().value(),
+                                service.password().value(),
+                            },
+                            service.expires(),
+                        },
+                    });
+                });
+        } else {
+            p.finish(StunTurnConfig { std::move(stunServers), std::move(turnServer) });
+        }
+    });
+    return p.task();
+}
 
 QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
     : q(qq)
@@ -45,6 +179,25 @@ void QXmppCallManagerPrivate::addCall(QXmppCall *call)
 {
     calls.append(call);
     QObject::connect(call, &QObject::destroyed, q, &QXmppCallManager::onCallDestroyed);
+}
+
+QList<StunServer> QXmppCallManagerPrivate::stunServers() const
+{
+    if (stunTurnServers) {
+        return transform<QList<StunServer>>(stunTurnServers->stun, [](const auto &c) {
+                   return c.server;
+               }) +
+            fallbackStunServers;
+    }
+    return fallbackStunServers;
+}
+
+std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
+{
+    if (stunTurnServers && stunTurnServers->turn) {
+        return stunTurnServers->turn->server;
+    }
+    return fallbackTurnServer;
 }
 
 ///
@@ -188,20 +341,14 @@ bool QXmppCallManager::handleStanza(const QDomElement &element)
 
 void QXmppCallManager::onRegistered(QXmppClient *client)
 {
-    connect(client, &QXmppClient::disconnected,
-            this, &QXmppCallManager::onDisconnected);
-
-    connect(client, &QXmppClient::presenceReceived,
-            this, &QXmppCallManager::onPresenceReceived);
+    connect(client, &QXmppClient::connected, this, &QXmppCallManager::onConnected);
+    connect(client, &QXmppClient::disconnected, this, &QXmppCallManager::onDisconnected);
+    connect(client, &QXmppClient::presenceReceived, this, &QXmppCallManager::onPresenceReceived);
 }
 
 void QXmppCallManager::onUnregistered(QXmppClient *client)
 {
-    disconnect(client, &QXmppClient::disconnected,
-               this, &QXmppCallManager::onDisconnected);
-
-    disconnect(client, &QXmppClient::presenceReceived,
-               this, &QXmppCallManager::onPresenceReceived);
+    disconnect(client, nullptr, this, nullptr);
 }
 /// \endcond
 
@@ -325,6 +472,21 @@ void QXmppCallManager::setDtlsRequired(bool dtlsRequired)
 void QXmppCallManager::onCallDestroyed(QObject *object)
 {
     d->calls.removeAll(static_cast<QXmppCall *>(object));
+}
+
+void QXmppCallManager::onConnected()
+{
+    if (client()->streamManagementState() != QXmppClient::ResumedStream) {
+        // request STUN/TURN servers
+        requestStunTurnConfig(client(), this).then(this, [this](auto &&result) {
+            if (auto *error = std::get_if<QXmppError>(&result)) {
+                warning(u"Could not fetch STUN/TURN servers: %1"_s.arg(error->description));
+                d->stunTurnServers = StunTurnConfig { {}, {} };
+            } else {
+                d->stunTurnServers = std::get<StunTurnConfig>(std::move(result));
+            }
+        });
+    }
 }
 
 // Handles disconnection from server.
