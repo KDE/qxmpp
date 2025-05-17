@@ -2655,7 +2655,7 @@ bool QXmppIceConnection::bind(const QList<QHostAddress> &addresses)
     QList<int> keys = d->components.keys();
     std::sort(keys.begin(), keys.end());
     int s = 0;
-    for (const auto k : keys) {
+    for (const auto k : std::as_const(keys)) {
         d->components[k]->d->setSockets(sockets.mid(s, addresses.size()));
         s += addresses.size();
     }
