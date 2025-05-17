@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 
+#include "QXmppAsync_p.h"
 #include "QXmppClientExtension.h"
 #include "QXmppClient_p.h"
 #include "QXmppDiscoveryIq.h"
@@ -25,7 +26,7 @@
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
-#include "Async.h"
+#include "Algorithms.h"
 #include "Constants.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
@@ -148,10 +149,7 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
 
     // notify managers
     Q_EMIT q->error(oldError);
-    Q_EMIT q->errorOccurred(QXmppError {
-        text,
-        visit([](const auto &value) { return std::any(value); }, err),
-    });
+    Q_EMIT q->errorOccurred(QXmppError { text, into<std::any>(std::move(err)) });
 }
 /// \endcond
 
