@@ -6,6 +6,7 @@
 #include <QXmppCallManager.h>
 #include <QXmppClient.h>
 #include <QXmppRosterManager.h>
+#include <QXmppStunServer.h>
 
 #include <chrono>
 #include <gst/gst.h>
@@ -16,6 +17,7 @@
 #include <csignal>
 #endif
 
+using namespace QXmpp;
 using namespace std::chrono_literals;
 
 #ifdef Q_OS_UNIX
@@ -94,10 +96,8 @@ int main(int argc, char *argv[])
     config.setResourcePrefix("Call");
 
     // call manager config
-    callManager->setStunServer(QHostAddress(QStringLiteral("stun.nextcloud.com")), 443);
+    callManager->setFallbackStunServers({ StunServer { QHostAddress(QStringLiteral("stun.nextcloud.com")), 443 } });
     // callManager->setTurnServer();
-    // callManager->setTurnUser(client.configuration().jid());
-    // callManager->setTurnUser(client.configuration().password());
 
     client.connectToServer(config);
 

@@ -8,9 +8,8 @@
 #define QXMPPCALLMANAGER_P_H
 
 #include "QXmppCall.h"
-
-#include <QHostAddress>
-#include <QList>
+#include "QXmppStunServer.h"
+#include "QXmppTurnServer.h"
 
 class QXmppCallManager;
 class QXmppJingleReason;
@@ -34,11 +33,8 @@ public:
     void addCall(QXmppCall *call);
 
     QList<QXmppCall *> calls;
-    QList<QPair<QHostAddress, quint16>> stunServers;
-    QHostAddress turnHost;
-    quint16 turnPort = 0;
-    QString turnUser;
-    QString turnPassword;
+    QList<QXmpp::StunServer> fallbackStunServers;
+    std::optional<QXmpp::TurnServer> fallbackTurnServer;
 
     bool dtlsRequired = false;
     bool supportsDtls = false;
