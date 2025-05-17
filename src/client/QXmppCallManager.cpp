@@ -137,6 +137,32 @@ QXmppCallManager::QXmppCallManager()
 ///
 QXmppCallManager::~QXmppCallManager() = default;
 
+///
+/// Sets STUN servers that are used as a fallback, additionally to the ones provided by the XMPP
+/// server via \xep{0215, External Service Discovery}.
+///
+/// STUN is used to determine server-reflexive addresses and ports.
+///
+/// \since QXmpp 1.11
+///
+void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
+{
+    d->fallbackStunServers = servers;
+}
+
+///
+/// Set a TURN server that is used as a fallback, if the XMPP server does not provide any TURN
+/// server via \xep{0215, External Service Discovery}.
+///
+/// TURN is used to relay packets in double-NAT configurations.
+///
+/// \since QXmpp 1.11
+///
+void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &server)
+{
+    d->fallbackTurnServer = server;
+}
+
 /// \cond
 QStringList QXmppCallManager::discoveryFeatures() const
 {
@@ -260,68 +286,6 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid)
     });
 
     return call;
-}
-
-///
-/// Sets multiple STUN servers to use to determine server-reflexive addresses
-/// and ports.
-///
-/// \note This may only be called prior to calling bind().
-///
-/// \param servers List of the STUN servers.
-///
-/// \since QXmpp 1.3
-///
-void QXmppCallManager::setStunServers(const QList<QPair<QHostAddress, quint16>> &servers)
-{
-    d->stunServers = servers;
-}
-
-///
-/// Sets a single STUN server to use to determine server-reflexive addresses
-/// and ports.
-///
-/// \note This may only be called prior to calling bind().
-///
-/// \param host The address of the STUN server.
-/// \param port The port of the STUN server.
-///
-void QXmppCallManager::setStunServer(const QHostAddress &host, quint16 port)
-{
-    d->stunServers.clear();
-    d->stunServers.push_back(qMakePair(host, port));
-}
-
-///
-/// Sets the TURN server to use to relay packets in double-NAT configurations.
-///
-/// \param host The address of the TURN server.
-/// \param port The port of the TURN server.
-///
-void QXmppCallManager::setTurnServer(const QHostAddress &host, quint16 port)
-{
-    d->turnHost = host;
-    d->turnPort = port;
-}
-
-///
-/// Sets the \a user used for authentication with the TURN server.
-///
-/// \param user
-///
-void QXmppCallManager::setTurnUser(const QString &user)
-{
-    d->turnUser = user;
-}
-
-///
-/// Sets the \a password used for authentication with the TURN server.
-///
-/// \param password
-///
-void QXmppCallManager::setTurnPassword(const QString &password)
-{
-    d->turnPassword = password;
 }
 
 ///
