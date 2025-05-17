@@ -410,8 +410,10 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
 
     // ICE connection
     stream->d->connection->setIceControlling(direction == QXmppCall::OutgoingDirection);
-    stream->d->connection->setStunServers(manager->d->fallbackStunServers);
-    stream->d->connection->setTurnServer(manager->d->fallbackTurnServer);
+    stream->d->connection->setStunServers(manager->d->stunServers());
+    if (auto turnServer = manager->d->turnServer()) {
+        stream->d->connection->setTurnServer(*turnServer);
+    }
     stream->d->connection->bind(QXmppIceComponent::discoverAddresses());
 
     // connect signals
