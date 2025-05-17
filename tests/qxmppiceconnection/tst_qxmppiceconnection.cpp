@@ -3,10 +3,12 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppStun.h"
-
-#include "util.h"
+#include "QXmppStunServer.h"
 
 #include <QHostInfo>
+#include <QTest>
+
+using namespace QXmpp;
 
 class tst_QXmppIceConnection : public QObject
 {
@@ -60,7 +62,7 @@ void tst_QXmppIceConnection::testBindStun()
     connect(&client, &QXmppLoggable::logMessage,
             &logger, &QXmppLogger::log);
     client.setIceControlling(true);
-    QList<QPair<QHostAddress, quint16>> stunServers;
+    QList<StunServer> stunServers;
     for (auto &address : stunInfo.addresses()) {
         stunServers.push_back({ address, 19302 });
     }
