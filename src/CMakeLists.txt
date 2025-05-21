@@ -241,6 +241,7 @@ set(SOURCE_FILES
     base/QXmppVersionIq.cpp
     base/compat/removed_api.cpp
     base/hsluv/hsluv.c
+    base/XmlWriter.cpp
     # to trigger MOC
     base/XmppSocket.h
 
