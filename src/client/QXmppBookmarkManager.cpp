@@ -12,6 +12,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -62,10 +63,7 @@ void QXmppPrivateStorageIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppPrivateStorageIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_private));
-    m_bookmarks.toXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"query", ns_private }, m_bookmarks });
 }
 
 class QXmppBookmarkManagerPrivate

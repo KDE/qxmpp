@@ -5,7 +5,9 @@
 #ifndef QXMPPOUTOFBANDURL_H
 #define QXMPPOUTOFBANDURL_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
+#include "QXmppXmlTags_p.h"
 
 #include <optional>
 
@@ -29,6 +31,7 @@ public:
     void setDescription(const std::optional<QString> &description);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_oob };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

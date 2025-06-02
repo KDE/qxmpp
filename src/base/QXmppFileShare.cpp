@@ -35,7 +35,7 @@ struct Enums::Data<Disposition> {
 
 struct FileSources {
     static FileSources fromDom(const QDomElement &el);
-    void innerToXml(QXmlStreamWriter *writer) const;
+    void toXml(XmlWriter &writer) const;
 
     QVector<QXmppHttpFileSource> httpSources;
     QVector<QXmppEncryptedFileSource> encryptedSources;
@@ -49,10 +49,11 @@ FileSources FileSources::fromDom(const QDomElement &el)
     };
 }
 
-void FileSources::innerToXml(QXmlStreamWriter *writer) const
+// only inner (without <sources/> element)
+void FileSources::toXml(XmlWriter &writer) const
 {
-    writeElements(writer, httpSources);
-    writeElements(writer, encryptedSources);
+    writer.write(httpSources);
+    writer.write(encryptedSources);
 }
 
 }  // namespace QXmpp::Private
@@ -142,11 +143,11 @@ std::optional<QXmppFileSourcesAttachment> QXmppFileSourcesAttachment::fromDom(co
 
 void QXmppFileSourcesAttachment::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("sources"));
-    writer->writeDefaultNamespace(toString65(ns_sfs));
-    writer->writeAttribute(QSL65("id"), d->id);
-    d->sources.innerToXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"sources", ns_sfs },
+        Attribute { u"id", d->id },
+        d->sources,
+    });
 }
 
 class QXmppFileSharePrivate : public QSharedData
@@ -297,9 +298,9 @@ bool QXmppFileShare::parse(const QDomElement &el)
         d->id = el.attribute(u"id"_s);
 
         // file metadata
-        auto fileEl = firstChildElement(el, u"file");
-        d->metadata = QXmppFileMetadata();
-        if (!d->metadata.parse(fileEl)) {
+        if (auto metadata = parseElement<QXmppFileMetadata>(firstChildElement(el, u"file"))) {
+            d->metadata = std::move(*metadata);
+        } else {
             return false;
         }
 
@@ -314,16 +315,12 @@ bool QXmppFileShare::parse(const QDomElement &el)
 
 void QXmppFileShare::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("file-sharing"));
-    writer->writeDefaultNamespace(toString65(ns_sfs));
-    writer->writeAttribute(QSL65("disposition"), toString65(Enums::toString(d->disposition)));
-    writeOptionalXmlAttribute(writer, u"id", d->id);
-    d->metadata.toXml(writer);
-
-    // sources
-    writer->writeStartElement(QSL65("sources"));
-    d->sources.innerToXml(writer);
-    writer->writeEndElement();
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"disposition", d->disposition },
+        OptionalAttribute { u"id", d->id },
+        d->metadata,
+        Element { u"sources", d->sources },
+    });
 }
 /// \endcond

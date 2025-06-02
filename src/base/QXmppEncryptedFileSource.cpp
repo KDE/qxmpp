@@ -11,6 +11,7 @@
 
 #include "Enums.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <optional>
 
@@ -155,25 +156,16 @@ bool QXmppEncryptedFileSource::parse(const QDomElement &el)
 
 void QXmppEncryptedFileSource::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("encrypted"));
-    writer->writeDefaultNamespace(toString65(ns_esfs));
-    writer->writeAttribute(QSL65("cipher"), toString65(Enums::toString(d->cipher)));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeTextElement("key", d->key.toBase64());
-    writer->writeTextElement("iv", d->iv.toBase64());
-#else
-    writer->writeTextElement(u"key"_s, QString::fromUtf8(d->key.toBase64()));
-    writer->writeTextElement(u"iv"_s, QString::fromUtf8(d->iv.toBase64()));
-#endif
-    for (const auto &hash : d->hashes) {
-        hash.toXml(writer);
-    }
-    writer->writeStartElement(QSL65("sources"));
-    writer->writeDefaultNamespace(toString65(ns_sfs));
-    for (const auto &source : d->httpSources) {
-        source.toXml(writer);
-    }
-    writer->writeEndElement();
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"cipher", d->cipher },
+        TextElement { u"key"_s, Base64 { d->key } },
+        TextElement { u"iv"_s, Base64 { d->iv } },
+        d->hashes,
+        Element {
+            { u"sources", ns_sfs },
+            d->httpSources,
+        },
+    });
 }
 /// \endcond

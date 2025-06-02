@@ -7,6 +7,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -87,22 +88,22 @@ void QXmppStreamInitiationIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppStreamInitiationIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("si"));
-    writer->writeDefaultNamespace(toString65(ns_stream_initiation));
-    writeOptionalXmlAttribute(writer, u"id", m_siId);
-    writeOptionalXmlAttribute(writer, u"mime-type", m_mimeType);
-    if (m_profile == FileTransfer) {
-        writeOptionalXmlAttribute(writer, u"profile", ns_stream_initiation_file_transfer);
-    }
-    if (!m_fileInfo.isNull()) {
-        m_fileInfo.toXml(writer);
-    }
-    if (!m_featureForm.isNull()) {
-        writer->writeStartElement(QSL65("feature"));
-        writer->writeDefaultNamespace(toString65(ns_feature_negotiation));
-        m_featureForm.toXml(writer);
-        writer->writeEndElement();
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        OptionalAttribute { u"id", m_siId },
+        OptionalAttribute { u"mime-type", m_mimeType },
+        OptionalContent {
+            m_profile == FileTransfer,
+            Attribute { u"profile", ns_stream_initiation_file_transfer },
+        },
+        OptionalContent {
+            !m_fileInfo.isNull(),
+            m_fileInfo,
+        },
+        OptionalContent {
+            !m_featureForm.isNull(),
+            Element { { u"feature", ns_feature_negotiation }, m_featureForm },
+        },
+    });
 }
 /// \endcond

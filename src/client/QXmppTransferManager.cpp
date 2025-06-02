@@ -16,6 +16,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QCryptographicHash>
 #include <QDomElement>
@@ -183,24 +184,14 @@ void QXmppTransferFileInfo::parse(const QDomElement &element)
 
 void QXmppTransferFileInfo::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("file"));
-    writer->writeDefaultNamespace(toString65(ns_stream_initiation_file_transfer));
-    if (d->date.isValid()) {
-        writer->writeAttribute(QSL65("date"), QXmppUtils::datetimeToString(d->date));
-    }
-    if (!d->hash.isEmpty()) {
-        writer->writeAttribute(QSL65("hash"), QString::fromUtf8(d->hash.toHex()));
-    }
-    if (!d->name.isEmpty()) {
-        writer->writeAttribute(QSL65("name"), d->name);
-    }
-    if (d->size > 0) {
-        writer->writeAttribute(QSL65("size"), QString::number(d->size));
-    }
-    if (!d->description.isEmpty()) {
-        writer->writeTextElement(QSL65("desc"), d->description);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"file", ns_stream_initiation_file_transfer },
+        OptionalAttribute { u"date", d->date },
+        OptionalAttribute { u"hash", d->hash.toHex() },
+        OptionalAttribute { u"name", d->name },
+        OptionalAttribute { u"size", d->size > 0 ? std::make_optional(d->size) : std::nullopt },
+        OptionalTextElement { u"desc", d->description },
+    });
 }
 /// \endcond
 

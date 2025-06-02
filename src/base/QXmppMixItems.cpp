@@ -13,6 +13,7 @@
 
 #include "Enums.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDateTime>
 
@@ -1184,15 +1185,11 @@ void QXmppMixParticipantItem::parsePayload(const QDomElement &payload)
 
 void QXmppMixParticipantItem::serializePayload(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("participant"));
-    writer->writeDefaultNamespace(toString65(ns_mix));
-    if (!d->jid.isEmpty()) {
-        writer->writeTextElement(QSL65("jid"), d->jid);
-    }
-    if (!d->nick.isEmpty()) {
-        writer->writeTextElement(QSL65("nick"), d->nick);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"participant", ns_mix },
+        OptionalTextElement { u"jid", d->jid },
+        OptionalTextElement { u"nick", d->nick },
+    });
 }
 /// \endcond
 

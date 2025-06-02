@@ -17,6 +17,7 @@ using namespace QXmpp::Private;
 template<>
 struct Enums::Data<QXmppMucItem::Affiliation> {
     using enum QXmppMucItem::Affiliation;
+    static constexpr auto NullValue = UnspecifiedAffiliation;
     static constexpr auto Values = makeValues<QXmppMucItem::Affiliation>({
         { UnspecifiedAffiliation, {} },
         { OutcastAffiliation, u"outcast" },
@@ -30,6 +31,7 @@ struct Enums::Data<QXmppMucItem::Affiliation> {
 template<>
 struct Enums::Data<QXmppMucItem::Role> {
     using enum QXmppMucItem::Role;
+    static constexpr auto NullValue = UnspecifiedRole;
     static constexpr auto Values = makeValues<QXmppMucItem::Role>({
         { UnspecifiedRole, {} },
         { NoRole, u"none" },
@@ -145,20 +147,19 @@ void QXmppMucItem::parse(const QDomElement &element)
 
 void QXmppMucItem::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("item"));
-    writeOptionalXmlAttribute(writer, u"affiliation", Enums::toString(m_affiliation));
-    writeOptionalXmlAttribute(writer, u"jid", m_jid);
-    writeOptionalXmlAttribute(writer, u"nick", m_nick);
-    writeOptionalXmlAttribute(writer, u"role", Enums::toString(m_role));
-    if (!m_actor.isEmpty()) {
-        writer->writeStartElement(QSL65("actor"));
-        writeOptionalXmlAttribute(writer, u"jid", m_actor);
-        writer->writeEndElement();
+    if (isNull()) {
+        return;
     }
-    if (!m_reason.isEmpty()) {
-        writeXmlTextElement(writer, u"reason", m_reason);
-    }
-    writer->writeEndElement();
+
+    XmlWriter(writer).write(Element {
+        u"item",
+        OptionalAttribute { u"affiliation", m_affiliation },
+        OptionalAttribute { u"jid", m_jid },
+        OptionalAttribute { u"nick", m_nick },
+        OptionalAttribute { u"role", m_role },
+        OptionalContent { !m_actor.isEmpty(), Element { u"actor", Attribute { u"jid", m_actor } } },
+        OptionalTextElement { u"reason", m_reason },
+    });
 }
 /// \endcond
 
@@ -189,10 +190,7 @@ void QXmppMucAdminIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppMucAdminIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_muc_admin));
-    writeElements(writer, m_items);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"query", ns_muc_admin }, m_items });
 }
 /// \endcond
 
@@ -223,9 +221,6 @@ void QXmppMucOwnerIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppMucOwnerIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_muc_owner));
-    m_form.toXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"query", ns_muc_owner }, m_form });
 }
 /// \endcond

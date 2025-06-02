@@ -90,8 +90,7 @@ void QXmppArchiveChat::toXml(QXmlStreamWriter *writer, const QXmppResultSetReply
 
     XmlWriter w(writer);
     w.write(Element {
-        u"chat",
-        ns_archive,
+        { u"chat", ns_archive },
         OptionalAttribute { u"with", m_with },
         OptionalAttribute { u"start", m_start },
         OptionalAttribute { u"subject", m_subject },
@@ -353,8 +352,7 @@ void QXmppArchiveListIq::parseElementFromChild(const QDomElement &element)
 void QXmppArchiveListIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
-        u"list",
-        ns_archive,
+        { u"list", ns_archive },
         OptionalAttribute { u"with", m_with },
         OptionalAttribute { u"start", m_start },
         OptionalAttribute { u"end", m_end },
@@ -377,9 +375,7 @@ void QXmppArchivePrefIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppArchivePrefIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("pref"));
-    writer->writeDefaultNamespace(toString65(ns_archive));
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"pref", ns_archive } });
 }
 /// \endcond
 
@@ -436,8 +432,7 @@ void QXmppArchiveRemoveIq::parseElementFromChild(const QDomElement &element)
 void QXmppArchiveRemoveIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
-        u"remove",
-        ns_archive,
+        { u"remove", ns_archive },
         OptionalAttribute { u"with", m_with },
         OptionalAttribute { u"start", m_start },
         OptionalAttribute { u"end", m_end },
@@ -512,8 +507,7 @@ void QXmppArchiveRetrieveIq::parseElementFromChild(const QDomElement &element)
 void QXmppArchiveRetrieveIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
-        u"retrieve",
-        ns_archive,
+        { u"retrieve", ns_archive },
         OptionalAttribute { u"with", m_with },
         OptionalAttribute { u"start", m_start },
         m_rsmQuery,

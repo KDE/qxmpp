@@ -294,48 +294,24 @@ void QXmppExternalService::parse(const QDomElement &el)
 ///
 void QXmppExternalService::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("service"));
-    writeOptionalXmlAttribute(writer, u"host", d->host);
-    writeOptionalXmlAttribute(writer, u"type", d->type);
-
-    if (d->action) {
-        writeOptionalXmlAttribute(writer, u"action", Enums::toString(d->action.value()));
-    }
-
-    if (d->expires) {
-        writeOptionalXmlAttribute(writer, u"expires", d->expires->toString(Qt::ISODateWithMs));
-    }
-
-    if (d->name) {
-        writeOptionalXmlAttribute(writer, u"name", d->name.value());
-    }
-
-    if (d->password) {
-        writeOptionalXmlAttribute(writer, u"password", d->password.value());
-    }
-
-    if (d->port) {
-        writeOptionalXmlAttribute(writer, u"port", QString::number(d->port.value()));
-    }
-
-    if (d->restricted) {
-        writeOptionalXmlAttribute(writer, u"restricted", d->restricted.value() ? u"true" : u"false");
-    }
-
-    if (d->transport) {
-        writeOptionalXmlAttribute(writer, u"transport", Enums::toString(d->transport.value()));
-    }
-
-    if (d->username) {
-        writeOptionalXmlAttribute(writer, u"username", d->username.value());
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"service",
+        Attribute { u"host", d->host },
+        Attribute { u"type", d->type },
+        OptionalAttribute { u"action", d->action },
+        OptionalAttribute { u"expires", d->expires },
+        OptionalAttribute { u"name", d->name },
+        OptionalAttribute { u"password", d->password },
+        OptionalAttribute { u"port", d->port },
+        OptionalAttribute { u"restricted", d->restricted },
+        OptionalAttribute { u"transport", d->transport },
+        OptionalAttribute { u"username", d->username },
+    });
 }
 
 ///
 /// \brief The QXmppExternalServiceDiscoveryIq class represents an IQ used to discover external
-/// services as defined by \xep{0215}: External Service Discovery.
+/// services as defined by \xep{0215, External Service Discovery}.
 ///
 /// \ingroup Stanzas
 ///
@@ -400,9 +376,6 @@ void QXmppExternalServiceDiscoveryIq::parseElementFromChild(const QDomElement &e
 
 void QXmppExternalServiceDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("services"));
-    writer->writeDefaultNamespace(toString65(ns_external_service_discovery));
-    writeElements(writer, d->externalServices);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"services", ns_external_service_discovery }, d->externalServices });
 }
 /// \endcond

@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -77,18 +78,13 @@ void QXmppDialback::parse(const QDomElement &element)
 
 void QXmppDialback::toXml(QXmlStreamWriter *xmlWriter) const
 {
-    if (m_command == Result) {
-        xmlWriter->writeStartElement(QSL65("db:result"));
-    } else {
-        xmlWriter->writeStartElement(QSL65("db:verify"));
-    }
-    writeOptionalXmlAttribute(xmlWriter, u"id", id());
-    writeOptionalXmlAttribute(xmlWriter, u"to", to());
-    writeOptionalXmlAttribute(xmlWriter, u"from", from());
-    writeOptionalXmlAttribute(xmlWriter, u"type", m_type);
-    if (!m_key.isEmpty()) {
-        xmlWriter->writeCharacters(m_key);
-    }
-    xmlWriter->writeEndElement();
+    XmlWriter(xmlWriter).write(Element {
+        m_command == Result ? u"db:result" : u"db:verify",
+        OptionalAttribute { u"id", id() },
+        OptionalAttribute { u"to", to() },
+        OptionalAttribute { u"from", from() },
+        OptionalAttribute { u"type", m_type },
+        OptionalCharacters { m_key },
+    });
 }
 /// \endcond

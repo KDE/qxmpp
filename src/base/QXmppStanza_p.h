@@ -61,6 +61,7 @@ struct Enums::Data<QXmppStanza::Error::Condition> {
 template<>
 struct Enums::Data<QXmppStanza::Error::Type> {
     using enum QXmppStanza::Error::Type;
+    static constexpr auto NullValue = NoType;
     static constexpr auto Values = makeValues<QXmppStanza::Error::Type>({
         { NoType, {} },
         { Cancel, u"cancel" },

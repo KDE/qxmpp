@@ -10,6 +10,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -37,10 +38,10 @@ public:
     }
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override
     {
-        writer->writeStartElement(QSL65("blocklist"));
-        writer->writeDefaultNamespace(toString65(ns_blocking));
-        writeSingleAttributeElements(writer, u"item", u"jid", jids);
-        writer->writeEndElement();
+        XmlWriter(writer).write(Element {
+            { u"blocklist", ns_blocking },
+            SingleAttributeElements { u"item", u"jid", jids },
+        });
     }
     static bool checkIqType(const QString &tagName, const QString &xmlns)
     {
@@ -64,10 +65,10 @@ public:
     }
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override
     {
-        writer->writeStartElement(QSL65("block"));
-        writer->writeDefaultNamespace(toString65(ns_blocking));
-        writeSingleAttributeElements(writer, u"item", u"jid", jids);
-        writer->writeEndElement();
+        XmlWriter(writer).write(Element {
+            { u"block", ns_blocking },
+            SingleAttributeElements { u"item", u"jid", jids },
+        });
     }
     static bool checkIqType(const QString &tagName, const QString &xmlns)
     {
@@ -92,10 +93,10 @@ public:
 
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override
     {
-        writer->writeStartElement(QSL65("unblock"));
-        writer->writeDefaultNamespace(toString65(ns_blocking));
-        writeSingleAttributeElements(writer, u"item", u"jid", jids);
-        writer->writeEndElement();
+        XmlWriter(writer).write(Element {
+            { u"unblock", ns_blocking },
+            SingleAttributeElements { u"item", u"jid", jids },
+        });
     }
 
     static bool checkIqType(const QString &tagName, const QString &xmlns)

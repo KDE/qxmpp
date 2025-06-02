@@ -66,8 +66,7 @@ void QXmppBindIq::parseElementFromChild(const QDomElement &element)
 void QXmppBindIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
-        u"bind",
-        ns_bind,
+        { u"bind", ns_bind },
         OptionalTextElement { u"jid", m_jid },
         OptionalTextElement { u"resource", m_resource },
     });

@@ -15,8 +15,10 @@ static void checkVariant(const QVariant &value, const QByteArray &xml)
     buffer.open(QIODevice::ReadWrite);
     QXmlStreamWriter writer(&buffer);
     QXmppRpcMarshaller::marshall(&writer, value);
-    qDebug() << "expect " << xml;
-    qDebug() << "writing" << buffer.data();
+    if (xml != buffer.data()) {
+        qDebug() << "expect " << xml;
+        qDebug() << "writing" << buffer.data();
+    }
     QCOMPARE(buffer.data(), xml);
 
     // parse
@@ -58,9 +60,9 @@ void tst_QXmppRpcIq::testBase64()
 void tst_QXmppRpcIq::testBool()
 {
     checkVariant(false,
-                 QByteArray("<value><boolean>0</boolean></value>"));
+                 QByteArray("<value><boolean>false</boolean></value>"));
     checkVariant(true,
-                 QByteArray("<value><boolean>1</boolean></value>"));
+                 QByteArray("<value><boolean>true</boolean></value>"));
 }
 
 void tst_QXmppRpcIq::testDateTime()

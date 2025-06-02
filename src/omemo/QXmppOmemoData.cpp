@@ -13,6 +13,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QHash>
@@ -96,14 +97,11 @@ void QXmppOmemoDeviceElement::parse(const QDomElement &element)
 
 void QXmppOmemoDeviceElement::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("device"));
-
-    writer->writeAttribute(QSL65("id"), QString::number(m_id));
-    if (!m_label.isEmpty()) {
-        writer->writeAttribute(QSL65("label"), m_label);
-    }
-
-    writer->writeEndElement();  // device
+    XmlWriter(writer).write(Element {
+        u"device",
+        Attribute { u"id", m_id },
+        OptionalAttribute { u"label", m_label },
+    });
 }
 
 ///
@@ -132,10 +130,14 @@ void QXmppOmemoDeviceList::parse(const QDomElement &element)
 
 void QXmppOmemoDeviceList::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("devices"));
-    writer->writeDefaultNamespace(toString65(ns_omemo_2));
-    writeElements(writer, *this);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        [&] {
+            for (const auto &item : *this) {
+                item.toXml(writer);
+            }
+        },
+    });
 }
 
 ///
@@ -309,48 +311,29 @@ void QXmppOmemoDeviceBundle::parse(const QDomElement &element)
 
 void QXmppOmemoDeviceBundle::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("bundle"));
-    writer->writeDefaultNamespace(toString65(ns_omemo_2));
-
-    writer->writeStartElement(QSL65("ik"));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeCharacters(publicIdentityKey().toBase64());
-#else
-    writer->writeCharacters(QString::fromUtf8(publicIdentityKey().toBase64()));
-#endif
-    writer->writeEndElement();
-
-    writer->writeStartElement(QSL65("spk"));
-    writer->writeAttribute(QSL65("id"), QString::number(signedPublicPreKeyId()));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeCharacters(signedPublicPreKey().toBase64());
-#else
-    writer->writeCharacters(QString::fromUtf8(signedPublicPreKey().toBase64()));
-#endif
-    writer->writeEndElement();
-
-    writer->writeStartElement(QSL65("spks"));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    writer->writeCharacters(signedPublicPreKeySignature().toBase64());
-#else
-    writer->writeCharacters(QString::fromUtf8(signedPublicPreKeySignature().toBase64()));
-#endif
-    writer->writeEndElement();
-
-    writer->writeStartElement(QSL65("prekeys"));
-    for (auto it = m_publicPreKeys.cbegin(); it != m_publicPreKeys.cend(); it++) {
-        writer->writeStartElement(QSL65("pk"));
-        writer->writeAttribute(QSL65("id"), QString::number(it.key()));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-        writer->writeCharacters(it.value().toBase64());
-#else
-        writer->writeCharacters(QString::fromUtf8(it.value().toBase64()));
-#endif
-        writer->writeEndElement();
-    }
-    writer->writeEndElement();  // prekeys
-
-    writer->writeEndElement();  // bundle
+    XmlWriter w(writer);
+    w.write(Element {
+        { u"bundle", ns_omemo_2 },
+        TextElement { u"ik", Base64 { m_publicIdentityKey } },
+        Element {
+            u"spk",
+            Attribute { u"id", m_signedPublicPreKeyId },
+            Characters { Base64 { m_signedPublicPreKey } },
+        },
+        TextElement { u"spks", Base64 { m_signedPublicPreKeySignature } },
+        Element {
+            u"prekeys",
+            [&] {
+                for (auto it = m_publicPreKeys.cbegin(); it != m_publicPreKeys.cend(); it++) {
+                    w.write(Element {
+                        u"pk",
+                        Attribute { u"id", it.key() },
+                        Characters { Base64 { it.value() } },
+                    });
+                }
+            },
+        },
+    });
 }
 
 ///

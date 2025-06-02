@@ -5,6 +5,7 @@
 #ifndef QXMPPTRUSTMESSAGEELEMENT_H
 #define QXMPPTRUSTMESSAGEELEMENT_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <QSharedDataPointer>
@@ -36,6 +37,7 @@ public:
     void addKeyOwner(const QXmppTrustMessageKeyOwner &keyOwner);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"trust-message", QXmpp::Private::ns_tm };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

@@ -10,6 +10,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <ranges>
 
@@ -20,59 +21,117 @@
 #include <QVariant>
 
 using namespace QXmpp::Private;
+using std::ranges::transform_view;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+using MetaType = QMetaType::Type;
+#else
+using MetaType = QVariant::Type;
+#endif
+
+struct RpcValue {
+    const QVariant &value;
+
+    static RpcValue fromVariant(const QVariant &v) { return RpcValue { v }; }
+    void toXml(QXmlStreamWriter *writer) const
+    {
+        QXmppRpcMarshaller::marshall(writer, value);
+    }
+};
+
+struct RpcList {
+    const QVariantList &list;
+
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element {
+            u"array",
+            Element {
+                u"data",
+                transform_view(list, &RpcValue::fromVariant),
+            },
+        });
+    }
+};
+
+struct RpcMap {
+    const QMap<QString, QVariant> &map;
+
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element {
+            u"struct",
+            [&] {
+                for (auto it = map.begin(); it != map.end(); ++it) {
+                    w.write(Element {
+                        u"member",
+                        TextElement { u"name", it.key() },
+                        RpcValue { it.value() },
+                    });
+                }
+            },
+        });
+    }
+};
+
+struct RpcParams {
+    const QVariantList &params;
+
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element {
+            u"params",
+            [&] {
+                for (const auto &value : params) {
+                    w.write(Element { u"param", RpcValue { value } });
+                }
+            },
+        });
+    }
+};
 
 void QXmppRpcMarshaller::marshall(QXmlStreamWriter *writer, const QVariant &value)
 {
-    writer->writeStartElement(QSL65("value"));
+    XmlWriter w(writer);
+
+    writer->writeStartElement(u"value"_s);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     switch (value.typeId()) {
-    case QMetaType::Type::Int:
-    case QMetaType::Type::UInt:
-    case QMetaType::Type::LongLong:
-    case QMetaType::Type::ULongLong:
 #else
     switch (value.type()) {
-    case QVariant::Int:
-    case QVariant::UInt:
-    case QVariant::LongLong:
-    case QVariant::ULongLong:
 #endif
-        writer->writeTextElement(QSL65("i4"), value.toString());
+    case MetaType::Int:
+    case MetaType::UInt:
+    case MetaType::LongLong:
+    case MetaType::ULongLong:
+        w.write(TextElement { u"i4", value.toString() });
         break;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    case QMetaType::Type::Double:
-#else
-    case QVariant::Double:
-#endif
-        writer->writeTextElement(QSL65("double"), value.toString());
+    case MetaType::Double:
+        w.write(TextElement { u"double", value.toString() });
         break;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    case QMetaType::Type::Bool:
-#else
-    case QVariant::Bool:
-#endif
-        writer->writeTextElement(QSL65("boolean"), value.toBool() ? u"1"_s : u"0"_s);
+    case MetaType::Bool:
+        w.write(TextElement { u"boolean", value.toBool() });
         break;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QDate:
 #else
     case QVariant::Date:
 #endif
-        writer->writeTextElement(QSL65("dateTime.iso8601"), value.toDate().toString(Qt::ISODate));
+        w.write(TextElement { u"dateTime.iso8601", value.toDate().toString(Qt::ISODate) });
         break;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QDateTime:
 #else
     case QVariant::DateTime:
 #endif
-        writer->writeTextElement(QSL65("dateTime.iso8601"), value.toDateTime().toString(Qt::ISODate));
+        w.write(TextElement { u"dateTime.iso8601", value.toDateTime() });
         break;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QTime:
 #else
     case QVariant::Time:
 #endif
-        writer->writeTextElement(QSL65("dateTime.iso8601"), value.toTime().toString(Qt::ISODate));
+        w.write(TextElement { u"dateTime.iso8601", value.toTime().toString(Qt::ISODate) });
         break;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QStringList:
@@ -81,14 +140,7 @@ void QXmppRpcMarshaller::marshall(QXmlStreamWriter *writer, const QVariant &valu
     case QVariant::StringList:
     case QVariant::List: {
 #endif
-        writer->writeStartElement(QSL65("array"));
-        writer->writeStartElement(QSL65("data"));
-        const auto list = value.toList();
-        for (const auto &item : list) {
-            marshall(writer, item);
-        }
-        writer->writeEndElement();
-        writer->writeEndElement();
+        w.write(RpcList { value.toList() });
         break;
     }
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -96,17 +148,7 @@ void QXmppRpcMarshaller::marshall(QXmlStreamWriter *writer, const QVariant &valu
 #else
     case QVariant::Map: {
 #endif
-        writer->writeStartElement(QSL65("struct"));
-        const QMap<QString, QVariant> map = value.toMap();
-        QMap<QString, QVariant>::ConstIterator index = map.begin();
-        while (index != map.end()) {
-            writer->writeStartElement(QSL65("member"));
-            writer->writeTextElement(QSL65("name"), index.key());
-            marshall(writer, *index);
-            writer->writeEndElement();
-            ++index;
-        }
-        writer->writeEndElement();
+        w.write(RpcMap { value.toMap() });
         break;
     }
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -114,30 +156,29 @@ void QXmppRpcMarshaller::marshall(QXmlStreamWriter *writer, const QVariant &valu
 #else
     case QVariant::ByteArray: {
 #endif
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-        writer->writeTextElement("base64", value.toByteArray().toBase64());
-#else
-        writer->writeTextElement(u"base64"_s, QString::fromUtf8(value.toByteArray().toBase64()));
-#endif
+        w.write(TextElement { u"base64", Base64 { value.toByteArray() } });
         break;
     }
     default: {
         if (value.isNull()) {
-            writer->writeEmptyElement(u"nil"_s);
+            w.write(Element { u"nil" });
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         } else if (value.canConvert(QMetaType(QMetaType::Type::QString))) {
 #else
         } else if (value.canConvert(QVariant::String)) {
 #endif
-            const auto string = value.toString();
-            writer->writeStartElement(QSL65("string"));
-            if (std::ranges::all_of(string, [](auto c) { return c.isSpace(); })) {
-                // strings with only whitespace get stripped by some parsers
-                writer->writeCDATA(string);
-            } else {
-                writer->writeCharacters(string);
-            }
-            writer->writeEndElement();
+            w.write(Element {
+                u"string",
+                [&] {
+                    const auto string = value.toString();
+                    if (std::ranges::all_of(string, [](auto c) { return c.isSpace(); })) {
+                        // strings with only whitespace get stripped by some parsers
+                        writer->writeCDATA(string);
+                    } else {
+                        writer->writeCharacters(string);
+                    }
+                },
+            });
         }
         break;
     }
@@ -326,29 +367,24 @@ void QXmppRpcResponseIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppRpcResponseIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_rpc));
+    XmlWriter w(writer);
+    w.write(Element {
+        { u"query", ns_rpc },
+        Element {
+            u"methodResponse",
+            [&] {
+                if (m_faultCode) {
+                    QVariantMap fault;
+                    fault[u"faultCode"_s] = m_faultCode;
+                    fault[u"faultString"_s] = m_faultString;
 
-    writer->writeStartElement(QSL65("methodResponse"));
-    if (m_faultCode) {
-        writer->writeStartElement(QSL65("fault"));
-        QMap<QString, QVariant> fault;
-        fault[u"faultCode"_s] = m_faultCode;
-        fault[u"faultString"_s] = m_faultString;
-        QXmppRpcMarshaller::marshall(writer, fault);
-        writer->writeEndElement();
-    } else if (!m_values.isEmpty()) {
-        writer->writeStartElement(QSL65("params"));
-        for (const auto &arg : m_values) {
-            writer->writeStartElement(QSL65("param"));
-            QXmppRpcMarshaller::marshall(writer, arg);
-            writer->writeEndElement();
-        }
-        writer->writeEndElement();
-    }
-    writer->writeEndElement();
-
-    writer->writeEndElement();
+                    w.write(Element { u"fault", Element { u"value", RpcMap { fault } } });
+                } else if (!m_values.isEmpty()) {
+                    w.write(RpcParams { m_values });
+                }
+            },
+        },
+    });
 }
 /// \endcond
 
@@ -417,22 +453,13 @@ void QXmppRpcInvokeIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppRpcInvokeIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_rpc));
-
-    writer->writeStartElement(QSL65("methodCall"));
-    writer->writeTextElement(QSL65("methodName"), m_method);
-    if (!m_arguments.isEmpty()) {
-        writer->writeStartElement(QSL65("params"));
-        for (const auto &arg : m_arguments) {
-            writer->writeStartElement(QSL65("param"));
-            QXmppRpcMarshaller::marshall(writer, arg);
-            writer->writeEndElement();
-        }
-        writer->writeEndElement();
-    }
-    writer->writeEndElement();
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"query", ns_rpc },
+        Element {
+            u"methodCall",
+            TextElement { u"methodName", m_method },
+            OptionalContent { !m_arguments.isEmpty(), RpcParams { m_arguments } },
+        },
+    });
 }
 /// \endcond

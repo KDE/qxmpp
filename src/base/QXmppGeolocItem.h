@@ -5,6 +5,7 @@
 #ifndef QXMPPGEOLOCITEM_H
 #define QXMPPGEOLOCITEM_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppPubSubBaseItem.h"
 
 #include <optional>
@@ -40,9 +41,10 @@ public:
     void setLongitude(std::optional<double> lon);
 
     static bool isItem(const QDomElement &itemElement);
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"geoloc", QXmpp::Private::ns_geoloc };
 
 protected:
-    /// \cond
     void parsePayload(const QDomElement &payloadElement) override;
     void serializePayload(QXmlStreamWriter *writer) const override;
     /// \endcond

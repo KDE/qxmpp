@@ -138,16 +138,13 @@ void QXmppExtendedAddress::parse(const QDomElement &element)
 
 void QXmppExtendedAddress::toXml(QXmlStreamWriter *xmlWriter) const
 {
-    xmlWriter->writeStartElement(QSL65("address"));
-    if (d->delivered) {
-        xmlWriter->writeAttribute(QSL65("delivered"), u"true"_s);
-    }
-    if (!d->description.isEmpty()) {
-        xmlWriter->writeAttribute(QSL65("desc"), d->description);
-    }
-    xmlWriter->writeAttribute(QSL65("jid"), d->jid);
-    xmlWriter->writeAttribute(QSL65("type"), d->type);
-    xmlWriter->writeEndElement();
+    XmlWriter(xmlWriter).write(Element {
+        u"address",
+        OptionalAttribute { u"delivered", DefaultedBool { d->delivered, false } },
+        OptionalAttribute { u"desc", d->description },
+        Attribute { u"jid", d->jid },
+        Attribute { u"type", d->type },
+    });
 }
 /// \endcond
 
@@ -450,51 +447,49 @@ void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
         return;
     }
 
-    writer->writeStartElement(QSL65("error"));
-    writeOptionalXmlAttribute(writer, u"by", d->by);
-    if (d->type != NoType) {
-        writer->writeAttribute(QSL65("type"), toString65(Enums::toString(d->type)));
-    }
+    auto optionalInt = [](int n) {
+        return n > 0 ? std::make_optional(n) : std::nullopt;
+    };
 
-    if (d->code > 0) {
-        writeOptionalXmlAttribute(writer, u"code", QString::number(d->code));
-    }
-
-    if (d->condition != NoCondition) {
-        writer->writeStartElement(toString65(Enums::toString(d->condition)));
-        writer->writeDefaultNamespace(toString65(ns_stanza));
-
-        // redirection URI
-        if (!d->redirectionUri.isEmpty() && (d->condition == Gone || d->condition == Redirect)) {
-            writer->writeCharacters(d->redirectionUri);
-        }
-
-        writer->writeEndElement();
-    }
-    if (!d->text.isEmpty()) {
-        writer->writeStartElement(QSL65("text"));
-        writer->writeAttribute(QSL65("xml:lang"), u"en"_s);
-        writer->writeDefaultNamespace(toString65(ns_stanza));
-        writer->writeCharacters(d->text);
-        writer->writeEndElement();
-    }
-
-    // XEP-0363: HTTP File Upload
-    if (d->fileTooLarge) {
-        writer->writeStartElement(QSL65("file-too-large"));
-        writer->writeDefaultNamespace(toString65(ns_http_upload));
-        writeXmlTextElement(writer, u"max-file-size",
-                            QString::number(d->maxFileSize));
-        writer->writeEndElement();
-    } else if (!d->retryDate.isNull() && d->retryDate.isValid()) {
-        writer->writeStartElement(QSL65("retry"));
-        writer->writeDefaultNamespace(toString65(ns_http_upload));
-        writer->writeAttribute(QSL65("stamp"),
-                               QXmppUtils::datetimeToString(d->retryDate));
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"error",
+        OptionalAttribute { u"by", d->by },
+        OptionalAttribute { u"type", d->type },
+        OptionalAttribute { u"code", optionalInt(d->code) },
+        OptionalContent {
+            d->condition != NoCondition,
+            Element {
+                Tag { d->condition, ns_stanza },
+                OptionalContent {
+                    !d->redirectionUri.isEmpty() && (d->condition == Gone || d->condition == Redirect),
+                    Characters { d->redirectionUri },
+                },
+            },
+        },
+        OptionalContent {
+            !d->text.isEmpty(),
+            Element {
+                { u"text", ns_stanza },
+                Attribute { u"xml:lang", u"en"_s },
+                Characters { d->text },
+            },
+        },
+        // XEP-0363: HTTP File Upload
+        OptionalContent {
+            d->fileTooLarge,
+            Element {
+                { u"file-too-large", ns_http_upload },
+                TextElement { u"max-file-size", d->maxFileSize },
+            },
+        },
+        OptionalContent {
+            d->retryDate.isValid(),
+            Element {
+                { u"retry", ns_http_upload },
+                Attribute { u"stamp", d->retryDate },
+            },
+        },
+    });
 }
 /// \endcond
 
@@ -885,20 +880,15 @@ void QXmppStanza::parse(const QDomElement &element)
 
 void QXmppStanza::extensionsToXml(QXmlStreamWriter *xmlWriter, QXmpp::SceMode sceMode) const
 {
+    XmlWriter w(xmlWriter);
+
     // XEP-0033: Extended Stanza Addressing
     if (sceMode & QXmpp::ScePublic && !d->extendedAddresses.isEmpty()) {
-        xmlWriter->writeStartElement(QSL65("addresses"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_extended_addressing));
-        for (const auto &address : d->extendedAddresses) {
-            address.toXml(xmlWriter);
-        }
-        xmlWriter->writeEndElement();
+        w.write(Element { { u"addresses", ns_extended_addressing }, d->extendedAddresses });
     }
 
     // other extensions
-    for (const auto &extension : d->extensions) {
-        extension.toXml(xmlWriter);
-    }
+    w.write(d->extensions);
 }
 
 /// \endcond

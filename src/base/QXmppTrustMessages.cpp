@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -132,12 +133,12 @@ void QXmppTrustMessageElement::parse(const QDomElement &element)
 
 void QXmppTrustMessageElement::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("trust-message"));
-    writer->writeDefaultNamespace(toString65(ns_tm));
-    writer->writeAttribute(QSL65("usage"), d->usage);
-    writer->writeAttribute(QSL65("encryption"), d->encryption);
-    writeElements(writer, d->keyOwners);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"usage", d->usage },
+        Attribute { u"encryption", d->encryption },
+        d->keyOwners,
+    });
 }
 /// \endcond
 
@@ -266,26 +267,14 @@ void QXmppTrustMessageKeyOwner::parse(const QDomElement &element)
 
 void QXmppTrustMessageKeyOwner::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("key-owner"));
-    writer->writeAttribute(QSL65("jid"), d->jid);
+    using std::views::transform;
 
-    for (const auto &keyIdentifier : d->trustedKeys) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-        writer->writeTextElement("trust", keyIdentifier.toBase64());
-#else
-        writer->writeTextElement(u"trust"_s, QString::fromUtf8(keyIdentifier.toBase64()));
-#endif
-    }
-
-    for (const auto &keyIdentifier : d->distrustedKeys) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-        writer->writeTextElement("distrust", keyIdentifier.toBase64());
-#else
-        writer->writeTextElement(u"distrust"_s, QString::fromUtf8(keyIdentifier.toBase64()));
-#endif
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"key-owner",
+        Attribute { u"jid", d->jid },
+        TextElements { u"trust", transform(d->trustedKeys, &Base64::fromByteArray) },
+        TextElements { u"distrust", transform(d->distrustedKeys, &Base64::fromByteArray) },
+    });
 }
 /// \endcond
 

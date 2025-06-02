@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -118,13 +119,12 @@ void QXmppPubSubBaseItem::parse(const QDomElement &element)
 
 void QXmppPubSubBaseItem::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("item"));
-    writeOptionalXmlAttribute(writer, u"id", d->id);
-    writeOptionalXmlAttribute(writer, u"publisher", d->publisher);
-
-    serializePayload(writer);
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"item",
+        OptionalAttribute { u"id", d->id },
+        OptionalAttribute { u"publisher", d->publisher },
+        [&] { serializePayload(writer); },
+    });
 }
 /// \endcond
 

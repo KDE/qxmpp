@@ -103,24 +103,21 @@ void QXmppIq::parseElementFromChild(const QDomElement &element)
     setExtensions(extensions);
 }
 
-void QXmppIq::toXml(QXmlStreamWriter *xmlWriter) const
+void QXmppIq::toXml(QXmlStreamWriter *w) const
 {
-    xmlWriter->writeStartElement(QSL65("iq"));
-
-    writeOptionalXmlAttribute(xmlWriter, u"id", id());
-    writeOptionalXmlAttribute(xmlWriter, u"to", to());
-    writeOptionalXmlAttribute(xmlWriter, u"from", from());
-    writeOptionalXmlAttribute(xmlWriter, u"type", Enums::toString(d->type));
-    toXmlElementFromChild(xmlWriter);
-    error().toXml(xmlWriter);
-    xmlWriter->writeEndElement();
+    XmlWriter(w).write(Element {
+        u"iq",
+        Attribute { u"id", id() },
+        OptionalAttribute { u"to", to() },
+        OptionalAttribute { u"from", from() },
+        Attribute { u"type", d->type },
+        [&] { toXmlElementFromChild(w); },
+        errorOptional(),
+    });
 }
 
-void QXmppIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
+void QXmppIq::toXmlElementFromChild(QXmlStreamWriter *w) const
 {
-    const auto exts = extensions();
-    for (const QXmppElement &extension : exts) {
-        extension.toXml(writer);
-    }
+    XmlWriter(w).write(extensions());
 }
 /// \endcond

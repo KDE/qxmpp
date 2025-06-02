@@ -230,8 +230,8 @@ void Bind2Request::toXml(XmlWriter &writer) const
     writer.write(Element {
         XmlTag,
         OptionalTextElement { u"tag", tag },
-        OptionalContent { csiInactive, Element { u"inactive", ns_csi } },
-        OptionalContent { carbonsEnable, Element { u"enable", ns_carbons } },
+        OptionalContent { csiInactive, Element { { u"inactive", ns_csi } } },
+        OptionalContent { carbonsEnable, Element { { u"enable", ns_carbons } } },
         smEnable,
     });
 }
@@ -353,7 +353,7 @@ void StreamFeature::toXml(XmlWriter &writer) const
                 u"inline",
                 bind2Feature,
                 fast,
-                OptionalContent { streamResumptionAvailable, Element { u"sm", ns_stream_management } },
+                OptionalContent { streamResumptionAvailable, Element { { u"sm", ns_stream_management } } },
             },
         },
     });
@@ -507,7 +507,7 @@ void Failure::toXml(XmlWriter &writer) const
 {
     writer.write(Element {
         XmlTag,
-        Element { condition, ns_sasl },
+        Element { Tag { condition, ns_sasl } },
         OptionalTextElement { u"text", text },
     });
 }
@@ -719,9 +719,9 @@ std::optional<HtToken> HtToken::fromXml(QXmlStreamReader &r)
     return {};
 }
 
-void HtToken::toXml(QXmlStreamWriter &w) const
+void HtToken::toXml(XmlWriter &w) const
 {
-    XmlWriter(&w).write(Element {
+    w.write(Element {
         u"ht-token",
         Attribute { u"mechanism", mechanism.toString() },
         Attribute { u"secret", secret },

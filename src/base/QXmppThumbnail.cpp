@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QMimeDatabase>
@@ -132,18 +133,12 @@ bool QXmppThumbnail::parse(const QDomElement &el)
 
 void QXmppThumbnail::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("thumbnail"));
-    writer->writeDefaultNamespace(toString65(ns_thumbs));
-    writer->writeAttribute(QSL65("uri"), d->uri);
-    if (d->mediaType.isValid()) {
-        writer->writeAttribute(QSL65("media-type"), d->mediaType.name());
-    }
-    if (d->width) {
-        writer->writeAttribute(QSL65("width"), QString::number(*d->width));
-    }
-    if (d->height) {
-        writer->writeAttribute(QSL65("height"), QString::number(*d->height));
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"uri", d->uri },
+        OptionalAttribute { u"media-type", d->mediaType },
+        OptionalAttribute { u"width", d->width },
+        OptionalAttribute { u"height", d->height },
+    });
 }
 /// \endcond

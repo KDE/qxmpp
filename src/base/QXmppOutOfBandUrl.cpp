@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
@@ -24,7 +25,7 @@ public:
 ///
 /// \class QXmppOutOfBandUrl
 ///
-/// A URL and a description of its contents, from \xep{0066}: Out of Band Data
+/// A URL and a description of its contents, from \xep{0066, Out of Band Data}
 ///
 /// \since QXmpp 1.5
 ///
@@ -82,12 +83,10 @@ bool QXmppOutOfBandUrl::parse(const QDomElement &el)
 
 void QXmppOutOfBandUrl::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("x"));
-    writer->writeDefaultNamespace(toString65(ns_oob));
-    writer->writeTextElement(QSL65("url"), d->url);
-    if (d->description) {
-        writer->writeTextElement(QSL65("desc"), *d->description);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        TextElement { u"url", d->url },
+        OptionalTextElement { u"desc", d->description },
+    });
 }
 /// \endcond

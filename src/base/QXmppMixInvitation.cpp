@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QSharedData>
@@ -144,15 +145,13 @@ void QXmppMixInvitation::parse(const QDomElement &element)
 
 void QXmppMixInvitation::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("invitation"));
-    writer->writeDefaultNamespace(toString65(ns_mix_misc));
-
-    writeOptionalXmlTextElement(writer, u"inviter", d->inviterJid);
-    writeOptionalXmlTextElement(writer, u"invitee", d->inviteeJid);
-    writeOptionalXmlTextElement(writer, u"channel", d->channelJid);
-    writeOptionalXmlTextElement(writer, u"token", d->token);
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalTextElement { u"inviter", d->inviterJid },
+        OptionalTextElement { u"invitee", d->inviteeJid },
+        OptionalTextElement { u"channel", d->channelJid },
+        OptionalTextElement { u"token", d->token },
+    });
 }
 /// \endcond
 

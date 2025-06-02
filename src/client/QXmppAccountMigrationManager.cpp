@@ -13,6 +13,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -132,28 +133,30 @@ void QXmppExportData::toXml(QXmlStreamWriter *writer) const
         return keys;
     }();
 
+    XmlWriter w(writer);
+
     writer->writeStartDocument();
-    writer->writeStartElement(QSL65("account-data"));
-    writer->writeDefaultNamespace(toString65(ns_qxmpp_export));
-    writer->writeAttribute(QSL65("jid"), d->accountJid);
+    w.write(Element {
+        { u"account-data", ns_qxmpp_export },
+        Attribute { u"jid", d->accountJid },
+        [&] {
+            const auto &serializers = accountDataSerializers();
+            for (const auto &sortedKey : sortedExtensionsKeys) {
+                const auto &typeIndex = sortedKey.first;
 
-    const auto &serializers = accountDataSerializers();
-    for (const auto &sortedKey : sortedExtensionsKeys) {
-        const auto &typeIndex = sortedKey.first;
+                if (!d->extensions.contains(typeIndex)) {
+                    continue;
+                }
 
-        if (!d->extensions.contains(typeIndex)) {
-            continue;
-        }
+                const auto serializer = serializers.find(typeIndex);
+                if (serializer != serializers.end()) {
+                    const auto &[_, serialize] = *serializer;
 
-        const auto serializer = serializers.find(typeIndex);
-        if (serializer != serializers.end()) {
-            const auto &[_, serialize] = *serializer;
-
-            serialize(d->extensions.at(typeIndex), *writer);
-        }
-    }
-
-    writer->writeEndElement();
+                    serialize(d->extensions.at(typeIndex), *writer);
+                }
+            }
+        },
+    });
     writer->writeEndDocument();
 }
 

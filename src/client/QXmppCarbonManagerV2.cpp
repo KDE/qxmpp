@@ -11,6 +11,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -31,9 +32,7 @@ public:
     }
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override
     {
-        writer->writeStartElement(QSL65("enable"));
-        writer->writeDefaultNamespace(toString65(ns_carbons));
-        writer->writeEndElement();
+        XmlWriter(writer).write(Element { { u"enable", ns_carbons } });
     }
 };
 

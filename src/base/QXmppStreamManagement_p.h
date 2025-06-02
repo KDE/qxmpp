@@ -17,8 +17,9 @@
 class QXmppPacket;
 
 namespace QXmpp::Private {
+class XmlWriter;
 class XmppSocket;
-}
+}  // namespace QXmpp::Private
 
 //
 //  W A R N I N G
@@ -42,7 +43,7 @@ struct SmFeature {
 struct SmEnable {
     static constexpr std::tuple XmlTag = { u"enable", QXmpp::Private::ns_stream_management };
     static std::optional<SmEnable> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *w) const;
+    void toXml(XmlWriter &w) const;
 
     bool resume = false;
     quint64 max = 0;
@@ -51,7 +52,7 @@ struct SmEnable {
 struct SmEnabled {
     static constexpr std::tuple XmlTag = { u"enabled", QXmpp::Private::ns_stream_management };
     static std::optional<SmEnabled> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *w) const;
+    void toXml(XmlWriter &w) const;
 
     bool resume = false;
     QString id;
@@ -62,7 +63,7 @@ struct SmEnabled {
 struct SmResume {
     static constexpr std::tuple XmlTag = { u"resume", QXmpp::Private::ns_stream_management };
     static std::optional<SmResume> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *w) const;
+    void toXml(XmlWriter &w) const;
 
     quint32 h = 0;
     QString previd;
@@ -71,7 +72,7 @@ struct SmResume {
 struct SmResumed {
     static constexpr std::tuple XmlTag = { u"resumed", QXmpp::Private::ns_stream_management };
     static std::optional<SmResumed> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *w) const;
+    void toXml(XmlWriter &w) const;
 
     quint32 h = 0;
     QString previd;
@@ -80,7 +81,7 @@ struct SmResumed {
 struct SmFailed {
     static constexpr std::tuple XmlTag = { u"failed", QXmpp::Private::ns_stream_management };
     static std::optional<SmFailed> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *w) const;
+    void toXml(XmlWriter &w) const;
 
     std::optional<QXmppStanza::Error::Condition> error;
 };
@@ -88,7 +89,7 @@ struct SmFailed {
 struct SmAck {
     static constexpr std::tuple XmlTag = { u"a", QXmpp::Private::ns_stream_management };
     static std::optional<SmAck> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *w) const;
+    void toXml(XmlWriter &w) const;
 
     quint32 seqNo = 0;
 };
@@ -96,7 +97,7 @@ struct SmAck {
 struct SmRequest {
     static constexpr std::tuple XmlTag = { u"r", QXmpp::Private::ns_stream_management };
     static std::optional<SmRequest> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *w) const;
+    void toXml(XmlWriter &w) const;
 };
 
 //

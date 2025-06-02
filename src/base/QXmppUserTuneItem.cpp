@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QUrl>
@@ -261,21 +262,15 @@ void QXmppTuneItem::parsePayload(const QDomElement &tune)
 
 void QXmppTuneItem::serializePayload(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("tune"));
-    writer->writeDefaultNamespace(toString65(ns_tune));
-
-    writeXmlTextElement(writer, u"artist", d->artist);
-    if (d->length) {
-        writer->writeTextElement(QSL65("length"), QString::number(*d->length));
-    }
-    if (d->rating) {
-        writer->writeTextElement(QSL65("rating"), QString::number(*d->rating));
-    }
-    writeXmlTextElement(writer, u"source", d->source);
-    writeXmlTextElement(writer, u"title", d->title);
-    writeXmlTextElement(writer, u"track", d->track);
-    writeXmlTextElement(writer, u"uri", d->uri.toString(QUrl::FullyEncoded));
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"tune", ns_tune },
+        TextElement { u"artist", d->artist },
+        OptionalTextElement { u"length", d->length },
+        OptionalTextElement { u"rating", d->rating },
+        TextElement { u"source", d->source },
+        TextElement { u"title", d->title },
+        TextElement { u"track", d->track },
+        TextElement { u"uri", d->uri.toString(QUrl::FullyEncoded) },
+    });
 }
 /// \endcond

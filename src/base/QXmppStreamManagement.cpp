@@ -7,9 +7,11 @@
 #include "QXmppPacket_p.h"
 #include "QXmppStanza_p.h"
 #include "QXmppStreamManagement_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 #include "XmppSocket.h"
 
 namespace QXmpp::Private {
@@ -27,17 +29,13 @@ std::optional<SmEnable> SmEnable::fromDom(const QDomElement &el)
     };
 }
 
-void SmEnable::toXml(QXmlStreamWriter *w) const
+void SmEnable::toXml(XmlWriter &w) const
 {
-    w->writeStartElement(QSL65("enable"));
-    w->writeDefaultNamespace(toString65(ns_stream_management));
-    if (resume) {
-        w->writeAttribute(QSL65("resume"), u"true"_s);
-    }
-    if (max > 0) {
-        w->writeAttribute(QSL65("max"), QString::number(max));
-    }
-    w->writeEndElement();
+    w.write(Element {
+        XmlTag,
+        OptionalAttribute { u"resume", DefaultedBool { resume, false } },
+        OptionalContent { max > 0, Attribute { u"max", max } },
+    });
 }
 
 std::optional<SmEnabled> SmEnabled::fromDom(const QDomElement &el)
@@ -55,21 +53,15 @@ std::optional<SmEnabled> SmEnabled::fromDom(const QDomElement &el)
     };
 }
 
-void SmEnabled::toXml(QXmlStreamWriter *w) const
+void SmEnabled::toXml(XmlWriter &w) const
 {
-    w->writeStartElement(QSL65("enable"));
-    w->writeDefaultNamespace(toString65(ns_stream_management));
-    if (resume) {
-        w->writeAttribute(QSL65("resume"), u"true"_s);
-    }
-    writeOptionalXmlAttribute(w, u"id", id);
-    if (max > 0) {
-        w->writeAttribute(QSL65("max"), QString::number(max));
-    }
-    if (!location.isEmpty()) {
-        w->writeAttribute(QSL65("location"), location);
-    }
-    w->writeEndElement();
+    w.write(Element {
+        XmlTag,
+        OptionalAttribute { u"resume", DefaultedBool { resume, false } },
+        OptionalAttribute { u"id", id },
+        OptionalContent { max > 0, Attribute { u"max", max } },
+        OptionalAttribute { u"location", location },
+    });
 }
 
 std::optional<SmResume> SmResume::fromDom(const QDomElement &el)
@@ -83,13 +75,13 @@ std::optional<SmResume> SmResume::fromDom(const QDomElement &el)
     };
 }
 
-void SmResume::toXml(QXmlStreamWriter *w) const
+void SmResume::toXml(XmlWriter &w) const
 {
-    w->writeStartElement(QSL65("resume"));
-    w->writeDefaultNamespace(toString65(ns_stream_management));
-    w->writeAttribute(QSL65("h"), QString::number(h));
-    w->writeAttribute(QSL65("previd"), previd);
-    w->writeEndElement();
+    w.write(Element {
+        XmlTag,
+        Attribute { u"h", h },
+        Attribute { u"previd", previd },
+    });
 }
 
 std::optional<SmResumed> SmResumed::fromDom(const QDomElement &el)
@@ -103,13 +95,13 @@ std::optional<SmResumed> SmResumed::fromDom(const QDomElement &el)
     };
 }
 
-void SmResumed::toXml(QXmlStreamWriter *w) const
+void SmResumed::toXml(XmlWriter &w) const
 {
-    w->writeStartElement(QSL65("resumed"));
-    w->writeDefaultNamespace(toString65(ns_stream_management));
-    w->writeAttribute(QSL65("h"), QString::number(h));
-    w->writeAttribute(QSL65("previd"), previd);
-    w->writeEndElement();
+    w.write(Element {
+        XmlTag,
+        Attribute { u"h", h },
+        Attribute { u"previd", previd },
+    });
 }
 
 std::optional<SmFailed> SmFailed::fromDom(const QDomElement &el)
@@ -123,45 +115,35 @@ std::optional<SmFailed> SmFailed::fromDom(const QDomElement &el)
     };
 }
 
-void SmFailed::toXml(QXmlStreamWriter *w) const
+void SmFailed::toXml(XmlWriter &w) const
 {
-    w->writeStartElement(QSL65("failed"));
-    w->writeDefaultNamespace(toString65(ns_stream_management));
-    if (error) {
-        writeEmptyElement(w, Enums::toString(*error), ns_stanza);
-    }
-    w->writeEndElement();
+    w.write(Element {
+        XmlTag,
+        OptionalContent { error.has_value(), Element { Tag { *error, ns_stanza } } },
+    });
 }
 
 std::optional<SmAck> SmAck::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"a" || el.namespaceURI() != ns_stream_management) {
+    if (!isElementType<SmAck>(el)) {
         return {};
     }
     return SmAck { el.attribute(u"h"_s).toUInt() };
 }
 
-void SmAck::toXml(QXmlStreamWriter *w) const
+void SmAck::toXml(XmlWriter &w) const
 {
-    w->writeStartElement(QSL65("a"));
-    w->writeDefaultNamespace(toString65(ns_stream_management));
-    w->writeAttribute(QSL65("h"), QString::number(seqNo));
-    w->writeEndElement();
+    w.write(Element { XmlTag, Attribute { u"h", seqNo } });
 }
 
 std::optional<SmRequest> SmRequest::fromDom(const QDomElement &el)
 {
-    if (el.tagName() == u"r" && el.namespaceURI() == ns_stream_management) {
-        return SmRequest();
-    }
-    return {};
+    return isElementType<SmRequest>(el) ? std::make_optional(SmRequest()) : std::nullopt;
 }
 
-void SmRequest::toXml(QXmlStreamWriter *w) const
+void SmRequest::toXml(XmlWriter &w) const
 {
-    w->writeStartElement(QSL65("r"));
-    w->writeDefaultNamespace(toString65(ns_stream_management));
-    w->writeEndElement();
+    w.write(Element { XmlTag });
 }
 
 StreamAckManager::StreamAckManager(XmppSocket &socket)

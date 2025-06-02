@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QCryptographicHash>
 #include <QDomElement>
@@ -112,24 +113,12 @@ void QXmppNonSASLAuthIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppNonSASLAuthIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_auth));
-    if (!m_username.isEmpty()) {
-        writer->writeTextElement(QSL65("username"), m_username);
-    }
-    if (!m_digest.isEmpty()) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-        writer->writeTextElement("digest", m_digest.toHex());
-#else
-        writer->writeTextElement(u"digest"_s, QString::fromUtf8(m_digest.toHex()));
-#endif
-    }
-    if (!m_password.isEmpty()) {
-        writer->writeTextElement(QSL65("password"), m_password);
-    }
-    if (!m_resource.isEmpty()) {
-        writer->writeTextElement(QSL65("resource"), m_resource);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        OptionalTextElement { u"username", m_username },
+        OptionalTextElement { u"digest", m_digest.toHex() },
+        OptionalTextElement { u"password", m_password },
+        OptionalTextElement { u"resource", m_resource },
+    });
 }
 /// \endcond

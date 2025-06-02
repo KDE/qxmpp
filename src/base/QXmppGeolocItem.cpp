@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
@@ -141,7 +142,7 @@ void QXmppGeolocItem::setLongitude(std::optional<double> lon)
 }
 
 ///
-/// Returns true, if the element is a valid \xep{0080}: User Location PubSub item.
+/// Returns true, if the element is a valid \xep{0080, User Location} PubSub item.
 ///
 bool QXmppGeolocItem::isItem(const QDomElement &itemElement)
 {
@@ -154,55 +155,33 @@ bool QXmppGeolocItem::isItem(const QDomElement &itemElement)
 }
 
 /// \cond
-std::optional<double> parseOptDouble(const QDomElement &element)
-{
-    bool ok = false;
-    if (auto val = element.text().toDouble(&ok); ok) {
-        return val;
-    }
-    return {};
-}
-
 void QXmppGeolocItem::parsePayload(const QDomElement &tune)
 {
     for (const auto &child : iterChildElements(tune)) {
         const auto tagName = child.tagName();
         if (tagName == u"accuracy") {
-            d->accuracy = parseOptDouble(child);
+            d->accuracy = parseDouble(child.text());
         } else if (tagName == u"country") {
             d->country = child.text();
         } else if (tagName == u"lat") {
-            setLatitude(parseOptDouble(child));
+            setLatitude(parseDouble(child.text()));
         } else if (tagName == u"locality") {
             d->locality = child.text();
         } else if (tagName == u"lon") {
-            setLongitude(parseOptDouble(child));
+            setLongitude(parseDouble(child.text()));
         }
     }
 }
 
-auto writeTextEl(QXmlStreamWriter *writer, const QString &name, std::optional<double> val)
-{
-    if (val.has_value()) {
-        writer->writeTextElement(name, QString::number(*val));
-    }
-}
-auto writeTextEl(QXmlStreamWriter *writer, const QString &name, const QString &val)
-{
-    writeXmlTextElement(writer, name, val);
-}
-
 void QXmppGeolocItem::serializePayload(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("geoloc"));
-    writer->writeDefaultNamespace(toString65(ns_geoloc));
-
-    writeTextEl(writer, u"accuracy"_s, d->accuracy);
-    writeTextEl(writer, u"country"_s, d->country);
-    writeTextEl(writer, u"lat"_s, d->latitude);
-    writeTextEl(writer, u"locality"_s, d->locality);
-    writeTextEl(writer, u"lon"_s, d->longitude);
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalTextElement { u"accuracy", d->accuracy },
+        OptionalTextElement { u"country", d->country },
+        OptionalTextElement { u"lat", d->latitude },
+        OptionalTextElement { u"locality", d->locality },
+        OptionalTextElement { u"lon", d->longitude },
+    });
 }
 /// \endcond
