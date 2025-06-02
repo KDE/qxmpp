@@ -817,7 +817,7 @@ void QXmppOutgoingClient::handleStreamError(const QXmpp::Private::StreamErrorEle
     } else {
         auto condition = std::get<StreamError>(streamError.condition);
         auto text = u"Received stream error (%1): %2"_s
-                        .arg(StreamErrorElement::streamErrorToString(condition), streamError.text);
+                        .arg(Enums::toString(condition), streamError.text);
 
         setError(text, condition);
     }

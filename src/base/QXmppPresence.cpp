@@ -22,6 +22,7 @@ using namespace QXmpp::Private;
 template<>
 struct Enums::Data<QXmppPresence::Type> {
     using enum QXmppPresence::Type;
+    static constexpr auto NullValue = Available;
     static constexpr auto Values = makeValues<QXmppPresence::Type>({
         { Error, u"error" },
         { Available, {} },
@@ -37,6 +38,7 @@ struct Enums::Data<QXmppPresence::Type> {
 template<>
 struct Enums::Data<QXmppPresence::AvailableStatusType> {
     using enum QXmppPresence::AvailableStatusType;
+    static constexpr auto NullValue = Online;
     static constexpr auto Values = makeValues<QXmppPresence::AvailableStatusType>({
         { Online, {} },
         { Away, u"away" },
@@ -532,122 +534,85 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
 
 void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
 {
-    xmlWriter->writeStartElement(QSL65("presence"));
-    writeOptionalXmlAttribute(xmlWriter, u"xml:lang", lang());
-    writeOptionalXmlAttribute(xmlWriter, u"id", id());
-    writeOptionalXmlAttribute(xmlWriter, u"to", to());
-    writeOptionalXmlAttribute(xmlWriter, u"from", from());
-    writeOptionalXmlAttribute(xmlWriter, u"type", Enums::toString(d->type));
-
-    writeOptionalXmlTextElement(xmlWriter, u"show", Enums::toString(d->availableStatusType));
-    writeOptionalXmlTextElement(xmlWriter, u"status", d->statusText);
-    if (d->priority != 0) {
-        writeXmlTextElement(xmlWriter, u"priority", QString::number(d->priority));
-    }
-
-    error().toXml(xmlWriter);
-
-    // XEP-0045: Multi-User Chat
-    if (d->mucSupported) {
-        xmlWriter->writeStartElement(QSL65("x"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_muc));
-        if (!d->mucPassword.isEmpty()) {
-            xmlWriter->writeTextElement(QSL65("password"), d->mucPassword);
-        }
-        xmlWriter->writeEndElement();
-    }
-
-    if (!d->mucItem.isNull() || !d->mucStatusCodes.isEmpty()) {
-        xmlWriter->writeStartElement(QSL65("x"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_muc_user));
-        if (!d->mucItem.isNull()) {
-            d->mucItem.toXml(xmlWriter);
-        }
-        for (const auto code : d->mucStatusCodes) {
-            xmlWriter->writeStartElement(QSL65("status"));
-            xmlWriter->writeAttribute(QSL65("code"), QString::number(code));
-            xmlWriter->writeEndElement();
-        }
-        xmlWriter->writeEndElement();
-    }
-
-    // XEP-0115: Entity Capabilities
-    if (!d->capabilityNode.isEmpty() &&
-        !d->capabilityVer.isEmpty() &&
-        !d->capabilityHash.isEmpty()) {
-        xmlWriter->writeStartElement(QSL65("c"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_capabilities));
-        writeOptionalXmlAttribute(xmlWriter, u"hash", d->capabilityHash);
-        writeOptionalXmlAttribute(xmlWriter, u"node", d->capabilityNode);
-        writeOptionalXmlAttribute(xmlWriter, u"ver", QString::fromUtf8(d->capabilityVer.toBase64()));
-        xmlWriter->writeEndElement();
-    }
-
-    // XEP-0153: vCard-Based Avatars
-    if (d->vCardUpdateType != VCardUpdateNone) {
-        xmlWriter->writeStartElement(QSL65("x"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_vcard_update));
-        switch (d->vCardUpdateType) {
-        case VCardUpdateNoPhoto:
-            xmlWriter->writeEmptyElement(u"photo"_s);
-            break;
-        case VCardUpdateValidPhoto:
-            writeXmlTextElement(xmlWriter, u"photo", QString::fromUtf8(d->photoHash.toHex()));
-            break;
-        default:
-            break;
-        }
-        xmlWriter->writeEndElement();
-    }
-
-    // XEP-0272: Multiparty Jingle (Muji)
-    if (d->isPreparingMujiSession || !d->mujiContents.isEmpty()) {
-        xmlWriter->writeStartElement(QSL65("muji"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_muji));
-
-        if (d->isPreparingMujiSession) {
-            xmlWriter->writeEmptyElement(u"preparing"_s);
-        }
-
-        for (const auto &mujiContent : d->mujiContents) {
-            mujiContent.toXml(xmlWriter);
-        }
-
-        xmlWriter->writeEndElement();
-    }
-
-    // XEP-0283: Moved
-    if (!d->oldJid.isEmpty()) {
-        xmlWriter->writeStartElement(QSL65("moved"));
-        xmlWriter->writeDefaultNamespace(ns_moved.toString());
-        writeXmlTextElement(xmlWriter, u"old-jid", d->oldJid);
-        xmlWriter->writeEndElement();
-    }
-
-    // XEP-0319: Last User Interaction in Presence
-    if (!d->lastUserInteraction.isNull() && d->lastUserInteraction.isValid()) {
-        xmlWriter->writeStartElement(QSL65("idle"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_idle));
-        writeOptionalXmlAttribute(xmlWriter, u"since", QXmppUtils::datetimeToString(d->lastUserInteraction));
-        xmlWriter->writeEndElement();
-    }
-
-    // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
-    if (!d->mixUserJid.isEmpty() || !d->mixUserNick.isEmpty()) {
-        xmlWriter->writeStartElement(QSL65("mix"));
-        xmlWriter->writeDefaultNamespace(toString65(ns_mix_presence));
-        if (!d->mixUserJid.isEmpty()) {
-            writeXmlTextElement(xmlWriter, u"jid", d->mixUserJid);
-        }
-        if (!d->mixUserNick.isEmpty()) {
-            writeXmlTextElement(xmlWriter, u"nick", d->mixUserNick);
-        }
-        xmlWriter->writeEndElement();
-    }
-
-    // unknown extensions
-    QXmppStanza::extensionsToXml(xmlWriter);
-
-    xmlWriter->writeEndElement();
+    XmlWriter w(xmlWriter);
+    w.write(Element {
+        u"presence",
+        OptionalAttribute { u"xml:lang", lang() },
+        OptionalAttribute { u"id", id() },
+        OptionalAttribute { u"to", to() },
+        OptionalAttribute { u"from", from() },
+        OptionalAttribute { u"type", d->type },
+        OptionalTextElement { u"show", d->availableStatusType },
+        OptionalTextElement { u"status", d->statusText },
+        OptionalTextElement { u"priority", d->priority != 0 ? std::make_optional(d->priority) : std::nullopt },
+        errorOptional(),
+        // XEP-0045: Multi-User Chat
+        OptionalContent {
+            d->mucSupported,
+            Element { { u"x", ns_muc }, OptionalTextElement { u"password", d->mucPassword } },
+        },
+        OptionalContent {
+            !d->mucItem.isNull() || !d->mucStatusCodes.isEmpty(),
+            Element {
+                { u"x", ns_muc_user },
+                d->mucItem,
+                SingleAttributeElements { u"status", u"code", d->mucStatusCodes },
+            },
+        },
+        // XEP-0115: Entity Capabilities
+        OptionalContent {
+            !d->capabilityNode.isEmpty() && !d->capabilityVer.isEmpty() && !d->capabilityHash.isEmpty(),
+            Element {
+                { u"c", ns_capabilities },
+                Attribute { u"hash", d->capabilityHash },
+                Attribute { u"node", d->capabilityNode },
+                Attribute { u"ver", Base64 { d->capabilityVer } },
+            },
+        },
+        // XEP-0153: vCard-Based Avatars
+        OptionalContent {
+            d->vCardUpdateType != VCardUpdateNone,
+            Element {
+                { u"x", ns_vcard_update },
+                [&] {
+                    if (d->vCardUpdateType == VCardUpdateNoPhoto) {
+                        w.write(Element { u"photo" });
+                    } else if (d->vCardUpdateType == VCardUpdateValidPhoto) {
+                        w.write(TextElement { u"photo", d->photoHash.toHex() });
+                    }
+                },
+            },
+        },
+        // XEP-0272: Multiparty Jingle (Muji)
+        OptionalContent {
+            d->isPreparingMujiSession || !d->mujiContents.isEmpty(),
+            Element {
+                { u"muji", ns_muji },
+                OptionalContent { d->isPreparingMujiSession, Element { u"preparing" } },
+                d->mujiContents,
+            },
+        },
+        // XEP-0283: Moved
+        OptionalContent {
+            !d->oldJid.isEmpty(),
+            Element { { u"moved", ns_moved }, TextElement { u"old-jid", d->oldJid } },
+        },
+        // XEP-0319: Last User Interaction in Presence
+        OptionalContent {
+            d->lastUserInteraction.isValid(),
+            Element { { u"idle", ns_idle }, Attribute { u"since", d->lastUserInteraction } },
+        },
+        // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
+        OptionalContent {
+            !d->mixUserJid.isEmpty() || !d->mixUserNick.isEmpty(),
+            Element {
+                { u"mix", ns_mix_presence },
+                OptionalTextElement { u"jid", d->mixUserJid },
+                OptionalTextElement { u"nick", d->mixUserNick },
+            },
+        },
+        // unknown extensions
+        [&] { QXmppStanza::extensionsToXml(xmlWriter); },
+    });
 }
 /// \endcond

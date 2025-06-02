@@ -25,6 +25,7 @@
 #include "Async.h"
 #include "Enums.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -56,12 +57,13 @@ struct MixData {
             nick = element.attribute(u"nick"_s);
         }
 
-        void toXml(QXmlStreamWriter *writer) const
+        void toXml(XmlWriter &w) const
         {
-            writer->writeStartElement(QSL65("item"));
-            writeOptionalXmlAttribute(writer, u"jid", jid);
-            writeOptionalXmlAttribute(writer, u"nick", nick);
-            writer->writeEndElement();
+            w.write(Element {
+                u"item",
+                OptionalAttribute { u"jid", jid },
+                OptionalAttribute { u"nick", nick },
+            });
         }
     };
 
@@ -80,17 +82,15 @@ struct MixData {
         };
     }
 
-    void toXml(QXmlStreamWriter &writer) const
+    void toXml(XmlWriter &w) const
     {
-        writer.writeStartElement(QSL65("mix"));
-        writeElements(&writer, items);
-        writer.writeEndElement();
+        w.write(Element { u"mix", items });
     }
 };
 
 static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
 {
-    d.toXml(writer);
+    XmlWriter(&writer).write(d);
 }
 
 }  // namespace QXmpp::Private

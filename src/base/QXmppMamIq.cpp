@@ -8,6 +8,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -144,17 +145,13 @@ void QXmppMamQueryIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppMamQueryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("query"));
-    writer->writeDefaultNamespace(toString65(ns_mam));
-    if (!d->node.isEmpty()) {
-        writer->writeAttribute(QSL65("node"), d->node);
-    }
-    if (!d->queryId.isEmpty()) {
-        writer->writeAttribute(QSL65("queryid"), d->queryId);
-    }
-    d->form.toXml(writer);
-    d->resultSetQuery.toXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        OptionalAttribute { u"node", d->node },
+        OptionalAttribute { u"queryid", d->queryId },
+        d->form,
+        d->resultSetQuery,
+    });
 }
 /// \endcond
 
@@ -250,12 +247,10 @@ void QXmppMamResultIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppMamResultIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("fin"));
-    writer->writeDefaultNamespace(toString65(ns_mam));
-    if (d->complete) {
-        writer->writeAttribute(QSL65("complete"), u"true"_s);
-    }
-    d->resultSetReply.toXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        PayloadXmlTag,
+        OptionalAttribute { u"complete", DefaultedBool { d->complete, false } },
+        d->resultSetReply,
+    });
 }
 /// \endcond

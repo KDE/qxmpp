@@ -10,13 +10,13 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 #include "XmppSocket.h"
 
 #include <QDomDocument>
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <QSslSocket>
-#include <QXmlStreamWriter>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -61,17 +61,17 @@ StreamOpen StreamOpen::fromXml(QXmlStreamReader &reader)
     return out;
 }
 
-void StreamOpen::toXml(QXmlStreamWriter *writer) const
+void StreamOpen::toXml(XmlWriter &w) const
 {
-    writer->writeStartDocument();
-    writer->writeStartElement(QSL65("stream:stream"));
-    writeOptionalXmlAttribute(writer, u"from", from);
-    writeOptionalXmlAttribute(writer, u"to", to);
-    writeOptionalXmlAttribute(writer, u"id", id);
-    writeOptionalXmlAttribute(writer, u"version", version);
-    writer->writeDefaultNamespace(xmlns);
-    writer->writeNamespace(toString65(ns_stream), QSL65("stream"));
-    writer->writeCharacters({});
+    w.writer()->writeStartDocument();
+    w.writer()->writeStartElement(u"stream:stream"_s);
+    w.write(OptionalAttribute { u"from", from });
+    w.write(OptionalAttribute { u"to", to });
+    w.write(OptionalAttribute { u"id", id });
+    w.write(OptionalAttribute { u"version", version });
+    w.write(DefaultNamespace { xmlns });
+    w.write(Namespace { u"stream", ns_stream });
+    w.write(Characters { QString() });
 }
 
 std::optional<StarttlsRequest> StarttlsRequest::fromDom(const QDomElement &el)
@@ -82,9 +82,9 @@ std::optional<StarttlsRequest> StarttlsRequest::fromDom(const QDomElement &el)
     return StarttlsRequest {};
 }
 
-void StarttlsRequest::toXml(QXmlStreamWriter *w) const
+void StarttlsRequest::toXml(XmlWriter &w) const
 {
-    writeEmptyElement(w, u"starttls", ns_tls);
+    w.write(Element { XmlTag });
 }
 
 std::optional<StarttlsProceed> StarttlsProceed::fromDom(const QDomElement &el)
@@ -95,52 +95,19 @@ std::optional<StarttlsProceed> StarttlsProceed::fromDom(const QDomElement &el)
     return StarttlsProceed {};
 }
 
-void StarttlsProceed::toXml(QXmlStreamWriter *w) const
+void StarttlsProceed::toXml(XmlWriter &w) const
 {
-    writeEmptyElement(w, u"proceed", ns_tls);
+    w.write(Element { XmlTag });
 }
 
-void CsiActive::toXml(QXmlStreamWriter *w) const
+void CsiActive::toXml(XmlWriter &w) const
 {
-    writeEmptyElement(w, u"active", ns_csi);
+    w.write(Element { XmlTag });
 }
 
-void CsiInactive::toXml(QXmlStreamWriter *w) const
+void CsiInactive::toXml(XmlWriter &w) const
 {
-    writeEmptyElement(w, u"inactive", ns_csi);
-}
-
-constexpr auto STREAM_ERROR_CONDITIONS = to_array<QStringView>({
-    u"bad-format",
-    u"bad-namespace-prefix",
-    u"conflict",
-    u"connection-timeout",
-    u"host-gone",
-    u"host-unknown",
-    u"improper-addressing",
-    u"internal-server-error",
-    u"invalid-from",
-    u"invalid-id",
-    u"invalid-namespace",
-    u"invalid-xml",
-    u"not-authorized",
-    u"not-well-formed",
-    u"policy-violation",
-    u"remote-connection-failed",
-    u"reset",
-    u"resource-constraint",
-    u"restricted-xml",
-    u"system-shutdown",
-    u"undefined-condition",
-    u"unsupported-encoding",
-    u"unsupported-feature",
-    u"unsupported-stanza-type",
-    u"unsupported-version",
-});
-
-QString StreamErrorElement::streamErrorToString(StreamError e)
-{
-    return STREAM_ERROR_CONDITIONS.at(size_t(e)).toString();
+    w.write(Element { XmlTag });
 }
 
 std::variant<StreamErrorElement, QXmppError> StreamErrorElement::fromDom(const QDomElement &el)
@@ -155,7 +122,7 @@ std::variant<StreamErrorElement, QXmppError> StreamErrorElement::fromDom(const Q
     if (conditionEl.namespaceURI() != ns_stream_error) {
         return QXmppError { u"Invalid xmlns on stream error condition."_s, {} };
     }
-    if (auto conditionEnum = enumFromString<StreamError>(STREAM_ERROR_CONDITIONS, conditionEl.tagName())) {
+    if (auto conditionEnum = Enums::fromString<StreamError>(conditionEl.tagName())) {
         condition = conditionEnum;
     } else if (conditionEl.tagName() == u"see-other-host") {
         if (auto [host, port] = parseHostAddress(conditionEl.text()); !host.isEmpty()) {
@@ -173,21 +140,22 @@ std::variant<StreamErrorElement, QXmppError> StreamErrorElement::fromDom(const Q
     };
 }
 
-void StreamErrorElement::toXml(QXmlStreamWriter *writer) const
+void StreamErrorElement::toXml(XmlWriter &w) const
 {
-    writer->writeStartElement(u"stream:error"_s);
-    if (const auto *streamError = std::get_if<StreamError>(&condition)) {
-        writer->writeStartElement(toString65(STREAM_ERROR_CONDITIONS.at(size_t(*streamError))));
-        writer->writeDefaultNamespace(toString65(ns_stream_error));
-        writer->writeEndElement();
-    } else if (const auto *seeOtherHost = std::get_if<SeeOtherHost>(&condition)) {
-        writer->writeStartElement(u"see-other-host"_s);
-        writer->writeDefaultNamespace(toString65(ns_stream_error));
-        writer->writeCharacters(seeOtherHost->host + u':' + QString::number(seeOtherHost->port));
-        writer->writeEndElement();
-    }
-    writeOptionalXmlTextElement(writer, u"text", text);
-    writer->writeEndElement();
+    w.write(Element {
+        u"stream:error",
+        [&] {
+            if (const auto *streamError = std::get_if<StreamError>(&condition)) {
+                w.write(Element { Tag { *streamError, ns_stream_error } });
+            } else if (const auto *seeOtherHost = std::get_if<SeeOtherHost>(&condition)) {
+                w.write(Element {
+                    { u"see-other-host", ns_stream_error },
+                    Characters<QString> { seeOtherHost->host + u':' + QString::number(seeOtherHost->port) },
+                });
+            }
+        },
+        OptionalTextElement { u"text", text },
+    });
 }
 
 static QString restrictedXmlErrorText(QXmlStreamReader::TokenType token)

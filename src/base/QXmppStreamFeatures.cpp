@@ -5,7 +5,6 @@
 #include "QXmppStreamFeatures.h"
 
 #include "QXmppConstants_p.h"
-#include "QXmppGlobal_p.h"
 #include "QXmppSasl_p.h"
 #include "QXmppUtils_p.h"
 
@@ -320,62 +319,62 @@ void QXmppStreamFeatures::parse(const QDomElement &element)
     d->sasl2Feature = Sasl2::StreamFeature::fromDom(firstChildElement(element, u"authentication", ns_sasl_2));
 }
 
-static void writeFeature(QXmlStreamWriter *writer, QStringView tagName, QStringView tagNs, QXmppStreamFeatures::Mode mode)
-{
-    if (mode != QXmppStreamFeatures::Disabled) {
-        writer->writeStartElement(toString65(tagName));
-        writer->writeDefaultNamespace(toString65(tagNs));
-        if (mode == QXmppStreamFeatures::Required) {
-            writer->writeEmptyElement(u"required"_s);
-        }
-        writer->writeEndElement();
-    }
-}
+struct Feature {
+    using enum QXmppStreamFeatures::Mode;
 
-static void writeBoolenFeature(QXmlStreamWriter *writer, QStringView tagName, QStringView xmlns, bool enabled)
-{
-    if (enabled) {
-        writer->writeStartElement(toString65(tagName));
-        writer->writeDefaultNamespace(toString65(xmlns));
-        writer->writeEndElement();
+    QStringView name;
+    QStringView xmlns;
+    QXmppStreamFeatures::Mode mode;
+
+    void toXml(XmlWriter &w) const
+    {
+        if (mode != Disabled) {
+            w.write(Element {
+                { name, xmlns },
+                OptionalContent {
+                    mode == Required,
+                    Element { u"required" },
+                },
+            });
+        }
     }
-}
+};
+
+struct BooleanFeature {
+    QStringView name;
+    QStringView xmlns;
+    bool enabled;
+
+    void toXml(XmlWriter &w) const
+    {
+        if (enabled) {
+            w.write(Element { { name, xmlns } });
+        }
+    }
+};
 
 void QXmppStreamFeatures::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("stream:features"));
-    writeFeature(writer, u"bind", ns_bind, d->bindMode);
-    writeFeature(writer, u"session", ns_session, d->sessionMode);
-    writeFeature(writer, u"auth", ns_authFeature, d->nonSaslAuthMode);
-    writeFeature(writer, u"starttls", ns_tls, d->tlsMode);
-    writeFeature(writer, u"sm", ns_stream_management, d->streamManagementMode);
-    writeFeature(writer, u"csi", ns_csi, d->csiMode);
-    writeFeature(writer, u"register", ns_register_feature, d->registerMode);
-    writeBoolenFeature(writer, u"sub", ns_pre_approval, d->preApprovedSubscriptionsSupported);
-    writeBoolenFeature(writer, u"ver", ns_rosterver, d->rosterVersioningSupported);
-
-    if (!d->compressionMethods.isEmpty()) {
-        writer->writeStartElement(QSL65("compression"));
-        writer->writeDefaultNamespace(toString65(ns_compressFeature));
-        for (const auto &method : std::as_const(d->compressionMethods)) {
-            writer->writeTextElement(QSL65("method"), method);
-        }
-        writer->writeEndElement();
-    }
-    if (!d->authMechanisms.isEmpty()) {
-        writer->writeStartElement(QSL65("mechanisms"));
-        writer->writeDefaultNamespace(toString65(ns_sasl));
-        for (const auto &mechanism : std::as_const(d->authMechanisms)) {
-            writer->writeTextElement(QSL65("mechanism"), mechanism);
-        }
-        writer->writeEndElement();
-    }
-
-    if (d->sasl2Feature) {
-        XmlWriter w(writer);
-        d->sasl2Feature->toXml(w);
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"stream:features",
+        Feature { u"bind", ns_bind, d->bindMode },
+        Feature { u"session", ns_session, d->sessionMode },
+        Feature { u"auth", ns_authFeature, d->nonSaslAuthMode },
+        Feature { u"starttls", ns_tls, d->tlsMode },
+        Feature { u"sm", ns_stream_management, d->streamManagementMode },
+        Feature { u"csi", ns_csi, d->csiMode },
+        Feature { u"register", ns_register_feature, d->registerMode },
+        BooleanFeature { u"sub", ns_pre_approval, d->preApprovedSubscriptionsSupported },
+        BooleanFeature { u"ver", ns_rosterver, d->rosterVersioningSupported },
+        OptionalContent {
+            !d->compressionMethods.isEmpty(),
+            Element { { u"compression", ns_compressFeature }, TextElements { u"method", d->compressionMethods } },
+        },
+        OptionalContent {
+            !d->authMechanisms.isEmpty(),
+            Element { { u"mechanisms", ns_sasl }, TextElements { u"mechanism", d->authMechanisms } },
+        },
+        d->sasl2Feature,
+    });
 }
 /// \endcond

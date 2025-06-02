@@ -263,13 +263,32 @@ bool QXmppDataForm::Media::isNull() const
     return d->uris.isEmpty();
 }
 
+struct DataFormListOption {
+    QString label;
+    QString value;
+
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element {
+            u"option",
+            OptionalAttribute { u"label", label },
+            TextElement { u"value", value },
+        });
+    }
+
+    bool operator==(const auto &other) const
+    {
+        return label == other.label && value == other.value;
+    }
+};
+
 class QXmppDataFormFieldPrivate : public QSharedData
 {
 public:
     QString description;
     QString key;
     QString label;
-    QList<QPair<QString, QString>> options;
+    QList<DataFormListOption> options;
     bool required = false;
     QXmppDataForm::Field::Type type = QXmppDataForm::Field::TextSingleField;
     QVariant value;
@@ -304,7 +323,7 @@ QXmppDataForm::Field::Field(QXmppDataForm::Field::Type type,
     d->required = isRequired;
     d->label = label;
     d->description = description;
-    d->options = options;
+    setOptions(options);
 }
 
 /// Constructs a copy of \a other.
@@ -432,7 +451,9 @@ void QXmppDataForm::Field::setMedia(const QXmppDataForm::Media &media)
 ///
 QList<QPair<QString, QString>> QXmppDataForm::Field::options() const
 {
-    return d->options;
+    return transform<QList<QPair<QString, QString>>>(d->options, [](const auto &option) {
+        return QPair { option.label, option.value };
+    });
 }
 
 ///
@@ -442,7 +463,9 @@ QList<QPair<QString, QString>> QXmppDataForm::Field::options() const
 ///
 void QXmppDataForm::Field::setOptions(const QList<QPair<QString, QString>> &options)
 {
-    d->options = options;
+    d->options = transform<QList<DataFormListOption>>(options, [](const auto &pair) {
+        return DataFormListOption { pair.first, pair.second };
+    });
 }
 
 ///
@@ -575,7 +598,7 @@ bool QXmppDataForm::Field::operator==(const QXmppDataForm::Field &other) const
     return d->description == other.description() &&
         d->key == other.key() &&
         d->label == other.label() &&
-        d->options == other.options() &&
+        d->options == other.d->options &&
         d->required == other.isRequired() &&
         d->type == other.type() &&
         d->value == other.value() &&
@@ -679,8 +702,7 @@ void QXmppDataForm::Field::toXml(QXmlStreamWriter *w) const
         OptionalContent {
             !d->mediaSources.isEmpty(),
             Element {
-                u"media",
-                ns_media_element,
+                { u"media", ns_media_element },
                 OptionalAttribute { u"width", d->mediaSize.width() > 0 ? std::make_optional(d->mediaSize.width()) : std::nullopt },
                 OptionalAttribute { u"height", d->mediaSize.height() > 0 ? std::make_optional(d->mediaSize.height()) : std::nullopt },
                 [&] {
@@ -695,22 +717,9 @@ void QXmppDataForm::Field::toXml(QXmlStreamWriter *w) const
             },
         },
         /* field options */
-        [&] {
-            switch (d->type) {
-            case Field::ListMultiField:
-            case Field::ListSingleField: {
-                for (const auto &option : d->options) {
-                    writer.write(Element {
-                        u"option",
-                        OptionalAttribute { u"label", option.first },
-                        TextElement { u"value", option.second },
-                    });
-                }
-                break;
-            }
-            default:
-                break;
-            }
+        OptionalContent {
+            d->type == Field::ListMultiField || d->type == Field::ListSingleField,
+            d->options,
         },
         OptionalTextElement { u"description", d->description },
         OptionalContent { d->required, Element { u"required" } },

@@ -240,8 +240,7 @@ void QXmppByteStreamIq::parseElementFromChild(const QDomElement &element)
 void QXmppByteStreamIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
-        u"query",
-        ns_bytestreams,
+        { u"query", ns_bytestreams },
         OptionalAttribute { u"sid", m_sid },
         OptionalAttribute { u"mode", m_mode == Tcp ? u"tcp"_s : m_mode == Udp ? u"udp"_s
                                                                               : QString() },

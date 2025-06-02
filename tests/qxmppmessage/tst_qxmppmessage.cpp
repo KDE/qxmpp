@@ -871,7 +871,7 @@ void tst_QXmppMessage::testSpoiler()
     const QByteArray xmlWithoutHint(
         "<message to=\"foo@example.com/QXmpp\" from=\"bar@example.com/QXmpp\" type=\"normal\">"
         "<body>And at the end of the story, both of them die! It is so tragic!</body>"
-        "<spoiler xmlns=\"urn:xmpp:spoiler:0\"></spoiler>"
+        "<spoiler xmlns=\"urn:xmpp:spoiler:0\"/>"
         "</message>");
 
     QXmppMessage messageWithoutHint;

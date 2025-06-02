@@ -158,7 +158,7 @@ int QXmppUtils::timezoneOffsetFromString(const QString &str)
 
 ///
 /// Serializes a timezone offset (in seconds) to a string according to
-/// \xep{0082}: XMPP Date and Time Profiles.
+/// \xep{0082, XMPP Date and Time Profiles}.
 ///
 QString QXmppUtils::timezoneOffsetToString(int secs)
 {

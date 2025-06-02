@@ -5,6 +5,7 @@
 #ifndef QXMPPFILESHARE_H
 #define QXMPPFILESHARE_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
 #include <any>
@@ -21,6 +22,10 @@ class QXmppFileSharePrivate;
 class QXmppFileMetadata;
 class QXmppHttpFileSource;
 class QXmppEncryptedFileSource;
+
+namespace QXmpp::Private {
+class XmlWriter;
+}
 
 class QXMPP_EXPORT QXmppFileSourcesAttachment
 {
@@ -39,6 +44,7 @@ public:
 
 private:
     friend class QXmppMessage;
+    friend class QXmpp::Private::XmlWriter;
 
     static std::optional<QXmppFileSourcesAttachment> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
@@ -73,6 +79,7 @@ public:
     void setEncryptedSourecs(const QVector<QXmppEncryptedFileSource> &newEncryptedSources);
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"file-sharing", QXmpp::Private::ns_sfs };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
 

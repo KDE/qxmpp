@@ -71,12 +71,10 @@ std::optional<QXmppCredentials> QXmppCredentials::fromXml(QXmlStreamReader &r)
 ///
 void QXmppCredentials::toXml(QXmlStreamWriter &writer) const
 {
-    writer.writeStartElement(QSL65("credentials"));
-    writer.writeDefaultNamespace(toString65(ns_qxmpp_credentials));
-    if (d->htToken) {
-        d->htToken->toXml(writer);
-    }
-    writer.writeEndElement();
+    XmlWriter(&writer).write(Element {
+        { u"credentials", ns_qxmpp_credentials },
+        d->htToken,
+    });
 }
 
 bool QXmppCredentials::operator==(const QXmppCredentials &other) const

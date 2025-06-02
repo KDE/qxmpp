@@ -159,10 +159,11 @@ void QXmppPubSubAffiliation::parse(const QDomElement &element)
 
 void QXmppPubSubAffiliation::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("affiliation"));
-    writer->writeAttribute(QSL65("affiliation"), toString65(Enums::toString(d->type)));
-    writeOptionalXmlAttribute(writer, u"node", d->node);
-    writeOptionalXmlAttribute(writer, u"jid", d->jid);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"affiliation",
+        Attribute { u"affiliation", d->type },
+        OptionalAttribute { u"node", d->node },
+        OptionalAttribute { u"jid", d->jid },
+    });
 }
 /// \endcond

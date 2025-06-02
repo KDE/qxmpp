@@ -32,6 +32,7 @@ using namespace QXmpp::Private;
 template<>
 struct Enums::Data<QXmppPubSubSubscription::State> {
     using enum QXmppPubSubSubscription::State;
+    static constexpr auto NullValue = Invalid;
     static constexpr auto Values = makeValues<QXmppPubSubSubscription::State>({
         { Invalid, {} },
         { None, u"none" },
@@ -284,26 +285,20 @@ void QXmppPubSubSubscription::parse(const QDomElement &element)
 
 void QXmppPubSubSubscription::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("subscription"));
-
-    // jid is required
-    writer->writeAttribute(QSL65("jid"), d->jid);
-    writeOptionalXmlAttribute(writer, u"node", d->node);
-    writeOptionalXmlAttribute(writer, u"subscription", Enums::toString(d->state));
-    writeOptionalXmlAttribute(writer, u"subid", d->subId);
-    if (d->expiry.isValid()) {
-        writer->writeAttribute(QSL65("expiry"),
-                               QXmppUtils::datetimeToString(d->expiry));
-    }
-
-    if (d->configurationSupport > Unavailable) {
-        writer->writeStartElement(QSL65("subscribe-options"));
-        if (d->configurationSupport == Required) {
-            writer->writeEmptyElement(u"required"_s);
-        }
-        writer->writeEndElement();
-    }
-
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"subscription",
+        Attribute { u"jid", d->jid },
+        OptionalAttribute { u"node", d->node },
+        OptionalAttribute { u"subscription", d->state },
+        OptionalAttribute { u"subid", d->subId },
+        OptionalAttribute { u"expiry", d->expiry },
+        OptionalContent {
+            d->configurationSupport != Unavailable,
+            Element {
+                u"subscribe-options",
+                OptionalContent { d->configurationSupport == Required, Element { u"required" } },
+            },
+        },
+    });
 }
 /// \endcond

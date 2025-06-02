@@ -11,6 +11,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -143,22 +144,11 @@ void QXmppPushEnableIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppPushEnableIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    switch (d->mode) {
-    case Enable:
-        writer->writeStartElement(QSL65("enable"));
-        break;
-    case Disable:
-        writer->writeStartElement(QSL65("disable"));
-        break;
-    }
-
-    writer->writeDefaultNamespace(toString65(ns_push));
-    writer->writeAttribute(QSL65("jid"), d->jid);
-    writer->writeAttribute(QSL65("node"), d->node);
-
-    if (d->mode == Enable) {
-        d->dataForm.toXml(writer);
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { d->mode == Enable ? u"enable" : u"disable", ns_push },
+        Attribute { u"jid", d->jid },
+        Attribute { u"node", d->node },
+        OptionalContent { d->mode == Enable, d->dataForm },
+    });
 }
 /// \endcond

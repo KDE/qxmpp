@@ -166,7 +166,7 @@ void tst_QXmppRosterIq::testVersion()
 void tst_QXmppRosterIq::testMixAnnotate()
 {
     const QByteArray xml(
-        "<iq from=\"juliet@example.com/balcony\" "
+        "<iq id='1' from=\"juliet@example.com/balcony\" "
         "type=\"get\">"
         "<query xmlns=\"jabber:iq:roster\">"
         "<annotate xmlns=\"urn:xmpp:mix:roster:0\"/>"

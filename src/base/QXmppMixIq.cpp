@@ -113,11 +113,11 @@ void QXmppMixSubscriptionUpdateIq::parseElementFromChild(const QDomElement &elem
 
 void QXmppMixSubscriptionUpdateIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("update-subscription"));
-    writer->writeDefaultNamespace(toString65(ns_mix));
-    writeSingleAttributeElements(writer, u"subscribe", u"node", Enums::toStringList(m_additions));
-    writeSingleAttributeElements(writer, u"unsubscribe", u"node", Enums::toStringList(m_removals));
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"update-subscription", ns_mix },
+        SingleAttributeElements { u"subscribe", u"node", Enums::toStringList(m_additions) },
+        SingleAttributeElements { u"unsubscribe", u"node", Enums::toStringList(m_removals) },
+    });
 }
 
 //
@@ -175,10 +175,10 @@ void QXmppMixInvitationRequestIq::parseElementFromChild(const QDomElement &eleme
 
 void QXmppMixInvitationRequestIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("invite"));
-    writer->writeDefaultNamespace(toString65(ns_mix_misc));
-    writeXmlTextElement(writer, u"invitee", m_inviteeJid);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"invite", ns_mix_misc },
+        TextElement { u"invitee", m_inviteeJid },
+    });
 }
 
 //
@@ -237,10 +237,7 @@ void QXmppMixInvitationResponseIq::parseElementFromChild(const QDomElement &elem
 
 void QXmppMixInvitationResponseIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("invite"));
-    writer->writeDefaultNamespace(toString65(ns_mix_misc));
-    m_invitation.toXml(writer);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element { { u"invite", ns_mix_misc }, m_invitation });
 }
 
 class QXmppMixIqPrivate : public QSharedData
@@ -626,34 +623,28 @@ void QXmppMixIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         return;
     }
 
-    writer->writeStartElement(toString65(Enums::toString(d->actionType)));
-
     if (d->actionType == ClientJoin || d->actionType == ClientLeave) {
-        writer->writeDefaultNamespace(toString65(ns_mix_pam));
-        if (type() == Set) {
-            writeOptionalXmlAttribute(writer, u"channel", d->channelJid);
-        }
-        if (d->actionType == ClientJoin) {
-            writer->writeStartElement(QSL65("join"));
-        } else if (d->actionType == ClientLeave) {
-            writer->writeStartElement(QSL65("leave"));
-        }
-    }
-
-    writer->writeDefaultNamespace(toString65(ns_mix));
-    writeOptionalXmlAttribute(writer, u"channel", d->channelId);
-    if (type() == Result) {
-        writeOptionalXmlAttribute(writer, u"id", d->participantId);
-    }
-
-    writeSingleAttributeElements(writer, u"subscribe", u"node", Enums::toStringList(d->subscriptions));
-    writeOptionalXmlTextElement(writer, u"nick", d->nick);
-    writeOptional(writer, d->invitation);
-
-    writer->writeEndElement();
-
-    if (d->actionType == ClientJoin || d->actionType == ClientLeave) {
-        writer->writeEndElement();
+        XmlWriter(writer).write(Element {
+            Tag { d->actionType, ns_mix_pam },
+            OptionalContent { type() == Set, Attribute { u"channel", d->channelJid } },
+            Element {
+                { d->actionType == ClientJoin ? u"join" : u"leave", ns_mix },
+                OptionalAttribute { u"channel", d->channelId },
+                OptionalContent { type() == Result, OptionalAttribute { u"id", d->participantId } },
+                SingleAttributeElements { u"subscribe", u"node", Enums::toStringList(d->subscriptions) },
+                OptionalTextElement { u"nick", d->nick },
+                d->invitation,
+            },
+        });
+    } else {
+        XmlWriter(writer).write(Element {
+            Tag { d->actionType, ns_mix },
+            OptionalAttribute { u"channel", d->channelId },
+            OptionalContent { type() == Result, OptionalAttribute { u"id", d->participantId } },
+            SingleAttributeElements { u"subscribe", u"node", Enums::toStringList(d->subscriptions) },
+            OptionalTextElement { u"nick", d->nick },
+            d->invitation,
+        });
     }
 }
 /// \endcond

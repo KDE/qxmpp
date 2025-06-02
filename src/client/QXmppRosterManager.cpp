@@ -19,6 +19,7 @@
 #include "Algorithms.h"
 #include "Async.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 
@@ -43,19 +44,22 @@ struct RosterData {
         };
     }
 
-    void toXml(QXmlStreamWriter &writer) const
+    void toXml(XmlWriter &w) const
     {
-        writer.writeStartElement(QSL65("roster"));
-        for (const auto &item : items) {
-            item.toXml(&writer, true);
-        }
-        writer.writeEndElement();
+        w.write(Element {
+            u"roster",
+            [&] {
+                for (const auto &item : items) {
+                    item.toXml(w, true);
+                }
+            },
+        });
     }
 };
 
 static void serializeRosterData(const RosterData &d, QXmlStreamWriter &writer)
 {
-    d.toXml(writer);
+    XmlWriter(&writer).write(d);
 }
 
 }  // namespace QXmpp::Private

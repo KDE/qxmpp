@@ -358,70 +358,62 @@ bool QXmppPubSubEventBase::parseExtension(const QDomElement &eventElement, QXmpp
 
 void QXmppPubSubEventBase::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode sceMode, const QString &baseNamespace) const
 {
+    XmlWriter w(writer);
+
     QXmppMessage::serializeExtensions(writer, sceMode, baseNamespace);
 
     if (!(sceMode & QXmpp::SceSensitive)) {
         return;
     }
 
-    writer->writeStartElement(QSL65("event"));
-    writer->writeDefaultNamespace(toString65(ns_pubsub_event));
-
-    if (d->eventType == Subscription && d->subscription) {
-        d->subscription->toXml(writer);
+    if (d->eventType == Subscription) {
+        w.write(Element { { u"event", ns_pubsub_event }, d->subscription });
     } else {
-        writer->writeStartElement(toString65(Enums::toString(d->eventType)));
-
-        // write node attribute
-        switch (d->eventType) {
-        case Delete:
-        case Items:
-        case Retract:
-        case Purge:
-            // node attribute is required
-            writer->writeAttribute(QSL65("node"), d->node);
-            break;
-        case Configuration:
-            // node attribute is optional
-            writeOptionalXmlAttribute(writer, u"node", d->node);
-            break;
-        case Subscription:
-            break;
-        }
-
-        switch (d->eventType) {
-        case Configuration:
-            if (d->configurationForm) {
-                d->configurationForm->toXml(writer);
-            }
-            break;
-        case Delete:
-            if (!d->redirectUri.isEmpty()) {
-                writer->writeStartElement(QSL65("redirect"));
-                writer->writeAttribute(QSL65("uri"), d->redirectUri);
-                writer->writeEndElement();
-            }
-        case Items:
-            // serialize items
-            serializeItems(writer);
-
-            break;
-        case Retract:
-            // serialize retract ids
-            for (const auto &id : std::as_const(d->retractIds)) {
-                writer->writeStartElement(QSL65("retract"));
-                writer->writeAttribute(QSL65("id"), id);
-                writer->writeEndElement();
-            }
-
-            break;
-        case Purge:
-        case Subscription:
-            break;
-        }
-
-        writer->writeEndElement();  // close event's type element
+        w.write(Element {
+            { u"event", ns_pubsub_event },
+            Element {
+                d->eventType,
+                // `node` attribute
+                [&] {
+                    switch (d->eventType) {
+                    case Delete:
+                    case Items:
+                    case Retract:
+                    case Purge:
+                        w.write(Attribute { u"node", d->node });
+                        break;
+                    case Configuration:
+                        w.write(OptionalAttribute { u"node", d->node });
+                        break;
+                    case Subscription:
+                        break;
+                    }
+                },
+                // content
+                [&] {
+                    switch (d->eventType) {
+                    case Configuration:
+                        w.write(d->configurationForm);
+                        break;
+                    case Delete:
+                        if (!d->redirectUri.isEmpty()) {
+                            w.write(Element { u"redirect", Attribute { u"uri", d->redirectUri } });
+                        }
+                    case Items:
+                        // serialize items
+                        serializeItems(writer);
+                        break;
+                    case Retract:
+                        // serialize retract ids
+                        w.write(SingleAttributeElements { u"retract", u"id", d->retractIds });
+                        break;
+                    case Purge:
+                    case Subscription:
+                        break;
+                    }
+                },
+            },
+        });
     }
-    writer->writeEndElement();  // </event>
 }
 /// \endcond

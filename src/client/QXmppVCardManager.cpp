@@ -15,6 +15,7 @@
 
 #include "Async.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 using namespace QXmpp::Private;
 
@@ -39,17 +40,18 @@ struct VCardData {
         return d;
     }
 
-    void toXml(QXmlStreamWriter &writer) const
+    void toXml(XmlWriter &w) const
     {
-        writer.writeStartElement(QSL65("vcard"));
-        vCard.toXmlElementFromChild(&writer);
-        writer.writeEndElement();
+        w.write(Element {
+            u"vcard",
+            [&] { vCard.toXmlElementFromChild(w); },
+        });
     }
 };
 
 void serializeVCardData(const VCardData &data, QXmlStreamWriter &writer)
 {
-    data.toXml(writer);
+    XmlWriter(&writer).write(data);
 }
 
 }  // namespace QXmpp::Private

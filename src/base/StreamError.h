@@ -8,12 +8,49 @@
 #include "QXmppError.h"
 #include "QXmppStreamError.h"
 
+#include "Enums.h"
+
 #include <variant>
 
 class QDomElement;
 class QXmlStreamWriter;
+namespace QXmpp::Private {
+class XmlWriter;
+}
 
 namespace QXmpp::Private {
+
+template<>
+struct Enums::Data<StreamError> {
+    using enum StreamError;
+    static constexpr auto Values = makeValues<StreamError>({
+        { BadFormat, u"bad-format" },
+        { BadNamespacePrefix, u"bad-namespace-prefix" },
+        { Conflict, u"conflict" },
+        { ConnectionTimeout, u"connection-timeout" },
+        { HostGone, u"host-gone" },
+        { HostUnknown, u"host-unknown" },
+        { ImproperAddressing, u"improper-addressing" },
+        { InternalServerError, u"internal-server-error" },
+        { InvalidFrom, u"invalid-from" },
+        { InvalidId, u"invalid-id" },
+        { InvalidNamespace, u"invalid-namespace" },
+        { InvalidXml, u"invalid-xml" },
+        { NotAuthorized, u"not-authorized" },
+        { NotWellFormed, u"not-well-formed" },
+        { PolicyViolation, u"policy-violation" },
+        { RemoteConnectionFailed, u"remote-connection-failed" },
+        { Reset, u"reset" },
+        { ResourceConstraint, u"resource-constraint" },
+        { RestrictedXml, u"restricted-xml" },
+        { SystemShutdown, u"system-shutdown" },
+        { UndefinedCondition, u"undefined-condition" },
+        { UnsupportedEncoding, u"unsupported-encoding" },
+        { UnsupportedFeature, u"unsupported-feature" },
+        { UnsupportedStanzaType, u"unsupported-stanza-type" },
+        { UnsupportedVersion, u"unsupported-version" },
+    });
+};
 
 // implemented in Stream.cpp
 struct StreamErrorElement {
@@ -26,9 +63,8 @@ struct StreamErrorElement {
 
     using Condition = std::variant<StreamError, SeeOtherHost>;
 
-    static QString streamErrorToString(StreamError);
     static std::variant<StreamErrorElement, QXmppError> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *) const;
+    void toXml(XmlWriter &) const;
 
     Condition condition;
     QString text;

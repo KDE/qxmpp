@@ -486,19 +486,17 @@ void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    XmlWriter w(writer);
-    w.write(Element {
-        u"query",
-        d->queryType == InfoQuery ? ns_disco_info : ns_disco_items,
+    XmlWriter(writer).write(Element {
+        { u"query", d->queryType == InfoQuery ? ns_disco_info : ns_disco_items },
         OptionalAttribute { u"node", d->queryNode },
         // InfoQuery
-        [&] {
-            if (d->queryType == InfoQuery) {
-                w.write(d->identities);
-                w.write(SingleAttributeElements { u"feature", u"var", d->features });
-            } else {
-                w.write(d->items);
-            }
+        OptionalContent {
+            d->queryType == InfoQuery,
+            d->identities,
+            SingleAttributeElements { u"feature", u"var", d->features } },
+        OptionalContent {
+            d->queryType == ItemsQuery,
+            d->items,
         },
         d->form,
     });

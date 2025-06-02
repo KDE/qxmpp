@@ -17,6 +17,7 @@
 
 #include "Async.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QUrl>
 
@@ -51,10 +52,10 @@ void QXmppMovedItem::serializePayload(QXmlStreamWriter *writer) const
         return;
     }
 
-    writer->writeStartElement(QSL65("moved"));
-    writer->writeDefaultNamespace(toString65(ns_moved));
-    writer->writeTextElement(QSL65("new-jid"), m_newJid);
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"moved", ns_moved },
+        TextElement { u"new-jid", m_newJid },
+    });
 }
 
 class QXmppMovedManagerPrivate

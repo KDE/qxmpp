@@ -8,11 +8,23 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDebug>
 #include <QDomElement>
 
 using namespace QXmpp::Private;
+
+template<std::integral Int>
+static auto toOptional(Int n)
+{
+    return n >= 0 ? std::make_optional(n) : std::nullopt;
+}
+
+static auto toOptional(QStringView s)
+{
+    return !s.isNull() ? std::make_optional(s) : std::nullopt;
+}
 
 QXmppResultSetQuery::QXmppResultSetQuery()
     : m_index(-1), m_max(-1)
@@ -122,21 +134,14 @@ void QXmppResultSetQuery::toXml(QXmlStreamWriter *writer) const
     if (isNull()) {
         return;
     }
-    writer->writeStartElement(QSL65("set"));
-    writer->writeDefaultNamespace(toString65(ns_rsm));
-    if (m_max >= 0) {
-        writeXmlTextElement(writer, u"max", QString::number(m_max));
-    }
-    if (!m_after.isNull()) {
-        writeXmlTextElement(writer, u"after", m_after);
-    }
-    if (!m_before.isNull()) {
-        writeXmlTextElement(writer, u"before", m_before);
-    }
-    if (m_index >= 0) {
-        writeXmlTextElement(writer, u"index", QString::number(m_index));
-    }
-    writer->writeEndElement();
+
+    XmlWriter(writer).write(Element {
+        { u"set", ns_rsm },
+        OptionalTextElement { u"max", toOptional(m_max) },
+        OptionalTextElement { u"after", toOptional(m_after) },
+        OptionalTextElement { u"before", toOptional(m_before) },
+        OptionalTextElement { u"index", toOptional(m_index) },
+    });
 }
 /// \endcond
 
@@ -237,23 +242,19 @@ void QXmppResultSetReply::toXml(QXmlStreamWriter *writer) const
     if (isNull()) {
         return;
     }
-    writer->writeStartElement(QSL65("set"));
-    writer->writeDefaultNamespace(toString65(ns_rsm));
-    if (!m_first.isNull() || m_index >= 0) {
-        writer->writeStartElement(QSL65("first"));
-        if (m_index >= 0) {
-            writer->writeAttribute(QSL65("index"), QString::number(m_index));
-        }
-        writer->writeCharacters(m_first);
-        writer->writeEndElement();
-    }
-    if (!m_last.isNull()) {
-        writeXmlTextElement(writer, u"last", m_last);
-    }
 
-    if (m_count >= 0) {
-        writeXmlTextElement(writer, u"count", QString::number(m_count));
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalContent {
+            toOptional(m_first) || toOptional(m_index),
+            Element {
+                u"first",
+                OptionalAttribute { u"index", toOptional(m_index) },
+                Characters { m_first },
+            },
+        },
+        OptionalTextElement { u"last", toOptional(m_last) },
+        OptionalTextElement { u"count", toOptional(m_count) },
+    });
 }
 /// \endcond

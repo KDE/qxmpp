@@ -12,6 +12,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <utility>
 
@@ -108,38 +109,19 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
 
 void QXmppFileMetadata::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("file"));
-    writer->writeDefaultNamespace(toString65(ns_file_metadata));
-    if (d->date) {
-        writer->writeTextElement(QSL65("date"), QXmppUtils::datetimeToString(*d->date));
-    }
-
-    if (d->desc) {
-        writer->writeTextElement(QSL65("desc"), *d->desc);
-    }
-
-    writeElements(writer, d->hashes);
-
-    if (d->height) {
-        writer->writeTextElement(QSL65("height"), QString::number(*d->height));
-    }
-    if (d->length) {
-        writer->writeTextElement(QSL65("length"), QString::number(*d->length));
-    }
-    if (d->mediaType) {
-        writer->writeTextElement(QSL65("media-type"), d->mediaType->name());
-    }
-    if (d->name) {
-        writer->writeTextElement(QSL65("name"), *d->name);
-    }
-    if (d->size) {
-        writer->writeTextElement(QSL65("size"), QString::number(*d->size));
-    }
-    writeElements(writer, d->thumbnails);
-    if (d->width) {
-        writer->writeTextElement(QSL65("width"), QString::number(*d->width));
-    }
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        { u"file", ns_file_metadata },
+        OptionalTextElement { u"date", d->date },
+        OptionalTextElement { u"desc", d->desc },
+        d->hashes,
+        OptionalTextElement { u"height", d->height },
+        OptionalTextElement { u"length", d->length },
+        OptionalTextElement { u"media-type", d->mediaType },
+        OptionalTextElement { u"name", d->name },
+        OptionalTextElement { u"size", d->size },
+        d->thumbnails,
+        OptionalTextElement { u"width", d->width },
+    });
 }
 /// \endcond
 

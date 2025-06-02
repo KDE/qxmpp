@@ -145,7 +145,7 @@ void tst_QXmppStanza::testErrorCases_data()
         policy - violation - text,
         "<error by=\"example.net\" type=\"modify\">"
         "<policy-violation xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\"/>"
-        "<text xml:lang=\"en\" xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\">The used words are not allowed on this server.</text>"
+        "<text xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\" xml:lang=\"en\">The used words are not allowed on this server.</text>"
         "</error>",
         Modify,
         PolicyViolation,
@@ -329,8 +329,7 @@ void tst_QXmppStanza::testErrorFileTooLarge()
     const QByteArray xml(
         "<error type=\"modify\">"
         "<not-acceptable xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\"/>"
-        "<text xml:lang=\"en\" "
-        "xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\">"
+        "<text xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\" xml:lang=\"en\">"
         "File too large. The maximum file size is 20000 bytes"
         "</text>"
         "<file-too-large xmlns=\"urn:xmpp:http:upload:0\">"
@@ -365,8 +364,7 @@ void tst_QXmppStanza::testErrorRetry()
         "<error type=\"wait\">"
         "<resource-constraint "
         "xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\"/>"
-        "<text xml:lang=\"en\" "
-        "xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\">"
+        "<text xmlns=\"urn:ietf:params:xml:ns:xmpp-stanzas\" xml:lang=\"en\">"
         "Quota reached. You can only upload 5 files in 5 minutes"
         "</text>"
         "<retry xmlns=\"urn:xmpp:http:upload:0\" "

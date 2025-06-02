@@ -318,7 +318,7 @@ void tst_QXmppRegisterIq::testSetWithForm()
 void tst_QXmppRegisterIq::testBobData()
 {
     const QByteArray xml = QByteArrayLiteral(
-        "<iq type=\"result\">"
+        "<iq id='' type=\"result\">"
         "<query xmlns=\"jabber:iq:register\">"
         "<data xmlns=\"urn:xmpp:bob\" "
         "cid=\"sha1+5a4c38d44fc64805cbb2d92d8b208be13ff40c0f@bob.xmpp.org\" "
@@ -409,7 +409,7 @@ void tst_QXmppRegisterIq::testBobData()
 void tst_QXmppRegisterIq::testRegistered()
 {
     const QByteArray xml = QByteArrayLiteral(
-        "<iq type=\"result\">"
+        "<iq id='' type=\"result\">"
         "<query xmlns=\"jabber:iq:register\">"
         "<registered/>"
         "<username>juliet</username>"
@@ -433,7 +433,7 @@ void tst_QXmppRegisterIq::testRegistered()
 void tst_QXmppRegisterIq::testRemove()
 {
     const QByteArray xml = QByteArrayLiteral(
-        "<iq type=\"result\">"
+        "<iq id='' type=\"result\">"
         "<query xmlns=\"jabber:iq:register\">"
         "<remove/>"
         "<username>juliet</username>"

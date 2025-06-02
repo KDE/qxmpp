@@ -11,6 +11,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDomElement>
 #include <QXmlStreamWriter>
@@ -110,15 +111,12 @@ void QXmppOmemoEnvelope::parse(const QDomElement &element)
 
 void QXmppOmemoEnvelope::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("key"));
-    writer->writeAttribute(QSL65("rid"), QString::number(m_recipientDeviceId));
-
-    if (m_isUsedForKeyExchange) {
-        writeOptionalXmlAttribute(writer, u"kex", u"true"_s);
-    }
-
-    writer->writeCharacters(QString::fromUtf8(m_data.toBase64()));
-    writer->writeEndElement();
+    XmlWriter(writer).write(Element {
+        u"key",
+        Attribute { u"rid", m_recipientDeviceId },
+        OptionalAttribute { u"kex", DefaultedBool { m_isUsedForKeyExchange, false } },
+        Characters { Base64 { m_data } },
+    });
 }
 
 ///
@@ -243,36 +241,31 @@ void QXmppOmemoElement::parse(const QDomElement &element)
 
 void QXmppOmemoElement::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("encrypted"));
-    writer->writeDefaultNamespace(toString65(ns_omemo_2));
-
-    writer->writeStartElement(QSL65("header"));
-    writer->writeAttribute(QSL65("sid"), QString::number(m_senderDeviceId));
-
-    const auto recipientJids = m_envelopes.uniqueKeys();
-    for (const auto &recipientJid : recipientJids) {
-        writer->writeStartElement(QSL65("keys"));
-        writer->writeAttribute(QSL65("jid"), recipientJid);
-
-        for (auto itr = m_envelopes.constFind(recipientJid);
-             itr != m_envelopes.constEnd() && itr.key() == recipientJid;
-             ++itr) {
-            const auto &envelope = itr.value();
-            envelope.toXml(writer);
-        }
-
-        writer->writeEndElement();  // keys
-    }
-
-    writer->writeEndElement();  // header
-
-    // The payload element is only included if there is a payload.
-    // An empty OMEMO message does not contain a payload.
-    if (!m_payload.isEmpty()) {
-        writer->writeTextElement(QSL65("payload"), QString::fromUtf8(m_payload.toBase64()));
-    }
-
-    writer->writeEndElement();  // encrypted
+    XmlWriter w(writer);
+    w.write(Element {
+        { u"encrypted", ns_omemo_2 },
+        Element {
+            u"header",
+            Attribute { u"sid", m_senderDeviceId },
+            [&] {
+                const auto recipientJids = m_envelopes.uniqueKeys();
+                for (const auto &recipientJid : recipientJids) {
+                    w.write(Element {
+                        u"keys",
+                        Attribute { u"jid", recipientJid },
+                        [&] {
+                            for (auto itr = m_envelopes.constFind(recipientJid);
+                                 itr != m_envelopes.constEnd() && itr.key() == recipientJid;
+                                 ++itr) {
+                                w.write(itr.value());
+                            }
+                        },
+                    });
+                }
+            },
+        },
+        OptionalTextElement { u"payload", Base64 { m_payload } },
+    });
 }
 
 ///
