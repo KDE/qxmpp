@@ -6,17 +6,12 @@
 #define QXMPPASYNC_P_H
 
 #include "QXmppPromise.h"
+#include "QXmppVisitHelper_p.h"
 
 class QDomElement;
 class QXmppError;
 
 namespace QXmpp::Private {
-
-// helper for std::visit
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
 
 // first argument of function
 template<typename F, typename Ret, typename A, typename... Rest>
