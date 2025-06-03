@@ -117,7 +117,7 @@ public:
 
     void resetIdCount()
     {
-        QXmppStanza::s_uniqeIdNo = 0;
+        QXmpp::Private::globalStanzaIdCounter = 0;
     }
 
     void setStreamManagementState(QXmppClient::StreamManagementState state)

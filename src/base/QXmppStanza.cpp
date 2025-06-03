@@ -22,9 +22,8 @@
 #include <QDomElement>
 #include <QXmlStreamWriter>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
-
-uint QXmppStanza::s_uniqeIdNo = 0;
 
 class QXmppExtendedAddressPrivate : public QSharedData
 {
@@ -859,9 +858,7 @@ void QXmppStanza::setE2eeMetadata(const std::optional<QXmppE2eeMetadata> &e2eeMe
 /// \cond
 void QXmppStanza::generateAndSetNextId()
 {
-    // get back
-    ++s_uniqeIdNo;
-    d->id = u"qxmpp" + QString::number(s_uniqeIdNo);
+    d->id = generateSequentialStanzaId();
 }
 
 void QXmppStanza::parse(const QDomElement &element)
@@ -890,5 +887,4 @@ void QXmppStanza::extensionsToXml(QXmlStreamWriter *xmlWriter, QXmpp::SceMode sc
     // other extensions
     w.write(d->extensions);
 }
-
 /// \endcond

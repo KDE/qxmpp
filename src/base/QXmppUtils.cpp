@@ -334,6 +334,20 @@ std::tuple<QString, QString> QXmpp::Private::iqPayloadXmlTag(const QDomElement &
     return { {}, {} };
 }
 
+///
+/// Generates a new sequential stanza id. The ID is locally unique, not globally unique (see
+/// QXmppUtils::generateStanzaUuid()).
+///
+/// This is used for all QXmppStanzas automatically.
+///
+/// \since QXmpp 1.11
+///
+QString QXmpp::generateSequentialStanzaId()
+{
+    ++globalStanzaIdCounter;
+    return u"qxmpp" + QString::number(globalStanzaIdCounter);
+}
+
 /// \cond
 std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
 {

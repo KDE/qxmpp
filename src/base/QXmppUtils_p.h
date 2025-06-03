@@ -42,6 +42,9 @@ concept IsStdOptional = requires {
     requires std::same_as<std::remove_cvref_t<T>, std::optional<typename std::remove_cvref_t<T>::value_type>>;
 };
 
+// sequential stanza IDs
+inline QAtomicInt globalStanzaIdCounter = 0;
+
 // Base64
 std::optional<QByteArray> parseBase64(const QString &);
 inline QString serializeBase64(const QByteArray &data) { return QString::fromUtf8(data.toBase64()); }
