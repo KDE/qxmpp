@@ -15,21 +15,6 @@
 
 namespace QXmpp::Private {
 
-// Variation of std::visit allowing to forward unhandled types
-template<typename ReturnType, typename T, typename Visitor>
-auto visitForward(T variant, Visitor visitor)
-{
-    return std::visit([&](auto &&value) -> ReturnType {
-        using ValueType = std::decay_t<decltype(value)>;
-        if constexpr (std::is_invocable_v<Visitor, ValueType>) {
-            return visitor(std::move(value));
-        } else {
-            return value;
-        }
-    },
-                      std::forward<T>(variant));
-}
-
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
 template<typename T>
 QFuture<T> makeReadyFuture(T &&value) { return QtFuture::makeReadyValueFuture(std::move(value)); }

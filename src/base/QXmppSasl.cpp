@@ -9,6 +9,7 @@
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSasl_p.h"
 #include "QXmppUtils.h"
+#include "QXmppVisitHelper_p.h"
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
@@ -23,11 +24,6 @@
 
 using std::visit;
 using namespace QXmpp::Private;
-
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
 
 static QByteArray forcedNonce;
 

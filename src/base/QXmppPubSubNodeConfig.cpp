@@ -5,6 +5,7 @@
 #include "QXmppPubSubNodeConfig.h"
 
 #include "QXmppPubSubNodeConfig_p.h"
+#include "QXmppVisitHelper_p.h"
 
 #include "StringLiterals.h"
 
@@ -46,12 +47,6 @@ static const auto TEMPORARY_SUBSCRIPTIONS = u"pubsub#tempsub"_s;
 static const auto ALLOW_SUBSCRIPTIONS = u"pubsub#subscribe"_s;
 static const auto TITLE = u"pubsub#title"_s;
 static const auto PAYLOAD_TYPE = u"pubsub#type"_s;
-
-// helper for std::visit
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
 
 class QXmppPubSubNodeConfigPrivate : public QSharedData
 {

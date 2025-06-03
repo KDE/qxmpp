@@ -8,6 +8,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppUtils_p.h"
+#include "QXmppVisitHelper_p.h"
 
 #include "StringLiterals.h"
 #include "XmlWriter.h"
@@ -20,12 +21,6 @@
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
-
-// helper for std::visit
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
 
 namespace QXmpp::Private {
 

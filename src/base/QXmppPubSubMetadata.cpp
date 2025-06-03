@@ -5,18 +5,13 @@
 #include "QXmppPubSubMetadata.h"
 
 #include "QXmppPubSubNodeConfig_p.h"
+#include "QXmppVisitHelper_p.h"
 
 #include "StringLiterals.h"
 
 #include <QDateTime>
 
 using namespace QXmpp::Private;
-
-// helper for std::visit
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
 
 constexpr QStringView FORM_TYPE_METADATA = u"http://jabber.org/protocol/pubsub#metadata";
 
