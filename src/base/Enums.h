@@ -79,7 +79,7 @@ concept NullableEnum = requires(Enum value) {
 };
 
 template<typename Enum>
-std::optional<Enum> fromString(QStringView str)
+constexpr std::optional<Enum> fromString(QStringView str)
     requires SerializableEnum<Enum> || SerializableFlags<Enum>
 {
     constexpr auto values = Data<Enum>::Values;
@@ -94,7 +94,7 @@ std::optional<Enum> fromString(QStringView str)
 }
 
 template<SerializableEnum Enum>
-QStringView toString(Enum value)
+constexpr QStringView toString(Enum value)
 {
     // offset for enums that do not start at 0
     constexpr auto offset = size_t(std::get<0>(Data<Enum>::Values[0]));
@@ -104,7 +104,7 @@ QStringView toString(Enum value)
 };
 
 template<SerializableFlags Enum, typename Container>
-QFlags<Enum> fromStrings(const Container &container)
+constexpr QFlags<Enum> fromStrings(const Container &container)
 {
     QFlags<Enum> result;
     for (const auto &string : container) {
@@ -116,7 +116,7 @@ QFlags<Enum> fromStrings(const Container &container)
 }
 
 template<SerializableFlags Enum>
-auto toStrings(QFlags<Enum> value)
+constexpr auto toStrings(QFlags<Enum> value)
 {
     auto testFlag = [value](auto entry) {
         auto &[enumerator, string] = entry;
