@@ -21,7 +21,6 @@ class QDomElement;
 class QString;
 
 /// \brief The QXmppUtils class contains static utility functions.
-///
 class QXMPP_EXPORT QXmppUtils
 {
 public:
@@ -56,6 +55,8 @@ QXMPP_EXPORT std::tuple<QString, QString> elementXmlTag(const QDomElement &el);
 QXMPP_EXPORT std::tuple<QString, QString> iqPayloadXmlTag(const QDomElement &el);
 
 }  // namespace Private
+
+QXMPP_EXPORT QString generateSequentialStanzaId();
 
 /// \brief Checks whether a QDomElement is an IQ stanza of a specific type T.
 template<typename T>

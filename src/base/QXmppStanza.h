@@ -236,7 +236,6 @@ protected:
 
 private:
     QSharedDataPointer<QXmppStanzaPrivate> d;
-    static uint s_uniqeIdNo;
     friend class TestClient;
 };
 
