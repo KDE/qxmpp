@@ -116,6 +116,34 @@ auto map(Function mapValue, const std::optional<T> &optValue) -> std::optional<s
     return {};
 }
 
+template<typename Out, typename Function, typename... InTypes>
+auto map(Function mapValue, std::variant<InTypes...> &&variant)
+{
+    return std::visit(
+        [&](auto &&v) -> Out {
+            if constexpr (std::is_invocable_v<Function, decltype(v)>) {
+                return { mapValue(std::move(v)) };
+            } else {
+                return { v };
+            }
+        },
+        std::move(variant));
+}
+
+template<typename Out, typename Function, typename... InTypes>
+auto map(Function mapValue, const std::variant<InTypes...> &variant)
+{
+    return std::visit(
+        [&](const auto &v) -> Out {
+            if constexpr (std::is_invocable_v<Function, decltype(v)>) {
+                return { mapValue(v) };
+            } else {
+                return { v };
+            }
+        },
+        variant);
+}
+
 template<typename To, typename From>
 auto into(std::optional<From> &&value) -> std::optional<To>
 {

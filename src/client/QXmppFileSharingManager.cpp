@@ -574,7 +574,7 @@ std::shared_ptr<QXmppFileDownload> QXmppFileSharingManager::downloadFile(
                     };
                 }
             };
-            download->reportFinished(visitForward<QXmppFileDownload::Result>(hashResult->result, convert));
+            download->reportFinished(map<QXmppFileDownload::Result>(convert, hashResult->result));
         });
     };
 
