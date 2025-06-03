@@ -10,6 +10,7 @@
 #include "QXmppFileSharingManager.h"
 #include "QXmppUtils.h"
 
+#include "Algorithms.h"
 #include "Async.h"
 #include "QcaInitializer_p.h"
 #include "StringLiterals.h"
@@ -110,15 +111,17 @@ auto QXmppEncryptedFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> da
         metadata,
         std::move(reportProgress),
         [=, reportFinished = std::move(reportFinished)](UploadResult result) {
-            auto encryptedResult = visitForward<UploadResult>(std::move(result), [&](std::any httpSourceAny) {
-                QXmppEncryptedFileSource encryptedSource;
-                encryptedSource.setCipher(ENCRYPTION_DEFAULT_CIPHER);
-                encryptedSource.setKey(key);
-                encryptedSource.setIv(iv);
-                encryptedSource.setHttpSources({ std::any_cast<QXmppHttpFileSource>(std::move(httpSourceAny)) });
+            auto encryptedResult = map<UploadResult>(
+                [&](std::any httpSourceAny) {
+                    QXmppEncryptedFileSource encryptedSource;
+                    encryptedSource.setCipher(ENCRYPTION_DEFAULT_CIPHER);
+                    encryptedSource.setKey(key);
+                    encryptedSource.setIv(iv);
+                    encryptedSource.setHttpSources({ std::any_cast<QXmppHttpFileSource>(std::move(httpSourceAny)) });
 
-                return encryptedSource;
-            });
+                    return encryptedSource;
+                },
+                std::move(result));
             reportFinished(std::move(encryptedResult));
         });
 }

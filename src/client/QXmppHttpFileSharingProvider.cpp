@@ -9,6 +9,7 @@
 #include "QXmppHttpUploadManager.h"
 #include "QXmppUtils.h"
 
+#include "Algorithms.h"
 #include "Async.h"
 #include "StringLiterals.h"
 
@@ -153,9 +154,11 @@ auto QXmppHttpFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> data,
         info.size() ? info.size().value() : -1);
 
     QObject::connect(state->upload.get(), &QXmppHttpUpload::finished, [state, reportFinished = std::move(reportFinished)](const QXmppHttpUpload::Result &result) mutable {
-        reportFinished(visitForward<UploadResult>(result, [](QUrl url) {
-            return std::any(QXmppHttpFileSource(std::move(url)));
-        }));
+        reportFinished(map<UploadResult>(
+            [](const QUrl &url) {
+                return std::any(QXmppHttpFileSource(url));
+            },
+            std::move(result)));
 
         // reduce ref count, so the signal connection doesn't keep the state alive forever
         state.reset();
