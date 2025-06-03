@@ -187,7 +187,7 @@ static bool candidateParseSdp(QXmppJingleCandidate *candidate, const QString &sd
 
 static QString candidateToSdp(const QXmppJingleCandidate &candidate)
 {
-    return u"candidate:%1 %2 %3 %4 %5 %6 typ %7 generation %8"_s
+    return QStringView(u"candidate:%1 %2 %3 %4 %5 %6 typ %7 generation %8")
         .arg(candidate.foundation(),
              QString::number(candidate.component()),
              candidate.protocol(),

@@ -655,7 +655,7 @@ std::optional<SaslHtMechanism> SaslHtMechanism::fromString(QStringView string)
 
 QString SaslHtMechanism::toString() const
 {
-    return u"HT-" + Enums::toString(hashAlgorithm) + u'-' + Enums::toString(channelBindingType);
+    return u"HT-" + hashAlgorithm + u'-' + channelBindingType;
 }
 
 std::optional<SaslMechanism> SaslMechanism::fromString(QStringView str)

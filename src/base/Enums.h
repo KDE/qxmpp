@@ -9,6 +9,7 @@
 #include <optional>
 #include <ranges>
 
+#include <QDebug>
 #include <QList>
 #include <QString>
 
@@ -135,5 +136,34 @@ QList<QString> toStringList(QFlags<Enum> value)
 }
 
 }  // namespace QXmpp::Private::Enums
+
+// operators
+
+template<QXmpp::Private::Enums::SerializableEnum Enum>
+bool operator==(QStringView s, Enum e) { return s == QXmpp::Private::Enums::toString(e); }
+template<QXmpp::Private::Enums::SerializableEnum Enum>
+bool operator!=(QStringView s, Enum e) { return s != QXmpp::Private::Enums::toString(e); }
+
+template<QXmpp::Private::Enums::SerializableEnum Enum>
+struct QConcatenable<Enum> {
+    typedef Enum type;
+    typedef QString ConvertTo;
+    enum { ExactSize = true };
+
+    static int size(Enum e)
+    {
+        return QXmpp::Private::Enums::toString(e).size();
+    }
+    static void appendTo(Enum m, QChar *&out)
+    {
+        QConcatenable<QStringView>::appendTo(QXmpp::Private::Enums::toString(m), out);
+    }
+};
+
+template<QXmpp::Private::Enums::SerializableEnum Enum>
+QDebug operator<<(QDebug debug, Enum e)
+{
+    return debug << QXmpp::Private::Enums::toString(e);
+}
 
 #endif  // ENUMS_H
