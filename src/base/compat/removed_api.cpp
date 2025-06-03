@@ -19,6 +19,15 @@
 
 using namespace QXmpp::Private;
 
+template<typename Enum, std::size_t N>
+std::optional<Enum> enumFromString(const std::array<QStringView, N> &values, QStringView str)
+{
+    if (auto itr = std::ranges::find(values, str); itr != values.end()) {
+        return Enum(std::distance(values.begin(), itr));
+    }
+    return {};
+}
+
 // SessionIq
 
 bool QXmppSessionIq::isSessionIq(const QDomElement &element)
