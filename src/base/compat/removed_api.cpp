@@ -31,7 +31,7 @@ std::optional<Enum> enumFromString(const std::array<QStringView, N> &values, QSt
 static void writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name, QStringView value)
 {
     if (!value.isEmpty()) {
-        stream->writeAttribute(toString65(name), toString65(value));
+        stream->writeAttribute(name.toString(), value.toString());
     }
 }
 
@@ -44,8 +44,8 @@ bool QXmppSessionIq::isSessionIq(const QDomElement &element)
 
 void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("session"));
-    writer->writeDefaultNamespace(toString65(ns_session));
+    writer->writeStartElement(u"session"_s);
+    writer->writeDefaultNamespace(ns_session.toString());
     writer->writeEndElement();
 }
 
@@ -220,8 +220,8 @@ void QXmppPubSubIq::parseElementFromChild(const QDomElement &element)
 
 void QXmppPubSubIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("pubsub"));
-    writer->writeDefaultNamespace(toString65(ns_pubsub));
+    writer->writeStartElement(u"pubsub"_s);
+    writer->writeDefaultNamespace(ns_pubsub.toString());
 
     // write query type
     writer->writeStartElement(PUBSUB_QUERIES.at(d->queryType));
@@ -310,7 +310,7 @@ void QXmppPubSubItem::parse(const QDomElement &element)
 
 void QXmppPubSubItem::toXml(QXmlStreamWriter *writer) const
 {
-    writer->writeStartElement(QSL65("item"));
+    writer->writeStartElement(u"item"_s);
     writeOptionalXmlAttribute(writer, u"id", d->id);
     d->contents.toXml(writer);
     writer->writeEndElement();
@@ -362,8 +362,8 @@ void QXmppStartTlsPacket::parse(const QDomElement &element)
 void QXmppStartTlsPacket::toXml(QXmlStreamWriter *writer) const
 {
     if (m_type != Invalid) {
-        writer->writeStartElement(toString65(STARTTLS_TYPES.at(size_t(m_type))));
-        writer->writeDefaultNamespace(toString65(ns_tls));
+        writer->writeStartElement(STARTTLS_TYPES.at(size_t(m_type)).toString());
+        writer->writeDefaultNamespace(ns_tls.toString());
         writer->writeEndElement();
     }
 }
