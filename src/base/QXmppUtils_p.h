@@ -52,22 +52,6 @@ inline auto toString60(QStringView s)
 #endif
 }
 
-#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
-inline auto toString65(QStringView s) { return s.toString(); }
-inline auto toString65(const QByteArray &s) { return QString::fromUtf8(s); }
-inline const QString &toString65(const QString &s) { return s; }
-inline QString toString65(QString &&s) { return std::move(s); }
-#else
-#define toString65(x) x
-#endif
-
-// QStringLiteral for Qt < 6.5, otherwise uses string view
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-#define QSL65(text) u"" text
-#else
-#define QSL65(text) QStringLiteral(text)
-#endif
-
 template<typename T>
 concept IsStdOptional = requires {
     typename std::remove_cvref_t<T>::value_type;

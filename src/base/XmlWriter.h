@@ -31,6 +31,15 @@ concept IsXmlTag =
 
 class XmlWriter;
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
+inline auto toString65(QStringView s) { return s.toString(); }
+inline auto toString65(const QByteArray &s) { return QString::fromUtf8(s); }
+inline const QString &toString65(const QString &s) { return s; }
+inline QString toString65(QString &&s) { return std::move(s); }
+#else
+#define toString65(x) x
+#endif
+
 template<typename T>
 struct StringSerializer {
     static decltype(auto) serialize(auto &&s) { return std::forward<decltype(s)>(s); }
