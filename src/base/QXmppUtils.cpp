@@ -322,55 +322,6 @@ QString QXmppUtils::generateStanzaHash(int length)
 }
 
 /// \cond
-void QXmpp::Private::writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name,
-                                               QStringView value)
-{
-    if (!value.isEmpty()) {
-        stream->writeAttribute(toString65(name), toString65(value));
-    }
-}
-
-void QXmpp::Private::writeXmlTextElement(QXmlStreamWriter *stream, QStringView name,
-                                         QStringView value)
-{
-    if (!value.isEmpty()) {
-        stream->writeTextElement(toString65(name), toString65(value));
-    } else {
-        stream->writeEmptyElement(toString65(name));
-    }
-}
-
-void QXmpp::Private::writeXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns, QStringView value)
-{
-    writer->writeStartElement(toString65(name));
-    writer->writeDefaultNamespace(toString65(xmlns));
-    if (!value.isEmpty()) {
-        writer->writeCharacters(toString65(value));
-    }
-    writer->writeEndElement();
-}
-
-void QXmpp::Private::writeOptionalXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView value)
-{
-    if (!value.isEmpty()) {
-        writer->writeTextElement(toString65(name), toString65(value));
-    }
-}
-
-void QXmpp::Private::writeEmptyElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns)
-{
-    writer->writeStartElement(toString65(name));
-    writer->writeDefaultNamespace(toString65(xmlns));
-    writer->writeEndElement();
-}
-
-void QXmpp::Private::writeSingleAttributeElement(QXmlStreamWriter *writer, QStringView name, QStringView attribute, QStringView value)
-{
-    writer->writeStartElement(toString65(name));
-    writer->writeAttribute(toString65(attribute), toString65(value));
-    writer->writeEndElement();
-}
-
 std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
 {
     if (auto result = QByteArray::fromBase64Encoding(text.toUtf8())) {
