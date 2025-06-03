@@ -564,7 +564,7 @@ QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids
 QXmppTask<QXmppMixManager::ChannelNodeResult> QXmppMixManager::requestChannelNodes(const QString &channelJid)
 {
     return chainMapSuccess(d->discoveryManager->requestDiscoItems(channelJid, MIX_SERVICE_DISCOVERY_NODE.toString()), this, [](QList<QXmppDiscoveryIq::Item> &&items) {
-        return Enums::fromStringList<QXmppMixConfigItem::Node>(transform<QList<QString>>(items, &QXmppDiscoveryIq::Item::node));
+        return Enums::fromStrings<QXmppMixConfigItem::Node>(transform<QList<QString>>(items, &QXmppDiscoveryIq::Item::node));
     });
 }
 
