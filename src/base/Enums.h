@@ -7,6 +7,7 @@
 
 #include <array>
 #include <optional>
+#include <ranges>
 
 #include <QList>
 #include <QString>
@@ -92,9 +93,8 @@ std::optional<Enum> fromString(QStringView str)
     return {};
 }
 
-template<typename Enum>
+template<SerializableEnum Enum>
 QStringView toString(Enum value)
-    requires SerializableEnum<Enum>
 {
     // offset for enums that do not start at 0
     constexpr auto offset = size_t(std::get<0>(Data<Enum>::Values[0]));
@@ -103,9 +103,8 @@ QStringView toString(Enum value)
     return string;
 };
 
-template<typename Enum, typename Container>
-QFlags<Enum> fromStringList(const Container &container)
-    requires SerializableFlags<Enum>
+template<SerializableFlags Enum, typename Container>
+QFlags<Enum> fromStrings(const Container &container)
 {
     QFlags<Enum> result;
     for (const auto &string : container) {
@@ -116,17 +115,23 @@ QFlags<Enum> fromStringList(const Container &container)
     return result;
 }
 
-template<typename Enum>
-QList<QStringView> toStringList(QFlags<Enum> value)
-    requires SerializableFlags<Enum>
+template<SerializableFlags Enum>
+auto toStrings(QFlags<Enum> value)
 {
-    QList<QStringView> result;
-    for (const auto &[enumerator, string] : Data<Enum>::Values) {
-        if (value.testFlag(enumerator)) {
-            result.push_back(string);
-        }
-    }
-    return result;
+    auto testFlag = [value](auto entry) {
+        auto &[enumerator, string] = entry;
+        return value.testFlag(enumerator);
+    };
+    auto string = [](auto entry) { return std::get<1>(entry); };
+
+    return std::views::filter(Data<Enum>::Values, testFlag) | std::views::transform(string);
+}
+
+template<SerializableFlags Enum>
+QList<QString> toStringList(QFlags<Enum> value)
+{
+    auto strings = toStrings(value) | std::views::transform(&QStringView::toString);
+    return QList<QString>(strings.begin(), strings.end());
 }
 
 }  // namespace QXmpp::Private::Enums

@@ -1922,8 +1922,8 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
         }
 
         // XEP-0334: Message Processing Hints
-        for (auto hint : Enums::toStringList(d->hints)) {
-            w.write(Element { Tag { hint, ns_message_processing_hints } });
+        for (auto hint : Enums::toStrings(d->hints)) {
+            w.write(Element { { hint, ns_message_processing_hints } });
         }
 
         // XEP-0359: Unique and Stable Stanza IDs

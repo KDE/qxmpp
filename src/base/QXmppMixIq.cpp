@@ -107,16 +107,16 @@ bool QXmppMixSubscriptionUpdateIq::isMixSubscriptionUpdateIq(const QDomElement &
 void QXmppMixSubscriptionUpdateIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement child = element.firstChildElement();
-    m_additions = Enums::fromStringList<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
-    m_removals = Enums::fromStringList<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"unsubscribe", ns_mix, u"node"_s));
+    m_additions = Enums::fromStrings<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
+    m_removals = Enums::fromStrings<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"unsubscribe", ns_mix, u"node"_s));
 }
 
 void QXmppMixSubscriptionUpdateIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
         { u"update-subscription", ns_mix },
-        SingleAttributeElements { u"subscribe", u"node", Enums::toStringList(m_additions) },
-        SingleAttributeElements { u"unsubscribe", u"node", Enums::toStringList(m_removals) },
+        SingleAttributeElements { u"subscribe", u"node", Enums::toStrings(m_additions) },
+        SingleAttributeElements { u"unsubscribe", u"node", Enums::toStrings(m_removals) },
     });
 }
 
@@ -477,7 +477,7 @@ void QXmppMixIq::setChannelJid(const QString &channelJid)
 ///
 QStringList QXmppMixIq::nodes() const
 {
-    return transform<QStringList>(Enums::toStringList(d->subscriptions), &QStringView::toString);
+    return Enums::toStringList(d->subscriptions);
 }
 
 ///
@@ -490,7 +490,7 @@ QStringList QXmppMixIq::nodes() const
 ///
 void QXmppMixIq::setNodes(const QStringList &nodes)
 {
-    d->subscriptions = Enums::fromStringList<QXmppMixConfigItem::Node>(nodes);
+    d->subscriptions = Enums::fromStrings<QXmppMixConfigItem::Node>(nodes);
 }
 
 ///
@@ -613,7 +613,7 @@ void QXmppMixIq::parseElementFromChild(const QDomElement &element)
 
         d->nick = firstChildElement(child, u"nick").text();
         d->invitation = parseOptionalChildElement<QXmppMixInvitation>(child);
-        d->subscriptions = Enums::fromStringList<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
+        d->subscriptions = Enums::fromStrings<QXmppMixConfigItem::Node>(parseSingleAttributeElements(child, u"subscribe", ns_mix, u"node"_s));
     }
 }
 
@@ -631,7 +631,7 @@ void QXmppMixIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
                 { d->actionType == ClientJoin ? u"join" : u"leave", ns_mix },
                 OptionalAttribute { u"channel", d->channelId },
                 OptionalContent { type() == Result, OptionalAttribute { u"id", d->participantId } },
-                SingleAttributeElements { u"subscribe", u"node", Enums::toStringList(d->subscriptions) },
+                SingleAttributeElements { u"subscribe", u"node", Enums::toStrings(d->subscriptions) },
                 OptionalTextElement { u"nick", d->nick },
                 d->invitation,
             },
@@ -641,7 +641,7 @@ void QXmppMixIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
             Tag { d->actionType, ns_mix },
             OptionalAttribute { u"channel", d->channelId },
             OptionalContent { type() == Result, OptionalAttribute { u"id", d->participantId } },
-            SingleAttributeElements { u"subscribe", u"node", Enums::toStringList(d->subscriptions) },
+            SingleAttributeElements { u"subscribe", u"node", Enums::toStrings(d->subscriptions) },
             OptionalTextElement { u"nick", d->nick },
             d->invitation,
         });

@@ -196,7 +196,7 @@ bool QXmppPubSubSubscribeOptions::parseField(const QXmppDataForm::Field &field)
     } else if (key == EXPIRE) {
         d->expire = QDateTime::fromString(value.toString(), Qt::ISODate);
     } else if (key == NOTIFICATION_RULES) {
-        d->notificationRules = Enums::fromStringList<PresenceState>(value.toStringList());
+        d->notificationRules = Enums::fromStrings<PresenceState>(value.toStringList());
     } else if (key == SUBSCRIPTION_TYPE) {
         d->subscriptionType = Enums::fromString<SubscriptionType>(value.toString());
     } else if (key == SUBSCRIPTION_DEPTH) {
@@ -223,7 +223,7 @@ void QXmppPubSubSubscribeOptions::serializeForm(QXmppDataForm &form) const
     serializeOptional(form, Type::TextSingleField, DIGEST_FREQUENCY_MS, d->digestFrequencyMs, numberToString);
     serializeDatetime(form, EXPIRE, d->expire);
     serializeOptional(form, Type::BooleanField, BODY_INCLUDED, d->bodyIncluded);
-    serializeEmptyable(form, Type::ListMultiField, NOTIFICATION_RULES, transform<QStringList>(Enums::toStringList(d->notificationRules), &QStringView::toString));
+    serializeEmptyable(form, Type::ListMultiField, NOTIFICATION_RULES, QStringList(Enums::toStringList(d->notificationRules)));
     serializeOptional(form, Type::ListSingleField, SUBSCRIPTION_TYPE, d->subscriptionType, enumToString);
     serializeOptional(form, Type::ListSingleField, SUBSCRIPTION_DEPTH, d->subscriptionDepth, enumToString);
 }
