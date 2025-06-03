@@ -68,41 +68,6 @@ inline QString toString65(QString &&s) { return std::move(s); }
 #define QSL65(text) QStringLiteral(text)
 #endif
 
-// XML streams
-void writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name, QStringView value);
-void writeXmlTextElement(QXmlStreamWriter *stream, QStringView name, QStringView value);
-void writeXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns, QStringView value);
-void writeOptionalXmlTextElement(QXmlStreamWriter *writer, QStringView name, QStringView value);
-void writeEmptyElement(QXmlStreamWriter *writer, QStringView name, QStringView xmlns);
-void writeSingleAttributeElement(QXmlStreamWriter *writer, QStringView name, QStringView attribute, QStringView value);
-template<typename Container>
-void writeSingleAttributeElements(QXmlStreamWriter *writer, QStringView name, QStringView attribute, const Container &values)
-{
-    for (const auto &value : values) {
-        writeSingleAttributeElement(writer, name, attribute, value);
-    }
-}
-template<typename Container>
-void writeTextElements(QXmlStreamWriter *writer, QStringView name, const Container &values)
-{
-    for (const auto &value : values) {
-        writeXmlTextElement(writer, name, value);
-    }
-}
-template<typename T>
-inline void writeOptional(QXmlStreamWriter *writer, const std::optional<T> &value)
-{
-    if (value) {
-        value->toXml(writer);
-    }
-}
-void writeElements(QXmlStreamWriter *writer, const auto &elements)
-{
-    for (const auto &element : elements) {
-        element.toXml(writer);
-    }
-}
-
 template<typename T>
 concept IsStdOptional = requires {
     typename std::remove_cvref_t<T>::value_type;

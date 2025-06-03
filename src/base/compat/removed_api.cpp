@@ -28,6 +28,13 @@ std::optional<Enum> enumFromString(const std::array<QStringView, N> &values, QSt
     return {};
 }
 
+static void writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name, QStringView value)
+{
+    if (!value.isEmpty()) {
+        stream->writeAttribute(toString65(name), toString65(value));
+    }
+}
+
 // SessionIq
 
 bool QXmppSessionIq::isSessionIq(const QDomElement &element)
