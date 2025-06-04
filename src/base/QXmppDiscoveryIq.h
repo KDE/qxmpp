@@ -98,8 +98,9 @@ public:
 
     QByteArray verificationString() const;
 
-    static bool isDiscoveryIq(const QDomElement &element);
     /// \cond
+    [[deprecated("Use QXmpp::isIqType()")]]
+    static bool isDiscoveryIq(const QDomElement &element);
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
 
 protected:

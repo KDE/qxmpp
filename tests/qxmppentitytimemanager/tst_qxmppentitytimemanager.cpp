@@ -56,7 +56,12 @@ void tst_QXmppEntityTimeManager::testHandleRequest()
 </iq>)"));
 
     auto packet = xmlToDom(test.takePacket());
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QVERIFY(QXmppEntityTimeIq::isEntityTimeIq(packet));
+    QT_WARNING_POP
+
     QXmppEntityTimeIq resp;
     resp.parse(packet);
 

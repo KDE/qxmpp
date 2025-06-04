@@ -210,14 +210,6 @@ void QXmppByteStreamIq::setStreamHostUsed(const QString &jid)
     m_streamHostUsed = jid;
 }
 
-///
-/// Returns whether \a element is an IQ element with a bytestream query.
-///
-bool QXmppByteStreamIq::isByteStreamIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_bytestreams);
-}
-
 /// \cond
 void QXmppByteStreamIq::parseElementFromChild(const QDomElement &element)
 {

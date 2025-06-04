@@ -123,11 +123,6 @@ void QXmppMamQueryIq::setQueryId(const QString &id)
 }
 
 /// \cond
-bool QXmppMamQueryIq::isMamQueryIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_mam);
-}
-
 void QXmppMamQueryIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -224,17 +219,6 @@ void QXmppMamResultIq::setComplete(bool complete)
 }
 
 /// \cond
-bool QXmppMamResultIq::isMamResultIq(const QDomElement &element)
-{
-    if (element.tagName() == u"iq") {
-        QDomElement finElement = element.firstChildElement(u"fin"_s);
-        if (!finElement.isNull() && finElement.namespaceURI() == ns_mam) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void QXmppMamResultIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement finElement = element.firstChildElement(u"fin"_s);

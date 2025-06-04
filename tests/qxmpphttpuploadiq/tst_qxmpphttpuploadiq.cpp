@@ -71,7 +71,10 @@ void tst_QXmppHttpUploadIq::testIsRequest()
     QFETCH(QByteArray, xml);
     QFETCH(bool, isRequest);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QCOMPARE(QXmppHttpUploadRequestIq::isHttpUploadRequestIq(xmlToDom(xml)), isRequest);
+    QT_WARNING_POP
 }
 
 void tst_QXmppHttpUploadIq::testSlot()
@@ -135,7 +138,10 @@ void tst_QXmppHttpUploadIq::testIsSlot()
     QFETCH(QByteArray, xml);
     QFETCH(bool, isSlot);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QCOMPARE(QXmppHttpUploadSlotIq::isHttpUploadSlotIq(xmlToDom(xml)), isSlot);
+    QT_WARNING_POP
 }
 
 QTEST_MAIN(tst_QXmppHttpUploadIq)

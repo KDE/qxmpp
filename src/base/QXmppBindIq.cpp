@@ -51,11 +51,6 @@ void QXmppBindIq::setResource(const QString &resource)
 }
 
 /// \cond
-bool QXmppBindIq::isBindIq(const QDomElement &element)
-{
-    return isIqType(element, u"bind", ns_bind);
-}
-
 void QXmppBindIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement bindElement = firstChildElement(element, u"bind");

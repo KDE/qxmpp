@@ -20,15 +20,6 @@
 
 namespace QXmpp::Private {
 
-template<typename T>
-concept IsXmlTag =
-    requires {
-        typename std::tuple_size<T>::type;
-    } &&
-    std::tuple_size_v<T> == 2 &&
-    std::convertible_to<std::tuple_element_t<0, T>, QStringView> &&
-    std::convertible_to<std::tuple_element_t<1, T>, QStringView>;
-
 class XmlWriter;
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)

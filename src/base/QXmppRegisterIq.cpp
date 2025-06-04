@@ -257,11 +257,6 @@ void QXmppRegisterIq::setOutOfBandUrl(const QString &outOfBandUrl)
 }
 
 /// \cond
-bool QXmppRegisterIq::isRegisterIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_register);
-}
-
 void QXmppRegisterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);

@@ -97,11 +97,6 @@ void QXmppNonSASLAuthIq::setResource(const QString &resource)
 }
 
 /// \cond
-bool QXmppNonSASLAuthIq::isNonSASLAuthIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_auth);
-}
-
 void QXmppNonSASLAuthIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);

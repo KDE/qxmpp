@@ -3,13 +3,29 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppArchiveIq.h"
+#include "QXmppBindIq.h"
+#include "QXmppBitsOfBinaryIq.h"
+#include "QXmppByteStreamIq.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryIq.h"
 #include "QXmppElement.h"
+#include "QXmppEntityTimeIq.h"
+#include "QXmppExternalServiceDiscoveryIq.h"
+#include "QXmppHttpUploadIq.h"
+#include "QXmppIbbIq.h"
+#include "QXmppMamIq.h"
+#include "QXmppNonSASLAuth.h"
+#include "QXmppPingIq.h"
 #include "QXmppPubSubIq.h"
 #include "QXmppPubSubItem.h"
+#include "QXmppRegisterIq.h"
+#include "QXmppRosterIq.h"
 #include "QXmppSessionIq.h"
 #include "QXmppStartTlsPacket.h"
 #include "QXmppUtils_p.h"
+#include "QXmppVCardIq.h"
+#include "QXmppVersionIq.h"
 
 #include "StringLiterals.h"
 
@@ -35,6 +51,189 @@ static void writeOptionalXmlAttribute(QXmlStreamWriter *stream, QStringView name
     }
 }
 
+static bool isIqType(const QDomElement &element, QStringView tagName, QStringView xmlns)
+{
+    // IQs must have only one child element, so we do not need to iterate over the child elements.
+    auto child = element.firstChildElement();
+    return child.tagName() == tagName && child.namespaceURI() == xmlns;
+}
+
+/// \cond
+
+// ArchiveIq
+
+bool QXmppArchiveChatIq::isArchiveChatIq(const QDomElement &element)
+{
+    auto chatEl = firstChildElement(element, u"chat", ns_archive);
+    return !chatEl.isNull() && !chatEl.attribute(u"with"_s).isEmpty();
+}
+
+bool QXmppArchiveListIq::isArchiveListIq(const QDomElement &element)
+{
+    return isIqType(element, u"list", ns_archive);
+}
+
+bool QXmppArchiveRemoveIq::isArchiveRemoveIq(const QDomElement &element)
+{
+    return isIqType(element, u"remove", ns_archive);
+}
+
+bool QXmppArchiveRetrieveIq::isArchiveRetrieveIq(const QDomElement &element)
+{
+    return isIqType(element, u"retrieve", ns_archive);
+}
+
+bool QXmppArchivePrefIq::isArchivePrefIq(const QDomElement &element)
+{
+    return isIqType(element, u"pref", ns_archive);
+}
+
+// BindIq
+
+bool QXmppBindIq::isBindIq(const QDomElement &element)
+{
+    return isIqType(element, u"bind", ns_bind);
+}
+
+// Bob
+
+bool QXmppBitsOfBinaryIq::isBitsOfBinaryIq(const QDomElement &element)
+{
+    return isIqType(element, u"data", ns_bob);
+}
+
+// ByteStreamIq
+
+bool QXmppByteStreamIq::isByteStreamIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_bytestreams);
+}
+
+// DiscoveryIq
+
+bool QXmppDiscoveryIq::isDiscoveryIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_disco_info) || isIqType(element, u"query", ns_disco_items);
+}
+
+// EntityTimeIq
+
+bool QXmppEntityTimeIq::isEntityTimeIq(const QDomElement &element)
+{
+    return isIqType(element, u"time", ns_entity_time);
+}
+
+bool QXmppEntityTimeIq::checkIqType(const QString &tagName, const QString &xmlns)
+{
+    return tagName == u"time" && xmlns == ns_entity_time;
+}
+
+// ExternalServiceDiscoveryIq
+
+bool QXmppExternalServiceDiscoveryIq::isExternalServiceDiscoveryIq(const QDomElement &element)
+{
+    return isIqType(element, u"services", ns_external_service_discovery);
+}
+
+// HttpUploadIq
+
+bool QXmppHttpUploadRequestIq::isHttpUploadRequestIq(const QDomElement &element)
+{
+    return isIqType(element, u"request", ns_http_upload);
+}
+
+bool QXmppHttpUploadSlotIq::isHttpUploadSlotIq(const QDomElement &element)
+{
+    return isIqType(element, u"slot", ns_http_upload);
+}
+
+// IbbIq
+
+bool QXmppIbbDataIq::isIbbDataIq(const QDomElement &element)
+{
+    return isIqType(element, u"data", ns_ibb);
+}
+
+bool QXmppIbbOpenIq::isIbbOpenIq(const QDomElement &element)
+{
+    return isIqType(element, u"open", ns_ibb);
+}
+
+bool QXmppIbbCloseIq::isIbbCloseIq(const QDomElement &element)
+{
+    return isIqType(element, u"close", ns_ibb);
+}
+
+// MamIq
+
+bool QXmppMamQueryIq::isMamQueryIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_mam);
+}
+
+bool QXmppMamResultIq::isMamResultIq(const QDomElement &element)
+{
+    if (element.tagName() == u"iq") {
+        QDomElement finElement = element.firstChildElement(u"fin"_s);
+        if (!finElement.isNull() && finElement.namespaceURI() == ns_mam) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// NonSaslIq
+
+bool QXmppNonSASLAuthIq::isNonSASLAuthIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_auth);
+}
+
+// PingIq
+
+bool QXmppPingIq::isPingIq(const QDomElement &element)
+{
+    return isIqType(element, u"ping", ns_ping) && element.attribute(u"type"_s) == u"get";
+}
+
+// RegisterIq
+
+bool QXmppRegisterIq::isRegisterIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_register);
+}
+
+// RosterIq
+
+bool QXmppRosterIq::isRosterIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_roster);
+}
+
+// VCardIq
+
+bool QXmppVCardIq::isVCard(const QDomElement &el)
+{
+    return isIqType(el, u"vCard", ns_vcard);
+}
+
+bool QXmppVCardIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
+{
+    return tagName == u"vCard" && xmlNamespace == ns_vcard;
+}
+
+// VersionIq
+
+bool QXmppVersionIq::isVersionIq(const QDomElement &element)
+{
+    return isIqType(element, u"query", ns_version);
+}
+
+bool QXmppVersionIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
+{
+    return tagName == u"query" && xmlNamespace == ns_version;
+}
+
 // SessionIq
 
 bool QXmppSessionIq::isSessionIq(const QDomElement &element)
@@ -48,6 +247,8 @@ void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(ns_session.toString());
     writer->writeEndElement();
 }
+
+/// \endcond
 
 // PubSubIq
 

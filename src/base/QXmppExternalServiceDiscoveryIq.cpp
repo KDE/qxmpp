@@ -353,14 +353,6 @@ void QXmppExternalServiceDiscoveryIq::addExternalService(const QXmppExternalServ
 }
 
 ///
-/// Returns true if the provided DOM element is an external service discovery IQ.
-///
-bool QXmppExternalServiceDiscoveryIq::isExternalServiceDiscoveryIq(const QDomElement &element)
-{
-    return isIqType(element, u"services", ns_external_service_discovery);
-}
-
-///
 /// Returns true if the IQ is a valid external service discovery IQ.
 ///
 bool QXmppExternalServiceDiscoveryIq::checkIqType(const QString &tagName, const QString &xmlNamespace)

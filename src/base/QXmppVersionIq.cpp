@@ -51,16 +51,6 @@ void QXmppVersionIq::setVersion(const QString &version)
 }
 
 /// \cond
-bool QXmppVersionIq::isVersionIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_version);
-}
-
-bool QXmppVersionIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
-{
-    return tagName == u"query" && xmlNamespace == ns_version;
-}
-
 void QXmppVersionIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);

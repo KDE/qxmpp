@@ -28,14 +28,6 @@ QXmppPingIq::QXmppPingIq()
 {
 }
 
-///
-/// Returns true, if the element is a ping IQ.
-///
-bool QXmppPingIq::isPingIq(const QDomElement &element)
-{
-    return isIqType(element, u"ping", ns_ping) && element.attribute(u"type"_s) == u"get";
-}
-
 /// \cond
 void QXmppPingIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {

@@ -62,6 +62,8 @@ public:
     void setOutOfBandUrl(const QString &outOfBandUrl);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_register };
+    [[deprecated("Use QXmpp::isIqType()")]]
     static bool isRegisterIq(const QDomElement &element);
     /// \endcond
 

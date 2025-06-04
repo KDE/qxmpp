@@ -7,6 +7,7 @@
 #define QXMPPUTILS_P_H
 
 #include "QXmppGlobal.h"
+#include "QXmppXmlTags_p.h"
 
 #include "Algorithms.h"
 
@@ -63,17 +64,6 @@ QString serializeBoolean(bool);
 // DOM
 //
 
-template<typename T>
-concept HasXmlTag = requires {
-    { !std::is_void_v<T> };
-    { T::XmlTag };
-    { std::get<0>(T::XmlTag) };
-    { std::get<1>(T::XmlTag) };
-    { std::is_constructible_v<QStringView, decltype(std::get<0>(T::XmlTag))> };
-    { std::is_constructible_v<QStringView, decltype(std::get<1>(T::XmlTag))> };
-};
-
-QXMPP_EXPORT bool isIqType(const QDomElement &, QStringView tagName, QStringView xmlns);
 QXMPP_EXPORT QDomElement firstChildElement(const QDomElement &, QStringView tagName = {}, QStringView xmlNs = {});
 QXMPP_EXPORT QDomElement nextSiblingElement(const QDomElement &, QStringView tagName = {}, QStringView xmlNs = {});
 

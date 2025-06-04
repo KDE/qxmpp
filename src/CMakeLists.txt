@@ -95,6 +95,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppVCardIq.h
     base/QXmppVersionIq.h
     base/QXmppVisitHelper_p.h
+    base/QXmppXmlTags_p.h
     base/compat/QXmppSessionIq.h
     base/compat/QXmppStartTlsPacket.h
     base/compat/QXmppPubSubIq.h

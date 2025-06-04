@@ -134,7 +134,10 @@ void tst_QXmppExternalServiceDiscoveryIq::testIsExternalServiceDiscoveryIq()
     QFETCH(QByteArray, xml);
     QFETCH(bool, isValid);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QCOMPARE(QXmppExternalServiceDiscoveryIq::isExternalServiceDiscoveryIq(xmlToDom(xml)), isValid);
+    QT_WARNING_POP
 }
 
 void tst_QXmppExternalServiceDiscoveryIq::testExternalServiceDiscoveryIq()

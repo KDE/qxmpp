@@ -452,15 +452,6 @@ QByteArray QXmppDiscoveryIq::verificationString() const
     return hasher.result();
 }
 
-///
-/// Returns true, if the element is a valid service discovery IQ and can be
-/// parsed.
-///
-bool QXmppDiscoveryIq::isDiscoveryIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_disco_info) || isIqType(element, u"query", ns_disco_items);
-}
-
 /// \cond
 bool QXmppDiscoveryIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
 {

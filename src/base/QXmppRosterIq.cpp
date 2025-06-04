@@ -116,11 +116,6 @@ void QXmppRosterIq::setMixAnnotate(bool mixAnnotate)
 }
 
 /// \cond
-bool QXmppRosterIq::isRosterIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_roster);
-}
-
 void QXmppRosterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
