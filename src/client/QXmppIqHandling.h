@@ -9,7 +9,10 @@
 #include "QXmppClient.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppIq.h"
+#include "QXmppUtils_p.h"
 #include "QXmppXmlTags_p.h"
+
+#include "StringLiterals.h"
 
 #include <QDomElement>
 
@@ -92,15 +95,15 @@ bool handleIqType(Handler handler,
                   const QString &xmlNamespace)
 {
     if (isPayloadType<IqType>(std::tuple { tagName, xmlNamespace })) {
-        IqType iq;
-        iq.parse(element);
-        iq.setE2eeMetadata(e2eeMetadata);
+        if (auto iq = parseElement<IqType>(element)) {
+            if constexpr (std::is_base_of_v<QXmppIq, IqType>) {
+                iq->setE2eeMetadata(e2eeMetadata);
+            }
 
-        auto id = iq.id(), from = iq.from();
-
-        processHandleIqResult(client, id, from, e2eeMetadata,
-                              invokeIqHandler(std::forward<Handler>(handler), std::move(iq)));
-        return true;
+            processHandleIqResult(client, element.attribute(u"id"_s), element.attribute(u"from"_s), e2eeMetadata,
+                                  invokeIqHandler(std::forward<Handler>(handler), std::move(*iq)));
+            return true;
+        }
     }
     return false;
 }
