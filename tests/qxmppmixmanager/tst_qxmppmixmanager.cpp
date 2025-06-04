@@ -257,14 +257,14 @@ void tst_QXmppMixManager::testAddJidToNode()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:mix:nodes:allowed'>"
         "<item id='alice@wonderland.example'/>"
         "</publish>"
         "</pubsub>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='coven@mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
@@ -284,13 +284,13 @@ void tst_QXmppMixManager::testRequestJids()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:allowed'/>"
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:allowed'>"
         "<item id='shakespeare.example'/>"
@@ -334,7 +334,7 @@ void tst_QXmppMixManager::testJoinChannelPrivate()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='hag66@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='hag66@shakespeare.example' type='set'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<join xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
@@ -350,7 +350,7 @@ void tst_QXmppMixManager::testJoinChannelPrivate()
         "</client-join>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2'>"
         "<join xmlns='urn:xmpp:mix:core:1' id='123456'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
@@ -364,7 +364,7 @@ void tst_QXmppMixManager::testJoinChannelPrivate()
     QCOMPARE(result.nickname, u"third witch 2"_s);
     QCOMPARE(result.subscriptions, QXmppMixConfigItem::Node::AllowedJids);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"hag66@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"hag66@shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testPrepareJoinIq()
@@ -604,18 +604,18 @@ void tst_QXmppMixManager::testCreateChannel()
     auto task = call();
 
     client.inject(
-        "<iq id='qxmpp1' from='mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
         "<create xmlns='urn:xmpp:mix:core:1' channel='A1B2C345'/>"
         "</iq>");
     client.expect(
-        "<iq id='qxmpp1' to='mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='mix.shakespeare.example' type='set'>"
         "<create xmlns='urn:xmpp:mix:core:1'/>"
         "</iq>");
 
     auto channelJid = expectFutureVariant<QXmppMixManager::ChannelJid>(task);
     QCOMPARE(channelJid, u"A1B2C345@mix.shakespeare.example"_s);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"mix.shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"mix.shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testCreateChannelWithId()
@@ -631,18 +631,18 @@ void tst_QXmppMixManager::testCreateChannelWithId()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='mix.shakespeare.example' type='set'>"
         "<create xmlns='urn:xmpp:mix:core:1' channel='coven'/>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
         "<create xmlns='urn:xmpp:mix:core:1' channel='coven'/>"
         "</iq>");
 
     auto channelJid = expectFutureVariant<QXmppMixManager::ChannelJid>(task);
     QCOMPARE(channelJid, u"coven@mix.shakespeare.example"_s);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"mix.shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"mix.shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testRequestChannelJids()
@@ -658,11 +658,11 @@ void tst_QXmppMixManager::testRequestChannelJids()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
         "<query xmlns='http://jabber.org/protocol/disco#items'/>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
         "<query xmlns='http://jabber.org/protocol/disco#items'>"
         "<item jid='coven@mix.shakespeare.example'/>"
         "<item jid='spells@mix.shakespeare.example'/>"
@@ -676,7 +676,7 @@ void tst_QXmppMixManager::testRequestChannelJids()
     QCOMPARE(jids.at(1), u"spells@mix.shakespeare.example"_s);
     QCOMPARE(jids.at(2), u"wizards@mix.shakespeare.example"_s);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"mix.shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"mix.shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testRequestChannelNodes()
@@ -692,11 +692,11 @@ void tst_QXmppMixManager::testRequestChannelNodes()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<query xmlns='http://jabber.org/protocol/disco#items' node='mix'/>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<query xmlns='http://jabber.org/protocol/disco#items' node='mix'>"
         "<item jid='coven@mix.shakespeare.example' node='urn:xmpp:mix:nodes:presence'/>"
         "<item jid='coven@mix.shakespeare.example' node='urn:xmpp:mix:nodes:allowed'/>"
@@ -722,13 +722,13 @@ void tst_QXmppMixManager::testRequestChannelConfiguration()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:config'/>"
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:config'>"
         "<item id='2016-05-30T09:00:00'>"
@@ -768,7 +768,7 @@ void tst_QXmppMixManager::testUpdateChannelConfiguration()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:mix:nodes:config'>"
         "<item id='2016-05-30T09:00:00'>"
@@ -785,7 +785,7 @@ void tst_QXmppMixManager::testUpdateChannelConfiguration()
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:mix:nodes:config'>"
         "<item id='2016-05-30T09:00:00'/>"
@@ -811,13 +811,13 @@ void tst_QXmppMixManager::testRequestChannelInformation()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:info'/>"
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:info'>"
         "<item id='2016-05-30T09:00:00'>"
@@ -857,7 +857,7 @@ void tst_QXmppMixManager::testUpdateChannelInformation()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:mix:nodes:info'>"
         "<item id='2016-05-30T09:00:00'>"
@@ -874,7 +874,7 @@ void tst_QXmppMixManager::testUpdateChannelInformation()
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:mix:nodes:info'>"
         "<item id='2016-05-30T09:00:00'/>"
@@ -900,7 +900,7 @@ void tst_QXmppMixManager::testJoinChannel()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='hag66@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='hag66@shakespeare.example' type='set'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<join xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
@@ -917,7 +917,7 @@ void tst_QXmppMixManager::testJoinChannel()
         "</client-join>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2'>"
         "<join xmlns='urn:xmpp:mix:core:1' id='123456'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -931,7 +931,7 @@ void tst_QXmppMixManager::testJoinChannel()
     QVERIFY(result.nickname.isEmpty());
     QCOMPARE(result.subscriptions, QXmppMixConfigItem::Node::Messages | QXmppMixConfigItem::Node::Presence);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"hag66@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"hag66@shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testJoinChannelWithNickname()
@@ -941,7 +941,7 @@ void tst_QXmppMixManager::testJoinChannelWithNickname()
     auto task = manager->joinChannel(u"coven@mix.shakespeare.example"_s, u"third witch"_s);
 
     client.expect(
-        "<iq id='qxmpp1' to='hag66@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='hag66@shakespeare.example' type='set'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<join xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
@@ -959,7 +959,7 @@ void tst_QXmppMixManager::testJoinChannelWithNickname()
         "</client-join>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2'>"
         "<join xmlns='urn:xmpp:mix:core:1' id='123456'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -982,7 +982,7 @@ void tst_QXmppMixManager::testJoinChannelWithNodes()
     auto task = manager->joinChannel(u"coven@mix.shakespeare.example"_s, {}, QXmppMixConfigItem::Node::Messages | QXmppMixConfigItem::Node::Presence);
 
     client.expect(
-        "<iq id='qxmpp1' to='hag66@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='hag66@shakespeare.example' type='set'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<join xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -991,7 +991,7 @@ void tst_QXmppMixManager::testJoinChannelWithNodes()
         "</client-join>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2'>"
         "<join xmlns='urn:xmpp:mix:core:1' id='123456'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -1025,7 +1025,7 @@ void tst_QXmppMixManager::testJoinChannelViaInvitation()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='cat@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='cat@shakespeare.example' type='set'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<join xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
@@ -1048,7 +1048,7 @@ void tst_QXmppMixManager::testJoinChannelViaInvitation()
         "</client-join>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2'>"
         "<join xmlns='urn:xmpp:mix:core:1' id='123457'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -1062,7 +1062,7 @@ void tst_QXmppMixManager::testJoinChannelViaInvitation()
     QVERIFY(result.nickname.isEmpty());
     QCOMPARE(result.subscriptions, QXmppMixConfigItem::Node::Messages | QXmppMixConfigItem::Node::Presence);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"cat@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"cat@shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testJoinChannelViaInvitationWithNickname()
@@ -1078,7 +1078,7 @@ void tst_QXmppMixManager::testJoinChannelViaInvitationWithNickname()
     auto task = manager->joinChannel(invitation, u"fourth witch"_s);
 
     client.expect(
-        "<iq id='qxmpp1' to='cat@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='cat@shakespeare.example' type='set'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<join xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
@@ -1102,7 +1102,7 @@ void tst_QXmppMixManager::testJoinChannelViaInvitationWithNickname()
         "</client-join>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2'>"
         "<join xmlns='urn:xmpp:mix:core:1' id='123457'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -1131,7 +1131,7 @@ void tst_QXmppMixManager::testJoinChannelViaInvitationWithNodes()
     auto task = manager->joinChannel(invitation, {}, QXmppMixConfigItem::Node::Messages | QXmppMixConfigItem::Node::Presence);
 
     client.expect(
-        "<iq id='qxmpp1' to='cat@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='cat@shakespeare.example' type='set'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<join xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -1146,7 +1146,7 @@ void tst_QXmppMixManager::testJoinChannelViaInvitationWithNodes()
         "</client-join>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-join xmlns='urn:xmpp:mix:pam:2'>"
         "<join xmlns='urn:xmpp:mix:core:1' id='123457'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
@@ -1174,13 +1174,13 @@ void tst_QXmppMixManager::testUpdateNickname()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<setnick xmlns='urn:xmpp:mix:core:1'>"
         "<nick>third witch</nick>"
         "</setnick>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<setnick xmlns='urn:xmpp:mix:core:1'>"
         "<nick>third witch 2</nick>"
         "</setnick>"
@@ -1205,7 +1205,7 @@ void tst_QXmppMixManager::testUpdateSubscriptions()
     auto task = defaultParametersCall();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<update-subscription xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
         "<subscribe node='urn:xmpp:avatar:data'/>"
@@ -1220,7 +1220,7 @@ void tst_QXmppMixManager::testUpdateSubscriptions()
         "</update-subscription>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<update-subscription xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
         "<subscribe node='urn:xmpp:avatar:data'/>"
@@ -1257,14 +1257,14 @@ void tst_QXmppMixManager::testUpdateSubscriptions()
     task = defaultRemovalParameterCall();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<update-subscription xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
         "<subscribe node='urn:xmpp:mix:nodes:banned'/>"
         "</update-subscription>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<update-subscription xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:allowed'/>"
         "<subscribe node='urn:xmpp:mix:nodes:banned'/>"
@@ -1282,7 +1282,7 @@ void tst_QXmppMixManager::testUpdateSubscriptions()
     task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<update-subscription xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
         "<subscribe node='urn:xmpp:mix:nodes:presence'/>"
@@ -1291,7 +1291,7 @@ void tst_QXmppMixManager::testUpdateSubscriptions()
         "</update-subscription>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<update-subscription xmlns='urn:xmpp:mix:core:1'>"
         "<subscribe node='urn:xmpp:mix:nodes:messages'/>"
         "<subscribe node='urn:xmpp:mix:nodes:presence'/>"
@@ -1321,13 +1321,13 @@ void tst_QXmppMixManager::testRequestInvitation()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<invite xmlns='urn:xmpp:mix:misc:0'>"
         "<invitee>cat@shakespeare.example</invitee>"
         "</invite>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<invite xmlns='urn:xmpp:mix:misc:0'>"
         "<invitation xmlns='urn:xmpp:mix:misc:0'>"
         "<inviter>hag66@shakespeare.example</inviter>"
@@ -1357,13 +1357,13 @@ void tst_QXmppMixManager::testRequestAllowedJids()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:allowed'/>"
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:allowed'>"
         "<item id='shakespeare.example'/>"
@@ -1392,14 +1392,14 @@ void tst_QXmppMixManager::testAllowJid()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:mix:nodes:allowed'>"
         "<item id='alice@wonderland.example'/>"
         "</publish>"
         "</pubsub>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='coven@mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
@@ -1419,14 +1419,14 @@ void tst_QXmppMixManager::testDisallowJid()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<retract node='urn:xmpp:mix:nodes:allowed'>"
         "<item id='alice@wonderland.example'/>"
         "</retract>"
         "</pubsub>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='coven@mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
@@ -1446,12 +1446,12 @@ void tst_QXmppMixManager::testDisallowAllJids()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub#owner'>"
         "<purge node='urn:xmpp:mix:nodes:allowed'/>"
         "</pubsub>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='coven@mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
@@ -1471,13 +1471,13 @@ void tst_QXmppMixManager::testRequestBannedJids()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:banned'/>"
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:banned'>"
         "<item id='lear@shakespeare.example'/>"
@@ -1506,14 +1506,14 @@ void tst_QXmppMixManager::testBanJid()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:mix:nodes:banned'>"
         "<item id='macbeth@shakespeare.example'/>"
         "</publish>"
         "</pubsub>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='coven@mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
@@ -1533,14 +1533,14 @@ void tst_QXmppMixManager::testUnbanJid()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<retract node='urn:xmpp:mix:nodes:banned'>"
         "<item id='macbeth@shakespeare.example'/>"
         "</retract>"
         "</pubsub>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='coven@mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
@@ -1560,12 +1560,12 @@ void tst_QXmppMixManager::testUnbanAllJids()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='set'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub#owner'>"
         "<purge node='urn:xmpp:mix:nodes:banned'/>"
         "</pubsub>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='coven@mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
@@ -1585,13 +1585,13 @@ void tst_QXmppMixManager::testRequestParticipants()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='coven@mix.shakespeare.example' type='get'>"
+        "<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:participants'/>"
         "</pubsub>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' from='coven@mix.shakespeare.example' type='result'>"
+        "<iq id='qx1' from='coven@mix.shakespeare.example' type='result'>"
         "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<items node='urn:xmpp:mix:nodes:participants'>"
         "<item id='123456'>"
@@ -1630,13 +1630,13 @@ void tst_QXmppMixManager::testLeaveChannel()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='hag66@shakespeare.example' type='set'>"
+        "<iq id='qx1' to='hag66@shakespeare.example' type='set'>"
         "<client-leave xmlns='urn:xmpp:mix:pam:2' channel='coven@mix.shakespeare.example'>"
         "<leave xmlns='urn:xmpp:mix:core:1'/>"
         "</client-leave>"
         "</iq>");
     client.inject(
-        "<iq id='qxmpp1' type='result'>"
+        "<iq id='qx1' type='result'>"
         "<client-leave xmlns='urn:xmpp:mix:pam:2'>"
         "<leave xmlns='urn:xmpp:mix:core:1'/>"
         "</client-leave>"
@@ -1644,7 +1644,7 @@ void tst_QXmppMixManager::testLeaveChannel()
 
     expectFutureVariant<QXmpp::Success>(task);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"hag66@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"hag66@shakespeare.example"_s);
 }
 
 void tst_QXmppMixManager::testDeleteChannel()
@@ -1660,20 +1660,20 @@ void tst_QXmppMixManager::testDeleteChannel()
     auto task = call();
 
     client.expect(
-        "<iq id='qxmpp1' to='mix.shakespeare.example' type='set'>"
+        "<iq id='qx1' to='mix.shakespeare.example' type='set'>"
         "<destroy xmlns='urn:xmpp:mix:core:1' channel='coven'/>"
         "</iq>");
-    client.inject(u"<iq id='qxmpp1' from='mix.shakespeare.example' type='result'/>"_s);
+    client.inject(u"<iq id='qx1' from='mix.shakespeare.example' type='result'/>"_s);
 
     expectFutureVariant<QXmpp::Success>(task);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"mix.shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"mix.shakespeare.example"_s);
 }
 
 template<typename T>
 void tst_QXmppMixManager::testErrorFromChannel(QXmppTask<T> &task, TestClient &client)
 {
-    testErrorFromChannel(task, client, u"qxmpp1"_s);
+    testErrorFromChannel(task, client, u"qx1"_s);
 }
 
 template<typename T>

@@ -38,8 +38,8 @@ void tst_QXmppUserLocationManager::testRequest()
     auto *tuneManager = test.addNewExtension<QXmppUserLocationManager>();
 
     auto future = tuneManager->request("anthony@qxmpp.org");
-    test.expect("<iq id=\"qxmpp1\" to=\"anthony@qxmpp.org\" type=\"get\"><pubsub xmlns=\"http://jabber.org/protocol/pubsub\"><items node=\"http://jabber.org/protocol/geoloc\"/></pubsub></iq>");
-    test.inject<QString>("<iq id=\"qxmpp1\" from=\"anthony@qxmpp.org\" type=\"result\">"
+    test.expect("<iq id=\"qx1\" to=\"anthony@qxmpp.org\" type=\"get\"><pubsub xmlns=\"http://jabber.org/protocol/pubsub\"><items node=\"http://jabber.org/protocol/geoloc\"/></pubsub></iq>");
+    test.inject<QString>("<iq id=\"qx1\" from=\"anthony@qxmpp.org\" type=\"result\">"
                          "<pubsub xmlns=\"http://jabber.org/protocol/pubsub\">"
                          "<items node=\"http://jabber.org/protocol/geoloc\">"
                          "<item id='abc3'><geoloc xmlns='http://jabber.org/protocol/geoloc'>"
@@ -79,7 +79,7 @@ void tst_QXmppUserLocationManager::testPublish()
     item.setLocality("Venice");
 
     auto future = manager->publish(item);
-    test.expect("<iq id='qxmpp1' to='stpeter@jabber.org' type='set'>"
+    test.expect("<iq id='qx1' to='stpeter@jabber.org' type='set'>"
                 "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                 "<publish node='http://jabber.org/protocol/geoloc'>"
                 "<item id='abc3'><geoloc xmlns='http://jabber.org/protocol/geoloc'>"
@@ -91,7 +91,7 @@ void tst_QXmppUserLocationManager::testPublish()
                 "</geoloc></item>"
                 "</publish>"
                 "</pubsub></iq>");
-    test.inject<QString>("<iq type='result' from='stpeter@jabber.org' id='qxmpp1'>"
+    test.inject<QString>("<iq type='result' from='stpeter@jabber.org' id='qx1'>"
                          "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                          "<publish node='http://jabber.org/protocol/tune'>"
                          "<item id='some-id'/>"

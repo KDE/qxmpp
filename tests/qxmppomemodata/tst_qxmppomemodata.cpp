@@ -629,7 +629,7 @@ void tst_QXmppOmemoData::testMessageOmemoElement()
 void tst_QXmppOmemoData::testOmemoIq()
 {
     const QByteArray xmlOtherIq(
-        "<iq id=\"qxmpp2\" type=\"get\">"
+        "<iq id=\"qx2\" type=\"get\">"
         "<encrypted xmlns=\"urn:xmpp:encryption:stub:sce:1\">"
         "<payload>"
         "V2FpdCwgd2hhdD8gQXJlIHlvdSBzZXJpb3VzPyBEaWQgeW91IHJlYWxseSBqdXN0IGdyYWIgeW91"
@@ -641,7 +641,7 @@ void tst_QXmppOmemoData::testOmemoIq()
         "</iq>");
 
     const QByteArray xmlOmemoIq(
-        "<iq id=\"qxmpp2\" type=\"get\">"
+        "<iq id=\"qx2\" type=\"get\">"
         "<encrypted xmlns=\"urn:xmpp:omemo:2\">"
         "<header sid=\"27183\"/>"
         "<payload>"

@@ -30,8 +30,8 @@ void tst_QXmppEntityTimeManager::testSendRequest()
     QSignalSpy spy(manager, &QXmppEntityTimeManager::timeReceived);
 
     manager->requestTime("juliet@capulet.com/balcony");
-    test.expect("<iq id='qxmpp1' to='juliet@capulet.com/balcony' type='get'><time xmlns='urn:xmpp:time'/></iq>");
-    manager->handleStanza(xmlToDom(R"(<iq id='qxmpp1' to='romeo@montague.net/orchard' from='juliet@capulet.com/balcony' type='result'>
+    test.expect("<iq id='qx1' to='juliet@capulet.com/balcony' type='get'><time xmlns='urn:xmpp:time'/></iq>");
+    manager->handleStanza(xmlToDom(R"(<iq id='qx1' to='romeo@montague.net/orchard' from='juliet@capulet.com/balcony' type='result'>
   <time xmlns='urn:xmpp:time'>
     <tzo>-06:00</tzo>
     <utc>2006-12-19T17:58:35Z</utc>

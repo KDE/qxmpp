@@ -144,7 +144,7 @@ void tst_QXmppExternalServiceDiscoveryIq::testExternalServiceDiscoveryIq()
 {
     const QByteArray xml { QByteArrayLiteral(
         "<iq"
-        " id='qxmpp2'"
+        " id='qx2'"
         " type='result'>"
         "<services xmlns='urn:xmpp:extdisco:2'>"
         "<service host='stun.shakespeare.lit'"
@@ -200,7 +200,7 @@ void tst_QXmppExternalServiceDiscoveryIq::testExternalServiceDiscoveryIq()
 
     const QByteArray xml2 { QByteArrayLiteral(
         "<iq"
-        " id='qxmpp2'"
+        " id='qx2'"
         " type='result'>"
         "<services xmlns='urn:xmpp:extdisco:2'>"
         "<service host='193.169.1.256'"
