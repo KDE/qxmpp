@@ -91,6 +91,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppTrustMessages.h
     base/QXmppUserTuneItem.h
     base/QXmppUtils.h
+    base/QXmppUtils_p.h
     base/QXmppUri.h
     base/QXmppVCardIq.h
     base/QXmppVersionIq.h

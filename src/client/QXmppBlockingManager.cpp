@@ -9,6 +9,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Iq.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -27,81 +28,38 @@ static void makeUnique(T &vec)
 }
 
 // IQs
-class BlocklistIq : public QXmppIq
-{
-public:
-    QVector<QString> jids;
-
-    void parseElementFromChild(const QDomElement &el) override
-    {
-        jids = parseSingleAttributeElements<QVector<QString>>(el.firstChildElement(), u"item", ns_blocking, u"jid"_s);
-    }
-    void toXmlElementFromChild(QXmlStreamWriter *writer) const override
-    {
-        XmlWriter(writer).write(Element {
-            { u"blocklist", ns_blocking },
-            SingleAttributeElements { u"item", u"jid", jids },
-        });
-    }
-    static bool checkIqType(const QString &tagName, const QString &xmlns)
-    {
-        return tagName == u"blocklist" && xmlns == ns_blocking;
-    }
+enum BlockingAction {
+    List,
+    Block,
+    Unblock,
 };
 
-class BlockIq : public QXmppIq
-{
-public:
-    QVector<QString> jids;
-
-    explicit BlockIq(QVector<QString> jids = {})
-        : QXmppIq(QXmppIq::Set), jids(std::move(jids))
-    {
-    }
-
-    void parseElementFromChild(const QDomElement &el) override
-    {
-        jids = parseSingleAttributeElements<QVector<QString>>(el.firstChildElement(), u"item", ns_blocking, u"jid"_s);
-    }
-    void toXmlElementFromChild(QXmlStreamWriter *writer) const override
-    {
-        XmlWriter(writer).write(Element {
-            { u"block", ns_blocking },
-            SingleAttributeElements { u"item", u"jid", jids },
-        });
-    }
-    static bool checkIqType(const QString &tagName, const QString &xmlns)
-    {
-        return tagName == u"block" && xmlns == ns_blocking;
-    }
+template<>
+struct Enums::Data<BlockingAction> {
+    static constexpr auto Values = makeValues<BlockingAction>({
+        { List, u"blocklist" },
+        { Block, u"block" },
+        { Unblock, u"unblock" },
+    });
 };
 
-class UnblockIq : public QXmppIq
-{
-public:
+template<BlockingAction Action>
+struct Blocking {
     QVector<QString> jids;
 
-    explicit UnblockIq(QVector<QString> jids = {})
-        : QXmppIq(QXmppIq::Set), jids(std::move(jids))
-    {
-    }
+    static constexpr std::tuple XmlTag = { Enums::toString(Action), ns_blocking };
 
-    void parseElementFromChild(const QDomElement &el) override
+    bool parse(const QDomElement &el)
     {
-        jids = parseSingleAttributeElements<QVector<QString>>(el.firstChildElement(), u"item", ns_blocking, u"jid"_s);
+        if (elementXmlTag(el) == XmlTag) {
+            jids = parseSingleAttributeElements<QVector<QString>>(el, u"item", ns_blocking, u"jid"_s);
+            return true;
+        }
+        return false;
     }
-
-    void toXmlElementFromChild(QXmlStreamWriter *writer) const override
+    void toXml(XmlWriter &w) const
     {
-        XmlWriter(writer).write(Element {
-            { u"unblock", ns_blocking },
-            SingleAttributeElements { u"item", u"jid", jids },
-        });
-    }
-
-    static bool checkIqType(const QString &tagName, const QString &xmlns)
-    {
-        return tagName == u"unblock" && xmlns == ns_blocking;
+        w.write(Element { XmlTag, SingleAttributeElements { u"item", u"jid", jids } });
     }
 };
 
@@ -267,11 +225,16 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
 
     // send IQ request, if this is the first request
     if (d->openFetchBlocklistPromises.size() == 1) {
-        client()->sendIq(BlocklistIq()).then(this, [this](QXmppClient::IqResult &&result) {
+        auto iq = CompatIq {
+            GetIq<Blocking<List>> {
+                generateSequentialStanzaId(),
+            },
+        };
+        client()->sendIq(std::move(iq)).then(this, [this](QXmppClient::IqResult &&result) {
             // parse into QXmppBlocklist/Error variant
-            auto blocklistResult = parseIq<BlocklistIq>(std::move(result), [](BlocklistIq &&iq) -> BlocklistResult {
-                return QXmppBlocklist(std::move(iq.jids));
-            });
+            auto blocklistResult = map<BlocklistResult>(
+                [](Blocking<List> &&list) { return QXmppBlocklist(list.jids); },
+                parseIqResponse<Blocking<List>>(std::move(result)));
 
             // store blocklist on success
             if (!d->blocklist) {
@@ -309,7 +272,10 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
 ///
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QVector<QString> jids)
 {
-    return client()->sendGenericIq(BlockIq(std::move(jids)));
+    return client()->sendGenericIq(CompatIq {
+        SetIq<Blocking<Block>> {
+            generateSequentialStanzaId(), {}, {}, {}, { std::move(jids) } },
+    });
 }
 
 ///
@@ -327,7 +293,10 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QVector<QStr
 ///
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QVector<QString> jids)
 {
-    return client()->sendGenericIq(UnblockIq(std::move(jids)));
+    return client()->sendGenericIq(CompatIq {
+        SetIq<Blocking<Unblock>> {
+            generateSequentialStanzaId(), {}, {}, {}, { std::move(jids) } },
+    });
 }
 
 /// \cond
@@ -348,16 +317,7 @@ void QXmppBlockingManager::onUnregistered(QXmppClient *oldClient)
 
 bool QXmppBlockingManager::handleStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &)
 {
-    auto checkIqValidity = [this](QXmppIq::Type type, QStringView from) -> std::optional<StanzaError> {
-        // check type
-        if (type != QXmppIq::Set) {
-            return StanzaError {
-                StanzaError::Cancel,
-                StanzaError::FeatureNotImplemented,
-                u"Only IQs of type 'set' supported."_s
-            };
-        }
-
+    auto checkIqValidity = [this](QStringView from) -> std::optional<StanzaError> {
         // check permissions
         // only server (user's account) is allowed to do blocklist pushes
         if (!from.isEmpty() && from != client()->configuration().jidBare()) {
@@ -381,35 +341,35 @@ bool QXmppBlockingManager::handleStanza(const QDomElement &stanza, const std::op
         return {};
     };
 
-    auto handleBlock = [this, checkIqValidity](BlockIq &&iq) -> std::variant<QXmppIq, StanzaError> {
-        if (auto err = checkIqValidity(iq.type(), iq.from())) {
+    auto handleBlock = [this, checkIqValidity](SetIq<Blocking<Block>> &&iq) -> std::variant<QXmppIq, StanzaError> {
+        if (auto err = checkIqValidity(iq.from)) {
             return std::move(*err);
         }
 
         // store new jids
-        d->blocklist->append(iq.jids);
+        d->blocklist->append(iq.payload.jids);
         // assure blocklist has no duplicates
         makeUnique(*d->blocklist);
 
-        Q_EMIT blocked(iq.jids);
+        Q_EMIT blocked(iq.payload.jids);
         return QXmppIq(QXmppIq::Result);
     };
-    auto handleUnblock = [this, checkIqValidity](UnblockIq &&iq) -> std::variant<QXmppIq, StanzaError> {
-        if (auto err = checkIqValidity(iq.type(), iq.from())) {
+    auto handleUnblock = [this, checkIqValidity](SetIq<Blocking<Unblock>> &&iq) -> std::variant<QXmppIq, StanzaError> {
+        if (auto err = checkIqValidity(iq.from)) {
             return std::move(*err);
         }
 
         // remove jids
-        for (const auto &jid : iq.jids) {
+        for (const auto &jid : std::as_const(iq.payload.jids)) {
             d->blocklist->removeOne(jid);
         }
 
-        Q_EMIT unblocked(iq.jids);
+        Q_EMIT unblocked(iq.payload.jids);
         return QXmppIq(QXmppIq::Result);
     };
 
     // e2ee is not supported (not needed with local server)
-    return handleIqRequests<BlockIq, UnblockIq>(stanza, client(), overloaded { handleBlock, handleUnblock });
+    return handleIqRequests<SetIq<Blocking<Block>>, SetIq<Blocking<Unblock>>>(stanza, client(), overloaded { handleBlock, handleUnblock });
 }
 /// \endcond
 
