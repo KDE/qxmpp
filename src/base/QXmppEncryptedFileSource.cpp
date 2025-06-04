@@ -23,7 +23,7 @@ using namespace QXmpp::Private;
 
 template<>
 struct Enums::Data<Cipher> {
-    static inline constexpr auto Values = to_array<std::tuple<Cipher, QStringView>>({
+    static constexpr auto Values = makeValues<Cipher>({
         { Aes128GcmNoPad, u"urn:xmpp:ciphers:aes-128-gcm-nopadding:0" },
         { Aes256GcmNoPad, u"urn:xmpp:ciphers:aes-256-gcm-nopadding:0" },
         { Aes256CbcPkcs7, u"urn:xmpp:ciphers:aes-256-cbc-pkcs7:0" },
