@@ -240,15 +240,15 @@ void tst_QXmppMamManager::retrieveMessagesUnencrypted()
     TestClient test;
     auto *mam = test.addNewExtension<QXmppMamManager>();
     auto task = mam->retrieveMessages("mam.server.org");
-    test.expect("<iq id='qxmpp1' to='mam.server.org' type='set'>"
-                "<query xmlns='urn:xmpp:mam:2' queryid='qxmpp1'>"
+    test.expect("<iq id='qx1' to='mam.server.org' type='set'>"
+                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
                 "<x xmlns='jabber:x:data' type='submit'>"
                 "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
                 "</x>"
                 "</query>"
                 "</iq>");
     mam->handleStanza(xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qxmpp1' id='28482-98726-73623'>"
+                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
                                "<forwarded xmlns='urn:xmpp:forward:0'>"
                                "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
                                "<message xmlns='jabber:client'"
@@ -261,7 +261,7 @@ void tst_QXmppMamManager::retrieveMessagesUnencrypted()
                                "</result>"
                                "</message>"));
     mam->handleStanza(xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qxmpp1' id='5d398-28273-f7382'>"
+                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
                                "<forwarded xmlns='urn:xmpp:forward:0'>"
                                "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
                                "<message xmlns='jabber:client'"
@@ -273,7 +273,7 @@ void tst_QXmppMamManager::retrieveMessagesUnencrypted()
                                "</forwarded>"
                                "</result>"
                                "</message>"));
-    test.inject("<iq type='result' id='qxmpp1'>"
+    test.inject("<iq type='result' id='qx1'>"
                 "<fin xmlns='urn:xmpp:mam:2'>"
                 "<set xmlns='http://jabber.org/protocol/rsm'>"
                 "<first index='0'>28482-98726-73623</first>"
@@ -300,15 +300,15 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
 
     // start request
     auto task = mam->retrieveMessages("mam.server.org");
-    test.expect("<iq id='qxmpp1' to='mam.server.org' type='set'>"
-                "<query xmlns='urn:xmpp:mam:2' queryid='qxmpp1'>"
+    test.expect("<iq id='qx1' to='mam.server.org' type='set'>"
+                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
                 "<x xmlns='jabber:x:data' type='submit'>"
                 "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
                 "</x>"
                 "</query>"
                 "</iq>");
     mam->handleStanza(xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qxmpp1' id='28482-98726-73623'>"
+                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
                                "<forwarded xmlns='urn:xmpp:forward:0'>"
                                "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
                                "<message xmlns='jabber:client'"
@@ -322,7 +322,7 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
                                "</result>"
                                "</message>"));
     mam->handleStanza(xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qxmpp1' id='5d398-28273-f7382'>"
+                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
                                "<forwarded xmlns='urn:xmpp:forward:0'>"
                                "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
                                "<message xmlns='jabber:client'"
@@ -334,7 +334,7 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
                                "</forwarded>"
                                "</result>"
                                "</message>"));
-    test.inject("<iq type='result' id='qxmpp1'>"
+    test.inject("<iq type='result' id='qx1'>"
                 "<fin xmlns='urn:xmpp:mam:2'>"
                 "<set xmlns='http://jabber.org/protocol/rsm'>"
                 "<first index='0'>28482-98726-73623</first>"

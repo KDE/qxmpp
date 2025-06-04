@@ -211,7 +211,7 @@ void tst_QXmppMovedManager::testPublishMoved()
 
     auto task = call();
 
-    client.expect(u"<iq id='qxmpp1' to='old@shakespeare.example' type='set'>"
+    client.expect(u"<iq id='qx1' to='old@shakespeare.example' type='set'>"
                   "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                   "<publish node='urn:xmpp:moved:1'>"
                   "<item id='current'>"
@@ -222,7 +222,7 @@ void tst_QXmppMovedManager::testPublishMoved()
                   "</publish>"
                   "</pubsub>"
                   "</iq>"_s);
-    client.inject(u"<iq id='qxmpp1' from='old@shakespeare.example' type='result'>"
+    client.inject(u"<iq id='qx1' from='old@shakespeare.example' type='result'>"
                   "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                   "<publish node='uurn:xmpp:moved:1'>"
                   "<item id='current'/>"
@@ -232,7 +232,7 @@ void tst_QXmppMovedManager::testPublishMoved()
 
     expectFutureVariant<QXmpp::Success>(task);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"old@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"old@shakespeare.example"_s);
 }
 
 void tst_QXmppMovedManager::testVerifyMoved()
@@ -247,14 +247,14 @@ void tst_QXmppMovedManager::testVerifyMoved()
 
     auto task = call();
 
-    client.expect(u"<iq id='qxmpp1' to='old@shakespeare.example' type='get'>"
+    client.expect(u"<iq id='qx1' to='old@shakespeare.example' type='get'>"
                   "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                   "<items node='urn:xmpp:moved:1'>"
                   "<item id='current'/>"
                   "</items>"
                   "</pubsub>"
                   "</iq>"_s);
-    client.inject(u"<iq id='qxmpp1' from='old@shakespeare.example' type='result'>"
+    client.inject(u"<iq id='qx1' from='old@shakespeare.example' type='result'>"
                   "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                   "<items node='urn:xmpp:moved:1'>"
                   "<item id='current'>"
@@ -268,7 +268,7 @@ void tst_QXmppMovedManager::testVerifyMoved()
 
     expectFutureVariant<QXmpp::Success>(task);
 
-    testError(task = call(), client, u"qxmpp1"_s, u"old@shakespeare.example"_s);
+    testError(task = call(), client, u"qx1"_s, u"old@shakespeare.example"_s);
 }
 
 void tst_QXmppMovedManager::testNotify()

@@ -21,9 +21,9 @@ void tst_QXmppDiscoveryManager::testInfo()
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
 
     auto future = discoManager->requestDiscoInfo("user@example.org");
-    test.expect("<iq id='qxmpp1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>");
+    test.expect("<iq id='qx1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>");
     test.inject<QString>(R"(
-<iq id='qxmpp1' from='user@example.org' type='result'>
+<iq id='qx1' from='user@example.org' type='result'>
     <query xmlns='http://jabber.org/protocol/disco#info'>
         <identity category='pubsub' type='service'/>
         <feature var='http://jabber.org/protocol/pubsub'/>
@@ -44,11 +44,11 @@ void tst_QXmppDiscoveryManager::testItems()
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
 
     auto future = discoManager->requestDiscoItems("user@example.org");
-    test.expect("<iq id='qxmpp1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>");
+    test.expect("<iq id='qx1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>");
     test.inject<QString>(R"(
 <iq type='result'
     from='user@example.org'
-    id='qxmpp1'>
+    id='qx1'>
   <query xmlns='http://jabber.org/protocol/disco#items'>
     <item name='368866411b877c30064a5f62b917cffe'/>
     <item name='3300659945416e274474e469a1f0154c'/>

@@ -41,8 +41,8 @@ void tst_QXmppBlockingManager::fetch()
     auto task3 = m->fetchBlocklist();
 
     // expect only one IQ
-    t.expect("<iq id='qxmpp1' type='get'><blocklist xmlns='urn:xmpp:blocking'/></iq>");
-    t.inject("<iq type='result' id='qxmpp1'><blocklist xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/><item jid='iago@shakespeare.lit'/></blocklist></iq>");
+    t.expect("<iq id='qx1' type='get'><blocklist xmlns='urn:xmpp:blocking'/></iq>");
+    t.inject("<iq type='result' id='qx1'><blocklist xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/><item jid='iago@shakespeare.lit'/></blocklist></iq>");
 
     // we should be subscribed to the blocklist now
     QVERIFY(m->isSubscribed());
@@ -69,8 +69,8 @@ void tst_QXmppBlockingManager::block()
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     auto task = m->block("romeo@montague.net");
-    t.expect("<iq id='qxmpp1' type='set'><block xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></block></iq>");
-    t.inject("<iq type='result' id='qxmpp1'/>");
+    t.expect("<iq id='qx1' type='set'><block xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></block></iq>");
+    t.inject("<iq type='result' id='qx1'/>");
     expectFutureVariant<Success>(task);
 }
 
@@ -81,8 +81,8 @@ void tst_QXmppBlockingManager::unblock()
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     auto task = m->unblock("romeo@montague.net");
-    t.expect("<iq id='qxmpp1' type='set'><unblock xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></unblock></iq>");
-    t.inject("<iq type='result' id='qxmpp1'/>");
+    t.expect("<iq id='qx1' type='set'><unblock xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></unblock></iq>");
+    t.inject("<iq type='result' id='qx1'/>");
     expectFutureVariant<Success>(task);
 }
 
@@ -93,8 +93,8 @@ void tst_QXmppBlockingManager::pushBlocked()
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     m->fetchBlocklist();
-    t.expect("<iq id='qxmpp1' type='get'><blocklist xmlns='urn:xmpp:blocking'/></iq>");
-    t.inject("<iq type='result' id='qxmpp1'><blocklist xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/><item jid='iago@shakespeare.lit'/></blocklist></iq>");
+    t.expect("<iq id='qx1' type='get'><blocklist xmlns='urn:xmpp:blocking'/></iq>");
+    t.inject("<iq type='result' id='qx1'><blocklist xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/><item jid='iago@shakespeare.lit'/></blocklist></iq>");
 
     QVERIFY(m->isSubscribed());
 

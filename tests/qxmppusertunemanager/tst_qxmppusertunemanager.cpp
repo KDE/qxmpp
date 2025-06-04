@@ -34,8 +34,8 @@ void tst_QXmppUserTuneManager::testRequest()
     auto *tuneManager = test.addNewExtension<QXmppUserTuneManager>();
 
     auto future = tuneManager->request("anthony@qxmpp.org");
-    test.expect("<iq id=\"qxmpp1\" to=\"anthony@qxmpp.org\" type=\"get\"><pubsub xmlns=\"http://jabber.org/protocol/pubsub\"><items node=\"http://jabber.org/protocol/tune\"/></pubsub></iq>");
-    test.inject(QStringLiteral("<iq id=\"qxmpp1\" from=\"anthony@qxmpp.org\" type=\"result\">"
+    test.expect("<iq id=\"qx1\" to=\"anthony@qxmpp.org\" type=\"get\"><pubsub xmlns=\"http://jabber.org/protocol/pubsub\"><items node=\"http://jabber.org/protocol/tune\"/></pubsub></iq>");
+    test.inject(QStringLiteral("<iq id=\"qx1\" from=\"anthony@qxmpp.org\" type=\"result\">"
                                "<pubsub xmlns=\"http://jabber.org/protocol/pubsub\">"
                                "<items node=\"http://jabber.org/protocol/tune\">"
                                "<item id='abc3'><tune xmlns='http://jabber.org/protocol/tune'><title>I Kiste girl</title></tune></item>"
@@ -65,14 +65,14 @@ void tst_QXmppUserTuneManager::testPublish()
     item.setUri(QUrl("http://www.yesworld.com/lyrics/Fragile.html#9"));
 
     auto future = tuneManager->publish(item);
-    test.expect("<iq id='qxmpp1' to='stpeter@jabber.org' type='set'>"
+    test.expect("<iq id='qx1' to='stpeter@jabber.org' type='set'>"
                 "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                 "<publish node='http://jabber.org/protocol/tune'>"
                 "<item><tune xmlns='http://jabber.org/protocol/tune'>"
                 "<artist>Yes</artist><length>686</length><rating>8</rating><source>Yessongs</source><title>Heart of the Sunrise</title><track>3</track><uri>http://www.yesworld.com/lyrics/Fragile.html#9</uri></tune></item>"
                 "</publish>"
                 "</pubsub></iq>");
-    test.inject(QStringLiteral("<iq type='result' from='stpeter@jabber.org' id='qxmpp1'>"
+    test.inject(QStringLiteral("<iq type='result' from='stpeter@jabber.org' id='qx1'>"
                                "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                                "<publish node='http://jabber.org/protocol/tune'>"
                                "<item id='abcdf'/>"

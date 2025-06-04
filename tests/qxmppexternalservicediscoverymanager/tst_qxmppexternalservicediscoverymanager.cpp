@@ -26,14 +26,14 @@ void tst_QXmppExternalServiceDiscoveryManager::testRequestServices()
     auto future { extDiscoManager->requestServices("shakespeare.lit") };
 
     test.expect("<iq"
-                " id='qxmpp1'"
+                " id='qx1'"
                 " to='shakespeare.lit'"
                 " type='get'>"
                 "<services xmlns='urn:xmpp:extdisco:2'/>"
                 "</iq>");
 
     test.inject<QString>("<iq"
-                         " id='qxmpp1'"
+                         " id='qx1'"
                          " from='shakespeare.lit'"
                          " type='result'>"
                          "<services xmlns='urn:xmpp:extdisco:2'>"

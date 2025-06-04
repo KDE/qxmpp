@@ -30,8 +30,8 @@ void tst_QXmppVersionManager::testSendRequest()
     QSignalSpy spy(verManager, &QXmppVersionManager::versionReceived);
 
     auto id = verManager->requestVersion("juliet@capulet.com/balcony");
-    test.expect("<iq id='qxmpp1' to='juliet@capulet.com/balcony' type='get'><query xmlns='jabber:iq:version'/></iq>");
-    verManager->handleStanza(xmlToDom(R"(<iq type='result' from='juliet@capulet.com/balcony' id='qxmpp1'>
+    test.expect("<iq id='qx1' to='juliet@capulet.com/balcony' type='get'><query xmlns='jabber:iq:version'/></iq>");
+    verManager->handleStanza(xmlToDom(R"(<iq type='result' from='juliet@capulet.com/balcony' id='qx1'>
   <query xmlns='jabber:iq:version'>
     <name>Exodus</name>
     <version>0.7.0.4</version>

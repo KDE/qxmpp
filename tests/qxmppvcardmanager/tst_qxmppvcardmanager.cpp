@@ -104,8 +104,8 @@ void tst_QXmppVCardManager::fetchVCard()
     auto task = manager->fetchVCard("stpeter@jabber.org");
     QVERIFY(!task.isFinished());
 
-    test.expect("<iq id='qxmpp2' to='stpeter@jabber.org' type='get'><vCard xmlns='vcard-temp'><TITLE/><ROLE/></vCard></iq>");
-    test.inject("<iq id='qxmpp2' type='result'>"
+    test.expect("<iq id='qx2' to='stpeter@jabber.org' type='get'><vCard xmlns='vcard-temp'><TITLE/><ROLE/></vCard></iq>");
+    test.inject("<iq id='qx2' type='result'>"
                 "<vCard xmlns='vcard-temp'>"
                 "<FN>Peter Saint-Andre</FN>"
                 "<N>"
@@ -169,7 +169,7 @@ void tst_QXmppVCardManager::setVCard()
 
     auto task = manager->setVCard(v);
     QVERIFY(!task.isFinished());
-    test.expect("<iq id='qxmpp2' to='stpeter@jabber.org' type='set'>"
+    test.expect("<iq id='qx2' to='stpeter@jabber.org' type='set'>"
                 "<vCard xmlns='vcard-temp'>"
                 "<FN>Peter Saint-Andre</FN>"
                 "<N>"
@@ -179,7 +179,7 @@ void tst_QXmppVCardManager::setVCard()
                 "<TITLE/><ROLE/>"
                 "</vCard>"
                 "</iq>");
-    test.inject("<iq id='qxmpp2' type='result'/>");
+    test.inject("<iq id='qx2' type='result'/>");
 
     expectFutureVariant<Success>(task);
 }
