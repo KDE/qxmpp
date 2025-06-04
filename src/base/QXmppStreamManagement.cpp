@@ -125,7 +125,7 @@ void SmFailed::toXml(XmlWriter &w) const
 
 std::optional<SmAck> SmAck::fromDom(const QDomElement &el)
 {
-    if (!isElementType<SmAck>(el)) {
+    if (!isElement<SmAck>(el)) {
         return {};
     }
     return SmAck { el.attribute(u"h"_s).toUInt() };
@@ -138,7 +138,7 @@ void SmAck::toXml(XmlWriter &w) const
 
 std::optional<SmRequest> SmRequest::fromDom(const QDomElement &el)
 {
-    return isElementType<SmRequest>(el) ? std::make_optional(SmRequest()) : std::nullopt;
+    return isElement<SmRequest>(el) ? std::make_optional(SmRequest()) : std::nullopt;
 }
 
 void SmRequest::toXml(XmlWriter &w) const

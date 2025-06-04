@@ -62,10 +62,12 @@ public:
     QString streamHostUsed() const;
     void setStreamHostUsed(const QString &jid);
 
+    /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_bytestreams };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isByteStreamIq(const QDomElement &element);
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
     /// \endcond

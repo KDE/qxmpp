@@ -158,6 +158,8 @@ void tst_QXmppBitsOfBinaryIq::testOtherSubelement()
 
 void tst_QXmppBitsOfBinaryIq::testIsBobIq()
 {
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     const QByteArray xmlSimple(
         "<iq id=\"get-data-1\" "
         "to=\"ladymacbeth@shakespeare.lit/castle\" "
@@ -186,6 +188,7 @@ void tst_QXmppBitsOfBinaryIq::testIsBobIq()
         "<data xmlns=\"urn:xmpp:other-data-format:0\" cid=\"sha1+8f35fef110ffc5df08d579a50083ff9308fb6242@bob.xmpp.org\"></data>"
         "</iq>");
     QCOMPARE(QXmppBitsOfBinaryIq::isBitsOfBinaryIq(xmlToDom(xmlWithoutBobData)), false);
+    QT_WARNING_POP
 }
 
 void tst_QXmppBitsOfBinaryIq::fromByteArray()

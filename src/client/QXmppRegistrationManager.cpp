@@ -17,6 +17,7 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 class QXmppRegistrationManagerPrivate
@@ -278,7 +279,7 @@ bool QXmppRegistrationManager::handleStanza(const QDomElement &stanza)
 
             d->deleteAccountIqId.clear();
             return true;
-        } else if (QXmppRegisterIq::isRegisterIq(stanza)) {
+        } else if (isIqElement<QXmppRegisterIq>(stanza)) {
             QXmppRegisterIq iq;
             iq.parse(stanza);
 

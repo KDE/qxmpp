@@ -161,7 +161,7 @@ bool QXmppMamManager::handleStanza(const QDomElement &element)
             }
             return true;
         }
-    } else if (QXmppMamResultIq::isMamResultIq(element)) {
+    } else if (isIqElement<QXmppMamResultIq>(element)) {
         QXmppMamResultIq result;
         result.parse(element);
         Q_EMIT resultsRecieved(result.id(), result.resultSetReply(), result.complete());

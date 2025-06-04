@@ -17,6 +17,7 @@
 #include <QDomElement>
 #include <QTimeZone>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 ///
@@ -75,11 +76,11 @@ QStringList QXmppEntityTimeManager::discoveryFeatures() const
 
 bool QXmppEntityTimeManager::handleStanza(const QDomElement &element)
 {
-    if (QXmpp::handleIqRequests<QXmppEntityTimeIq>(element, client(), this)) {
+    if (handleIqRequests<QXmppEntityTimeIq>(element, client(), this)) {
         return true;
     }
 
-    if (element.tagName() == u"iq" && QXmppEntityTimeIq::isEntityTimeIq(element)) {
+    if (isIqElement<QXmppEntityTimeIq>(element)) {
         QXmppEntityTimeIq entityTime;
         entityTime.parse(element);
         Q_EMIT timeReceived(entityTime);

@@ -35,6 +35,8 @@ public:
     void setQueryId(const QString &id);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_mam };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isMamQueryIq(const QDomElement &element);
 
 protected:
@@ -63,6 +65,8 @@ public:
     void setComplete(bool complete);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"fin", QXmpp::Private::ns_mam };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isMamResultIq(const QDomElement &element);
 
 protected:

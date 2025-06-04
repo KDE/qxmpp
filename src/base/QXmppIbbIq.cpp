@@ -66,11 +66,6 @@ void QXmppIbbOpenIq::setSid(const QString &sid)
 }
 
 /// \cond
-bool QXmppIbbOpenIq::isIbbOpenIq(const QDomElement &element)
-{
-    return isIqType(element, u"open", ns_ibb);
-}
-
 void QXmppIbbOpenIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement openElement = firstChildElement(element, u"open");
@@ -120,11 +115,6 @@ void QXmppIbbCloseIq::setSid(const QString &sid)
 }
 
 /// \cond
-bool QXmppIbbCloseIq::isIbbCloseIq(const QDomElement &element)
-{
-    return isIqType(element, u"close", ns_ibb);
-}
-
 void QXmppIbbCloseIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement openElement = firstChildElement(element, u"close");
@@ -209,11 +199,6 @@ void QXmppIbbDataIq::setPayload(const QByteArray &data)
 }
 
 /// \cond
-bool QXmppIbbDataIq::isIbbDataIq(const QDomElement &element)
-{
-    return isIqType(element, u"data", ns_ibb);
-}
-
 void QXmppIbbDataIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement dataElement = firstChildElement(element, u"data");

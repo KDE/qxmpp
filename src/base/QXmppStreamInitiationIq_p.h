@@ -48,7 +48,7 @@ public:
     QString siId() const;
     void setSiId(const QString &id);
 
-    static bool isStreamInitiationIq(const QDomElement &element);
+    static constexpr std::tuple PayloadXmlTag = { u"si", QXmpp::Private::ns_stream_initiation };
 
 protected:
     void parseElementFromChild(const QDomElement &element) override;

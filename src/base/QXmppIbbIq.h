@@ -20,6 +20,8 @@ public:
     void setSid(const QString &sid);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"open", QXmpp::Private::ns_ibb };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isIbbOpenIq(const QDomElement &element);
 
 protected:
@@ -41,6 +43,8 @@ public:
     void setSid(const QString &sid);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"close", QXmpp::Private::ns_ibb };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isIbbCloseIq(const QDomElement &element);
 
 protected:
@@ -67,6 +71,8 @@ public:
     void setPayload(const QByteArray &data);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"data", QXmpp::Private::ns_ibb };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isIbbDataIq(const QDomElement &element);
 
 protected:

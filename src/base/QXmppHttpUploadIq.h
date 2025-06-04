@@ -43,10 +43,12 @@ public:
     QMimeType contentType() const;
     void setContentType(const QMimeType &type);
 
+    /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"request", QXmpp::Private::ns_http_upload };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isHttpUploadRequestIq(const QDomElement &element);
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
     /// \endcond
@@ -83,10 +85,12 @@ public:
     QMap<QString, QString> putHeaders() const;
     void setPutHeaders(const QMap<QString, QString> &putHeaders);
 
+    /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"slot", QXmpp::Private::ns_http_upload };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isHttpUploadSlotIq(const QDomElement &element);
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
     /// \endcond

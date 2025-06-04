@@ -64,12 +64,6 @@ void QXmppStreamInitiationIq::setSiId(const QString &id)
     m_siId = id;
 }
 
-bool QXmppStreamInitiationIq::isStreamInitiationIq(const QDomElement &element)
-{
-    QDomElement siElement = element.firstChildElement(u"si"_s);
-    return (siElement.namespaceURI() == ns_stream_initiation);
-}
-
 void QXmppStreamInitiationIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement siElement = element.firstChildElement(u"si"_s);

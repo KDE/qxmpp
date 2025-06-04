@@ -11,7 +11,7 @@
 
 ///
 /// \brief QXmppEntityTimeIq represents an entity time request/response as
-/// defined in \xep{0202}: Entity Time.
+/// defined in \xep{0202, Entity Time}.
 ///
 /// \ingroup Stanzas
 ///
@@ -24,8 +24,11 @@ public:
     QDateTime utc() const;
     void setUtc(const QDateTime &utc);
 
-    static bool isEntityTimeIq(const QDomElement &element);
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"time", QXmpp::Private::ns_entity_time };
+    [[deprecated("Use QXmpp::isIqElement()")]]
+    static bool isEntityTimeIq(const QDomElement &element);
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool checkIqType(const QString &tagName, const QString &xmlns);
 
 protected:

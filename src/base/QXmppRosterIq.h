@@ -114,6 +114,8 @@ public:
     void setMixAnnotate(bool);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_roster };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isRosterIq(const QDomElement &element);
     /// \endcond
 

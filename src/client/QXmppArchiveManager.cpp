@@ -7,6 +7,7 @@
 #include "QXmppArchiveIq.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 
 #include <QDomElement>
 
@@ -21,22 +22,19 @@ QStringList QXmppArchiveManager::discoveryFeatures() const
 
 bool QXmppArchiveManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() != u"iq") {
-        return false;
-    }
+    auto tag = iqPayloadXmlTag(element);
 
-    // XEP-0136: Message Archiving
-    if (QXmppArchiveChatIq::isArchiveChatIq(element)) {
+    if (tag == PayloadXmlTag<QXmppArchiveChatIq>) {
         QXmppArchiveChatIq archiveIq;
         archiveIq.parse(element);
         Q_EMIT archiveChatReceived(archiveIq.chat(), archiveIq.resultSetReply());
         return true;
-    } else if (QXmppArchiveListIq::isArchiveListIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppArchiveListIq>) {
         QXmppArchiveListIq archiveIq;
         archiveIq.parse(element);
         Q_EMIT archiveListReceived(archiveIq.chats(), archiveIq.resultSetReply());
         return true;
-    } else if (QXmppArchivePrefIq::isArchivePrefIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppArchivePrefIq>) {
         // TODO: handle preference iq
         QXmppArchivePrefIq archiveIq;
         archiveIq.parse(element);

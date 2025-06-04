@@ -7,6 +7,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppUtils.h"
 #include "QXmppVersionIq.h"
 
 #include "StringLiterals.h"
@@ -122,7 +123,7 @@ bool QXmppVersionManager::handleStanza(const QDomElement &element)
         return true;
     }
 
-    if (element.tagName() == u"iq" && QXmppVersionIq::isVersionIq(element)) {
+    if (isIqElement<QXmppVersionIq>(element)) {
         QXmppVersionIq versionIq;
         versionIq.parse(element);
 

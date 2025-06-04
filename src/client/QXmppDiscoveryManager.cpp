@@ -10,6 +10,7 @@
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppIqHandling.h"
+#include "QXmppUtils.h"
 
 #include "Async.h"
 #include "StringLiterals.h"
@@ -17,6 +18,7 @@
 #include <QCoreApplication>
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 class QXmppDiscoveryManagerPrivate
@@ -314,11 +316,11 @@ QStringList QXmppDiscoveryManager::discoveryFeatures() const
 
 bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
 {
-    if (QXmpp::handleIqRequests<QXmppDiscoveryIq>(element, client(), this)) {
+    if (handleIqRequests<QXmppDiscoveryIq>(element, client(), this)) {
         return true;
     }
 
-    if (element.tagName() == u"iq" && QXmppDiscoveryIq::isDiscoveryIq(element)) {
+    if (isIqElement<QXmppDiscoveryIq>(element)) {
         QXmppDiscoveryIq receivedIq;
         receivedIq.parse(element);
 

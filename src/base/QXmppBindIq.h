@@ -8,11 +8,12 @@
 
 #include "QXmppIq.h"
 
+///
 /// \brief The QXmppBindIq class represents an IQ used for resource
 /// binding as defined by RFC 3921.
 ///
 /// \ingroup Stanzas
-
+///
 class QXMPP_EXPORT QXmppBindIq : public QXmppIq
 {
 public:
@@ -25,11 +26,11 @@ public:
     void setResource(const QString &);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"bind", QXmpp::Private::ns_bind };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isBindIq(const QDomElement &element);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
     /// \endcond

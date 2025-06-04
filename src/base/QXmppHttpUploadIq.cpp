@@ -88,14 +88,6 @@ void QXmppHttpUploadRequestIq::setContentType(const QMimeType &type)
     d->contentType = type;
 }
 
-///
-/// Returns true, if the the element is an HTTP File Upload slot request IQ.
-///
-bool QXmppHttpUploadRequestIq::isHttpUploadRequestIq(const QDomElement &element)
-{
-    return isIqType(element, u"request", ns_http_upload);
-}
-
 /// \cond
 void QXmppHttpUploadRequestIq::parseElementFromChild(const QDomElement &element)
 {
@@ -201,14 +193,6 @@ void QXmppHttpUploadSlotIq::setPutHeaders(const QMap<QString, QString> &putHeade
                           d->putHeaders.insert(name, putHeaders[name]);
                       }
                   });
-}
-
-///
-/// Returns true, if the the element is an HTTP File Upload slot result IQ.
-///
-bool QXmppHttpUploadSlotIq::isHttpUploadSlotIq(const QDomElement &element)
-{
-    return isIqType(element, u"slot", ns_http_upload);
 }
 
 /// \cond

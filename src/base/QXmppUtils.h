@@ -11,6 +11,7 @@
 // See http://lists.trolltech.com/qt-interest/2008-07/thread00798-0.html
 // for an explanation.
 #include "QXmppGlobal.h"
+#include "QXmppXmlTags_p.h"
 
 #include <QXmlStreamWriter>
 
@@ -46,5 +47,24 @@ public:
     static QString generateStanzaUuid();
     static QString generateStanzaHash(int length = 36);
 };
+
+namespace QXmpp {
+
+namespace Private {
+
+QXMPP_EXPORT std::tuple<QString, QString> elementXmlTag(const QDomElement &el);
+QXMPP_EXPORT std::tuple<QString, QString> iqPayloadXmlTag(const QDomElement &el);
+
+}  // namespace Private
+
+/// \brief Checks whether a QDomElement is an IQ stanza of a specific type T.
+template<typename T>
+bool isIqElement(const QDomElement &el) { return Private::isPayloadType<T>(Private::iqPayloadXmlTag(el)); }
+
+/// \brief Checks whether an XML element has the correct tag name and namespace URI for type T.
+template<Private::HasXmlTag T>
+bool isElement(const QDomElement &el) { return Private::elementXmlTag(el) == T::XmlTag; }
+
+}  // namespace QXmpp
 
 #endif  // QXMPPUTILS_H

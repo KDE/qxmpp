@@ -15,6 +15,7 @@
 #include "QXmppOmemoManager.h"
 #include "QXmppOmemoMemoryStorage.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppUtils.h"
 
 #include "IntegrationTesting.h"
 #include "util.h"
@@ -51,7 +52,7 @@ public:
 
     bool handleStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) override
     {
-        if (stanza.tagName() == u"iq" && QXmppBitsOfBinaryIq::isBitsOfBinaryIq(stanza)) {
+        if (isIqElement<QXmppBitsOfBinaryIq>(stanza)) {
             QXmppBitsOfBinaryIq iq;
             iq.parse(stanza);
 
@@ -457,7 +458,7 @@ void tst_QXmppOmemoManager::testSendIq()
                         if (const auto response = std::get_if<QDomElement>(&result)) {
                             isSecondRequestSent = true;
 
-                            if (QXmppBitsOfBinaryIq::isBitsOfBinaryIq(*response)) {
+                            if (isIqElement<QXmppBitsOfBinaryIq>(*response)) {
                                 QXmppBitsOfBinaryIq iq;
                                 iq.parse(*response);
                                 QCOMPARE(iq.data(), responseIq.data());

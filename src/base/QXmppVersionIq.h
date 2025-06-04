@@ -26,7 +26,10 @@ public:
     void setVersion(const QString &version);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_version };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isVersionIq(const QDomElement &element);
+    [[deprecated]]
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
     /// \endcond
 

@@ -63,20 +63,7 @@ void QXmppEntityTimeIq::setUtc(const QDateTime &utc)
     m_utc = utc;
 }
 
-///
-/// Returns true, if the element is a valid entity time IQ.
-///
-bool QXmppEntityTimeIq::isEntityTimeIq(const QDomElement &element)
-{
-    return isIqType(element, u"time", ns_entity_time);
-}
-
 /// \cond
-bool QXmppEntityTimeIq::checkIqType(const QString &tagName, const QString &xmlns)
-{
-    return tagName == u"time" && xmlns == ns_entity_time;
-}
-
 void QXmppEntityTimeIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement timeElement = firstChildElement(element, u"time");

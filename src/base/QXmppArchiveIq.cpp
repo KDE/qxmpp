@@ -217,12 +217,6 @@ void QXmppArchiveChatIq::setResultSetReply(const QXmppResultSetReply &rsm)
 }
 
 /// \cond
-bool QXmppArchiveChatIq::isArchiveChatIq(const QDomElement &element)
-{
-    auto chatEl = firstChildElement(element, u"chat", ns_archive);
-    return !chatEl.isNull() && !chatEl.attribute(u"with"_s).isEmpty();
-}
-
 void QXmppArchiveChatIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement chatElement = firstChildElement(element, u"chat");
@@ -331,11 +325,6 @@ void QXmppArchiveListIq::setResultSetReply(const QXmppResultSetReply &rsm)
 }
 
 /// \cond
-bool QXmppArchiveListIq::isArchiveListIq(const QDomElement &element)
-{
-    return isIqType(element, u"list", ns_archive);
-}
-
 void QXmppArchiveListIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement listElement = firstChildElement(element, u"list");
@@ -360,11 +349,6 @@ void QXmppArchiveListIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         m_rsmReply,
         m_chats,
     });
-}
-
-bool QXmppArchivePrefIq::isArchivePrefIq(const QDomElement &element)
-{
-    return isIqType(element, u"pref", ns_archive);
 }
 
 void QXmppArchivePrefIq::parseElementFromChild(const QDomElement &element)
@@ -416,11 +400,6 @@ void QXmppArchiveRemoveIq::setEnd(const QDateTime &end)
 }
 
 /// \cond
-bool QXmppArchiveRemoveIq::isArchiveRemoveIq(const QDomElement &element)
-{
-    return isIqType(element, u"remove", ns_archive);
-}
-
 void QXmppArchiveRemoveIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement listElement = firstChildElement(element, u"remove");
@@ -490,11 +469,6 @@ void QXmppArchiveRetrieveIq::setResultSetQuery(const QXmppResultSetQuery &rsm)
 }
 
 /// \cond
-bool QXmppArchiveRetrieveIq::isArchiveRetrieveIq(const QDomElement &element)
-{
-    return isIqType(element, u"retrieve", ns_archive);
-}
-
 void QXmppArchiveRetrieveIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement retrieveElement = firstChildElement(element, u"retrieve", ns_archive);

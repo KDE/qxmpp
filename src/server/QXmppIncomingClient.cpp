@@ -22,9 +22,11 @@
 #include <QSslSocket>
 #include <QTimer>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 constexpr uint RESOURCE_RANDOM_SUFFIX_LENGTH = 8;
+constexpr std::tuple SessionIqXmlTag = { u"session", ns_session };
 
 class QXmppIncomingClientPrivate
 {
@@ -386,7 +388,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
             const QString type = nodeRecv.attribute(u"type"_s);
             const auto id = nodeRecv.attribute(u"id"_s);
 
-            if (QXmppBindIq::isBindIq(nodeRecv) && type == u"set") {
+            if (isIqElement<QXmppBindIq>(nodeRecv) && type == u"set") {
                 QXmppBindIq bindSet;
                 bindSet.parse(nodeRecv);
                 d->resource = bindSet.resource().trimmed();
@@ -404,7 +406,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
                 // bound
                 Q_EMIT connected();
                 return;
-            } else if (isIqType(nodeRecv, u"session", ns_session) && type == u"set") {
+            } else if (iqPayloadXmlTag(nodeRecv) == SessionIqXmlTag && type == u"set") {
                 QXmppIq sessionResult;
                 sessionResult.setType(QXmppIq::Result);
                 sessionResult.setId(id);

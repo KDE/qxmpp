@@ -268,7 +268,10 @@ public:
     void setOrganization(const QXmppVCardOrganization &);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"vCard", QXmpp::Private::ns_vcard };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isVCard(const QDomElement &element);
+    [[deprecated]]
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
     /// \endcond
 

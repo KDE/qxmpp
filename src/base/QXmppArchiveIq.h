@@ -93,6 +93,8 @@ public:
     void setResultSetReply(const QXmppResultSetReply &rsm);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"chat", QXmpp::Private::ns_archive };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveChatIq(const QDomElement &element);
 
 protected:
@@ -134,6 +136,8 @@ public:
     void setResultSetReply(const QXmppResultSetReply &rsm);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"list", QXmpp::Private::ns_archive };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveListIq(const QDomElement &element);
     /// \endcond
 
@@ -170,6 +174,8 @@ public:
     void setEnd(const QDateTime &end);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"remove", QXmpp::Private::ns_archive };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveRemoveIq(const QDomElement &element);
 
 protected:
@@ -203,6 +209,8 @@ public:
     void setResultSetQuery(const QXmppResultSetQuery &rsm);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"retrieve", QXmpp::Private::ns_archive };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveRetrieveIq(const QDomElement &element);
 
 protected:
@@ -225,6 +233,8 @@ class QXMPP_EXPORT QXmppArchivePrefIq : public QXmppIq
 {
 public:
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"pref", QXmpp::Private::ns_archive };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchivePrefIq(const QDomElement &element);
 
 protected:

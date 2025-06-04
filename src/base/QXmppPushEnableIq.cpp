@@ -8,6 +8,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -117,7 +118,8 @@ void QXmppPushEnableIq::setDataForm(const QXmppDataForm &form)
 ///
 bool QXmppPushEnableIq::isPushEnableIq(const QDomElement &element)
 {
-    return isIqType(element, u"enable", ns_push) || isIqType(element, u"disable", ns_push);
+    auto tag = iqPayloadXmlTag(element);
+    return tag == std::tuple { u"enable", ns_push } || tag == std::tuple { u"disable", ns_push };
 }
 
 /// \cond

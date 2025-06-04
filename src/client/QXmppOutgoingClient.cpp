@@ -978,7 +978,7 @@ HandleElementResult BindManager::handleElement(const QDomElement &el)
         return iq.error();
     };
 
-    if (QXmppBindIq::isBindIq(el) && el.attribute(u"id"_s) == m_iqId) {
+    if (isIqElement<QXmppBindIq>(el) && el.attribute(u"id"_s) == m_iqId) {
         Q_ASSERT(m_promise.has_value());
 
         auto p = std::move(*m_promise);
@@ -1051,7 +1051,7 @@ HandleElementResult NonSaslAuthManager::handleElement(const QDomElement &el)
         m_query = {};
 
         auto iqType = el.attribute(u"type"_s);
-        if (QXmppNonSASLAuthIq::isNonSASLAuthIq(el) && iqType == u"result") {
+        if (isIqElement<QXmppNonSASLAuthIq>(el) && iqType == u"result") {
             auto queryEl = firstChildElement(el, u"query");
 
             bool digest = !firstChildElement(queryEl, u"digest").isNull();

@@ -898,36 +898,34 @@ QStringList QXmppTransferManager::discoveryFeatures() const
 
 bool QXmppTransferManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() != u"iq") {
-        return false;
-    }
+    auto tag = iqPayloadXmlTag(element);
 
     // XEP-0047 In-Band Bytestreams
-    if (QXmppIbbCloseIq::isIbbCloseIq(element)) {
+    if (tag == PayloadXmlTag<QXmppIbbCloseIq>) {
         QXmppIbbCloseIq ibbCloseIq;
         ibbCloseIq.parse(element);
         ibbCloseIqReceived(ibbCloseIq);
         return true;
-    } else if (QXmppIbbDataIq::isIbbDataIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppIbbDataIq>) {
         QXmppIbbDataIq ibbDataIq;
         ibbDataIq.parse(element);
         ibbDataIqReceived(ibbDataIq);
         return true;
-    } else if (QXmppIbbOpenIq::isIbbOpenIq(element)) {
+    } else if (tag == PayloadXmlTag<QXmppIbbOpenIq>) {
         QXmppIbbOpenIq ibbOpenIq;
         ibbOpenIq.parse(element);
         ibbOpenIqReceived(ibbOpenIq);
         return true;
     }
     // XEP-0065: SOCKS5 Bytestreams
-    else if (QXmppByteStreamIq::isByteStreamIq(element)) {
+    else if (tag == PayloadXmlTag<QXmppByteStreamIq>) {
         QXmppByteStreamIq byteStreamIq;
         byteStreamIq.parse(element);
         byteStreamIqReceived(byteStreamIq);
         return true;
     }
     // XEP-0095: Stream Initiation
-    else if (QXmppStreamInitiationIq::isStreamInitiationIq(element)) {
+    else if (tag == PayloadXmlTag<QXmppStreamInitiationIq>) {
         QXmppStreamInitiationIq siIq;
         siIq.parse(element);
         streamInitiationIqReceived(siIq);

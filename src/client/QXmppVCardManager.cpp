@@ -17,6 +17,7 @@
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 namespace QXmpp::Private {
@@ -151,7 +152,7 @@ QStringList QXmppVCardManager::discoveryFeatures() const
 
 bool QXmppVCardManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() == u"iq" && QXmppVCardIq::isVCard(element)) {
+    if (isIqElement<QXmppVCardIq>(element)) {
         QXmppVCardIq vCardIq;
         vCardIq.parse(element);
 

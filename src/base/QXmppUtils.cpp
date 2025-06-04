@@ -321,6 +321,19 @@ QString QXmppUtils::generateStanzaHash(int length)
     return hashResult;
 }
 
+std::tuple<QString, QString> QXmpp::Private::elementXmlTag(const QDomElement &el)
+{
+    return { el.tagName(), el.namespaceURI() };
+}
+
+std::tuple<QString, QString> QXmpp::Private::iqPayloadXmlTag(const QDomElement &el)
+{
+    if (el.tagName() == u"iq") {
+        return elementXmlTag(el.firstChildElement());
+    }
+    return { {}, {} };
+}
+
 /// \cond
 std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
 {
@@ -411,13 +424,6 @@ std::optional<bool> QXmpp::Private::parseBoolean(const QString &str)
 QString QXmpp::Private::serializeBoolean(bool value)
 {
     return value ? QStringLiteral("true") : QStringLiteral("false");
-}
-
-bool QXmpp::Private::isIqType(const QDomElement &element, QStringView tagName, QStringView xmlns)
-{
-    // IQs must have only one child element, so we do not need to iterate over the child elements.
-    auto child = element.firstChildElement();
-    return child.tagName() == tagName && child.namespaceURI() == xmlns;
 }
 
 QDomElement QXmpp::Private::firstChildElement(const QDomElement &el, QStringView tagName, QStringView xmlNs)

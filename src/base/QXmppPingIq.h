@@ -11,9 +11,12 @@ class QXMPP_EXPORT QXmppPingIq : public QXmppIq
 {
 public:
     QXmppPingIq();
-    static bool isPingIq(const QDomElement &element);
 
     /// \cond
+    static constexpr std::tuple PayloadXmlTag = { u"ping", QXmpp::Private::ns_ping };
+    [[deprecated("Use QXmpp::isIqElement()")]]
+    static bool isPingIq(const QDomElement &element);
+
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
     /// \endcond
 };

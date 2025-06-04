@@ -21,6 +21,8 @@ public:
     void setExternalServices(const QVector<QXmppExternalService> &);
     void addExternalService(const QXmppExternalService &);
 
+    static constexpr std::tuple PayloadXmlTag = { u"services", QXmpp::Private::ns_external_service_discovery };
+    [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isExternalServiceDiscoveryIq(const QDomElement &);
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
 

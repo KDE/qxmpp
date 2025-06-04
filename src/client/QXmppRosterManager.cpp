@@ -196,7 +196,7 @@ void QXmppRosterManager::_q_disconnected()
 /// \cond
 bool QXmppRosterManager::handleStanza(const QDomElement &element)
 {
-    if (element.tagName() != u"iq" || !QXmppRosterIq::isRosterIq(element)) {
+    if (!isIqElement<QXmppRosterIq>(element)) {
         return false;
     }
 

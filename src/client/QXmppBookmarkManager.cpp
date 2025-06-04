@@ -16,6 +16,7 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 // The QXmppPrivateStorageIq class represents an XML private storage IQ
@@ -29,7 +30,7 @@ public:
     QXmppBookmarkSet bookmarks() const;
     void setBookmarks(const QXmppBookmarkSet &bookmark);
 
-    static bool isPrivateStorageIq(const QDomElement &element);
+    static constexpr std::tuple PayloadXmlTag = { u"query", ns_private };
 
 protected:
     void parseElementFromChild(const QDomElement &element) override;
@@ -47,12 +48,6 @@ QXmppBookmarkSet QXmppPrivateStorageIq::bookmarks() const
 void QXmppPrivateStorageIq::setBookmarks(const QXmppBookmarkSet &bookmarks)
 {
     m_bookmarks = bookmarks;
-}
-
-bool QXmppPrivateStorageIq::isPrivateStorageIq(const QDomElement &element)
-{
-    return isIqType(element, u"query", ns_private) &&
-        QXmppBookmarkSet::isBookmarkSet(element.firstChildElement().firstChildElement());
 }
 
 void QXmppPrivateStorageIq::parseElementFromChild(const QDomElement &element)
@@ -127,7 +122,7 @@ bool QXmppBookmarkManager::setBookmarks(const QXmppBookmarkSet &bookmarks)
 bool QXmppBookmarkManager::handleStanza(const QDomElement &stanza)
 {
     if (stanza.tagName() == u"iq") {
-        if (QXmppPrivateStorageIq::isPrivateStorageIq(stanza)) {
+        if (isIqElement<QXmppPrivateStorageIq>(stanza)) {
             QXmppPrivateStorageIq iq;
             iq.parse(stanza);
 
