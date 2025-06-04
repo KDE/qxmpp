@@ -319,11 +319,11 @@ void QXmppPubSubItem::toXml(QXmlStreamWriter *writer) const
 
 // StarttlsPacket
 
-constexpr auto STARTTLS_TYPES = to_array<QStringView>({
+constexpr std::array<QStringView, 3> STARTTLS_TYPES = {
     u"starttls",
     u"proceed",
     u"failure",
-});
+};
 
 ///
 /// Constructs a new QXmppStartTlsPacket

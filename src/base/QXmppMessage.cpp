@@ -80,16 +80,16 @@ struct Enums::Data<QXmppMessage::Hint> {
     });
 };
 
-constexpr auto ENCRYPTION_NAMES = to_array<QStringView>({
-    {},
-    {},
+constexpr std::array<QStringView, 8> ENCRYPTION_NAMES = {
+    QStringView(),
+    QStringView(),
     u"OTR",
     u"Legacy OpenPGP",
     u"OpenPGP for XMPP (OX)",
     u"OMEMO",
     u"OMEMO 1",
     u"OMEMO 2",
-});
+};
 
 static QStringView encryptionToName(EncryptionMethod encryption)
 {
