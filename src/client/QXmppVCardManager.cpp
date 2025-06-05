@@ -42,10 +42,7 @@ struct VCardData {
 
     void toXml(XmlWriter &w) const
     {
-        w.write(Element {
-            u"vcard",
-            [&] { vCard.toXmlElementFromChild(w); },
-        });
+        w.write(Element { u"vcard", [&] { vCard.toXmlElementFromChild(w); } });
     }
 };
 

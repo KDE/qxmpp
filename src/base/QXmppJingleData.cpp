@@ -3079,27 +3079,15 @@ void QXmppCallInviteElement::toXml(QXmlStreamWriter *writer) const
     w.write(Element {
         Tag { d->type, ns_call_invites },
         OptionalAttribute { u"id", d->id },
-        [&] {
-            // Reject,
-            // Retract,
-            // Left
-
-            // Invite,
-            // Accept,
-            if (d->type == Type::Invite) {
-                w.write(OptionalAttribute { u"audio", DefaultedBool { d->audio, true } });
-                w.write(OptionalAttribute { u"video", DefaultedBool { d->video, false } });
-            }
-
-            switch (d->type) {
-            case Type::Invite:
-            case Type::Accept:
-                w.write(d->jingle);
-                w.write(d->external);
-                break;
-            default:
-                break;
-            }
+        OptionalContent {
+            d->type == Type::Invite,
+            OptionalAttribute { u"audio", DefaultedBool { d->audio, true } },
+            OptionalAttribute { u"video", DefaultedBool { d->video, false } },
+        },
+        OptionalContent {
+            d->type == Type::Invite || d->type == Type::Accept,
+            d->jingle,
+            d->external,
         },
     });
 }

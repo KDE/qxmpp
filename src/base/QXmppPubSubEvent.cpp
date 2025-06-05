@@ -374,43 +374,28 @@ void QXmppPubSubEventBase::serializeExtensions(QXmlStreamWriter *writer, QXmpp::
             Element {
                 d->eventType,
                 // `node` attribute
-                [&] {
-                    switch (d->eventType) {
-                    case Delete:
-                    case Items:
-                    case Retract:
-                    case Purge:
-                        w.write(Attribute { u"node", d->node });
-                        break;
-                    case Configuration:
-                        w.write(OptionalAttribute { u"node", d->node });
-                        break;
-                    case Subscription:
-                        break;
-                    }
+                OptionalContent {
+                    d->eventType == Delete || d->eventType == Items || d->eventType == Retract ||
+                        d->eventType == Purge,
+                    Attribute { u"node", d->node },
+                },
+                OptionalContent {
+                    d->eventType == Configuration,
+                    OptionalAttribute { u"node", d->node },
                 },
                 // content
-                [&] {
-                    switch (d->eventType) {
-                    case Configuration:
-                        w.write(d->configurationForm);
-                        break;
-                    case Delete:
-                        if (!d->redirectUri.isEmpty()) {
-                            w.write(Element { u"redirect", Attribute { u"uri", d->redirectUri } });
-                        }
-                    case Items:
-                        // serialize items
-                        serializeItems(writer);
-                        break;
-                    case Retract:
-                        // serialize retract ids
-                        w.write(SingleAttributeElements { u"retract", u"id", d->retractIds });
-                        break;
-                    case Purge:
-                    case Subscription:
-                        break;
-                    }
+                OptionalContent { d->eventType == Configuration, d->configurationForm },
+                OptionalContent {
+                    d->eventType == Delete && !d->redirectUri.isEmpty(),
+                    Element { u"redirect", Attribute { u"uri", d->redirectUri } },
+                },
+                OptionalContent {
+                    d->eventType == Items || d->eventType == Delete,
+                    [&] { serializeItems(writer); },
+                },
+                OptionalContent {
+                    d->eventType == Retract,
+                    SingleAttributeElements { u"retract", u"id", d->retractIds },
                 },
             },
         });
