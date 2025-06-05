@@ -596,8 +596,8 @@ void PubSubIqBase::toXmlElementFromChild(QXmlStreamWriter *writer) const
                     }
                 },
             },
+            // data form
             [&] {
-                // add extra element with data form
                 if (auto form = d->dataForm) {
                     // make sure form type is 'submit'
                     form->setType(type() == Result ? QXmppDataForm::Result : QXmppDataForm::Submit);
@@ -617,12 +617,9 @@ void PubSubIqBase::toXmlElementFromChild(QXmlStreamWriter *writer) const
                         break;
                     }
                 }
-
-                // Result Set Management
-                if (d->queryType == Items) {
-                    w.write(d->itemsContinuation);
-                }
             },
+            // Result Set Management
+            OptionalContent { d->queryType == Items, d->itemsContinuation },
         });
     }
 }
