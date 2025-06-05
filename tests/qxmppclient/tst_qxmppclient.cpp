@@ -36,6 +36,7 @@ private:
     Q_SLOT void testE2eeExtension();
     Q_SLOT void testTaskDirect();
     Q_SLOT void testTaskStore();
+    Q_SLOT void taskMultipleThen();
     Q_SLOT void colorGeneration();
 #if QT_GUI_LIB
     Q_SLOT void colorGenerationQColor();
@@ -188,7 +189,8 @@ void tst_QXmppClient::testTaskDirect()
 
     QVERIFY(thenCalled);
     QVERIFY(p.task().isFinished());
-    QVERIFY(!p.task().hasResult());
+    // QXmppIq is copyable
+    QVERIFY(p.task().hasResult());
 }
 
 static QXmppTask<QXmppIq> generateRegisterIq()
@@ -232,7 +234,43 @@ void tst_QXmppClient::testTaskStore()
     QVERIFY(thenCalled);
 
     QVERIFY(p.task().isFinished());
-    QVERIFY(!p.task().hasResult());
+    // QXmppIq is copyable
+    QVERIFY(p.task().hasResult());
+}
+
+void tst_QXmppClient::taskMultipleThen()
+{
+    bool exec1 = false, exec2 = false, exec3 = false, exec4 = false;
+    QString called;
+
+    auto context1 = std::make_unique<QObject>();
+
+    QXmppPromise<QString> p;
+    p.task().then(this, [&](QString) {
+        called.append(u'1');
+    });
+    p.task().then(context1.get(), [&](QString) {
+        called.append(u'2');
+    });
+    p.task().then(this, [&](QString) {
+        called.append(u'3');
+    });
+    QVERIFY(called.isEmpty());
+    context1.reset();
+    p.finish(u"test"_s);
+    QCOMPARE(called, u"13"_s);
+
+    p.task().then(this, [&](QString) {
+        called.append(u'4');
+    });
+    p.task().then(this, [&](QString) {
+        called.append(u'5');
+    });
+    p.task().then(this, [&](QString) {
+        called.append(u'6');
+    });
+
+    QCOMPARE(called, u"13456");
 }
 
 void tst_QXmppClient::colorGeneration()

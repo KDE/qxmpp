@@ -24,13 +24,15 @@ class QXmppPromise
     static_assert(!std::is_abstract_v<T>);
 
 public:
-    template<typename U = T, std::enable_if_t<std::is_void_v<U>> * = nullptr>
+    template<typename U = T>
+        requires(std::is_void_v<T>)
     QXmppPromise()
         : d(QXmpp::Private::TaskPrivate(nullptr))
     {
     }
 
-    template<typename U = T, std::enable_if_t<!std::is_void_v<U>> * = nullptr>
+    template<typename U = T>
+        requires(!std::is_void_v<T>)
     QXmppPromise()
         : d(QXmpp::Private::TaskPrivate([](void *r) { delete static_cast<T *>(r); }))
     {
@@ -45,46 +47,46 @@ public:
 #ifdef QXMPP_DOC
     void reportFinished(T &&value)
 #else
-    template<typename U, typename TT = T, std::enable_if_t<!std::is_void_v<TT> && std::is_same_v<TT, U>> * = nullptr>
+    template<typename U, typename TT = T>
+        requires(!std::is_void_v<T> && std::is_same_v<TT, U>)
     void finish(U &&value)
 #endif
     {
         Q_ASSERT(!d.isFinished());
         d.setFinished(true);
-        if (d.continuation()) {
-            if (d.isContextAlive()) {
-                d.invokeContinuation(&value);
-            }
-        } else {
-            d.setResult(new U(std::move(value)));
+        d.setResult(new U(std::move(value)));
+        if (d.hasContinuation()) {
+            d.invokeContinuation();
+            // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
+            d.setContinuation({});
         }
     }
 
     /// \cond
-    template<typename U, typename TT = T, std::enable_if_t<!std::is_void_v<TT> && std::is_constructible_v<TT, U> && !std::is_same_v<TT, U>> * = nullptr>
+    template<typename U, typename TT = T>
+        requires(!std::is_void_v<T> && std::is_constructible_v<TT, U> && !std::is_same_v<TT, U>)
     void finish(U &&value)
     {
         Q_ASSERT(!d.isFinished());
         d.setFinished(true);
-        if (d.continuation()) {
-            if (d.isContextAlive()) {
-                T convertedValue { std::move(value) };
-                d.invokeContinuation(&convertedValue);
-            }
-        } else {
-            d.setResult(new T(std::move(value)));
+        d.setResult(new T(std::move(value)));
+        if (d.hasContinuation()) {
+            d.invokeContinuation();
+            // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
+            d.setContinuation({});
         }
     }
 
-    template<typename U = T, std::enable_if_t<std::is_void_v<U>> * = nullptr>
+    template<typename U = T>
+        requires(std::is_void_v<T>)
     void finish()
     {
         Q_ASSERT(!d.isFinished());
         d.setFinished(true);
-        if (d.continuation()) {
-            if (d.isContextAlive()) {
-                d.invokeContinuation(nullptr);
-            }
+        if (d.hasContinuation()) {
+            d.invokeContinuation();
+            // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
+            d.setContinuation({});
         }
     }
     /// \endcond

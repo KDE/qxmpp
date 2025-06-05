@@ -9,7 +9,6 @@
 namespace QXmpp::Private {
 
 struct TaskData {
-    QPointer<const QObject> context;
     std::function<void(TaskPrivate &, void *)> continuation;
     void *result = nullptr;
     void (*freeResult)(void *);
@@ -45,16 +44,6 @@ void QXmpp::Private::TaskPrivate::setFinished(bool finished)
     d->finished = finished;
 }
 
-bool QXmpp::Private::TaskPrivate::isContextAlive()
-{
-    return !d->context.isNull();
-}
-
-void QXmpp::Private::TaskPrivate::setContext(const QObject *obj)
-{
-    d->context = obj;
-}
-
 void *QXmpp::Private::TaskPrivate::result() const
 {
     return d->result;
@@ -75,10 +64,15 @@ const std::function<void(QXmpp::Private::TaskPrivate &, void *)> QXmpp::Private:
 
 void QXmpp::Private::TaskPrivate::setContinuation(std::function<void(TaskPrivate &, void *)> &&continuation)
 {
-    d->continuation = continuation;
+    d->continuation = std::move(continuation);
 }
 
-void QXmpp::Private::TaskPrivate::invokeContinuation(void *result)
+bool QXmpp::Private::TaskPrivate::hasContinuation() const
 {
-    d->continuation(*this, result);
+    return d->continuation != nullptr;
+}
+
+void QXmpp::Private::TaskPrivate::invokeContinuation()
+{
+    d->continuation(*this, d->result);
 }
