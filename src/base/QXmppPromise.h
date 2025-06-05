@@ -24,19 +24,7 @@ class QXmppPromise
     static_assert(!std::is_abstract_v<T>);
 
 public:
-    template<typename U = T>
-        requires(std::is_void_v<T>)
-    QXmppPromise()
-        : d(QXmpp::Private::TaskPrivate(nullptr))
-    {
-    }
-
-    template<typename U = T>
-        requires(!std::is_void_v<T>)
-    QXmppPromise()
-        : d(QXmpp::Private::TaskPrivate([](void *r) { delete static_cast<T *>(r); }))
-    {
-    }
+    QXmppPromise() : d(std::make_shared<QXmpp::Private::TaskData<T>>()) { }
 
     ///
     /// Report that the asynchronous operation has finished, and call the connected handler of the
@@ -52,13 +40,13 @@ public:
     void finish(U &&value)
 #endif
     {
-        Q_ASSERT(!d.isFinished());
-        d.setFinished(true);
-        d.setResult(new U(std::move(value)));
-        if (d.hasContinuation()) {
-            d.invokeContinuation();
+        Q_ASSERT(!d->finished);
+        d->finished = true;
+        d->result = std::move(value);
+        if (d->continuation) {
+            d->continuation(*d);
             // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
-            d.setContinuation({});
+            d->continuation = {};
         }
     }
 
@@ -67,13 +55,13 @@ public:
         requires(!std::is_void_v<T> && std::is_constructible_v<TT, U> && !std::is_same_v<TT, U>)
     void finish(U &&value)
     {
-        Q_ASSERT(!d.isFinished());
-        d.setFinished(true);
-        d.setResult(new T(std::move(value)));
-        if (d.hasContinuation()) {
-            d.invokeContinuation();
+        Q_ASSERT(!d->finished);
+        d->finished = true;
+        d->result = T { std::move(value) };
+        if (d->continuation) {
+            d->continuation(*d);
             // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
-            d.setContinuation({});
+            d->continuation = {};
         }
     }
 
@@ -81,12 +69,12 @@ public:
         requires(std::is_void_v<T>)
     void finish()
     {
-        Q_ASSERT(!d.isFinished());
-        d.setFinished(true);
-        if (d.hasContinuation()) {
-            d.invokeContinuation();
+        Q_ASSERT(!d->finished);
+        d->finished = true;
+        if (d->continuation) {
+            d->continuation(*d);
             // clear continuation to avoid "deadlocks" in case the user captured this QXmppTask
-            d.setContinuation({});
+            d->continuation = {};
         }
     }
     /// \endcond
@@ -95,13 +83,10 @@ public:
     /// Obtain a handle to this promise that allows to obtain the value that will be produced
     /// asynchronously.
     ///
-    QXmppTask<T> task()
-    {
-        return QXmppTask<T>(d);
-    }
+    QXmppTask<T> task() { return QXmppTask<T> { d }; }
 
 private:
-    QXmpp::Private::TaskPrivate d;
+    std::shared_ptr<QXmpp::Private::TaskData<T>> d;
 };
 
 #endif  // QXMPPPROMISE_H
