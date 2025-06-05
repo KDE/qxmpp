@@ -174,9 +174,7 @@ set(SOURCE_FILES
     base/Stream.cpp
     base/QXmppArchiveIq.cpp
     base/QXmppBindIq.cpp
-    base/QXmppBitsOfBinaryContentId.cpp
-    base/QXmppBitsOfBinaryData.cpp
-    base/QXmppBitsOfBinaryIq.cpp
+    base/QXmppBitsOfBinary.cpp
     base/QXmppBookmarkSet.cpp
     base/QXmppByteStreamIq.cpp
     base/QXmppColorGeneration.cpp
