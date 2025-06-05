@@ -20,26 +20,11 @@ class QXmppPromise;
 
 namespace QXmpp::Private {
 
-struct TaskData;
-
-class QXMPP_EXPORT TaskPrivate
-{
-public:
-    TaskPrivate(void (*freeResult)(void *));
-    ~TaskPrivate();
-
-    bool isFinished() const;
-    void setFinished(bool);
-    void *result() const;
-    void setResult(void *);
-    void resetResult() { setResult(nullptr); }
-    const std::function<void(TaskPrivate &, void *)> continuation() const;
-    void setContinuation(std::function<void(TaskPrivate &, void *)> &&);
-    bool hasContinuation() const;
-    void invokeContinuation();
-
-private:
-    std::shared_ptr<TaskData> d;
+template<typename T>
+struct QXMPP_EXPORT TaskData {
+    std::function<void(TaskData &)> continuation;
+    std::conditional_t<std::is_void_v<T>, std::monostate, std::optional<T>> result;
+    bool finished = false;
 };
 
 }  // namespace QXmpp::Private
@@ -91,6 +76,9 @@ public:
     /// // Manager is derived from QObject.
     /// ```
     ///
+    /// \note Support for multiple continuations with copy-constructible types was added in QXmpp
+    /// 1.11.
+    ///
     /// \param context QObject used for unregistering the handler function when the object is
     /// deleted. This way your lambda will never be executed after your object has been deleted.
     /// \param continuation A function accepting a result in the form of `T &&`.
@@ -110,77 +98,77 @@ public:
             static_assert(std::is_invocable_v<Continuation, T &&>, "Function needs to be invocable with T &&.");
         }
 
-        if (d.isFinished()) {
+        if (d->finished) {
             if constexpr (std::is_void_v<T>) {
                 continuation();
             } else {
                 if constexpr (std::is_copy_constructible_v<T>) {
                     if constexpr (std::is_invocable_v<Continuation, const T &>) {
-                        continuation(*reinterpret_cast<const T *>(d.result()));
+                        continuation(*d->result);
                     } else {
-                        T copy = *reinterpret_cast<T *>(d.result());
-                        continuation(std::move(copy));
+                        continuation(T { d->result.value() });
                     }
                 } else {
                     // for move-only types, the result may not exist anymore
                     if (hasResult()) {
-                        continuation(std::move(*reinterpret_cast<T *>(d.result())));
-                        d.resetResult();
+                        auto value = std::move(*d->result);
+                        d->result.reset();
+                        continuation(std::move(value));
                     }
                 }
             }
         } else {
             if constexpr (std::is_copy_constructible_v<T>) {
-                if (d.hasContinuation()) {
+                if (d->continuation != nullptr) {
                     // secondary continuation
-                    d.setContinuation([previous = d.continuation(),
+                    d->continuation = [previous = std::move(d->continuation),
                                        context = QPointer(context),
-                                       continuation = std::forward<Continuation>(continuation)](TaskPrivate &d, void *result) mutable {
-                        previous(d, result);
+                                       continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
+                        previous(d);
                         if (context) {
                             if constexpr (std::is_void_v<T>) {
                                 continuation();
                             } else {
                                 if constexpr (std::is_invocable_v<Continuation, const T &>) {
-                                    continuation(*reinterpret_cast<const T *>(d.result()));
+                                    continuation(d.result.value());
                                 } else {
-                                    T copy = *reinterpret_cast<T *>(d.result());
-                                    continuation(std::move(copy));
+                                    continuation(T { d.result.value() });
                                 }
                             }
                         }
-                    });
+                    };
                     return;
                 } else {
                     // first continuation
-                    d.setContinuation([context = QPointer(context),
-                                       continuation = std::forward<Continuation>(continuation)](TaskPrivate &d, void *result) mutable {
+                    d->continuation = [context = QPointer(context),
+                                       continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
                         if (context) {
                             if constexpr (std::is_void_v<T>) {
                                 continuation();
                             } else {
                                 if constexpr (std::is_invocable_v<Continuation, const T &>) {
-                                    continuation(*reinterpret_cast<const T *>(d.result()));
+                                    continuation(d.result.value());
                                 } else {
-                                    T copy = *reinterpret_cast<T *>(d.result());
-                                    continuation(std::move(copy));
+                                    continuation(T { d.result.value() });
                                 }
                             }
                         }
-                    });
+                    };
                 }
             } else {
-                d.setContinuation([context = QPointer(context),
-                                   continuation = std::forward<Continuation>(continuation)](TaskPrivate &d, void *result) mutable {
+                d->continuation = [context = QPointer(context),
+                                   continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
                     if (context) {
                         if constexpr (std::is_void_v<T>) {
                             continuation();
                         } else {
                             // move out value (only one continuation allowed)
-                            continuation(std::move(*reinterpret_cast<T *>(result)));
+                            auto value = std::move(*d.result);
+                            d.result.reset();
+                            continuation(std::move(value));
                         }
                     }
-                });
+                };
             }
         }
     }
@@ -194,7 +182,7 @@ public:
     [[nodiscard]]
     bool isFinished() const
     {
-        return d.isFinished();
+        return d->finished;
     }
 
     ///
@@ -206,7 +194,7 @@ public:
     [[nodiscard]]
     bool hasResult() const
     {
-        return d.result() != nullptr;
+        return d->result.has_value();
     }
 
     ///
@@ -225,7 +213,7 @@ public:
     {
         Q_ASSERT(isFinished());
         Q_ASSERT(hasResult());
-        return *reinterpret_cast<U *>(d.result());
+        return d->result.value();
     }
 
     ///
@@ -244,9 +232,9 @@ public:
     {
         Q_ASSERT(isFinished());
         Q_ASSERT(hasResult());
-        U result = std::move(*reinterpret_cast<U *>(d.result()));
-        d.resetResult();
-        return result;
+        auto value = std::move(*d->result);
+        d->result.reset();
+        return std::move(value);
     }
 
     ///
@@ -273,12 +261,12 @@ public:
 private:
     friend class QXmppPromise<T>;
 
-    explicit QXmppTask(QXmpp::Private::TaskPrivate data)
+    explicit QXmppTask(std::shared_ptr<QXmpp::Private::TaskData<T>> data)
         : d(std::move(data))
     {
     }
 
-    QXmpp::Private::TaskPrivate d;
+    std::shared_ptr<QXmpp::Private::TaskData<T>> d;
 };
 
 #endif  // QXMPPTASK_H
