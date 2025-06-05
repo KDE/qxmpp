@@ -640,7 +640,7 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, cons
             std::visit(overloaded {
                            [&](std::unique_ptr<QXmppIq> &&iq) {
                                // success (encrypted)
-                               d->stream->sendIq(std::move(*iq)).then(this, [this, p = std::move(p)](auto &&result) mutable {
+                               d->stream->sendIq(std::move(*iq)).then(this, [this, p = std::move(p)](IqResult &&result) mutable {
                                    // iq sent, response received
                                    std::visit(overloaded {
                                                   [&](QDomElement &&el) {
