@@ -66,7 +66,7 @@ struct Blocking {
 // Manager data
 struct QXmppBlockingManagerPrivate {
     std::optional<QVector<QString>> blocklist;
-    std::vector<QXmppPromise<QXmppBlockingManager::BlocklistResult>> openFetchBlocklistPromises;
+    std::optional<QXmppPromise<QXmppBlockingManager::BlocklistResult>> fetchBlocklistPromise;
 };
 
 ///
@@ -211,49 +211,37 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
         return makeReadyTask<BlocklistResult>(QXmppBlocklist(d->blocklist.value()));
     }
 
-    // This function is designed so that you can call it multiple times and the actual IQ request
-    // to the server is only done once.
-    //
-    // If there's no data yet, we cache all open promises. When the IQ request finishes, the result
-    // is reported to all promises.
-
-    // Create promise and cache it
-    QXmppPromise<BlocklistResult> promise;
-    auto task = promise.task();
-
-    d->openFetchBlocklistPromises.push_back(std::move(promise));
-
-    // send IQ request, if this is the first request
-    if (d->openFetchBlocklistPromises.size() == 1) {
-        auto iq = CompatIq {
-            GetIq<Blocking<List>> {
-                generateSequentialStanzaId(),
-            },
-        };
-        client()->sendIq(std::move(iq)).then(this, [this](QXmppClient::IqResult &&result) {
-            // parse into QXmppBlocklist/Error variant
-            auto blocklistResult = map<BlocklistResult>(
-                [](Blocking<List> &&list) { return QXmppBlocklist(list.jids); },
-                parseIqResponse<Blocking<List>>(std::move(result)));
-
-            // store blocklist on success
-            if (!d->blocklist) {
-                if (auto *blocklist = std::get_if<QXmppBlocklist>(&blocklistResult)) {
-                    d->blocklist = blocklist->entries();
-                    Q_EMIT subscribedChanged();
-                }
-            }
-
-            // report result to all promises
-            for (auto &promise : d->openFetchBlocklistPromises) {
-                auto copy = blocklistResult;
-                promise.finish(std::move(copy));
-            }
-            // delete cached promises
-            d->openFetchBlocklistPromises.clear();
-        });
+    // another request is already running, attach to it
+    if (d->fetchBlocklistPromise) {
+        return d->fetchBlocklistPromise->task();
     }
 
+    // new request
+    d->fetchBlocklistPromise = QXmppPromise<BlocklistResult>();
+    auto task = d->fetchBlocklistPromise->task();
+
+    auto iq = CompatIq {
+        GetIq<Blocking<List>> {
+            generateSequentialStanzaId(),
+        },
+    };
+    client()->sendIq(std::move(iq)).then(this, [this](QXmppClient::IqResult &&result) {
+        // parse into QXmppBlocklist/Error variant
+        auto blocklistResult = map<BlocklistResult>(
+            [](Blocking<List> &&list) { return QXmppBlocklist(list.jids); },
+            parseIqResponse<Blocking<List>>(std::move(result)));
+
+        // store blocklist on success
+        if (!d->blocklist) {
+            if (auto *blocklist = std::get_if<QXmppBlocklist>(&blocklistResult)) {
+                d->blocklist = blocklist->entries();
+                Q_EMIT subscribedChanged();
+            }
+        }
+
+        d->fetchBlocklistPromise->finish(std::move(blocklistResult));
+        d->fetchBlocklistPromise.reset();
+    });
     return task;
 }
 
