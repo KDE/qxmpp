@@ -107,13 +107,6 @@ QDateTime QXmppUtils::datetimeFromString(QStringView str)
     return QDateTime::fromString(toString60(str), Qt::ISODate).toUTC();
 }
 
-/// \cond
-QDateTime QXmppUtils::datetimeFromString(const QString &str)
-{
-    return QDateTime::fromString(str, Qt::ISODate).toUTC();
-}
-/// \endcond
-
 ///
 /// Serializes a date-time to a string according to \xep{0082, XMPP Date and Time Profiles}.
 ///
