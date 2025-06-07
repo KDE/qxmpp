@@ -13,6 +13,7 @@
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
+#include "Xml.h"
 #include "XmlWriter.h"
 
 #include <QDomElement>
@@ -71,53 +72,63 @@ struct Enums::Data<SaslHtMechanism::ChannelBindingType> {
 
 namespace QXmpp::Private {
 
+template<>
+struct XmlSpec<Sasl::Auth> {
+    static constexpr std::tuple Spec = {
+        XmlAttribute { &Sasl::Auth::mechanism, u"mechanism" },
+        XmlOptionalText { &Sasl::Auth::value, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl::Challenge> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalText { &Sasl::Challenge::value, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl::Response> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalText { &Sasl::Response::value, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl::Success> {
+    static constexpr std::tuple Spec = {};
+};
+
+template<>
+struct XmlSpec<Bind2Feature> {
+    static constexpr std::tuple Spec = {
+        XmlElement {
+            u"inline",
+            XmlSingleAttributeElements { &Bind2Feature::features, Tag { u"feature", ns_bind2 }, u"var" },
+        },
+    };
+};
+
+template<>
+struct XmlSpec<Bind2Request> {
+    static constexpr std::tuple Spec = {
+        XmlElement { { u"tag", ns_bind2 }, Optional(), XmlText { &Bind2Request::tag } },
+    };
+};
+
 namespace Sasl {
 
-std::optional<Auth> Auth::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"auth" || el.namespaceURI() != ns_sasl) {
-        return {};
-    }
+std::optional<Auth> Auth::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Auth>(el); }
 
-    Auth auth;
-    if (auto value = parseBase64(el.text())) {
-        auth.value = *value;
-    } else {
-        return {};
-    }
-    auth.mechanism = el.attribute(u"mechanism"_s);
-    return auth;
-}
+void Auth::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-void Auth::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        Attribute { u"mechanism", mechanism },
-        OptionalCharacters { Base64 { value } },
-    });
-}
+std::optional<Challenge> Challenge::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Challenge>(el); }
 
-std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"challenge" || el.namespaceURI() != ns_sasl) {
-        return {};
-    }
-
-    if (auto value = parseBase64(el.text())) {
-        return Challenge { *value };
-    }
-    return {};
-}
-
-void Challenge::toXml(XmlWriter &writer) const
-{
-    writer.write(TextElement { XmlTag, Base64 { value } });
-}
+void Challenge::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
 std::optional<Failure> Failure::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"failure" || el.namespaceURI() != ns_sasl) {
+    if (!isElementType<Failure>(el)) {
         return {};
     }
 
@@ -150,62 +161,16 @@ void Failure::toXml(XmlWriter &writer) const
     });
 }
 
-std::optional<Response> Response::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"response" || el.namespaceURI() != ns_sasl) {
-        return {};
-    }
+std::optional<Response> Response::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Response>(el); }
+void Response::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-    if (auto value = parseBase64(el.text())) {
-        return Response { *value };
-    }
-    return {};
-}
-
-void Response::toXml(XmlWriter &writer) const
-{
-    writer.write(TextElement { XmlTag, Base64 { value } });
-}
-
-std::optional<Success> Success::fromDom(const QDomElement &el)
-{
-    if (el.tagName() == u"success" && el.namespaceURI() == ns_sasl) {
-        return Success();
-    }
-    return {};
-}
-
-void Success::toXml(XmlWriter &writer) const
-{
-    writer.write(Element { XmlTag });
-}
+std::optional<Success> Success::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Success>(el); }
+void Success::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
 }  // namespace Sasl
 
-std::optional<Bind2Feature> Bind2Feature::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"bind" || el.namespaceURI() != ns_bind2) {
-        return {};
-    }
-
-    Bind2Feature bind2;
-
-    auto inlineElement = firstChildElement(el, u"inline", ns_bind2);
-    bind2.features = parseSingleAttributeElements<std::vector<QString>>(inlineElement, u"feature", ns_bind2, u"var"_s);
-
-    return bind2;
-}
-
-void Bind2Feature::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        Element {
-            u"inline",
-            SingleAttributeElements { u"feature", u"var", features },
-        },
-    });
-}
+std::optional<Bind2Feature> Bind2Feature::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Bind2Feature>(el); }
+void Bind2Feature::toXml(XmlWriter &writer) const { return XmlSpecSerializer::serialize(writer, *this); }
 
 std::optional<Bind2Request> Bind2Request::fromDom(const QDomElement &el)
 {
