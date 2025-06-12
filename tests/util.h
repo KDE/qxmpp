@@ -159,14 +159,7 @@ std::tuple<QString, QString> rewriteXmlWithoutStanzaId(const String &inputXml)
 template<typename T>
 static QByteArray packetToXml(const T &packet)
 {
-    using namespace QXmpp::Private;
-
-    QBuffer buffer;
-    buffer.open(QIODevice::ReadWrite);
-    QXmlStreamWriter writer(&buffer);
-    XmlWriter xmlWriter(&writer);
-    packet.toXml(xmlWriter);
-    auto data = buffer.data();
+    auto data = QXmpp::Private::serializeXml(packet);
     data.replace(u'\'', "&apos;");
     return data;
 }
