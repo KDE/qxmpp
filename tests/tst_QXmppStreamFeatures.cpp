@@ -5,6 +5,8 @@
 #include "QXmppSasl_p.h"
 #include "QXmppStreamFeatures.h"
 
+#include "packets/Sasl2.h"
+
 #include "util.h"
 
 template<class T>
