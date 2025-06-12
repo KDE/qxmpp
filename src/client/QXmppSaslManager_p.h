@@ -12,6 +12,8 @@
 #include "QXmppSasl_p.h"
 #include "QXmppTask.h"
 
+#include "packets/Sasl2.h"
+
 #include <optional>
 
 class QXmppConfiguration;

@@ -16,6 +16,7 @@
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
+#include "packets/Sasl2.h"
 
 #include <QDomElement>
 #include <QHostAddress>
