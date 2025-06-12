@@ -2,149 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#include "QXmppConstants_p.h"
-#include "QXmppGlobal.h"
 #include "QXmppPacket_p.h"
-#include "QXmppStanza_p.h"
 #include "QXmppStreamManagement_p.h"
-#include "QXmppUtils.h"
-#include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
-#include "XmlWriter.h"
 #include "XmppSocket.h"
 
 namespace QXmpp::Private {
-
-std::optional<SmEnable> SmEnable::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"enable" || el.namespaceURI() != ns_stream_management) {
-        return {};
-    }
-
-    const auto resume = el.attribute(u"resume"_s);
-    return SmEnable {
-        .resume = resume == u"true" || resume == u"1",
-        .max = el.attribute(u"max"_s).toULongLong(),
-    };
-}
-
-void SmEnable::toXml(XmlWriter &w) const
-{
-    w.write(Element {
-        XmlTag,
-        OptionalAttribute { u"resume", DefaultedBool { resume, false } },
-        OptionalContent { max > 0, Attribute { u"max", max } },
-    });
-}
-
-std::optional<SmEnabled> SmEnabled::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"enabled" || el.namespaceURI() != ns_stream_management) {
-        return {};
-    }
-
-    const auto resume = el.attribute(u"resume"_s);
-    return SmEnabled {
-        .resume = (resume == u"true" || resume == u"1"),
-        .id = el.attribute(u"id"_s),
-        .max = el.attribute(u"max"_s).toULongLong(),
-        .location = el.attribute(u"location"_s),
-    };
-}
-
-void SmEnabled::toXml(XmlWriter &w) const
-{
-    w.write(Element {
-        XmlTag,
-        OptionalAttribute { u"resume", DefaultedBool { resume, false } },
-        OptionalAttribute { u"id", id },
-        OptionalContent { max > 0, Attribute { u"max", max } },
-        OptionalAttribute { u"location", location },
-    });
-}
-
-std::optional<SmResume> SmResume::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"resume" || el.namespaceURI() != ns_stream_management) {
-        return {};
-    }
-    return SmResume {
-        el.attribute(u"h"_s).toUInt(),
-        el.attribute(u"previd"_s),
-    };
-}
-
-void SmResume::toXml(XmlWriter &w) const
-{
-    w.write(Element {
-        XmlTag,
-        Attribute { u"h", h },
-        Attribute { u"previd", previd },
-    });
-}
-
-std::optional<SmResumed> SmResumed::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"resumed" || el.namespaceURI() != ns_stream_management) {
-        return {};
-    }
-    return SmResumed {
-        el.attribute(u"h"_s).toUInt(),
-        el.attribute(u"previd"_s),
-    };
-}
-
-void SmResumed::toXml(XmlWriter &w) const
-{
-    w.write(Element {
-        XmlTag,
-        Attribute { u"h", h },
-        Attribute { u"previd", previd },
-    });
-}
-
-std::optional<SmFailed> SmFailed::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"failed" || el.namespaceURI() != ns_stream_management) {
-        return {};
-    }
-
-    return SmFailed {
-        Enums::fromString<QXmppStanza::Error::Condition>(firstChildElement(el, {}, ns_stanza).tagName()),
-    };
-}
-
-void SmFailed::toXml(XmlWriter &w) const
-{
-    w.write(Element {
-        XmlTag,
-        OptionalContent { error.has_value(), Element { Tag { *error, ns_stanza } } },
-    });
-}
-
-std::optional<SmAck> SmAck::fromDom(const QDomElement &el)
-{
-    if (!isElement<SmAck>(el)) {
-        return {};
-    }
-    return SmAck { el.attribute(u"h"_s).toUInt() };
-}
-
-void SmAck::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag, Attribute { u"h", seqNo } });
-}
-
-std::optional<SmRequest> SmRequest::fromDom(const QDomElement &el)
-{
-    return isElement<SmRequest>(el) ? std::make_optional(SmRequest()) : std::nullopt;
-}
-
-void SmRequest::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
 
 StreamAckManager::StreamAckManager(XmppSocket &socket)
     : socket(socket)
@@ -153,11 +17,11 @@ StreamAckManager::StreamAckManager(XmppSocket &socket)
 
 bool StreamAckManager::handleStanza(const QDomElement &stanza)
 {
-    if (auto ack = SmAck::fromDom(stanza)) {
+    if (auto ack = elementFromDom<SmAck>(stanza)) {
         handleAcknowledgement(*ack);
         return true;
     }
-    if (auto req = SmRequest::fromDom(stanza)) {
+    if (auto req = elementFromDom<SmRequest>(stanza)) {
         sendAcknowledgement();
         return true;
     }

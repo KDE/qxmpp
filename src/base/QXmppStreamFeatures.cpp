@@ -316,7 +316,7 @@ void QXmppStreamFeatures::parse(const QDomElement &element)
     auto mechs = firstChildElement(element, u"mechanisms", ns_sasl);
     d->authMechanisms = parseTextElements(mechs, u"mechanism", ns_sasl);
 
-    d->sasl2Feature = Sasl2::StreamFeature::fromDom(firstChildElement(element, u"authentication", ns_sasl_2));
+    d->sasl2Feature = elementFromDom<Sasl2::StreamFeature>(firstChildElement<Sasl2::StreamFeature>(element));
 }
 
 struct Feature {

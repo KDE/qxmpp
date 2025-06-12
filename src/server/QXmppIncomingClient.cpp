@@ -269,7 +269,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
             return;
         }
 
-        if (auto auth = Sasl2::Authenticate::fromDom(nodeRecv)) {
+        if (auto auth = elementFromDom<Sasl2::Authenticate>(nodeRecv)) {
             d->saslVersion = QXmppIncomingClientPrivate::Sasl2;
             d->sasl2AuthRequest = std::move(auth);
             d->saslServer = QXmppSaslServer::create(d->sasl2AuthRequest->mechanism, this);
@@ -295,7 +295,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
                 disconnectFromHost();
                 return;
             }
-        } else if (auto response = Sasl2::Response::fromDom(nodeRecv)) {
+        } else if (auto response = elementFromDom<Sasl2::Response>(nodeRecv)) {
             if (!d->saslServer) {
                 warning(u"SASL response received, but no mechanism selected"_s);
                 sendData(serializeXml(Sasl2::Failure()));
@@ -319,7 +319,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
                 sendData(serializeXml(Sasl2::Failure { Sasl::ErrorCondition::NotAuthorized, {} }));
                 disconnectFromHost();
             }
-        } else if (auto abort = Sasl2::Abort::fromDom(nodeRecv)) {
+        } else if (auto abort = elementFromDom<Sasl2::Abort>(nodeRecv)) {
             d->sasl2AuthRequest.reset();
             sendData(serializeXml(Sasl2::Failure { Sasl::ErrorCondition::Aborted, {} }));
         }
@@ -331,7 +331,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
             return;
         }
 
-        if (auto auth = Sasl::Auth::fromDom(nodeRecv)) {
+        if (auto auth = elementFromDom<Sasl::Auth>(nodeRecv)) {
             d->saslVersion = QXmppIncomingClientPrivate::Sasl;
             d->sasl2AuthRequest.reset();
             d->saslServer = QXmppSaslServer::create(auth->mechanism, this);
@@ -357,7 +357,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
                 disconnectFromHost();
                 return;
             }
-        } else if (auto response = Sasl::Response::fromDom(nodeRecv)) {
+        } else if (auto response = elementFromDom<Sasl::Response>(nodeRecv)) {
             if (!d->saslServer) {
                 warning(u"SASL response received, but no mechanism selected"_s);
                 sendData(serializeXml(Sasl::Failure()));

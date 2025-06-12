@@ -67,45 +67,49 @@ enum class ErrorCondition {
 
 struct Auth {
     static constexpr std::tuple XmlTag = { u"auth", ns_sasl };
-    static std::optional<Auth> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QString mechanism;
     QByteArray value;
 };
 
 struct Challenge {
     static constexpr std::tuple XmlTag = { u"challenge", ns_sasl };
-    static std::optional<Challenge> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QByteArray value;
 };
 
 struct Failure {
     static constexpr std::tuple XmlTag = { u"failure", ns_sasl };
-    static std::optional<Failure> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     std::optional<ErrorCondition> condition;
     QString text;
 };
 
 struct Response {
     static constexpr std::tuple XmlTag = { u"response", ns_sasl };
-    static std::optional<Response> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QByteArray value;
 };
 
 struct Success {
     static constexpr std::tuple XmlTag = { u"success", ns_sasl };
-    static std::optional<Success> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
 };
 
 }  // namespace Sasl
+
+template<>
+struct Enums::Data<Sasl::ErrorCondition> {
+    using enum Sasl::ErrorCondition;
+    static inline constexpr auto Values = makeValues<Sasl::ErrorCondition>({
+        { Aborted, u"aborted" },
+        { AccountDisabled, u"account-disabled" },
+        { CredentialsExpired, u"credentials-expired" },
+        { EncryptionRequired, u"encryption-required" },
+        { IncorrectEncoding, u"incorrect-encoding" },
+        { InvalidAuthzid, u"invalid-authzid" },
+        { InvalidMechanism, u"invalid-mechanism" },
+        { MalformedRequest, u"malformed-request" },
+        { MechanismTooWeak, u"mechanism-too-weak" },
+        { NotAuthorized, u"not-authorized" },
+        { TemporaryAuthFailure, u"temporary-auth-failure" },
+    });
+};
 
 template<>
 struct XmlSpec<Sasl::Auth> {
@@ -119,6 +123,36 @@ template<>
 struct XmlSpec<Sasl::Challenge> {
     static constexpr std::tuple Spec = {
         XmlOptionalText { &Sasl::Challenge::value, Base64Serializer() },
+    };
+};
+
+// Custom parsing with mapping of 'bad-auth'
+struct SaslFailureConditionSerializer {
+    std::optional<Sasl::ErrorCondition> parse(const QString &s) const
+    {
+        auto e = Enums::fromString<Sasl::ErrorCondition>(s);
+        if (!e) {
+            // RFC3920 defines the error condition as "not-authorized", but
+            // some broken servers use "bad-auth" instead. We tolerate this
+            // by remapping the error to "not-authorized".
+            if (s == u"bad-auth") {
+                e = Sasl::ErrorCondition::NotAuthorized;
+            } else {
+                throw InvalidValueError("Sasl::ErrorCondition", s);
+            }
+        }
+        return e;
+    }
+    auto serialize(std::optional<Sasl::ErrorCondition> value) const { return Enums::toString(value.value()); }
+    bool hasValue(std::optional<Sasl::ErrorCondition> value) const { return value.has_value(); }
+    auto defaultValue() const { return std::optional<Sasl::ErrorCondition>(); }
+};
+
+template<>
+struct XmlSpec<Sasl::Failure> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalEnumElement { &Sasl::Failure::condition, ns_sasl, SaslFailureConditionSerializer() },
+        XmlOptionalTextElement { &Sasl::Failure::text, u"text" },
     };
 };
 
@@ -140,17 +174,11 @@ struct XmlSpec<Sasl::Success> {
 
 struct Bind2Feature {
     static constexpr std::tuple XmlTag = { u"bind", ns_bind2 };
-    static std::optional<Bind2Feature> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     std::vector<QString> features;
 };
 
 struct Bind2Request {
     static constexpr std::tuple XmlTag = { u"bind", ns_bind2 };
-    static std::optional<Bind2Request> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QString tag;
     // bind2 extensions
     bool csiInactive = false;
@@ -160,9 +188,6 @@ struct Bind2Request {
 
 struct Bind2Bound {
     static constexpr std::tuple XmlTag = { u"bound", ns_bind2 };
-    static std::optional<Bind2Bound> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     // extensions
     std::optional<SmFailed> smFailed;
     std::optional<SmEnabled> smEnabled;
@@ -203,35 +228,23 @@ struct XmlSpec<Bind2Bound> {
 
 struct FastFeature {
     static constexpr std::tuple XmlTag = { u"fast", ns_fast };
-    static std::optional<FastFeature> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     bool tls0rtt = false;
     std::vector<QString> mechanisms;
 };
 
 struct FastTokenRequest {
     static constexpr std::tuple XmlTag = { u"request-token", ns_fast };
-    static std::optional<FastTokenRequest> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QString mechanism;
 };
 
 struct FastToken {
     static constexpr std::tuple XmlTag = { u"token", ns_fast };
-    static std::optional<FastToken> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QDateTime expiry;
     QString token;
 };
 
 struct FastRequest {
     static constexpr std::tuple XmlTag = { u"fast", ns_fast };
-    static std::optional<FastRequest> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     std::optional<uint64_t> count;
     bool invalidate = false;
 };
@@ -271,9 +284,6 @@ namespace Sasl2 {
 
 struct StreamFeature {
     static constexpr std::tuple XmlTag = { u"authentication", ns_sasl_2 };
-    static std::optional<StreamFeature> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QList<QString> mechanisms;
     std::optional<Bind2Feature> bind2Feature;
     std::optional<FastFeature> fast;
@@ -282,9 +292,6 @@ struct StreamFeature {
 
 struct UserAgent {
     static constexpr std::tuple XmlTag = { u"user-agent", ns_sasl_2 };
-    static std::optional<UserAgent> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QUuid id;
     QString software;
     QString device;
@@ -292,9 +299,6 @@ struct UserAgent {
 
 struct Authenticate {
     static constexpr std::tuple XmlTag = { u"authenticate", ns_sasl_2 };
-    static std::optional<Authenticate> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QString mechanism;
     QByteArray initialResponse;
     std::optional<UserAgent> userAgent;
@@ -306,25 +310,16 @@ struct Authenticate {
 
 struct Challenge {
     static constexpr std::tuple XmlTag = { u"challenge", ns_sasl_2 };
-    static std::optional<Challenge> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QByteArray data;
 };
 
 struct Response {
     static constexpr std::tuple XmlTag = { u"response", ns_sasl_2 };
-    static std::optional<Response> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QByteArray data;
 };
 
 struct Success {
     static constexpr std::tuple XmlTag = { u"success", ns_sasl_2 };
-    static std::optional<Success> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     std::optional<QByteArray> additionalData;
     QString authorizationIdentifier;
     // extensions
@@ -336,9 +331,6 @@ struct Success {
 
 struct Failure {
     static constexpr std::tuple XmlTag = { u"failure", ns_sasl_2 };
-    static std::optional<Failure> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     Sasl::ErrorCondition condition;
     QString text;
     // extensions
@@ -346,9 +338,6 @@ struct Failure {
 
 struct Continue {
     static constexpr std::tuple XmlTag = { u"continue", ns_sasl_2 };
-    static std::optional<Continue> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QByteArray additionalData;
     std::vector<QString> tasks;
     QString text;
@@ -356,9 +345,6 @@ struct Continue {
 
 struct Abort {
     static constexpr std::tuple XmlTag = { u"abort", ns_sasl_2 };
-    static std::optional<Abort> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-
     QString text;
 };
 
@@ -417,12 +403,40 @@ struct XmlSpec<Sasl2::Response> {
 template<>
 struct XmlSpec<Sasl2::Success> {
     static constexpr std::tuple Spec = {
-        XmlOptionalTextElement { &Sasl2::Success::additionalData, u"additional-data", Base64Serializer() },
+        XmlOptionalTextElement { &Sasl2::Success::additionalData, u"additional-data", OptionalBase64Serializer() },
         XmlTextElement { &Sasl2::Success::authorizationIdentifier, u"authorization-identifier" },
         XmlReference { &Sasl2::Success::bound },
         XmlReference { &Sasl2::Success::smResumed },
         XmlReference { &Sasl2::Success::smFailed },
         XmlReference { &Sasl2::Success::token },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::Failure> {
+    static constexpr std::tuple Spec = {
+        XmlEnumElement { &Sasl2::Failure::condition, ns_sasl },
+        XmlOptionalTextElement { &Sasl2::Failure::text, u"text" },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::Continue> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalTextElement { &Sasl2::Continue::additionalData, u"additional-data", Base64Serializer() },
+        XmlElement {
+            u"tasks",
+            Required(),
+            XmlTextElements { &Sasl2::Continue::tasks, u"task" },
+        },
+        XmlOptionalTextElement { &Sasl2::Continue::text, u"text" },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::Abort> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalTextElement { &Sasl2::Abort::text, u"text" },
     };
 };
 
@@ -543,24 +557,6 @@ struct Credentials {
     QString googleAccessToken;
     // Windows Live
     QString windowsLiveAccessToken;
-};
-
-template<>
-struct Enums::Data<Sasl::ErrorCondition> {
-    using enum Sasl::ErrorCondition;
-    static inline constexpr auto Values = makeValues<Sasl::ErrorCondition>({
-        { Aborted, u"aborted" },
-        { AccountDisabled, u"account-disabled" },
-        { CredentialsExpired, u"credentials-expired" },
-        { EncryptionRequired, u"encryption-required" },
-        { IncorrectEncoding, u"incorrect-encoding" },
-        { InvalidAuthzid, u"invalid-authzid" },
-        { InvalidMechanism, u"invalid-mechanism" },
-        { MalformedRequest, u"malformed-request" },
-        { MechanismTooWeak, u"mechanism-too-weak" },
-        { NotAuthorized, u"not-authorized" },
-        { TemporaryAuthFailure, u"temporary-auth-failure" },
-    });
 };
 
 }  // namespace QXmpp::Private

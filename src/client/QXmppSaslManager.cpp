@@ -172,10 +172,10 @@ HandleElementResult SaslManager::handleElement(const QDomElement &el)
         return Rejected;
     }
 
-    if (Success::fromDom(el)) {
+    if (isElementType<Success>(el)) {
         finish(QXmpp::Success());
         return Finished;
-    } else if (auto challenge = Challenge::fromDom(el)) {
+    } else if (auto challenge = elementFromDom<Challenge>(el)) {
         if (auto response = m_saslClient->respond(challenge->value)) {
             m_socket->sendData(serializeXml(Response { *response }));
             return Accepted;
@@ -186,7 +186,7 @@ HandleElementResult SaslManager::handleElement(const QDomElement &el)
             });
             return Finished;
         }
-    } else if (auto failure = Failure::fromDom(el)) {
+    } else if (auto failure = elementFromDom<Failure>(el)) {
         auto text = failure->text.isEmpty()
             ? Enums::toString(failure->condition.value_or(ErrorCondition::NotAuthorized))
             : failure->text;
@@ -261,7 +261,7 @@ HandleElementResult Sasl2Manager::handleElement(const QDomElement &el)
         return Rejected;
     }
 
-    if (auto challenge = Challenge::fromDom(el)) {
+    if (auto challenge = elementFromDom<Challenge>(el)) {
         if (auto response = m_state->sasl->respond(challenge->data)) {
             m_socket->sendData(serializeXml(Response { *response }));
             return Accepted;
@@ -272,10 +272,10 @@ HandleElementResult Sasl2Manager::handleElement(const QDomElement &el)
             });
             return Finished;
         }
-    } else if (auto success = Success::fromDom(el)) {
+    } else if (auto success = elementFromDom<Success>(el)) {
         finish(std::move(*success));
         return Finished;
-    } else if (auto failure = Failure::fromDom(el)) {
+    } else if (auto failure = elementFromDom<Failure>(el)) {
         auto text = failure->text.isEmpty()
             ? Enums::toString(failure->condition)
             : failure->text;
@@ -296,7 +296,7 @@ HandleElementResult Sasl2Manager::handleElement(const QDomElement &el)
             });
         }
         return Finished;
-    } else if (auto continueElement = Continue::fromDom(el)) {
+    } else if (auto continueElement = elementFromDom<Continue>(el)) {
         // no SASL 2 tasks are currently implemented
         m_state->unsupportedContinue = continueElement;
         m_socket->sendData(serializeXml(Abort { u"SASL 2 tasks are not supported."_s }));

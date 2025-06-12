@@ -17,6 +17,16 @@
 
 using namespace QXmpp::Private;
 
+#define PARSE_SPEC(Type, VarName, Xml)                              \
+    std::optional<Type> _opt_##VarName;                             \
+    try {                                                           \
+        _opt_##VarName = XmlSpecParser::parse<Type>(xmlToDom(Xml)); \
+    } catch (ParsingError e) {                                      \
+        QFAIL(e.what());                                            \
+    }                                                               \
+    QVERIFY(_opt_##VarName);                                        \
+    Type VarName = std::move(*_opt_##VarName);
+
 // std::array helper
 template<class T, std::size_t N, std::size_t... I>
 constexpr std::array<std::remove_cv_t<T>, N>
@@ -160,12 +170,10 @@ void tst_QXmppSasl::testAuth()
     QFETCH(QString, mechanism);
     QFETCH(QByteArray, value);
 
-    // no condition
-    auto auth = Sasl::Auth::fromDom(xmlToDom(xml));
-    QVERIFY(auth);
-    QCOMPARE(auth->mechanism, mechanism);
-    QCOMPARE(auth->value, value);
-    serializePacket(*auth, xml);
+    PARSE_SPEC(Sasl::Auth, auth, xml)
+    QCOMPARE(auth.mechanism, mechanism);
+    QCOMPARE(auth.value, value);
+    serializePacket(auth, xml);
 }
 
 void tst_QXmppSasl::testChallenge_data()
@@ -187,40 +195,36 @@ void tst_QXmppSasl::testChallenge()
     QFETCH(QByteArray, xml);
     QFETCH(QByteArray, value);
 
-    // no condition
-    auto challenge = Sasl::Challenge::fromDom(xmlToDom(xml));
-    QVERIFY(challenge);
-    QCOMPARE(challenge->value, value);
-    serializePacket(*challenge, xml);
+    PARSE_SPEC(Sasl::Challenge, challenge, xml)
+    QCOMPARE(challenge.value, value);
+    serializePacket(challenge, xml);
 }
 
 void tst_QXmppSasl::testFailure()
 {
     // no condition
     const QByteArray xml = "<failure xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\"/>";
-    auto failure = Sasl::Failure::fromDom(xmlToDom(xml));
-    QVERIFY(!failure->condition.has_value());
-    QVERIFY(failure->text.isEmpty());
-    serializePacket(*failure, xml);
+    PARSE_SPEC(Sasl::Failure, failure, xml)
+    QVERIFY(!failure.condition.has_value());
+    QVERIFY(failure.text.isEmpty());
+    serializePacket(failure, xml);
 
     // not authorized
     const QByteArray xml2 = "<failure xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\"><not-authorized/></failure>";
-    auto failure2 = Sasl::Failure::fromDom(xmlToDom(xml2));
-    QVERIFY(failure2);
-    QCOMPARE(failure2->condition, Sasl::ErrorCondition::NotAuthorized);
-    serializePacket(*failure2, xml2);
+    PARSE_SPEC(Sasl::Failure, failure2, xml2)
+    QCOMPARE(failure2.condition, Sasl::ErrorCondition::NotAuthorized);
+    serializePacket(failure2, xml2);
 
     // email verification required
     const QByteArray xml3 = "<failure xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\">"
                             "<account-disabled/>"
-                            "<text xml:lang=\"en\">Your account has not been activated yet. Please check your email inbox for an activation link</text>"
+                            "<text>Your account has not been activated yet. Please check your email inbox for an activation link</text>"
                             "</failure>";
 
-    auto failure3 = Sasl::Failure::fromDom(xmlToDom(xml3));
-    QVERIFY(failure3);
-    QCOMPARE(failure3->condition, Sasl::ErrorCondition::AccountDisabled);
-    QCOMPARE(failure3->text, "Your account has not been activated yet. Please check your email inbox for an activation link");
-    serializePacket(*failure3, xml3);
+    PARSE_SPEC(Sasl::Failure, failure3, xml3)
+    QCOMPARE(failure3.condition, Sasl::ErrorCondition::AccountDisabled);
+    QCOMPARE(failure3.text, "Your account has not been activated yet. Please check your email inbox for an activation link");
+    serializePacket(failure3, xml3);
 }
 
 void tst_QXmppSasl::testResponse_data()
@@ -242,18 +246,15 @@ void tst_QXmppSasl::testResponse()
     QFETCH(QByteArray, xml);
     QFETCH(QByteArray, value);
 
-    // no condition
-    auto response = Sasl::Response::fromDom(xmlToDom(xml));
-    QVERIFY(response);
-    QCOMPARE(response->value, value);
-    serializePacket(*response, xml);
+    PARSE_SPEC(Sasl::Response, response, xml)
+    QCOMPARE(response.value, value);
+    serializePacket(response, xml);
 }
 
 void tst_QXmppSasl::testSuccess()
 {
     const QByteArray xml = "<success xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\"/>";
-    QVERIFY(Sasl::Success::fromDom(xmlToDom(xml)));
-    Sasl::Success success;
+    PARSE_SPEC(Sasl::Success, success, xml)
     serializePacket(success, xml);
 }
 
@@ -275,14 +276,13 @@ void tst_QXmppSasl::sasl2StreamFeature()
         "</inline>"
         "</authentication>";
 
-    auto feature = Sasl2::StreamFeature::fromDom(xmlToDom(xml));
-    QVERIFY(feature.has_value());
-    QCOMPARE(feature->mechanisms.size(), 2);
-    QCOMPARE(feature->mechanisms, (QList<QString> { "SCRAM-SHA-1", "SCRAM-SHA-1-PLUS" }));
-    QCOMPARE(feature->streamResumptionAvailable, true);
-    QVERIFY(feature->bind2Feature.has_value());
-    QCOMPARE(feature->bind2Feature->features, (std::vector<QString> { "urn:xmpp:carbons:2", "urn:xmpp:csi:0", "urn:xmpp:sm:3" }));
-    serializePacket(*feature, xml);
+    PARSE_SPEC(Sasl2::StreamFeature, feature, xml)
+    QCOMPARE(feature.mechanisms.size(), 2);
+    QCOMPARE(feature.mechanisms, (QList<QString> { "SCRAM-SHA-1", "SCRAM-SHA-1-PLUS" }));
+    QCOMPARE(feature.streamResumptionAvailable, true);
+    QVERIFY(feature.bind2Feature.has_value());
+    QCOMPARE(feature.bind2Feature->features, (std::vector<QString> { "urn:xmpp:carbons:2", "urn:xmpp:csi:0", "urn:xmpp:sm:3" }));
+    serializePacket(feature, xml);
 }
 
 void tst_QXmppSasl::sasl2UserAgent()
@@ -292,17 +292,14 @@ void tst_QXmppSasl::sasl2UserAgent()
         "<software>AwesomeXMPP</software>"
         "<device>Kiva&apos;s Phone</device>"
         "</user-agent>";
-    auto namespaceWrapper = u"<authenticate xmlns='%1'>%2</authenticate>"_s;
 
-    auto userAgentDom = xmlToDom(namespaceWrapper.arg(ns_sasl_2, xml)).firstChildElement();
-    auto userAgent = Sasl2::UserAgent::fromDom(userAgentDom);
-    QVERIFY(userAgent.has_value());
-    QCOMPARE(userAgent->id, QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s));
-    QVERIFY(!userAgent->id.isNull());
-    QCOMPARE(userAgent->software, "AwesomeXMPP");
-    QCOMPARE(userAgent->device, "Kiva's Phone");
+    PARSE_SPEC(Sasl2::UserAgent, userAgent, xml)
+    QCOMPARE(userAgent.id, QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s));
+    QVERIFY(!userAgent.id.isNull());
+    QCOMPARE(userAgent.software, "AwesomeXMPP");
+    QCOMPARE(userAgent.device, "Kiva's Phone");
 
-    serializePacket(*userAgent, xml);
+    serializePacket(userAgent, xml);
 }
 
 void tst_QXmppSasl::sasl2Authenticate()
@@ -319,17 +316,16 @@ void tst_QXmppSasl::sasl2Authenticate()
         "</bind>"
         "</authenticate>";
 
-    auto auth = Sasl2::Authenticate::fromDom(xmlToDom(xml));
-    QVERIFY(auth);
-    QCOMPARE(auth->mechanism, "SCRAM-SHA-1-PLUS");
-    QCOMPARE(auth->initialResponse, "p=tls-exporter,,n=user,r=12C4CD5C-E38E-4A98-8F6D-15C38F51CCC6");
-    QVERIFY(auth->userAgent);
-    QCOMPARE(auth->userAgent->id, QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s));
-    QCOMPARE(auth->userAgent->software, "AwesomeXMPP");
-    QCOMPARE(auth->userAgent->device, "Kiva's Phone");
-    QVERIFY(auth->bindRequest);
-    QCOMPARE(auth->bindRequest->tag, "AwesomeXMPP");
-    serializePacket(*auth, xml);
+    PARSE_SPEC(Sasl2::Authenticate, auth, xml)
+    QCOMPARE(auth.mechanism, "SCRAM-SHA-1-PLUS");
+    QCOMPARE(auth.initialResponse, "p=tls-exporter,,n=user,r=12C4CD5C-E38E-4A98-8F6D-15C38F51CCC6");
+    QVERIFY(auth.userAgent);
+    QCOMPARE(auth.userAgent->id, QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s));
+    QCOMPARE(auth.userAgent->software, "AwesomeXMPP");
+    QCOMPARE(auth.userAgent->device, "Kiva's Phone");
+    QVERIFY(auth.bindRequest);
+    QCOMPARE(auth.bindRequest->tag, "AwesomeXMPP");
+    serializePacket(auth, xml);
 }
 
 void tst_QXmppSasl::sasl2Challenge()
@@ -339,10 +335,9 @@ void tst_QXmppSasl::sasl2Challenge()
         "cj0xMkM0Q0Q1Qy1FMzhFLTRBOTgtOEY2RC0xNUMzOEY1MUNDQzZhMDkxMTdhNi1hYzUwLTRmMmYtOTNmMS05Mzc5OWMyYmRkZjYscz1RU1hDUitRNnNlazhiZjkyLGk9NDA5Ng=="
         "</challenge>";
 
-    auto challenge = Sasl2::Challenge::fromDom(xmlToDom(xml));
-    QVERIFY(challenge.has_value());
-    QCOMPARE(challenge->data, "r=12C4CD5C-E38E-4A98-8F6D-15C38F51CCC6a09117a6-ac50-4f2f-93f1-93799c2bddf6,s=QSXCR+Q6sek8bf92,i=4096");
-    serializePacket(*challenge, xml);
+    PARSE_SPEC(Sasl2::Challenge, challenge, xml)
+    QCOMPARE(challenge.data, "r=12C4CD5C-E38E-4A98-8F6D-15C38F51CCC6a09117a6-ac50-4f2f-93f1-93799c2bddf6,s=QSXCR+Q6sek8bf92,i=4096");
+    serializePacket(challenge, xml);
 }
 
 void tst_QXmppSasl::sasl2Response()
@@ -352,10 +347,9 @@ void tst_QXmppSasl::sasl2Response()
         "Yz1jRDEwYkhNdFpYaHdiM0owWlhJc0xNY29Rdk9kQkRlUGQ0T3N3bG1BV1YzZGcxYTFXaDF0WVBUQndWaWQxMFZVLHI9MTJDNENENUMtRTM4RS00QTk4LThGNkQtMTVDMzhGNTFDQ0M2YTA5MTE3YTYtYWM1MC00ZjJmLTkzZjEtOTM3OTljMmJkZGY2LHA9VUFwbzd4bzZQYTlKK1ZhZWpmei9kRzdCb21VPQ=="
         "</response>";
 
-    auto response = Sasl2::Response::fromDom(xmlToDom(xml));
-    QVERIFY(response);
-    QCOMPARE(response->data, "c=cD10bHMtZXhwb3J0ZXIsLMcoQvOdBDePd4OswlmAWV3dg1a1Wh1tYPTBwVid10VU,r=12C4CD5C-E38E-4A98-8F6D-15C38F51CCC6a09117a6-ac50-4f2f-93f1-93799c2bddf6,p=UApo7xo6Pa9J+Vaejfz/dG7BomU=");
-    serializePacket(*response, xml);
+    PARSE_SPEC(Sasl2::Response, response, xml)
+    QCOMPARE(response.data, "c=cD10bHMtZXhwb3J0ZXIsLMcoQvOdBDePd4OswlmAWV3dg1a1Wh1tYPTBwVid10VU,r=12C4CD5C-E38E-4A98-8F6D-15C38F51CCC6a09117a6-ac50-4f2f-93f1-93799c2bddf6,p=UApo7xo6Pa9J+Vaejfz/dG7BomU=");
+    serializePacket(response, xml);
 }
 
 void tst_QXmppSasl::sasl2Success()
@@ -369,12 +363,11 @@ void tst_QXmppSasl::sasl2Success()
         "<bound xmlns='urn:xmpp:bind:0'/>"
         "</success>";
 
-    auto success = Sasl2::Success::fromDom(xmlToDom(xml));
-    QVERIFY(success.has_value());
-    QCOMPARE(success->additionalData, "v=msVHs/BzIOHDqXeVH7EmmDu9id8=");
-    QCOMPARE(success->authorizationIdentifier, "user@example.org/abc");
-    QVERIFY(success->bound);
-    serializePacket(*success, xml);
+    PARSE_SPEC(Sasl2::Success, success, xml)
+    QCOMPARE(success.additionalData, "v=msVHs/BzIOHDqXeVH7EmmDu9id8=");
+    QCOMPARE(success.authorizationIdentifier, "user@example.org/abc");
+    QVERIFY(success.bound);
+    serializePacket(success, xml);
 }
 
 void tst_QXmppSasl::sasl2Failure()
@@ -385,11 +378,10 @@ void tst_QXmppSasl::sasl2Failure()
         "<text>This is a terrible example.</text>"
         "</failure>";
 
-    auto failure = Sasl2::Failure::fromDom(xmlToDom(xml));
-    QVERIFY(failure.has_value());
-    QCOMPARE(failure->condition, Sasl::ErrorCondition::Aborted);
-    QCOMPARE(failure->text, "This is a terrible example.");
-    serializePacket(*failure, xml);
+    PARSE_SPEC(Sasl2::Failure, failure, xml)
+    QCOMPARE(failure.condition, Sasl::ErrorCondition::Aborted);
+    QCOMPARE(failure.text, "This is a terrible example.");
+    serializePacket(failure, xml);
 }
 
 void tst_QXmppSasl::sasl2ContinueElement()
@@ -406,22 +398,20 @@ void tst_QXmppSasl::sasl2ContinueElement()
         "<text>This account requires 2FA</text>"
         "</continue>";
 
-    auto cont = Sasl2::Continue::fromDom(xmlToDom(xml));
-    QVERIFY(cont.has_value());
-    QCOMPARE(cont->additionalData, "I'm bored now.");
-    QCOMPARE(cont->tasks, (std::vector<QString> { "HOTP-EXAMPLE", "TOTP-EXAMPLE" }));
-    QCOMPARE(cont->text, "This account requires 2FA");
-    serializePacket(*cont, xml);
+    PARSE_SPEC(Sasl2::Continue, cont, xml)
+    QCOMPARE(cont.additionalData, "I'm bored now.");
+    QCOMPARE(cont.tasks, (std::vector<QString> { "HOTP-EXAMPLE", "TOTP-EXAMPLE" }));
+    QCOMPARE(cont.text, "This account requires 2FA");
+    serializePacket(cont, xml);
 }
 
 void tst_QXmppSasl::sasl2Abort()
 {
     auto xml = "<abort xmlns='urn:xmpp:sasl:2'><text>I changed my mind.</text></abort>";
 
-    auto abort = Sasl2::Abort::fromDom(xmlToDom(xml));
-    QVERIFY(abort);
-    QCOMPARE(abort->text, "I changed my mind.");
-    serializePacket(*abort, xml);
+    PARSE_SPEC(Sasl2::Abort, abort, xml)
+    QCOMPARE(abort.text, "I changed my mind.");
+    serializePacket(abort, xml);
 }
 
 void tst_QXmppSasl::bind2Feature_data()
@@ -449,13 +439,9 @@ void tst_QXmppSasl::bind2Feature()
     QFETCH(QByteArray, xml);
     QFETCH(std::vector<QString>, features);
 
-    try {
-        auto feature = XmlSpecParser::parse<Bind2Feature>(xmlToDom(xml));
-        QCOMPARE(feature.features, features);
-        serializePacket(feature, xml);
-    } catch (ParsingError e) {
-        QFAIL(e.what());
-    }
+    PARSE_SPEC(Bind2Feature, feature, xml)
+    QCOMPARE(feature.features, features);
+    serializePacket(feature, xml);
 }
 
 void tst_QXmppSasl::bind2Request()
@@ -465,12 +451,8 @@ void tst_QXmppSasl::bind2Request()
         "<tag>AwesomeXMPP</tag>"
         "</bind>";
 
-    try {
-        auto bind = XmlSpecParser::parse<Bind2Request>(xmlToDom(xml));
-        QCOMPARE(bind.tag, u"AwesomeXMPP");
-    } catch (ParsingError e) {
-        QFAIL(e.what());
-    }
+    PARSE_SPEC(Bind2Request, bind, xml)
+    QCOMPARE(bind.tag, u"AwesomeXMPP");
 }
 
 void tst_QXmppSasl::htAlgorithmParsing()
@@ -885,6 +867,9 @@ void tst_QXmppSasl::sasl2ManagerPlain()
     test.manager.handleElement(xmlToDom("<success xmlns='urn:xmpp:sasl:2'><authorization-identifier>bowman@example.org</authorization-identifier></success>"));
 
     QVERIFY(task.isFinished());
+    if (std::holds_alternative<Sasl2Manager::AuthError>(task.result())) {
+        QFAIL(std::get<Sasl2Manager::AuthError>(task.result()).first.toStdString().data());
+    }
     auto success = expectFutureVariant<Sasl2::Success>(task);
 
     QCOMPARE(success.additionalData, std::nullopt);

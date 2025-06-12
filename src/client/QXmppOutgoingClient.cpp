@@ -1324,13 +1324,13 @@ HandleElementResult C2sStreamManager::handleElement(const QDomElement &el)
         auto request = std::get<ResumeRequest>(std::move(m_request));
         m_request = {};
 
-        if (auto resumed = SmResumed::fromDom(el)) {
+        if (auto resumed = elementFromDom<SmResumed>(el)) {
             onResumed(*resumed);
             request.p.finish();
             return Finished;
         }
 
-        if (auto failed = SmFailed::fromDom(el)) {
+        if (auto failed = elementFromDom<SmFailed>(el)) {
             onResumeFailed(*failed);
             request.p.finish();
             return Finished;
@@ -1341,13 +1341,13 @@ HandleElementResult C2sStreamManager::handleElement(const QDomElement &el)
         auto request = std::get<EnableRequest>(std::move(m_request));
         m_request = {};
 
-        if (auto enabled = SmEnabled::fromDom(el)) {
+        if (auto enabled = elementFromDom<SmEnabled>(el)) {
             onEnabled(*enabled);
             request.p.finish();
             return Finished;
         }
 
-        if (auto failed = SmFailed::fromDom(el)) {
+        if (auto failed = elementFromDom<SmFailed>(el)) {
             onEnableFailed(*failed);
             request.p.finish();
             return Finished;
