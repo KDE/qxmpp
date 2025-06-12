@@ -9,18 +9,18 @@
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSasl_p.h"
 #include "QXmppUtils.h"
+#include "QXmppUtils_p.h"
 #include "QXmppVisitHelper_p.h"
 
 #include "Algorithms.h"
+#include "Enums.h"
 #include "StringLiterals.h"
-#include "Xml.h"
-#include "XmlWriter.h"
+#include "packets/Sasl2.h"
 
-#include <QDomElement>
 #include <QMessageAuthenticationCode>
 #include <QPasswordDigestor>
 #include <QUrlQuery>
-#include <QXmlStreamWriter>
+#include <QXmlStreamReader>
 #include <QtEndian>
 
 using std::visit;

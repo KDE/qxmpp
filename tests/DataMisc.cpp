@@ -24,6 +24,8 @@
 #include "QXmppUri.h"
 #include "QXmppXmlElement.h"
 
+#include "packets/Sasl2.h"
+
 #include "util.h"
 
 #include <QCoreApplication>
