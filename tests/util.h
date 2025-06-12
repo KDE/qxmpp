@@ -11,6 +11,7 @@
 #include "QXmppPasswordChecker.h"
 #include "QXmppTask.h"
 
+#include "QXmppUtils_p.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -159,14 +160,9 @@ std::tuple<QString, QString> rewriteXmlWithoutStanzaId(const String &inputXml)
 template<typename T, typename... Args>
 static QByteArray packetToXml(const T &packet, Args &&...args)
 {
-    using namespace QXmpp::Private;
-
-    QBuffer buffer;
-    buffer.open(QIODevice::ReadWrite);
-    QXmlStreamWriter writer(&buffer);
-    XmlWriter xmlWriter(&writer);
-    packet.toXml(xmlWriter, std::forward<Args>(args)...);
-    auto data = buffer.data();
+    auto data = QXmpp::Private::serializeXmlWriter([&](QXmpp::Private::XmlWriter &w) {
+        packet.toXml(w, std::forward<Args>(args)...);
+    });
     data.replace(u'\'', "&apos;");
     return data;
 }
