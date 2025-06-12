@@ -79,6 +79,10 @@ private:
     Q_SLOT void sasl2ContinueElement();
     Q_SLOT void sasl2Abort();
 
+    Q_SLOT void bind2Feature_data();
+    Q_SLOT void bind2Feature();
+    Q_SLOT void bind2Request();
+
     Q_SLOT void htAlgorithmParsing();
 
     // client
@@ -284,7 +288,7 @@ void tst_QXmppSasl::sasl2StreamFeature()
 void tst_QXmppSasl::sasl2UserAgent()
 {
     auto xml =
-        "<user-agent id='d4565fa7-4d72-4749-b3d3-740edbf87770'>"
+        "<user-agent xmlns='urn:xmpp:sasl:2' id='d4565fa7-4d72-4749-b3d3-740edbf87770'>"
         "<software>AwesomeXMPP</software>"
         "<device>Kiva&apos;s Phone</device>"
         "</user-agent>";
@@ -418,6 +422,55 @@ void tst_QXmppSasl::sasl2Abort()
     QVERIFY(abort);
     QCOMPARE(abort->text, "I changed my mind.");
     serializePacket(*abort, xml);
+}
+
+void tst_QXmppSasl::bind2Feature_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<std::vector<QString>>("features");
+
+    QTest::newRow("empty")
+        << QByteArray("<bind xmlns='urn:xmpp:bind:0'/>")
+        << std::vector<QString> {};
+
+    QTest::newRow("inline features")
+        << QByteArray("<bind xmlns='urn:xmpp:bind:0'>"
+                      "<inline>"
+                      "<feature var='urn:xmpp:carbons:2'/>"
+                      "<feature var='urn:xmpp:csi:0'/>"
+                      "<feature var='urn:xmpp:sm:3'/>"
+                      "</inline>"
+                      "</bind>")
+        << std::vector { u"urn:xmpp:carbons:2"_s, u"urn:xmpp:csi:0"_s, u"urn:xmpp:sm:3"_s };
+}
+
+void tst_QXmppSasl::bind2Feature()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(std::vector<QString>, features);
+
+    try {
+        auto feature = XmlSpecParser::parse<Bind2Feature>(xmlToDom(xml));
+        QCOMPARE(feature.features, features);
+        serializePacket(feature, xml);
+    } catch (ParsingError e) {
+        QFAIL(e.what());
+    }
+}
+
+void tst_QXmppSasl::bind2Request()
+{
+    auto xml =
+        "<bind xmlns='urn:xmpp:bind:0'>"
+        "<tag>AwesomeXMPP</tag>"
+        "</bind>";
+
+    try {
+        auto bind = XmlSpecParser::parse<Bind2Request>(xmlToDom(xml));
+        QCOMPARE(bind.tag, u"AwesomeXMPP");
+    } catch (ParsingError e) {
+        QFAIL(e.what());
+    }
 }
 
 void tst_QXmppSasl::htAlgorithmParsing()
@@ -929,7 +982,7 @@ void tst_QXmppSasl::sasl2Fast()
     Sasl2::StreamFeature sasl2Feature {
         { "PLAIN" },
         {},
-        FastFeature { { "HT-SHA-256-NONE", "HT-SHA3-512-NONE" }, false },
+        FastFeature { false, { "HT-SHA-256-NONE", "HT-SHA3-512-NONE" } },
         false
     };
 
@@ -975,6 +1028,12 @@ void tst_QXmppSasl::sasl2Fast()
         "<user-agent id=\"d4565fa7-4d72-4749-b3d3-740edbf87770\"><software>QXmpp</software><device>HAL 9000</device></user-agent>"
         "<fast xmlns=\"urn:xmpp:fast:0\"/>"
         "</authenticate>";
+    if (sent.at(1) != authenticateXml) {
+        qDebug() << "actual:";
+        qDebug().noquote() << "\t" << sent.at(1);
+        qDebug() << "expected:";
+        qDebug().noquote() << "\t" << authenticateXml;
+    }
     QCOMPARE(sent.at(1), authenticateXml);
     test.manager.handleElement(xmlToDom("<success xmlns='urn:xmpp:sasl:2'><authorization-identifier>bowman@example.org</authorization-identifier><token xmlns='urn:xmpp:fast:0' token='t0k3n-rotation-token' expiry='2024-07-30T14:00:00Z'/></success>"));
 
