@@ -9,6 +9,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "packets/Sasl2.h"
 
 #include <QDomElement>
 

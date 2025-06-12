@@ -5,6 +5,8 @@
 #include "QXmppStreamFeatures.h"
 #ifdef BUILD_INTERNAL_TESTS
 #include "QXmppSasl_p.h"
+
+#include "packets/Sasl2.h"
 #endif
 
 #include "util.h"

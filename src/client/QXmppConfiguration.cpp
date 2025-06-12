@@ -12,6 +12,7 @@
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QCoreApplication>
 #include <QNetworkProxy>
