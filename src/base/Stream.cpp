@@ -72,62 +72,6 @@ void StreamOpen::toXml(XmlWriter &w) const
     w.write(Characters { QString() });
 }
 
-std::optional<StarttlsRequest> StarttlsRequest::fromDom(const QDomElement &el)
-{
-    if (elementXmlTag(el) != XmlTag) {
-        return {};
-    }
-    return StarttlsRequest {};
-}
-
-void StarttlsRequest::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
-std::optional<StarttlsProceed> StarttlsProceed::fromDom(const QDomElement &el)
-{
-    if (elementXmlTag(el) != XmlTag) {
-        return {};
-    }
-    return StarttlsProceed {};
-}
-
-void StarttlsProceed::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
-std::optional<BindElement> BindElement::fromDom(const QDomElement &el)
-{
-    if (elementXmlTag(el) != XmlTag) {
-        return {};
-    }
-    return BindElement {
-        .jid = firstChildElement(el, u"jid").text(),
-        .resource = firstChildElement(el, u"resource").text(),
-    };
-}
-
-void BindElement::toXml(XmlWriter &w) const
-{
-    w.write(Element {
-        { u"bind", ns_bind },
-        OptionalTextElement { u"jid", jid },
-        OptionalTextElement { u"resource", resource },
-    });
-}
-
-void CsiActive::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
-void CsiInactive::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
 std::variant<StreamErrorElement, QXmppError> StreamErrorElement::fromDom(const QDomElement &el)
 {
     if (el.tagName() != u"error" || el.namespaceURI() != ns_stream) {

@@ -32,37 +32,6 @@ struct StreamOpen {
     QString xmlLang;
 };
 
-struct StarttlsRequest {
-    static constexpr std::tuple XmlTag = { u"starttls", ns_tls };
-    static std::optional<StarttlsRequest> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-};
-
-struct StarttlsProceed {
-    static constexpr std::tuple XmlTag = { u"proceed", ns_tls };
-    static std::optional<StarttlsProceed> fromDom(const QDomElement &);
-    void toXml(XmlWriter &) const;
-};
-
-struct BindElement {
-    QString jid;
-    QString resource;
-
-    static constexpr std::tuple XmlTag = { u"bind", ns_bind };
-    static std::optional<BindElement> fromDom(const QDomElement &el);
-    void toXml(XmlWriter &w) const;
-};
-
-struct CsiActive {
-    static constexpr std::tuple XmlTag = { u"active", ns_csi };
-    void toXml(XmlWriter &) const;
-};
-
-struct CsiInactive {
-    static constexpr std::tuple XmlTag = { u"inactive", ns_csi };
-    void toXml(XmlWriter &) const;
-};
-
 }  // namespace QXmpp::Private
 
 #endif  // STREAM_H

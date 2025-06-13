@@ -35,8 +35,6 @@ public:
     void setNickName(const QString &nickName);
 
     static constexpr std::tuple XmlTag = { u"conference", QXmpp::Private::ns_bookmarks };
-    static std::optional<QXmppBookmarkConference> fromDom(const QDomElement &el);
-    void toXml(QXmlStreamWriter *writer) const;
 
 private:
     bool m_autoJoin;
@@ -61,8 +59,6 @@ public:
     void setUrl(const QUrl &url);
 
     static constexpr std::tuple XmlTag = { u"url", QXmpp::Private::ns_bookmarks };
-    static std::optional<QXmppBookmarkUrl> fromDom(const QDomElement &el);
-    void toXml(QXmlStreamWriter *writer) const;
 
 private:
     QString m_name;
