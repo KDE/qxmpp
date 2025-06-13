@@ -31,6 +31,7 @@
 
 #include "StringLiterals.h"
 #include "XmlWriter.h"
+#include "packets/Bind.h"
 
 #include <QCryptographicHash>
 #include <QDomElement>
@@ -125,18 +126,17 @@ void QXmppBindIq::setResource(const QString &resource)
 
 void QXmppBindIq::parseElementFromChild(const QDomElement &element)
 {
-    QDomElement bindElement = firstChildElement(element, u"bind");
-    m_jid = firstChildElement(bindElement, u"jid").text();
-    m_resource = firstChildElement(bindElement, u"resource").text();
+    try {
+        auto bind = XmlSpecParser::parse<Bind>(element.firstChildElement());
+        m_jid = bind.jid;
+        m_resource = bind.resource;
+    } catch (ParsingError) {
+    }
 }
 
 void QXmppBindIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    XmlWriter(writer).write(Element {
-        { u"bind", ns_bind },
-        OptionalTextElement { u"jid", m_jid },
-        OptionalTextElement { u"resource", m_resource },
-    });
+    XmlSpecSerializer::serialize(XmlWriter(writer), Bind { m_jid, m_resource });
 }
 
 bool QXmppBindIq::isBindIq(const QDomElement &element)

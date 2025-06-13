@@ -21,6 +21,8 @@
 #include "Iq.h"
 #include "Stream.h"
 #include "StringLiterals.h"
+#include "packets/Csi.h"
+#include "packets/Starttls.h"
 
 #include <unordered_map>
 
@@ -986,7 +988,7 @@ namespace QXmpp::Private {
 
 HandleElementResult StarttlsManager::handleElement(const QDomElement &el)
 {
-    if (StarttlsProceed::fromDom(el)) {
+    if (isElementType<StarttlsProceed>(el)) {
         m_promise.finish();
         return Finished;
     }
