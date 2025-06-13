@@ -69,42 +69,6 @@ void StreamOpen::toXml(XmlWriter &w) const
     w.write(Characters { QString() });
 }
 
-std::optional<StarttlsRequest> StarttlsRequest::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"starttls" || el.namespaceURI() != ns_tls) {
-        return {};
-    }
-    return StarttlsRequest {};
-}
-
-void StarttlsRequest::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
-std::optional<StarttlsProceed> StarttlsProceed::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"proceed" || el.namespaceURI() != ns_tls) {
-        return {};
-    }
-    return StarttlsProceed {};
-}
-
-void StarttlsProceed::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
-void CsiActive::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
-void CsiInactive::toXml(XmlWriter &w) const
-{
-    w.write(Element { XmlTag });
-}
-
 std::variant<StreamErrorElement, QXmppError> StreamErrorElement::fromDom(const QDomElement &el)
 {
     if (el.tagName() != u"error" || el.namespaceURI() != ns_stream) {

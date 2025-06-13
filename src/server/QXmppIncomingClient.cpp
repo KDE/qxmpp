@@ -16,6 +16,7 @@
 #include "StringLiterals.h"
 #include "XmppSocket.h"
 #include "packets/Sasl2.h"
+#include "packets/Starttls.h"
 
 #include <QDomElement>
 #include <QHostAddress>
@@ -257,7 +258,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
         d->idleTimer->start();
     }
 
-    if (StarttlsRequest::fromDom(nodeRecv)) {
+    if (isElementType<StarttlsRequest>(nodeRecv)) {
         sendData(serializeXml(StarttlsProceed()));
         d->socket.internalSocket()->flush();
         d->socket.internalSocket()->startServerEncryption();

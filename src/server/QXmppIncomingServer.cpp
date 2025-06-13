@@ -14,6 +14,7 @@
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
+#include "packets/Starttls.h"
 
 #include <QDomElement>
 #include <QHostAddress>
@@ -143,7 +144,7 @@ void QXmppIncomingServer::handleStream(const StreamOpen &stream)
 
 void QXmppIncomingServer::handleStanza(const QDomElement &stanza)
 {
-    if (StarttlsRequest::fromDom(stanza)) {
+    if (elementFromDom<StarttlsRequest>(stanza)) {
         sendData(serializeXml(StarttlsProceed()));
         d->socket.internalSocket()->flush();
         d->socket.internalSocket()->startServerEncryption();

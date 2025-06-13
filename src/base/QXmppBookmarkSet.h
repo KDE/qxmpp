@@ -34,8 +34,6 @@ public:
 
     /// \cond
     static constexpr std::tuple XmlTag = { u"conference", QXmpp::Private::ns_bookmarks };
-    static std::optional<QXmppBookmarkConference> fromDom(const QDomElement &el);
-    void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
 
 private:
@@ -60,8 +58,6 @@ public:
 
     /// \cond
     static constexpr std::tuple XmlTag = { u"url", QXmpp::Private::ns_bookmarks };
-    static std::optional<QXmppBookmarkUrl> fromDom(const QDomElement &el);
-    void toXml(QXmlStreamWriter *writer) const;
     /// \endcond
 
 private:

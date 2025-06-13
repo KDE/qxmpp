@@ -13,6 +13,7 @@
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
+#include "packets/Starttls.h"
 
 #include <chrono>
 
@@ -175,7 +176,7 @@ void QXmppOutgoingServer::handleStanza(const QDomElement &stanza)
         // send dialback if needed
         d->dialbackTimer->stop();
         sendDialback();
-    } else if (StarttlsProceed::fromDom(stanza)) {
+    } else if (isElementType<StarttlsProceed>(stanza)) {
         debug(u"Starting encryption"_s);
         d->socket.internalSocket()->startClientEncryption();
         return;
