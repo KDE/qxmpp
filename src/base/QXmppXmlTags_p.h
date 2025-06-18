@@ -19,13 +19,13 @@ struct Tag {
     using NameType = Name;
     using XmlnsType = Xmlns;
 
-    Tag(Name name, Xmlns xmlns)
+    constexpr Tag(Name name, Xmlns xmlns)
         : name(std::forward<Name>(name)), xmlns(std::forward<Xmlns>(xmlns)) { }
 
     template<typename N, typename X>
-    Tag(std::tuple<N, X> &&t) : name(std::get<0>(t)), xmlns(std::get<1>(t)) { }
+    constexpr Tag(std::tuple<N, X> &&t) : name(std::get<0>(t)), xmlns(std::get<1>(t)) { }
     template<typename N, typename X>
-    Tag(const std::tuple<N, X> &t) : name(std::get<0>(t)), xmlns(std::get<1>(t)) { }
+    constexpr Tag(const std::tuple<N, X> &t) : name(std::get<0>(t)), xmlns(std::get<1>(t)) { }
 };
 
 template<size_t N, std::convertible_to<QStringView> Xmlns>
