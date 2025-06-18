@@ -35,23 +35,26 @@ void processHandleIqResult(QXmppClient *client,
                            const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
                            std::variant<VariantTypes...> &&result)
 {
-    std::visit([&](auto &&value) {
-        using T = std::decay_t<decltype(value)>;
+    std::visit(
+        [&]<typename T>(T &&value) {
+            static_assert(
+                std::is_base_of_v<QXmppIq, T> || std::is_same_v<QXmppStanza::Error, T> || IsTask<T>,
+                "QXmppIq based type, QXmppStanza::Error or QXmppTask required");
 
-        static_assert(
-            std::is_base_of_v<QXmppIq, T> || std::is_same_v<QXmppStanza::Error, T>,
-            "QXmppIq based type or QXmppStanza::Error required");
-
-        if constexpr (std::is_base_of_v<QXmppIq, T>) {
-            sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(value));
-        } else if constexpr (std::is_same_v<QXmppStanza::Error, T>) {
-            QXmppIq iq;
-            iq.setType(QXmppIq::Error);
-            iq.setError(value);
-            sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(iq));
-        }
-    },
-               std::move(result));
+            if constexpr (std::is_base_of_v<QXmppIq, T>) {
+                sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(value));
+            } else if constexpr (std::is_same_v<QXmppStanza::Error, T>) {
+                QXmppIq iq;
+                iq.setType(QXmppIq::Error);
+                iq.setError(value);
+                sendIqReply(client, requestId, requestFrom, e2eeMetadata, std::move(iq));
+            } else if constexpr (IsTask<T>) {
+                value.then(client, [=](TaskValueType<T> &&v) {
+                    processHandleIqResult(client, requestId, requestFrom, e2eeMetadata, std::move(v));
+                });
+            }
+        },
+        std::move(result));
 }
 
 template<typename T>
@@ -59,9 +62,9 @@ void processHandleIqResult(QXmppClient *client,
                            const QString &requestId,
                            const QString &requestFrom,
                            const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
-                           QXmppTask<T> future)
+                           QXmppTask<T> task)
 {
-    future.then(client, [client, requestId, requestFrom, e2eeMetadata](T result) {
+    task.then(client, [client, requestId, requestFrom, e2eeMetadata](T result) {
         processHandleIqResult(client, requestId, requestFrom, e2eeMetadata, result);
     });
 }
