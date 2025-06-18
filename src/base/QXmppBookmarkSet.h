@@ -5,7 +5,7 @@
 #ifndef QXMPPBOOKMARKSET_H
 #define QXMPPBOOKMARKSET_H
 
-#include "QXmppConstants_p.h"
+#include "QXmppPackets_p.h"
 #include "QXmppStanza.h"
 
 #include <QList>
@@ -21,6 +21,8 @@ class QXMPP_EXPORT QXmppBookmarkConference
 {
 public:
     QXmppBookmarkConference();
+    QXmppBookmarkConference(QXmpp::Private::BookmarkConference &&data)
+        : m_data(std::move(data)) { }
 
     bool autoJoin() const;
     void setAutoJoin(bool autoJoin);
@@ -34,13 +36,8 @@ public:
     QString nickName() const;
     void setNickName(const QString &nickName);
 
-    static constexpr std::tuple XmlTag = { u"conference", QXmpp::Private::ns_bookmarks };
-
 private:
-    bool m_autoJoin;
-    QString m_jid;
-    QString m_name;
-    QString m_nickName;
+    QXmpp::Private::BookmarkConference m_data;
 };
 
 /*!
@@ -52,17 +49,18 @@ private:
 class QXMPP_EXPORT QXmppBookmarkUrl
 {
 public:
+    QXmppBookmarkUrl() { }
+    QXmppBookmarkUrl(QXmpp::Private::BookmarkUrl &&data)
+        : m_data(std::move(data)) { }
+
     QString name() const;
     void setName(const QString &name);
 
     QUrl url() const;
     void setUrl(const QUrl &url);
 
-    static constexpr std::tuple XmlTag = { u"url", QXmpp::Private::ns_bookmarks };
-
 private:
-    QString m_name;
-    QUrl m_url;
+    QXmpp::Private::BookmarkUrl m_data;
 };
 
 /*!
