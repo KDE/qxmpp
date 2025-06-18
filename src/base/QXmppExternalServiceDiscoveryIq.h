@@ -17,7 +17,7 @@ public:
 
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppExternalServiceDiscoveryIq)
 
-    QVector<QXmppExternalService> externalServices();
+    QVector<QXmppExternalService> externalServices() const;
     void setExternalServices(const QVector<QXmppExternalService> &);
     void addExternalService(const QXmppExternalService &);
 

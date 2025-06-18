@@ -331,7 +331,7 @@ QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppExternalServiceDiscoveryIq)
 ///
 /// Returns the external services of the IQ.
 ///
-QVector<QXmppExternalService> QXmppExternalServiceDiscoveryIq::externalServices()
+QVector<QXmppExternalService> QXmppExternalServiceDiscoveryIq::externalServices() const
 {
     return d->externalServices;
 }
