@@ -106,37 +106,35 @@ QXmppBindIq QXmppBindIq::bindAddressIq(const QString &resource)
 
 QString QXmppBindIq::jid() const
 {
-    return m_jid;
+    return m_data.jid;
 }
 
 void QXmppBindIq::setJid(const QString &jid)
 {
-    m_jid = jid;
+    m_data.jid = jid;
 }
 
 QString QXmppBindIq::resource() const
 {
-    return m_resource;
+    return m_data.resource;
 }
 
 void QXmppBindIq::setResource(const QString &resource)
 {
-    m_resource = resource;
+    m_data.resource = resource;
 }
 
 void QXmppBindIq::parseElementFromChild(const QDomElement &element)
 {
     try {
-        auto bind = XmlSpecParser::parse<Bind>(element.firstChildElement());
-        m_jid = bind.jid;
-        m_resource = bind.resource;
+        m_data = XmlSpecParser::parse<Bind>(element.firstChildElement());
     } catch (ParsingError) {
     }
 }
 
 void QXmppBindIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    XmlSpecSerializer::serialize(XmlWriter(writer), Bind { m_jid, m_resource });
+    XmlSpecSerializer::serialize(XmlWriter(writer), m_data);
 }
 
 bool QXmppBindIq::isBindIq(const QDomElement &element)

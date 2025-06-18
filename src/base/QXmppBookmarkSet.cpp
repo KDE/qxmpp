@@ -10,7 +10,6 @@ using namespace QXmpp::Private;
 
 /*! Constructs a new conference room bookmark. */
 QXmppBookmarkConference::QXmppBookmarkConference()
-    : m_autoJoin(false)
 {
 }
 
@@ -20,7 +19,7 @@ QXmppBookmarkConference::QXmppBookmarkConference()
 */
 bool QXmppBookmarkConference::autoJoin() const
 {
-    return m_autoJoin;
+    return m_data.autojoin;
 }
 
 /*!
@@ -31,13 +30,13 @@ bool QXmppBookmarkConference::autoJoin() const
 */
 void QXmppBookmarkConference::setAutoJoin(bool autoJoin)
 {
-    m_autoJoin = autoJoin;
+    m_data.autojoin = autoJoin;
 }
 
 /*! Returns the JID of the conference room. */
 QString QXmppBookmarkConference::jid() const
 {
-    return m_jid;
+    return m_data.jid;
 }
 
 /*!
@@ -47,25 +46,25 @@ QString QXmppBookmarkConference::jid() const
 */
 void QXmppBookmarkConference::setJid(const QString &jid)
 {
-    m_jid = jid;
+    m_data.jid = jid;
 }
 
 /*! Returns the friendly name for the bookmark. */
 QString QXmppBookmarkConference::name() const
 {
-    return m_name;
+    return m_data.name;
 }
 
 /*! Sets the friendly \a name for the bookmark. */
 void QXmppBookmarkConference::setName(const QString &name)
 {
-    m_name = name;
+    m_data.name = name;
 }
 
 /*! Returns the preferred nickname for the conference room. */
 QString QXmppBookmarkConference::nickName() const
 {
-    return m_nickName;
+    return m_data.nick;
 }
 
 /*!
@@ -75,25 +74,25 @@ QString QXmppBookmarkConference::nickName() const
 */
 void QXmppBookmarkConference::setNickName(const QString &nickName)
 {
-    m_nickName = nickName;
+    m_data.nick = nickName;
 }
 
 /*! Returns the friendly name for the bookmark. */
 QString QXmppBookmarkUrl::name() const
 {
-    return m_name;
+    return m_data.name;
 }
 
 /*! Sets the friendly \a name for the bookmark. */
 void QXmppBookmarkUrl::setName(const QString &name)
 {
-    m_name = name;
+    m_data.name = name;
 }
 
 /*! Returns the URL for the web page. */
 QUrl QXmppBookmarkUrl::url() const
 {
-    return m_url;
+    return m_data.url;
 }
 
 /*!
@@ -103,7 +102,7 @@ QUrl QXmppBookmarkUrl::url() const
 */
 void QXmppBookmarkUrl::setUrl(const QUrl &url)
 {
-    m_url = url;
+    m_data.url = url;
 }
 
 /*! Returns the conference rooms bookmarks in this bookmark set. */
@@ -147,19 +146,11 @@ void QXmppBookmarkSet::parse(const QDomElement &element)
 {
     try {
         auto storage = XmlSpecParser::parse<BookmarkStorage>(element);
-        m_conferences = transform<QList<QXmppBookmarkConference>>(storage.conferences, [](const auto &c) {
-            QXmppBookmarkConference conference;
-            conference.setAutoJoin(c.autojoin);
-            conference.setJid(c.jid);
-            conference.setName(c.name);
-            conference.setNickName(c.nick);
-            return conference;
+        m_conferences = transform<QList<QXmppBookmarkConference>>(std::move(storage.conferences), [](BookmarkConference &&c) {
+            return QXmppBookmarkConference(std::move(c));
         });
-        m_urls = transform<QList<QXmppBookmarkUrl>>(storage.urls, [](const auto &u) {
-            QXmppBookmarkUrl url;
-            url.setName(u.name);
-            url.setUrl(u.url);
-            return url;
+        m_urls = transform<QList<QXmppBookmarkUrl>>(std::move(storage.urls), [](BookmarkUrl &&u) {
+            return QXmppBookmarkUrl(std::move(u));
         });
     } catch (ParsingError) {
     }

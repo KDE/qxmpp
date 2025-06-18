@@ -7,6 +7,7 @@
 #define QXMPPBINDIQ_H
 
 #include "QXmppIq.h"
+#include "QXmppPackets_p.h"
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)
 class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API") QXmppBindIq : public QXmppIq
@@ -29,8 +30,7 @@ protected:
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
 
 private:
-    QString m_jid;
-    QString m_resource;
+    QXmpp::Private::Bind m_data;
 };
 #endif
 

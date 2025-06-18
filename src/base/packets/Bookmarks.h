@@ -6,32 +6,13 @@
 #define BOOKMARKS_H
 
 #include "QXmppConstants_p.h"
+#include "QXmppPackets_p.h"
 
 #include "Xml.h"
 
 namespace QXmpp::Private {
 
-struct BookmarkConference {
-    static constexpr std::tuple XmlTag = { u"conference", ns_bookmarks };
-    bool autojoin;
-    QString jid;
-    QString name;
-    QString nick;
-    QString password;
-};
-
-struct BookmarkUrl {
-    static constexpr std::tuple XmlTag = { u"url", ns_bookmarks };
-
-    QString name;
-    QUrl url;
-};
-
-struct BookmarkStorage {
-    static constexpr std::tuple XmlTag = { u"storage", ns_bookmarks };
-    QList<BookmarkConference> conferences;
-    QList<BookmarkUrl> urls;
-};
+// actual structs in QXmppPackets_p.h
 
 template<>
 struct XmlSpec<BookmarkConference> {
