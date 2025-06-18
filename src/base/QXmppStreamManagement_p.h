@@ -11,6 +11,8 @@
 #include "QXmppStanza.h"
 #include "QXmppTask.h"
 
+#include "Xml.h"
+
 #include <QDomDocument>
 #include <QXmlStreamWriter>
 
@@ -36,12 +38,8 @@ class XmppSocket;
 
 namespace QXmpp::Private {
 
-struct SmFeature {
-    static constexpr std::tuple XmlTag = { u"sm", QXmpp::Private::ns_stream_management };
-};
-
 struct SmEnable {
-    static constexpr std::tuple XmlTag = { u"enable", QXmpp::Private::ns_stream_management };
+    static constexpr std::tuple XmlTag = { u"enable", ns_stream_management };
     static std::optional<SmEnable> fromDom(const QDomElement &);
     void toXml(XmlWriter &w) const;
 
@@ -50,7 +48,7 @@ struct SmEnable {
 };
 
 struct SmEnabled {
-    static constexpr std::tuple XmlTag = { u"enabled", QXmpp::Private::ns_stream_management };
+    static constexpr std::tuple XmlTag = { u"enabled", ns_stream_management };
     static std::optional<SmEnabled> fromDom(const QDomElement &);
     void toXml(XmlWriter &w) const;
 

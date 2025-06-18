@@ -72,58 +72,12 @@ struct Enums::Data<SaslHtMechanism::ChannelBindingType> {
 
 namespace QXmpp::Private {
 
-template<>
-struct XmlSpec<Sasl::Auth> {
-    static constexpr std::tuple Spec = {
-        XmlAttribute { &Sasl::Auth::mechanism, u"mechanism" },
-        XmlOptionalText { &Sasl::Auth::value, Base64Serializer() },
-    };
-};
-
-template<>
-struct XmlSpec<Sasl::Challenge> {
-    static constexpr std::tuple Spec = {
-        XmlOptionalText { &Sasl::Challenge::value, Base64Serializer() },
-    };
-};
-
-template<>
-struct XmlSpec<Sasl::Response> {
-    static constexpr std::tuple Spec = {
-        XmlOptionalText { &Sasl::Response::value, Base64Serializer() },
-    };
-};
-
-template<>
-struct XmlSpec<Sasl::Success> {
-    static constexpr std::tuple Spec = {};
-};
-
-template<>
-struct XmlSpec<Bind2Feature> {
-    static constexpr std::tuple Spec = {
-        XmlElement {
-            u"inline",
-            XmlSingleAttributeElements { &Bind2Feature::features, Tag { u"feature", ns_bind2 }, u"var" },
-        },
-    };
-};
-
-template<>
-struct XmlSpec<Bind2Request> {
-    static constexpr std::tuple Spec = {
-        XmlElement { { u"tag", ns_bind2 }, Optional(), XmlText { &Bind2Request::tag } },
-    };
-};
-
 namespace Sasl {
 
 std::optional<Auth> Auth::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Auth>(el); }
-
 void Auth::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
 std::optional<Challenge> Challenge::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Challenge>(el); }
-
 void Challenge::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
 std::optional<Failure> Failure::fromDom(const QDomElement &el)
@@ -170,281 +124,45 @@ void Success::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writ
 }  // namespace Sasl
 
 std::optional<Bind2Feature> Bind2Feature::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Bind2Feature>(el); }
-void Bind2Feature::toXml(XmlWriter &writer) const { return XmlSpecSerializer::serialize(writer, *this); }
+void Bind2Feature::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-std::optional<Bind2Request> Bind2Request::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"bind" || el.namespaceURI() != ns_bind2) {
-        return {};
-    }
+std::optional<Bind2Request> Bind2Request::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Bind2Request>(el); }
+void Bind2Request::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-    return Bind2Request {
-        firstChildElement(el, u"tag", ns_bind2).text(),
-        !firstChildElement(el, u"inactive", ns_csi).isNull(),
-        !firstChildElement(el, u"enable", ns_carbons).isNull(),
-        parseOptionalChildElement<SmEnable>(el),
-    };
-}
+std::optional<Bind2Bound> Bind2Bound::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Bind2Bound>(el); }
+void Bind2Bound::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-void Bind2Request::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        OptionalTextElement { u"tag", tag },
-        OptionalContent { csiInactive, Element { { u"inactive", ns_csi } } },
-        OptionalContent { carbonsEnable, Element { { u"enable", ns_carbons } } },
-        smEnable,
-    });
-}
+std::optional<FastFeature> FastFeature::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<FastFeature>(el); }
+void FastFeature::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-std::optional<Bind2Bound> Bind2Bound::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"bound" || el.namespaceURI() != ns_bind2) {
-        return {};
-    }
+std::optional<FastTokenRequest> FastTokenRequest::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<FastTokenRequest>(el); }
+void FastTokenRequest::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-    return Bind2Bound {
-        .smFailed = parseOptionalChildElement<SmFailed>(el),
-        .smEnabled = parseOptionalChildElement<SmEnabled>(el),
-    };
-}
+std::optional<FastToken> FastToken::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<FastToken>(el); }
+void FastToken::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-void Bind2Bound::toXml(XmlWriter &writer) const
-{
-    writer.write(Element { XmlTag, smFailed, smEnabled });
-}
-
-std::optional<FastFeature> FastFeature::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"fast" || el.namespaceURI() != ns_fast) {
-        return {};
-    }
-
-    return FastFeature {
-        .mechanisms = parseTextElements<std::vector<QString>>(el, u"mechanism", ns_fast),
-        .tls0rtt = parseBoolean(el.attribute(QStringLiteral("tls-0rtt"))).value_or(false),
-    };
-}
-
-void FastFeature::toXml(XmlWriter &writer) const
-{
-    writer.write(Element { XmlTag, TextElements { u"mechanism", mechanisms } });
-}
-
-std::optional<FastTokenRequest> FastTokenRequest::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"request-token" || el.namespaceURI() != ns_fast) {
-        return {};
-    }
-    return FastTokenRequest { el.attribute(QStringLiteral("mechanism")) };
-}
-
-void FastTokenRequest::toXml(XmlWriter &writer) const
-{
-    writer.write(Element { XmlTag, Attribute { u"mechanism", mechanism } });
-}
-
-std::optional<FastToken> FastToken::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"token" || el.namespaceURI() != ns_fast) {
-        return {};
-    }
-
-    return FastToken {
-        QXmppUtils::datetimeFromString(el.attribute(QStringLiteral("expiry"))),
-        el.attribute(QStringLiteral("token")),
-    };
-}
-
-void FastToken::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        Attribute { u"expiry", expiry },
-        Attribute { u"token", token },
-    });
-}
-
-std::optional<FastRequest> FastRequest::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"fast" || el.namespaceURI() != ns_fast) {
-        return {};
-    }
-    return FastRequest {
-        parseInt<uint64_t>(el.attribute(QStringLiteral("count"))),
-        parseBoolean(el.attribute(QStringLiteral("invalidate"))).value_or(false),
-    };
-}
-
-void FastRequest::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        OptionalAttribute { u"count", count },
-        OptionalAttribute { u"invalidate", DefaultedBool { invalidate, false } },
-    });
-}
+std::optional<FastRequest> FastRequest::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<FastRequest>(el); }
+void FastRequest::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
 namespace Sasl2 {
 
-std::optional<StreamFeature> StreamFeature::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"authentication" || el.namespaceURI() != ns_sasl_2) {
-        return {};
-    }
+std::optional<StreamFeature> StreamFeature::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<StreamFeature>(el); }
+void StreamFeature::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-    StreamFeature feature;
-    feature.mechanisms = parseTextElements<QList<QString>>(el, u"mechanism", ns_sasl_2);
-    if (auto inlineEl = firstChildElement(el, u"inline", ns_sasl_2); !inlineEl.isNull()) {
-        feature.bind2Feature = parseOptionalChildElement<Bind2Feature>(inlineEl);
-        feature.fast = parseOptionalChildElement<FastFeature>(inlineEl);
-        feature.streamResumptionAvailable = hasChild<SmFeature>(inlineEl);
-    }
-    return feature;
-}
+std::optional<UserAgent> UserAgent::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<UserAgent>(el); }
+void UserAgent::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-void StreamFeature::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        TextElements { u"mechanism", mechanisms },
-        OptionalContent {
-            bind2Feature || fast || streamResumptionAvailable,
-            Element {
-                u"inline",
-                bind2Feature,
-                fast,
-                OptionalContent { streamResumptionAvailable, Element { { u"sm", ns_stream_management } } },
-            },
-        },
-    });
-}
+std::optional<Authenticate> Authenticate::fromDom(const QDomElement &el) { return XmlSpecParser::parse<Authenticate>(el); }
+void Authenticate::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-std::optional<UserAgent> UserAgent::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"user-agent" || el.namespaceURI() != ns_sasl_2) {
-        return {};
-    }
+std::optional<Challenge> Challenge::fromDom(const QDomElement &el) { return XmlSpecParser::parse<Challenge>(el); }
+void Challenge::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-    return UserAgent {
-        QUuid::fromString(el.attribute(u"id"_s)),
-        firstChildElement(el, u"software", ns_sasl_2).text(),
-        firstChildElement(el, u"device", ns_sasl_2).text(),
-    };
-}
+std::optional<Response> Response::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Response>(el); }
+void Response::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
-void UserAgent::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        u"user-agent",
-        OptionalAttribute { u"id", id },
-        OptionalTextElement { u"software", software },
-        OptionalTextElement { u"device", device },
-    });
-}
-
-std::optional<Authenticate> Authenticate::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"authenticate" || el.namespaceURI() != ns_sasl_2) {
-        return {};
-    }
-    return Authenticate {
-        el.attribute(u"mechanism"_s),
-        parseBase64(firstChildElement(el, u"initial-response", ns_sasl_2).text()).value_or(QByteArray()),
-        parseOptionalChildElement<UserAgent>(el),
-        parseOptionalChildElement<Bind2Request>(el),
-        parseOptionalChildElement<SmResume>(el),
-        parseOptionalChildElement<FastTokenRequest>(el),
-        parseOptionalChildElement<FastRequest>(el),
-    };
-}
-
-void Authenticate::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        Attribute { u"mechanism", mechanism },
-        OptionalTextElement { u"initial-response", Base64 { initialResponse } },
-        userAgent,
-        bindRequest,
-        smResume,
-        tokenRequest,
-        fast,
-    });
-}
-
-std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"challenge" || el.namespaceURI() != ns_sasl_2) {
-        return {};
-    }
-
-    if (auto result = parseBase64(el.text())) {
-        return Challenge { *result };
-    }
-    return {};
-}
-
-void Challenge::toXml(XmlWriter &writer) const
-{
-    writer.write(TextElement { XmlTag, Base64 { data } });
-}
-
-std::optional<Response> Response::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"response" || el.namespaceURI() != ns_sasl_2) {
-        return {};
-    }
-
-    if (auto result = parseBase64(el.text())) {
-        return Response { *result };
-    }
-    return {};
-}
-
-void Response::toXml(XmlWriter &writer) const
-{
-    writer.write(TextElement { XmlTag, Base64 { data } });
-}
-
-std::optional<Success> Success::fromDom(const QDomElement &el)
-{
-    if (el.tagName() != u"success" || el.namespaceURI() != ns_sasl_2) {
-        return {};
-    }
-
-    Success output;
-
-    if (auto subEl = firstChildElement(el, u"additional-data", ns_sasl_2); !subEl.isNull()) {
-        if (auto result = parseBase64(subEl.text())) {
-            output.additionalData = *result;
-        } else {
-            // invalid base64 data
-            return {};
-        }
-    }
-
-    output.authorizationIdentifier = firstChildElement(el, u"authorization-identifier", ns_sasl_2).text();
-    output.bound = parseOptionalChildElement<Bind2Bound>(el);
-    output.smResumed = parseOptionalChildElement<SmResumed>(el);
-    output.smFailed = parseOptionalChildElement<SmFailed>(el);
-    output.token = parseOptionalChildElement<FastToken>(el);
-
-    return output;
-}
-
-void Success::toXml(XmlWriter &writer) const
-{
-    writer.write(Element {
-        XmlTag,
-        OptionalTextElement { u"additional-data", into<Base64>(additionalData) },
-        TextElement { u"authorization-identifier", authorizationIdentifier },
-        bound,
-        smResumed,
-        smFailed,
-        token,
-    });
-}
+std::optional<Success> Success::fromDom(const QDomElement &el) { return XmlSpecParser::parse<Success>(el); }
+void Success::toXml(XmlWriter &writer) const { XmlSpecSerializer::serialize(writer, *this); }
 
 std::optional<Failure> Failure::fromDom(const QDomElement &el)
 {
