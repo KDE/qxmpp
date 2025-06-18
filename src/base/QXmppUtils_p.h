@@ -59,6 +59,19 @@ std::optional<bool> parseBoolean(const QString &str);
 QString serializeBoolean(bool);
 
 //
+// XML Specs
+//
+
+template<typename Struct>
+struct XmlSpec;
+
+template<typename T>
+concept HasXmlSpec = requires {
+    typename XmlSpec<T>;
+    { XmlSpec<T>::Spec };
+};
+
+//
 // DOM
 //
 

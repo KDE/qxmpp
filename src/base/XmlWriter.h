@@ -170,6 +170,8 @@ public:
     {
         f();
     }
+    template<HasXmlSpec T>
+    void write(const T &t);
 
 private:
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
