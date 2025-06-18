@@ -50,14 +50,25 @@ auto chain(QXmppTask<Input> &&source, QObject *context, Converter task) -> QXmpp
 {
     QXmppPromise<Result> promise;
 
-    source.then(context, [=](const Input &input) mutable {
-        if constexpr (std::is_void_v<Result>) {
-            task(input);
-            promise.finish();
-        } else {
-            promise.finish(task(input));
-        }
-    });
+    if constexpr (std::is_void_v<Input>) {
+        source.then(context, [=]() mutable {
+            if constexpr (std::is_void_v<Result>) {
+                task();
+                promise.finish();
+            } else {
+                promise.finish(task());
+            }
+        });
+    } else {
+        source.then(context, [=](const Input &input) mutable {
+            if constexpr (std::is_void_v<Result>) {
+                task(input);
+                promise.finish();
+            } else {
+                promise.finish(task(input));
+            }
+        });
+    }
     return promise.task();
 }
 
