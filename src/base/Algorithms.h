@@ -189,9 +189,9 @@ auto into(std::variant<BaseTypes...> &&variant)
 }
 
 template<typename GreaterVariant, typename... BaseTypes>
-auto into(std::variant<BaseTypes...> variant)
+auto into(const std::variant<BaseTypes...> &variant)
 {
-    return std::visit([](auto &&value) -> GreaterVariant { return value; }, std::move(variant));
+    return std::visit([](const auto &value) -> GreaterVariant { return value; }, variant);
 }
 
 }  // namespace QXmpp::Private
