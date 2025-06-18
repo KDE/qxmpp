@@ -28,42 +28,28 @@ QXmppBindIq QXmppBindIq::bindAddressIq(const QString &resource)
 }
 
 /// Returns the bound JID.
-QString QXmppBindIq::jid() const
-{
-    return m_jid;
-}
+QString QXmppBindIq::jid() const { return m_data.jid; }
 
 /// Sets the bound JID.
-void QXmppBindIq::setJid(const QString &jid)
-{
-    m_jid = jid;
-}
+void QXmppBindIq::setJid(const QString &jid) { m_data.jid = jid; }
 
 /// Returns the requested resource.
-QString QXmppBindIq::resource() const
-{
-    return m_resource;
-}
+QString QXmppBindIq::resource() const { return m_data.resource; }
 
 /// Sets the requested resource.
-void QXmppBindIq::setResource(const QString &resource)
-{
-    m_resource = resource;
-}
+void QXmppBindIq::setResource(const QString &resource) { m_data.resource = resource; }
 
 /// \cond
 void QXmppBindIq::parseElementFromChild(const QDomElement &element)
 {
     try {
-        auto bind = XmlSpecParser::parse<Bind>(element.firstChildElement());
-        m_jid = bind.jid;
-        m_resource = bind.resource;
+        m_data = XmlSpecParser::parse<Bind>(element.firstChildElement());
     } catch (ParsingError) {
     }
 }
 
 void QXmppBindIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    XmlSpecSerializer::serialize(XmlWriter(writer), Bind { m_jid, m_resource });
+    XmlSpecSerializer::serialize(XmlWriter(writer), m_data);
 }
 /// \endcond

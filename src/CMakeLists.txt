@@ -59,6 +59,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppNonza.h
     base/QXmppNonSASLAuth.h
     base/QXmppOutOfBandUrl.h
+    base/QXmppPackets_p.h
     base/QXmppPingIq.h
     base/QXmppPresence.h
     base/QXmppPromise.h

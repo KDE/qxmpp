@@ -5,18 +5,13 @@
 #ifndef BIND_H
 #define BIND_H
 
-#include "QXmppConstants_p.h"
+#include "QXmppPackets_p.h"
 
 #include "Xml.h"
 
 namespace QXmpp::Private {
 
-struct Bind {
-    static constexpr std::tuple XmlTag = { u"bind", ns_bind };
-    // XML schema actually says variant<Jid, Resource>
-    QString jid;
-    QString resource;
-};
+// struct in QXmppPackets_p.h
 
 template<>
 struct XmlSpec<Bind> {

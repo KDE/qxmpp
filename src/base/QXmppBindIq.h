@@ -7,6 +7,7 @@
 #define QXMPPBINDIQ_H
 
 #include "QXmppIq.h"
+#include "QXmppPackets_p.h"
 
 ///
 /// \brief The QXmppBindIq class represents an IQ used for resource
@@ -36,8 +37,7 @@ protected:
     /// \endcond
 
 private:
-    QString m_jid;
-    QString m_resource;
+    QXmpp::Private::Bind m_data;
 };
 
 #endif  // QXMPPBIND_H
