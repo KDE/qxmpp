@@ -341,7 +341,6 @@ bool QXmppCallManager::handleStanza(const QDomElement &element)
 
 void QXmppCallManager::onRegistered(QXmppClient *client)
 {
-    connect(client, &QXmppClient::connected, this, &QXmppCallManager::onConnected);
     connect(client, &QXmppClient::disconnected, this, &QXmppCallManager::onDisconnected);
     connect(client, &QXmppClient::presenceReceived, this, &QXmppCallManager::onPresenceReceived);
 }
@@ -436,12 +435,14 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, const QStr
             return;
         }
 
-        auto *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
+        refreshStunTurnConfig().then(call, [this, call] {
+            auto *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
 
-        // register call
-        d->addCall(call);
+            // register call
+            d->addCall(call);
 
-        call->d->sendInvite();
+            call->d->sendInvite();
+        });
     });
 
     return call;
@@ -474,21 +475,6 @@ void QXmppCallManager::onCallDestroyed(QObject *object)
     d->calls.removeAll(static_cast<QXmppCall *>(object));
 }
 
-void QXmppCallManager::onConnected()
-{
-    if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        // request STUN/TURN servers
-        requestStunTurnConfig(client(), this).then(this, [this](auto &&result) {
-            if (auto *error = std::get_if<QXmppError>(&result)) {
-                warning(u"Could not fetch STUN/TURN servers: %1"_s.arg(error->description));
-                d->stunTurnServers = StunTurnConfig { {}, {} };
-            } else {
-                d->stunTurnServers = std::get<StunTurnConfig>(std::move(result));
-            }
-        });
-    }
-}
-
 // Handles disconnection from server.
 void QXmppCallManager::onDisconnected()
 {
@@ -497,7 +483,7 @@ void QXmppCallManager::onDisconnected()
     }
 }
 
-std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingleIq &&iq)
+auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
 {
     using Error = QXmppStanza::Error;
 
@@ -530,47 +516,52 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
             return {};
         }
 
-        auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
-        if (!stream) {
-            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
-            return {};
-        }
-
-        // check content description and transport
-        if (!call->d->handleDescription(stream, content) ||
-            !call->d->handleTransport(stream, content)) {
-
-            // terminate call
-            call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
-            call->terminated();
-            return {};
-        }
-
         // register call
         d->addCall(call.get());
 
-        later(this, [this, call = std::move(call)]() mutable {
-            // send ringing indication
-            auto ringing = call->d->createIq(QXmppJingleIq::SessionInfo);
-            ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
-            client()->sendIq(std::move(ringing));
+        return chain<std::variant<QXmppIq>>(refreshStunTurnConfig(), this, [this, content, callPtr = call.release()]() mutable -> QXmppIq {
+            auto call = std::unique_ptr<QXmppCall>(callPtr);
 
-            // notify user
-            Q_EMIT callReceived(call);
-
-            if (call) {
-                // nobody took over the call
-
-                // take ownership, delete on finished
-                auto *rawCall = call.release();
-                rawCall->setParent(this);
-                connect(rawCall, &QXmppCall::finished, rawCall, &QObject::deleteLater);
-
-                // decline call
-                rawCall->d->terminate({ QXmppJingleReason::Decline, {}, {} });
+            // create stream (with up-to-date STUN/TURN credentials)
+            auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
+            if (!stream) {
+                call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
+                return {};
             }
+
+            // check content description and transport
+            if (!call->d->handleDescription(stream, content) ||
+                !call->d->handleTransport(stream, content)) {
+
+                // terminate call
+                call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
+                call->terminated();
+                return {};
+            }
+
+            later(this, [this, call = std::move(call)]() mutable {
+                // send ringing indication
+                auto ringing = call->d->createIq(QXmppJingleIq::SessionInfo);
+                ringing.setRtpSessionState(QXmppJingleIq::RtpSessionStateRinging());
+                client()->sendIq(std::move(ringing));
+
+                // notify user
+                Q_EMIT callReceived(call);
+
+                if (call) {
+                    // nobody took over the call
+
+                    // take ownership, delete on finished
+                    auto *rawCall = call.release();
+                    rawCall->setParent(this);
+                    connect(rawCall, &QXmppCall::finished, rawCall, &QObject::deleteLater);
+
+                    // decline call
+                    rawCall->d->terminate({ QXmppJingleReason::Decline, {}, {} });
+                }
+            });
+            return {};
         });
-        return {};
     }
     default: {
         // for all other requests, require a valid call
@@ -580,7 +571,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallManager::handleIq(QXmppJingle
             warning(u"Remote party %1 sent a request for an unknown call %2"_s.arg(iq.from(), iq.sid()));
             return Error { Error::Cancel, Error::ItemNotFound, u"Unknown call."_s };
         }
-        return call.value()->d->handleRequest(std::move(iq));
+        return into<IncomingIqResult>(call.value()->d->handleRequest(std::move(iq)));
     }
     }
 }
@@ -596,5 +587,36 @@ void QXmppCallManager::onPresenceReceived(const QXmppPresence &presence)
         auto &callObject = call.value();
         callObject->d->error = { u"Received unavailable presence"_s, {} };
         callObject->d->terminate({ QXmppJingleReason::Gone, {}, {} });
+    }
+}
+
+QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
+{
+    if (d->refreshStunTurnConfigPromise.has_value()) {
+        // attach to ongoing task
+        return d->refreshStunTurnConfigPromise->task();
+    } else {
+        if (d->stunTurnServers.has_value()) {
+            // TODO: check expiry and refresh credentials
+            return makeReadyTask();
+        }
+
+        // initial request of STUN/TURN credentials
+        d->refreshStunTurnConfigPromise = QXmppPromise<void>();
+
+        requestStunTurnConfig(client(), this).then(this, [this](const auto &result) {
+            if (auto *error = std::get_if<QXmppError>(&result)) {
+                warning(u"Could not fetch STUN/TURN servers: %1"_s.arg(error->description));
+                d->stunTurnServers = StunTurnConfig { {}, {} };
+            } else {
+                d->stunTurnServers = std::get<StunTurnConfig>(result);
+            }
+
+            auto p = std::move(d->refreshStunTurnConfigPromise.value());
+            d->refreshStunTurnConfigPromise.reset();
+            p.finish();
+        });
+
+        return d->refreshStunTurnConfigPromise->task();
     }
 }
