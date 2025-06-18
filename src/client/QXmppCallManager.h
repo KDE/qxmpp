@@ -8,9 +8,8 @@
 #define QXMPPCALLMANAGER_H
 
 #include "QXmppClientExtension.h"
-#include "QXmppLogger.h"
+#include "QXmppTask.h"
 
-class QHostAddress;
 class QXmppCall;
 class QXmppCallManagerPrivate;
 class QXmppIq;
@@ -52,10 +51,11 @@ protected:
 
 private:
     void onCallDestroyed(QObject *object);
-    void onConnected();
     void onDisconnected();
-    std::variant<QXmppIq, QXmppStanza::Error> handleIq(QXmppJingleIq &&iq);
+    using IncomingIqResult = std::variant<QXmppIq, QXmppStanza::Error, QXmppTask<std::variant<QXmppIq>>>;
+    IncomingIqResult handleIq(QXmppJingleIq &&iq);
     void onPresenceReceived(const QXmppPresence &presence);
+    QXmppTask<void> refreshStunTurnConfig();
 
     const std::unique_ptr<QXmppCallManagerPrivate> d;
     friend class QXmppCall;

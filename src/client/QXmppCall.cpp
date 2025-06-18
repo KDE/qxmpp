@@ -302,6 +302,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
         break;
     }
     case QXmppJingleIq::ContentAccept: {
+        // TODO: check we are creator of the stream; assure session accepted
         // check content description and transport
         auto stream = find(streams, content.name(), &QXmppCallStream::name);
         if (!stream ||
@@ -314,6 +315,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
         break;
     }
     case QXmppJingleIq::ContentAdd: {
+        // TODO: assure session accepted
         // check media stream does not exist yet
         if (contains(streams, content.name(), &QXmppCallStream::name)) {
             return Error { Error::Cancel, Error::Conflict, u"Media stream already exists."_s };
@@ -365,6 +367,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
         break;
     }
     case QXmppJingleIq::TransportInfo: {
+        // TODO: assure session accepted
         // check content transport
         auto stream = find(streams, content.name(), &QXmppCallStream::name);
         if (!stream ||
