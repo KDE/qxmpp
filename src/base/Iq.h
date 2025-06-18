@@ -189,13 +189,13 @@ auto iqFromDomImpl(const QDomElement &el) -> std::optional<Iq<Type, Payload>>
 
 // parse Iq type from QDomElement or pass error
 template<typename Payload>
-auto parseIqResponse(std::variant<QDomElement, QXmppError> &&sendResult) -> std::variant<Payload, QXmppError>
+auto parseIqResponse(const std::variant<QDomElement, QXmppError> &sendResult) -> std::variant<Payload, QXmppError>
 {
     using StanzaError = QXmppStanza::Error;
     using Result = std::variant<Payload, QXmppError>;
 
     return map<Result>(
-        [](QDomElement &&el) -> Result {
+        [](const QDomElement &el) -> Result {
             auto type = el.attribute(u"type"_s);
             if (type == IqType::Result) {
                 if (auto payload = parseElement<Payload>(el.firstChildElement())) {
@@ -222,7 +222,7 @@ auto parseIqResponse(std::variant<QDomElement, QXmppError> &&sendResult) -> std:
                 };
             }
         },
-        std::move(sendResult));
+        sendResult);
 }
 
 // For usage with QXmppClient::sendIq()

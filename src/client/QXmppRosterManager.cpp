@@ -584,22 +584,22 @@ void QXmppRosterManager::onRegistered(QXmppClient *client)
             return promise.task();
         };
         auto exportData = [this]() {
-            return chainMapSuccess(requestRoster(), this, [](QXmppRosterIq &&iq) -> RosterData {
-                const auto items = transformFilter<RosterData::Items>(iq.items(), [](const auto &item) -> std::optional<QXmppRosterIq::Item> {
-                    if (item.isMixChannel()) {
-                        return {};
-                    }
+            return chainMapSuccess(requestRoster(), this, [](const QXmppRosterIq &iq) -> RosterData {
+                return {
+                    transformFilter<RosterData::Items>(iq.items(), [](const auto &item) -> std::optional<QXmppRosterIq::Item> {
+                        if (item.isMixChannel()) {
+                            return {};
+                        }
 
-                    auto fixed = item;
+                        auto fixed = item;
 
-                    // We don't want this to be sent while importing.
-                    // See https://datatracker.ietf.org/doc/html/rfc6121#section-2.1.2.2
-                    fixed.setSubscriptionStatus({});
+                        // We don't want this to be sent while importing.
+                        // See https://datatracker.ietf.org/doc/html/rfc6121#section-2.1.2.2
+                        fixed.setSubscriptionStatus({});
 
-                    return fixed;
-                });
-
-                return { items };
+                        return fixed;
+                    })
+                };
             });
         };
 

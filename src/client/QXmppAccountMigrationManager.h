@@ -140,11 +140,11 @@ void QXmppAccountMigrationManager::registerExportData(ImportFunc importFunc, Exp
 
     using AnyResult = std::variant<std::any, QXmppError>;
     auto exportInternal = [this, exportFunc = std::move(exportFunc)]() -> QXmppTask<AnyResult> {
-        return chain<AnyResult>(exportFunc(), this, [](Result<DataType> &&result) {
+        return chain<AnyResult>(exportFunc(), this, [](const Result<DataType> &result) {
             return std::visit(overloaded {
                                   [](DataType data) -> AnyResult { return std::any(std::move(data)); },
                                   [](QXmppError err) -> AnyResult { return err; } },
-                              std::move(result));
+                              result);
         });
     };
 

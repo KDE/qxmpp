@@ -16,14 +16,14 @@ inline QXmppTask<GetResult<ItemT>> request(QXmppPubSubManager *pubSub, const QSt
 {
     using PubSub = QXmppPubSubManager;
 
-    auto process = [](PubSub::ItemsResult<ItemT> &&result) -> GetResult<ItemT> {
-        if (const auto itemsResult = std::get_if<PubSub::Items<ItemT>>(&result)) {
+    auto process = [](const PubSub::ItemsResult<ItemT> &result) -> GetResult<ItemT> {
+        if (const auto *itemsResult = std::get_if<PubSub::Items<ItemT>>(&result)) {
             if (!itemsResult->items.isEmpty()) {
-                return itemsResult->items.takeFirst();
+                return itemsResult->items.constFirst();
             }
             return QXmppError { QStringLiteral("User has no published items."), {} };
         } else {
-            return std::get<QXmppError>(std::move(result));
+            return std::get<QXmppError>(result);
         }
     };
     return chain<GetResult<ItemT>>(pubSub->requestItems<ItemT>(jid, nodeName), parent, process);

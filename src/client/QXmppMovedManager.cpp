@@ -171,13 +171,13 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(const QS
     return chain<QXmppClient::EmptyResult>(
         client()->findExtension<QXmppPubSubManager>()->requestItem<QXmppMovedItem>(oldBareJid, ns_moved.toString(), u"current"_s),
         this,
-        [=, this](QXmppPubSubManager::ItemResult<QXmppMovedItem> &&result) {
+        [=, this](const QXmppPubSubManager::ItemResult<QXmppMovedItem> &result) {
             return std::visit(
                 overloaded {
-                    [newBareJid, this](QXmppMovedItem item) -> Result {
+                    [newBareJid, this](const QXmppMovedItem &item) -> Result {
                         return movedJidsMatch(newBareJid, item.newJid());
                     },
-                    [newBareJid, this](QXmppError err) -> Result {
+                    [newBareJid, this](const QXmppError &err) -> Result {
                         // As a special case, if the attempt to retrieve the moved statement results in an error with the <gone/> condition
                         // as defined in RFC 6120, and that <gone/> element contains a valid XMPP URI (e.g. xmpp:user@example.com), then the
                         // error response MUST be handled equivalent to a <moved/> statement containing a <new-jid/> element with the JID
@@ -205,7 +205,7 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(const QS
                         return err;
                     },
                 },
-                std::move(result));
+                result);
         });
 }
 
@@ -275,7 +275,7 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
     switch (entry.subscriptionType()) {
     case QXmppRosterIq::Item::From:
     case QXmppRosterIq::Item::Both:
-        return chain<QXmppPresence>(verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from())), this, [this, presence = presence](Result &&result) mutable {
+        return chain<QXmppPresence>(verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from())), this, [this, presence = presence](const Result &result) mutable {
             if (std::holds_alternative<QXmppError>(result)) {
                 warning(presence.from() + u" sent a presence subscription request with the invalid old JID "_s + presence.oldJid());
                 presence.setOldJid({});

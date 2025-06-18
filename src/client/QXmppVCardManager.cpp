@@ -180,8 +180,8 @@ void QXmppVCardManager::onRegistered(QXmppClient *client)
         };
 
         auto exportData = [this]() {
-            return chain<DataResult>(fetchVCard(this->client()->configuration().jidBare()), this, [](auto &&result) {
-                return mapSuccess(std::move(result), [](QXmppVCardIq &&iq) -> VCardData { return { iq }; });
+            return chain<DataResult>(fetchVCard(this->client()->configuration().jidBare()), this, [](const auto &result) {
+                return mapSuccess(result, [](const QXmppVCardIq &iq) { return VCardData { iq }; });
             });
         };
 

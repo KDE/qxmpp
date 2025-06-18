@@ -74,10 +74,10 @@ QXmppTask<ServiceResult> QXmpp::Private::requestCredentials(QXmppClient *client,
         { std::move(s) },
     } };
 
-    return chain<ServiceResult>(client->sendIq(std::move(iq)), client, [](QXmppClient::IqResult result) {
+    return chain<ServiceResult>(client->sendIq(std::move(iq)), client, [](const QXmppClient::IqResult &result) {
         return map<ServiceResult>(
             [](ExtDiscoCredentials &&c) { return c.service; },
-            parseIqResponse<ExtDiscoCredentials>(std::move(result)));
+            parseIqResponse<ExtDiscoCredentials>(result));
     });
 }
 

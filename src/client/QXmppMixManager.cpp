@@ -547,7 +547,7 @@ QXmppTask<QXmppMixManager::CreationResult> QXmppMixManager::createChannel(const 
 ///
 QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids(const QString &serviceJid)
 {
-    return chainMapSuccess(d->discoveryManager->requestDiscoItems(serviceJid), this, [](QList<QXmppDiscoveryIq::Item> &&items) {
+    return chainMapSuccess(d->discoveryManager->requestDiscoItems(serviceJid), this, [](const auto &items) {
         return transform<QVector<ChannelJid>>(items, [](const QXmppDiscoveryIq::Item &item) {
             return item.jid();
         });
@@ -563,7 +563,7 @@ QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids
 ///
 QXmppTask<QXmppMixManager::ChannelNodeResult> QXmppMixManager::requestChannelNodes(const QString &channelJid)
 {
-    return chainMapSuccess(d->discoveryManager->requestDiscoItems(channelJid, MIX_SERVICE_DISCOVERY_NODE.toString()), this, [](QList<QXmppDiscoveryIq::Item> &&items) {
+    return chainMapSuccess(d->discoveryManager->requestDiscoItems(channelJid, MIX_SERVICE_DISCOVERY_NODE.toString()), this, [](const auto &items) {
         return Enums::fromStrings<QXmppMixConfigItem::Node>(transform<QList<QString>>(items, &QXmppDiscoveryIq::Item::node));
     });
 }
@@ -577,9 +577,12 @@ QXmppTask<QXmppMixManager::ChannelNodeResult> QXmppMixManager::requestChannelNod
 ///
 QXmppTask<QXmppMixManager::ConfigurationResult> QXmppMixManager::requestChannelConfiguration(const QString &channelJid)
 {
-    return chainMapSuccess(d->pubSubManager->requestItems<QXmppMixConfigItem>(channelJid, ns_mix_node_config.toString()), this, [](QXmppPubSubManager::Items<QXmppMixConfigItem> &&items) {
-        return items.items.takeFirst();
-    });
+    return chainMapSuccess(
+        d->pubSubManager->requestItems<QXmppMixConfigItem>(channelJid, ns_mix_node_config.toString()),
+        this,
+        [](const QXmppPubSubManager::Items<QXmppMixConfigItem> &items) {
+            return items.items.first();
+        });
 }
 
 ///
@@ -618,8 +621,8 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::updateChannelConfiguration(
 ///
 QXmppTask<QXmppMixManager::InformationResult> QXmppMixManager::requestChannelInformation(const QString &channelJid)
 {
-    return chainMapSuccess(d->pubSubManager->requestItems<QXmppMixInfoItem>(channelJid, ns_mix_node_info.toString()), this, [](QXmppPubSubManager::Items<QXmppMixInfoItem> &&items) {
-        return items.items.takeFirst();
+    return chainMapSuccess(d->pubSubManager->requestItems<QXmppMixInfoItem>(channelJid, ns_mix_node_info.toString()), this, [](const QXmppPubSubManager::Items<QXmppMixInfoItem> &items) {
+        return items.items.first();
     });
 }
 
@@ -978,7 +981,7 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::unbanAllJids(const QString 
 ///
 QXmppTask<QXmppMixManager::ParticipantResult> QXmppMixManager::requestParticipants(const QString &channelJid)
 {
-    return chainMapSuccess(d->pubSubManager->requestItems<QXmppMixParticipantItem>(channelJid, ns_mix_node_participants.toString()), this, [](QXmppPubSubManager::Items<QXmppMixParticipantItem> &&items) {
+    return chainMapSuccess(d->pubSubManager->requestItems<QXmppMixParticipantItem>(channelJid, ns_mix_node_participants.toString()), this, [](const auto &items) {
         return items.items;
     });
 }
@@ -1376,7 +1379,7 @@ QXmppTask<QXmppMixManager::JoiningResult> QXmppMixManager::joinChannel(QXmppMixI
 ///
 QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestJids(const QString &channelJid, const QString &node)
 {
-    return chainMapSuccess(d->pubSubManager->requestItems(channelJid, node), this, [](QXmppPubSubManager::Items<QXmppPubSubBaseItem> &&items) {
+    return chainMapSuccess(d->pubSubManager->requestItems(channelJid, node), this, [](const auto &items) {
         return transform<QVector<Jid>>(items.items, [](const QXmppPubSubBaseItem &item) {
             return item.id();
         });

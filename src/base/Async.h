@@ -68,24 +68,26 @@ void await(const QFuture<void> &future, QObject *context, Handler handler)
 }
 
 template<typename T, typename Err, typename Function>
-auto mapSuccess(std::variant<T, Err> var, Function lambda)
+auto mapSuccess(const std::variant<T, Err> &var, Function lambda)
 {
-    using MapResult = std::decay_t<decltype(lambda({}))>;
+    using MapResult = std::invoke_result_t<Function, T>;
     using MappedVariant = std::variant<MapResult, Err>;
-    return std::visit(overloaded {
-                          [lambda = std::move(lambda)](T val) -> MappedVariant {
-                              return lambda(std::move(val));
-                          },
-                          [](Err err) -> MappedVariant {
-                              return err;
-                          } },
-                      std::move(var));
+    return std::visit(
+        overloaded {
+            [lambda = std::move(lambda)](const T &val) -> MappedVariant {
+                return lambda(val);
+            },
+            [](const Err &err) -> MappedVariant {
+                return err;
+            },
+        },
+        var);
 }
 
 template<typename T, typename Err>
-auto mapToSuccess(std::variant<T, Err> var)
+auto mapToSuccess(const std::variant<T, Err> &var)
 {
-    return mapSuccess(std::move(var), [](T) {
+    return mapSuccess(var, [](const T &) {
         return Success();
     });
 }
@@ -96,12 +98,15 @@ auto chainSuccess(QXmppTask<std::variant<T, Err>> &&source, QObject *context) ->
     return chain<std::variant<QXmpp::Success, QXmppError>>(std::move(source), context, mapToSuccess<T, Err>);
 }
 
-template<typename Input, typename Converter>
-auto chainMapSuccess(QXmppTask<Input> &&source, QObject *context, Converter convert)
+template<typename T, typename Err, typename Converter>
+auto chainMapSuccess(QXmppTask<std::variant<T, Err>> &&source, QObject *context, Converter convert)
 {
-    return chain<std::variant<decltype(convert({})), QXmppError>>(std::move(source), context, [convert](Input &&input) {
-        return mapSuccess(std::move(input), convert);
-    });
+    return chain<std::variant<std::invoke_result_t<Converter, T>, Err>>(
+        std::move(source),
+        context,
+        [convert](const auto &input) {
+            return mapSuccess(input, convert);
+        });
 }
 
 }  // namespace QXmpp::Private

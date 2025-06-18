@@ -596,7 +596,7 @@ signal_protocol_session_store ManagerPrivate::createSessionStore() const
 QXmppTask<bool> ManagerPrivate::setUpDeviceId()
 {
     auto future = pubSubManager->requestOwnPepItemIds(ns_omemo_2_bundles.toString());
-    return chain<bool>(std::move(future), q, [this](QXmppPubSubManager::ItemIdsResult result) mutable {
+    return chain<bool>(std::move(future), q, [this](const QXmppPubSubManager::ItemIdsResult &result) mutable {
         // There can be the following cases:
         // 1. There is no PubSub node for device bundles: XEP-0030 states that a server must
         // respond with an error (at least ejabberd 22.05 responds with an empty node instead).
@@ -1448,7 +1448,7 @@ QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(const QDo
         subscribeToNewDeviceLists(senderJid, senderDeviceId);
 
         auto future = decryptStanza(iq, senderJid, senderDeviceId, *omemoEnvelope, omemoElement.payload(), false);
-        return chain<Result>(std::move(future), q, [iqElement](auto result) -> Result {
+        return chain<Result>(std::move(future), q, [iqElement](const auto &result) -> Result {
             if (result) {
                 auto decryptedElement = iqElement.cloneNode(true).toElement();
                 replaceChildElements(decryptedElement, result->sceContent);
@@ -3056,9 +3056,8 @@ QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(cons
         } else {
             jidsOfManuallySubscribedDevices.append(jid);
 
-            auto future = requestDeviceList(jid);
-            future.then(q, [=](auto result) mutable {
-                interface.finish(mapToSuccess(std::move(result)));
+            requestDeviceList(jid).then(q, [=](const auto &result) mutable {
+                interface.finish(mapToSuccess(result));
             });
         }
     });
