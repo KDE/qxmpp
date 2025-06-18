@@ -107,6 +107,37 @@ struct Success {
 
 }  // namespace Sasl
 
+template<>
+struct XmlSpec<Sasl::Auth> {
+    static constexpr std::tuple Spec = {
+        XmlAttribute { &Sasl::Auth::mechanism, u"mechanism" },
+        XmlOptionalText { &Sasl::Auth::value, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl::Challenge> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalText { &Sasl::Challenge::value, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl::Response> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalText { &Sasl::Response::value, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl::Success> {
+    static constexpr std::tuple Spec = {};
+};
+
+//
+// Bind 2
+//
+
 struct Bind2Feature {
     static constexpr std::tuple XmlTag = { u"bind", ns_bind2 };
     static std::optional<Bind2Feature> fromDom(const QDomElement &);
@@ -137,13 +168,46 @@ struct Bind2Bound {
     std::optional<SmEnabled> smEnabled;
 };
 
+template<>
+struct XmlSpec<Bind2Feature> {
+    static constexpr std::tuple Spec = {
+        XmlElement {
+            u"inline",
+            Optional(),
+            XmlSingleAttributeElements { &Bind2Feature::features, Tag { u"feature", ns_bind2 }, u"var" },
+        },
+    };
+};
+
+template<>
+struct XmlSpec<Bind2Request> {
+    static constexpr std::tuple Spec = {
+        XmlElement { u"tag", Optional(), XmlText { &Bind2Request::tag } },
+        XmlReference { &Bind2Request::csiInactive, { u"inactive", ns_csi } },
+        XmlReference { &Bind2Request::carbonsEnable, { u"enable", ns_carbons } },
+        XmlReference { &Bind2Request::smEnable },
+    };
+};
+
+template<>
+struct XmlSpec<Bind2Bound> {
+    static constexpr std::tuple Spec = {
+        XmlReference { &Bind2Bound::smFailed },
+        XmlReference { &Bind2Bound::smEnabled },
+    };
+};
+
+//
+// FAST
+//
+
 struct FastFeature {
     static constexpr std::tuple XmlTag = { u"fast", ns_fast };
     static std::optional<FastFeature> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
-    std::vector<QString> mechanisms;
     bool tls0rtt = false;
+    std::vector<QString> mechanisms;
 };
 
 struct FastTokenRequest {
@@ -172,10 +236,41 @@ struct FastRequest {
     bool invalidate = false;
 };
 
+template<>
+struct XmlSpec<FastFeature> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalAttribute { &FastFeature::tls0rtt, u"tls-0rtt", BoolDefaultSerializer(false) },
+        XmlTextElements { &FastFeature::mechanisms, u"mechanism" },
+    };
+};
+
+template<>
+struct XmlSpec<FastTokenRequest> {
+    static constexpr std::tuple Spec = {
+        XmlAttribute { &FastTokenRequest::mechanism, u"mechanism" },
+    };
+};
+
+template<>
+struct XmlSpec<FastToken> {
+    static constexpr std::tuple Spec = {
+        XmlAttribute { &FastToken::expiry, u"expiry" },
+        XmlAttribute { &FastToken::token, u"token" },
+    };
+};
+
+template<>
+struct XmlSpec<FastRequest> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalAttribute { &FastRequest::count, u"count" },
+        XmlOptionalAttribute { &FastRequest::invalidate, u"invalidate", BoolDefaultSerializer(false) },
+    };
+};
+
 namespace Sasl2 {
 
 struct StreamFeature {
-    static constexpr std::tuple XmlTag = { u"authentication", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"authentication", ns_sasl_2 };
     static std::optional<StreamFeature> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -186,7 +281,7 @@ struct StreamFeature {
 };
 
 struct UserAgent {
-    static constexpr std::tuple XmlTag = { u"user-agent", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"user-agent", ns_sasl_2 };
     static std::optional<UserAgent> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -196,7 +291,7 @@ struct UserAgent {
 };
 
 struct Authenticate {
-    static constexpr std::tuple XmlTag = { u"authenticate", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"authenticate", ns_sasl_2 };
     static std::optional<Authenticate> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -210,7 +305,7 @@ struct Authenticate {
 };
 
 struct Challenge {
-    static constexpr std::tuple XmlTag = { u"challenge", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"challenge", ns_sasl_2 };
     static std::optional<Challenge> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -218,7 +313,7 @@ struct Challenge {
 };
 
 struct Response {
-    static constexpr std::tuple XmlTag = { u"response", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"response", ns_sasl_2 };
     static std::optional<Response> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -226,7 +321,7 @@ struct Response {
 };
 
 struct Success {
-    static constexpr std::tuple XmlTag = { u"success", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"success", ns_sasl_2 };
     static std::optional<Success> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -240,7 +335,7 @@ struct Success {
 };
 
 struct Failure {
-    static constexpr std::tuple XmlTag = { u"failure", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"failure", ns_sasl_2 };
     static std::optional<Failure> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -250,7 +345,7 @@ struct Failure {
 };
 
 struct Continue {
-    static constexpr std::tuple XmlTag = { u"continue", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"continue", ns_sasl_2 };
     static std::optional<Continue> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -260,7 +355,7 @@ struct Continue {
 };
 
 struct Abort {
-    static constexpr std::tuple XmlTag = { u"abort", QXmpp::Private::ns_sasl_2 };
+    static constexpr std::tuple XmlTag = { u"abort", ns_sasl_2 };
     static std::optional<Abort> fromDom(const QDomElement &);
     void toXml(XmlWriter &) const;
 
@@ -268,6 +363,68 @@ struct Abort {
 };
 
 }  // namespace Sasl2
+
+template<>
+struct XmlSpec<Sasl2::StreamFeature> {
+    static constexpr std::tuple Spec = {
+        XmlTextElements { &Sasl2::StreamFeature::mechanisms, u"mechanism" },
+        XmlElement {
+            u"inline",
+            Optional(),
+            XmlReference { &Sasl2::StreamFeature::bind2Feature },
+            XmlReference { &Sasl2::StreamFeature::fast },
+            XmlReference { &Sasl2::StreamFeature::streamResumptionAvailable, { u"sm", ns_stream_management } },
+        },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::UserAgent> {
+    static constexpr std::tuple Spec = {
+        XmlAttribute { &Sasl2::UserAgent::id, u"id" },
+        XmlOptionalTextElement { &Sasl2::UserAgent::software, u"software" },
+        XmlOptionalTextElement { &Sasl2::UserAgent::device, u"device" },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::Authenticate> {
+    static constexpr std::tuple Spec = {
+        XmlAttribute { &Sasl2::Authenticate::mechanism, u"mechanism" },
+        XmlOptionalTextElement { &Sasl2::Authenticate::initialResponse, u"initial-response", Base64Serializer() },
+        XmlReference { &Sasl2::Authenticate::userAgent },
+        XmlReference { &Sasl2::Authenticate::bindRequest },
+        XmlReference { &Sasl2::Authenticate::smResume },
+        XmlReference { &Sasl2::Authenticate::tokenRequest },
+        XmlReference { &Sasl2::Authenticate::fast },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::Challenge> {
+    static constexpr std::tuple Spec = {
+        XmlText { &Sasl2::Challenge::data, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::Response> {
+    static constexpr std::tuple Spec = {
+        XmlText { &Sasl2::Response::data, Base64Serializer() },
+    };
+};
+
+template<>
+struct XmlSpec<Sasl2::Success> {
+    static constexpr std::tuple Spec = {
+        XmlOptionalTextElement { &Sasl2::Success::additionalData, u"additional-data", Base64Serializer() },
+        XmlTextElement { &Sasl2::Success::authorizationIdentifier, u"authorization-identifier" },
+        XmlReference { &Sasl2::Success::bound },
+        XmlReference { &Sasl2::Success::smResumed },
+        XmlReference { &Sasl2::Success::smFailed },
+        XmlReference { &Sasl2::Success::token },
+    };
+};
 
 enum class IanaHashAlgorithm {
     Sha256,
