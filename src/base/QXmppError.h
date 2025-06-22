@@ -37,7 +37,7 @@ struct QXMPP_EXPORT QXmppError {
         // any_cast always checks this, to avoid an additional check we use exceptions
         try {
             return std::any_cast<T>(error);
-        } catch (std::bad_any_cast) {
+        } catch (const std::bad_any_cast &) {
             return {};
         }
     }
