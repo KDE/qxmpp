@@ -435,7 +435,6 @@ struct SingleAttributeElements {
     void toXml(XmlWriter &w)
     {
         for (const auto &value : values) {
-            using ValueType = std::ranges::range_value_t<Range>;
             w.writeSingleAttributeElement(xmlS(name), xmlS(attribute), xmlS(value));
         }
     }
