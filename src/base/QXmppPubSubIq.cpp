@@ -391,6 +391,7 @@ bool PubSubIqBase::isPubSubIq(const QDomElement &element, bool (*isItemValid)(co
         if (!QXmppPubSubSubscription::isSubscription(queryElement)) {
             return false;
         }
+        [[fallthrough]];
     case Delete:
     case Purge:
     case Configure:
