@@ -10,7 +10,6 @@
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 
-#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QDateTime>
@@ -57,7 +56,7 @@ auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<
     iq.setType(QXmppIq::Get);
     iq.setTo(jid);
 
-    return chainIq<EntityTimeResult>(client()->sendIq(std::move(iq)), this);
+    co_return parseIq<QXmppEntityTimeIq>(co_await client()->sendIq(std::move(iq)));
 }
 
 /// \cond

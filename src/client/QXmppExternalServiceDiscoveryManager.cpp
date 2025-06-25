@@ -49,7 +49,7 @@ QXmppTask<QXmppExternalServiceDiscoveryManager::ServicesResult> QXmppExternalSer
     request.setType(QXmppIq::Get);
     request.setTo(jid);
 
-    return chainIq(client()->sendIq(std::move(request)), this, [](QXmppExternalServiceDiscoveryIq &&iq) -> ServicesResult {
+    co_return parseIq<QXmppExternalServiceDiscoveryIq>(co_await client()->sendIq(std::move(request)).withContext(this), [](QXmppExternalServiceDiscoveryIq &&iq) -> ServicesResult {
         return iq.externalServices();
     });
 }

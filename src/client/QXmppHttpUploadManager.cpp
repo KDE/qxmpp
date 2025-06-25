@@ -617,7 +617,7 @@ void QXmppHttpUploadManager::updateServices()
             maybeReportUnsupported();
         } else {
             const auto jids = transform<QList<QString>>(getValue(result), &QXmppDiscoItem::jid);
-            auto tasks = transform<QList<QXmppTask<void>>>(jids, std::bind(&QXmppHttpUploadManager::updateService, this, std::placeholders::_1));
+            auto tasks = transform<std::vector<QXmppTask<void>>>(jids, [this](const auto &jid) { return updateService(jid); });
             auto task = joinVoidTasks(this, std::move(tasks));
 
             task.then(this, maybeReportUnsupported);
@@ -707,8 +707,8 @@ QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlo
                                                                                   const QString &uploadService)
 {
     if (support() != Support::Supported && uploadService.isEmpty()) {
-        return makeReadyTask(SlotResult(QXmppError {
-            u"Couldn't request upload slot: No service found."_s, {} }));
+        co_return SlotResult(QXmppError {
+            u"Couldn't request upload slot: No service found."_s, {} });
     }
 
     QXmppHttpUploadRequestIq iq;
@@ -722,5 +722,5 @@ QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlo
     iq.setSize(fileSize);
     iq.setContentType(mimeType);
 
-    return chainIq<SlotResult>(client()->sendIq(std::move(iq)), this);
+    co_return parseIq<QXmppHttpUploadSlotIq>(co_await client()->sendIq(std::move(iq)));
 }

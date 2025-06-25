@@ -269,19 +269,23 @@ QXmppTask<QXmppPubSubManager::NodesResult> QXmppPubSubManager::requestNodes(cons
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT(discoManager);
 
-    return chainMapSuccess(discoManager->items(jid), this, [](QList<QXmppDiscoItem> &&items) {
-        QVector<QString> nodes;
-        for (const auto &item : std::as_const(items)) {
-            // only accept non-empty nodes
-            if (const auto node = item.node(); !node.isEmpty()) {
-                nodes << node;
-            }
+    auto itemsResult = co_await discoManager->items(jid);
+    if (hasError(itemsResult)) {
+        co_return getError(std::move(itemsResult));
+    }
+
+    QVector<QString> nodes;
+    for (const auto &item : std::as_const(getValue(itemsResult))) {
+        // only accept non-empty nodes
+        if (const auto node = item.node(); !node.isEmpty()) {
+            nodes << node;
         }
-        // make unique
-        std::sort(nodes.begin(), nodes.end());
-        nodes.erase(std::unique(nodes.begin(), nodes.end()), nodes.end());
-        return nodes;
-    });
+    }
+
+    // make unique
+    std::sort(nodes.begin(), nodes.end());
+    nodes.erase(std::unique(nodes.begin(), nodes.end()), nodes.end());
+    co_return nodes;
 }
 
 ///
@@ -410,10 +414,13 @@ QXmppTask<QXmppPubSubManager::ItemIdsResult> QXmppPubSubManager::requestItemIds(
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT(discoManager);
 
-    return chainMapSuccess(discoManager->items(serviceJid, nodeName), this, [](QList<QXmppDiscoItem> &&items) {
-        return transform<QVector<QString>>(std::move(items), [](const auto &item) {
-            return item.name();
-        });
+    auto items = co_await discoManager->items(serviceJid, nodeName);
+    if (hasError(items)) {
+        co_return getError(std::move(items));
+    }
+
+    co_return transform<QVector<QString>>(getValue(std::move(items)), [](const auto &item) {
+        return item.name();
     });
 }
 
