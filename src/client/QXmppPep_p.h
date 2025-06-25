@@ -5,6 +5,8 @@
 #include <QXmppPubSubEvent.h>
 #include <QXmppPubSubManager.h>
 
+#include "StringLiterals.h"
+
 namespace QXmpp::Private::Pep {
 
 template<typename T>
@@ -14,19 +16,16 @@ using PublishResult = std::variant<QString, QXmppError>;
 template<typename ItemT>
 inline QXmppTask<GetResult<ItemT>> request(QXmppPubSubManager *pubSub, const QString &jid, const QString &nodeName, QObject *parent)
 {
-    using PubSub = QXmppPubSubManager;
+    auto result = co_await pubSub->requestItems<ItemT>(jid, nodeName);
 
-    auto process = [](PubSub::ItemsResult<ItemT> &&result) -> GetResult<ItemT> {
-        if (const auto itemsResult = std::get_if<PubSub::Items<ItemT>>(&result)) {
-            if (!itemsResult->items.isEmpty()) {
-                return itemsResult->items.takeFirst();
-            }
-            return QXmppError { QStringLiteral("User has no published items."), {} };
-        } else {
-            return std::get<QXmppError>(std::move(result));
+    if (const auto *itemsResult = std::get_if<QXmppPubSubManager::Items<ItemT>>(&result)) {
+        if (!itemsResult->items.isEmpty()) {
+            co_return itemsResult->items.constFirst();
         }
-    };
-    return chain<GetResult<ItemT>>(pubSub->requestItems<ItemT>(jid, nodeName), parent, process);
+        co_return QXmppError { u"User has no published items."_s, {} };
+    } else {
+        co_return std::get<QXmppError>(std::move(result));
+    }
 }
 
 // NodeName is a template parameter, so the right qstring comparison overload is used
