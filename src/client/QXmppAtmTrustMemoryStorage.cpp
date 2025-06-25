@@ -85,7 +85,7 @@ QXmppTask<void> QXmppAtmTrustMemoryStorage::addKeysForPostponedTrustDecisions(co
         addKeys(keyOwner, false, keyOwner.distrustedKeys());
     }
 
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppAtmTrustMemoryStorage::removeKeysForPostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &keyIdsForAuthentication, const QList<QByteArray> &keyIdsForDistrusting)
@@ -100,8 +100,7 @@ QXmppTask<void> QXmppAtmTrustMemoryStorage::removeKeysForPostponedTrustDecisions
             ++itr;
         }
     }
-
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppAtmTrustMemoryStorage::removeKeysForPostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &senderKeyIds)
@@ -114,14 +113,13 @@ QXmppTask<void> QXmppAtmTrustMemoryStorage::removeKeysForPostponedTrustDecisions
             ++itr;
         }
     }
-
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppAtmTrustMemoryStorage::removeKeysForPostponedTrustDecisions(const QString &encryption)
 {
     d->keys.remove(encryption);
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<QHash<bool, QMultiHash<QString, QByteArray>>> QXmppAtmTrustMemoryStorage::keysForPostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &senderKeyIds)
@@ -134,14 +132,13 @@ QXmppTask<QHash<bool, QMultiHash<QString, QByteArray>>> QXmppAtmTrustMemoryStora
             keys[key.trust].insert(key.ownerJid, key.id);
         }
     }
-
-    return makeReadyTask(std::move(keys));
+    co_return keys;
 }
 
 QXmppTask<void> QXmppAtmTrustMemoryStorage::resetAll(const QString &encryption)
 {
     QXmppTrustMemoryStorage::resetAll(encryption);
     d->keys.remove(encryption);
-    return makeReadyTask();
+    co_return;
 }
 /// \endcond

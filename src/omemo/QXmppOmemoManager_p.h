@@ -221,92 +221,64 @@ public:
 
     QXmppTask<bool> publishOmemoData();
 
-    template<typename Function>
-    void publishDeviceBundle(bool isDeviceBundlesNodeExistent,
-                             bool arePublishOptionsSupported,
-                             bool isAutomaticCreationSupported,
-                             bool isCreationAndConfigurationSupported,
-                             bool isCreationSupported,
-                             bool isConfigurationSupported,
-                             bool isConfigNodeMaxSupported,
-                             Function continuation);
-    template<typename Function>
-    void publishDeviceBundleWithoutOptions(bool isDeviceBundlesNodeExistent,
-                                           bool isCreationAndConfigurationSupported,
-                                           bool isCreationSupported,
-                                           bool isConfigurationSupported,
-                                           bool isConfigNodeMaxSupported,
-                                           Function continuation);
-    template<typename Function>
-    void configureNodeAndPublishDeviceBundle(bool isConfigNodeMaxSupported, Function continuation);
-    template<typename Function>
-    void createAndConfigureDeviceBundlesNode(bool isConfigNodeMaxSupported, Function continuation);
-    template<typename Function>
-    void createDeviceBundlesNode(Function continuation);
-    template<typename Function>
-    void configureDeviceBundlesNode(bool isConfigNodeMaxSupported, Function continuation);
-    template<typename Function>
-    void publishDeviceBundleItem(Function continuation);
-    template<typename Function>
-    void publishDeviceBundleItemWithOptions(Function continuation);
+    QXmppTask<bool> publishDeviceBundle(bool isDeviceBundlesNodeExistent,
+                                        bool arePublishOptionsSupported,
+                                        bool isAutomaticCreationSupported,
+                                        bool isCreationAndConfigurationSupported,
+                                        bool isCreationSupported,
+                                        bool isConfigurationSupported,
+                                        bool isConfigNodeMaxSupported);
+    QXmppTask<bool> publishDeviceBundleWithoutOptions(bool isDeviceBundlesNodeExistent,
+                                                      bool isCreationAndConfigurationSupported,
+                                                      bool isCreationSupported,
+                                                      bool isConfigurationSupported,
+                                                      bool isConfigNodeMaxSupported);
+    QXmppTask<bool> configureNodeAndPublishDeviceBundle(bool isConfigNodeMaxSupported);
+    QXmppTask<bool> createAndConfigureDeviceBundlesNode(bool isConfigNodeMaxSupported);
+    QXmppTask<bool> createDeviceBundlesNode();
+    QXmppTask<bool> configureDeviceBundlesNode(bool isConfigNodeMaxSupported);
+    QXmppTask<bool> publishDeviceBundleItem();
+    QXmppTask<bool> publishDeviceBundleItemWithOptions();
     QXmppOmemoDeviceBundleItem deviceBundleItem() const;
     QXmppTask<std::optional<QXmppOmemoDeviceBundle>> requestDeviceBundle(const QString &deviceOwnerJid, uint32_t deviceId) const;
-    template<typename Function>
-    void deleteDeviceBundle(Function continuation);
+    QXmppTask<bool> deleteDeviceBundle();
 
-    template<typename Function>
-    void publishDeviceElement(bool isDeviceListNodeExistent,
-                              bool arePublishOptionsSupported,
-                              bool isAutomaticCreationSupported,
-                              bool isCreationAndConfigurationSupported,
-                              bool isCreationSupported,
-                              bool isConfigurationSupported,
-                              Function continuation);
-    template<typename Function>
-    void publishDeviceElementWithoutOptions(bool isDeviceListNodeExistent,
-                                            bool isCreationAndConfigurationSupported,
-                                            bool isCreationSupported,
-                                            bool isConfigurationSupported,
-                                            Function continuation);
-    template<typename Function>
-    void configureNodeAndPublishDeviceElement(Function continuation);
-    template<typename Function>
-    void createAndConfigureDeviceListNode(Function continuation);
-    template<typename Function>
-    void createDeviceListNode(Function continuation);
-    template<typename Function>
-    void configureDeviceListNode(Function continuation);
-    template<typename Function>
-    void publishDeviceListItem(bool addOwnDevice, Function continuation);
-    template<typename Function>
-    void publishDeviceListItemWithOptions(Function continuation);
+    QXmppTask<bool> publishDeviceElement(bool isDeviceListNodeExistent,
+                                         bool arePublishOptionsSupported,
+                                         bool isAutomaticCreationSupported,
+                                         bool isCreationAndConfigurationSupported,
+                                         bool isCreationSupported,
+                                         bool isConfigurationSupported);
+    QXmppTask<bool> publishDeviceElementWithoutOptions(bool isDeviceListNodeExistent,
+                                                       bool isCreationAndConfigurationSupported,
+                                                       bool isCreationSupported,
+                                                       bool isConfigurationSupported);
+    QXmppTask<bool> configureNodeAndPublishDeviceElement();
+    QXmppTask<bool> createAndConfigureDeviceListNode();
+    QXmppTask<bool> createDeviceListNode();
+    QXmppTask<bool> configureDeviceListNode();
+    QXmppTask<bool> publishDeviceListItem(bool addOwnDevice);
+    QXmppTask<bool> publishDeviceListItemWithOptions();
     QXmppOmemoDeviceListItem deviceListItem(bool addOwnDevice = true);
-    template<typename Function>
-    void updateOwnDevicesLocally(bool isDeviceListNodeExistent, Function continuation);
+    QXmppTask<bool> updateOwnDevicesLocally(bool isDeviceListNodeExistent);
     std::optional<QXmppOmemoDeviceListItem> updateContactDevices(const QString &deviceOwnerJid, const QVector<QXmppOmemoDeviceListItem> &deviceListItems);
     void updateDevices(const QString &deviceOwnerJid, const QXmppOmemoDeviceListItem &deviceListItem);
     void handleIrregularDeviceListChanges(const QString &deviceOwnerJid);
-    template<typename Function>
-    void deleteDeviceElement(Function continuation);
+    QXmppTask<bool> deleteDeviceElement();
 
-    template<typename Function>
-    void createNode(const QString &node, Function continuation);
-    template<typename Function>
-    void createNode(const QString &node, const QXmppPubSubNodeConfig &config, Function continuation);
-    template<typename Function>
-    void configureNode(const QString &node, const QXmppPubSubNodeConfig &config, Function continuation);
-    template<typename Function>
-    void retractItem(const QString &node, uint32_t itemId, Function continuation);
-    template<typename Function>
-    void deleteNode(const QString &node, Function continuation);
+    QXmppTask<bool> createNode(const QString &node);
+    QXmppTask<bool> createNode(const QString &node, const QXmppPubSubNodeConfig &config);
+    QXmppTask<bool> configureNode(const QString &node, const QXmppPubSubNodeConfig &config);
+    QXmppTask<bool> retractItem(const QString &node, uint32_t itemId);
+    QXmppTask<bool> deleteNode(const QString &node);
 
-    template<typename T, typename Function>
-    void publishItem(const QString &node, const T &item, Function continuation);
-    template<typename T, typename Function>
-    void publishItem(const QString &node, const T &item, const QXmppPubSubPublishOptions &publishOptions, Function continuation);
+    template<typename T>
+    QXmppTask<bool> publishItem(const QString &node, const T &item);
+    template<typename T>
+    QXmppTask<bool> publishItem(const QString &node, const T &item, const QXmppPubSubPublishOptions &publishOptions);
 
-    template<typename T, typename Function>
-    void runPubSubQueryWithContinuation(QXmppTask<T> future, const QString &errorMessage, Function continuation);
+    template<typename T>
+    QXmppTask<bool> runPubSubQueryWithContinuation(QXmppTask<T> future, const QString &errorMessage);
 
     QXmppTask<bool> changeDeviceLabel(const QString &deviceLabel);
 

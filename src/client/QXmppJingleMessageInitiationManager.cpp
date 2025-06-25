@@ -282,23 +282,19 @@ QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
 ///
 QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &callPartnerJid, const QXmppJingleDescription &description)
 {
-    QXmppPromise<ProposeResult> promise;
-
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Propose);
     jmiElement.setId(QXmppUtils::generateStanzaUuid());
     jmiElement.setDescription(description);
 
-    sendMessage(jmiElement, callPartnerJid).then(this, [this, promise, callPartnerJid](SendResult result) mutable {
-        if (auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Error sending Jingle Message Initiation proposal: " + error->description);
-            promise.finish(*error);
-        } else {
-            promise.finish(addJmi(callPartnerJid));
-        }
-    });
+    auto result = co_await sendMessage(jmiElement, callPartnerJid).withContext(this);
 
-    return promise.task();
+    if (auto *error = std::get_if<QXmppError>(&result)) {
+        warning(u"Error sending Jingle Message Initiation proposal: " + error->description);
+        co_return std::move(*error);
+    }
+
+    co_return addJmi(callPartnerJid);
 }
 
 /// \cond
