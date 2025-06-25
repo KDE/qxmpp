@@ -266,7 +266,7 @@ QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::f
         }
 
         client()->sendIq(QXmppVCardIq(jid)).then(this, [this, hashes, p = std::move(p)](auto &&result) mutable {
-            auto iqResponse = parseIq<QXmppVCardIq, Result<QXmppVCardIq>>(std::move(result));
+            auto iqResponse = parseIq<QXmppVCardIq>(std::move(result));
             if (hasError(iqResponse)) {
                 p.finish(getError(std::move(iqResponse)));
                 return;

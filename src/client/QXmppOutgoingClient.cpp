@@ -1207,7 +1207,7 @@ QXmppTask<IqResult> OutgoingIqManager::start(const QString &id, const QString &t
                          SendError::Disconnected });
     }
 
-    auto [itr, success] = m_requests.emplace(id, IqState { {}, to });
+    auto [itr, success] = m_requests.try_emplace(id, to);
     return itr->second.interface.task();
 }
 
@@ -1223,7 +1223,7 @@ void OutgoingIqManager::finish(const QString &id, IqResult &&result)
 void OutgoingIqManager::cancelAll()
 {
     auto requests = std::move(m_requests);
-    m_requests = {};
+    m_requests.clear();
     for (auto &[id, state] : requests) {
         state.interface.finish(QXmppError {
             u"IQ has been cancelled."_s,

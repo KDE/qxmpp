@@ -122,6 +122,12 @@ using IqResult = QXmppOutgoingClient::IqResult;
 struct IqState {
     QXmppPromise<IqResult> interface;
     QString jid;
+
+    explicit IqState(QString jid) : jid(std::move(jid)) { }
+    IqState(IqState &&) = default;
+    IqState &operator=(IqState &&) = default;
+    IqState(const IqState &) = delete;
+    IqState &operator=(const IqState &) = delete;
 };
 
 // Manager for creating tasks for outgoing IQ requests

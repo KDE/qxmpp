@@ -167,7 +167,10 @@ bool QXmppMovedManager::supportedByServer() const
 ///
 QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(const QString &newBareJid)
 {
-    return chainSuccess(client()->findExtension<QXmppPubSubManager>()->publishOwnPepItem(ns_moved.toString(), QXmppMovedItem { newBareJid }), this);
+    co_return mapToSuccess(co_await client()
+                               ->findExtension<QXmppPubSubManager>()
+                               ->publishOwnPepItem(ns_moved.toString(), QXmppMovedItem { newBareJid })
+                               .withContext(this));
 }
 
 ///
@@ -180,45 +183,43 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(const QS
 ///
 QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(const QString &oldBareJid, const QString &newBareJid)
 {
-    return chain<QXmppClient::EmptyResult>(
-        client()->findExtension<QXmppPubSubManager>()->requestItem<QXmppMovedItem>(oldBareJid, ns_moved.toString(), u"current"_s),
-        this,
-        [=, this](QXmppPubSubManager::ItemResult<QXmppMovedItem> &&result) {
-            return std::visit(
-                overloaded {
-                    [newBareJid](QXmppMovedItem item) -> Result {
-                        return movedJidsMatch(newBareJid, item.newJid());
-                    },
-                    [newBareJid](QXmppError err) -> Result {
-                        // As a special case, if the attempt to retrieve the moved statement results in an error with the <gone/> condition
-                        // as defined in RFC 6120, and that <gone/> element contains a valid XMPP URI (e.g. xmpp:user@example.com), then the
-                        // error response MUST be handled equivalent to a <moved/> statement containing a <new-jid/> element with the JID
-                        // provided in the URI (e.g. user@example.com).
-                        if (auto e = err.value<QXmppStanza::Error>()) {
-                            const auto newJid = [&e]() -> QString {
-                                if (e->condition() != QXmppStanza::Error::Gone) {
-                                    return {};
-                                }
-
-                                const auto result = QXmppUri::fromString(e->redirectionUri());
-
-                                if (hasValue(result)) {
-                                    return getValue(result).jid();
-                                }
-
-                                return {};
-                            }();
-
-                            if (!newJid.isEmpty()) {
-                                return movedJidsMatch(newBareJid, newJid);
-                            }
+    co_return std::visit(
+        overloaded {
+            [newBareJid](const QXmppMovedItem &item) -> Result {
+                return movedJidsMatch(newBareJid, item.newJid());
+            },
+            [newBareJid](const QXmppError &err) -> Result {
+                // As a special case, if the attempt to retrieve the moved statement results in an error with the <gone/> condition
+                // as defined in RFC 6120, and that <gone/> element contains a valid XMPP URI (e.g. xmpp:user@example.com), then the
+                // error response MUST be handled equivalent to a <moved/> statement containing a <new-jid/> element with the JID
+                // provided in the URI (e.g. user@example.com).
+                if (auto e = err.value<QXmppStanza::Error>()) {
+                    const auto newJid = [&e]() -> QString {
+                        if (e->condition() != QXmppStanza::Error::Gone) {
+                            return {};
                         }
 
-                        return err;
-                    },
-                },
-                std::move(result));
-        });
+                        const auto result = QXmppUri::fromString(e->redirectionUri());
+
+                        if (std::holds_alternative<QXmppUri>(result)) {
+                            return std::get<QXmppUri>(result).jid();
+                        }
+
+                        return {};
+                    }();
+
+                    if (!newJid.isEmpty()) {
+                        return movedJidsMatch(newBareJid, newJid);
+                    }
+                }
+
+                return err;
+            },
+        },
+        co_await client()
+            ->findExtension<QXmppPubSubManager>()
+            ->requestItem<QXmppMovedItem>(oldBareJid, ns_moved.toString(), u"current"_s)
+            .withContext(this));
 }
 
 ///
@@ -292,18 +293,19 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
 
     switch (entry.subscriptionType()) {
     case QXmppRosterIq::Item::From:
-    case QXmppRosterIq::Item::Both:
-        return chain<QXmppPresence>(verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from())), this, [this, presence = presence](Result &&result) mutable {
-            if (hasError(result)) {
-                warning(presence.from() + u" sent a presence subscription request with the invalid old JID "_s + presence.oldJid());
-                presence.setOldJid({});
-            }
+    case QXmppRosterIq::Item::Both: {
+        auto result = co_await verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from()));
 
-            return presence;
-        });
+        if (hasError(result)) {
+            warning(presence.from() + u" sent a presence subscription request with the invalid old JID "_s + presence.oldJid());
+            presence.setOldJid({});
+        }
+
+        co_return presence;
+    }
     default:
         presence.setOldJid({});
-        return makeReadyTask(std::move(presence));
+        co_return presence;
     }
 }
 

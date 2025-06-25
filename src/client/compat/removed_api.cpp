@@ -21,6 +21,7 @@
 #include <QEventLoop>
 #include <QTimer>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 // Client
@@ -221,15 +222,19 @@ QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDisco
     request.setTo(jid);
     request.setQueryNode(node);
 
-    return chainMapSuccess(info(jid, node, CachePolicy::Strict), this, [](QXmppDiscoInfo &&info) {
-        QXmppDiscoveryIq iq;
-        iq.setQueryNode(info.node());
-        iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
-        iq.setFeatures(info.features());
-        iq.setIdentities(info.identities());
-        iq.setDataForms(info.dataForms());
-        return iq;
-    });
+    auto infoResult = co_await info(jid, node, CachePolicy::Strict);
+    if (hasError(infoResult)) {
+        co_return getError(std::move(infoResult));
+    }
+    auto &info = getValue(infoResult);
+
+    QXmppDiscoveryIq iq;
+    iq.setQueryNode(info.node());
+    iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
+    iq.setFeatures(info.features());
+    iq.setIdentities(info.identities());
+    iq.setDataForms(info.dataForms());
+    co_return iq;
 }
 
 ///

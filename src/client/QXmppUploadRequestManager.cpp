@@ -228,11 +228,11 @@ auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
 auto QXmppUploadRequestManager::requestSlot(const QString &fileName,
                                             qint64 fileSize,
                                             const QMimeType &mimeType,
-                                            const QString &uploadService) -> QXmppTask<SlotResult>
+                                            const QString &uploadService)
+    -> QXmppTask<SlotResult>
 {
     if (!serviceFound() && uploadService.isEmpty()) {
-        return makeReadyTask(SlotResult(QXmppError {
-            u"Couldn't request upload slot: No service found."_s, {} }));
+        co_return QXmppError { u"Couldn't request upload slot: No service found."_s, {} };
     }
 
     QXmppHttpUploadRequestIq iq;
@@ -246,7 +246,7 @@ auto QXmppUploadRequestManager::requestSlot(const QString &fileName,
     iq.setSize(fileSize);
     iq.setContentType(mimeType);
 
-    return chainIq<SlotResult>(client()->sendIq(std::move(iq)), this);
+    co_return parseIq<QXmppHttpUploadSlotIq>(co_await client()->sendIq(std::move(iq)));
 }
 
 /// Returns true if an HTTP File Upload service has been discovered.
