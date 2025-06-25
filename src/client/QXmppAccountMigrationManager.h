@@ -131,7 +131,6 @@ void QXmppAccountMigrationManager::registerExportData(ImportFunc importFunc, Exp
     static_assert(std::is_constructible_v<std::function<QXmppTask<Result<DataType>>()>, ExportFunc>);
     static_assert(std::is_invocable_v<ImportFunc, const DataType &>);
     static_assert(std::is_invocable_v<ExportFunc>);
-    static_assert(std::is_same_v<first_argument_t<ImportFunc>, const DataType &>);
 
     auto importInternal = [importFunc = std::move(importFunc)](std::any data) -> QXmppTask<Result<>> {
         Q_ASSERT(std::type_index(data.type()) == std::type_index(typeid(DataType)));
@@ -140,12 +139,12 @@ void QXmppAccountMigrationManager::registerExportData(ImportFunc importFunc, Exp
 
     using AnyResult = std::variant<std::any, QXmppError>;
     auto exportInternal = [this, exportFunc = std::move(exportFunc)]() -> QXmppTask<AnyResult> {
-        return chain<AnyResult>(exportFunc(), this, [](Result<DataType> &&result) {
-            return std::visit(overloaded {
-                                  [](DataType data) -> AnyResult { return std::any(std::move(data)); },
-                                  [](QXmppError err) -> AnyResult { return err; } },
-                              std::move(result));
-        });
+        co_return std::visit(
+            overloaded {
+                [](DataType data) -> AnyResult { return std::any(std::move(data)); },
+                [](QXmppError err) -> AnyResult { return err; },
+            },
+            co_await exportFunc());
     };
 
     registerMigrationDataInternal(std::type_index(typeid(DataType)), std::move(importInternal), std::move(exportInternal));

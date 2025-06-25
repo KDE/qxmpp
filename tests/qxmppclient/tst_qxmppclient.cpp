@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppColorGeneration.h"
 #include "QXmppCredentials.h"
@@ -10,15 +11,12 @@
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppOutgoingClient.h"
-#include "QXmppOutgoingClient_p.h"
 #include "QXmppPromise.h"
 #include "QXmppRegisterIq.h"
 #include "QXmppRosterManager.h"
-#include "QXmppStreamFeatures.h"
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
-#include "Async.h"
 #include "TestClient.h"
 #include "util.h"
 
@@ -109,22 +107,22 @@ public:
     QXmppTask<MessageEncryptResult> encryptMessage(QXmppMessage &&, const std::optional<QXmppSendStanzaParams> &) override
     {
         messageCalled = true;
-        return makeReadyTask<MessageEncryptResult>(QXmppError { "it's only a test", QXmpp::SendError::EncryptionError });
+        co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
     QXmppTask<MessageDecryptResult> decryptMessage(QXmppMessage &&) override
     {
-        return makeReadyTask<MessageDecryptResult>(QXmppError { "it's only a test", QXmpp::SendError::EncryptionError });
+        co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
 
     QXmppTask<IqEncryptResult> encryptIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> &) override
     {
         iqCalled = true;
-        return makeReadyTask<IqEncryptResult>(QXmppError { "it's only a test", QXmpp::SendError::EncryptionError });
+        co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
 
     QXmppTask<IqDecryptResult> decryptIq(const QDomElement &) override
     {
-        return makeReadyTask<IqDecryptResult>(QXmppError { "it's only a test", QXmpp::SendError::EncryptionError });
+        co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
 
     bool isEncrypted(const QDomElement &) override { return false; };
@@ -141,7 +139,7 @@ void tst_QXmppClient::testE2eeExtension()
     QVERIFY(encrypter.messageCalled);
     QVERIFY(!encrypter.iqCalled);
     QCoreApplication::processEvents();
-    expectFutureVariant<QXmppError>(result.toFuture(this));
+    expectFutureVariant<QXmppError>(result);
 
     encrypter.messageCalled = false;
     result = client.sendSensitive(QXmppPresence(QXmppPresence::Available));
@@ -239,14 +237,7 @@ using DiscoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
 
 static QXmppTask<DiscoResult> parseIqResult(QXmppTask<QXmppClient::IqResult> &&sendTask, QObject *context)
 {
-    QXmppPromise<DiscoResult> p;
-    auto task = p.task();
-    sendTask.then(context, [p = std::move(p)](QXmppClient::IqResult sendResult) mutable {
-        p.finish(parseIq<QXmppDiscoveryIq>(sendResult, [](QXmppDiscoveryIq &&iq) -> DiscoResult {
-            return iq;
-        }));
-    });
-    return task;
+    co_return parseIq<QXmppDiscoveryIq>(co_await sendTask);
 }
 
 void tst_QXmppClient::testChainIq()

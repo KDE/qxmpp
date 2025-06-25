@@ -356,9 +356,6 @@ void tst_QXmppAtmManager::testDistrust()
                                                      QByteArray::fromBase64(QByteArrayLiteral("tfskruc1xcfC+VKzuqvLZUJVZccZX/Pg5j88ukpuY2M=")),
                                                      { keyOwnerBob });
 
-    auto futureVoid = m_manager.distrust(ns_omemo, {});
-    QVERIFY(futureVoid.isFinished());
-
     auto future = m_manager.keys(ns_omemo);
     QVERIFY(future.isFinished());
     auto result = future.result();
@@ -374,16 +371,13 @@ void tst_QXmppAtmManager::testDistrust()
                     TrustLevel::ManuallyDistrusted,
                     manuallyDistrustedKeys) }));
 
-    futureVoid = m_manager.distrust(ns_omemo,
-                                    { std::pair(
-                                          u"alice@example.org"_s,
-                                          QByteArray::fromBase64(QByteArrayLiteral("RwyI/3m9l4wgju9JduFxb5MEJvBNRDfPfo1Ewhl1DEI="))),
-                                      std::pair(
-                                          u"bob@example.com"_s,
-                                          QByteArray::fromBase64(QByteArrayLiteral("mwT0Hwr7aG1p+x0q60H0UDSEnr8cr7hxvxDEhFGrLmY="))) });
-    while (!futureVoid.isFinished()) {
-        QCoreApplication::processEvents();
-    }
+    auto futureVoid = m_manager.makeTrustDecisions(
+        ns_omemo,
+        {},
+        {
+            std::pair(u"alice@example.org"_s, QByteArray::fromBase64("RwyI/3m9l4wgju9JduFxb5MEJvBNRDfPfo1Ewhl1DEI=")),
+            std::pair(u"bob@example.com"_s, QByteArray::fromBase64("mwT0Hwr7aG1p+x0q60H0UDSEnr8cr7hxvxDEhFGrLmY=")),
+        });
 
     authenticatedKeys = { { u"alice@example.org"_s,
                             QByteArray::fromBase64(QByteArrayLiteral("tfskruc1xcfC+VKzuqvLZUJVZccZX/Pg5j88ukpuY2M=")) } };
@@ -556,9 +550,6 @@ void tst_QXmppAtmManager::testAuthenticate()
                                                      QByteArray::fromBase64(QByteArrayLiteral("KXVnPIqbak7+7XZ+58dkPoe6w3cN/GyjKj8IdJtcbt8=")),
                                                      { keyOwnerCarol });
 
-    auto futureVoid = m_manager.authenticate(ns_omemo, {});
-    QVERIFY(futureVoid.isFinished());
-
     auto future = m_manager.keys(ns_omemo);
     QVERIFY(future.isFinished());
     auto result = future.result();
@@ -577,16 +568,11 @@ void tst_QXmppAtmManager::testAuthenticate()
                     TrustLevel::AutomaticallyDistrusted,
                     automaticallyDistrustedKeys) }));
 
-    futureVoid = m_manager.authenticate(ns_omemo,
-                                        { std::pair(
-                                              u"alice@example.org"_s,
-                                              QByteArray::fromBase64(QByteArrayLiteral("RwyI/3m9l4wgju9JduFxb5MEJvBNRDfPfo1Ewhl1DEI="))),
-                                          std::pair(
-                                              u"bob@example.com"_s,
-                                              QByteArray::fromBase64(QByteArrayLiteral("mwT0Hwr7aG1p+x0q60H0UDSEnr8cr7hxvxDEhFGrLmY="))) });
-    while (!futureVoid.isFinished()) {
-        QCoreApplication::processEvents();
-    }
+    m_manager.makeTrustDecisions(
+        ns_omemo,
+        { std::pair(u"alice@example.org"_s, QByteArray::fromBase64(QByteArrayLiteral("RwyI/3m9l4wgju9JduFxb5MEJvBNRDfPfo1Ewhl1DEI="))),
+          std::pair(u"bob@example.com"_s, QByteArray::fromBase64(QByteArrayLiteral("mwT0Hwr7aG1p+x0q60H0UDSEnr8cr7hxvxDEhFGrLmY="))) },
+        {});
 
     authenticatedKeys = { { u"alice@example.org"_s,
                             QByteArray::fromBase64(QByteArrayLiteral("rQIL2albuSR1i06EZAp1uZ838zUeEgGIq2whwu3s+Zg=")) },
@@ -705,12 +691,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisions()
                                                             { u"bob@example.com"_s,
                                                               QByteArray::fromBase64(QByteArrayLiteral("Pw4KZ2uLdEVuGTWaeSbwZsSstBzN2+prK0GDeD8HyKA=")) } };
 
-    auto futureVoid = m_manager.makeTrustDecisions(ns_omemo,
-                                                   keysBeingAuthenticated,
-                                                   keysBeingDistrusted);
-    while (!futureVoid.isFinished()) {
-        QCoreApplication::processEvents();
-    }
+    m_manager.makeTrustDecisions(ns_omemo, keysBeingAuthenticated, keysBeingDistrusted);
 
     auto future = m_manager.keys(ns_omemo);
     QVERIFY(future.isFinished());

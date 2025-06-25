@@ -245,8 +245,6 @@ QXmppTask<QXmppCallInviteManager::ProposeResult> QXmppCallInviteManager::invite(
     std::optional<QXmppCallInviteElement::Jingle> jingle,
     std::optional<QVector<QXmppCallInviteElement::External>> external)
 {
-    QXmppPromise<ProposeResult> promise;
-
     QXmppCallInviteElement callInviteElement;
     callInviteElement.setType(CallInviteType::Invite);
     callInviteElement.setId(QXmppUtils::generateStanzaUuid());
@@ -261,16 +259,13 @@ QXmppTask<QXmppCallInviteManager::ProposeResult> QXmppCallInviteManager::invite(
         callInviteElement.setExternal(external);
     }
 
-    sendMessage(callInviteElement, callPartnerJid).then(this, [this, promise, callPartnerJid](SendResult result) mutable {
-        if (auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Error sending Call Invite proposal: " + error->description);
-            promise.finish(*error);
-        } else {
-            promise.finish(addCallInvite(callPartnerJid));
-        }
-    });
+    auto result = co_await sendMessage(callInviteElement, callPartnerJid);
 
-    return promise.task();
+    if (auto error = std::get_if<QXmppError>(&result)) {
+        warning(u"Error sending Call Invite proposal: " + error->description);
+        co_return std::move(*error);
+    }
+    co_return addCallInvite(callPartnerJid);
 }
 
 /// \cond
