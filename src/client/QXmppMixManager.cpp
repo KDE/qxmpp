@@ -1327,7 +1327,7 @@ QXmppMixIq QXmppMixManager::prepareJoinIq(const QString &channelJid, const QStri
 ///
 QXmppTask<QXmppMixManager::JoiningResult> QXmppMixManager::joinChannel(QXmppMixIq &&iq)
 {
-    return chainIq(client()->sendIq(std::move(iq)), this, [](QXmppMixIq &&iq) -> JoiningResult {
+    co_return parseIq<QXmppMixIq>(co_await client()->sendIq(std::move(iq)), [](QXmppMixIq &&iq) -> JoiningResult {
         return Participation { iq.participantId(), iq.nick(), iq.subscriptions() };
     });
 }
