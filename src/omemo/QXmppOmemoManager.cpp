@@ -357,48 +357,40 @@ QXmppOmemoManager::~QXmppOmemoManager() = default;
 ///
 QXmppTask<bool> Manager::load()
 {
-    QXmppPromise<bool> interface;
-
     if (d->initialized) {
-        interface.finish(true);
-    } else {
-        d->omemoStorage->allData().then(this, [=, this](QXmppOmemoStorage::OmemoData omemoData) mutable {
-            const auto &optionalOwnDevice = omemoData.ownDevice;
-            if (optionalOwnDevice) {
-                d->ownDevice = *optionalOwnDevice;
-            } else {
-                debug(u"Device could not be loaded because it is not stored"_s);
-                interface.finish(false);
-                return;
-            }
-
-            const auto &signedPreKeyPairs = omemoData.signedPreKeyPairs;
-            if (signedPreKeyPairs.isEmpty()) {
-                warning(u"Signed pre keys could not be loaded because none is stored"_s);
-                interface.finish(false);
-                return;
-            } else {
-                d->signedPreKeyPairs = signedPreKeyPairs;
-            }
-
-            const auto &preKeyPairs = omemoData.preKeyPairs;
-            if (preKeyPairs.isEmpty()) {
-                warning(u"Pre keys could not be loaded because none is stored"_s);
-                interface.finish(false);
-                return;
-            } else {
-                d->preKeyPairs = preKeyPairs;
-            }
-
-            d->devices = omemoData.devices;
-            d->removeDevicesRemovedFromServer();
-
-            d->initialized = true;
-            interface.finish(true);
-        });
+        co_return true;
     }
 
-    return interface.task();
+    auto omemoData = co_await d->omemoStorage->allData().withContext(this);
+    const auto &optionalOwnDevice = omemoData.ownDevice;
+    if (optionalOwnDevice) {
+        d->ownDevice = *optionalOwnDevice;
+    } else {
+        debug(u"Device could not be loaded because it is not stored"_s);
+        co_return false;
+    }
+
+    const auto &signedPreKeyPairs = omemoData.signedPreKeyPairs;
+    if (signedPreKeyPairs.isEmpty()) {
+        warning(u"Signed pre keys could not be loaded because none is stored"_s);
+        co_return false;
+    } else {
+        d->signedPreKeyPairs = signedPreKeyPairs;
+    }
+
+    const auto &preKeyPairs = omemoData.preKeyPairs;
+    if (preKeyPairs.isEmpty()) {
+        warning(u"Pre keys could not be loaded because none is stored"_s);
+        co_return false;
+    } else {
+        d->preKeyPairs = preKeyPairs;
+    }
+
+    d->devices = omemoData.devices;
+    d->removeDevicesRemovedFromServer();
+
+    d->initialized = true;
+    co_return true;
 }
 
 ///
@@ -412,37 +404,26 @@ QXmppTask<bool> Manager::load()
 ///
 QXmppTask<bool> Manager::setUp(const QString &deviceLabel)
 {
-    QXmppPromise<bool> interface;
+    if (!co_await d->setUpDeviceId()) {
+        co_return false;
+    }
 
-    auto future = d->setUpDeviceId();
-    future.then(this, [=, this](bool isDeviceIdSetUp) mutable {
-        if (isDeviceIdSetUp) {
-            // The identity key pair in its deserialized form is not stored as a
-            // member variable because it is only needed by
-            // updateSignedPreKeyPair().
-            RefCountedPtr<ratchet_identity_key_pair> identityKeyPair;
+    // The identity key pair in its deserialized form is not stored as a
+    // member variable because it is only needed by
+    // updateSignedPreKeyPair().
+    RefCountedPtr<ratchet_identity_key_pair> identityKeyPair;
 
-            if (d->setUpIdentityKeyPair(identityKeyPair.ptrRef()) &&
-                d->updateSignedPreKeyPair(identityKeyPair.get()) &&
-                d->updatePreKeyPairs(PRE_KEY_INITIAL_CREATION_COUNT)) {
-                d->ownDevice.label = deviceLabel;
+    if (d->setUpIdentityKeyPair(identityKeyPair.ptrRef()) &&
+        d->updateSignedPreKeyPair(identityKeyPair.get()) &&
+        d->updatePreKeyPairs(PRE_KEY_INITIAL_CREATION_COUNT)) {
+        d->ownDevice.label = deviceLabel;
 
-                d->omemoStorage->setOwnDevice(d->ownDevice).then(this, [=, this]() mutable {
-                    auto future = d->publishOmemoData();
-                    future.then(this, [=, this](bool isPublished) mutable {
-                        d->initialized = isPublished;
-                        interface.finish(std::move(isPublished));
-                    });
-                });
-            } else {
-                interface.finish(false);
-            }
-        } else {
-            interface.finish(false);
-        }
-    });
+        co_await d->omemoStorage->setOwnDevice(d->ownDevice);
+        d->initialized = co_await d->publishOmemoData();
 
-    return interface.task();
+        co_return d->initialized;
+    }
+    co_return false;
 }
 
 ///
@@ -574,35 +555,23 @@ void Manager::setMaximumDevicesPerStanza(int maximum)
 ///
 QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(const QList<QString> &jids)
 {
-    if (const auto jidsCount = jids.size()) {
-        struct State {
-            int processed = 0;
-            int jidsCount = 0;
-            QXmppPromise<QVector<Manager::DevicesResult>> interface;
-            QVector<Manager::DevicesResult> devicesResults;
+    Q_ASSERT_X(!jids.contains(d->ownBareJid()), "Requesting contact's device list", "Own JID passed");
+    QVector<Manager::DevicesResult> devicesResults;
+
+    auto tasks = transform<std::vector<std::tuple<QString, QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>>>>>(
+        jids,
+        [this](const auto &jid) {
+            return std::tuple { jid, d->requestDeviceList(jid) };
+        });
+
+    for (auto &[jid, task] : tasks) {
+        devicesResults << DevicesResult {
+            jid,
+            mapSuccess(co_await task, [](QXmppOmemoDeviceListItem) { return Success(); })
         };
-
-        auto state = std::make_shared<State>();
-        state->jidsCount = jids.count();
-
-        for (const auto &jid : jids) {
-            Q_ASSERT_X(jid != d->ownBareJid(), "Requesting contact's device list", "Own JID passed");
-
-            auto future = d->requestDeviceList(jid);
-            future.then(this, [jid, state](auto result) mutable {
-                state->devicesResults << DevicesResult {
-                    jid,
-                    mapSuccess(std::move(result), [](QXmppOmemoDeviceListItem) { return Success(); })
-                };
-
-                if (++(state->processed) == state->jidsCount) {
-                    state->interface.finish(std::move(state->devicesResults));
-                }
-            });
-        }
-        return state->interface.task();
     }
-    return makeReadyTask(QVector<Manager::DevicesResult>());
+
+    co_return devicesResults;
 }
 
 ///
@@ -621,32 +590,17 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(const QLi
 ///
 QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(const QList<QString> &jids)
 {
-    if (const auto jidsCount = jids.size()) {
-        struct State {
-            int processed = 0;
-            int jidsCount = 0;
-            QXmppPromise<QVector<Manager::DevicesResult>> interface;
-            QVector<Manager::DevicesResult> devicesResults;
-        };
+    auto tasks = transform<std::vector<QXmppTask<std::variant<QXmpp::Success, QXmppError>>>>(jids, [this](const auto &jid) {
+        return d->subscribeToDeviceList(jid);
+    });
 
-        auto state = std::make_shared<State>();
-        state->jidsCount = jids.size();
-
-        for (const auto &jid : jids) {
-            d->subscribeToDeviceList(jid).then(this, [state, jid](QXmppPubSubManager::Result result) mutable {
-                Manager::DevicesResult devicesResult;
-                devicesResult.jid = jid;
-                devicesResult.result = result;
-                state->devicesResults << devicesResult;
-
-                if (++(state->processed) == state->jidsCount) {
-                    state->interface.finish(std::move(state->devicesResults));
-                }
-            });
-        }
-        return state->interface.task();
+    QVector<DevicesResult> devicesResults;
+    devicesResults.reserve(tasks.size());
+    for (size_t i = 0; i < tasks.size(); i++) {
+        devicesResults.push_back(DevicesResult { jids.at(i), co_await tasks[i] });
     }
-    return makeReadyTask(QVector<Manager::DevicesResult>());
+
+    co_return devicesResults;
 }
 
 ///
@@ -670,11 +624,9 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::unsubscribeFromDeviceLists()
 ///
 QXmppOmemoOwnDevice Manager::ownDevice()
 {
-    const auto &ownDevice = d->ownDevice;
-
     QXmppOmemoOwnDevice device;
-    device.setLabel(ownDevice.label);
-    device.setKeyId(ownDevice.publicIdentityKey);
+    device.setLabel(d->ownDevice.label);
+    device.setKeyId(d->ownDevice.publicIdentityKey);
 
     return device;
 }
@@ -713,36 +665,30 @@ QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices()
 ///
 QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(const QList<QString> &jids)
 {
-    QXmppPromise<QVector<QXmppOmemoDevice>> interface;
+    auto keys = co_await this->keys(jids).withContext(this);
 
-    auto future = keys(jids);
-    future.then(this, [=, this](QHash<QString, QHash<QByteArray, TrustLevel>> keys) mutable {
-        QVector<QXmppOmemoDevice> devices;
+    QVector<QXmppOmemoDevice> devices;
+    for (const auto &jid : jids) {
+        const auto &storedDevices = d->devices.value(jid);
+        const auto &storedKeys = keys.value(jid);
 
-        for (const auto &jid : jids) {
-            const auto &storedDevices = d->devices.value(jid);
-            const auto &storedKeys = keys.value(jid);
+        for (const auto &storedDevice : storedDevices) {
+            const auto &keyId = storedDevice.keyId;
 
-            for (const auto &storedDevice : storedDevices) {
-                const auto &keyId = storedDevice.keyId;
+            QXmppOmemoDevice device;
+            device.setJid(jid);
+            device.setLabel(storedDevice.label);
 
-                QXmppOmemoDevice device;
-                device.setJid(jid);
-                device.setLabel(storedDevice.label);
-
-                if (!keyId.isEmpty()) {
-                    device.setKeyId(keyId);
-                    device.setTrustLevel(storedKeys.value(keyId));
-                }
-
-                devices.append(device);
+            if (!keyId.isEmpty()) {
+                device.setKeyId(keyId);
+                device.setTrustLevel(storedKeys.value(keyId));
             }
+
+            devices.append(device);
         }
+    }
 
-        interface.finish(std::move(devices));
-    });
-
-    return interface.task();
+    co_return devices;
 }
 
 ///
@@ -760,30 +706,23 @@ QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(const QList<QString> &jids
 ///
 QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(const QString &jid)
 {
-    QXmppPromise<QXmppPubSubManager::Result> interface;
-
     Q_ASSERT_X(jid != d->ownBareJid(), "Removing contact device", "Own JID passed");
 
-    auto future = d->unsubscribeFromDeviceList(jid);
-    future.then(this, [=, this](QXmppPubSubManager::Result result) mutable {
-        if (std::holds_alternative<QXmppError>(result)) {
-            warning(u"Contact '" + jid + u"' could not be removed because the device list subscription could not be removed");
-            interface.finish(std::move(result));
-        } else {
-            d->devices.remove(jid);
+    auto result = co_await d->unsubscribeFromDeviceList(jid).withContext(this);
+    if (std::holds_alternative<QXmppError>(result)) {
+        warning(u"Contact '" + jid + u"' could not be removed because the device list subscription could not be removed");
+        co_return result;
+    }
 
-            auto future = d->omemoStorage->removeDevices(jid);
-            future.then(this, [=, this]() mutable {
-                auto future = d->trustManager->removeKeys(ns_omemo_2.toString(), jid);
-                future.then(this, [=, this]() mutable {
-                    interface.finish(std::move(result));
-                    Q_EMIT devicesRemoved(jid);
-                });
-            });
-        }
-    });
+    d->devices.remove(jid);
 
-    return interface.task();
+    auto storageTask = d->omemoStorage->removeDevices(jid);
+    auto trustTask = d->trustManager->removeKeys(ns_omemo_2.toString(), jid);
+    co_await storageTask.withContext(this);
+    co_await trustTask.withContext(this);
+
+    Q_EMIT devicesRemoved(jid);
+    co_return result;
 }
 
 ///
@@ -861,8 +800,6 @@ bool Manager::isNewDeviceAutoSessionBuildingEnabled()
 ///
 QXmppTask<void> Manager::buildMissingSessions(const QList<QString> &jids)
 {
-    QXmppPromise<void> interface;
-
     auto &devices = d->devices;
     auto devicesCount = 0;
 
@@ -880,7 +817,7 @@ QXmppTask<void> Manager::buildMissingSessions(const QList<QString> &jids)
     }
 
     if (devicesCount) {
-        auto processedDevicesCount = std::make_shared<int>(0);
+        std::vector<QXmppTask<bool>> buildSessionTasks;
 
         for (const auto &jid : jids) {
             auto &processedDevices = devices[jid];
@@ -890,22 +827,15 @@ QXmppTask<void> Manager::buildMissingSessions(const QList<QString> &jids)
                 auto &device = itr.value();
 
                 if (device.session.isEmpty()) {
-                    auto future = d->buildSessionWithDeviceBundle(jid, deviceId, device);
-                    future.then(this, [=](auto) mutable {
-                        if (++(*processedDevicesCount) == devicesCount) {
-                            interface.finish();
-                        }
-                    });
-                } else if (++(*processedDevicesCount) == devicesCount) {
-                    interface.finish();
+                    buildSessionTasks.push_back(d->buildSessionWithDeviceBundle(jid, deviceId, device));
                 }
             }
         }
-    } else {
-        interface.finish();
-    }
 
-    return interface.task();
+        for (auto &task : buildSessionTasks) {
+            co_await task;
+        }
+    }
 }
 
 ///
@@ -1044,92 +974,80 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> Manager::encryptMessage(QXmp
 QXmppTask<QXmppE2eeExtension::MessageDecryptResult> QXmppOmemoManager::decryptMessage(QXmppMessage &&message)
 {
     if (!d->initialized) {
-        return makeReadyTask<MessageDecryptResult>(QXmppError {
+        co_return QXmppError {
             u"OMEMO manager must be initialized before decrypting"_s,
-            SendError::EncryptionError });
+            SendError::EncryptionError
+        };
     }
 
     if (!message.omemoElement()) {
-        return makeReadyTask<MessageDecryptResult>(NotEncrypted());
+        co_return NotEncrypted();
     }
 
-    return chain<MessageDecryptResult>(d->decryptMessage(message), this, [](std::optional<QXmppMessage> message) -> MessageDecryptResult {
-        if (message) {
-            return std::move(*message);
-        }
-        return QXmppError {
-            u"Couldn't decrypt message"_s,
-            {}
-        };
-    });
+    if (auto decrypted = co_await d->decryptMessage(message)) {
+        co_return std::move(*decrypted);
+    }
+    co_return QXmppError { u"Couldn't decrypt message"_s, {} };
 }
 
 QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &params)
 {
-    QXmppPromise<QXmppE2eeExtension::IqEncryptResult> interface;
-
     if (!d->initialized) {
-        interface.finish(QXmppError {
+        co_return QXmppError {
             u"OMEMO manager must be initialized before encrypting"_s,
-            SendError::EncryptionError });
-    } else {
-        std::optional<TrustLevels> acceptedTrustLevels;
-
-        if (params) {
-            acceptedTrustLevels = params->acceptedTrustLevels();
-        }
-
-        if (!acceptedTrustLevels) {
-            acceptedTrustLevels = ACCEPTED_TRUST_LEVELS;
-        }
-
-        auto future = d->encryptStanza(iq, { QXmppUtils::jidToBareJid(iq.to()) }, *acceptedTrustLevels);
-        future.then(this, [=, iq = std::move(iq)](std::optional<QXmppOmemoElement> omemoElement) mutable {
-            if (!omemoElement) {
-                interface.finish(QXmppError {
-                    u"OMEMO element could not be created"_s,
-                    SendError::EncryptionError });
-
-            } else {
-                auto omemoIq = std::make_unique<QXmppOmemoIq>();
-                omemoIq->setId(iq.id());
-                omemoIq->setType(iq.type());
-                omemoIq->setLang(iq.lang());
-                omemoIq->setFrom(iq.from());
-                omemoIq->setTo(iq.to());
-                omemoIq->setOmemoElement(*omemoElement);
-
-                interface.finish(std::move(omemoIq));
-            }
-        });
+            SendError::EncryptionError
+        };
     }
 
-    return interface.task();
+    std::optional<TrustLevels> acceptedTrustLevels;
+    if (params) {
+        acceptedTrustLevels = params->acceptedTrustLevels();
+    }
+    if (!acceptedTrustLevels) {
+        acceptedTrustLevels = ACCEPTED_TRUST_LEVELS;
+    }
+
+    auto omemoElement = co_await d->encryptStanza(iq, { QXmppUtils::jidToBareJid(iq.to()) }, *acceptedTrustLevels);
+    if (!omemoElement) {
+        co_return QXmppError {
+            u"OMEMO element could not be created"_s,
+            SendError::EncryptionError
+        };
+    }
+
+    auto omemoIq = std::make_unique<QXmppOmemoIq>();
+    omemoIq->setId(iq.id());
+    omemoIq->setType(iq.type());
+    omemoIq->setLang(iq.lang());
+    omemoIq->setFrom(iq.from());
+    omemoIq->setTo(iq.to());
+    omemoIq->setOmemoElement(*omemoElement);
+
+    co_return omemoIq;
 }
 
 QXmppTask<QXmppE2eeExtension::IqDecryptResult> Manager::decryptIq(const QDomElement &element)
 {
     if (!d->initialized) {
         // TODO: Add decryption queue to avoid this error
-        return makeReadyTask<IqDecryptResult>(QXmppError {
+        co_return QXmppError {
             u"OMEMO manager must be initialized before decrypting"_s,
-            SendError::EncryptionError });
+            SendError::EncryptionError
+        };
     }
 
-    if (QXmppOmemoIq::isOmemoIq(element)) {
-        // Tag name and iq type are already checked in QXmppClient.
-        return chain<IqDecryptResult>(d->decryptIq(element), this, [](auto result) -> IqDecryptResult {
-            if (result) {
-                return result->iq;
-            }
-            return QXmppError {
-                u"OMEMO message could not be decrypted"_s,
-                SendError::EncryptionError
-            };
-        });
+    if (!QXmppOmemoIq::isOmemoIq(element)) {
+        co_return NotEncrypted();
     }
 
-    return makeReadyTask<IqDecryptResult>(NotEncrypted());
+    // Tag name and iq type are already checked in QXmppClient.
+    if (auto result = co_await d->decryptIq(element)) {
+        co_return result->iq;
+    }
+    co_return QXmppError {
+        u"OMEMO message could not be decrypted"_s,
+        SendError::EncryptionError
+    };
 }
 
 bool QXmppOmemoManager::isEncrypted(const QDomElement &el)
@@ -1180,8 +1098,7 @@ bool Manager::handleStanza(const QDomElement &stanza)
 bool Manager::handleMessage(const QXmppMessage &message)
 {
     if (d->initialized && message.omemoElement()) {
-        auto future = d->decryptMessage(message);
-        future.then(this, [this, message](std::optional<QXmppMessage> optionalDecryptedMessage) {
+        d->decryptMessage(message).then(this, [this, message](std::optional<QXmppMessage> optionalDecryptedMessage) {
             if (optionalDecryptedMessage) {
                 injectMessage(std::move(*optionalDecryptedMessage));
             } else {
