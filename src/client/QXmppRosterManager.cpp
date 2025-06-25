@@ -312,7 +312,7 @@ QXmppTask<QXmppRosterManager::RosterResult> QXmppRosterManager::requestRoster()
     // TODO: Request MIX annotations only when the server supports MIX-PAM.
     iq.setMixAnnotate(true);
 
-    return chainIq<RosterResult>(client()->sendIq(std::move(iq)), this);
+    co_return parseIq<QXmppRosterIq>(co_await client()->sendIq(std::move(iq)));
 }
 
 ///
@@ -552,54 +552,40 @@ void QXmppRosterManager::onRegistered(QXmppClient *client)
     if (auto manager = client->findExtension<QXmppAccountMigrationManager>()) {
         using ImportResult = std::variant<Success, QXmppError>;
         auto importData = [this, client, manager](const RosterData &data) -> QXmppTask<ImportResult> {
-            if (data.items.isEmpty()) {
-                return makeReadyTask<ImportResult>(Success());
-            }
-
-            QXmppPromise<ImportResult> promise;
-            auto counter = std::make_shared<int>(data.items.size());
-
-            for (const auto &item : std::as_const(data.items)) {
+            auto tasks = transform<std::vector<QXmppTask<QXmppClient::EmptyResult>>>(data.items, [client](const auto &item) {
                 Q_ASSERT(!item.isMixChannel());
-
                 QXmppRosterIq iq;
                 iq.addItem(item);
                 iq.setType(QXmppIq::Set);
+                return client->sendGenericIq(std::move(iq));
+            });
 
-                client->sendGenericIq(std::move(iq)).then(this, [promise, counter](auto &&result) mutable {
-                    if (promise.task().isFinished()) {
-                        return;
-                    }
+            for (auto &task : tasks) {
+                auto result = co_await task;
 
-                    if (hasError(result)) {
-                        return promise.finish(getError(std::move(result)));
-                    }
-
-                    if ((--(*counter)) == 0) {
-                        return promise.finish(Success());
-                    }
-                });
+                if (hasError(result)) {
+                    co_return getError(std::move(result));
+                }
             }
-
-            return promise.task();
+            co_return Success();
         };
-        auto exportData = [this]() {
-            return chainMapSuccess(requestRoster(), this, [](QXmppRosterIq &&iq) -> RosterData {
-                const auto items = transformFilter<RosterData::Items>(iq.items(), [](const auto &item) -> std::optional<QXmppRosterIq::Item> {
-                    if (item.isMixChannel()) {
-                        return {};
-                    }
+        auto exportData = [this]() -> QXmppTask<std::variant<RosterData, QXmppError>> {
+            co_return mapSuccess(co_await requestRoster(), [](const QXmppRosterIq &iq) -> RosterData {
+                return {
+                    transformFilter<RosterData::Items>(iq.items(), [](const auto &item) -> std::optional<QXmppRosterIq::Item> {
+                        if (item.isMixChannel()) {
+                            return {};
+                        }
 
-                    auto fixed = item;
+                        auto fixed = item;
 
-                    // We don't want this to be sent while importing.
-                    // See https://datatracker.ietf.org/doc/html/rfc6121#section-2.1.2.2
-                    fixed.setSubscriptionStatus({});
+                        // We don't want this to be sent while importing.
+                        // See https://datatracker.ietf.org/doc/html/rfc6121#section-2.1.2.2
+                        fixed.setSubscriptionStatus({});
 
-                    return fixed;
-                });
-
-                return { items };
+                        return fixed;
+                    })
+                };
             });
         };
 

@@ -53,36 +53,35 @@ QXmppTrustMemoryStorage::~QXmppTrustMemoryStorage() = default;
 QXmppTask<void> QXmppTrustMemoryStorage::setSecurityPolicy(const QString &encryption, TrustSecurityPolicy securityPolicy)
 {
     d->securityPolicies.insert(encryption, securityPolicy);
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::resetSecurityPolicy(const QString &encryption)
 {
     d->securityPolicies.remove(encryption);
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<TrustSecurityPolicy> QXmppTrustMemoryStorage::securityPolicy(const QString &encryption)
 {
-    return makeReadyTask(std::move(d->securityPolicies.value(encryption)));
+    co_return d->securityPolicies.value(encryption);
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::setOwnKey(const QString &encryption, const QByteArray &keyId)
 {
     d->ownKeys.insert(encryption, keyId);
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::resetOwnKey(const QString &encryption)
 {
     d->ownKeys.remove(encryption);
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<QByteArray> QXmppTrustMemoryStorage::ownKey(const QString &encryption)
 {
-    auto key = d->ownKeys[encryption];
-    return makeReadyTask(std::move(key));
+    co_return d->ownKeys[encryption];
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::addKeys(const QString &encryption, const QString &keyOwnerJid, const QList<QByteArray> &keyIds, TrustLevel trustLevel)
@@ -94,8 +93,7 @@ QXmppTask<void> QXmppTrustMemoryStorage::addKeys(const QString &encryption, cons
         key.trustLevel = trustLevel;
         d->keys.insert(encryption, key);
     }
-
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::removeKeys(const QString &encryption, const QList<QByteArray> &keyIds)
@@ -108,8 +106,7 @@ QXmppTask<void> QXmppTrustMemoryStorage::removeKeys(const QString &encryption, c
             ++itr;
         }
     }
-
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::removeKeys(const QString &encryption, const QString &keyOwnerJid)
@@ -122,14 +119,13 @@ QXmppTask<void> QXmppTrustMemoryStorage::removeKeys(const QString &encryption, c
             ++itr;
         }
     }
-
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::removeKeys(const QString &encryption)
 {
     d->keys.remove(encryption);
-    return makeReadyTask();
+    co_return;
 }
 
 QXmppTask<QHash<TrustLevel, QMultiHash<QString, QByteArray>>> QXmppTrustMemoryStorage::keys(const QString &encryption, TrustLevels trustLevels)
@@ -144,7 +140,7 @@ QXmppTask<QHash<TrustLevel, QMultiHash<QString, QByteArray>>> QXmppTrustMemorySt
         }
     }
 
-    return makeReadyTask(std::move(keys));
+    co_return keys;
 }
 
 QXmppTask<QHash<QString, QHash<QByteArray, TrustLevel>>> QXmppTrustMemoryStorage::keys(const QString &encryption, const QList<QString> &keyOwnerJids, TrustLevels trustLevels)
@@ -160,7 +156,7 @@ QXmppTask<QHash<QString, QHash<QByteArray, TrustLevel>>> QXmppTrustMemoryStorage
         }
     }
 
-    return makeReadyTask(std::move(keys));
+    co_return keys;
 }
 
 QXmppTask<bool> QXmppTrustMemoryStorage::hasKey(const QString &encryption, const QString &keyOwnerJid, TrustLevels trustLevels)
@@ -168,11 +164,11 @@ QXmppTask<bool> QXmppTrustMemoryStorage::hasKey(const QString &encryption, const
     const auto storedKeys = d->keys.values(encryption);
     for (const auto &key : storedKeys) {
         if (key.ownerJid == keyOwnerJid && trustLevels.testFlag(key.trustLevel)) {
-            return makeReadyTask(std::move(true));
+            co_return true;
         }
     }
 
-    return makeReadyTask(std::move(false));
+    co_return false;
 }
 
 QXmppTask<QHash<QString, QMultiHash<QString, QByteArray>>> QXmppTrustMemoryStorage::setTrustLevel(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIds, TrustLevel trustLevel)
@@ -212,7 +208,7 @@ QXmppTask<QHash<QString, QMultiHash<QString, QByteArray>>> QXmppTrustMemoryStora
         }
     }
 
-    return makeReadyTask(std::move(modifiedKeys));
+    co_return modifiedKeys;
 }
 
 QXmppTask<QHash<QString, QMultiHash<QString, QByteArray>>> QXmppTrustMemoryStorage::setTrustLevel(const QString &encryption, const QList<QString> &keyOwnerJids, TrustLevel oldTrustLevel, TrustLevel newTrustLevel)
@@ -228,7 +224,7 @@ QXmppTask<QHash<QString, QMultiHash<QString, QByteArray>>> QXmppTrustMemoryStora
         }
     }
 
-    return makeReadyTask(std::move(modifiedKeys));
+    co_return modifiedKeys;
 }
 
 QXmppTask<TrustLevel> QXmppTrustMemoryStorage::trustLevel(const QString &encryption, const QString &keyOwnerJid, const QByteArray &keyId)
@@ -236,11 +232,11 @@ QXmppTask<TrustLevel> QXmppTrustMemoryStorage::trustLevel(const QString &encrypt
     const auto keys = d->keys.values(encryption);
     for (const auto &key : keys) {
         if (key.id == keyId && key.ownerJid == keyOwnerJid) {
-            return makeReadyTask(std::move(TrustLevel(key.trustLevel)));
+            co_return TrustLevel(key.trustLevel);
         }
     }
 
-    return makeReadyTask(std::move(TrustLevel::Undecided));
+    co_return TrustLevel::Undecided;
 }
 
 QXmppTask<void> QXmppTrustMemoryStorage::resetAll(const QString &encryption)
@@ -248,7 +244,6 @@ QXmppTask<void> QXmppTrustMemoryStorage::resetAll(const QString &encryption)
     d->securityPolicies.remove(encryption);
     d->ownKeys.remove(encryption);
     d->keys.remove(encryption);
-
-    return makeReadyTask();
+    co_return;
 }
 /// \endcond

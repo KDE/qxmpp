@@ -343,23 +343,18 @@ QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessage
 
 QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &id, const QString &remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
 {
-    QXmppPromise<ProposeResult> promise;
-
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Propose);
     jmiElement.setId(id);
     jmiElement.setDescriptions(descriptions);
 
-    sendMessage(jmiElement, remoteJid).then(this, [this, promise, id, remoteJid](SendResult result) mutable {
-        if (hasError(result)) {
-            warning(u"Error sending Jingle Message Initiation proposal: " + getError(result).description);
-            promise.finish(getError(std::move(result)));
-        } else {
-            promise.finish(addJmi(id, remoteJid));
-        }
-    });
-
-    return promise.task();
+    auto result = co_await sendMessage(jmiElement, remoteJid).withContext(this);
+    if (hasError(result)) {
+        warning(u"Error sending Jingle Message Initiation proposal: " + getError(result).description);
+        co_return getError(std::move(result));
+    } else {
+        co_return addJmi(id, remoteJid);
+    }
 }
 
 /// \cond

@@ -175,15 +175,15 @@ void tst_QXmppAccountMigrationManager::testImportExport()
     std::optional<DataExtension> currentState;
 
     manager->registerExportData<DataExtension>(
-        [&](const DataExtension &data) {
+        [&](const DataExtension &data) -> QXmppTask<Manager::Result<>> {
             currentState = data;
-            return makeReadyTask<Manager::Result<>>(Success());
+            co_return Success();
         },
-        [&]() {
+        [&]() -> QXmppTask<Manager::Result<DataExtension>> {
             if (currentState) {
-                return makeReadyTask<Manager::Result<DataExtension>>(*currentState);
+                co_return *currentState;
             }
-            return makeReadyTask<Manager::Result<DataExtension>>(QXmppError { "No data.", {} });
+            co_return QXmppError { "No data.", {} };
         });
 
     auto importTask = manager->importData(QXmppExportData {});

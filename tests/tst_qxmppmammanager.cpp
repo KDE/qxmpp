@@ -19,23 +19,23 @@ class EncryptionExtension : public QXmppE2eeExtension
 public:
     QXmppTask<MessageEncryptResult> encryptMessage(QXmppMessage &&, const std::optional<QXmppSendStanzaParams> &) override
     {
-        return makeReadyTask<MessageEncryptResult>(QXmppError { "it's only a test", QXmpp::SendError::EncryptionError });
+        co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
     QXmppTask<MessageDecryptResult> decryptMessage(QXmppMessage &&m) override
     {
         m.setBody(m.e2eeFallbackBody());
         m.setE2eeFallbackBody({});
-        return makeReadyTask<MessageDecryptResult>(std::move(m));
+        co_return m;
     }
 
     QXmppTask<IqEncryptResult> encryptIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> &) override
     {
-        return makeReadyTask<IqEncryptResult>(QXmppError { "it's only a test", QXmpp::SendError::EncryptionError });
+        co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
 
     QXmppTask<IqDecryptResult> decryptIq(const QDomElement &) override
     {
-        return makeReadyTask<IqDecryptResult>(QXmppError { "it's only a test", QXmpp::SendError::EncryptionError });
+        co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
 
     bool isEncrypted(const QDomElement &e) override { return !e.firstChildElement("test-encrypted").isNull(); };

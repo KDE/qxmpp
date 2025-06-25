@@ -28,6 +28,7 @@
 #include "QXmppVersionManager.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
 
@@ -498,38 +499,31 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
 ///
 QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
-    const auto sendEncrypted = [this](auto &&task) {
-        QXmppPromise<QXmpp::SendResult> interface;
-        task.then(this, [this, interface](auto &&result) mutable {
-            std::visit(overloaded {
-                           [&](std::unique_ptr<QXmppMessage> &&message) {
-                               QByteArray xml;
-                               QXmlStreamWriter writer(&xml);
-                               message->toXml(&writer, QXmpp::ScePublic);
+    auto sendEncryptedMessage = [this](auto &&task) -> QXmppTask<QXmpp::SendResult> {
+        auto result = co_await task.withContext(this);
+        if (std::holds_alternative<QXmppError>(result)) {
+            co_return std::get<QXmppError>(std::move(result));
+        }
+        QByteArray xml;
+        QXmlStreamWriter writer(&xml);
+        std::get<std::unique_ptr<QXmppMessage>>(result)->toXml(&writer, QXmpp::ScePublic);
 
-                               d->stream->streamAckManager().send(QXmppPacket(xml, true, std::move(interface)));
-                           },
-                           [&](std::unique_ptr<QXmppIq> &&iq) {
-                               d->stream->streamAckManager().send(QXmppPacket(*iq, std::move(interface)));
-                           },
-                           [&](QXmppError &&error) {
-                               interface.finish(std::move(error));
-                           } },
-                       std::move(result));
-        });
+        co_return co_await d->stream->streamAckManager().send(QXmppPacket(xml, true));
+    };
 
-        return interface.task();
+    auto sendEncryptedIq = [this](auto &&task) -> QXmppTask<QXmpp::SendResult> {
+        auto result = co_await task.withContext(this);
+        if (std::holds_alternative<QXmppError>(result)) {
+            co_return std::get<QXmppError>(std::move(result));
+        }
+        co_return co_await d->stream->streamAckManager().send(QXmppPacket(*std::get<std::unique_ptr<QXmppIq>>(result)));
     };
 
     if (d->encryptionExtension) {
         if (dynamic_cast<QXmppMessage *>(&stanza)) {
-            return sendEncrypted(
-                d->encryptionExtension->encryptMessage(
-                    std::move(dynamic_cast<QXmppMessage &&>(stanza)), params));
+            return sendEncryptedMessage(d->encryptionExtension->encryptMessage(dynamic_cast<QXmppMessage &&>(stanza), params));
         } else if (dynamic_cast<QXmppIq *>(&stanza)) {
-            return sendEncrypted(
-                d->encryptionExtension->encryptIq(
-                    std::move(dynamic_cast<QXmppIq &&>(stanza)), params));
+            return sendEncryptedIq(d->encryptionExtension->encryptIq(dynamic_cast<QXmppIq &&>(stanza), params));
         }
     }
     return d->stream->streamAckManager().send(stanza);
@@ -606,63 +600,43 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::op
 ///
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &params)
 {
-    if (d->encryptionExtension) {
-        QXmppPromise<IqResult> p;
-        auto task = p.task();
-        d->encryptionExtension->encryptIq(std::move(iq), params).then(this, [this, p = std::move(p)](IqEncryptResult result) mutable {
-            std::visit(overloaded {
-                           [&](std::unique_ptr<QXmppIq> &&iq) {
-                               // success (encrypted)
-                               d->stream->sendIq(std::move(*iq)).then(this, [this, p = std::move(p)](IqResult &&result) mutable {
-                                   // iq sent, response received
-                                   std::visit(overloaded {
-                                                  [&](QDomElement &&el) {
-                                                      if (!isIqResponse(el)) {
-                                                          p.finish(QXmppError {
-                                                              u"Invalid IQ response received."_s,
-                                                              QXmpp::SendError::EncryptionError });
-                                                          return;
-                                                      }
-                                                      if (!d->encryptionExtension) {
-                                                          p.finish(QXmppError {
-                                                              u"No decryption extension found."_s,
-                                                              QXmpp::SendError::EncryptionError });
-                                                          return;
-                                                      }
-                                                      // try to decrypt the result (should be encrypted)
-                                                      d->encryptionExtension->decryptIq(el).then(this, [p = std::move(p), encryptedEl = el](IqDecryptResult result) mutable {
-                                                          std::visit(overloaded {
-                                                                         [&](QDomElement &&decryptedEl) {
-                                                                             p.finish(decryptedEl);
-                                                                         },
-                                                                         [&](QXmppE2eeExtension::NotEncrypted) {
-                                                                             // the IQ response from the other entity was not encrypted
-                                                                             // then report IQ response without modifications
-                                                                             // TODO: should we return a QXmppError instead?
-                                                                             p.finish(std::move(encryptedEl));
-                                                                         },
-                                                                         [&](QXmppError &&error) {
-                                                                             p.finish(error);
-                                                                         } },
-                                                                     std::move(result));
-                                                      });
-                                                  },
-                                                  [&](QXmppError &&e) {
-                                                      p.finish(std::move(e));
-                                                  } },
-                                              std::move(result));
-                               });
-                           },
-                           [&](QXmppError &&error) {
-                               // error (encryption)
-                               p.finish(std::move(error));
-                           } },
-                       std::move(result));
-        });
+    auto sendEncryptedIq = [this, params](QXmppIq &&iq) -> QXmppTask<IqResult> {
+        auto encryptResult = co_await d->encryptionExtension->encryptIq(std::move(iq), params);
 
-        return task;
-    }
-    return d->stream->sendIq(std::move(iq));
+        if (std::holds_alternative<QXmppError>(encryptResult)) {
+            co_return std::get<QXmppError>(std::move(encryptResult));
+        }
+
+        auto encryptedIq = std::get<std::unique_ptr<QXmppIq>>(std::move(encryptResult));
+        auto sendResult = co_await d->stream->sendIq(std::move(*encryptedIq));
+
+        if (std::holds_alternative<QXmppError>(sendResult)) {
+            co_return std::get<QXmppError>(std::move(sendResult));
+        }
+        auto responseIqElement = std::get<QDomElement>(sendResult);
+
+        // iq sent, response received
+        if (!isIqResponse(responseIqElement)) {
+            co_return QXmppError { u"Invalid IQ response received."_s, QXmpp::SendError::EncryptionError };
+        }
+        if (!d->encryptionExtension) {
+            co_return QXmppError { u"No decryption extension found."_s, QXmpp::SendError::EncryptionError };
+        }
+
+        // try to decrypt the result (should be encrypted)
+        auto decryptResult = co_await d->encryptionExtension->decryptIq(responseIqElement);
+
+        co_return map<IqResult>(
+            [&](QXmppE2eeExtension::NotEncrypted) -> IqResult {
+                // the IQ response from the other entity was not encrypted
+                // then report IQ response without modifications
+                // TODO: should we return an QXmppError instead?
+                return responseIqElement;
+            },
+            std::move(decryptResult));
+    };
+
+    return d->encryptionExtension ? sendEncryptedIq(std::move(iq)) : d->stream->sendIq(std::move(iq));
 }
 
 ///
@@ -676,11 +650,10 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, cons
 ///
 /// \since QXmpp 1.5
 ///
-QXmppTask<QXmppClient::EmptyResult> QXmppClient::sendGenericIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
+QXmppTask<QXmppClient::EmptyResult>
+QXmppClient::sendGenericIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
 {
-    return chainIq(sendIq(std::move(iq)), this, [](const QXmppIq &) -> EmptyResult {
-        return QXmpp::Success();
-    });
+    co_return mapToSuccess(co_await sendIq(std::move(iq)));
 }
 
 ///

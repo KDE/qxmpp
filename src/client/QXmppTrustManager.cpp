@@ -209,15 +209,9 @@ QXmppTask<bool> QXmppTrustManager::hasKey(const QString &encryption, const QStri
 ///
 QXmppTask<void> QXmppTrustManager::setTrustLevel(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIds, TrustLevel trustLevel)
 {
-    QXmppPromise<void> promise;
-
-    auto future = m_trustStorage->setTrustLevel(encryption, keyIds, trustLevel);
-    future.then(this, [=, this](QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys) mutable {
-        Q_EMIT trustLevelsChanged(modifiedKeys);
-        promise.finish();
-    });
-
-    return promise.task();
+    auto modifiedKeys = co_await m_trustStorage->setTrustLevel(encryption, keyIds, trustLevel)
+                            .withContext(this);
+    Q_EMIT trustLevelsChanged(modifiedKeys);
 }
 
 ///
@@ -230,14 +224,9 @@ QXmppTask<void> QXmppTrustManager::setTrustLevel(const QString &encryption, cons
 ///
 QXmppTask<void> QXmppTrustManager::setTrustLevel(const QString &encryption, const QList<QString> &keyOwnerJids, TrustLevel oldTrustLevel, TrustLevel newTrustLevel)
 {
-    QXmppPromise<void> promise;
-    m_trustStorage->setTrustLevel(encryption, keyOwnerJids, oldTrustLevel, newTrustLevel)
-        .then(this, [=, this](QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys) mutable {
-            Q_EMIT trustLevelsChanged(modifiedKeys);
-            promise.finish();
-        });
-
-    return promise.task();
+    auto modifiedKeys = co_await m_trustStorage->setTrustLevel(encryption, keyOwnerJids, oldTrustLevel, newTrustLevel)
+                            .withContext(this);
+    Q_EMIT trustLevelsChanged(modifiedKeys);
 }
 
 ///

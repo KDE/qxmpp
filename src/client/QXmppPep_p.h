@@ -5,6 +5,8 @@
 #include <QXmppPubSubEvent.h>
 #include <QXmppPubSubManager.h>
 
+#include "StringLiterals.h"
+
 namespace QXmpp::Private::Pep {
 
 template<typename T>
@@ -14,19 +16,16 @@ using PublishResult = std::variant<QString, QXmppError>;
 template<typename ItemT>
 inline QXmppTask<GetResult<ItemT>> request(QXmppPubSubManager *pubSub, const QString &jid, const QString &nodeName, QObject *parent)
 {
-    using PubSub = QXmppPubSubManager;
+    auto result = co_await pubSub->requestItems<ItemT>(jid, nodeName);
 
-    auto process = [](PubSub::ItemsResult<ItemT> &&result) -> GetResult<ItemT> {
-        if (hasValue(result)) {
-            if (!getValue(result).items.isEmpty()) {
-                return getValue(result).items.takeFirst();
-            }
-            return QXmppError { QStringLiteral("User has no published items."), {} };
-        } else {
-            return getError(std::move(result));
+    if (hasValue(result)) {
+        if (!getValue(result).items.isEmpty()) {
+            co_return getValue(result).items.constFirst();
         }
-    };
-    return chain<GetResult<ItemT>>(pubSub->requestItems<ItemT>(jid, nodeName), parent, process);
+        co_return QXmppError { u"User has no published items."_s, {} };
+    } else {
+        co_return getError(std::move(result));
+    }
 }
 
 // NodeName is a template parameter, so the right qstring comparison overload is used

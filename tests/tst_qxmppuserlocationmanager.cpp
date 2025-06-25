@@ -52,8 +52,6 @@ void tst_QXmppUserLocationManager::testRequest()
                          "</items>"
                          "</pubsub></iq>");
 
-    QCoreApplication::processEvents();
-
     auto item = expectFutureVariant<QXmppGeolocItem>(future);
     QCOMPARE(item.id(), u"abc3"_s);
     COMPARE_OPT(item.accuracy(), 20.0);

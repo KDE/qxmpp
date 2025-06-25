@@ -318,7 +318,7 @@ void QXmppRegistrationManager::onRegistered(QXmppClient *client)
     });
 }
 
-void QXmppRegistrationManager::onUnregistered(QXmppClient *)
+void QXmppRegistrationManager::onUnregistered(QXmppClient *client)
 {
     disconnect(client, nullptr, this, nullptr);
 }

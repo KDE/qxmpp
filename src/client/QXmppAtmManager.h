@@ -26,16 +26,11 @@ protected:
     /// \cond
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
-
-private:
-    Q_SLOT void handleMessageReceived(const QXmppMessage &message);
     /// \endcond
 
+private:
     QXmppTask<void> makeTrustDecisions(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIdsForAuthentication, const QMultiHash<QString, QByteArray> &keyIdsForDistrusting);
     QXmppTask<void> handleMessage(const QXmppMessage &message);
-
-    QXmppTask<void> authenticate(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIds);
-    QXmppTask<void> distrust(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIds);
 
     QXmppTask<void> distrustAutomaticallyTrustedKeys(const QString &encryption, const QList<QString> &keyOwnerJids);
     QXmppTask<void> makePostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &senderKeyIds);
