@@ -7,6 +7,7 @@
 #define ASYNC_H
 
 #include "QXmppAsync_p.h"
+#include "QXmppError.h"
 #include "QXmppGlobal.h"
 
 #include <memory>

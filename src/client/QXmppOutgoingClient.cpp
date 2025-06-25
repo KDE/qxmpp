@@ -38,17 +38,12 @@ using namespace QXmpp::Private;
 
 template<typename Result1, typename Result2, typename Handler>
 auto join(QXmppTask<Result1> t1, QXmppTask<Result2> t2, QObject *context, Handler handler)
+    -> QXmppTask<std::invoke_result_t<Handler, Result1, Result2>>
 {
-    using T = std::invoke_result_t<Handler, Result1, Result2>;
+    auto r1 = co_await t1;
+    auto r2 = co_await t2;
 
-    QXmppPromise<T> p;
-    t1.then(context, [context, p, t2, handler = std::move(handler)](Result1 &&result1) mutable {
-        t2.then(context, [p = std::move(p), handler = std::move(handler), result1 = std::move(result1)](Result2 &&result2) mutable {
-            p.finish(handler(std::move(result1), std::move(result2)));
-        });
-    });
-
-    return p.task();
+    co_return handler(std::move(r1), std::move(r2));
 }
 
 using ServerAddressesResult = std::variant<std::vector<ServerAddress>, QXmppError>;
