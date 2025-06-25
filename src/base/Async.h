@@ -16,6 +16,22 @@
 
 namespace QXmpp::Private {
 
+struct DelayTask {
+    QObject *context;
+
+    bool await_ready() const noexcept { return false; }
+    void await_suspend(std::coroutine_handle<> handle)
+    {
+        bool called = QMetaObject::invokeMethod(context, [handle]() { handle.resume(); }, Qt::QueuedConnection);
+        if (!called) {
+            handle.destroy();
+        }
+    }
+    auto await_resume() { }
+};
+
+inline DelayTask later(QObject *context) { return DelayTask { context }; }
+
 template<typename Function>
 auto later(QObject *context, Function function)
 {
