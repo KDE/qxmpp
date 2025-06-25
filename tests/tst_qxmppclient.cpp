@@ -37,7 +37,7 @@ private:
     Q_SLOT void testE2eeExtension();
     Q_SLOT void testTaskDirect();
     Q_SLOT void testTaskStore();
-    Q_SLOT void taskMultipleThen();
+    Q_SLOT void testChainIq();
     Q_SLOT void colorGeneration();
 #if QT_GUI_LIB
     Q_SLOT void colorGenerationQColor();
@@ -186,8 +186,6 @@ void tst_QXmppClient::testTaskDirect()
     p.finish(std::move(iq));
 
     QVERIFY(thenCalled);
-    QVERIFY(p.task().isFinished());
-    QVERIFY(!p.task().hasResult());
 }
 
 static QXmppTask<QXmppIq> generateRegisterIq()
@@ -196,8 +194,9 @@ static QXmppTask<QXmppIq> generateRegisterIq()
     QXmppRegisterIq iq;
     iq.setFrom("juliet");
     iq.setUsername("username");
+    auto task = p.task();
     p.finish(std::move(iq));
-    return p.task();
+    return task;
 }
 
 void tst_QXmppClient::testTaskStore()
@@ -234,27 +233,42 @@ void tst_QXmppClient::testTaskStore()
     QVERIFY(!p.task().hasResult());
 }
 
-void tst_QXmppClient::taskMultipleThen()
+using DiscoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
+
+static QXmppTask<DiscoResult> parseIqResult(QXmppTask<QXmppClient::IqResult> &&sendTask, QObject *context)
 {
-    bool exec1 = false, exec2 = false, exec3 = false, exec4 = false;
-    QString called;
+    QXmppPromise<DiscoResult> p;
+    auto task = p.task();
+    sendTask.then(context, [p = std::move(p)](QXmppClient::IqResult sendResult) mutable {
+        p.finish(parseIq<QXmppDiscoveryIq>(sendResult, [](QXmppDiscoveryIq &&iq) -> DiscoResult {
+            return iq;
+        }));
+    });
+    return task;
+}
 
-    auto context1 = std::make_unique<QObject>();
+void tst_QXmppClient::testChainIq()
+{
+    QXmppPromise<QXmppClient::IqResult> iqP;
+    auto task = iqP.task();
 
-    QXmppPromise<QString> p;
-    p.task().then(this, [&](QString) {
-        called.append(u'1');
-    });
-    p.task().then(context1.get(), [&](QString) {
-        called.append(u'2');
-    });
-    p.task().then(this, [&](QString) {
-        called.append(u'3');
-    });
-    QVERIFY(called.isEmpty());
-    context1.reset();
-    p.finish(u"test"_s);
-    QCOMPARE(called, u"3"_s);
+    auto parsingTask = parseIqResult(std::move(task), this);
+
+    QVERIFY(!parsingTask.isFinished());
+
+    iqP.finish(xmlToDom(
+        "<iq id='qx1' from='user@example.org' type='result'>"
+        "<query xmlns='http://jabber.org/protocol/disco#info'>"
+        "<identity category='pubsub' type='service'/>"
+        "<feature var='http://jabber.org/protocol/pubsub'/>"
+        "<feature var='urn:xmpp:mix:core:1'/>"
+        "</query>"
+        "</iq>"));
+
+    QVERIFY(parsingTask.isFinished());
+    auto result = parsingTask.result();
+    QVERIFY(std::holds_alternative<QXmppDiscoveryIq>(result));
+    QCOMPARE(std::get<QXmppDiscoveryIq>(result).features().size(), 2);
 }
 
 void tst_QXmppClient::colorGeneration()

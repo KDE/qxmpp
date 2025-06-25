@@ -49,14 +49,16 @@ void tst_QXmppBlockingManager::fetch()
 
     // check all three results
     QVector<QString> expected { "romeo@montague.net", "iago@shakespeare.lit" };
-    for (auto t : { task, task2, task3 }) {
-        auto blocklist = expectFutureVariant<QXmppBlocklist>(t);
-        QCOMPARE(blocklist.entries(), expected);
-    }
+    auto blocklist = expectFutureVariant<QXmppBlocklist>(task);
+    QCOMPARE(blocklist.entries(), expected);
+    blocklist = expectFutureVariant<QXmppBlocklist>(task2);
+    QCOMPARE(blocklist.entries(), expected);
+    blocklist = expectFutureVariant<QXmppBlocklist>(task3);
+    QCOMPARE(blocklist.entries(), expected);
 
     // now the blocklist is cached
     task = m->fetchBlocklist();
-    auto blocklist = expectFutureVariant<QXmppBlocklist>(task);
+    blocklist = expectFutureVariant<QXmppBlocklist>(task);
     QCOMPARE(blocklist.entries(), expected);
 
     QVERIFY(m->isSubscribed());

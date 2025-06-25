@@ -6,28 +6,308 @@
 #ifndef QXMPPTASK_H
 #define QXMPPTASK_H
 
-#include "qxmpp_export.h"
+#include "QXmppGlobal.h"
 
-#include <functional>
+#include <coroutine>
 #include <memory>
 #include <optional>
 
 #include <QFuture>
 #include <QPointer>
 
-template<typename T>
-class QXmppPromise;
+#if QXMPP_DEPRECATED_SINCE(1, 11)
+#include <functional>
+#endif
 
 namespace QXmpp::Private {
 
 template<typename T>
 struct TaskData {
-    std::function<void(TaskData &)> continuation;
     std::conditional_t<std::is_void_v<T>, std::monostate, std::optional<T>> result;
+    std::coroutine_handle<> handle;
+    QPointer<const QObject> context;
     bool finished = false;
+    bool cancelled = false;
+    bool hasContext = false;
+    uint8_t promiseCount = 1;
+
+    ~TaskData()
+    {
+        Q_ASSERT(promiseCount == 0);
+    }
 };
 
+template<typename T>
+struct ConstRefOrVoidHelper {
+    using Type = const T &;
+};
+template<>
+struct ConstRefOrVoidHelper<void> {
+    using Type = void;
+};
+
+template<typename T>
+using ConstRefOrVoid = ConstRefOrVoidHelper<T>::Type;
+
+template<typename Continuation, typename T>
+struct InvokeContinuationResultHelper {
+    using Type = std::invoke_result_t<Continuation, T &&>;
+};
+template<typename Continuation>
+struct InvokeContinuationResultHelper<Continuation, void> {
+    using Type = std::invoke_result_t<Continuation>;
+};
+
+template<typename Continuation, typename T>
+using InvokeContinuationResult = InvokeContinuationResultHelper<Continuation, T>::Type;
+
 }  // namespace QXmpp::Private
+
+template<typename T>
+class QXmppTask;
+
+///
+/// \brief Create and update QXmppTask objects to communicate results of asynchronous operations.
+///
+/// Unlike QFuture, this is not thread-safe. This avoids the need to do mutex locking at every
+/// access though.
+///
+/// \ingroup Core
+///
+/// \since QXmpp 1.5
+///
+template<typename T>
+class QXmppPromise
+{
+    using Task = QXmppTask<T>;
+    using SharedData = QXmpp::Private::TaskData<T>;
+    using SharedDataPtr = std::shared_ptr<SharedData>;
+
+    struct InlineData {
+        Task *task = nullptr;
+        QPointer<const QObject> context;
+        std::coroutine_handle<> handle;
+        bool cancelled = false;
+        bool hasContext = false;
+    };
+
+public:
+    QXmppPromise() : data(InlineData()) { }
+    // [[deprecated]]
+    QXmppPromise(const QXmppPromise<T> &p)
+    {
+        p.detachData();
+        data = p.data;
+        sharedData().promiseCount += 1;
+    }
+    QXmppPromise(QXmppPromise<T> &&p)
+    {
+        std::swap(data, p.data);
+        if (!shared()) {
+            if (auto *task = inlineData().task) {
+                task->setPromise(this);
+            }
+        }
+    }
+    ~QXmppPromise()
+    {
+        if (shared()) {
+            sharedData().promiseCount -= 1;
+
+            // cancel coroutine if any
+            if (sharedData().promiseCount == 0) {
+                if (auto handle = sharedData().handle) {
+                    sharedData().handle = nullptr;
+                    handle.destroy();
+                }
+            }
+        } else {
+            if (auto *task = inlineData().task) {
+                task->setPromise(nullptr);
+            }
+            // cancel coroutine if any
+            if (inlineData().handle) {
+                inlineData().handle.destroy();
+            }
+        }
+    }
+
+    // [[deprecated]]
+    QXmppPromise<T> &operator=(const QXmppPromise<T> &p)
+    {
+        if (shared()) {
+            sharedData().promiseCount -= 1;
+        }
+        p.detachData();
+        data = p.data;
+        if (shared()) {
+            sharedData().promiseCount += 1;
+        }
+        return *this;
+    }
+    QXmppPromise<T> &operator=(QXmppPromise<T> &&p)
+    {
+        std::swap(data, p.data);
+        if (!shared()) {
+            if (auto *task = inlineData().task) {
+                task->setPromise(this);
+            }
+        }
+        return *this;
+    }
+
+    ///
+    /// Obtain a handle to this promise that allows to obtain the value that will be produced
+    /// asynchronously.
+    ///
+    QXmppTask<T> task()
+    {
+        if (!shared()) {
+            if (inlineData().task == nullptr) {
+                return Task { this };
+            } else {
+                detachData();
+            }
+        }
+        return Task { std::get<SharedDataPtr>(data) };
+    }
+
+    ///
+    /// Finishes task.
+    ///
+    /// Must be called only once.
+    ///
+    void finish()
+        requires(std::is_void_v<T>)
+    {
+        if (shared()) {
+            sharedData().finished = true;
+        } else {
+            if (auto *task = inlineData().task) {
+                task->inlineData().finished = true;
+            } else {
+                // finish called without generating task
+                detachData();
+                sharedData().finished = true;
+            }
+        }
+        invokeHandle();
+    }
+
+    ///
+    /// Finishes task with result.
+    ///
+    /// Must be called only once.
+    ///
+    template<typename U>
+    void finish(U &&value)
+        requires(!std::is_void_v<T>)
+    {
+        if (shared()) {
+            sharedData().finished = true;
+            sharedData().result = std::forward<U>(value);
+        } else {
+            if (auto *task = inlineData().task) {
+                inlineData().task->inlineData().finished = true;
+                inlineData().task->inlineData().result = std::forward<U>(value);
+            } else {
+                // finish called without generating task
+                detachData();
+                sharedData().finished = true;
+                sharedData().result = std::forward<U>(value);
+            }
+        }
+        invokeHandle();
+    }
+
+    ///
+    /// Returns whether the task has been cancelled.
+    ///
+    /// If a task is cancelled, no call to `finish()` is needed and no continuation is resumed.
+    ///
+    /// \since QXmpp 1.11
+    ///
+    bool cancelled() const
+    {
+        return shared() ? sharedData().cancelled : inlineData().cancelled;
+    }
+
+private:
+    friend class QXmppTask<T>;
+
+    bool shared() const { return std::holds_alternative<SharedDataPtr>(data); }
+    InlineData &inlineData()
+    {
+        Q_ASSERT(!shared());
+        return std::get<InlineData>(data);
+    }
+    const InlineData &inlineData() const
+    {
+        Q_ASSERT(!shared());
+        return std::get<InlineData>(data);
+    }
+    SharedData &sharedData()
+    {
+        Q_ASSERT(shared());
+        return *std::get<SharedDataPtr>(data);
+    }
+    const SharedData &sharedData() const
+    {
+        Q_ASSERT(shared());
+        return *std::get<SharedDataPtr>(data);
+    }
+
+    bool contextAlive() const
+    {
+        if (shared()) {
+            return sharedData().context != nullptr || !sharedData().hasContext;
+        } else {
+            return inlineData().context != nullptr || !inlineData().hasContext;
+        }
+    }
+
+    void invokeHandle()
+    {
+        auto &handleRef = shared() ? sharedData().handle : inlineData().handle;
+        if (auto handle = handleRef) {
+            handleRef = nullptr;
+            if (contextAlive()) {
+                handle.resume();
+            } else {
+                handle.destroy();
+            }
+        }
+    }
+
+    // Moves data from QXmppTask object to shared_ptr that can be accessed by multiple tasks and
+    // multiple promises.
+    // Historically required because task and promise must be copyable.
+    void detachData() const
+    {
+        if (shared()) {
+            return;
+        }
+
+        if (inlineData().task != nullptr) {
+            auto &taskData = inlineData().task->inlineData();
+
+            auto sharedData = std::make_shared<SharedData>(
+                std::move(taskData.result),
+                inlineData().handle,
+                inlineData().context,
+                taskData.finished,
+                inlineData().cancelled,
+                inlineData().hasContext,
+                1);
+            inlineData().task->data = sharedData;
+            data = std::move(sharedData);
+        } else {
+            data = std::make_shared<SharedData>();
+        }
+    }
+
+    mutable std::variant<InlineData, SharedDataPtr> data;
+};
 
 ///
 /// Handle for an ongoing operation that finishes in the future.
@@ -44,8 +324,87 @@ struct TaskData {
 template<typename T>
 class QXmppTask
 {
+    using Task = QXmppTask<T>;
+    using SharedData = QXmpp::Private::TaskData<T>;
+    using SharedDataPtr = std::shared_ptr<SharedData>;
+
+    struct InlineData {
+        QXmppPromise<T> *promise = nullptr;
+        std::conditional_t<std::is_void_v<T>, std::monostate, std::optional<T>> result;
+        bool finished = false;
+    };
+
 public:
-    ~QXmppTask() = default;
+    QXmppTask(QXmppTask &&t) : data(InlineData {})
+    {
+        std::swap(data, t.data);
+        if (!shared()) {
+            if (auto *p = inlineData().promise) {
+                p->inlineData().task = this;
+            }
+        }
+    }
+    QXmppTask(const QXmppTask &) = delete;
+    ~QXmppTask()
+    {
+        if (!shared()) {
+            if (auto *p = inlineData().promise) {
+                p->inlineData().task = nullptr;
+            }
+        }
+    }
+
+    QXmppTask &operator=(QXmppTask &&t) noexcept
+    {
+        // unregister with old promise
+        if (!shared()) {
+            if (auto *p = inlineData().promise) {
+                p->inlineData().task = nullptr;
+                // to swap nullptr into `t` in next step
+                inlineData().promise = nullptr;
+            }
+        }
+        std::swap(data, t.data);
+        // register with new promise
+        if (!shared()) {
+            if (auto *p = inlineData().promise) {
+                p->inlineData().task = this;
+            }
+        }
+        return *this;
+    }
+    QXmppTask &operator=(const QXmppTask &) = delete;
+
+    bool await_ready() const noexcept { return isFinished(); }
+    void await_suspend(std::coroutine_handle<> handle)
+    {
+        auto replace = [](auto &var, auto newValue) {
+            if (var) {
+                var.destroy();
+            }
+            var = newValue;
+        };
+
+        if (shared()) {
+            if (sharedData().promiseCount > 0 && !sharedData().cancelled) {
+                replace(sharedData().handle, handle);
+            } else {
+                handle.destroy();
+            }
+        } else {
+            if (auto *p = inlineData().promise; p && !p->cancelled()) {
+                replace(p->inlineData().handle, handle);
+            } else {
+                handle.destroy();
+            }
+        }
+    }
+    auto await_resume()
+    {
+        if constexpr (!std::is_void_v<T>) {
+            return takeResult();
+        }
+    }
 
     ///
     /// Registers a function that will be called with the result as parameter when the asynchronous
@@ -54,9 +413,7 @@ public:
     /// If the task is already finished when calling this (and still has a result), the function
     /// will be called immediately.
     ///
-    /// `.then()` can be called multiple times if and only if T is copy-constructible. For copyable
-    /// types all continuations will be called in the order they were set. For move-only types only
-    /// the latest continuation will be called.
+    /// `.then()` can only be called once.
     ///
     /// Example usage:
     /// ```
@@ -76,49 +433,74 @@ public:
     /// // Manager is derived from QObject.
     /// ```
     ///
-    /// \note Support for multiple continuations with copy-constructible types was added in QXmpp
-    /// 1.11.
-    ///
     /// \param context QObject used for unregistering the handler function when the object is
     /// deleted. This way your lambda will never be executed after your object has been deleted.
     /// \param continuation A function accepting a result in the form of `T &&`.
     ///
-#ifndef QXMPP_DOC
     template<typename Continuation>
-#endif
-    void then(const QObject *context, Continuation continuation)
+    auto then(const QObject *context, Continuation continuation)
+        -> QXmppTask<QXmpp::Private::InvokeContinuationResult<Continuation, T>>
     {
-        using namespace QXmpp::Private;
+        QXmppTask<T> task = std::move(*this);
         if constexpr (std::is_void_v<T>) {
-            static_assert(std::is_invocable_v<Continuation>, "Function needs to be invocable without arguments.");
+            co_await task.withContext(context);
+            continuation();
         } else {
-            static_assert(std::is_invocable_v<Continuation, T &&>, "Function needs to be invocable with T &&.");
+            continuation(co_await task.withContext(context));
         }
+    }
 
-        if (d->finished) {
-            if constexpr (std::is_void_v<T>) {
-                continuation();
-            } else {
-                if (hasResult()) {
-                    auto value = std::move(*d->result);
-                    d->result.reset();
-                    continuation(std::move(value));
-                }
+    ///
+    /// Sets a context object for co_await.
+    ///
+    /// If this task is co_await'ed, the coroutine will only be resumed if the context object is
+    /// still alive. This is very helpful for usage in member functions to assure that `this` still
+    /// exists after an co_await statement.
+    ///
+    /// \returns reference to this task
+    ///
+    /// \since QXmpp 1.11
+    ///
+    QXmppTask<T> &withContext(const QObject *c)
+    {
+        if (shared()) {
+            if (!sharedData().finished) {
+                sharedData().context = c;
+                sharedData().hasContext = true;
             }
         } else {
-            d->continuation = [context = QPointer(context),
-                               continuation = std::forward<Continuation>(continuation)](TaskData<T> &d) mutable {
-                if (context) {
-                    if constexpr (std::is_void_v<T>) {
-                        continuation();
-                    } else {
-                        // move out value (only one continuation allowed)
-                        auto value = std::move(*d.result);
-                        d.result.reset();
-                        continuation(std::move(value));
-                    }
+            if (auto *p = inlineData().promise) {
+                p->inlineData().context = c;
+                p->inlineData().hasContext = true;
+            }
+        }
+        return *this;
+    }
+
+    ///
+    /// Cancels the task
+    ///
+    /// If there is a waiting coroutine, it is cancelled immediately. Any continuation set in the
+    /// future also won't be executed.
+    ///
+    /// \since QXmpp 1.11
+    ///
+    void cancel()
+    {
+        if (shared()) {
+            sharedData().cancelled = true;
+            if (auto handle = sharedData().handle) {
+                sharedData().handle = nullptr;
+                handle.destroy();
+            }
+        } else {
+            if (auto *p = inlineData().promise) {
+                p->inlineData().cancelled = true;
+                if (auto handle = p->inlineData().handle) {
+                    p->inlineData().handle = nullptr;
+                    handle.destroy();
                 }
-            };
+            }
         }
     }
 
@@ -131,19 +513,17 @@ public:
     [[nodiscard]]
     bool isFinished() const
     {
-        return d->finished;
+        return shared() ? sharedData().finished : inlineData().finished;
     }
 
     ///
     /// Returns whether the task is finished and the value has not been taken yet.
     ///
-#ifndef QXMPP_DOC
-    template<typename U = T, std::enable_if_t<(!std::is_void_v<U>)> * = nullptr>
-#endif
     [[nodiscard]]
     bool hasResult() const
+        requires(!std::is_void_v<T>)
     {
-        return d->result.has_value();
+        return shared() ? sharedData().result.has_value() : inlineData().result.has_value();
     }
 
     ///
@@ -151,18 +531,13 @@ public:
     ///
     /// \warning This can only be used once the operation is finished.
     ///
-#ifdef QXMPP_DOC
     [[nodiscard]]
-    const T &result() const
-#else
-    template<typename U = T, std::enable_if_t<(!std::is_void_v<U>)> * = nullptr>
-    [[nodiscard]]
-    const U &result() const
-#endif
+    QXmpp::Private::ConstRefOrVoid<T> result() const
+        requires(!std::is_void_v<T>)
     {
         Q_ASSERT(isFinished());
         Q_ASSERT(hasResult());
-        return d->result.value();
+        return shared() ? sharedData().result.value() : inlineData().result.value();
     }
 
     ///
@@ -170,25 +545,23 @@ public:
     ///
     /// \warning This can only be used once and only after the operation has finished.
     ///
-#ifdef QXMPP_DOC
     [[nodiscard]]
     T takeResult()
-#else
-    template<typename U = T, std::enable_if_t<(!std::is_void_v<U>)> * = nullptr>
-    [[nodiscard]]
-    U takeResult()
-#endif
+        requires(!std::is_void_v<T>)
     {
         Q_ASSERT(isFinished());
         Q_ASSERT(hasResult());
-        auto value = std::move(*d->result);
-        d->result.reset();
-        return std::move(value);
+        auto &result = shared() ? sharedData().result : inlineData().result;
+
+        auto value = std::move(*result);
+        result.reset();
+        return value;
     }
 
     ///
     /// Converts the Task into a QFuture. Afterwards the QXmppTask object is invalid.
     ///
+    [[nodiscard]]
     QFuture<T> toFuture(const QObject *context)
     {
         QFutureInterface<T> interface;
@@ -210,13 +583,86 @@ public:
 private:
     friend class QXmppPromise<T>;
 
-    explicit QXmppTask(std::shared_ptr<QXmpp::Private::TaskData<T>> data)
-        : d(std::move(data))
+    explicit QXmppTask(QXmppPromise<T> *p) : data(InlineData {})
     {
+        inlineData().promise = p;
+
+        Q_ASSERT(p->inlineData().task == nullptr);
+        p->inlineData().task = this;
+    }
+    explicit QXmppTask(SharedDataPtr data) : data(std::move(data)) { }
+
+    bool shared() const { return std::holds_alternative<SharedDataPtr>(data); }
+    InlineData &inlineData()
+    {
+        Q_ASSERT(!shared());
+        return std::get<InlineData>(data);
+    }
+    const InlineData &inlineData() const
+    {
+        Q_ASSERT(!shared());
+        return std::get<InlineData>(data);
+    }
+    SharedData &sharedData()
+    {
+        Q_ASSERT(shared());
+        return *std::get<SharedDataPtr>(data);
+    }
+    const SharedData &sharedData() const
+    {
+        Q_ASSERT(shared());
+        return *std::get<SharedDataPtr>(data);
     }
 
-    std::shared_ptr<QXmpp::Private::TaskData<T>> d;
+    void setPromise(QXmppPromise<T> *p)
+    {
+        inlineData().promise = p;
+    }
+
+    std::variant<InlineData, SharedDataPtr> data;
 };
+
+namespace std {
+
+template<typename T, typename... Args>
+struct coroutine_traits<QXmppTask<T>, Args...> {
+    struct promise_type {
+        QXmppPromise<T> p;
+
+        QXmppTask<T> get_return_object() { return p.task(); }
+        std::suspend_never initial_suspend() noexcept { return {}; }
+        std::suspend_always final_suspend() noexcept { return {}; }
+
+        void unhandled_exception()
+        {
+            // exception handling currently not supported
+            throw std::current_exception();
+        }
+
+        void return_value(T value) { p.finish(std::move(value)); }
+    };
+};
+
+template<typename... Args>
+struct coroutine_traits<QXmppTask<void>, Args...> {
+    struct promise_type {
+        QXmppPromise<void> p;
+
+        QXmppTask<void> get_return_object() { return p.task(); }
+        std::suspend_never initial_suspend() noexcept { return {}; }
+        std::suspend_always final_suspend() noexcept { return {}; }
+
+        void unhandled_exception()
+        {
+            // exception handling currently not supported
+            throw std::current_exception();
+        }
+
+        void return_void() { p.finish(); }
+    };
+};
+
+}  // namespace std
 
 namespace QXmpp {
 

@@ -179,7 +179,7 @@ bool process(const QList<QXmppClientExtension *> &extensions, const QDomElement 
 
 namespace QXmpp::Private::MessagePipeline {
 
-bool process(QXmppClient *client, const QList<QXmppClientExtension *> &extensions, QXmppMessage &&message)
+bool process(QXmppClient *, const QList<QXmppClientExtension *> &extensions, QXmppMessage &&message)
 {
     for (auto *extension : extensions) {
         if (auto *messageHandler = dynamic_cast<QXmppMessageHandler *>(extension)) {
