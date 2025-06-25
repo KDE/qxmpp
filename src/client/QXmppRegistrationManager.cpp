@@ -322,7 +322,7 @@ void QXmppRegistrationManager::onRegistered(QXmppClient *client)
     });
 }
 
-void QXmppRegistrationManager::onUnregistered(QXmppClient *client)
+void QXmppRegistrationManager::onUnregistered(QXmppClient *)
 {
     // TODO: Proper clean up of connections (currently no issue because extensions are deleted
     // on removal)
