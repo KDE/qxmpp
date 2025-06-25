@@ -112,18 +112,14 @@ auto mapToSuccess(const std::variant<T, Err> &var)
 template<typename T, typename Err>
 auto chainSuccess(QXmppTask<std::variant<T, Err>> &&source, QObject *context) -> QXmppTask<std::variant<QXmpp::Success, QXmppError>>
 {
-    return chain<std::variant<QXmpp::Success, QXmppError>>(std::move(source), context, mapToSuccess<T, Err>);
+    co_return mapToSuccess<T, Err>(co_await source.withContext(context));
 }
 
 template<typename T, typename Err, typename Converter>
 auto chainMapSuccess(QXmppTask<std::variant<T, Err>> &&source, QObject *context, Converter convert)
+    -> QXmppTask<std::variant<std::invoke_result_t<Converter, T>, Err>>
 {
-    return chain<std::variant<std::invoke_result_t<Converter, T>, Err>>(
-        std::move(source),
-        context,
-        [convert](const auto &input) {
-            return mapSuccess(input, convert);
-        });
+    co_return mapSuccess(co_await source.withContext(context), convert);
 }
 
 }  // namespace QXmpp::Private

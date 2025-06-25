@@ -547,11 +547,13 @@ QXmppTask<QXmppMixManager::CreationResult> QXmppMixManager::createChannel(const 
 ///
 QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids(const QString &serviceJid)
 {
-    return chainMapSuccess(d->discoveryManager->requestDiscoItems(serviceJid), this, [](const auto &items) {
-        return transform<QVector<ChannelJid>>(items, [](const QXmppDiscoveryIq::Item &item) {
-            return item.jid();
-        });
-    });
+    co_return map<ChannelJidResult>(
+        [](QList<QXmppDiscoveryIq::Item> &&items) {
+            return transform<QVector<ChannelJid>>(items, [](const QXmppDiscoveryIq::Item &item) {
+                return item.jid();
+            });
+        },
+        co_await d->discoveryManager->requestDiscoItems(serviceJid));
 }
 
 ///

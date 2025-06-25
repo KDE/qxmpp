@@ -30,47 +30,8 @@ using first_argument_t = typename first_argument<F>::type;
 
 // creates a task in finished state with value
 template<typename T>
-QXmppTask<T> makeReadyTask(T &&value)
-{
-    QXmppPromise<T> promise;
-    promise.finish(std::move(value));
-    return promise.task();
-}
-
-inline QXmppTask<void> makeReadyTask()
-{
-    QXmppPromise<void> promise;
-    promise.finish();
-    return promise.task();
-}
-
-// creates new task which converts the result of the first
-template<typename Result, typename Input, typename Converter>
-auto chain(QXmppTask<Input> &&source, QObject *context, Converter task) -> QXmppTask<Result>
-{
-    QXmppPromise<Result> promise;
-
-    if constexpr (std::is_void_v<Input>) {
-        source.then(context, [=]() mutable {
-            if constexpr (std::is_void_v<Result>) {
-                task();
-                promise.finish();
-            } else {
-                promise.finish(task());
-            }
-        });
-    } else {
-        source.then(context, [=](const Input &input) mutable {
-            if constexpr (std::is_void_v<Result>) {
-                task(input);
-                promise.finish();
-            } else {
-                promise.finish(task(input));
-            }
-        });
-    }
-    return promise.task();
-}
+QXmppTask<T> makeReadyTask(T &&value) { co_return value; }
+inline QXmppTask<void> makeReadyTask() { co_return; }
 
 // parse Iq type from QDomElement or pass error
 template<typename IqType, typename Input, typename Converter>
@@ -104,11 +65,8 @@ auto parseIq(const Input &sendResult) -> Result
 template<typename Input, typename Converter>
 auto chainIq(QXmppTask<Input> &&input, QObject *context, Converter convert) -> QXmppTask<decltype(convert({}))>
 {
-    using Result = decltype(convert({}));
     using IqType = std::decay_t<first_argument_t<Converter>>;
-    return chain<Result>(std::move(input), context, [convert = std::move(convert)](const Input &input) -> Result {
-        return parseIq<IqType>(input, convert);
-    });
+    co_return parseIq<IqType>(co_await input.withContext(context), convert);
 }
 
 // chain sendIq() task and parse DOM element to first type of Result variant
@@ -117,9 +75,7 @@ auto chainIq(QXmppTask<Input> &&input, QObject *context) -> QXmppTask<Result>
 {
     // IQ type is first std::variant parameter
     using IqType = std::decay_t<decltype(std::get<0>(Result {}))>;
-    return chain<Result>(std::move(input), context, [](const Input &sendResult) mutable {
-        return parseIq<IqType, Result>(sendResult);
-    });
+    co_return parseIq<IqType, Result>(co_await input.withContext(context));
 }
 
 }  // namespace QXmpp::Private

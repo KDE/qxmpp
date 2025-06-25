@@ -132,7 +132,7 @@ QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDisco
         request.setQueryNode(node);
     }
 
-    return chainIq<InfoResult>(client()->sendIq(std::move(request)), this);
+    co_return parseIq<QXmppDiscoveryIq, InfoResult>(co_await client()->sendIq(std::move(request)));
 }
 
 ///
@@ -155,7 +155,7 @@ QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDisc
         request.setQueryNode(node);
     }
 
-    return chainIq(client()->sendIq(std::move(request)), this, [](QXmppDiscoveryIq &&iq) -> ItemsResult {
+    co_return parseIq<QXmppDiscoveryIq>(co_await client()->sendIq(std::move(request)), [](QXmppDiscoveryIq &&iq) -> ItemsResult {
         return iq.items();
     });
 }
