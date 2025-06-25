@@ -128,7 +128,7 @@ void tst_QXmppCallManager::senderImpersonation()
         "</content>"
         "</jingle></iq>"_s;
     result = manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml2.arg("abc1"))));
-    auto error = expectVariant<Error>(result);
+    auto error = expectVariant<Error>(std::move(result));
     QCOMPARE(error.type(), Error::Cancel);
     QCOMPARE(error.condition(), Error::ItemNotFound);
 
