@@ -74,11 +74,9 @@ QXmppTask<ServiceResult> QXmpp::Private::requestCredentials(QXmppClient *client,
         { std::move(s) },
     } };
 
-    return chain<ServiceResult>(client->sendIq(std::move(iq)), client, [](const QXmppClient::IqResult &result) {
-        return map<ServiceResult>(
-            [](ExtDiscoCredentials &&c) { return c.service; },
-            parseIqResponse<ExtDiscoCredentials>(result));
-    });
+    co_return map<ServiceResult>(
+        [](ExtDiscoCredentials &&c) { return c.service; },
+        parseIqResponse<ExtDiscoCredentials>(co_await client->sendIq(std::move(iq))));
 }
 
 QXmppTask<StunTurnResult> QXmpp::Private::requestStunTurnConfig(QXmppClient *client, QXmppLoggable *q)
@@ -519,14 +517,14 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
         // register call
         d->addCall(call.get());
 
-        return chain<std::variant<QXmppIq>>(refreshStunTurnConfig(), this, [this, content, callPtr = call.release()]() mutable -> QXmppIq {
-            auto call = std::unique_ptr<QXmppCall>(callPtr);
+        return [this, content, call = std::move(call)]() mutable -> QXmppTask<std::variant<QXmppIq>> {
+            co_await refreshStunTurnConfig();
 
             // create stream (with up-to-date STUN/TURN credentials)
             auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
             if (!stream) {
                 call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
-                return {};
+                co_return {};
             }
 
             // check content description and transport
@@ -536,7 +534,7 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
                 // terminate call
                 call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
                 call->terminated();
-                return {};
+                co_return {};
             }
 
             later(this, [this, call = std::move(call)]() mutable {
@@ -560,8 +558,8 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
                     rawCall->d->terminate({ QXmppJingleReason::Decline, {}, {} });
                 }
             });
-            return {};
-        });
+            co_return {};
+        }();
     }
     default: {
         // for all other requests, require a valid call
