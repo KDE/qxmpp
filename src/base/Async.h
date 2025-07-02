@@ -10,6 +10,8 @@
 #include "QXmppError.h"
 #include "QXmppGlobal.h"
 
+#include "Algorithms.h"
+
 #include <memory>
 #include <variant>
 
@@ -70,22 +72,21 @@ void await(const QFuture<void> &future, QObject *context, Handler handler)
 }
 
 template<typename T, typename Err, typename Function>
-auto mapSuccess(std::variant<T, Err> var, Function lambda)
+auto mapSuccess(const std::variant<T, Err> &var, Function lambda)
 {
-    using MapResult = std::decay_t<decltype(lambda({}))>;
-    using MappedVariant = std::variant<MapResult, Err>;
-    return std::visit(overloaded {
-                          [lambda = std::move(lambda)](T val) -> MappedVariant {
-                              return lambda(std::move(val));
-                          },
-                          [](Err err) -> MappedVariant {
-                              return err;
-                          } },
-                      std::move(var));
+    using MappedVariant = std::variant<std::invoke_result_t<Function, const T &>, Err>;
+    return map<MappedVariant>(lambda, var);
+}
+
+template<typename T, typename Err, typename Function>
+auto mapSuccess(std::variant<T, Err> &&var, Function lambda)
+{
+    using MappedVariant = std::variant<std::invoke_result_t<Function, T &&>, Err>;
+    return map<MappedVariant>(lambda, std::move(var));
 }
 
 template<typename T, typename Err>
-auto mapToSuccess(std::variant<T, Err> var)
+auto mapToSuccess(std::variant<T, Err> &&var)
 {
     return mapSuccess(std::move(var), [](T) {
         return Success();
