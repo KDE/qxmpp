@@ -98,29 +98,29 @@ auto chain(QXmppTask<Input> &&source, QObject *context, Converter convert) -> QX
 }
 
 // parse Iq type from QDomElement or pass error
-template<typename IqType, typename Input, typename Converter>
-auto parseIq(Input &&sendResult, Converter convert) -> decltype(convert({}))
+template<typename IqType, typename Converter>
+auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult, Converter convert)
 {
-    using Result = decltype(convert({}));
-    return std::visit(overloaded {
-                          [convert = std::move(convert)](const QDomElement &element) -> Result {
-                              IqType iq;
-                              iq.parse(element);
-                              return convert(std::move(iq));
-                          },
-                          [](QXmppError &&error) -> Result {
-                              return error;
-                          },
-                      },
-                      std::move(sendResult));
+    using Result = std::invoke_result_t<Converter, IqType &&>;
+    return std::visit(
+        overloaded {
+            [convert = std::move(convert)](const QDomElement &element) -> Result {
+                IqType iq;
+                iq.parse(element);
+                return convert(std::move(iq));
+            },
+            [](QXmppError &&error) -> Result {
+                return error;
+            },
+        },
+        std::move(sendResult));
 }
 
-template<typename IqType, typename Result, typename Input>
-auto parseIq(Input &&sendResult) -> Result
+template<typename IqType>
+auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::variant<IqType, QXmppError>
 {
-    return parseIq<IqType>(std::move(sendResult), [](IqType &&iq) -> Result {
-        // no conversion
-        return iq;
+    return parseIq<IqType>(std::move(sendResult), [](IqType &&iq) {
+        return std::variant<IqType, QXmppError> { iq };
     });
 }
 
@@ -142,7 +142,7 @@ auto chainIq(QXmppTask<Input> &&input, QObject *context) -> QXmppTask<Result>
     // IQ type is first std::variant parameter
     using IqType = std::decay_t<decltype(getValue(Result {}))>;
     return chain<Result>(std::move(input), context, [](Input &&sendResult) mutable {
-        return parseIq<IqType, Result>(sendResult);
+        return parseIq<IqType>(std::move(sendResult));
     });
 }
 
