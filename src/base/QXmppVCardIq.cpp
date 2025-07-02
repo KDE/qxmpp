@@ -64,7 +64,7 @@ struct VCardPhoto {
 class QXmppVCardAddressPrivate : public QSharedData
 {
 public:
-    QXmppVCardAddressPrivate() : type(QXmppVCardAddress::None) {};
+    QXmppVCardAddressPrivate() : type(QXmppVCardAddress::None) { };
     QString country;
     QString locality;
     QString postcode;
@@ -222,7 +222,7 @@ void QXmppVCardAddress::toXml(QXmlStreamWriter *writer) const
 class QXmppVCardEmailPrivate : public QSharedData
 {
 public:
-    QXmppVCardEmailPrivate() : type(QXmppVCardEmail::None) {};
+    QXmppVCardEmailPrivate() : type(QXmppVCardEmail::None) { };
     QString address;
     QXmppVCardEmail::Type type;
 };
@@ -316,7 +316,7 @@ void QXmppVCardEmail::toXml(QXmlStreamWriter *writer) const
 class QXmppVCardPhonePrivate : public QSharedData
 {
 public:
-    QXmppVCardPhonePrivate() : type(QXmppVCardPhone::None) {};
+    QXmppVCardPhonePrivate() : type(QXmppVCardPhone::None) { };
     QString number;
     QXmppVCardPhone::Type type;
 };
