@@ -172,13 +172,12 @@ QXmppTask<QXmppPubSubManager::ItemResult<T>> QXmppPubSubManager::requestItem(con
                                                                              const QString &itemId)
 {
     using namespace QXmpp::Private;
-    return chainIq(client()->sendIq(requestItemsIq(jid, nodeName, { itemId })), this,
-                   [](PubSubIq<T> &&iq) -> ItemResult<T> {
-                       if (!iq.items().isEmpty()) {
-                           return iq.items().constFirst();
-                       }
-                       return QXmppError { QStringLiteral("No such item has been found."), {} };
-                   });
+    co_return parseIq<PubSubIq<T>>(co_await client()->sendIq(requestItemsIq(jid, nodeName, { itemId })), [](PubSubIq<T> &&iq) -> ItemResult<T> {
+        if (!iq.items().isEmpty()) {
+            return iq.items().constFirst();
+        }
+        return QXmppError { QStringLiteral("No such item has been found."), {} };
+    });
 }
 
 ///
@@ -229,13 +228,11 @@ QXmppTask<QXmppPubSubManager::ItemsResult<T>> QXmppPubSubManager::requestItems(c
                                                                                const QStringList &itemIds)
 {
     using namespace QXmpp::Private;
-    return chainIq(client()->sendIq(requestItemsIq(jid, nodeName, itemIds)), this,
-                   [](PubSubIq<T> &&iq) -> ItemsResult<T> {
-                       return Items<T> {
-                           iq.items(),
-                           iq.itemsContinuation(),
-                       };
-                   });
+    co_return parseIq<PubSubIq<T>>(
+        co_await client()->sendIq(requestItemsIq(jid, nodeName, itemIds)),
+        [](PubSubIq<T> &&iq) -> ItemsResult<T> {
+            return Items<T> { iq.items(), iq.itemsContinuation() };
+        });
 }
 
 ///
