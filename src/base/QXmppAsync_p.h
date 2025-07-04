@@ -44,14 +44,12 @@ inline QXmppTask<void> makeReadyTask()
     return promise.task();
 }
 
-// creates new task which converts the result of the first
+// Attaches to existing promise
 template<typename Result, typename Input, typename Converter>
-auto chain(QXmppTask<Input> &&source, QObject *context, Converter convert) -> QXmppTask<Result>
+auto chain(QXmppTask<Input> &&source, QObject *context, QXmppPromise<Result> &&p, Converter convert)
 {
-    QXmppPromise<Result> promise;
-    auto task = promise.task();
     if constexpr (std::is_void_v<Input>) {
-        source.then(context, [p = std::move(promise), convert = std::move(convert)]() mutable {
+        source.then(context, [p = std::move(p), convert = std::move(convert)]() mutable {
             if constexpr (std::is_void_v<Result>) {
                 convert();
                 p.finish();
@@ -60,7 +58,34 @@ auto chain(QXmppTask<Input> &&source, QObject *context, Converter convert) -> QX
             }
         });
     } else {
-        source.then(context, [p = std::move(promise), convert = std::move(convert)](Input &&input) mutable {
+        source.then(context, [p = std::move(p), convert = std::move(convert)](Input &&input) mutable {
+            if constexpr (std::is_void_v<Result>) {
+                convert(std::move(input));
+                p.finish();
+            } else {
+                p.finish(convert(std::move(input)));
+            }
+        });
+    }
+}
+
+// creates new task which converts the result of the first
+template<typename Result, typename Input, typename Converter>
+auto chain(QXmppTask<Input> &&source, QObject *context, Converter convert) -> QXmppTask<Result>
+{
+    QXmppPromise<Result> p;
+    auto task = p.task();
+    if constexpr (std::is_void_v<Input>) {
+        source.then(context, [p = std::move(p), convert = std::move(convert)]() mutable {
+            if constexpr (std::is_void_v<Result>) {
+                convert();
+                p.finish();
+            } else {
+                p.finish(convert());
+            }
+        });
+    } else {
+        source.then(context, [p = std::move(p), convert = std::move(convert)](Input &&input) mutable {
             if constexpr (std::is_void_v<Result>) {
                 convert(std::move(input));
                 p.finish();
