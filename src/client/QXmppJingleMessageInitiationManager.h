@@ -81,12 +81,12 @@ public:
 
     QXmppTask<ProposeResult> propose(
         const QString &callPartnerJid,
-        const QXmppJingleDescription &description);
+        const QXmppJingleRtpDescription &description);
 
     Q_SIGNAL void proposed(
         const std::shared_ptr<QXmppJingleMessageInitiation> &jmi,
         const QString &id,
-        const std::optional<QXmppJingleDescription> &description);
+        const std::optional<QXmppJingleRtpDescription> &description);
 
 protected:
     /// \cond

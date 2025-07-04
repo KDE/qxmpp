@@ -654,7 +654,7 @@ void tst_QXmppJingleData::testContent()
     QXmppJingleIq::Content content2;
     content2.setCreator(u"initiator"_s);
     content2.setName(u"voice"_s);
-    QXmppJingleDescription content2desc;
+    QXmppJingleRtpDescription content2desc;
     content2desc.setMedia(u"audio"_s);
     content2desc.setSsrc(quint32(0));
     content2.setRtpMultiplexingSupported(true);
@@ -977,7 +977,7 @@ void tst_QXmppJingleData::testContentRtpFeedbackNegotiation()
     QXmppJingleIq::Content content2;
     content2.setCreator(u"initiator"_s);
     content2.setName(u"voice"_s);
-    QXmppJingleDescription content2desc;
+    QXmppJingleRtpDescription content2desc;
     content2desc.addPayloadType(payloadType);
     content2.setDescription(content2desc);
     content2.setRtpFeedbackProperties({ rtpFeedbackProperty1, rtpFeedbackProperty2 });
@@ -1037,7 +1037,7 @@ void tst_QXmppJingleData::testContentRtpHeaderExtensionsNegotiation()
     QXmppJingleIq::Content content2;
     content2.setCreator(u"initiator"_s);
     content2.setName(u"voice"_s);
-    QXmppJingleDescription content2desc;
+    QXmppJingleRtpDescription content2desc;
     content2desc.addPayloadType(payloadType);
     content2.setDescription(content2desc);
     content2.setRtpHeaderExtensionProperties({ rtpHeaderExtensionProperty1, rtpHeaderExtensionProperty2 });
