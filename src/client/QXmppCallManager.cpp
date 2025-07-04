@@ -410,20 +410,17 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, const QStr
         // determine supported features of remote
         auto &&info = std::get<QXmppDiscoInfo>(std::move(result));
         const auto remoteFeatures = info.features();
-        if (!contains(remoteFeatures, ns_jingle)) {
-            failure(u"Remote does not support Jingle"_s);
-            return;
-        }
-        if (!contains(remoteFeatures, ns_jingle_rtp)) {
-            failure(u"Remote does not support Jingle RTP"_s);
-            return;
-        }
-        if (!contains(remoteFeatures, ns_jingle_rtp_audio)) {
-            failure(u"Remote does not support Jingle RTP audio"_s);
-            return;
-        }
-        if (!contains(remoteFeatures, ns_jingle_ice_udp)) {
-            failure(u"Remote does not support Jingle ICE-UDP"_s);
+        auto testFeature = [&](QStringView feature, QString &&text) {
+            if (contains(remoteFeatures, feature)) {
+                return true;
+            }
+            failure(std::move(text));
+            return false;
+        };
+        if (!testFeature(ns_jingle, u"Remote does not support Jingle"_s) ||
+            !testFeature(ns_jingle_rtp, u"Remote does not support Jingle RTP"_s) ||
+            !testFeature(ns_jingle_rtp_audio, u"Remote does not support Jingle RTP audio"_s) ||
+            !testFeature(ns_jingle_ice_udp, u"Remote does not support Jingle ICE-UDP"_s)) {
             return;
         }
 
