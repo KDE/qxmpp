@@ -63,8 +63,8 @@ public:
     std::optional<QString> password() const;
     void setPassword(std::optional<QString>);
 
-    std::optional<int> port() const;
-    void setPort(std::optional<int>);
+    std::optional<quint16> port() const;
+    void setPort(std::optional<quint16>);
 
     std::optional<bool> restricted() const;
     void setRestricted(std::optional<bool>);

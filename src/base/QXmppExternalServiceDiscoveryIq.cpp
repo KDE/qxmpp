@@ -47,7 +47,7 @@ public:
     std::optional<QDateTime> expires;
     std::optional<QString> name;
     std::optional<QString> password;
-    std::optional<int> port;  // recommended
+    std::optional<quint16> port;  // recommended
     std::optional<bool> restricted;
     std::optional<Transport> transport;  // recommended
     std::optional<QString> username;
@@ -171,21 +171,13 @@ void QXmppExternalService::setPassword(std::optional<QString> password)
     d->password = std::move(password);
 }
 
-///
 /// Returns the port of the external service.
-///
-std::optional<int> QXmppExternalService::port() const
-{
-    return d->port;
-}
+/// \note quint16 since QXmpp 1.11
+std::optional<quint16> QXmppExternalService::port() const { return d->port; }
 
-///
 /// Sets the port of the external service.
-///
-void QXmppExternalService::setPort(std::optional<int> port)
-{
-    d->port = port;
-}
+/// \note quint16 since QXmpp 1.11
+void QXmppExternalService::setPort(std::optional<quint16> port) { d->port = port; }
 
 ///
 /// Returns the restricted mode of the external service.

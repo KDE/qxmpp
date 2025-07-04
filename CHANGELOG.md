@@ -12,6 +12,7 @@ QXmpp 1.11.0 (UNRELEASED)
 Breaking changes:
  - JingleIq::RtpSessionStateMuting: 'isMute' is not default initialized anymore like 'creator' is
    not initialized, too (@lnjX, !701)
+ - ExternalServiceDiscoveryIq: Change port type from `int` to `quint16` to match XEP-0215 (@lnjX, !702)
 
 QXmpp 1.10.4 (May 17, 2025)
 ---------------------------
