@@ -1893,8 +1893,8 @@ public:
 ///
 /// \class QXmppJingleDescription
 ///
-/// \brief The QXmppJingleDescription class represents descriptions for Jingle elements including
-/// media type, streaming source, namespace and payload types.
+/// \brief Represents a description for \xep{0167, Jingle RTP Sessions}, including media type,
+/// streaming source, namespace and payload types.
 ///
 /// \since QXmpp 1.6
 ///
@@ -1966,7 +1966,7 @@ void QXmppJingleDescription::setPayloadTypes(const QList<QXmppJinglePayloadType>
 void QXmppJingleDescription::parse(const QDomElement &element)
 {
     d->media = element.attribute(u"media"_s);
-    d->ssrc = element.attribute(u"ssrc"_s).toULong();
+    d->ssrc = parseInt<uint32_t>(element.attribute(u"ssrc"_s)).value_or(0);
     d->payloadTypes = parseChildElements<QList<QXmppJinglePayloadType>>(element);
 }
 
