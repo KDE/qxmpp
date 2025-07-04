@@ -15,7 +15,7 @@
 #include <QHostAddress>
 
 class QXmppJingleCandidatePrivate;
-class QXmppJingleDescriptionPrivate;
+class QXmppJingleRtpDescriptionPrivate;
 class QXmppJingleIqContentPrivate;
 class QXmppJingleIqReasonPrivate;
 class QXmppJingleIqPrivate;
@@ -249,11 +249,11 @@ private:
     QSharedDataPointer<QXmppJinglePayloadTypePrivate> d;
 };
 
-class QXMPP_EXPORT QXmppJingleDescription
+class QXMPP_EXPORT QXmppJingleRtpDescription
 {
 public:
-    QXmppJingleDescription();
-    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleDescription)
+    QXmppJingleRtpDescription();
+    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleRtpDescription)
 
     QString media() const;
     void setMedia(const QString &media);
@@ -272,8 +272,12 @@ public:
     /// \endcond
 
 private:
-    QSharedDataPointer<QXmppJingleDescriptionPrivate> d;
+    QSharedDataPointer<QXmppJingleRtpDescriptionPrivate> d;
 };
+
+#if QXMPP_DEPRECATED_SINCE(1, 11)
+using QXmppJingleDescription [[deprecated]] = QXmppJingleRtpDescription;
+#endif
 
 ///
 /// \brief The QXmppJingleCandidate class represents a transport candidate
@@ -482,8 +486,8 @@ public:
         void setSenders(const QString &senders);
 
         // XEP-0167: Jingle RTP Sessions
-        QXmppJingleDescription description() const;
-        void setDescription(const QXmppJingleDescription &description);
+        QXmppJingleRtpDescription description() const;
+        void setDescription(const QXmppJingleRtpDescription &description);
 
 #if QXMPP_DEPRECATED_SINCE(1, 6)
         QString descriptionMedia() const;
@@ -633,8 +637,8 @@ public:
     QString id() const;
     void setId(const QString &id);
 
-    std::optional<QXmppJingleDescription> description() const;
-    void setDescription(std::optional<QXmppJingleDescription> description);
+    std::optional<QXmppJingleRtpDescription> description() const;
+    void setDescription(std::optional<QXmppJingleRtpDescription> description);
 
     std::optional<QXmppJingleReason> reason() const;
     void setReason(std::optional<QXmppJingleReason> reason);

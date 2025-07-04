@@ -280,7 +280,7 @@ QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
 ///
 /// Creates a proposal JMI element and passes it as a message.
 ///
-QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &callPartnerJid, const QXmppJingleDescription &description)
+QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &callPartnerJid, const QXmppJingleRtpDescription &description)
 {
     QXmppPromise<ProposeResult> promise;
 

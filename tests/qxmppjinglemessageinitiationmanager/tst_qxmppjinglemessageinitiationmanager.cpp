@@ -254,7 +254,7 @@ void tst_QXmppJingleMessageInitiationManager::testPropose()
 {
     QString jid { "julietPropose@capulet.example" };
 
-    QXmppJingleDescription description;
+    QXmppJingleRtpDescription description;
     description.setMedia(u"audio"_s);
     description.setSsrc(123);
 
@@ -499,7 +499,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleProposeJmiElement()
 {
     QXmppJingleMessageInitiationElement jmiElement;
 
-    QXmppJingleDescription description;
+    QXmppJingleRtpDescription description;
     description.setMedia("audio");
     description.setSsrc(321);
 
@@ -519,7 +519,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleProposeJmiElement()
 
     // --- usual JMI proposal ---
 
-    connect(&m_manager, &QXmppJingleMessageInitiationManager::proposed, this, [&, jmiElement](const std::shared_ptr<Jmi> &, const QString &jmiElementId, const std::optional<QXmppJingleDescription> &description) {
+    connect(&m_manager, &QXmppJingleMessageInitiationManager::proposed, this, [&, jmiElement](const std::shared_ptr<Jmi> &, const QString &jmiElementId, const std::optional<QXmppJingleRtpDescription> &description) {
         if (jmiElement.id() == jmiElementId) {
             QCOMPARE(m_manager.jmis().size(), 1);
             QVERIFY(description.has_value());
