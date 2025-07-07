@@ -18,7 +18,7 @@ class QXmppMucRoomPrivate;
 
 ///
 /// \brief The QXmppMucManager class makes it possible to interact with
-/// multi-user chat rooms as defined by \xep{0045}: Multi-User Chat.
+/// multi-user chat rooms as defined by \xep{0045, Multi-User Chat}.
 ///
 /// To make use of this manager, you need to instantiate it and load it into
 /// the QXmppClient instance as follows:
@@ -35,6 +35,8 @@ class QXmppMucRoomPrivate;
 /// room->setNickName("mynick");
 /// room->join();
 /// \endcode
+///
+/// \note This manager is going to be replaced with the QXmppMucManagerV2 in the future.
 ///
 /// \ingroup Managers
 ///
@@ -80,11 +82,12 @@ private:
     const std::unique_ptr<QXmppMucManagerPrivate> d;
 };
 
+///
 /// \brief The QXmppMucRoom class represents a multi-user chat room
 /// as defined by \xep{0045}: Multi-User Chat.
 ///
 /// \sa QXmppMucManager
-
+///
 class QXMPP_EXPORT QXmppMucRoom : public QObject
 {
     Q_OBJECT

@@ -234,6 +234,8 @@ inline constexpr QStringView ns_omemo_2_devices = u"urn:xmpp:omemo:2:devices";
 inline constexpr QStringView ns_bind2 = u"urn:xmpp:bind:0";
 // XEP-0388: Extensible SASL Profile
 inline constexpr QStringView ns_sasl_2 = u"urn:xmpp:sasl:2";
+// XEP-0402: PEP Native Bookmarks
+inline constexpr QStringView ns_bookmarks2 = u"urn:xmpp:bookmarks:1";
 // XEP-0403: Mediated Information eXchange (MIX): Presence Support
 inline constexpr QStringView ns_mix_node_presence = u"urn:xmpp:mix:nodes:presence";
 // XEP-0404: Mediated Information eXchange (MIX): JID Hidden Channels

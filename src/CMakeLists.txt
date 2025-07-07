@@ -138,6 +138,7 @@ set(INSTALL_HEADER_FILES
     client/QXmppMixManager.h
     client/QXmppMovedManager.h
     client/QXmppMucManager.h
+    client/QXmppMucManagerV2.h
     client/QXmppOutgoingClient.h
     client/QXmppRegistrationManager.h
     client/QXmppPubSubEventHandler.h
@@ -275,6 +276,7 @@ set(SOURCE_FILES
     client/QXmppMixManager.cpp
     client/QXmppMovedManager.cpp
     client/QXmppMucManager.cpp
+    client/QXmppMucManagerV2.cpp
     client/QXmppOutgoingClient.cpp
     client/QXmppRosterManager.cpp
     client/QXmppRegistrationManager.cpp
