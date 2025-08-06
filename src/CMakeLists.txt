@@ -21,6 +21,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppByteStreamIq.h
     base/QXmppColorGeneration.h
     base/QXmppConstants_p.h
+    base/QXmppContactAddresses.h
     base/QXmppDataForm.h
     base/QXmppDataFormBase.h
     base/QXmppDiscoveryIq.h
@@ -178,6 +179,7 @@ set(SOURCE_FILES
     base/QXmppBookmarkSet.cpp
     base/QXmppByteStreamIq.cpp
     base/QXmppColorGeneration.cpp
+    base/QXmppContactAddresses.cpp
     base/QXmppDataForm.cpp
     base/QXmppDataFormBase.cpp
     base/QXmppDiscoveryIq.cpp

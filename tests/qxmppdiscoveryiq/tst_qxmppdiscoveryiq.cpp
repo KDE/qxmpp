@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2012 Jeremy Lainé <jeremy.laine@m4x.org>
 // SPDX-FileCopyrightText: 2012 Manjeet Dahiya <manjeetdahiya@gmail.com>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppContactAddresses.h"
 #include "QXmppDiscoveryIq.h"
 
 #include "util.h"
@@ -16,6 +18,7 @@ class tst_QXmppDiscoveryIq : public QObject
 private:
     Q_SLOT void testDiscovery();
     Q_SLOT void testDiscoveryWithForm();
+    Q_SLOT void contactAddresses();
 };
 
 void tst_QXmppDiscoveryIq::testDiscovery()
@@ -76,6 +79,56 @@ void tst_QXmppDiscoveryIq::testDiscoveryWithForm()
     parsePacket(disco, xml);
     QCOMPARE(disco.verificationString(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
     serializePacket(disco, xml);
+}
+
+void tst_QXmppDiscoveryIq::contactAddresses()
+{
+    auto xml = QByteArrayLiteral(
+        "<x xmlns='jabber:x:data' type='result'>"
+        "<field type='hidden' var='FORM_TYPE'>"
+        "<value>http://jabber.org/network/serverinfo</value>"
+        "</field>"
+        "<field type='list-multi' var='abuse-addresses'>"
+        "<value>mailto:abuse@shakespeare.lit</value>"
+        "<value>xmpp:abuse@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='admin-addresses'>"
+        "<value>mailto:xmpp@shakespeare.lit</value>"
+        "<value>xmpp:admins@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='feedback-addresses'>"
+        "<value>http://shakespeare.lit/feedback.php</value>"
+        "<value>mailto:feedback@shakespeare.lit</value>"
+        "<value>xmpp:feedback@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='sales-addresses'>"
+        "<value>xmpp:bard@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='security-addresses'>"
+        "<value>xmpp:security@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='status-addresses'>"
+        "<value>https://status.shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='support-addresses'>"
+        "<value>http://shakespeare.lit/support.php</value>"
+        "<value>xmpp:support@shakespeare.lit</value>"
+        "</field>"
+        "</x>");
+
+    QXmppDataForm form;
+    parsePacket(form, xml);
+
+    auto parsed = QXmppContactAddresses::fromDataForm(form);
+    QVERIFY(parsed.has_value());
+
+    QCOMPARE(parsed->abuseAddresses(), (QStringList { u"mailto:abuse@shakespeare.lit"_s, u"xmpp:abuse@shakespeare.lit"_s }));
+
+    form = parsed->toDataForm();
+    form.setType(QXmppDataForm::Result);
+    QVERIFY(!form.isNull());
+    xml = QString::fromUtf8(xml).remove(QChar('\n')).toUtf8();
+    serializePacket(form, xml);
 }
 
 QTEST_MAIN(tst_QXmppDiscoveryIq)

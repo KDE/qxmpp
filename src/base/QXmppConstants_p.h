@@ -131,6 +131,8 @@ inline constexpr QStringView ns_compressFeature = u"http://jabber.org/features/c
 inline constexpr QStringView ns_rosternotes = u"storage:rosternotes";
 // XEP-0153: vCard-Based Avatars
 inline constexpr QStringView ns_vcard_update = u"vcard-temp:x:update";
+// XEP-0157: Contact Addresses for XMPP Services
+inline constexpr QStringView ns_contact_addresses = u"http://jabber.org/network/serverinfo";
 // XEP-0158: CAPTCHA Forms
 inline constexpr QStringView ns_captcha = u"urn:xmpp:captcha";
 // XEP-0166: Jingle
