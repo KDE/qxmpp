@@ -1192,22 +1192,6 @@ void QXmppStunTransaction::readStun(const QXmppStunMessage &response)
     }
 }
 
-///
-/// Returns the STUN request.
-///
-QXmppStunMessage QXmppStunTransaction::request() const
-{
-    return m_request;
-}
-
-///
-/// Returns the STUN response.
-///
-QXmppStunMessage QXmppStunTransaction::response() const
-{
-    return m_response;
-}
-
 void QXmppStunTransaction::retry()
 {
     if (m_tries >= STUN_RTO_MAX) {
