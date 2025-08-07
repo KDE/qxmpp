@@ -23,12 +23,10 @@ using namespace std::chrono_literals;
 #ifdef Q_OS_UNIX
 void handleSignal(int signal)
 {
-    if (signal == SIGINT) {
-        // print newline
-        qDebug() << "";
-        if (QCoreApplication::instance()) {
-            QCoreApplication::instance()->quit();
-        }
+    // print newline
+    qDebug() << "";
+    if (QCoreApplication::instance()) {
+        QCoreApplication::instance()->quit();
     }
 }
 #endif
@@ -118,8 +116,9 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
 
 #ifdef Q_OS_UNIX
-    // set signal handler for SIGINT (CTRL+C)
+    // set signal handlers for SIGINT (CTRL+C) and SIGTERM (terminated by QtCreator)
     std::signal(SIGINT, handleSignal);
+    std::signal(SIGTERM, handleSignal);
 #endif
 
     QXmppClient client;
