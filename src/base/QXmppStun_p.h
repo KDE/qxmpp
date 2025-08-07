@@ -31,8 +31,8 @@ class QXMPP_EXPORT QXmppStunTransaction : public QXmppLoggable
 
 public:
     QXmppStunTransaction(const QXmppStunMessage &request, QObject *parent);
-    QXmppStunMessage request() const;
-    QXmppStunMessage response() const;
+    const QXmppStunMessage &request() const { return m_request; }
+    const QXmppStunMessage &response() const { return m_response; }
 
     Q_SLOT void readStun(const QXmppStunMessage &response);
 
