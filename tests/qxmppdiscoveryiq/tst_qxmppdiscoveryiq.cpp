@@ -79,6 +79,9 @@ void tst_QXmppDiscoveryIq::testDiscoveryWithForm()
     parsePacket(disco, xml);
     QCOMPARE(disco.verificationString(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
     serializePacket(disco, xml);
+
+    auto softinfoForm = disco.findForm(u"urn:xmpp:dataforms:softwareinfo");
+    QVERIFY(softinfoForm.has_value());
 }
 
 void tst_QXmppDiscoveryIq::contactAddresses()

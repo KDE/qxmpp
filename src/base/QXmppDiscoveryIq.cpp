@@ -269,7 +269,7 @@ public:
     QStringList features;
     QList<QXmppDiscoveryIq::Identity> identities;
     QList<QXmppDiscoveryIq::Item> items;
-    QXmppDataForm form;
+    QList<QXmppDataForm> forms;
     QString queryNode;
     QXmppDiscoveryIq::QueryType queryType;
 };
@@ -348,23 +348,64 @@ void QXmppDiscoveryIq::setItems(const QList<QXmppDiscoveryIq::Item> &items)
 }
 
 ///
-/// Returns the QXmppDataForm for this IQ, as defined by \xep{0128, Service
-/// Discovery Extensions}.
+/// Returns the first of the included data forms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// Returns empty form if no form is included.
 ///
 QXmppDataForm QXmppDiscoveryIq::form() const
 {
-    return d->form;
+    if (d->forms.empty()) {
+        return {};
+    }
+    return d->forms.first();
 }
 
 ///
-/// Sets the QXmppDataForm for this IQ, as define by \xep{0128, Service
-/// Discovery Extensions}.
-///
-/// \param form
+/// Sets included data forms as defined by \xep{0128, Service Discovery Extensions}.
 ///
 void QXmppDiscoveryIq::setForm(const QXmppDataForm &form)
 {
-    d->form = form;
+    d->forms.clear();
+    d->forms.append(form);
+}
+
+///
+/// Returns included data forms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// \since QXmpp 1.12
+///
+const QList<QXmppDataForm> &QXmppDiscoveryIq::forms() const
+{
+    return d->forms;
+}
+
+///
+/// Sets included data forms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// Each form must have a FORM_TYPE field and each form type MUST occur only once.
+///
+/// \since QXmpp 1.12
+///
+void QXmppDiscoveryIq::setForms(const QList<QXmppDataForm> &forms)
+{
+    d->forms = forms;
+}
+
+///
+/// Looks for a form with the given form type and returns it if found.
+///
+/// Data forms in service discovery info are defined in \xep{0128, Service Discovery Extensions}.
+///
+/// \since QXmpp 1.12
+///
+std::optional<QXmppDataForm> QXmppDiscoveryIq::findForm(QStringView formType) const
+{
+    for (const auto &form : d->forms) {
+        if (form.formType() == formType) {
+            return form;
+        }
+    }
+    return {};
 }
 
 ///
@@ -417,22 +458,24 @@ QByteArray QXmppDiscoveryIq::verificationString() const
         S += feature + u'<';
     }
 
-    if (!d->form.isNull()) {
-        QMap<QString, QXmppDataForm::Field> fieldMap;
-        const auto fields = d->form.fields();
+    // extension data forms
+    auto forms = d->forms;
+    std::sort(forms.begin(), forms.end(), [](const auto &a, const auto &b) {
+        return a.formType() < b.formType();
+    });
+
+    for (auto &form : forms) {
+        S += form.formType();
+        S += u'<';
+
+        auto fields = form.fields();
+        std::sort(fields.begin(), fields.end(), [](const auto &a, const auto &b) {
+            return a.key() < b.key();
+        });
+
         for (const auto &field : fields) {
-            fieldMap.insert(field.key(), field);
-        }
-
-        if (fieldMap.contains(u"FORM_TYPE"_s)) {
-            const QXmppDataForm::Field field = fieldMap.take(u"FORM_TYPE"_s);
-            S += field.value().toString() + u"<";
-
-            QStringList keys = fieldMap.keys();
-            std::sort(keys.begin(), keys.end());
-            for (const auto &key : keys) {
-                const QXmppDataForm::Field field = fieldMap.value(key);
-                S += key + u'<';
+            if (field.key() != u"FORM_TYPE") {
+                S += field.key() + u'<';
                 if (field.value().canConvert<QStringList>()) {
                     QStringList list = field.value().toStringList();
                     list.sort();
@@ -442,8 +485,6 @@ QByteArray QXmppDiscoveryIq::verificationString() const
                 }
                 S += u'<';
             }
-        } else {
-            qWarning("QXmppDiscoveryIq form does not contain FORM_TYPE");
         }
     }
 
@@ -472,7 +513,7 @@ void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
     d->features = parseSingleAttributeElements(queryElement, u"feature", ns_disco_info, u"var"_s);
     d->identities = parseChildElements<QList<Identity>>(queryElement);
     d->items = parseChildElements<QList<Item>>(queryElement);
-    d->form = parseOptionalChildElement<QXmppDataForm>(queryElement).value_or(QXmppDataForm());
+    d->forms = parseChildElements<QList<QXmppDataForm>>(queryElement);
 }
 
 void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
@@ -489,7 +530,7 @@ void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
             d->queryType == ItemsQuery,
             d->items,
         },
-        d->form,
+        d->forms,
     });
 }
 /// \endcond
