@@ -110,6 +110,11 @@ void setupVideoStream(GstElement *pipeline, QXmppCallStream *stream)
 
 int main(int argc, char *argv[])
 {
+    if (qEnvironmentVariableIsEmpty("QXMPP_JID") || qEnvironmentVariableIsEmpty("QXMPP_PASSWORD")) {
+        qDebug() << "'QXMPP_JID' and 'QXMPP_PASSWORD' must be set to connect to a server.";
+        return 1;
+    }
+
     QCoreApplication app(argc, argv);
 
 #ifdef Q_OS_UNIX
@@ -128,6 +133,7 @@ int main(int argc, char *argv[])
     config.setJid(qEnvironmentVariable("QXMPP_JID"));
     config.setPassword(qEnvironmentVariable("QXMPP_PASSWORD"));
     config.setResourcePrefix("Call");
+    config.setIgnoreSslErrors(true);
 
     // call manager config
     callManager->setFallbackStunServers({ StunServer { QHostAddress(QStringLiteral("stun.nextcloud.com")), 443 } });
@@ -182,7 +188,7 @@ int main(int argc, char *argv[])
             auto otherResources = rosterManager->getResources(config.jidBare());
             otherResources.removeOne(config.resource());
             if (otherResources.isEmpty()) {
-                qDebug() << "[Call] No other clients to call on this account.";
+                qDebug() << "[Call] No other clients to call on this account. Start another instance of the example to start a call.";
                 return;
             }
 
