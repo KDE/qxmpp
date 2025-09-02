@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -15,6 +16,124 @@
 #include <QSharedData>
 
 using namespace QXmpp::Private;
+
+///
+/// \class QXmppDiscoItem
+///
+/// Related entity that can be queried using \xep{0030, Service Discovery}.
+///
+/// \since QXmpp 1.12
+///
+
+/// \cond
+std::optional<QXmppDiscoItem> QXmppDiscoItem::fromDom(const QDomElement &el)
+{
+    QXmppDiscoItem item;
+    item.m_jid = el.attribute(u"jid"_s);
+    if (item.m_jid.isEmpty()) {
+        return {};
+    }
+    item.m_name = el.attribute(u"name"_s);
+    item.m_node = el.attribute(u"node"_s);
+    return item;
+}
+
+void QXmppDiscoItem::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        u"item",
+        Attribute { u"jid", m_jid },
+        OptionalAttribute { u"name", m_name },
+        OptionalAttribute { u"node", m_node },
+    });
+}
+/// \endcond
+
+///
+/// \class QXmppDiscoItems
+///
+/// Items query request or result as defined in \xep{0030, Service Discovery}.
+///
+/// \since QXmpp 1.12
+///
+
+/// \cond
+std::optional<QXmppDiscoItems> QXmppDiscoItems::fromDom(const QDomElement &el)
+{
+    return QXmppDiscoItems { el.attribute(u"node"_s), parseChildElements<QList<QXmppDiscoItem>>(el) };
+}
+
+void QXmppDiscoItems::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element { XmlTag, OptionalAttribute { u"node", m_node }, m_items });
+}
+/// \endcond
+
+///
+/// \class QXmppDiscoIdentity
+///
+/// Identity of an XMPP entity as defined in \xep{0030, Service Discovery}.
+///
+/// \since QXmpp 1.12
+///
+
+/// \cond
+std::optional<QXmppDiscoIdentity> QXmppDiscoIdentity::fromDom(const QDomElement &el)
+{
+    QXmppDiscoIdentity identity {
+        el.attribute(u"category"_s),
+        el.attribute(u"type"_s),
+        el.attribute(u"name"_s),
+        el.attributeNS(ns_xml.toString(), u"lang"_s),
+    };
+    if (identity.category().isEmpty() || identity.type().isEmpty()) {
+        return {};
+    }
+    return identity;
+}
+
+void QXmppDiscoIdentity::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        u"identity",
+        OptionalAttribute { u"xml:lang", m_language },
+        Attribute { u"category", m_category },
+        OptionalAttribute { u"name", m_name },
+        Attribute { u"type", m_type },
+    });
+}
+/// \endcond
+
+///
+/// \class QXmppDiscoInfo
+///
+/// Info query request or result as defined in \xep{0030, Service Discovery}.
+///
+/// \since QXmpp 1.12
+///
+
+/// \cond
+std::optional<QXmppDiscoInfo> QXmppDiscoInfo::fromDom(const QDomElement &el)
+{
+    return QXmppDiscoInfo {
+        el.attribute(u"node"_s),
+        parseChildElements<QList<QXmppDiscoIdentity>>(el),
+        parseSingleAttributeElements(el, u"feature", ns_disco_info, u"var"_s),
+        parseChildElements<QList<QXmppDataForm>>(el),
+    };
+}
+
+void QXmppDiscoInfo::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalAttribute { u"node", m_node },
+        m_identities,
+        SingleAttributeElements { u"feature", u"var", m_features },
+        m_dataForms,
+    });
+}
+/// \endcond
 
 static bool identityLessThan(const QXmppDiscoveryIq::Identity &i1, const QXmppDiscoveryIq::Identity &i2)
 {

@@ -18,6 +18,8 @@ class tst_QXmppDiscoveryIq : public QObject
 private:
     Q_SLOT void testDiscovery();
     Q_SLOT void testDiscoveryWithForm();
+    Q_SLOT void discoInfo();
+    Q_SLOT void discoItems();
     Q_SLOT void contactAddresses();
 };
 
@@ -82,6 +84,60 @@ void tst_QXmppDiscoveryIq::testDiscoveryWithForm()
 
     auto softinfoForm = disco.dataForm(u"urn:xmpp:dataforms:softwareinfo");
     QVERIFY(softinfoForm.has_value());
+}
+
+void tst_QXmppDiscoveryIq::discoInfo()
+{
+    const auto xml = QByteArrayLiteral(
+        "<query xmlns=\"http://jabber.org/protocol/disco#info\" node=\"http://psi-im.org#q07IKJEyjvHSyhy//CH0CxmKi8w=\">"
+        "<identity xml:lang=\"en\" category=\"client\" name=\"Psi 0.11\" type=\"pc\"/>"
+        "<identity xml:lang=\"el\" category=\"client\" name=\"Ψ 0.11\" type=\"pc\"/>"
+        "<feature var=\"http://jabber.org/protocol/caps\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#info\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#items\"/>"
+        "<feature var=\"http://jabber.org/protocol/muc\"/>"
+        "<x xmlns=\"jabber:x:data\" type=\"result\">"
+        "<field type=\"hidden\" var=\"FORM_TYPE\">"
+        "<value>urn:xmpp:dataforms:softwareinfo</value>"
+        "</field>"
+        "<field type=\"text-multi\" var=\"ip_version\">"
+        "<value>ipv4</value>"
+        "<value>ipv6</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"os\">"
+        "<value>Mac</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"os_version\">"
+        "<value>10.5.1</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"software\">"
+        "<value>Psi</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"software_version\">"
+        "<value>0.11</value>"
+        "</field>"
+        "</x>"
+        "</query>");
+
+    auto info = unwrap(QXmppDiscoInfo::fromDom(xmlToDom(xml)));
+    QCOMPARE(info.calculateEntityCapabilitiesHash(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
+    serializePacket(info, xml);
+}
+
+void tst_QXmppDiscoveryIq::discoItems()
+{
+    const auto xml = QByteArrayLiteral(
+        "<query xmlns='http://jabber.org/protocol/disco#items'>"
+        "<item jid='368866411b877c30064a5f62b917cffe@test.org'/>"
+        "<item jid='3300659945416e274474e469a1f0154c@test.org'/>"
+        "<item jid='4e30f35051b7b8b42abe083742187228@test.org'/>"
+        "<item jid='ae890ac52d0df67ed7cfdf51b644e901@test.org'/>"
+        "</query>");
+
+    auto items = unwrap(QXmppDiscoItems::fromDom(xmlToDom(xml)));
+    QCOMPARE(items.items().size(), 4);
+    QCOMPARE(items.items().at(0).jid(), u"368866411b877c30064a5f62b917cffe@test.org");
+    serializePacket(items, xml);
 }
 
 void tst_QXmppDiscoveryIq::contactAddresses()
