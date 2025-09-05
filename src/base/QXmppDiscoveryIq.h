@@ -92,19 +92,37 @@ public:
     /// Sets the category of the identity.
     void setCategory(const QString &newCategory) { m_category = newCategory; }
 
-    /// Returns the type of the identity.
+    ///
+    /// Returns the service type in this category.
+    ///
+    /// See https://xmpp.org/registrar/disco-categories.html for details.
+    ///
     const QString &type() const { return m_type; }
-    /// Sets the type of the identity.
+    ///
+    /// Sets the service type in this category.
+    ///
+    /// See https://xmpp.org/registrar/disco-categories.html for details.
+    ///
     void setType(const QString &newType) { m_type = newType; }
 
-    /// Returns the name or description of the identity.
+    /// Returns the human-readable name of the service.
     const QString &name() const { return m_name; }
-    /// Sets the name or description of the identity.
+    /// Sets the human-readable name of the service.
     void setName(const QString &newName) { m_name = newName; }
 
-    /// Returns the language of the name.
+    ///
+    /// Returns the xml:lang code of the name.
+    ///
+    /// It is possible that the same identity (same type and same category) is
+    /// included multiple times with different languages and localized names.
+    ///
     const QString &language() const { return m_language; }
-    /// Sets the language of the name.
+    ///
+    /// Sets the xml:lang code of the name.
+    ///
+    /// It is possible that the same identity (same type and same category) is
+    /// included multiple times with different languages and localized names.
+    ///
     void setLanguage(const QString &newLanguage) { m_language = newLanguage; }
 
     /// \cond
@@ -180,58 +198,10 @@ private:
 class QXMPP_EXPORT QXmppDiscoveryIq : public QXmppIq
 {
 public:
-    class QXMPP_EXPORT Identity
-    {
-    public:
-        Identity();
-        QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(Identity)
-
-        QString category() const;
-        void setCategory(const QString &category);
-
-        QString language() const;
-        void setLanguage(const QString &language);
-
-        QString name() const;
-        void setName(const QString &name);
-
-        QString type() const;
-        void setType(const QString &type);
-
-        /// \cond
-        static constexpr std::tuple XmlTag = { u"identity", QXmpp::Private::ns_disco_info };
-        static std::optional<Identity> fromDom(const QDomElement &el);
-        void toXml(QXmlStreamWriter *writer) const;
-        /// \endcond
-
-    private:
-        QSharedDataPointer<QXmppDiscoveryIdentityPrivate> d;
-    };
-
-    class QXMPP_EXPORT Item
-    {
-    public:
-        Item();
-        QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(Item)
-
-        QString jid() const;
-        void setJid(const QString &jid);
-
-        QString name() const;
-        void setName(const QString &name);
-
-        QString node() const;
-        void setNode(const QString &node);
-
-        /// \cond
-        static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_disco_items };
-        static std::optional<Item> fromDom(const QDomElement &el);
-        void toXml(QXmlStreamWriter *writer) const;
-        /// \endcond
-
-    private:
-        QSharedDataPointer<QXmppDiscoveryItemPrivate> d;
-    };
+    /// Alias for backwards-compatibility
+    using Identity = QXmppDiscoIdentity;
+    /// Alias for backwards-compatibility
+    using Item = QXmppDiscoItem;
 
     QXmppDiscoveryIq();
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppDiscoveryIq)

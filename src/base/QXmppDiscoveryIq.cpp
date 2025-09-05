@@ -23,18 +23,12 @@ static bool entityCapabilities1Compare(const QXmppDiscoIdentity &i1, const QXmpp
         std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
 }
 
-static bool entityCapabilities1CompareOld(const QXmppDiscoveryIq::Identity &i1, const QXmppDiscoveryIq::Identity &i2)
-{
-    return std::tuple { i1.category(), i1.type(), i1.language(), i1.name() } <
-        std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
-}
-
 ///
 /// \class QXmppDiscoItem
 ///
 /// Related entity that can be queried using \xep{0030, Service Discovery}.
 ///
-/// \since QXmpp 1.12
+/// \note In QXmpp 1.11 and earlier, this class was called QXmppDiscoveryIq::Item.
 ///
 
 /// \cond
@@ -86,7 +80,7 @@ void QXmppDiscoItems::toXml(QXmlStreamWriter *writer) const
 ///
 /// Identity of an XMPP entity as defined in \xep{0030, Service Discovery}.
 ///
-/// \since QXmpp 1.12
+/// \note In QXmpp 1.11 and earlier, this class was called QXmppDiscoveryIq::Item.
 ///
 
 /// \cond
@@ -210,224 +204,6 @@ void QXmppDiscoInfo::toXml(QXmlStreamWriter *writer) const
         m_identities,
         SingleAttributeElements { u"feature", u"var", m_features },
         m_dataForms,
-    });
-}
-/// \endcond
-
-class QXmppDiscoveryIdentityPrivate : public QSharedData
-{
-public:
-    QString category;
-    QString language;
-    QString name;
-    QString type;
-};
-
-///
-/// \class QXmppDiscoveryIq::Identity
-///
-/// \brief Identity represents one of possibly multiple identities of an
-/// XMPP entity obtained from a service discovery request as defined in
-/// \xep{0030, Service Discovery}.
-///
-
-QXmppDiscoveryIq::Identity::Identity()
-    : d(new QXmppDiscoveryIdentityPrivate)
-{
-}
-
-QXMPP_PRIVATE_DEFINE_RULE_OF_SIX_INNER(QXmppDiscoveryIq, Identity)
-
-///
-/// Returns the category (e.g. "account", "client", "conference", etc.) of the
-/// identity.
-///
-/// See https://xmpp.org/registrar/disco-categories.html for more details.
-///
-QString QXmppDiscoveryIq::Identity::category() const
-{
-    return d->category;
-}
-
-///
-/// Sets the category (e.g. "account", "client", "conference", etc.) of the
-/// identity.
-///
-/// See https://xmpp.org/registrar/disco-categories.html for more details.
-///
-void QXmppDiscoveryIq::Identity::setCategory(const QString &category)
-{
-    d->category = category;
-}
-
-///
-/// Returns the language code of the identity.
-///
-/// It is possible that the same identity (same type and same category) is
-/// included multiple times with different languages and localized names.
-///
-QString QXmppDiscoveryIq::Identity::language() const
-{
-    return d->language;
-}
-
-///
-/// Sets the language code of the identity.
-///
-/// It is possible that the same identity (same type and same category) is
-/// included multiple times with different languages and localized names.
-///
-void QXmppDiscoveryIq::Identity::setLanguage(const QString &language)
-{
-    d->language = language;
-}
-
-///
-/// Returns the human-readable name of the service.
-///
-QString QXmppDiscoveryIq::Identity::name() const
-{
-    return d->name;
-}
-
-///
-/// Sets the human-readable name of the service.
-///
-void QXmppDiscoveryIq::Identity::setName(const QString &name)
-{
-    d->name = name;
-}
-
-///
-/// Returns the service type in this category.
-///
-/// See https://xmpp.org/registrar/disco-categories.html for details.
-///
-QString QXmppDiscoveryIq::Identity::type() const
-{
-    return d->type;
-}
-
-///
-/// Sets the service type in this category.
-///
-/// See https://xmpp.org/registrar/disco-categories.html for details.
-///
-void QXmppDiscoveryIq::Identity::setType(const QString &type)
-{
-    d->type = type;
-}
-
-/// \cond
-std::optional<QXmppDiscoveryIq::Identity> QXmppDiscoveryIq::Identity::fromDom(const QDomElement &el)
-{
-    QXmppDiscoveryIq::Identity identity;
-    identity.setLanguage(el.attributeNS(ns_xml.toString(), u"lang"_s));
-    identity.setCategory(el.attribute(u"category"_s));
-    identity.setName(el.attribute(u"name"_s));
-    identity.setType(el.attribute(u"type"_s));
-    return identity;
-}
-
-void QXmppDiscoveryIq::Identity::toXml(QXmlStreamWriter *writer) const
-{
-    XmlWriter(writer).write(Element {
-        u"identity",
-        OptionalAttribute { u"xml:lang", d->language },
-        Attribute { u"category", d->category },
-        OptionalAttribute { u"name", d->name },
-        Attribute { u"type", d->type },
-    });
-}
-/// \endcond
-
-class QXmppDiscoveryItemPrivate : public QSharedData
-{
-public:
-    QString jid;
-    QString name;
-    QString node;
-};
-
-///
-/// \class QXmppDiscoveryIq::Item
-///
-/// Item represents a related XMPP entity that can be queried using \xep{0030,
-/// Service Discovery}.
-///
-
-QXmppDiscoveryIq::Item::Item()
-    : d(new QXmppDiscoveryItemPrivate)
-{
-}
-
-QXMPP_PRIVATE_DEFINE_RULE_OF_SIX_INNER(QXmppDiscoveryIq, Item)
-
-///
-/// Returns the jid of the item.
-///
-QString QXmppDiscoveryIq::Item::jid() const
-{
-    return d->jid;
-}
-
-///
-/// Sets the jid of the item.
-///
-void QXmppDiscoveryIq::Item::setJid(const QString &jid)
-{
-    d->jid = jid;
-}
-
-///
-/// Returns the items human-readable name.
-///
-QString QXmppDiscoveryIq::Item::name() const
-{
-    return d->name;
-}
-
-///
-/// Sets the items human-readable name.
-///
-void QXmppDiscoveryIq::Item::setName(const QString &name)
-{
-    d->name = name;
-}
-
-///
-/// Returns a special service discovery node.
-///
-QString QXmppDiscoveryIq::Item::node() const
-{
-    return d->node;
-}
-
-///
-/// Sets a special service discovery node.
-///
-void QXmppDiscoveryIq::Item::setNode(const QString &node)
-{
-    d->node = node;
-}
-
-/// \cond
-std::optional<QXmppDiscoveryIq::Item> QXmppDiscoveryIq::Item::fromDom(const QDomElement &el)
-{
-    QXmppDiscoveryIq::Item item;
-    item.setJid(el.attribute(u"jid"_s));
-    item.setName(el.attribute(u"name"_s));
-    item.setNode(el.attribute(u"node"_s));
-    return item;
-}
-
-void QXmppDiscoveryIq::Item::toXml(QXmlStreamWriter *writer) const
-{
-    XmlWriter(writer).write(Element {
-        u"item",
-        Attribute { u"jid", d->jid },
-        OptionalAttribute { u"name", d->name },
-        OptionalAttribute { u"node", d->node },
     });
 }
 /// \endcond
@@ -635,7 +411,7 @@ QByteArray QXmppDiscoveryIq::verificationString() const
 {
     QString S;
     QList<QXmppDiscoveryIq::Identity> sortedIdentities = d->identities;
-    std::sort(sortedIdentities.begin(), sortedIdentities.end(), entityCapabilities1CompareOld);
+    std::sort(sortedIdentities.begin(), sortedIdentities.end(), entityCapabilities1Compare);
     QStringList sortedFeatures = d->features;
     std::sort(sortedFeatures.begin(), sortedFeatures.end());
     sortedFeatures.removeDuplicates();
