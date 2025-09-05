@@ -43,27 +43,27 @@ void tst_QXmppDiscoveryManager::testItems()
     TestClient test;
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
 
-    auto future = discoManager->requestDiscoItems("user@example.org");
+    auto task = discoManager->requestDiscoItems("user@example.org");
     test.expect("<iq id='qx1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>");
     test.inject<QString>(R"(
 <iq type='result'
     from='user@example.org'
     id='qx1'>
   <query xmlns='http://jabber.org/protocol/disco#items'>
-    <item name='368866411b877c30064a5f62b917cffe'/>
-    <item name='3300659945416e274474e469a1f0154c'/>
-    <item name='4e30f35051b7b8b42abe083742187228'/>
-    <item name='ae890ac52d0df67ed7cfdf51b644e901'/>
+    <item jid='368866411b877c30064a5f62b917cffe@test.org'/>
+    <item jid='3300659945416e274474e469a1f0154c@test.org'/>
+    <item jid='4e30f35051b7b8b42abe083742187228@test.org'/>
+    <item jid='ae890ac52d0df67ed7cfdf51b644e901@test.org'/>
   </query>
 </iq>)");
 
-    const auto items = expectFutureVariant<QList<QXmppDiscoveryIq::Item>>(future.toFuture(this));
+    const auto items = expectFutureVariant<QList<QXmppDiscoveryIq::Item>>(task);
 
     QCOMPARE(items.size(), 4);
-    QCOMPARE(items.at(0).name(), u"368866411b877c30064a5f62b917cffe"_s);
-    QCOMPARE(items.at(1).name(), u"3300659945416e274474e469a1f0154c"_s);
-    QCOMPARE(items.at(2).name(), u"4e30f35051b7b8b42abe083742187228"_s);
-    QCOMPARE(items.at(3).name(), u"ae890ac52d0df67ed7cfdf51b644e901"_s);
+    QCOMPARE(items.at(0).jid(), u"368866411b877c30064a5f62b917cffe@test.org"_s);
+    QCOMPARE(items.at(1).jid(), u"3300659945416e274474e469a1f0154c@test.org"_s);
+    QCOMPARE(items.at(2).jid(), u"4e30f35051b7b8b42abe083742187228@test.org"_s);
+    QCOMPARE(items.at(3).jid(), u"ae890ac52d0df67ed7cfdf51b644e901@test.org"_s);
 }
 
 void tst_QXmppDiscoveryManager::testRequests()
