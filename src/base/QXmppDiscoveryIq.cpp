@@ -17,6 +17,18 @@
 
 using namespace QXmpp::Private;
 
+static bool entityCapabilities1Compare(const QXmppDiscoIdentity &i1, const QXmppDiscoIdentity &i2)
+{
+    return std::tuple { i1.category(), i1.type(), i1.language(), i1.name() } <
+        std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
+}
+
+static bool entityCapabilities1CompareOld(const QXmppDiscoveryIq::Identity &i1, const QXmppDiscoveryIq::Identity &i2)
+{
+    return std::tuple { i1.category(), i1.type(), i1.language(), i1.name() } <
+        std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
+}
+
 ///
 /// \class QXmppDiscoItem
 ///
@@ -112,6 +124,63 @@ void QXmppDiscoIdentity::toXml(QXmlStreamWriter *writer) const
 /// \since QXmpp 1.12
 ///
 
+///
+/// Calculates an \xep{0115, Entity Capabilities} hash value of this service discovery data object.
+///
+QByteArray QXmppDiscoInfo::calculateEntityCapabilitiesHash() const
+{
+    QString S;
+
+    // identities
+    auto identities = m_identities;
+    std::sort(identities.begin(), identities.end(), entityCapabilities1Compare);
+
+    for (const auto &identity : std::as_const(identities)) {
+        S += identity.category() + u'/' + identity.type() + u'/' + identity.language() + u'/' + identity.name() + u'<';
+    }
+
+    // features
+    auto features = m_features;
+    std::sort(features.begin(), features.end());
+    features.removeDuplicates();
+
+    for (const auto &feature : std::as_const(features)) {
+        S += feature + u'<';
+    }
+
+    // data forms
+    auto forms = m_dataForms;
+    std::sort(forms.begin(), forms.end(), [](const auto &a, const auto &b) {
+        return a.formType() < b.formType();
+    });
+
+    for (auto &form : std::as_const(forms)) {
+        S += form.formType();
+        S += u'<';
+
+        auto fields = form.constFields();
+        std::sort(fields.begin(), fields.end(), [](const auto &a, const auto &b) {
+            return a.key() < b.key();
+        });
+
+        for (const auto &field : std::as_const(fields)) {
+            if (field.key() != u"FORM_TYPE") {
+                S += field.key() + u'<';
+                if (field.value().canConvert<QStringList>()) {
+                    QStringList list = field.value().toStringList();
+                    list.sort();
+                    S += list.join(u'<');
+                } else {
+                    S += field.value().toString();
+                }
+                S += u'<';
+            }
+        }
+    }
+
+    return QCryptographicHash::hash(S.toUtf8(), QCryptographicHash::Sha1);
+}
+
 /// \cond
 std::optional<QXmppDiscoInfo> QXmppDiscoInfo::fromDom(const QDomElement &el)
 {
@@ -134,35 +203,6 @@ void QXmppDiscoInfo::toXml(QXmlStreamWriter *writer) const
     });
 }
 /// \endcond
-
-static bool identityLessThan(const QXmppDiscoveryIq::Identity &i1, const QXmppDiscoveryIq::Identity &i2)
-{
-    if (i1.category() < i2.category()) {
-        return true;
-    } else if (i1.category() > i2.category()) {
-        return false;
-    }
-
-    if (i1.type() < i2.type()) {
-        return true;
-    } else if (i1.type() > i2.type()) {
-        return false;
-    }
-
-    if (i1.language() < i2.language()) {
-        return true;
-    } else if (i1.language() > i2.language()) {
-        return false;
-    }
-
-    if (i1.name() < i2.name()) {
-        return true;
-    } else if (i1.name() > i2.name()) {
-        return false;
-    }
-
-    return false;
-}
 
 class QXmppDiscoveryIdentityPrivate : public QSharedData
 {
@@ -585,7 +625,7 @@ QByteArray QXmppDiscoveryIq::verificationString() const
 {
     QString S;
     QList<QXmppDiscoveryIq::Identity> sortedIdentities = d->identities;
-    std::sort(sortedIdentities.begin(), sortedIdentities.end(), identityLessThan);
+    std::sort(sortedIdentities.begin(), sortedIdentities.end(), entityCapabilities1CompareOld);
     QStringList sortedFeatures = d->features;
     std::sort(sortedFeatures.begin(), sortedFeatures.end());
     sortedFeatures.removeDuplicates();

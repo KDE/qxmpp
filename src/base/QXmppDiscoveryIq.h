@@ -149,6 +149,8 @@ public:
     /// Forms MUST have a FORM_TYPE and each FORM_TYPE MUST occur only once.
     void setDataForms(const QList<QXmppDataForm> &newDataForms) { m_dataForms = newDataForms; }
 
+    QByteArray calculateEntityCapabilitiesHash() const;
+
     /// \cond
     static constexpr std::tuple XmlTag = { u"query", QXmpp::Private::ns_disco_info };
     static std::optional<QXmppDiscoInfo> fromDom(const QDomElement &el);
