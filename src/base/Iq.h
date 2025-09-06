@@ -236,27 +236,27 @@ public:
     std::optional<Payload> payload;
 
     template<IqType Type>
-        requires(Type == IqType::Get || Type == IqType::Set)
+        requires(Type == IqType::Get || Type == IqType::Set || Type == IqType::Result)
     CompatIq(Iq<Type, Payload> &&iq) : QXmppIq(), payload(std::move(iq.payload))
     {
         setId(iq.id);
         setFrom(iq.from);
         setTo(iq.to);
         setLang(iq.lang);
-        switch (Type) {
-        case IqType::Get:
+        if constexpr (Type == IqType::Get) {
             setType(QXmppIq::Get);
-            break;
-        case IqType::Set:
+        } else if constexpr (Type == IqType::Set) {
             setType(QXmppIq::Set);
-            break;
-        case IqType::Result:
+        } else if constexpr (Type == IqType::Result) {
             setType(QXmppIq::Result);
-            break;
-        case IqType::Error:
+        } else if constexpr (Type == IqType::Error) {
             setType(QXmppIq::Error);
-            break;
         }
+    }
+
+    CompatIq(QXmppIq::Type type, std::optional<Payload> &&payload = {})
+        : QXmppIq(type), payload(std::move(payload))
+    {
     }
 
     void parseElementFromChild(const QDomElement &el) override
@@ -268,6 +268,12 @@ public:
         XmlWriter(writer).write(payload);
     }
 };
+
+template<IqType Type, typename Payload>
+CompatIq(Iq<Type, Payload> &&) -> CompatIq<Payload>;
+
+template<typename Payload>
+CompatIq(QXmppIq::Type, Payload) -> CompatIq<Payload>;
 
 }  // namespace QXmpp::Private
 
