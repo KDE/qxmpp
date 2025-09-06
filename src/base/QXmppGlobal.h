@@ -12,6 +12,8 @@
 
 #include <QString>
 
+struct QXmppError;
+
 #define QXMPP_AUTOTEST_EXPORT
 #define QXMPP_PRIVATE_EXPORT QXMPP_EXPORT
 
@@ -193,6 +195,14 @@ struct Cancelled { };
 /// \since QXmpp 1.7
 ///
 struct TimeoutError { };
+
+///
+/// Generic result type offering value or QXmppError
+///
+/// \since QXmpp 1.12
+///
+template<typename T>
+using Result = std::variant<T, QXmppError>;
 
 }  // namespace QXmpp
 
