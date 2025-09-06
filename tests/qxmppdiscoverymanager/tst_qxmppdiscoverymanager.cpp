@@ -20,7 +20,28 @@ void tst_QXmppDiscoveryManager::testInfo()
     TestClient test;
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
 
-    auto future = discoManager->requestDiscoInfo("user@example.org");
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    auto task = discoManager->requestDiscoInfo("user@example.org");
+    QT_WARNING_POP
+    test.expect("<iq id='qx2' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>");
+    test.inject<QString>(R"(
+<iq id='qx2' from='user@example.org' type='result'>
+    <query xmlns='http://jabber.org/protocol/disco#info'>
+        <identity category='pubsub' type='service'/>
+        <feature var='http://jabber.org/protocol/pubsub'/>
+        <feature var='urn:xmpp:mix:core:1'/>
+    </query>
+</iq>)");
+
+    const auto info = expectFutureVariant<QXmppDiscoveryIq>(task);
+
+    const QStringList expFeatures = { "http://jabber.org/protocol/pubsub", "urn:xmpp:mix:core:1" };
+    QCOMPARE(info.features(), expFeatures);
+    QCOMPARE(info.identities().count(), 1);
+
+    // new API
+    auto task2 = discoManager->info("user@example.org");
     test.expect("<iq id='qx1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>");
     test.inject<QString>(R"(
 <iq id='qx1' from='user@example.org' type='result'>
@@ -31,11 +52,10 @@ void tst_QXmppDiscoveryManager::testInfo()
     </query>
 </iq>)");
 
-    const auto info = expectFutureVariant<QXmppDiscoveryIq>(future.toFuture(this));
+    const auto info2 = expectFutureVariant<QXmppDiscoInfo>(task2);
 
-    const QStringList expFeatures = { "http://jabber.org/protocol/pubsub", "urn:xmpp:mix:core:1" };
-    QCOMPARE(info.features(), expFeatures);
-    QCOMPARE(info.identities().count(), 1);
+    QCOMPARE(info2.features(), expFeatures);
+    QCOMPARE(info2.identities().count(), 1);
 }
 
 void tst_QXmppDiscoveryManager::testItems()
@@ -43,7 +63,10 @@ void tst_QXmppDiscoveryManager::testItems()
     TestClient test;
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     auto task = discoManager->requestDiscoItems("user@example.org");
+    QT_WARNING_POP
     test.expect("<iq id='qx1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>");
     test.inject<QString>(R"(
 <iq type='result'

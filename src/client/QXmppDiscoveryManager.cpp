@@ -20,23 +20,14 @@
 
 using namespace QXmpp;
 
-///
-/// \typedef QXmppDiscoveryManager::InfoResult
-///
-/// Contains the discovery information result in the form of an QXmppDiscoveryIq
-/// or (in case the request did not succeed) a QXmppStanza::Error.
-///
-/// \since QXmpp 1.5
-///
-
-///
-/// \typedef QXmppDiscoveryManager::ItemsResult
-///
-/// Contains a list of service discovery items or (in case the request did not
-/// succeed) a QXmppStanza::Error.
-///
-/// \since QXmpp 1.5
-///
+template<typename Response, typename Payload>
+static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, const QString &to, Payload &&payload)
+{
+    return chain<std::variant<Response, QXmppError>>(
+        client->sendIq(CompatIq { GetIq<Payload> { generateSequentialStanzaId(), {}, to, {}, std::move(payload) } }),
+        client,
+        parseIqResponseFlat<Response>);
+}
 
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
@@ -48,47 +39,38 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
 QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
 
 ///
-/// Requests information from the specified XMPP entity.
+/// Fetches discovery items from the specified XMPP entity.
 ///
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-/// \since QXmpp 1.5
+/// \since QXmpp 1.12
 ///
-QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDiscoInfo(const QString &jid, const QString &node)
+QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::InfoQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
-    }
-
-    return chainIq<InfoResult>(client()->sendIq(std::move(request)), this);
+    return chain<Result<QList<QXmppDiscoItem>>>(
+        get<QXmppDiscoItems>(client(), jid, QXmppDiscoItems { node }),
+        this,
+        [](auto &&result) -> Result<QList<QXmppDiscoItem>> {
+            if (auto *itemsPayload = std::get_if<QXmppDiscoItems>(&result)) {
+                return itemsPayload->items();
+            } else {
+                return std::get<QXmppError>(std::move(result));
+            }
+        });
 }
 
 ///
-/// Requests items from the specified XMPP entity.
+/// Fetches discovery info from the specified XMPP entity.
 ///
 /// \param jid  The target entity's JID.
 /// \param node The target node (optional).
 ///
-/// \since QXmpp 1.5
+/// \since QXmpp 1.12
 ///
-QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDiscoItems(const QString &jid, const QString &node)
+QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node)
 {
-    QXmppDiscoveryIq request;
-    request.setType(QXmppIq::Get);
-    request.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-    request.setTo(jid);
-    if (!node.isEmpty()) {
-        request.setQueryNode(node);
-    }
-
-    return chainIq(client()->sendIq(std::move(request)), this, [](QXmppDiscoveryIq &&iq) -> ItemsResult {
-        return iq.items();
-    });
+    return get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node });
 }
 
 ///

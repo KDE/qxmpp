@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppPubSubAffiliation.h"
 #include "QXmppPubSubBaseItem.h"
@@ -53,10 +54,10 @@ public:
 };
 
 struct Client {
-    Client() { }
-    Client(const QString &jid)
+    Client(const QString &jid = {})
     {
         test.configuration().setJid(jid);
+        test.addNewExtension<QXmppDiscoveryManager>();
     }
 
     TestClient test;

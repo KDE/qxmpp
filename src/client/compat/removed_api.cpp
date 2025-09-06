@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppAsync_p.h"
 #include "QXmppClient_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
@@ -14,6 +15,7 @@
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QEventLoop>
@@ -142,6 +144,8 @@ void QXmppClient::sendMessage(const QString &bareJid, const QString &message)
 
 // DiscoveryManager
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 ///
 /// Requests information from the specified XMPP entity.
 ///
@@ -183,6 +187,66 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
 }
 
 ///
+/// \typedef QXmppDiscoveryManager::InfoResult
+///
+/// Contains the discovery information result in the form of an QXmppDiscoveryIq
+/// or (in case the request did not succeed) a QXmppStanza::Error.
+///
+/// \since QXmpp 1.5
+///
+
+///
+/// \typedef QXmppDiscoveryManager::ItemsResult
+///
+/// Contains a list of service discovery items or (in case the request did not
+/// succeed) a QXmppStanza::Error.
+///
+/// \since QXmpp 1.5
+///
+
+///
+/// Requests information from the specified XMPP entity.
+///
+/// \param jid  The target entity's JID.
+/// \param node The target node (optional).
+///
+/// \deprecated
+/// \since QXmpp 1.5
+///
+QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDiscoInfo(const QString &jid, const QString &node)
+{
+    QXmppDiscoveryIq request;
+    request.setType(QXmppIq::Get);
+    request.setQueryType(QXmppDiscoveryIq::InfoQuery);
+    request.setTo(jid);
+    request.setQueryNode(node);
+
+    return chainMapSuccess(info(jid, node), this, [](QXmppDiscoInfo &&info) {
+        QXmppDiscoveryIq iq;
+        iq.setQueryNode(info.node());
+        iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
+        iq.setFeatures(info.features());
+        iq.setIdentities(info.identities());
+        iq.setDataForms(info.dataForms());
+        return iq;
+    });
+}
+
+///
+/// Requests items from the specified XMPP entity.
+///
+/// \param jid  The target entity's JID.
+/// \param node The target node (optional).
+///
+/// \deprecated
+/// \since QXmpp 1.5
+///
+QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDiscoItems(const QString &jid, const QString &node)
+{
+    return items(jid, node);
+}
+
+///
 /// Returns the client's full capabilities.
 ///
 /// \deprecated
@@ -199,6 +263,7 @@ QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
     iq.setDataForms(info.dataForms());
     return iq;
 }
+QT_WARNING_POP
 
 ///
 /// Sets the category of the local XMPP client.

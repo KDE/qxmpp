@@ -31,10 +31,8 @@ public:
     QXmppDiscoveryManager();
     ~QXmppDiscoveryManager() override;
 
-    using InfoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
-    using ItemsResult = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
-    QXmppTask<InfoResult> requestDiscoInfo(const QString &jid, const QString &node = {});
-    QXmppTask<ItemsResult> requestDiscoItems(const QString &jid, const QString &node = {});
+    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> info(const QString &jid, const QString &node = {});
+    QXmppTask<QXmpp::Result<QList<QXmppDiscoItem>>> items(const QString &jid, const QString &node = {});
 
     const QList<QXmppDiscoIdentity> &identities() const;
     void setIdentities(const QList<QXmppDiscoIdentity> &identities);
@@ -59,6 +57,16 @@ public:
     Q_SIGNAL void itemsReceived(const QXmppDiscoveryIq &);
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    using InfoResult [[deprecated]] = std::variant<QXmppDiscoveryIq, QXmppError>;
+    using ItemsResult [[deprecated]] = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
+    [[deprecated("Use info()")]]
+    QXmppTask<InfoResult> requestDiscoInfo(const QString &jid, const QString &node = {});
+    [[deprecated("Use items()")]]
+    QXmppTask<ItemsResult> requestDiscoItems(const QString &jid, const QString &node = {});
+    QT_WARNING_POP
+
     [[deprecated("Use buildDiscoInfo()")]]
     QXmppDiscoveryIq capabilities();
 

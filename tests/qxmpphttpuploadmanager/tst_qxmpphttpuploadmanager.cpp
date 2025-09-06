@@ -16,6 +16,7 @@
 
 #include <QMimeDatabase>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 static const auto UPLOAD_SERVICE_NAME = u"upload.montague.tld"_s;
@@ -393,8 +394,7 @@ void tst_QXmppHttpUploadManager::testUploadService()
 
 void tst_QXmppHttpUploadManager::testUpload()
 {
-    using DiscoInfoResult = QXmppDiscoveryManager::InfoResult;
-    using DiscoItem = QXmppDiscoveryIq::Item;
+    using DiscoInfoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
 
     SKIP_IF_INTEGRATION_TESTS_DISABLED()
 
@@ -408,19 +408,19 @@ void tst_QXmppHttpUploadManager::testUpload()
     QVERIFY(test.isConnected());
 
     // get server items
-    auto items = expectVariant<QList<DiscoItem>>(wait(disco->requestDiscoItems(test.configuration().domain()).toFuture(this)));
+    auto items = expectVariant<QList<QXmppDiscoItem>>(wait(disco->items(test.configuration().domain()).toFuture(this)));
     // request disco info for each item
-    auto infoFutures = transform<std::vector<QXmppTask<DiscoInfoResult>>>(items, [disco](const auto &item) {
-        return disco->requestDiscoInfo(item.jid(), item.node());
+    auto infoFutures = transform<std::vector<std::tuple<QString, QXmppTask<Result<QXmppDiscoInfo>>>>>(items, [disco](const auto &item) {
+        return std::tuple { item.jid(), disco->info(item.jid(), item.node()) };
     });
     auto uploadServiceJid = [&]() {
-        for (auto &future : infoFutures) {
-            auto result = expectVariant<QXmppDiscoveryIq>(wait(future.toFuture(this)));
+        for (auto &[jid, task] : infoFutures) {
+            auto result = expectVariant<QXmppDiscoInfo>(wait(task.toFuture(this)));
             for (const auto &identity : result.identities()) {
                 if (identity.category() == u"store" &&
                     identity.type() == u"file" &&
                     result.features().contains("urn:xmpp:http:upload:0")) {
-                    return result.from();
+                    return jid;
                 }
             }
         }

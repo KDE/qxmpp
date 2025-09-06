@@ -547,10 +547,8 @@ QXmppTask<QXmppMixManager::CreationResult> QXmppMixManager::createChannel(const 
 ///
 QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids(const QString &serviceJid)
 {
-    return chainMapSuccess(d->discoveryManager->requestDiscoItems(serviceJid), this, [](QList<QXmppDiscoveryIq::Item> &&items) {
-        return transform<QVector<ChannelJid>>(items, [](const QXmppDiscoveryIq::Item &item) {
-            return item.jid();
-        });
+    return chainMapSuccess(d->discoveryManager->items(serviceJid), this, [](QList<QXmppDiscoItem> &&items) {
+        return transform<QVector<ChannelJid>>(items, &QXmppDiscoItem::jid);
     });
 }
 
@@ -563,8 +561,8 @@ QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids
 ///
 QXmppTask<QXmppMixManager::ChannelNodeResult> QXmppMixManager::requestChannelNodes(const QString &channelJid)
 {
-    return chainMapSuccess(d->discoveryManager->requestDiscoItems(channelJid, MIX_SERVICE_DISCOVERY_NODE.toString()), this, [](QList<QXmppDiscoveryIq::Item> &&items) {
-        return Enums::fromStrings<QXmppMixConfigItem::Node>(transform<QList<QString>>(items, &QXmppDiscoveryIq::Item::node));
+    return chainMapSuccess(d->discoveryManager->items(channelJid, MIX_SERVICE_DISCOVERY_NODE.toString()), this, [](QList<QXmppDiscoItem> &&items) {
+        return Enums::fromStrings<QXmppMixConfigItem::Node>(transform<QList<QString>>(items, &QXmppDiscoItem::node));
     });
 }
 
