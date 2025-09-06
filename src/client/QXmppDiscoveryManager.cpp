@@ -92,44 +92,6 @@ QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDisc
 }
 
 ///
-/// Returns the client's full capabilities.
-///
-QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
-{
-    QXmppDiscoveryIq iq;
-    iq.setType(QXmppIq::Result);
-    iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
-
-    // features
-    QStringList features;
-    // add base features of the client
-    features << QXmppClientPrivate::discoveryFeatures();
-
-    // add features of all registered extensions
-    const auto extensions = client()->extensions();
-    for (auto *extension : extensions) {
-        if (extension) {
-            features << extension->discoveryFeatures();
-        }
-    }
-    iq.setFeatures(features);
-
-    // identities
-    auto identities = d->identities;
-    for (auto *extension : client()->extensions()) {
-        if (extension) {
-            identities << extension->discoveryIdentities();
-        }
-    }
-    iq.setIdentities(identities);
-
-    // extra data forms
-    iq.setDataForms(d->dataForms);
-
-    return iq;
-}
-
-///
 /// Returns the base identities of this client.
 ///
 /// The identities are added to the service discovery information other entities can request.
@@ -183,6 +145,31 @@ const QList<QXmppDataForm> &QXmppDiscoveryManager::infoForms() const
 void QXmppDiscoveryManager::setInfoForms(const QList<QXmppDataForm> &dataForms)
 {
     d->dataForms = dataForms;
+}
+
+///
+/// Builds a full disco info element for this client.
+///
+/// Contains features and identities from all extensions and identities and data forms configured
+/// in this manager.
+///
+/// \since QXmpp 1.12
+///
+QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
+{
+    const auto extensions = client()->extensions();
+
+    // collect features and identities
+    auto allFeatures = QXmppClientPrivate::discoveryFeatures();
+    auto allIdentities = d->identities;
+    for (auto *extension : extensions) {
+        if (extension) {
+            allFeatures << extension->discoveryFeatures();
+            allIdentities << extension->discoveryIdentities();
+        }
+    }
+
+    return QXmppDiscoInfo { {}, allIdentities, allFeatures, d->dataForms };
 }
 
 ///
@@ -269,27 +256,10 @@ QXmppDiscoIdentity QXmppDiscoveryManagerPrivate::defaultIdentity()
     };
 }
 
-QXmppDiscoInfo QXmppDiscoveryManagerPrivate::discoInfo() const
-{
-    const auto extensions = q->client()->extensions();
-
-    // collect features and identities
-    auto allFeatures = QXmppClientPrivate::discoveryFeatures();
-    auto allIdentities = identities;
-    for (auto *extension : extensions) {
-        if (extension) {
-            allFeatures << extension->discoveryFeatures();
-            allIdentities << extension->discoveryIdentities();
-        }
-    }
-
-    return QXmppDiscoInfo { {}, allIdentities, allFeatures, dataForms };
-}
-
 std::variant<CompatIq<QXmppDiscoInfo>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(GetIq<QXmppDiscoInfo> &&iq)
 {
     if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
-        return CompatIq { QXmppIq::Result, discoInfo() };
+        return CompatIq { QXmppIq::Result, q->buildClientInfo() };
     }
     return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
 }

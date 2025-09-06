@@ -26,7 +26,6 @@ public:
     static QString defaultApplicationName();
     static QXmppDiscoIdentity defaultIdentity();
 
-    QXmppDiscoInfo discoInfo() const;
     std::variant<CompatIq<QXmppDiscoInfo>, StanzaError> handleIq(GetIq<QXmppDiscoInfo> &&iq);
     std::variant<CompatIq<QXmppDiscoItems>, StanzaError> handleIq(GetIq<QXmppDiscoItems> &&iq);
 };

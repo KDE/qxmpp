@@ -70,11 +70,10 @@ void QXmppClientPrivate::resendPresence()
 
 void QXmppClientPrivate::addProperCapability(QXmppPresence &presence)
 {
-    auto *ext = q->findExtension<QXmppDiscoveryManager>();
-    if (ext) {
+    if (auto *discoManager = q->findExtension<QXmppDiscoveryManager>()) {
         presence.setCapabilityHash(u"sha-1"_s);
-        presence.setCapabilityNode(ext->clientCapabilitiesNode());
-        presence.setCapabilityVer(ext->capabilities().verificationString());
+        presence.setCapabilityNode(discoManager->clientCapabilitiesNode());
+        presence.setCapabilityVer(discoManager->buildClientInfo().calculateEntityCapabilitiesHash());
     }
 }
 

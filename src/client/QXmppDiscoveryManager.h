@@ -31,8 +31,6 @@ public:
     QXmppDiscoveryManager();
     ~QXmppDiscoveryManager() override;
 
-    QXmppDiscoveryIq capabilities();
-
     using InfoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
     using ItemsResult = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
     QXmppTask<InfoResult> requestDiscoInfo(const QString &jid, const QString &node = {});
@@ -47,6 +45,8 @@ public:
     QString clientCapabilitiesNode() const;
     void setClientCapabilitiesNode(const QString &);
 
+    QXmppDiscoInfo buildClientInfo() const;
+
     /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
@@ -59,6 +59,9 @@ public:
     Q_SIGNAL void itemsReceived(const QXmppDiscoveryIq &);
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)
+    [[deprecated("Use buildDiscoInfo()")]]
+    QXmppDiscoveryIq capabilities();
+
     [[deprecated("Use ownIdentities()")]]
     QString clientCategory() const;
     [[deprecated("Use setOwnIdentities()")]]

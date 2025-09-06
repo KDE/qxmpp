@@ -183,6 +183,24 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
 }
 
 ///
+/// Returns the client's full capabilities.
+///
+/// \deprecated
+///
+QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
+{
+    auto info = buildClientInfo();
+
+    QXmppDiscoveryIq iq;
+    iq.setType(QXmppIq::Result);
+    iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
+    iq.setFeatures(info.features());
+    iq.setIdentities(info.identities());
+    iq.setDataForms(info.dataForms());
+    return iq;
+}
+
+///
 /// Sets the category of the local XMPP client.
 ///
 /// You can find a list of valid categories at:
