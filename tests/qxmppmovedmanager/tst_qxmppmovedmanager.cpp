@@ -136,8 +136,11 @@ void tst_QXmppMovedManager::testHandleDiscoInfo()
 {
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
     iq.setFeatures({ ns_moved.toString() });
+    QT_WARNING_POP
 
     manager->handleDiscoInfo(iq);
 
@@ -167,7 +170,10 @@ void tst_QXmppMovedManager::testOnRegistered()
 
     QVERIFY(!manager.supportedByServer());
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
+    QT_WARNING_POP
     iq.setFeatures({ ns_moved.toString() });
     Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
 
@@ -187,7 +193,10 @@ void tst_QXmppMovedManager::testOnUnregistered()
     manager.setSupportedByServer(true);
     manager.onUnregistered(&client);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
+    QT_WARNING_POP
     iq.setFeatures({ ns_moved.toString() });
     Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
 

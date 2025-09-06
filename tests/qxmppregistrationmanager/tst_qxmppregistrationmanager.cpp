@@ -7,7 +7,10 @@
 #include "QXmppRegistrationManager.h"
 #include "QXmppStreamFeatures.h"
 
+#include "Iq.h"
 #include "util.h"
+
+using namespace QXmpp::Private;
 
 class tst_QXmppRegistrationManager : public QObject
 {
@@ -191,13 +194,13 @@ void tst_QXmppRegistrationManager::testServiceDiscovery()
         QCOMPARE(manager->supportedByServer(), true);
     });
 
-    QXmppDiscoveryIq iq;
-    iq.setType(QXmppIq::Result);
-    iq.setFrom(u"example.org"_s);
-    iq.setTo(u"bob@example.org"_s);
-    iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
-    iq.setFeatures(QStringList() << u"jabber:iq:register"_s);
-
+    ResultIq<QXmppDiscoInfo> iq {
+        u"1"_s,
+        u"example.org"_s,
+        u"bob@example.org"_s,
+        {},
+        QXmppDiscoInfo { {}, {}, QStringList { u"jabber:iq:register"_s } },
+    };
     client.findExtension<QXmppDiscoveryManager>()->handleStanza(writePacketToDom(iq));
 
     QVERIFY(signalEmitted);

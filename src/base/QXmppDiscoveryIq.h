@@ -195,14 +195,16 @@ private:
     QList<QXmppDataForm> m_dataForms;
 };
 
+#if QXMPP_DEPRECATED_SINCE(1, 12)
 class QXMPP_EXPORT QXmppDiscoveryIq : public QXmppIq
 {
 public:
     /// Alias for backwards-compatibility
-    using Identity = QXmppDiscoIdentity;
+    using Identity [[deprecated]] = QXmppDiscoIdentity;
     /// Alias for backwards-compatibility
-    using Item = QXmppDiscoItem;
+    using Item [[deprecated]] = QXmppDiscoItem;
 
+    [[deprecated("Use QXmppDiscoInfo/Items")]]
     QXmppDiscoveryIq();
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppDiscoveryIq)
 
@@ -214,11 +216,11 @@ public:
     QStringList features() const;
     void setFeatures(const QStringList &features);
 
-    QList<QXmppDiscoveryIq::Identity> identities() const;
-    void setIdentities(const QList<QXmppDiscoveryIq::Identity> &identities);
+    QList<QXmppDiscoIdentity> identities() const;
+    void setIdentities(const QList<QXmppDiscoIdentity> &identities);
 
-    QList<QXmppDiscoveryIq::Item> items() const;
-    void setItems(const QList<QXmppDiscoveryIq::Item> &items);
+    QList<QXmppDiscoItem> items() const;
+    void setItems(const QList<QXmppDiscoItem> &items);
 
     [[deprecated("Use dataForms() instead")]]
     QXmppDataForm form() const;
@@ -263,5 +265,6 @@ protected:
 private:
     QSharedDataPointer<QXmppDiscoveryIqPrivate> d;
 };
+#endif
 
 #endif

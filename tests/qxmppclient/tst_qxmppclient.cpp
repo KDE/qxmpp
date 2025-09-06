@@ -19,6 +19,7 @@
 #include "QXmppVersionManager.h"
 
 #include "Async.h"
+#include "Iq.h"
 #include "TestClient.h"
 #include "util.h"
 
@@ -150,11 +151,9 @@ void tst_QXmppClient::testE2eeExtension()
     QVERIFY(!encrypter.iqCalled);
 
     auto createRequest = []() {
-        QXmppDiscoveryIq request;
-        request.setType(QXmppIq::Get);
-        request.setQueryType(QXmppDiscoveryIq::InfoQuery);
-        request.setTo("component.qxmpp.org");
-        return request;
+        CompatIq iq { QXmppIq::Get, QXmppDiscoInfo {} };
+        iq.setTo(u"component.qxmpp.org"_s);
+        return iq;
     };
 
     client.sendSensitive(createRequest());

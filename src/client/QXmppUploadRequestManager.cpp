@@ -286,7 +286,7 @@ void QXmppUploadRequestManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
     }
 
     const auto identities = iq.identities();
-    for (const QXmppDiscoveryIq::Identity &identity : identities) {
+    for (const auto &identity : identities) {
         if (identity.category() == u"store" && identity.type() == u"file") {
             QXmppUploadService service;
             service.setJid(iq.from());

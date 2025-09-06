@@ -189,6 +189,8 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
     }
 
     if (isIqElement<QXmppDiscoveryIq>(element)) {
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
         QXmppDiscoveryIq receivedIq;
         receivedIq.parse(element);
 
@@ -209,6 +211,7 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
             // let other manager handle "set" IQs
             return false;
         }
+        QT_WARNING_POP
     }
     return false;
 }

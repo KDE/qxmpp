@@ -67,7 +67,7 @@ void tst_QXmppDiscoveryManager::testItems()
     QT_WARNING_DISABLE_DEPRECATED
     auto task = discoManager->requestDiscoItems("user@example.org");
     QT_WARNING_POP
-    test.expect("<iq id='qx1' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>");
+    test.expect("<iq id='qx2' to='user@example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>");
     test.inject<QString>(R"(
 <iq type='result'
     from='user@example.org'
@@ -80,7 +80,7 @@ void tst_QXmppDiscoveryManager::testItems()
   </query>
 </iq>)");
 
-    const auto items = expectFutureVariant<QList<QXmppDiscoveryIq::Item>>(task);
+    const auto items = expectFutureVariant<QList<QXmppDiscoItem>>(task);
 
     QCOMPARE(items.size(), 4);
     QCOMPARE(items.at(0).jid(), u"368866411b877c30064a5f62b917cffe@test.org"_s);

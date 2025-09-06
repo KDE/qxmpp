@@ -226,7 +226,7 @@ QXmppTask<QXmppPubSubManager::FeaturesResult> QXmppPubSubManager::requestFeature
 
         auto &info = std::get<QXmppDiscoInfo>(result);
         const auto &identities = info.identities();
-        const auto isPubSubServiceFound = std::any_of(identities.cbegin(), identities.cend(), [=](const QXmppDiscoveryIq::Identity &identity) {
+        const auto isPubSubServiceFound = std::any_of(identities.cbegin(), identities.cend(), [=](const QXmppDiscoIdentity &identity) {
             if (identity.category() == u"pubsub") {
                 const auto identityType = identity.type();
 

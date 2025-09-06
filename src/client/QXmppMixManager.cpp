@@ -1431,7 +1431,7 @@ void QXmppMixManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
     const auto identities = iq.identities();
 
     // Search for MIX features provided by the determined MIX service.
-    for (const QXmppDiscoveryIq::Identity &identity : identities) {
+    for (const auto &identity : identities) {
         // ' || identity.type() == u"text"' is a workaround for older ejabberd versions.
         if (identity.category() == u"conference" && (identity.type() == MIX_SERVICE_DISCOVERY_NODE || identity.type() == u"text")) {
             Service service;

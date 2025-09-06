@@ -37,7 +37,7 @@ public:
     ~QXmppClientExtension() override;
 
     virtual QStringList discoveryFeatures() const;
-    virtual QList<QXmppDiscoveryIq::Identity> discoveryIdentities() const;
+    virtual QList<QXmppDiscoIdentity> discoveryIdentities() const;
 
     virtual bool handleStanza(const QDomElement &stanza);
     virtual bool handleStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);

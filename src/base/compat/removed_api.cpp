@@ -30,6 +30,7 @@
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
+#include <QCryptographicHash>
 #include <QDomElement>
 #include <QSharedData>
 #include <QXmlStreamWriter>
@@ -59,10 +60,9 @@ static bool isIqType(const QDomElement &element, QStringView tagName, QStringVie
     return child.tagName() == tagName && child.namespaceURI() == xmlns;
 }
 
-/// \cond
-
 // ArchiveIq
 
+/// \cond
 bool QXmppArchiveChatIq::isArchiveChatIq(const QDomElement &element)
 {
     auto chatEl = firstChildElement(element, u"chat", ns_archive);
@@ -164,6 +164,304 @@ bool QXmppByteStreamIq::isByteStreamIq(const QDomElement &element)
 bool QXmppDiscoveryIq::isDiscoveryIq(const QDomElement &element)
 {
     return isIqType(element, u"query", ns_disco_info) || isIqType(element, u"query", ns_disco_items);
+}
+/// \endcond
+
+class QXmppDiscoveryIqPrivate : public QSharedData
+{
+public:
+    QStringList features;
+    QList<QXmppDiscoIdentity> identities;
+    QList<QXmppDiscoItem> items;
+    QList<QXmppDataForm> dataForms;
+    QString queryNode;
+    QXmppDiscoveryIq::QueryType queryType;
+};
+
+///
+/// \class QXmppDiscoveryIq
+///
+/// QXmppDiscoveryIq represents a discovery IQ request or result containing a
+/// list of features and other information about an entity as defined by
+/// \xep{0030, Service Discovery}.
+///
+/// \ingroup Stanzas
+///
+/// \deprecated
+///
+
+///
+/// \enum QXmppDiscoveryIq::QueryType
+///
+/// Specifies the type of a service discovery query. An InfoQuery queries
+/// identities and features, an ItemsQuery queries subservices in the form of
+/// items.
+///
+
+QXmppDiscoveryIq::QXmppDiscoveryIq()
+    : d(new QXmppDiscoveryIqPrivate)
+{
+}
+
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppDiscoveryIq)
+
+///
+/// Returns the features of the service.
+///
+QStringList QXmppDiscoveryIq::features() const
+{
+    return d->features;
+}
+
+///
+/// Sets the features of the service.
+///
+void QXmppDiscoveryIq::setFeatures(const QStringList &features)
+{
+    d->features = features;
+}
+
+///
+/// Returns the list of identities for this service.
+///
+QList<QXmppDiscoIdentity> QXmppDiscoveryIq::identities() const
+{
+    return d->identities;
+}
+
+///
+/// Sets the list of identities for this service.
+///
+void QXmppDiscoveryIq::setIdentities(const QList<QXmppDiscoIdentity> &identities)
+{
+    d->identities = identities;
+}
+
+///
+/// Returns the list of service discovery items.
+///
+QList<QXmppDiscoItem> QXmppDiscoveryIq::items() const
+{
+    return d->items;
+}
+
+///
+/// Sets the list of service discovery items.
+///
+void QXmppDiscoveryIq::setItems(const QList<QXmppDiscoItem> &items)
+{
+    d->items = items;
+}
+
+///
+/// Returns the first of the included data dataForms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// Returns empty form if no form is included.
+///
+/// \deprecated Use dataForms() or findForm() instead.
+///
+QXmppDataForm QXmppDiscoveryIq::form() const
+{
+    if (d->dataForms.empty()) {
+        return {};
+    }
+    if (d->dataForms.size() == 1) {
+        return d->dataForms.constFirst();
+    }
+
+    // compat: with old behaviour: append all fields into one form
+    QXmppDataForm mixedForm = d->dataForms.constLast();
+    mixedForm.setFields({});
+
+    // copy all fields
+    QList<QXmppDataForm::Field> mixedFields;
+    for (const auto &form : d->dataForms) {
+        mixedFields << form.fields();
+    }
+    mixedForm.setFields(mixedFields);
+
+    return mixedForm;
+}
+
+///
+/// Sets included data dataForms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// \deprecated Use setForms() instead.
+///
+void QXmppDiscoveryIq::setForm(const QXmppDataForm &form)
+{
+    d->dataForms.clear();
+    d->dataForms.append(form);
+}
+
+///
+/// Returns included data forms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// \since QXmpp 1.12
+///
+const QList<QXmppDataForm> &QXmppDiscoveryIq::dataForms() const
+{
+    return d->dataForms;
+}
+
+///
+/// Sets included data forms as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// Each form must have a FORM_TYPE field and each form type MUST occur only once.
+///
+/// \since QXmpp 1.12
+///
+void QXmppDiscoveryIq::setDataForms(const QList<QXmppDataForm> &dataForms)
+{
+    d->dataForms = dataForms;
+}
+
+///
+/// Looks for a data form with the given form type and returns it if found.
+///
+/// Data dataForms in service discovery info are defined in \xep{0128, Service Discovery Extensions}.
+///
+/// \since QXmpp 1.12
+///
+std::optional<QXmppDataForm> QXmppDiscoveryIq::dataForm(QStringView formType) const
+{
+    for (const auto &form : d->dataForms) {
+        if (form.formType() == formType) {
+            return form;
+        }
+    }
+    return {};
+}
+
+///
+/// Returns the special node to query.
+///
+QString QXmppDiscoveryIq::queryNode() const
+{
+    return d->queryNode;
+}
+
+///
+/// Sets the special node to query.
+///
+void QXmppDiscoveryIq::setQueryNode(const QString &node)
+{
+    d->queryNode = node;
+}
+
+///
+/// Returns the query type (info query or items query).
+///
+QXmppDiscoveryIq::QueryType QXmppDiscoveryIq::queryType() const
+{
+    return d->queryType;
+}
+
+///
+/// Sets the query type (info query or items query).
+///
+void QXmppDiscoveryIq::setQueryType(enum QXmppDiscoveryIq::QueryType type)
+{
+    d->queryType = type;
+}
+
+///
+/// Calculate the verification string for \xep{0115, Entity Capabilities}.
+///
+QByteArray QXmppDiscoveryIq::verificationString() const
+{
+    auto entityCapabilities1Compare = [](const QXmppDiscoIdentity &i1, const QXmppDiscoIdentity &i2) {
+        return std::tuple { i1.category(), i1.type(), i1.language(), i1.name() } <
+            std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
+    };
+
+    QString S;
+    QList<QXmppDiscoIdentity> sortedIdentities = d->identities;
+    std::sort(sortedIdentities.begin(), sortedIdentities.end(), entityCapabilities1Compare);
+    QStringList sortedFeatures = d->features;
+    std::sort(sortedFeatures.begin(), sortedFeatures.end());
+    sortedFeatures.removeDuplicates();
+    for (const auto &identity : sortedIdentities) {
+        S += identity.category() + u'/' + identity.type() + u'/' + identity.language() + u'/' + identity.name() + u'<';
+    }
+    for (const auto &feature : sortedFeatures) {
+        S += feature + u'<';
+    }
+
+    // extension data dataForms
+    auto forms = d->dataForms;
+    std::sort(forms.begin(), forms.end(), [](const auto &a, const auto &b) {
+        return a.formType() < b.formType();
+    });
+
+    for (const auto &form : forms) {
+        S += form.formType();
+        S += u'<';
+
+        auto fields = form.fields();
+        std::sort(fields.begin(), fields.end(), [](const auto &a, const auto &b) {
+            return a.key() < b.key();
+        });
+
+        for (const auto &field : fields) {
+            if (field.key() != u"FORM_TYPE") {
+                S += field.key() + u'<';
+                if (field.value().canConvert<QStringList>()) {
+                    QStringList list = field.value().toStringList();
+                    list.sort();
+                    S += list.join(u'<');
+                } else {
+                    S += field.value().toString();
+                }
+                S += u'<';
+            }
+        }
+    }
+
+    QCryptographicHash hasher(QCryptographicHash::Sha1);
+    hasher.addData(S.toUtf8());
+    return hasher.result();
+}
+
+/// \cond
+bool QXmppDiscoveryIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
+{
+    return tagName == u"query" &&
+        (xmlNamespace == ns_disco_info || xmlNamespace == ns_disco_items);
+}
+
+void QXmppDiscoveryIq::parseElementFromChild(const QDomElement &element)
+{
+    QDomElement queryElement = firstChildElement(element, u"query");
+    d->queryNode = queryElement.attribute(u"node"_s);
+    if (queryElement.namespaceURI() == ns_disco_items) {
+        d->queryType = ItemsQuery;
+    } else {
+        d->queryType = InfoQuery;
+    }
+
+    d->features = parseSingleAttributeElements(queryElement, u"feature", ns_disco_info, u"var"_s);
+    d->identities = parseChildElements<QList<QXmppDiscoIdentity>>(queryElement);
+    d->items = parseChildElements<QList<QXmppDiscoItem>>(queryElement);
+    d->dataForms = parseChildElements<QList<QXmppDataForm>>(queryElement);
+}
+
+void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        { u"query", d->queryType == InfoQuery ? ns_disco_info : ns_disco_items },
+        OptionalAttribute { u"node", d->queryNode },
+        // InfoQuery
+        OptionalContent {
+            d->queryType == InfoQuery,
+            d->identities,
+            SingleAttributeElements { u"feature", u"var", d->features } },
+        OptionalContent {
+            d->queryType == ItemsQuery,
+            d->items,
+        },
+        d->dataForms,
+    });
 }
 
 // EntityTimeIq

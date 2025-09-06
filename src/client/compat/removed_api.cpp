@@ -556,12 +556,12 @@ QStringList QXmppRpcManager::discoveryFeatures() const
     };
 }
 
-QList<QXmppDiscoveryIq::Identity> QXmppRpcManager::discoveryIdentities() const
+QList<QXmppDiscoIdentity> QXmppRpcManager::discoveryIdentities() const
 {
-    QXmppDiscoveryIq::Identity identity;
+    QXmppDiscoIdentity identity;
     identity.setCategory(u"automation"_s);
     identity.setType(u"rpc"_s);
-    return QList<QXmppDiscoveryIq::Identity>() << identity;
+    return QList<QXmppDiscoIdentity>() << identity;
 }
 
 bool QXmppRpcManager::handleStanza(const QDomElement &element)

@@ -36,7 +36,10 @@ void tst_QXmppDiscoveryIq::testDiscovery()
         "</query>"
         "</iq>");
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq disco;
+    QT_WARNING_POP
     parsePacket(disco, xml);
     QCOMPARE(disco.verificationString(), QByteArray::fromBase64("QgayPKawpkPSDYmwT/WM94uAlu0="));
     serializePacket(disco, xml);
@@ -77,7 +80,10 @@ void tst_QXmppDiscoveryIq::testDiscoveryWithForm()
         "</query>"
         "</iq>");
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq disco;
+    QT_WARNING_POP
     parsePacket(disco, xml);
     QCOMPARE(disco.verificationString(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
     serializePacket(disco, xml);
@@ -190,9 +196,9 @@ void tst_QXmppDiscoveryIq::contactAddresses()
     serializePacket(form, xml);
 
     // findForm with parsing
-    QXmppDiscoveryIq iq;
-    iq.setDataForms({ parsed->toDataForm() });
-    auto contactAddresses = iq.dataForm<QXmppContactAddresses>();
+    QXmppDiscoInfo info;
+    info.setDataForms({ parsed->toDataForm() });
+    auto contactAddresses = info.dataForm<QXmppContactAddresses>();
     QVERIFY(contactAddresses);
     QCOMPARE(contactAddresses->supportAddresses().constFirst(), u"http://shakespeare.lit/support.php");
 }

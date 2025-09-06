@@ -209,8 +209,9 @@ QDomElement writePacketToDom(T packet)
 {
     QBuffer buffer;
     buffer.open(QIODevice::ReadWrite);
-    QXmlStreamWriter writer(&buffer);
-    packet.toXml(&writer);
+    QXmlStreamWriter qtWriter(&buffer);
+    QXmpp::Private::XmlWriter writer(&qtWriter);
+    packet.toXml(writer);
 
     QDomDocument doc;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)

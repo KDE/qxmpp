@@ -203,7 +203,10 @@ void tst_QXmppMixManager::testHandleDiscoInfo()
 {
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq userIq;
+    QT_WARNING_POP
     userIq.setFeatures({ u"urn:xmpp:mix:pam:2"_s,
                          u"urn:xmpp:mix:pam:2#archive"_s });
 
@@ -219,11 +222,14 @@ void tst_QXmppMixManager::testHandleDiscoInfo()
     QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Unsupported);
     QCOMPARE(manager->messageArchivingSupport(), QXmppMixManager::Support::Unsupported);
 
-    QXmppDiscoveryIq::Identity identity;
+    QXmppDiscoIdentity identity;
     identity.setCategory(u"conference"_s);
     identity.setType(u"mix"_s);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq serverIq;
+    QT_WARNING_POP
     serverIq.setFrom(u"mix.shakespeare.example"_s);
     serverIq.setFeatures({ u"urn:xmpp:mix:core:1"_s,
                            u"urn:xmpp:mix:core:1#searchable"_s,
@@ -534,8 +540,11 @@ void tst_QXmppMixManager::testOnRegistered()
     QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Unknown);
     QVERIFY(manager.services().isEmpty());
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
     iq.setFeatures({ u"urn:xmpp:mix:pam:2"_s });
+    QT_WARNING_POP
     Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
     QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Supported);
 }
@@ -564,10 +573,12 @@ void tst_QXmppMixManager::testOnUnregistered()
     QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Unknown);
     QVERIFY(manager.services().isEmpty());
 
-    QXmppDiscoveryIq::Identity identity;
+    QXmppDiscoIdentity identity;
     identity.setCategory(u"conference"_s);
     identity.setType(u"mix"_s);
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QXmppDiscoveryIq iq;
     iq.setFeatures({ u"urn:xmpp:mix:pam:2"_s,
                      u"urn:xmpp:mix:pam:2#archive"_s,
@@ -575,6 +586,7 @@ void tst_QXmppMixManager::testOnUnregistered()
                      u"urn:xmpp:mix:core:1#searchable"_s,
                      u"urn:xmpp:mix:core:1#create-channel"_s });
     iq.setIdentities({ identity });
+    QT_WARNING_POP
 
     Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
     QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Unknown);
