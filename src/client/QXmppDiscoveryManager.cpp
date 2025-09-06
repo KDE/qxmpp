@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: 2010 Manjeet Dahiya <manjeetdahiya@gmail.com>
+// SPDX-FileCopyrightText: 2021 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
-
-#include "QXmppDiscoveryManager.h"
 
 #include "QXmppClient.h"
 #include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 
@@ -16,20 +16,9 @@
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
-#include <QDomElement>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
-
-class QXmppDiscoveryManagerPrivate
-{
-public:
-    QString clientCapabilitiesNode;
-    QString clientCategory;
-    QString clientType;
-    QString clientName;
-    QXmppDataForm clientInfoForm;
-};
 
 ///
 /// \typedef QXmppDiscoveryManager::InfoResult
@@ -53,17 +42,7 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate)
 {
     d->clientCapabilitiesNode = u"https://github.com/qxmpp-project/qxmpp"_s;
-    d->clientCategory = u"client"_s;
-#if defined Q_OS_ANDROID || defined Q_OS_BLACKBERRY || defined Q_OS_IOS || defined Q_OS_WP
-    d->clientType = u"phone"_s;
-#else
-    d->clientType = u"pc"_s;
-#endif
-    if (qApp->applicationName().isEmpty() && qApp->applicationVersion().isEmpty()) {
-        d->clientName = u"%1 %2"_s.arg(u"Based on QXmpp", QXmppVersion());
-    } else {
-        d->clientName = u"%1 %2"_s.arg(qApp->applicationName(), qApp->applicationVersion());
-    }
+    d->identities = { d->defaultIdentity() };
 }
 
 QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
@@ -133,72 +112,77 @@ QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
             features << extension->discoveryFeatures();
         }
     }
-
     iq.setFeatures(features);
 
     // identities
-    QList<QXmppDiscoveryIq::Identity> identities;
-
-    QXmppDiscoveryIq::Identity identity;
-    identity.setCategory(clientCategory());
-    identity.setType(clientType());
-    identity.setName(clientName());
-    identities << identity;
-
+    auto identities = d->identities;
     for (auto *extension : client()->extensions()) {
         if (extension) {
             identities << extension->discoveryIdentities();
         }
     }
-
     iq.setIdentities(identities);
 
-    // extended information
-    if (!d->clientInfoForm.isNull()) {
-        iq.setDataForms({ d->clientInfoForm });
-    }
+    // extra data forms
+    iq.setDataForms(d->dataForms);
 
     return iq;
 }
 
 ///
-/// Sets the capabilities node of the local XMPP client.
+/// Returns the base identities of this client.
 ///
-/// \param node
+/// The identities are added to the service discovery information other entities can request.
 ///
-void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
+/// \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
+///
+/// \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
+///
+/// \since QXmpp 1.12
+///
+const QList<QXmppDiscoIdentity> &QXmppDiscoveryManager::identities() const
 {
-    d->clientCapabilitiesNode = node;
+    return d->identities;
 }
 
 ///
-/// Sets the category of the local XMPP client.
+/// Sets the base identities of this client.
 ///
-/// You can find a list of valid categories at:
-/// http://xmpp.org/registrar/disco-categories.html
+/// The identities are added to the service discovery information other entities can request.
 ///
-/// \param category
+/// \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
 ///
-void QXmppDiscoveryManager::setClientCategory(const QString &category)
+/// \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
+///
+/// \since QXmpp 1.12
+///
+void QXmppDiscoveryManager::setIdentities(const QList<QXmppDiscoIdentity> &identities)
 {
-    d->clientCategory = category;
+    d->identities = identities;
 }
 
 ///
-/// Sets the type of the local XMPP client.
+/// Returns the data forms for this client as defined in \xep{0128, Service Discovery Extensions}.
 ///
-/// You can find a list of valid types at:
-/// http://xmpp.org/registrar/disco-categories.html
+/// The data forms are added to the service discovery information other entities can request.
 ///
-void QXmppDiscoveryManager::setClientType(const QString &type)
+/// \since QXmpp 1.12
+///
+const QList<QXmppDataForm> &QXmppDiscoveryManager::infoForms() const
 {
-    d->clientType = type;
+    return d->dataForms;
 }
 
-/// Sets the name of the local XMPP client.
-void QXmppDiscoveryManager::setClientName(const QString &name)
+///
+/// Sets the data forms for this client as defined in \xep{0128, Service Discovery Extensions}.
+///
+/// The data forms are added to the service discovery information other entities can request.
+///
+/// \since QXmpp 1.12
+///
+void QXmppDiscoveryManager::setInfoForms(const QList<QXmppDataForm> &dataForms)
 {
-    d->clientName = name;
+    d->dataForms = dataForms;
 }
 
 ///
@@ -212,52 +196,11 @@ QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 }
 
 ///
-/// Returns the category of the local XMPP client.
+/// Sets the capabilities node of the local XMPP client.
 ///
-/// By default this is "client".
-///
-QString QXmppDiscoveryManager::clientCategory() const
+void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
 {
-    return d->clientCategory;
-}
-
-///
-/// Returns the type of the local XMPP client.
-///
-/// With Qt builds for Android, Blackberry, iOS or Windows Phone this is set to
-/// "phone", otherwise it defaults to "pc".
-///
-QString QXmppDiscoveryManager::clientType() const
-{
-    return d->clientType;
-}
-
-///
-/// Returns the name of the local XMPP client.
-///
-/// By default this is "Based on QXmpp x.y.z".
-///
-QString QXmppDiscoveryManager::clientName() const
-{
-    return d->clientName;
-}
-
-///
-/// Returns the client's extended information form, as defined
-/// by \xep{0128, Service Discovery Extensions}.
-///
-QXmppDataForm QXmppDiscoveryManager::clientInfoForm() const
-{
-    return d->clientInfoForm;
-}
-
-///
-/// Sets the client's extended information form, as defined
-/// by \xep{0128, Service Discovery Extensions}.
-///
-void QXmppDiscoveryManager::setClientInfoForm(const QXmppDataForm &form)
-{
-    d->clientInfoForm = form;
+    d->clientCapabilitiesNode = node;
 }
 
 /// \cond
@@ -321,3 +264,29 @@ std::variant<QXmppDiscoveryIq, QXmppStanza::Error> QXmppDiscoveryManager::handle
     Q_UNREACHABLE();
 }
 /// \endcond
+
+QString QXmppDiscoveryManagerPrivate::defaultApplicationName()
+{
+    if (!qApp->applicationName().isEmpty()) {
+        if (!qApp->applicationVersion().isEmpty()) {
+            return qApp->applicationName() + u' ' + qApp->applicationVersion();
+        } else {
+            return qApp->applicationName();
+        }
+    } else {
+        return u"QXmpp " + QXmppVersion();
+    }
+}
+
+QXmppDiscoIdentity QXmppDiscoveryManagerPrivate::defaultIdentity()
+{
+    return QXmppDiscoIdentity {
+        u"client"_s,
+#if defined Q_OS_ANDROID || defined Q_OS_BLACKBERRY || defined Q_OS_IOS || defined Q_OS_WP
+        u"phone"_s,
+#else
+        u"pc"_s,
+#endif
+        defaultApplicationName(),
+    };
+}

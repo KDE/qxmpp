@@ -5,6 +5,7 @@
 
 #include "QXmppClient_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppMessage.h"
 #include "QXmppPacket_p.h"
 #include "QXmppRosterManager.h"
@@ -179,6 +180,117 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
         request.setQueryNode(node);
     }
     return client()->sendLegacyId(request);
+}
+
+///
+/// Sets the category of the local XMPP client.
+///
+/// You can find a list of valid categories at:
+/// http://xmpp.org/registrar/disco-categories.html
+///
+/// \deprecated Use setOwnIdentities(), this function will remove other identities if set.
+///
+void QXmppDiscoveryManager::setClientCategory(const QString &category)
+{
+    if (d->identities.size() != 1) {
+        d->identities = { d->defaultIdentity() };
+    }
+    d->identities.first().setCategory(category);
+}
+
+///
+/// Sets the type of the local XMPP client.
+///
+/// You can find a list of valid types at:
+/// http://xmpp.org/registrar/disco-categories.html
+///
+/// \deprecated Use setOwnIdentities(), this function will remove other identities if set.
+///
+void QXmppDiscoveryManager::setClientType(const QString &type)
+{
+    if (d->identities.size() != 1) {
+        d->identities = { d->defaultIdentity() };
+    }
+    d->identities.first().setType(type);
+}
+
+///
+/// Sets the name of the local XMPP client.
+///
+/// \deprecated Use setOwnIdentities(), this function will remove other identities if set.
+///
+void QXmppDiscoveryManager::setClientName(const QString &name)
+{
+    if (d->identities.size() != 1) {
+        d->identities = { d->defaultIdentity() };
+    }
+    d->identities.first().setName(name);
+}
+
+///
+/// Returns the category of the local XMPP client.
+///
+/// By default this is "client".
+///
+/// \deprecated Use ownIdentities()
+///
+QString QXmppDiscoveryManager::clientCategory() const
+{
+    if (d->identities.isEmpty()) {
+        return {};
+    }
+    return d->identities.constFirst().category();
+}
+
+///
+/// Returns the type of the local XMPP client.
+///
+/// With Qt builds for Android, Blackberry, iOS or Windows Phone this is set to
+/// "phone", otherwise it defaults to "pc".
+///
+/// \deprecated Use ownIdentities()
+///
+QString QXmppDiscoveryManager::clientType() const
+{
+    if (d->identities.isEmpty()) {
+        return {};
+    }
+    return d->identities.constFirst().type();
+}
+
+///
+/// Returns the name of the local XMPP client.
+///
+/// By default this is "QXmpp x.y.z".
+///
+/// \deprecated Use setOwnIdentities()
+///
+QString QXmppDiscoveryManager::clientApplicationName() const
+{
+    if (d->identities.isEmpty()) {
+        return {};
+    }
+    return d->identities.constFirst().name();
+}
+
+///
+/// Returns the client's extended information form, as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// \deprecated Use ownDataForms()
+///
+QXmppDataForm QXmppDiscoveryManager::clientInfoForm() const
+{
+    return d->dataForms.isEmpty() ? QXmppDataForm() : d->dataForms.constFirst();
+}
+
+///
+/// Sets the client's extended information form, as defined by \xep{0128, Service Discovery Extensions}.
+///
+/// \deprecated Use setOwnDataForms()
+///
+void QXmppDiscoveryManager::setClientInfoForm(const QXmppDataForm &form)
+{
+    d->dataForms = { form };
 }
 
 // RemoteMethod

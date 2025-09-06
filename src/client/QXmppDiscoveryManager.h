@@ -17,11 +17,12 @@ class QXmppDiscoveryIq;
 class QXmppDiscoveryManagerPrivate;
 struct QXmppError;
 
-/// \brief The QXmppDiscoveryManager class makes it possible to discover information
-/// about other entities as defined by \xep{0030}: Service Discovery.
+///
+/// \brief The QXmppDiscoveryManager class makes it possible to discover information about other
+/// entities as defined by \xep{0030, Service Discovery}.
 ///
 /// \ingroup Managers
-
+///
 class QXMPP_EXPORT QXmppDiscoveryManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -37,21 +38,14 @@ public:
     QXmppTask<InfoResult> requestDiscoInfo(const QString &jid, const QString &node = {});
     QXmppTask<ItemsResult> requestDiscoItems(const QString &jid, const QString &node = {});
 
+    const QList<QXmppDiscoIdentity> &identities() const;
+    void setIdentities(const QList<QXmppDiscoIdentity> &identities);
+
+    const QList<QXmppDataForm> &infoForms() const;
+    void setInfoForms(const QList<QXmppDataForm> &dataForms);
+
     QString clientCapabilitiesNode() const;
     void setClientCapabilitiesNode(const QString &);
-
-    // http://xmpp.org/registrar/disco-categories.html#client
-    QString clientCategory() const;
-    void setClientCategory(const QString &);
-
-    void setClientName(const QString &);
-    QString clientName() const;
-
-    QString clientType() const;
-    void setClientType(const QString &);
-
-    QXmppDataForm clientInfoForm() const;
-    void setClientInfoForm(const QXmppDataForm &form);
 
     /// \cond
     QStringList discoveryFeatures() const override;
@@ -66,6 +60,26 @@ public:
     Q_SIGNAL void itemsReceived(const QXmppDiscoveryIq &);
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)
+    [[deprecated("Use ownIdentities()")]]
+    QString clientCategory() const;
+    [[deprecated("Use setOwnIdentities()")]]
+    void setClientCategory(const QString &);
+
+    [[deprecated("Use ownIdentities()")]]
+    void setClientName(const QString &);
+    [[deprecated("Use setOwnIdentities()")]]
+    QString clientApplicationName() const;
+
+    [[deprecated("Use ownIdentities()")]]
+    QString clientType() const;
+    [[deprecated("Use setOwnIdentities()")]]
+    void setClientType(const QString &);
+
+    [[deprecated("Use ownDataForms()")]]
+    QXmppDataForm clientInfoForm() const;
+    [[deprecated("Use setOwnDataForms()")]]
+    void setClientInfoForm(const QXmppDataForm &form);
+
     [[deprecated("Use requestDiscoInfo")]]
     QString requestInfo(const QString &jid, const QString &node = QString());
     [[deprecated("Use requestDiscoItems")]]
