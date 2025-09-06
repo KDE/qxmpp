@@ -13,12 +13,12 @@
 #include "QXmppUtils.h"
 
 #include "Async.h"
+#include "Iq.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
 
 using namespace QXmpp;
-using namespace QXmpp::Private;
 
 ///
 /// \typedef QXmppDiscoveryManager::InfoResult
@@ -39,7 +39,7 @@ using namespace QXmpp::Private;
 ///
 
 QXmppDiscoveryManager::QXmppDiscoveryManager()
-    : d(new QXmppDiscoveryManagerPrivate)
+    : d(new QXmppDiscoveryManagerPrivate(this))
 {
     d->clientCapabilitiesNode = u"org.qxmpp.client"_s;
     d->identities = { d->defaultIdentity() };
@@ -213,7 +213,7 @@ QStringList QXmppDiscoveryManager::discoveryFeatures() const
 
 bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
 {
-    if (handleIqRequests<QXmppDiscoveryIq>(element, client(), this)) {
+    if (handleIqRequests<GetIq<QXmppDiscoInfo>, GetIq<QXmppDiscoItems>>(element, client(), d.get())) {
         return true;
     }
 
@@ -241,30 +241,6 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
     }
     return false;
 }
-
-std::variant<QXmppDiscoveryIq, QXmppStanza::Error> QXmppDiscoveryManager::handleIq(QXmppDiscoveryIq &&iq)
-{
-    using Error = QXmppStanza::Error;
-
-    if (!iq.queryNode().isEmpty() && !iq.queryNode().startsWith(d->clientCapabilitiesNode)) {
-        return Error(Error::Cancel, Error::ItemNotFound, u"Unknown node."_s);
-    }
-
-    switch (iq.queryType()) {
-    case QXmppDiscoveryIq::InfoQuery: {
-        // respond to info queries for the client itself
-        QXmppDiscoveryIq features = capabilities();
-        features.setQueryNode(iq.queryNode());
-        return features;
-    }
-    case QXmppDiscoveryIq::ItemsQuery: {
-        QXmppDiscoveryIq reply;
-        reply.setQueryType(QXmppDiscoveryIq::ItemsQuery);
-        return reply;
-    }
-    }
-    Q_UNREACHABLE();
-}
 /// \endcond
 
 QString QXmppDiscoveryManagerPrivate::defaultApplicationName()
@@ -291,4 +267,37 @@ QXmppDiscoIdentity QXmppDiscoveryManagerPrivate::defaultIdentity()
 #endif
         defaultApplicationName(),
     };
+}
+
+QXmppDiscoInfo QXmppDiscoveryManagerPrivate::discoInfo() const
+{
+    const auto extensions = q->client()->extensions();
+
+    // collect features and identities
+    auto allFeatures = QXmppClientPrivate::discoveryFeatures();
+    auto allIdentities = identities;
+    for (auto *extension : extensions) {
+        if (extension) {
+            allFeatures << extension->discoveryFeatures();
+            allIdentities << extension->discoveryIdentities();
+        }
+    }
+
+    return QXmppDiscoInfo { {}, allIdentities, allFeatures, dataForms };
+}
+
+std::variant<CompatIq<QXmppDiscoInfo>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(GetIq<QXmppDiscoInfo> &&iq)
+{
+    if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
+        return CompatIq { QXmppIq::Result, discoInfo() };
+    }
+    return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
+}
+
+std::variant<CompatIq<QXmppDiscoItems>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(GetIq<QXmppDiscoItems> &&iq)
+{
+    if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
+        return CompatIq { QXmppIq::Result, QXmppDiscoItems() };
+    }
+    return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
 }

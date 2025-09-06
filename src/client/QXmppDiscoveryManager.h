@@ -50,7 +50,6 @@ public:
     /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
-    std::variant<QXmppDiscoveryIq, QXmppStanza::Error> handleIq(QXmppDiscoveryIq &&iq);
     /// \endcond
 
     /// This signal is emitted when an information response is received.
@@ -87,6 +86,7 @@ public:
 #endif
 
 private:
+    friend class QXmppDiscoveryManagerPrivate;
     const std::unique_ptr<QXmppDiscoveryManagerPrivate> d;
 };
 

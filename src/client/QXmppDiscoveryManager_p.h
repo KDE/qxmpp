@@ -7,15 +7,28 @@
 
 #include "QXmppDiscoveryManager.h"
 
+#include "Iq.h"
+
+using namespace QXmpp::Private;
+
 class QXmppDiscoveryManagerPrivate
 {
 public:
+    using StanzaError = QXmppStanza::Error;
+
+    QXmppDiscoveryManager *q = nullptr;
     QString clientCapabilitiesNode;
     QList<QXmppDiscoIdentity> identities;
     QList<QXmppDataForm> dataForms;
 
+    explicit QXmppDiscoveryManagerPrivate(QXmppDiscoveryManager *q) : q(q) { }
+
     static QString defaultApplicationName();
     static QXmppDiscoIdentity defaultIdentity();
+
+    QXmppDiscoInfo discoInfo() const;
+    std::variant<CompatIq<QXmppDiscoInfo>, StanzaError> handleIq(GetIq<QXmppDiscoInfo> &&iq);
+    std::variant<CompatIq<QXmppDiscoItems>, StanzaError> handleIq(GetIq<QXmppDiscoItems> &&iq);
 };
 
 #endif  // QXMPPDISCOVERYMANAGER_P_H
