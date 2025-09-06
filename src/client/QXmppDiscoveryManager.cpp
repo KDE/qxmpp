@@ -169,6 +169,8 @@ QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
         }
     }
 
+    std::sort(allFeatures.begin(), allFeatures.end());
+
     return QXmppDiscoInfo { {}, allIdentities, allFeatures, d->dataForms };
 }
 
