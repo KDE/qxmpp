@@ -49,7 +49,7 @@ private:
     }
     /// \endcond
 
-    friend class tst_QXmppAtmManager;
+    friend class tst_QXmppTrustManager;
 };
 
 #endif  // QXMPPATMMANAGER_H

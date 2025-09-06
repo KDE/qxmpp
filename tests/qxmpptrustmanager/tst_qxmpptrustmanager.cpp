@@ -28,7 +28,7 @@ static const char *ns_atm = "urn:xmpp:atm:1";
 static const char *ns_omemo = "eu.siacs.conversations.axolotl";
 static const char *ns_ox = "urn:xmpp:openpgp:0";
 
-class tst_QXmppAtmManager : public QObject
+class tst_QXmppTrustManager : public QObject
 {
     Q_OBJECT
 
@@ -36,6 +36,18 @@ public:
     Q_SIGNAL void unexpectedTrustMessageSent();
 
 private:
+    // TrustMemoryStorage
+    Q_SLOT void memoryStorageSecurityPolicy();
+    Q_SLOT void memoryStorageOwnKeys();
+    Q_SLOT void memoryStorageKeys();
+    Q_SLOT void memoryStorageTrustLevels();
+    Q_SLOT void memoryStorageResetAll();
+
+    // AtmTrustMemoryStorage
+    Q_SLOT void atmStorageKeysForPostponedTrustDecisions();
+    Q_SLOT void atmStorageResetAll();
+
+    // AtmManager
     Q_SLOT void initTestCase();
     Q_SLOT void testSendTrustMessage();
     Q_SLOT void testMakePostponedTrustDecisions();
@@ -68,7 +80,974 @@ private:
     QXmppCarbonManager *m_carbonManager;
 };
 
-void tst_QXmppAtmManager::initTestCase()
+void tst_QXmppTrustManager::memoryStorageSecurityPolicy()
+{
+    QXmppTrustMemoryStorage storage;
+
+    auto future = storage.securityPolicy(ns_ox);
+    QVERIFY(future.isFinished());
+    auto result = future.result();
+    QCOMPARE(result, NoSecurityPolicy);
+
+    storage.setSecurityPolicy(ns_omemo, Toakafa);
+
+    future = storage.securityPolicy(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, NoSecurityPolicy);
+
+    future = storage.securityPolicy(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, Toakafa);
+
+    storage.resetSecurityPolicy(ns_omemo);
+
+    future = storage.securityPolicy(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, NoSecurityPolicy);
+}
+
+void tst_QXmppTrustManager::memoryStorageOwnKeys()
+{
+    QXmppTrustMemoryStorage storage;
+
+    auto future = storage.ownKey(ns_ox);
+    QVERIFY(future.isFinished());
+    auto result = future.result();
+    QVERIFY(result.isEmpty());
+
+    storage.setOwnKey(ns_ox, QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")));
+    storage.setOwnKey(ns_omemo, QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")));
+
+    // own OX key
+    future = storage.ownKey(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")));
+
+    // own OMEMO key
+    future = storage.ownKey(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")));
+
+    storage.resetOwnKey(ns_omemo);
+
+    // own OX key
+    future = storage.ownKey(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")));
+
+    // no own OMEMO key
+    future = storage.ownKey(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QVERIFY(result.isEmpty());
+}
+
+void tst_QXmppTrustManager::memoryStorageKeys()
+{
+    QXmppTrustMemoryStorage storage;
+
+    // no OMEMO keys
+    auto future = storage.keys(ns_omemo);
+    QVERIFY(future.isFinished());
+    auto result = future.result();
+    QVERIFY(result.isEmpty());
+
+    // no OMEMO keys (via JIDs)
+    auto futureForJids = storage.keys(ns_omemo,
+                                      { u"alice@example.org"_s, u"bob@example.com"_s });
+    QVERIFY(futureForJids.isFinished());
+    auto resultForJids = futureForJids.result();
+
+    // no automatically trusted and authenticated OMEMO keys
+    future = storage.keys(ns_omemo,
+                          TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QVERIFY(result.isEmpty());
+
+    // no automatically trusted and authenticated OMEMO key from Alice
+    auto futureBool = storage.hasKey(ns_omemo,
+                                     u"alice@example.org"_s,
+                                     TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(futureBool.isFinished());
+    auto resultBool = futureBool.result();
+    QVERIFY(!resultBool);
+
+    // Store keys with the default trust level.
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("WaAnpWyW1hnFooH3oJo9Ba5XYoksnLPeJRTAjxPbv38=")),
+          QByteArray::fromBase64(QByteArrayLiteral("/1eK3R2LtjPBT3el8f0q4DvzqUJSfFy5fkKkKPNFNYw=")) });
+
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")) },
+        TrustLevel::ManuallyDistrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("Ciemp4ZNzRJxnRD+k28vAie0kXJrwl4IrbfDy7n6OxE=")) },
+        TrustLevel::AutomaticallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"bob@example.com"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")) },
+        TrustLevel::AutomaticallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"bob@example.com"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("tCP1CI3pqSTVGzFYFyPYUMfMZ9Ck/msmfD0wH/VtJBM=")),
+          QByteArray::fromBase64(QByteArrayLiteral("2fhJtrgoMJxfLI3084/YkYh9paqiSiLFDVL2m0qAgX4=")) },
+        TrustLevel::ManuallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"bob@example.com"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=")) },
+        TrustLevel::Authenticated);
+
+    storage.addKeys(
+        ns_ox,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")),
+          QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")) },
+        TrustLevel::Authenticated);
+
+    QMultiHash<QString, QByteArray> automaticallyDistrustedKeys = { { u"alice@example.org"_s,
+                                                                      QByteArray::fromBase64(QByteArrayLiteral("WaAnpWyW1hnFooH3oJo9Ba5XYoksnLPeJRTAjxPbv38=")) },
+                                                                    { u"alice@example.org"_s,
+                                                                      QByteArray::fromBase64(QByteArrayLiteral("/1eK3R2LtjPBT3el8f0q4DvzqUJSfFy5fkKkKPNFNYw=")) } };
+    QMultiHash<QString, QByteArray> manuallyDistrustedKeys = { { u"alice@example.org"_s,
+                                                                 QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")) } };
+    QMultiHash<QString, QByteArray> automaticallyTrustedKeys = { { u"alice@example.org"_s,
+                                                                   QByteArray::fromBase64(QByteArrayLiteral("Ciemp4ZNzRJxnRD+k28vAie0kXJrwl4IrbfDy7n6OxE=")) },
+                                                                 { u"bob@example.com"_s,
+                                                                   QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")) } };
+    QMultiHash<QString, QByteArray> manuallyTrustedKeys = { { u"bob@example.com"_s,
+                                                              QByteArray::fromBase64(QByteArrayLiteral("tCP1CI3pqSTVGzFYFyPYUMfMZ9Ck/msmfD0wH/VtJBM=")) },
+                                                            { u"bob@example.com"_s,
+                                                              QByteArray::fromBase64(QByteArrayLiteral("2fhJtrgoMJxfLI3084/YkYh9paqiSiLFDVL2m0qAgX4=")) } };
+    QMultiHash<QString, QByteArray> authenticatedKeys = { { u"bob@example.com"_s,
+                                                            QByteArray::fromBase64(QByteArrayLiteral("YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=")) } };
+
+    QHash<QByteArray, TrustLevel> keysAlice = { { QByteArray::fromBase64(QByteArrayLiteral("WaAnpWyW1hnFooH3oJo9Ba5XYoksnLPeJRTAjxPbv38=")),
+                                                  TrustLevel::AutomaticallyDistrusted },
+                                                { QByteArray::fromBase64(QByteArrayLiteral("/1eK3R2LtjPBT3el8f0q4DvzqUJSfFy5fkKkKPNFNYw=")),
+                                                  TrustLevel::AutomaticallyDistrusted },
+                                                { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")),
+                                                  TrustLevel::ManuallyDistrusted },
+                                                { QByteArray::fromBase64(QByteArrayLiteral("Ciemp4ZNzRJxnRD+k28vAie0kXJrwl4IrbfDy7n6OxE=")),
+                                                  TrustLevel::AutomaticallyTrusted } };
+    QHash<QByteArray, TrustLevel> keysBob = { { QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")),
+                                                TrustLevel::AutomaticallyTrusted },
+                                              { QByteArray::fromBase64(QByteArrayLiteral("tCP1CI3pqSTVGzFYFyPYUMfMZ9Ck/msmfD0wH/VtJBM=")),
+                                                TrustLevel::ManuallyTrusted },
+                                              { QByteArray::fromBase64(QByteArrayLiteral("2fhJtrgoMJxfLI3084/YkYh9paqiSiLFDVL2m0qAgX4=")),
+                                                TrustLevel::ManuallyTrusted },
+                                              { QByteArray::fromBase64(QByteArrayLiteral("YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=")),
+                                                TrustLevel::Authenticated } };
+
+    // all OMEMO keys
+    future = storage.keys(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    TrustLevel::AutomaticallyDistrusted,
+                    automaticallyDistrustedKeys),
+                std::pair(
+                    TrustLevel::ManuallyDistrusted,
+                    manuallyDistrustedKeys),
+                std::pair(
+                    TrustLevel::AutomaticallyTrusted,
+                    automaticallyTrustedKeys),
+                std::pair(
+                    TrustLevel::ManuallyTrusted,
+                    manuallyTrustedKeys),
+                std::pair(
+                    TrustLevel::Authenticated,
+                    authenticatedKeys) }));
+
+    // automatically trusted and authenticated OMEMO keys
+    future = storage.keys(ns_omemo,
+                          TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    TrustLevel::AutomaticallyTrusted,
+                    automaticallyTrustedKeys),
+                std::pair(
+                    TrustLevel::Authenticated,
+                    authenticatedKeys) }));
+
+    // all OMEMO keys (via JIDs)
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s, u"bob@example.com"_s });
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+                    u"alice@example.org"_s,
+                    keysAlice),
+                std::pair(
+                    u"bob@example.com"_s,
+                    keysBob) }));
+
+    // Alice's OMEMO keys
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s });
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+            u"alice@example.org"_s,
+            keysAlice) }));
+
+    keysAlice = { { QByteArray::fromBase64(QByteArrayLiteral("Ciemp4ZNzRJxnRD+k28vAie0kXJrwl4IrbfDy7n6OxE=")),
+                    TrustLevel::AutomaticallyTrusted } };
+    keysBob = { { QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")),
+                  TrustLevel::AutomaticallyTrusted },
+                { QByteArray::fromBase64(QByteArrayLiteral("YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=")),
+                  TrustLevel::Authenticated } };
+
+    // automatically trusted and authenticated OMEMO keys (via JIDs)
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s, u"bob@example.com"_s },
+                                 TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+                    u"alice@example.org"_s,
+                    keysAlice),
+                std::pair(
+                    u"bob@example.com"_s,
+                    keysBob) }));
+
+    // Alice's automatically trusted and authenticated OMEMO keys
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s },
+                                 TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+            u"alice@example.org"_s,
+            keysAlice) }));
+
+    // at least one automatically trusted or authenticated OMEMO key from Alice
+    futureBool = storage.hasKey(ns_omemo,
+                                u"alice@example.org"_s,
+                                TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(futureBool.isFinished());
+    resultBool = futureBool.result();
+    QVERIFY(resultBool);
+
+    storage.removeKeys(ns_omemo,
+                       { QByteArray::fromBase64(QByteArrayLiteral("WaAnpWyW1hnFooH3oJo9Ba5XYoksnLPeJRTAjxPbv38=")),
+                         QByteArray::fromBase64(QByteArrayLiteral("Ciemp4ZNzRJxnRD+k28vAie0kXJrwl4IrbfDy7n6OxE=")) });
+
+    automaticallyDistrustedKeys = { { u"alice@example.org"_s,
+                                      QByteArray::fromBase64(QByteArrayLiteral("/1eK3R2LtjPBT3el8f0q4DvzqUJSfFy5fkKkKPNFNYw=")) } };
+    automaticallyTrustedKeys = { { u"bob@example.com"_s,
+                                   QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")) } };
+
+    keysAlice = { { QByteArray::fromBase64(QByteArrayLiteral("/1eK3R2LtjPBT3el8f0q4DvzqUJSfFy5fkKkKPNFNYw=")),
+                    TrustLevel::AutomaticallyDistrusted },
+                  { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")),
+                    TrustLevel::ManuallyDistrusted } };
+    keysBob = { { QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")),
+                  TrustLevel::AutomaticallyTrusted },
+                { QByteArray::fromBase64(QByteArrayLiteral("tCP1CI3pqSTVGzFYFyPYUMfMZ9Ck/msmfD0wH/VtJBM=")),
+                  TrustLevel::ManuallyTrusted },
+                { QByteArray::fromBase64(QByteArrayLiteral("2fhJtrgoMJxfLI3084/YkYh9paqiSiLFDVL2m0qAgX4=")),
+                  TrustLevel::ManuallyTrusted },
+                { QByteArray::fromBase64(QByteArrayLiteral("YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=")),
+                  TrustLevel::Authenticated } };
+
+    // OMEMO keys after removal
+    future = storage.keys(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    TrustLevel::AutomaticallyDistrusted,
+                    automaticallyDistrustedKeys),
+                std::pair(
+                    TrustLevel::ManuallyDistrusted,
+                    manuallyDistrustedKeys),
+                std::pair(
+                    TrustLevel::AutomaticallyTrusted,
+                    automaticallyTrustedKeys),
+                std::pair(
+                    TrustLevel::ManuallyTrusted,
+                    manuallyTrustedKeys),
+                std::pair(
+                    TrustLevel::Authenticated,
+                    authenticatedKeys) }));
+
+    // OMEMO keys after removal (via JIDs)
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s, u"bob@example.com"_s });
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+                    u"alice@example.org"_s,
+                    keysAlice),
+                std::pair(
+                    u"bob@example.com"_s,
+                    keysBob) }));
+
+    // Alice's OMEMO keys after removal
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s });
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+            u"alice@example.org"_s,
+            keysAlice) }));
+
+    keysAlice = { { QByteArray::fromBase64(QByteArrayLiteral("Ciemp4ZNzRJxnRD+k28vAie0kXJrwl4IrbfDy7n6OxE=")),
+                    TrustLevel::AutomaticallyTrusted } };
+    keysBob = { { QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")),
+                  TrustLevel::AutomaticallyTrusted },
+                { QByteArray::fromBase64(QByteArrayLiteral("YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=")),
+                  TrustLevel::Authenticated } };
+
+    // automatically trusted and authenticated OMEMO keys after removal (via JIDs)
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s, u"bob@example.com"_s },
+                                 TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+            u"bob@example.com"_s,
+            keysBob) }));
+
+    // Alice's automatically trusted and authenticated OMEMO keys after removal
+    futureForJids = storage.keys(ns_omemo,
+                                 { u"alice@example.org"_s },
+                                 TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QVERIFY(resultForJids.isEmpty());
+
+    storage.removeKeys(ns_omemo, u"alice@example.org"_s);
+
+    // OMEMO keys after removing Alice's keys
+    future = storage.keys(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    TrustLevel::AutomaticallyTrusted,
+                    automaticallyTrustedKeys),
+                std::pair(
+                    TrustLevel::ManuallyTrusted,
+                    manuallyTrustedKeys),
+                std::pair(
+                    TrustLevel::Authenticated,
+                    authenticatedKeys) }));
+
+    storage.removeKeys(ns_omemo);
+
+    // no stored OMEMO keys
+    future = storage.keys(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QVERIFY(result.isEmpty());
+
+    authenticatedKeys = { { u"alice@example.org"_s,
+                            QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")) },
+                          { u"alice@example.org"_s,
+                            QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")) } };
+
+    keysAlice = { { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")),
+                    TrustLevel::Authenticated },
+                  { QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")),
+                    TrustLevel::Authenticated } };
+
+    // remaining OX keys
+    future = storage.keys(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+            TrustLevel::Authenticated,
+            authenticatedKeys) }));
+
+    // remaining OX keys (via JIDs)
+    futureForJids = storage.keys(ns_ox,
+                                 { u"alice@example.org"_s, u"bob@example.com"_s });
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+            u"alice@example.org"_s,
+            keysAlice) }));
+
+    // Alice's remaining OX keys
+    futureForJids = storage.keys(ns_ox,
+                                 { u"alice@example.org"_s });
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QCOMPARE(
+        resultForJids,
+        QHash({ std::pair(
+            u"alice@example.org"_s,
+            keysAlice) }));
+
+    storage.removeKeys(ns_ox);
+
+    // no stored OX keys
+    future = storage.keys(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QVERIFY(result.isEmpty());
+
+    // no stored OX keys (via JIDs)
+    futureForJids = storage.keys(ns_ox,
+                                 { u"alice@example.org"_s, u"bob@example.com"_s });
+    QVERIFY(futureForJids.isFinished());
+    resultForJids = futureForJids.result();
+    QVERIFY(resultForJids.isEmpty());
+
+    // no automatically trusted or authenticated OX key from Alice
+    futureBool = storage.hasKey(ns_ox,
+                                u"alice@example.org"_s,
+                                TrustLevel::AutomaticallyTrusted | TrustLevel::Authenticated);
+    QVERIFY(futureBool.isFinished());
+    resultBool = futureBool.result();
+    QVERIFY(!resultBool);
+}
+
+void tst_QXmppTrustManager::memoryStorageTrustLevels()
+{
+    QXmppTrustMemoryStorage storage;
+
+    storage.addKeys(
+        ns_ox,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("AZ/cF4OrUOILKO1gQBf62pQevOhBJ2NyHnXLwM4FDZU=")) },
+        TrustLevel::AutomaticallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("AZ/cF4OrUOILKO1gQBf62pQevOhBJ2NyHnXLwM4FDZU=")),
+          QByteArray::fromBase64(QByteArrayLiteral("JU4pT7Ivpigtl+7QE87Bkq4r/C/mhI1FCjY5Wmjbtwg=")) },
+        TrustLevel::AutomaticallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")) },
+        TrustLevel::ManuallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"bob@example.com"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("9E51lG3vVmUn8CM7/AIcmIlLP2HPl6Ao0/VSf4VT/oA=")) },
+        TrustLevel::AutomaticallyTrusted);
+
+    auto future = storage.trustLevel(
+        ns_omemo,
+        u"alice@example.org"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("AZ/cF4OrUOILKO1gQBf62pQevOhBJ2NyHnXLwM4FDZU=")));
+    QVERIFY(future.isFinished());
+    auto result = future.result();
+    QCOMPARE(result, TrustLevel::AutomaticallyTrusted);
+
+    storage.setTrustLevel(
+        ns_omemo,
+        { { u"alice@example.org"_s,
+            QByteArray::fromBase64(QByteArrayLiteral("AZ/cF4OrUOILKO1gQBf62pQevOhBJ2NyHnXLwM4FDZU=")) },
+          { u"bob@example.com"_s,
+            QByteArray::fromBase64(QByteArrayLiteral("9E51lG3vVmUn8CM7/AIcmIlLP2HPl6Ao0/VSf4VT/oA=")) } },
+        TrustLevel::Authenticated);
+
+    future = storage.trustLevel(
+        ns_omemo,
+        u"alice@example.org"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("AZ/cF4OrUOILKO1gQBf62pQevOhBJ2NyHnXLwM4FDZU=")));
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, TrustLevel::Authenticated);
+
+    future = storage.trustLevel(
+        ns_omemo,
+        u"bob@example.com"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("9E51lG3vVmUn8CM7/AIcmIlLP2HPl6Ao0/VSf4VT/oA=")));
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, TrustLevel::Authenticated);
+
+    // Set the trust level of a key that is not stored yet.
+    // It is added to the storage automatically.
+    storage.setTrustLevel(
+        ns_omemo,
+        { { u"alice@example.org"_s,
+            QByteArray::fromBase64(QByteArrayLiteral("9w6oPjKyGSALd9gHq7sNOdOAkD5bHUVOKACNs89FjkA=")) } },
+        TrustLevel::ManuallyTrusted);
+
+    future = storage.trustLevel(
+        ns_omemo,
+        u"alice@example.org"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("9w6oPjKyGSALd9gHq7sNOdOAkD5bHUVOKACNs89FjkA=")));
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, TrustLevel::ManuallyTrusted);
+
+    // Try to retrieve the trust level of a key that is not stored yet.
+    // The default value is returned.
+    future = storage.trustLevel(
+        ns_omemo,
+        u"alice@example.org"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("WXL4EDfzUGbVPQWjT9pmBeiCpCBzYZv3lUAaj+UbPyE=")));
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, TrustLevel::Undecided);
+
+    // Set the trust levels of all authenticated keys belonging to Alice and
+    // Bob.
+    storage.setTrustLevel(
+        ns_omemo,
+        { u"alice@example.org"_s,
+          u"bob@example.com"_s },
+        TrustLevel::Authenticated,
+        TrustLevel::ManuallyDistrusted);
+
+    future = storage.trustLevel(
+        ns_omemo,
+        u"alice@example.org"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("AZ/cF4OrUOILKO1gQBf62pQevOhBJ2NyHnXLwM4FDZU=")));
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, TrustLevel::ManuallyDistrusted);
+
+    future = storage.trustLevel(
+        ns_omemo,
+        u"bob@example.com"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("9E51lG3vVmUn8CM7/AIcmIlLP2HPl6Ao0/VSf4VT/oA=")));
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, TrustLevel::ManuallyDistrusted);
+
+    // Verify that the default trust level is returned for an unknown key.
+    future = storage.trustLevel(
+        ns_omemo,
+        u"alice@example.org"_s,
+        QByteArray::fromBase64(QByteArrayLiteral("wE06Gwf8f4DvDLFDoaCsGs8ibcUjf84WIOA2FAjPI3o=")));
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, TrustLevel::Undecided);
+
+    storage.removeKeys(ns_ox);
+    storage.removeKeys(ns_omemo);
+}
+
+void tst_QXmppTrustManager::memoryStorageResetAll()
+{
+    QXmppTrustMemoryStorage storage;
+
+    storage.setSecurityPolicy(ns_ox, Toakafa);
+    storage.setSecurityPolicy(ns_omemo, Toakafa);
+
+    storage.setOwnKey(ns_ox, QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")));
+    storage.setOwnKey(ns_omemo, QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")));
+
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("WaAnpWyW1hnFooH3oJo9Ba5XYoksnLPeJRTAjxPbv38=")),
+          QByteArray::fromBase64(QByteArrayLiteral("/1eK3R2LtjPBT3el8f0q4DvzqUJSfFy5fkKkKPNFNYw=")) });
+
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")) },
+        TrustLevel::ManuallyDistrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("Ciemp4ZNzRJxnRD+k28vAie0kXJrwl4IrbfDy7n6OxE=")) },
+        TrustLevel::AutomaticallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"bob@example.com"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("rvSXBRd+EICMhQvVgcREQJxxP+T4EBmai4mYHBfJQGg=")) },
+        TrustLevel::AutomaticallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"bob@example.com"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("tCP1CI3pqSTVGzFYFyPYUMfMZ9Ck/msmfD0wH/VtJBM=")),
+          QByteArray::fromBase64(QByteArrayLiteral("2fhJtrgoMJxfLI3084/YkYh9paqiSiLFDVL2m0qAgX4=")) },
+        TrustLevel::ManuallyTrusted);
+
+    storage.addKeys(
+        ns_omemo,
+        u"bob@example.com"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("YjVI04NcbTPvXLaA95RO84HPcSvyOgEZ2r5cTyUs0C8=")) },
+        TrustLevel::Authenticated);
+
+    storage.addKeys(
+        ns_ox,
+        u"alice@example.org"_s,
+        { QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")),
+          QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")) },
+        TrustLevel::Authenticated);
+
+    storage.resetAll(ns_omemo);
+
+    auto future = storage.securityPolicy(ns_omemo);
+    QVERIFY(future.isFinished());
+    auto result = future.result();
+    QCOMPARE(result, NoSecurityPolicy);
+
+    future = storage.securityPolicy(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(result, Toakafa);
+
+    auto futureKey = storage.ownKey(ns_omemo);
+    QVERIFY(futureKey.isFinished());
+    auto resultKey = futureKey.result();
+    QVERIFY(resultKey.isEmpty());
+
+    futureKey = storage.ownKey(ns_ox);
+    QVERIFY(futureKey.isFinished());
+    resultKey = futureKey.result();
+    QCOMPARE(resultKey, QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")));
+
+    auto futureKeys = storage.keys(ns_omemo);
+    QVERIFY(futureKeys.isFinished());
+    auto resultKeys = futureKeys.result();
+    QVERIFY(resultKeys.isEmpty());
+
+    const QMultiHash<QString, QByteArray> authenticatedKeys = { { u"alice@example.org"_s,
+                                                                  QByteArray::fromBase64(QByteArrayLiteral("aFABnX7Q/rbTgjBySYzrT2FsYCVYb49mbca5yB734KQ=")) },
+                                                                { u"alice@example.org"_s,
+                                                                  QByteArray::fromBase64(QByteArrayLiteral("IhpPjiKLchgrAG5cpSfTvdzPjZ5v6vTOluHEUehkgCA=")) } };
+
+    futureKeys = storage.keys(ns_ox);
+    QVERIFY(futureKeys.isFinished());
+    resultKeys = futureKeys.result();
+    QCOMPARE(
+        resultKeys,
+        QHash({ std::pair(
+            TrustLevel::Authenticated,
+            authenticatedKeys) }));
+}
+
+void tst_QXmppTrustManager::atmStorageKeysForPostponedTrustDecisions()
+{
+    QXmppAtmTrustMemoryStorage storage;
+
+    // The key 7y1t0LnmNBeXJka43XejFPLrKtQlSFATrYmy7xHaKYU=
+    // is set for both postponed authentication and distrusting.
+    // Thus, it is only stored for postponed distrusting.
+    QXmppTrustMessageKeyOwner keyOwnerAlice;
+    keyOwnerAlice.setJid(u"alice@example.org"_s);
+    keyOwnerAlice.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("Wl53ZchbtAtCZQCHROiD20W7UnKTQgWQrjTHAVNw1ic=")),
+                                   QByteArray::fromBase64(QByteArrayLiteral("QR05jrab7PFkSLhtdzyXrPfCqhkNCYCrlWATaBMTenE=")),
+                                   QByteArray::fromBase64(QByteArrayLiteral("7y1t0LnmNBeXJka43XejFPLrKtQlSFATrYmy7xHaKYU=")) });
+    keyOwnerAlice.setDistrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("mB98hhdVps++skUuy4TGy/Vp6RQXLJO4JGf86FAUjyc=")),
+                                      QByteArray::fromBase64(QByteArrayLiteral("7y1t0LnmNBeXJka43XejFPLrKtQlSFATrYmy7xHaKYU=")) });
+
+    QXmppTrustMessageKeyOwner keyOwnerBobTrustedKeys;
+    keyOwnerBobTrustedKeys.setJid(u"bob@example.com"_s);
+    keyOwnerBobTrustedKeys.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("GgTqeRLp1M+MEenzFQym2oqer9PfHukS4brJDQl5ARE=")) });
+
+    storage.addKeysForPostponedTrustDecisions(ns_omemo,
+                                              QByteArray::fromBase64(QByteArrayLiteral("Mp6Y4wOF3aMcl38lb/VNbdPF9ucGFqSx2eyaEsqyHKE=")),
+                                              { keyOwnerAlice, keyOwnerBobTrustedKeys });
+
+    QXmppTrustMessageKeyOwner keyOwnerBobDistrustedKeys;
+    keyOwnerBobDistrustedKeys.setJid(u"bob@example.com"_s);
+    keyOwnerBobDistrustedKeys.setDistrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("sD6ilugEBeKxPsdDEyX43LSGKHKWd5MFEdhT+4RpsxA=")),
+                                                  QByteArray::fromBase64(QByteArrayLiteral("X5tJ1D5rEeaeQE8eqhBKAj4KUZGYe3x+iHifaTBY1kM=")) });
+
+    storage.addKeysForPostponedTrustDecisions(ns_omemo,
+                                              QByteArray::fromBase64(QByteArrayLiteral("IL5iwDQwquH7yjb5RAiIP+nvYiBUsNCXtKB8IpKc9QU=")),
+                                              { keyOwnerBobDistrustedKeys });
+
+    QXmppTrustMessageKeyOwner keyOwnerCarol;
+    keyOwnerCarol.setJid(u"carol@example.net"_s);
+    keyOwnerCarol.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("WcL+cEMpEeK+dpqg3Xd3amctzwP8h2MqwXcEzFf6LpU=")),
+                                   QByteArray::fromBase64(QByteArrayLiteral("bH3R31z0N97K1fUwG3+bdBrVPuDfXguQapHudkfa5nE=")) });
+    keyOwnerCarol.setDistrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("N0B2StHKk1/slwg1rzybTFzjdg7FChc+3cXmTU/rS8g=")),
+                                      QByteArray::fromBase64(QByteArrayLiteral("wsEN32UHCiNjYqTG/J63hY4Nu8tZT42Ni1FxrgyRQ5g=")) });
+
+    storage.addKeysForPostponedTrustDecisions(ns_ox,
+                                              QByteArray::fromBase64(QByteArrayLiteral("IL5iwDQwquH7yjb5RAiIP+nvYiBUsNCXtKB8IpKc9QU=")),
+                                              { keyOwnerCarol });
+
+    QMultiHash<QString, QByteArray> trustedKeys = { { u"alice@example.org"_s,
+                                                      QByteArray::fromBase64(QByteArrayLiteral("Wl53ZchbtAtCZQCHROiD20W7UnKTQgWQrjTHAVNw1ic=")) },
+                                                    { u"alice@example.org"_s,
+                                                      QByteArray::fromBase64(QByteArrayLiteral("QR05jrab7PFkSLhtdzyXrPfCqhkNCYCrlWATaBMTenE=")) },
+                                                    { u"bob@example.com"_s,
+                                                      QByteArray::fromBase64(QByteArrayLiteral("GgTqeRLp1M+MEenzFQym2oqer9PfHukS4brJDQl5ARE=")) } };
+    QMultiHash<QString, QByteArray> distrustedKeys = { { u"alice@example.org"_s,
+                                                         QByteArray::fromBase64(QByteArrayLiteral("mB98hhdVps++skUuy4TGy/Vp6RQXLJO4JGf86FAUjyc=")) },
+                                                       { u"alice@example.org"_s,
+                                                         QByteArray::fromBase64(QByteArrayLiteral("7y1t0LnmNBeXJka43XejFPLrKtQlSFATrYmy7xHaKYU=")) } };
+
+    auto future = storage.keysForPostponedTrustDecisions(ns_omemo,
+                                                         { QByteArray::fromBase64(QByteArrayLiteral("Mp6Y4wOF3aMcl38lb/VNbdPF9ucGFqSx2eyaEsqyHKE=")) });
+    QVERIFY(future.isFinished());
+    auto result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+
+    distrustedKeys = { { u"alice@example.org"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("mB98hhdVps++skUuy4TGy/Vp6RQXLJO4JGf86FAUjyc=")) },
+                       { u"alice@example.org"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("7y1t0LnmNBeXJka43XejFPLrKtQlSFATrYmy7xHaKYU=")) },
+                       { u"bob@example.com"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("sD6ilugEBeKxPsdDEyX43LSGKHKWd5MFEdhT+4RpsxA=")) },
+                       { u"bob@example.com"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("X5tJ1D5rEeaeQE8eqhBKAj4KUZGYe3x+iHifaTBY1kM=")) } };
+
+    future = storage.keysForPostponedTrustDecisions(ns_omemo,
+                                                    { QByteArray::fromBase64(QByteArrayLiteral("Mp6Y4wOF3aMcl38lb/VNbdPF9ucGFqSx2eyaEsqyHKE=")),
+                                                      QByteArray::fromBase64(QByteArrayLiteral("IL5iwDQwquH7yjb5RAiIP+nvYiBUsNCXtKB8IpKc9QU=")) });
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+
+    // Retrieve all keys.
+    future = storage.keysForPostponedTrustDecisions(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+
+    keyOwnerBobTrustedKeys.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("sD6ilugEBeKxPsdDEyX43LSGKHKWd5MFEdhT+4RpsxA=")) });
+
+    // Invert the trust in Bob's key
+    // sD6ilugEBeKxPsdDEyX43LSGKHKWd5MFEdhT+4RpsxA= for the
+    // sending endpoint with the key
+    // IL5iwDQwquH7yjb5RAiIP+nvYiBUsNCXtKB8IpKc9QU=.
+    storage.addKeysForPostponedTrustDecisions(
+        ns_omemo,
+        QByteArray::fromBase64(QByteArrayLiteral("IL5iwDQwquH7yjb5RAiIP+nvYiBUsNCXtKB8IpKc9QU=")),
+        { keyOwnerBobTrustedKeys });
+
+    trustedKeys = { { u"bob@example.com"_s,
+                      QByteArray::fromBase64(QByteArrayLiteral("sD6ilugEBeKxPsdDEyX43LSGKHKWd5MFEdhT+4RpsxA=")) } };
+    distrustedKeys = { { u"bob@example.com"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("X5tJ1D5rEeaeQE8eqhBKAj4KUZGYe3x+iHifaTBY1kM=")) } };
+
+    future = storage.keysForPostponedTrustDecisions(ns_omemo,
+                                                    { QByteArray::fromBase64(QByteArrayLiteral("IL5iwDQwquH7yjb5RAiIP+nvYiBUsNCXtKB8IpKc9QU=")) });
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+
+    storage.removeKeysForPostponedTrustDecisions(ns_omemo,
+                                                 { QByteArray::fromBase64(QByteArrayLiteral("Mp6Y4wOF3aMcl38lb/VNbdPF9ucGFqSx2eyaEsqyHKE=")) });
+
+    future = storage.keysForPostponedTrustDecisions(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+
+    storage.addKeysForPostponedTrustDecisions(
+        ns_omemo,
+        QByteArray::fromBase64(QByteArrayLiteral("Mp6Y4wOF3aMcl38lb/VNbdPF9ucGFqSx2eyaEsqyHKE=")),
+        { keyOwnerAlice });
+
+    // The key QR05jrab7PFkSLhtdzyXrPfCqhkNCYCrlWATaBMTenE= is not removed
+    // because its ID is passed within the parameter "keyIdsForDistrusting" but
+    // stored for postponed authentication.
+    storage.removeKeysForPostponedTrustDecisions(ns_omemo,
+                                                 { QByteArray::fromBase64(QByteArrayLiteral("Wl53ZchbtAtCZQCHROiD20W7UnKTQgWQrjTHAVNw1ic=")),
+                                                   QByteArray::fromBase64(QByteArrayLiteral("sD6ilugEBeKxPsdDEyX43LSGKHKWd5MFEdhT+4RpsxA=")) },
+                                                 { QByteArray::fromBase64(QByteArrayLiteral("mB98hhdVps++skUuy4TGy/Vp6RQXLJO4JGf86FAUjyc=")),
+                                                   QByteArray::fromBase64(QByteArrayLiteral("QR05jrab7PFkSLhtdzyXrPfCqhkNCYCrlWATaBMTenE=")) });
+
+    trustedKeys = { { u"alice@example.org"_s,
+                      QByteArray::fromBase64(QByteArrayLiteral("QR05jrab7PFkSLhtdzyXrPfCqhkNCYCrlWATaBMTenE=")) } };
+    distrustedKeys = { { u"alice@example.org"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("7y1t0LnmNBeXJka43XejFPLrKtQlSFATrYmy7xHaKYU=")) },
+                       { u"bob@example.com"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("X5tJ1D5rEeaeQE8eqhBKAj4KUZGYe3x+iHifaTBY1kM=")) } };
+
+    future = storage.keysForPostponedTrustDecisions(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+
+    // Remove all OMEMO keys.
+    storage.removeKeysForPostponedTrustDecisions(ns_omemo);
+
+    future = storage.keysForPostponedTrustDecisions(ns_omemo);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QVERIFY(result.isEmpty());
+
+    trustedKeys = { { u"carol@example.net"_s,
+                      QByteArray::fromBase64(QByteArrayLiteral("WcL+cEMpEeK+dpqg3Xd3amctzwP8h2MqwXcEzFf6LpU=")) },
+                    { u"carol@example.net"_s,
+                      QByteArray::fromBase64(QByteArrayLiteral("bH3R31z0N97K1fUwG3+bdBrVPuDfXguQapHudkfa5nE=")) } };
+    distrustedKeys = { { u"carol@example.net"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("N0B2StHKk1/slwg1rzybTFzjdg7FChc+3cXmTU/rS8g=")) },
+                       { u"carol@example.net"_s,
+                         QByteArray::fromBase64(QByteArrayLiteral("wsEN32UHCiNjYqTG/J63hY4Nu8tZT42Ni1FxrgyRQ5g=")) } };
+
+    // remaining OX keys
+    future = storage.keysForPostponedTrustDecisions(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QCOMPARE(
+        result,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+
+    storage.removeKeysForPostponedTrustDecisions(ns_ox);
+
+    // no OX keys
+    future = storage.keysForPostponedTrustDecisions(ns_ox);
+    QVERIFY(future.isFinished());
+    result = future.result();
+    QVERIFY(result.isEmpty());
+}
+
+void tst_QXmppTrustManager::atmStorageResetAll()
+{
+    QXmppAtmTrustMemoryStorage storage;
+
+    QXmppTrustMessageKeyOwner keyOwnerAlice;
+    keyOwnerAlice.setJid(u"alice@example.org"_s);
+    keyOwnerAlice.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("Wl53ZchbtAtCZQCHROiD20W7UnKTQgWQrjTHAVNw1ic=")),
+                                   QByteArray::fromBase64(QByteArrayLiteral("QR05jrab7PFkSLhtdzyXrPfCqhkNCYCrlWATaBMTenE=")) });
+    keyOwnerAlice.setDistrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("mB98hhdVps++skUuy4TGy/Vp6RQXLJO4JGf86FAUjyc=")) });
+
+    QXmppTrustMessageKeyOwner keyOwnerBobTrustedKeys;
+    keyOwnerBobTrustedKeys.setJid(u"bob@example.com"_s);
+    keyOwnerBobTrustedKeys.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("GgTqeRLp1M+MEenzFQym2oqer9PfHukS4brJDQl5ARE=")) });
+
+    storage.addKeysForPostponedTrustDecisions(ns_omemo,
+                                              QByteArray::fromBase64(QByteArrayLiteral("Mp6Y4wOF3aMcl38lb/VNbdPF9ucGFqSx2eyaEsqyHKE=")),
+                                              { keyOwnerAlice, keyOwnerBobTrustedKeys });
+
+    QXmppTrustMessageKeyOwner keyOwnerCarol;
+    keyOwnerCarol.setJid(u"carol@example.net"_s);
+    keyOwnerCarol.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("WcL+cEMpEeK+dpqg3Xd3amctzwP8h2MqwXcEzFf6LpU=")),
+                                   QByteArray::fromBase64(QByteArrayLiteral("bH3R31z0N97K1fUwG3+bdBrVPuDfXguQapHudkfa5nE=")) });
+    keyOwnerCarol.setDistrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("N0B2StHKk1/slwg1rzybTFzjdg7FChc+3cXmTU/rS8g=")),
+                                      QByteArray::fromBase64(QByteArrayLiteral("wsEN32UHCiNjYqTG/J63hY4Nu8tZT42Ni1FxrgyRQ5g=")) });
+
+    storage.addKeysForPostponedTrustDecisions(ns_ox,
+                                              QByteArray::fromBase64(QByteArrayLiteral("IL5iwDQwquH7yjb5RAiIP+nvYiBUsNCXtKB8IpKc9QU=")),
+                                              { keyOwnerCarol });
+
+    storage.resetAll(ns_omemo);
+
+    auto futureKeysForPostponedTrustDecisions = storage.keysForPostponedTrustDecisions(ns_omemo);
+    QVERIFY(futureKeysForPostponedTrustDecisions.isFinished());
+    auto resultKeysForPostponedTrustDecisions = futureKeysForPostponedTrustDecisions.result();
+    QVERIFY(resultKeysForPostponedTrustDecisions.isEmpty());
+
+    QMultiHash<QString, QByteArray> trustedKeys = { { u"carol@example.net"_s,
+                                                      QByteArray::fromBase64(QByteArrayLiteral("WcL+cEMpEeK+dpqg3Xd3amctzwP8h2MqwXcEzFf6LpU=")) },
+                                                    { u"carol@example.net"_s,
+                                                      QByteArray::fromBase64(QByteArrayLiteral("bH3R31z0N97K1fUwG3+bdBrVPuDfXguQapHudkfa5nE=")) } };
+    QMultiHash<QString, QByteArray> distrustedKeys = { { u"carol@example.net"_s,
+                                                         QByteArray::fromBase64(QByteArrayLiteral("N0B2StHKk1/slwg1rzybTFzjdg7FChc+3cXmTU/rS8g=")) },
+                                                       { u"carol@example.net"_s,
+                                                         QByteArray::fromBase64(QByteArrayLiteral("wsEN32UHCiNjYqTG/J63hY4Nu8tZT42Ni1FxrgyRQ5g=")) } };
+
+    futureKeysForPostponedTrustDecisions = storage.keysForPostponedTrustDecisions(ns_ox);
+    QVERIFY(futureKeysForPostponedTrustDecisions.isFinished());
+    resultKeysForPostponedTrustDecisions = futureKeysForPostponedTrustDecisions.result();
+    QCOMPARE(
+        resultKeysForPostponedTrustDecisions,
+        QHash({ std::pair(
+                    true,
+                    trustedKeys),
+                std::pair(
+                    false,
+                    distrustedKeys) }));
+}
+
+void tst_QXmppTrustManager::initTestCase()
 {
     m_client.addExtension(&m_manager);
     m_client.configuration().setJid("alice@example.org/phone");
@@ -81,7 +1060,7 @@ void tst_QXmppAtmManager::initTestCase()
     m_client.setLogger(&m_logger);
 }
 
-void tst_QXmppAtmManager::testSendTrustMessage()
+void tst_QXmppTrustManager::testSendTrustMessage()
 {
     QXmppTrustMessageKeyOwner keyOwnerAlice;
     keyOwnerAlice.setJid(u"alice@example.org"_s);
@@ -137,7 +1116,7 @@ void tst_QXmppAtmManager::testSendTrustMessage()
     QVERIFY(isMessageSent);
 }
 
-void tst_QXmppAtmManager::testMakePostponedTrustDecisions()
+void tst_QXmppTrustManager::testMakePostponedTrustDecisions()
 {
     clearTrustStorage();
 
@@ -243,7 +1222,7 @@ void tst_QXmppAtmManager::testMakePostponedTrustDecisions()
             manuallyDistrustedKeys) }));
 }
 
-void tst_QXmppAtmManager::testDistrustAutomaticallyTrustedKeys()
+void tst_QXmppTrustManager::testDistrustAutomaticallyTrustedKeys()
 {
     clearTrustStorage();
 
@@ -294,7 +1273,7 @@ void tst_QXmppAtmManager::testDistrustAutomaticallyTrustedKeys()
             automaticallyDistrustedKeys) }));
 }
 
-void tst_QXmppAtmManager::testDistrust()
+void tst_QXmppTrustManager::testDistrust()
 {
     clearTrustStorage();
 
@@ -435,7 +1414,7 @@ void tst_QXmppAtmManager::testDistrust()
                     distrustedKeys) }));
 }
 
-void tst_QXmppAtmManager::testAuthenticate_data()
+void tst_QXmppTrustManager::testAuthenticate_data()
 {
     QTest::addColumn<TrustSecurityPolicy>("securityPolicy");
 
@@ -446,7 +1425,7 @@ void tst_QXmppAtmManager::testAuthenticate_data()
         << Toakafa;
 }
 
-void tst_QXmppAtmManager::testAuthenticate()
+void tst_QXmppTrustManager::testAuthenticate()
 {
     clearTrustStorage();
 
@@ -692,7 +1671,7 @@ void tst_QXmppAtmManager::testAuthenticate()
                     distrustedKeys) }));
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisions()
+void tst_QXmppTrustManager::testMakeTrustDecisions()
 {
     clearTrustStorage();
 
@@ -725,7 +1704,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisions()
                     keysBeingDistrusted) }));
 }
 
-void tst_QXmppAtmManager::testHandleMessage_data()
+void tst_QXmppTrustManager::testHandleMessage_data()
 {
     QTest::addColumn<QXmppMessage>("message");
     QTest::addColumn<bool>("areTrustDecisionsValid");
@@ -836,7 +1815,7 @@ void tst_QXmppAtmManager::testHandleMessage_data()
         << true;
 }
 
-void tst_QXmppAtmManager::testHandleMessage()
+void tst_QXmppTrustManager::testHandleMessage()
 {
     clearTrustStorage();
 
@@ -997,11 +1976,11 @@ void tst_QXmppAtmManager::testHandleMessage()
     }
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsNoKeys()
+void tst_QXmppTrustManager::testMakeTrustDecisionsNoKeys()
 {
     clearTrustStorage();
 
-    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppAtmManager::unexpectedTrustMessageSent);
+    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppTrustManager::unexpectedTrustMessageSent);
 
     // key of own endpoints
     m_manager.addKeys(
@@ -1058,7 +2037,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsNoKeys()
                     manuallyDistrustedKeys) }));
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeys()
+void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeys()
 {
     clearTrustStorage();
 
@@ -1215,7 +2194,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeys()
     testMakeTrustDecisionsOwnKeysDone();
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysNoOwnEndpoints()
+void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpoints()
 {
     clearTrustStorage();
 
@@ -1345,7 +2324,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysNoOwnEndpoints()
     testMakeTrustDecisionsOwnKeysDone();
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysNoOwnEndpointsWithAuthenticatedKeys()
+void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpointsWithAuthenticatedKeys()
 {
     clearTrustStorage();
 
@@ -1486,7 +2465,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysNoOwnEndpointsWithAuthent
     testMakeTrustDecisionsOwnKeysDone();
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysNoContactsWithAuthenticatedKeys()
+void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoContactsWithAuthenticatedKeys()
 {
     clearTrustStorage();
 
@@ -1578,11 +2557,11 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysNoContactsWithAuthenticat
     testMakeTrustDecisionsOwnKeysDone();
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsSoleOwnKeyDistrusted()
+void tst_QXmppTrustManager::testMakeTrustDecisionsSoleOwnKeyDistrusted()
 {
     clearTrustStorage();
 
-    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppAtmManager::unexpectedTrustMessageSent);
+    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppTrustManager::unexpectedTrustMessageSent);
 
     // key of own endpoint
     m_manager.addKeys(
@@ -1693,11 +2672,11 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsSoleOwnKeyDistrusted()
     QCOMPARE(result, TrustLevel::ManuallyDistrusted);
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeys()
+void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeys()
 {
     clearTrustStorage();
 
-    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppAtmManager::unexpectedTrustMessageSent);
+    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppTrustManager::unexpectedTrustMessageSent);
 
     // keys of own endpoints
     m_manager.addKeys(
@@ -1822,11 +2801,11 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeys()
     testMakeTrustDecisionsContactKeysDone();
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeysNoOwnEndpoints()
+void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeysNoOwnEndpoints()
 {
     clearTrustStorage();
 
-    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppAtmManager::unexpectedTrustMessageSent);
+    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppTrustManager::unexpectedTrustMessageSent);
 
     // key of contact's endpoint
     m_manager.addKeys(
@@ -1865,11 +2844,11 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeysNoOwnEndpoints()
     testMakeTrustDecisionsContactKeysDone();
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeysNoOwnEndpointsWithAuthenticatedKeys()
+void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeysNoOwnEndpointsWithAuthenticatedKeys()
 {
     clearTrustStorage();
 
-    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppAtmManager::unexpectedTrustMessageSent);
+    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppTrustManager::unexpectedTrustMessageSent);
 
     // key of own endpoint
     m_manager.addKeys(
@@ -1949,11 +2928,11 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeysNoOwnEndpointsWithAut
     testMakeTrustDecisionsContactKeysDone();
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsSoleContactKeyDistrusted()
+void tst_QXmppTrustManager::testMakeTrustDecisionsSoleContactKeyDistrusted()
 {
     clearTrustStorage();
 
-    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppAtmManager::unexpectedTrustMessageSent);
+    QSignalSpy unexpectedTrustMessageSentSpy(this, &tst_QXmppTrustManager::unexpectedTrustMessageSent);
 
     // key of own endpoint
     m_manager.addKeys(
@@ -2037,7 +3016,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsSoleContactKeyDistrusted()
     QCOMPARE(result, TrustLevel::ManuallyDistrusted);
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysDone()
+void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysDone()
 {
     auto future = m_manager.trustLevel(ns_omemo,
                                        u"alice@example.org"_s,
@@ -2061,7 +3040,7 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsOwnKeysDone()
     QCOMPARE(result, TrustLevel::ManuallyDistrusted);
 }
 
-void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeysDone()
+void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeysDone()
 {
     auto future = m_manager.trustLevel(ns_omemo,
                                        u"bob@example.com"_s,
@@ -2085,11 +3064,11 @@ void tst_QXmppAtmManager::testMakeTrustDecisionsContactKeysDone()
     QCOMPARE(result, TrustLevel::ManuallyDistrusted);
 }
 
-void tst_QXmppAtmManager::clearTrustStorage()
+void tst_QXmppTrustManager::clearTrustStorage()
 {
     m_manager.removeKeys(ns_omemo);
     m_trustStorage.removeKeysForPostponedTrustDecisions(ns_omemo);
 }
 
-QTEST_MAIN(tst_QXmppAtmManager)
-#include "tst_qxmppatmmanager.moc"
+QTEST_MAIN(tst_QXmppTrustManager)
+#include "tst_qxmpptrustmanager.moc"
