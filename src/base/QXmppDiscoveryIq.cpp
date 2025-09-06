@@ -125,6 +125,16 @@ void QXmppDiscoIdentity::toXml(QXmlStreamWriter *writer) const
 ///
 
 ///
+/// Looks for a data form with the given form type and returns it if found.
+///
+/// Data forms in service discovery info are defined in \xep{0128, Service Discovery Extensions}.
+///
+std::optional<QXmppDataForm> QXmppDiscoInfo::dataForm(QStringView formType) const
+{
+    return find(m_dataForms, formType, &QXmppDataForm::formType);
+}
+
+///
 /// Calculates an \xep{0115, Entity Capabilities} hash value of this service discovery data object.
 ///
 QByteArray QXmppDiscoInfo::calculateEntityCapabilitiesHash() const

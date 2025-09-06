@@ -148,6 +148,19 @@ public:
     /// Sets additional data forms as specified in \xep{0128, Service Discovery Extensions}.
     /// Forms MUST have a FORM_TYPE and each FORM_TYPE MUST occur only once.
     void setDataForms(const QList<QXmppDataForm> &newDataForms) { m_dataForms = newDataForms; }
+    std::optional<QXmppDataForm> dataForm(QStringView formType) const;
+
+    /// Looks for a form with the form type of FormType and parses it if found.
+    template<QXmpp::Private::DataFormConvertible FormType>
+    std::optional<FormType> dataForm() const
+    {
+        if (auto form = dataForm(QXmpp::Private::DataFormType<FormType>)) {
+            if (auto result = FormType::fromDataForm(*form)) {
+                return *result;
+            }
+        }
+        return {};
+    }
 
     QByteArray calculateEntityCapabilitiesHash() const;
 
