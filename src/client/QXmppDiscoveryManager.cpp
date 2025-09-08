@@ -32,7 +32,7 @@ static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, co
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {
-    d->clientCapabilitiesNode = u"org.qxmpp.client"_s;
+    d->clientCapabilitiesNode = u"org.qxmpp.caps"_s;
     d->identities = { d->defaultIdentity() };
 }
 
@@ -159,7 +159,7 @@ QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
 ///
 /// Returns the capabilities node of the local XMPP client.
 ///
-/// By default this is "org.qxmpp.client".
+/// By default this is "org.qxmpp.caps".
 ///
 QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 {
@@ -169,7 +169,7 @@ QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 ///
 /// Sets the capabilities node of the local XMPP client.
 ///
-/// By default this is "org.qxmpp.client".
+/// By default this is "org.qxmpp.caps".
 ///
 void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
 {
