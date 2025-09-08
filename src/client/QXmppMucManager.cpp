@@ -618,12 +618,12 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
                 // request room information
                 if (d->discoManager) {
                     d->discoManager->info(d->jid).then(this, [this](auto &&result) {
-                        if (!std::holds_alternative<QXmppDiscoInfo>(result)) {
+                        if (!std::holds_alternative<QXmppDiscoveryManager::DiscoInfo>(result)) {
                             return;
                         }
 
                         QString name;
-                        const auto &identities = std::get<QXmppDiscoInfo>(result).identities();
+                        const auto &identities = std::get<QXmppDiscoveryManager::DiscoInfo>(result).data.identities();
                         for (const auto &identity : identities) {
                             if (identity.category() == u"conference") {
                                 name = identity.name();

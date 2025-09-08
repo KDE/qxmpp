@@ -221,13 +221,13 @@ QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDisco
     request.setTo(jid);
     request.setQueryNode(node);
 
-    return chainMapSuccess(info(jid, node), this, [](QXmppDiscoInfo &&info) {
+    return chainMapSuccess(info(jid, node, FetchPolicy::Strict), this, [](QXmppDiscoveryManager::DiscoInfo &&info) {
         QXmppDiscoveryIq iq;
-        iq.setQueryNode(info.node());
+        iq.setQueryNode(info.data.node());
         iq.setQueryType(QXmppDiscoveryIq::InfoQuery);
-        iq.setFeatures(info.features());
-        iq.setIdentities(info.identities());
-        iq.setDataForms(info.dataForms());
+        iq.setFeatures(info.data.features());
+        iq.setIdentities(info.data.identities());
+        iq.setDataForms(info.data.dataForms());
         return iq;
     });
 }
@@ -243,7 +243,7 @@ QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDisco
 ///
 QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDiscoItems(const QString &jid, const QString &node)
 {
-    return items(jid, node);
+    return items(jid, node, FetchPolicy::Strict);
 }
 
 ///

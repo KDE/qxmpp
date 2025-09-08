@@ -46,7 +46,7 @@ QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
 ///
 /// \since QXmpp 1.12
 ///
-QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node)
+QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node, FetchPolicy fetchPolicy)
 {
     return chain<Result<QList<QXmppDiscoItem>>>(
         get<QXmppDiscoItems>(client(), jid, QXmppDiscoItems { node }),
@@ -68,9 +68,18 @@ QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QStr
 ///
 /// \since QXmpp 1.12
 ///
-QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node)
+QXmppTask<Result<QXmppDiscoveryManager::DiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node, FetchPolicy fetchPolicy)
 {
-    return get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node });
+    return chain<Result<DiscoInfo>>(
+        get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node }),
+        this,
+        [](auto &&result) -> Result<DiscoInfo> {
+            if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
+                return DiscoInfo { info, std::nullopt };
+            } else {
+                return std::get<QXmppError>(std::move(result));
+            }
+        });
 }
 
 ///

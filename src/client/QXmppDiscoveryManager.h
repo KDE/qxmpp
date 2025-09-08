@@ -10,12 +10,21 @@
 
 #include <variant>
 
+#include <QDateTime>
+
 template<typename T>
 class QXmppTask;
 class QXmppDataForm;
 class QXmppDiscoveryIq;
 class QXmppDiscoveryManagerPrivate;
 struct QXmppError;
+
+class QXMPP_EXPORT QXmppDiscoStorage {
+    public :
+        // caps hash (1.0) -> info
+        // jid -> info
+        // jid -> caps hash -> info
+};
 
 ///
 /// \brief The QXmppDiscoveryManager class makes it possible to discover information about other
@@ -28,11 +37,28 @@ class QXMPP_EXPORT QXmppDiscoveryManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
+    struct DiscoInfo {
+        /// the actual disco info data
+        QXmppDiscoInfo data;
+        /// Timestamp when this info was fetched from the remote entity.
+        /// If std::nullopt, the info is considered authoritative (fresh).
+        std::optional<QDateTime> fetchedAt;
+    };
+
+    enum class FetchPolicy {
+        /// Always ensure the data is up-to-date. Cached data may be used only if it is guaranteed
+        /// to be current (e.g. via entity capabilities).
+        Strict,
+        /// Cached data may be used even if it is not guaranteed to be current, within the
+        /// configured limits.
+        Relaxed,
+    };
+
     QXmppDiscoveryManager();
     ~QXmppDiscoveryManager() override;
 
-    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> info(const QString &jid, const QString &node = {});
-    QXmppTask<QXmpp::Result<QList<QXmppDiscoItem>>> items(const QString &jid, const QString &node = {});
+    QXmppTask<QXmpp::Result<DiscoInfo>> info(const QString &jid, const QString &node = {}, FetchPolicy fetchPolicy = FetchPolicy::Relaxed);
+    QXmppTask<QXmpp::Result<QList<QXmppDiscoItem>>> items(const QString &jid, const QString &node = {}, FetchPolicy fetchPolicy = FetchPolicy::Relaxed);
 
     const QList<QXmppDiscoIdentity> &identities() const;
     void setIdentities(const QList<QXmppDiscoIdentity> &identities);
