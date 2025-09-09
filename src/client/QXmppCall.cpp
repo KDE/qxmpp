@@ -423,8 +423,9 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
     QObject::connect(stream->d->connection, &QXmppIceConnection::localCandidatesChanged,
                      q, [this, stream]() { q->onLocalCandidatesChanged(stream); });
 
-    QObject::connect(stream->d->connection, &QXmppIceConnection::disconnected,
-                     q, &QXmppCall::hangUp);
+    QObject::connect(stream->d->connection, &QXmppIceConnection::disconnected, q, [this]() {
+        terminate({ QXmppJingleReason::FailedTransport, u"ICE connection could not be established."_s, {} });
+    });
 
     connect(stream->d, &QXmppCallStreamPrivate::peerCertificateReceived, this, [this, stream](bool fingerprintMatches) {
         if (!fingerprintMatches) {
