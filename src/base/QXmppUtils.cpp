@@ -469,7 +469,7 @@ QDomElement QXmpp::Private::nextSiblingElement(const QDomElement &el, QStringVie
     return {};
 }
 
-QByteArray QXmpp::Private::serializeXml(std::function<void(XmlWriter &)> toXml)
+QByteArray QXmpp::Private::serializeXmlWriter(std::function<void(XmlWriter &)> toXml)
 {
     QByteArray data;
     QXmlStreamWriter xmlStream(&data);
@@ -478,7 +478,7 @@ QByteArray QXmpp::Private::serializeXml(std::function<void(XmlWriter &)> toXml)
     return data;
 }
 
-QByteArray QXmpp::Private::serializeXml(std::function<void(QXmlStreamWriter *)> toXml)
+QByteArray QXmpp::Private::serializeQXmlStream(std::function<void(QXmlStreamWriter *)> toXml)
 {
     QByteArray data;
     QXmlStreamWriter xmlStream(&data);

@@ -64,7 +64,8 @@ public:
     /// \cond
     static constexpr std::tuple XmlTag = { u"chat", QXmpp::Private::ns_archive };
     void parse(const QDomElement &element);
-    void toXml(QXmlStreamWriter *writer, const QXmppResultSetReply &rsm = QXmppResultSetReply()) const;
+    void toXml(QXmlStreamWriter *writer) const { toXml(writer, {}); }
+    void toXml(QXmlStreamWriter *writer, const QXmppResultSetReply &rsm) const;
     /// \endcond
 
 private:

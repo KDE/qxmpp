@@ -14,6 +14,7 @@
 #include <functional>
 #include <optional>
 #include <stdint.h>
+#include <type_traits>
 
 #include <QByteArray>
 #include <QDomElement>
@@ -244,28 +245,34 @@ auto parseSingleAttributeElements(const QDomElement &parent, QStringView tagName
     });
 }
 
-QByteArray serializeXml(std::function<void(XmlWriter &)>);
-QByteArray serializeXml(std::function<void(QXmlStreamWriter *)>);
+QByteArray serializeXmlWriter(std::function<void(XmlWriter &)>);
+QByteArray serializeQXmlStream(std::function<void(QXmlStreamWriter *)>);
 
 template<typename T>
-concept XmlWriterSerializeable = requires(T packet, XmlWriter &writer) {
-    { packet.toXml(writer) } -> std::same_as<void>;
-};
+concept XmlWriterSerializeable =
+    std::same_as<
+        decltype(static_cast<void (std::remove_cvref_t<T>::*)(XmlWriter &)>(&std::remove_cvref_t<T>::toXml)),
+        void (std::remove_cvref_t<T>::*)(XmlWriter &)> ||
+    std::same_as<
+        decltype(static_cast<void (std::remove_cvref_t<T>::*)(XmlWriter &) const>(&std::remove_cvref_t<T>::toXml)),
+        void (std::remove_cvref_t<T>::*)(XmlWriter &) const>;
+
 template<typename T>
-concept QXmlStreamSerializeable = requires(T packet, QXmlStreamWriter *writer) {
-    { packet.toXml(writer) } -> std::same_as<void>;
-};
+concept QXmlStreamSerializeable =
+    std::same_as<
+        decltype(static_cast<void (std::remove_cvref_t<T>::*)(QXmlStreamWriter *) const>(&std::remove_cvref_t<T>::toXml)),
+        void (std::remove_cvref_t<T>::*)(QXmlStreamWriter *) const>;
 
 template<typename T>
 inline QByteArray serializeXml(const T &packet)
     requires XmlWriterSerializeable<T> || QXmlStreamSerializeable<T>
 {
     if constexpr (XmlWriterSerializeable<T>) {
-        return serializeXml([&](XmlWriter &w) {
+        return serializeXmlWriter([&](XmlWriter &w) {
             packet.toXml(w);
         });
     } else if constexpr (QXmlStreamSerializeable<T>) {
-        return serializeXml([&](QXmlStreamWriter *w) {
+        return serializeQXmlStream([&](QXmlStreamWriter *w) {
             packet.toXml(w);
         });
     }
