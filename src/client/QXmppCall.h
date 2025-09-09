@@ -63,7 +63,7 @@ public:
     bool videoSupported() const;
 
     void accept();
-    void hangup();
+    void hangUp();
     void addVideo();
 
     /// \brief This signal is emitted when a call is connected.

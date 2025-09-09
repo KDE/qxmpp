@@ -424,7 +424,7 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
                      q, [this, stream]() { q->onLocalCandidatesChanged(stream); });
 
     QObject::connect(stream->d->connection, &QXmppIceConnection::disconnected,
-                     q, &QXmppCall::hangup);
+                     q, &QXmppCall::hangUp);
 
     connect(stream->d, &QXmppCallStreamPrivate::peerCertificateReceived, this, [this, stream](bool fingerprintMatches) {
         if (!fingerprintMatches) {
@@ -670,7 +670,7 @@ QXmppCall::Direction QXmppCall::direction() const
 ///
 /// Hangs up the call.
 ///
-void QXmppCall::hangup()
+void QXmppCall::hangUp()
 {
     d->terminate({ QXmppJingleReason::Success, {}, {} });
 }

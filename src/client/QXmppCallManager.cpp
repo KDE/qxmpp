@@ -222,7 +222,7 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
 ///
 /// Incoming calls are exposed via the callReceived() signal. You can take ownership of the call by
 /// moving the unique_ptr, otherwise the call manager will decline and delete the call. You can
-/// accept or reject (hangup) the call.
+/// accept or reject (hang up) the call.
 ///
 /// Outgoing calls are created using call().
 ///
@@ -271,7 +271,7 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
 /// the call.
 ///
 /// \note Incoming calls need to be accepted or rejected using QXmppCall::accept() or
-/// QXmppCall::hangup().
+/// QXmppCall::hangUp().
 ///
 /// \since QXmpp 1.11, previously this signal had a different signature.
 ///

@@ -224,7 +224,7 @@ void tst_QXmppCallManager::testCall()
     // hangup call
     qDebug() << "======== HANGUP ========";
     connect(senderCall.get(), &QXmppCall::finished, &loop, &QEventLoop::quit);
-    senderCall->hangup();
+    senderCall->hangUp();
     loop.exec();
 
     QCOMPARE(senderCall->direction(), QXmppCall::OutgoingDirection);
