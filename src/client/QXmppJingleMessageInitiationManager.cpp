@@ -195,9 +195,9 @@ void QXmppJingleMessageInitiation::setRemoteJid(const QString &remoteJid)
 ///
 /// Returns the call partner's bare JID.
 ///
-/// \return the call partner's bare JID.
+/// \since QXmpp 1.12
 ///
-QString QXmppJingleMessageInitiation::remoteJid() const
+const QString &QXmppJingleMessageInitiation::remoteJid() const
 {
     return d->remoteJid;
 }
