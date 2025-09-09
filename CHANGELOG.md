@@ -12,6 +12,9 @@ QXmpp 1.12.0 (November 9, 2025)
  - Modernize DiscoveryManager: Split up QXmppDiscoveryIq, add request deduplication and caching of disco info features (@lnj, !717)
  - HttpFileSharingProvider: Fix early finished uploads hanging (@fazevedo, !722)
 
+Breaking changes:
+ - JingleMessageInitiation: Constructor is now private (must only be used by manager) (@lnj, !702)
+
 QXmpp 1.11.3 (October 13, 2025)
 -------------------------------
 
