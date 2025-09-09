@@ -304,8 +304,7 @@ QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessage
 /// \cond
 bool QXmppJingleMessageInitiationManager::handleMessage(const QXmppMessage &message)
 {
-    // JMI messages must be of type "chat" and contain a <store/> hint.
-    if (message.type() != QXmppMessage::Chat || !message.hasHint(QXmppMessage::Store)) {
+    if (message.type() != QXmppMessage::Chat) {
         return false;
     }
 
