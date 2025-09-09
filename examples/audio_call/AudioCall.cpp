@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppTurnServer.h"
 #include <QXmppCall.h>
 #include <QXmppCallManager.h>
 #include <QXmppClient.h>
@@ -136,7 +137,7 @@ int main(int argc, char *argv[])
 
     // call manager config
     callManager->setFallbackStunServers({ StunServer { QHostAddress(QStringLiteral("stun.nextcloud.com")), 443 } });
-    // callManager->setTurnServer();
+    callManager->setFallbackTurnServer(TurnServer { QHostAddress("openrelay.metered.ca"), 80, "openrelayproject", "openrelayproject" });
 
     client.connectToServer(config);
 
@@ -183,8 +184,11 @@ int main(int argc, char *argv[])
     QObject::connect(&client, &QXmppClient::connected, &app, [&] {
         // wait 1 second for presence of other clients to arrive
         QTimer::singleShot(1s, &app, [&] {
+            // auto bareJid = QStringLiteral("melvo1@olomono.de");
+            auto bareJid = client.configuration().jidBare();
+
             // other resources of our account
-            auto otherResources = rosterManager->getResources(config.jidBare());
+            auto otherResources = rosterManager->getResources(bareJid);
             otherResources.removeOne(config.resource());
             if (otherResources.isEmpty()) {
                 qDebug() << "[Call] No other clients to call on this account. Start another instance of the example to start a call.";
@@ -192,7 +196,7 @@ int main(int argc, char *argv[])
             }
 
             // call first JID
-            activeCall = callManager->call(config.jidBare() + u'/' + otherResources.first());
+            activeCall = callManager->call(bareJid + u'/' + otherResources.first());
             Q_ASSERT(activeCall != nullptr);
 
             setupCall(activeCall.get());
