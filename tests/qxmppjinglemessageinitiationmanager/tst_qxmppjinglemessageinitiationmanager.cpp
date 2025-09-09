@@ -99,7 +99,7 @@ void tst_QXmppJingleMessageInitiationManager::testRing()
     auto jmi { m_manager.addJmi("julietRing@capulet.example") };
     jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
 
-    connect(&m_logger, &QXmppLogger::message, this, [jmicallPartnerJid = jmi->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+    connect(&m_logger, &QXmppLogger::message, this, [jmicallPartnerJid = jmi->remoteJid()](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
@@ -126,7 +126,7 @@ void tst_QXmppJingleMessageInitiationManager::testProceed()
     auto jmi { m_manager.addJmi("julietProceed@capulet.example") };
     jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
 
-    connect(&m_logger, &QXmppLogger::message, this, [jmiCallPartnerJid = jmi->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+    connect(&m_logger, &QXmppLogger::message, this, [jmiCallPartnerJid = jmi->remoteJid()](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
@@ -157,7 +157,7 @@ void tst_QXmppJingleMessageInitiationManager::testReject()
     reason.setType(QXmppJingleReason::Decline);
     reason.setText("Declined");
 
-    connect(&m_logger, &QXmppLogger::message, this, [jmiCallPartnerJid = jmi->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+    connect(&m_logger, &QXmppLogger::message, this, [jmiCallPartnerJid = jmi->remoteJid()](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
@@ -191,7 +191,7 @@ void tst_QXmppJingleMessageInitiationManager::testRetract()
     reason.setType(QXmppJingleReason::Gone);
     reason.setText("Gone");
 
-    connect(&m_logger, &QXmppLogger::message, this, [jmicallPartnerJid = jmi->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+    connect(&m_logger, &QXmppLogger::message, this, [jmicallPartnerJid = jmi->remoteJid()](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
@@ -225,7 +225,7 @@ void tst_QXmppJingleMessageInitiationManager::testFinish()
     reason.setType(QXmppJingleReason::Success);
     reason.setText("Finished");
 
-    connect(&m_logger, &QXmppLogger::message, this, [jmicallPartnerJid = jmi->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+    connect(&m_logger, &QXmppLogger::message, this, [jmicallPartnerJid = jmi->remoteJid()](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
@@ -348,7 +348,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleNonExistingSessionLowerI
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
 
-            if (message.to() == jmiWithHigherId->callPartnerJid()) {
+            if (message.to() == jmiWithHigherId->remoteJid()) {
                 const auto &jmiElement { message.jingleMessageInitiationElement() };
                 QVERIFY(jmiElement);
 
@@ -394,7 +394,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleNonExistingSessionHigher
     jmiWithLowerId->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
 
     // make sure that request with lower id rejects request with higher id
-    connect(&m_logger, &QXmppLogger::message, this, [jid = jmiWithLowerId->callPartnerJid(), reason](QXmppLogger::MessageType type, const QString &text) {
+    connect(&m_logger, &QXmppLogger::message, this, [jid = jmiWithLowerId->remoteJid(), reason](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
@@ -445,7 +445,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingSession()
             QXmppMessage message;
             parsePacket(message, text.toUtf8());
 
-            if (message.to() == jmi->callPartnerJid()) {
+            if (message.to() == jmi->remoteJid()) {
                 const auto &jmiElement { message.jingleMessageInitiationElement() };
                 QVERIFY(jmiElement);
 
