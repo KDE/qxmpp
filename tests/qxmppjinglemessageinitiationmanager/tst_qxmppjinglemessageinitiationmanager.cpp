@@ -71,8 +71,8 @@ void tst_QXmppJingleMessageInitiationManager::initTestCase()
 void tst_QXmppJingleMessageInitiationManager::testClear()
 {
     QCOMPARE(m_manager.jmis().size(), 0);
-    auto jmi1 { m_manager.addJmi("test1") };
-    auto jmi2 { m_manager.addJmi("test2") };
+    auto jmi1 { m_manager.addJmi("test1", "j@id.org") };
+    auto jmi2 { m_manager.addJmi("test2", "j@id.org") };
     QCOMPARE(m_manager.jmis().size(), 2);
 
     m_manager.clear(jmi1);
@@ -83,11 +83,11 @@ void tst_QXmppJingleMessageInitiationManager::testClear()
 void tst_QXmppJingleMessageInitiationManager::testClearAll()
 {
     QCOMPARE(m_manager.jmis().size(), 0);
-    m_manager.addJmi("test1");
-    m_manager.addJmi("test2");
-    m_manager.addJmi("test3");
-    m_manager.addJmi("test4");
-    m_manager.addJmi("test5");
+    m_manager.addJmi("test1", "j@id.org");
+    m_manager.addJmi("test2", "j@id.org");
+    m_manager.addJmi("test3", "j@id.org");
+    m_manager.addJmi("test4", "j@id.org");
+    m_manager.addJmi("test5", "j@id.org");
     QCOMPARE(m_manager.jmis().size(), 5);
 
     m_manager.clearAll();
@@ -96,8 +96,7 @@ void tst_QXmppJingleMessageInitiationManager::testClearAll()
 
 void tst_QXmppJingleMessageInitiationManager::testRing()
 {
-    auto jmi { m_manager.addJmi("julietRing@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "julietRing@capulet.example");
 
     connect(&m_logger, &QXmppLogger::message, this, [jmicallPartnerJid = jmi->remoteJid()](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
@@ -123,8 +122,7 @@ void tst_QXmppJingleMessageInitiationManager::testRing()
 
 void tst_QXmppJingleMessageInitiationManager::testProceed()
 {
-    auto jmi { m_manager.addJmi("julietProceed@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "julietProceed@capulet.example");
 
     connect(&m_logger, &QXmppLogger::message, this, [jmiCallPartnerJid = jmi->remoteJid()](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
@@ -150,8 +148,7 @@ void tst_QXmppJingleMessageInitiationManager::testProceed()
 
 void tst_QXmppJingleMessageInitiationManager::testReject()
 {
-    auto jmi { m_manager.addJmi("julietReject@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "julietReject@capulet.example");
 
     QXmppJingleReason reason;
     reason.setType(QXmppJingleReason::Decline);
@@ -184,8 +181,7 @@ void tst_QXmppJingleMessageInitiationManager::testReject()
 
 void tst_QXmppJingleMessageInitiationManager::testRetract()
 {
-    auto jmi { m_manager.addJmi("julietRetract@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "julietRetract@capulet.example");
 
     QXmppJingleReason reason;
     reason.setType(QXmppJingleReason::Gone);
@@ -218,8 +214,7 @@ void tst_QXmppJingleMessageInitiationManager::testRetract()
 
 void tst_QXmppJingleMessageInitiationManager::testFinish()
 {
-    auto jmi { m_manager.addJmi("julietFinish@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "julietFinish@capulet.example");
 
     QXmppJingleReason reason;
     reason.setType(QXmppJingleReason::Success);
@@ -335,8 +330,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleNonExistingSessionLowerI
         "</message>"
     };
 
-    auto jmiWithHigherId { m_manager.addJmi("romeoNonExistingSession@montague.example") };
-    jmiWithHigherId->setId("fecbea35-08d3-404f-9ec7-2b57c566fa74");
+    auto jmiWithHigherId = m_manager.addJmi("fecbea35-08d3-404f-9ec7-2b57c566fa74", "romeoNonExistingSession@montague.example");
 
     QXmppJingleReason reason;
     reason.setType(QXmppJingleReason::Expired);
@@ -390,8 +384,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleNonExistingSessionHigher
     reason.setType(QXmppJingleReason::Expired);
     reason.setText("Tie-Break");
 
-    auto jmiWithLowerId { m_manager.addJmi("julietNonExistingSession@capulet.example") };
-    jmiWithLowerId->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmiWithLowerId = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "julietNonExistingSession@capulet.example");
 
     // make sure that request with lower id rejects request with higher id
     connect(&m_logger, &QXmppLogger::message, this, [jid = jmiWithLowerId->remoteJid(), reason](QXmppLogger::MessageType type, const QString &text) {
@@ -432,8 +425,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingSession()
         "</message>"
     };
 
-    auto jmi { m_manager.addJmi("julietExistingSession@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi { m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "julietExistingSession@capulet.example") };
     jmi->setIsProceeded(true);
 
     QXmppJingleReason reason;
@@ -469,8 +461,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleTieBreak()
 {
     QString callPartnerJid { "romeoHandleTieBreakExistingSession@montague.example/orchard" };
     QString jmiId { "ca3cf894-5325-482f-a412-a6e9f832298d" };
-    auto jmi { m_manager.addJmi(QXmppUtils::jidToBareJid(callPartnerJid)) };
-    jmi->setId(jmiId);
+    auto jmi = m_manager.addJmi(jmiId, QXmppUtils::jidToBareJid(callPartnerJid));
 
     QXmppJingleMessageInitiationElement jmiElement;
     QString newJmiId("989a46a6-f202-4910-a7c3-83c6ba3f3947");
@@ -510,8 +501,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleProposeJmiElement()
 
     // --- Tie break ---
 
-    auto jmi { m_manager.addJmi(callPartnerJid) };
-    jmi->setId("989a4123-f202-4910-a7c3-83c6ba3f3947");
+    auto jmi = m_manager.addJmi("989a4123-f202-4910-a7c3-83c6ba3f3947", callPartnerJid);
 
     QVERIFY(m_manager.handleProposeJmiElement(jmiElement, callPartnerJid));
     QCOMPARE(m_manager.jmis().size(), 1);
@@ -540,8 +530,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
     QString callPartnerJid { "juliet@capulet.example" };
     QString jmiId { "989a46a6-f202-4910-a7c3-83c6ba3f3947" };
 
-    auto jmi { m_manager.addJmi(callPartnerJid) };
-    jmi->setId(jmiId);
+    auto jmi = m_manager.addJmi(jmiId, callPartnerJid);
 
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setId(jmiId);
@@ -558,8 +547,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
 
     // --- proceeded ---
 
-    jmi = m_manager.addJmi(callPartnerJid);
-    jmi->setId(jmiId);
+    jmi = m_manager.addJmi(jmiId, callPartnerJid);
 
     jmiElement.setType(JmiType::Proceed);
     connect(jmi.get(), &QXmppJingleMessageInitiation::proceeded, this, [jmiElement](const QString &jmiElementId) {
@@ -573,8 +561,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
 
     // --- closed: rejected ---
 
-    jmi = m_manager.addJmi(callPartnerJid);
-    jmi->setId(jmiId);
+    jmi = m_manager.addJmi(jmiId, callPartnerJid);
 
     QXmppJingleReason reason;
     reason.setType(QXmppJingleReason::Expired);
@@ -600,8 +587,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
 
     // --- closed: retracted ---
 
-    jmi = m_manager.addJmi(callPartnerJid);
-    jmi->setId(jmiId);
+    jmi = m_manager.addJmi(jmiId, callPartnerJid);
 
     reason.setType(QXmppJingleReason::ConnectivityError);
     reason.setText("Retracted due to connectivity error.");
@@ -626,8 +612,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
 
     // --- closed: finished ---
 
-    jmi = m_manager.addJmi(callPartnerJid);
-    jmi->setId(jmiId);
+    jmi = m_manager.addJmi(jmiId, callPartnerJid);
 
     reason.setType(QXmppJingleReason::Success);
     reason.setText("Finished.");
@@ -653,8 +638,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
 
     // --- none ---
 
-    jmi = m_manager.addJmi(callPartnerJid);
-    jmi->setId(jmiId);
+    jmi = m_manager.addJmi(jmiId, callPartnerJid);
 
     jmiElement.setType(JmiType::None);
 
@@ -687,8 +671,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleJmiElement()
     jmiElement = {};
     jmiElement.setType(JmiType::Ringing);
     jmiElement.setId(jmiId);
-    auto jmi { m_manager.addJmi(QXmppUtils::jidToBareJid(callPartnerJid)) };
-    jmi->setId(jmiId);
+    auto jmi = m_manager.addJmi(jmiId, QXmppUtils::jidToBareJid(callPartnerJid));
 
     QSignalSpy ringingSpy(jmi.get(), &QXmppJingleMessageInitiation::ringing);
     QVERIFY(m_manager.handleJmiElement(std::move(jmiElement), callPartnerJid));
@@ -759,8 +742,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageRinging()
         "</message>"
     };
 
-    auto jmi { m_manager.addJmi("juliet@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "juliet@capulet.example");
 
     QSignalSpy ringingSpy(jmi.get(), &QXmppJingleMessageInitiation::ringing);
 
@@ -781,8 +763,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageProceeded()
         "</message>"
     };
 
-    auto jmi { m_manager.addJmi("juliet@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "juliet@capulet.example");
 
     QSignalSpy proceededSpy(jmi.get(), &QXmppJingleMessageInitiation::proceeded);
 
@@ -808,8 +789,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedRejected()
         "</message>"
     };
 
-    auto jmi { m_manager.addJmi("juliet@capulet.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "juliet@capulet.example");
 
     connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const Result &result) {
         using ResultType = QXmppJingleMessageInitiation::Rejected;
@@ -842,8 +822,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedRetracted()
         "</message>"
     };
 
-    auto jmi { m_manager.addJmi("romeo@montague.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "romeo@montague.example");
 
     connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const Result &result) {
         using ResultType = QXmppJingleMessageInitiation::Retracted;
@@ -877,8 +856,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedFinished()
         "</message>"
     };
 
-    auto jmi { m_manager.addJmi("romeo@montague.example") };
-    jmi->setId("ca3cf894-5325-482f-a412-a6e9f832298d");
+    auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "romeo@montague.example");
 
     connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const Result &result) {
         using ResultType = QXmppJingleMessageInitiation::Finished;
