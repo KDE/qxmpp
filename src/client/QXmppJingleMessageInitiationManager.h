@@ -39,7 +39,6 @@ public:
     /// Variant of Rejected, Retracted, Finished or Error result types
     using Result = std::variant<Rejected, Retracted, Finished, QXmppError>;
 
-    QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager, const QString &id, const QString &remoteJid);
     ~QXmppJingleMessageInitiation();
 
     const QString &remoteJid() const;
@@ -55,6 +54,8 @@ public:
     Q_SIGNAL void closed(const Result &result);
 
 private:
+    QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager, const QString &id, const QString &remoteJid);
+
     QString id() const;
     void setId(const QString &id);
     void setRemoteJid(const QString &remoteJid);

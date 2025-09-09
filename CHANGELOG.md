@@ -9,6 +9,9 @@ QXmpp 1.12.0 (UNRELEASED)
 
 *under development*
 
+Breaking changes:
+ - JingleMessageInitiation: Constructor is now private (must only be used by manager) (@lnj, !702)
+
 QXmpp 1.11.3 (October 13, 2025)
 -------------------------------
 
