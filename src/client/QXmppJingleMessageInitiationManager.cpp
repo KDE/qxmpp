@@ -560,7 +560,7 @@ bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::sh
 ///
 std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManager::addJmi(const QString &id, const QString &remoteJid)
 {
-    auto jmi = std::make_shared<QXmppJingleMessageInitiation>(this, id, remoteJid);
+    auto jmi = std::shared_ptr<QXmppJingleMessageInitiation>(new QXmppJingleMessageInitiation(this, id, remoteJid));
     d->jmis.append(jmi);
     return jmi;
 }
