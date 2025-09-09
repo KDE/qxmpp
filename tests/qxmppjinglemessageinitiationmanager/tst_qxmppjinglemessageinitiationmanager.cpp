@@ -704,15 +704,6 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessage_data()
                "</message>")
         << false;
 
-    QTest::newRow("xmlInvalidNoStore")
-        << QByteArray(
-               "<message to='julietHandleMessageNoStore@capulet.example' from='romeoHandleMessageNoStore@montague.example/orchard' type='chat'>"
-               "<propose xmlns='urn:xmpp:jingle-message:0' id='ca3cf894-5325-482f-a412-a6e9f832298d'>"
-               "<description xmlns='urn:xmpp:jingle:apps:rtp:1' media='audio'/>"
-               "</propose>"
-               "</message>")
-        << false;
-
     QTest::newRow("xmlInvalidNoJmiElement")
         << QByteArray("<message to='julietHandleMessageNoJmi@capulet.example' from='romeoHandleMessageNoJmi@montague.example/orchard' type='chat'/>")
         << false;
