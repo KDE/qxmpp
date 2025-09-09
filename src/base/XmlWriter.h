@@ -345,6 +345,11 @@ struct OptionalEnumElement {
     }
 };
 
+template<IsOptionalStringSerializable Enum>
+OptionalEnumElement(Enum) -> OptionalEnumElement<Enum>;
+template<IsOptionalStringSerializable Enum, std::convertible_to<QStringView> StringView>
+OptionalEnumElement(Enum, StringView) -> OptionalEnumElement<Enum>;
+
 template<typename Tag, typename Value>
 struct TextElement {
     Tag tag;
