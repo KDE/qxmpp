@@ -249,11 +249,11 @@ QByteArray serializeXml(std::function<void(QXmlStreamWriter *)>);
 
 template<typename T>
 concept XmlWriterSerializeable = requires(T packet, XmlWriter &writer) {
-    { packet.toXml(writer) } -> std::same_as<void>;
+    { &T::toXml } -> std::same_as<void (T::*)(XmlWriter &) const>;
 };
 template<typename T>
 concept QXmlStreamSerializeable = requires(T packet, QXmlStreamWriter *writer) {
-    { packet.toXml(writer) } -> std::same_as<void>;
+    { &T::toXml } -> std::same_as<void (T::*)(QXmlStreamWriter *) const>;
 };
 
 template<typename T>
