@@ -42,6 +42,8 @@ public:
     QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager);
     ~QXmppJingleMessageInitiation();
 
+    const QString &remoteJid() const;
+
     QXmppTask<QXmpp::SendResult> ring();
     QXmppTask<QXmpp::SendResult> proceed();
     QXmppTask<QXmpp::SendResult> reject(std::optional<QXmppJingleReason> reason, bool containsTieBreak = false);
@@ -55,7 +57,6 @@ public:
 private:
     QString id() const;
     void setId(const QString &id);
-    QString remoteJid() const;
     void setRemoteJid(const QString &remoteJid);
     bool isProceeded() const;
     void setIsProceeded(bool isProceeded);
