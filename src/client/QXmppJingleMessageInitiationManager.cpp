@@ -26,17 +26,14 @@ using JmiType = JmiElement::Type;
 class QXmppJingleMessageInitiationPrivate
 {
 public:
-    QXmppJingleMessageInitiationPrivate(JmiManager *manager)
-        : manager(manager)
-    {
-    }
+    QXmppJingleMessageInitiationPrivate(JmiManager *manager, const QString &id, const QString &remoteJid) : manager(manager), id(id), remoteJid(remoteJid) { }
 
     QXmppTask<SendResult> request(JmiElement &&jmiElement);
 
     QXmppJingleMessageInitiationManager *manager;
     QString id;
     QString remoteJid;
-    bool isProceeded { false };
+    bool isProceeded = false;
 };
 
 ///
@@ -61,8 +58,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiationPrivate::request(JmiElement &&
 ///
 /// \brief Constructs a Jingle Message Initiation object.
 ///
-QXmppJingleMessageInitiation::QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager)
-    : d(new QXmppJingleMessageInitiationPrivate(manager))
+QXmppJingleMessageInitiation::QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager, const QString &id, const QString &remoteJid)
+    : d(new QXmppJingleMessageInitiationPrivate(manager, id, remoteJid))
 {
 }
 
@@ -284,17 +281,19 @@ QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessage
 {
     QXmppPromise<ProposeResult> promise;
 
+    const auto id = QXmppUtils::generateStanzaUuid();
+
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Propose);
-    jmiElement.setId(QXmppUtils::generateStanzaUuid());
+    jmiElement.setId(id);
     jmiElement.setDescription(description);
 
-    sendMessage(jmiElement, remoteJid).then(this, [this, promise, remoteJid](SendResult result) mutable {
+    sendMessage(jmiElement, remoteJid).then(this, [this, promise, id, remoteJid](SendResult result) mutable {
         if (auto error = std::get_if<QXmppError>(&result)) {
             warning(u"Error sending Jingle Message Initiation proposal: " + error->description);
             promise.finish(*error);
         } else {
-            promise.finish(addJmi(remoteJid));
+            promise.finish(addJmi(id, remoteJid));
         }
     });
 
@@ -362,6 +361,11 @@ bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageIni
 {
     auto jmiElementId = jmiElement.id();
     auto remoteJid = QXmppUtils::jidToBareJid(senderJid);
+
+    if (jmiElementId.isEmpty()) {
+        warning(u"Received JMI element with empty ID from %1. (ignoring)"_s.arg(senderJid));
+        return false;
+    }
 
     // Check if there's already a JMI object with jmiElementId and remoteJid in JMIs vector.
     // That means that a JMI has already been created with given (J)IDs.
@@ -439,7 +443,7 @@ bool QXmppJingleMessageInitiationManager::handleProposeJmiElement(const QXmppJin
         return handleTieBreak(*itr, jmiElement, remoteJid);
     }
 
-    Q_EMIT proposed(addJmi(remoteJid), jmiElement.id(), jmiElement.description());
+    Q_EMIT proposed(addJmi(jmiElement.id(), remoteJid), jmiElement.id(), jmiElement.description());
     return true;
 }
 
@@ -554,10 +558,9 @@ bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::sh
 /// \param remoteJid bare JID of the call partner
 /// \return The newly created JMI
 ///
-std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManager::addJmi(const QString &remoteJid)
+std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManager::addJmi(const QString &id, const QString &remoteJid)
 {
-    auto jmi { std::make_shared<QXmppJingleMessageInitiation>(this) };
-    jmi->setRemoteJid(remoteJid);
+    auto jmi = std::make_shared<QXmppJingleMessageInitiation>(this, id, remoteJid);
     d->jmis.append(jmi);
     return jmi;
 }
