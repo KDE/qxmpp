@@ -49,14 +49,14 @@ public:
     QXmppTask<QXmpp::SendResult> finish(std::optional<QXmppJingleReason> reason, const QString &migratedTo = {});
 
     Q_SIGNAL void ringing();
-    Q_SIGNAL void proceeded(const QString &id, const QString &callPartnerResource);
+    Q_SIGNAL void proceeded(const QString &id, const QString &remoteResource);
     Q_SIGNAL void closed(const Result &result);
 
 private:
     QString id() const;
     void setId(const QString &id);
-    void setCallPartnerJid(const QString &callPartnerJid);
-    QString callPartnerJid() const;
+    QString remoteJid() const;
+    void setRemoteJid(const QString &remoteJid);
     bool isProceeded() const;
     void setIsProceeded(bool isProceeded);
 
@@ -80,7 +80,7 @@ public:
     /// \endcond
 
     QXmppTask<ProposeResult> propose(
-        const QString &callPartnerJid,
+        const QString &remoteJid,
         const QXmppJingleRtpDescription &description);
 
     Q_SIGNAL void proposed(
@@ -96,18 +96,18 @@ protected:
 private:
     QXmppTask<QXmpp::SendResult> sendMessage(
         const QXmppJingleMessageInitiationElement &jmiElement,
-        const QString &callPartnerJid);
+        const QString &remoteJid);
 
     void clear(const std::shared_ptr<QXmppJingleMessageInitiation> &jmi);
     void clearAll();
 
     bool handleJmiElement(QXmppJingleMessageInitiationElement &&jmiElement, const QString &senderJid);
-    bool handleExistingJmi(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &callPartnerResource);
-    bool handleProposeJmiElement(const QXmppJingleMessageInitiationElement &jmiElement, const QString &callPartnerJid);
-    bool handleTieBreak(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &callPartnerResource);
+    bool handleExistingJmi(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteResource);
+    bool handleProposeJmiElement(const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteJid);
+    bool handleTieBreak(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteResource);
     bool handleExistingSession(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QString &jmiElementId);
-    bool handleNonExistingSession(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QString &jmiElementId, const QString &callPartnerResource);
-    std::shared_ptr<QXmppJingleMessageInitiation> addJmi(const QString &callPartnerJid);
+    bool handleNonExistingSession(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QString &jmiElementId, const QString &remoteResource);
+    std::shared_ptr<QXmppJingleMessageInitiation> addJmi(const QString &remoteJid);
     const QVector<std::shared_ptr<QXmppJingleMessageInitiation>> &jmis() const;
 
 private:
