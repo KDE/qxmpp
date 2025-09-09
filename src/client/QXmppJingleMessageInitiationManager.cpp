@@ -86,7 +86,7 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::proceed()
 {
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Proceed);
-
+    jmiElement.setId(d->id);
     return d->request(std::move(jmiElement));
 }
 
