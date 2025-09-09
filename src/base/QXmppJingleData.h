@@ -353,22 +353,44 @@ public:
     /// This enum is used to describe a reason's type.
     enum Type {
         None,
+        /// The party prefers to use an existing session with the peer rather than initiate a new
+        /// session; the Jingle session ID of the alternative session SHOULD be provided as the XML
+        /// character data of the <sid/> child.
         AlternativeSession,
+        /// The party is busy and cannot accept a session.
         Busy,
+        /// The initiator wishes to formally cancel the session initiation request.
         Cancel,
+        /// The action is related to connectivity problems.
         ConnectivityError,
+        /// The party wishes to formally decline the session.
         Decline,
+        /// The session length has exceeded a pre-defined time limit (e.g., a meeting hosted at a
+        /// conference service).
         Expired,
+        /// The party has been unable to initialize processing related to the application type.
         FailedApplication,
+        /// The party has been unable to establish connectivity for the transport method.
         FailedTransport,
+        /// The action is related to a non-specific application error.
         GeneralError,
+        /// The entity is going offline or is no longer available.
         Gone,
+        /// The party supports the offered application type but does not support the offered or
+        /// negotiated parameters.
         IncompatibleParameters,
+        /// The action is related to media processing problems.
         MediaError,
+        /// The action is related to a violation of local security policies.
         SecurityError,
+        /// The action is generated during the normal course of state management and does not
+        /// reflect any error.
         Success,
+        /// A request has not been answered so the sender is timing out the request.
         Timeout,
+        /// The party supports none of the offered application types.
         UnsupportedApplications,
+        /// The party supports none of the offered transport methods.
         UnsupportedTransports
     };
 
