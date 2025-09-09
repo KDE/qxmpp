@@ -39,7 +39,7 @@ public:
     /// Variant of Rejected, Retracted, Finished or Error result types
     using Result = std::variant<Rejected, Retracted, Finished, QXmppError>;
 
-    QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager);
+    QXmppJingleMessageInitiation(QXmppJingleMessageInitiationManager *manager, const QString &id, const QString &remoteJid);
     ~QXmppJingleMessageInitiation();
 
     const QString &remoteJid() const;
@@ -108,7 +108,7 @@ private:
     bool handleTieBreak(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteResource);
     bool handleExistingSession(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QString &jmiElementId);
     bool handleNonExistingSession(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QString &jmiElementId, const QString &remoteResource);
-    std::shared_ptr<QXmppJingleMessageInitiation> addJmi(const QString &remoteJid);
+    std::shared_ptr<QXmppJingleMessageInitiation> addJmi(const QString &id, const QString &remoteJid);
     const QVector<std::shared_ptr<QXmppJingleMessageInitiation>> &jmis() const;
 
 private:
