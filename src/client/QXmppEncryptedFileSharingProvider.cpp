@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022 Jonah Brüchert <jbb@kaidan.im>
 // SPDX-FileCopyrightText: 2022 Linus Jahn <lnj@kaidan.im>
+// SPDX-FileCopyrightText: 2025 Filipe AZevedo <pasnox@gmail.com>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -111,17 +112,23 @@ auto QXmppEncryptedFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> da
         metadata,
         std::move(reportProgress),
         [=, reportFinished = std::move(reportFinished)](UploadResult result) {
-            auto encryptedResult = map<UploadResult>(
-                [&](std::any httpSourceAny) {
-                    QXmppEncryptedFileSource encryptedSource;
-                    encryptedSource.setCipher(ENCRYPTION_DEFAULT_CIPHER);
-                    encryptedSource.setKey(key);
-                    encryptedSource.setIv(iv);
-                    encryptedSource.setHttpSources({ std::any_cast<QXmppHttpFileSource>(std::move(httpSourceAny)) });
+            if (std::holds_alternative<std::any>(result)) {
+                auto encryptedResult = map<UploadResult>(
+                    [&](std::any httpSourceAny) {
+                        QXmppEncryptedFileSource encryptedSource;
+                        encryptedSource.setCipher(ENCRYPTION_DEFAULT_CIPHER);
+                        encryptedSource.setKey(key);
+                        encryptedSource.setIv(iv);
+                        encryptedSource.setHttpSources({ std::any_cast<QXmppHttpFileSource>(std::move(httpSourceAny)) });
 
-                    return encryptedSource;
-                },
-                std::move(result));
-            reportFinished(std::move(encryptedResult));
+                        return encryptedSource;
+                    },
+                    std::move(result));
+                reportFinished(std::move(encryptedResult));
+            } else if (std::holds_alternative<Cancelled>(result)) {
+                reportFinished(Cancelled {});
+            } else if (std::holds_alternative<QXmppError>(result)) {
+                reportFinished(std::get<QXmppError>(std::move(result)));
+            }
         });
 }
