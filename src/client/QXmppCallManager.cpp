@@ -300,6 +300,15 @@ QXmppCallManager::~QXmppCallManager() = default;
 ///
 void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
 {
+    // Check for invalid addresses
+    uint invalidServers = 0;
+    for (const auto &server : servers) {
+        invalidServers += server.host.isNull();
+    }
+    if (invalidServers) {
+        warning(u"Fallback STUN servers contains %1 invalid servers with a null host address."_s
+                    .arg(invalidServers));
+    }
     d->fallbackStunServers = servers;
 }
 
@@ -313,6 +322,11 @@ void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
 ///
 void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &server)
 {
+    if (server) {
+        if (server->host.isNull()) {
+            warning(u"Fallback TURN server has invalid null host address."_s);
+        }
+    }
     d->fallbackTurnServer = server;
 }
 
