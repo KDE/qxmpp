@@ -45,7 +45,7 @@ private:
     QXmppStunMessage m_request;
     QXmppStunMessage m_response;
     QTimer *m_retryTimer;
-    int m_tries;
+    int m_tries = 0;
 };
 
 class QXMPP_EXPORT QXmppIceTransport : public QXmppLoggable
@@ -114,27 +114,27 @@ private:
     void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
     void setState(AllocationState state);
 
-    QUdpSocket *socket;
-    QTimer *m_timer;
-    QTimer *m_channelTimer;
+    QUdpSocket *socket = nullptr;
+    QTimer *m_timer = nullptr;
+    QTimer *m_channelTimer = nullptr;
     QString m_password;
     QString m_username;
     QHostAddress m_relayedHost;
-    quint16 m_relayedPort;
+    quint16 m_relayedPort = 0;
     QHostAddress m_turnHost;
-    quint16 m_turnPort;
+    quint16 m_turnPort = 0;
 
     // channels
     typedef QPair<QHostAddress, quint16> Address;
-    quint16 m_channelNumber;
+    quint16 m_channelNumber = 0x4000;
     QMap<quint16, Address> m_channels;
 
     // state
-    quint32 m_lifetime;
+    quint32 m_lifetime = 600;
     QByteArray m_key;
     QString m_realm;
     QByteArray m_nonce;
-    AllocationState m_state;
+    AllocationState m_state = UnconnectedState;
     QList<QXmppStunTransaction *> m_transactions;
 };
 
