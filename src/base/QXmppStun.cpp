@@ -1378,7 +1378,8 @@ void QXmppTurnAllocation::handleDatagram(const QByteArray &buffer, const QHostAd
     // Data Indication packets (relayed data encoded in STUN messages)
     // AFAIK data indication STUN packets are used initially and then the more optimized Channel
     // Data packets are used (which only have 4 additional bytes for channel number and length).
-    if (message.messageClass() == QXmppStunMessage::Data && message.messageMethod() == QXmppStunMessage::Indication) {
+    if (message.messageMethod() == QXmppStunMessage::Data && message.messageClass() == QXmppStunMessage::Indication) {
+        debug(u"TURN relayed data via Data Indication received"_s);
         Q_EMIT datagramReceived(message.data(), message.xorPeerHost, message.xorPeerPort);
     } else {
         warning(u"Unexpected TURN packet received."_s);
