@@ -18,6 +18,8 @@ class QTimer;
 class QXmppIceComponentPrivate;
 class QXmppIceConnectionPrivate;
 class QXmppIcePrivate;
+class QXmppIceTransport;
+class QXmppStunTransaction;
 
 namespace QXmpp {
 struct StunServer;
@@ -186,9 +188,8 @@ private:
     Q_SLOT void checkCandidates();
     Q_SLOT void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
     Q_SLOT void turnConnected();
-    Q_SLOT void transactionFinished();
+    void handleStunResponse(QXmppIceTransport *transport, const QXmppStunMessage &response);
     Q_SLOT void updateGatheringState();
-    Q_SLOT void writeStun(const QXmppStunMessage &request);
 
     const std::unique_ptr<QXmppIceComponentPrivate> d;
     friend class QXmppIceComponentPrivate;
