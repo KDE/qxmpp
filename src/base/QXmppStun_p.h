@@ -30,7 +30,7 @@ class QXMPP_EXPORT QXmppStunTransaction : public QXmppLoggable
     Q_OBJECT
 
 public:
-    QXmppStunTransaction(const QXmppStunMessage &request, QObject *parent);
+    QXmppStunTransaction(const QXmppStunMessage &request, std::function<void(const QXmppStunMessage &)> sendStunMessage, std::function<void(QXmppStunTransaction *)> onFinished, QObject *parent);
     const QXmppStunMessage &request() const { return m_request; }
     const QXmppStunMessage &response() const { return m_response; }
 
@@ -105,11 +105,12 @@ public:
     Q_SIGNAL void disconnected();
 
 private:
+    void sendStunMessage(QXmppStunMessage &&message);
     Q_SLOT void readyRead();
     Q_SLOT void refresh();
     Q_SLOT void refreshChannels();
-    Q_SLOT void transactionFinished();
-    Q_SLOT void writeStun(const QXmppStunMessage &message);
+    void handleTransactionFinished(QXmppStunTransaction *);
+    void writeStun(const QXmppStunMessage &message);
 
     void handleDatagram(const QByteArray &datagram, const QHostAddress &host, quint16 port);
     void setState(AllocationState state);
