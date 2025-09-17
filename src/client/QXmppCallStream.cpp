@@ -128,7 +128,7 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     }
 
     /* Create appsrc / appsink elements */
-    connection = new QXmppIceConnection(this);
+    connection = new QXmppIceConnection(parent);
     connection->addComponent(RTP_COMPONENT);
     connection->addComponent(RTCP_COMPONENT);
     appRtpSink = gst_element_factory_make("appsink", nullptr);
