@@ -134,12 +134,13 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
 
 GstCaps *QXmppCallPrivate::ptMap(uint sessionId, uint pt)
 {
+    // generate caps for incoming stream by payload type id
     auto *stream = find(streams, sessionId, &QXmppCallStream::id).value();
     if (auto payloadType = find(stream->d->payloadTypes, pt, &QXmppJinglePayloadType::id)) {
         return gst_caps_new_simple("application/x-rtp",
                                    "media", G_TYPE_STRING, stream->media().toLatin1().data(),
                                    "clock-rate", G_TYPE_INT, payloadType->clockrate(),
-                                   "encoding-name", G_TYPE_STRING, payloadType->name().toLatin1().data(),
+                                   "encoding-name", G_TYPE_STRING, payloadType->name().toUpper().toLatin1().data(),
                                    nullptr);
     }
     q->warning(u"Remote party %1 transmits wrong %2 payload for call %3"_s.arg(jid, stream->media(), sid));
