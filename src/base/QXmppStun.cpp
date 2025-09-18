@@ -2884,7 +2884,7 @@ void QXmppIceConnection::slotGatheringStateChanged()
 
     if (newGatheringState != d->gatheringState) {
         info(u"ICE gathering state changed from '%1' to '%2'"_s
-                 .arg(d->gatheringState, newGatheringState));
+                 .arg(Enums::toString(d->gatheringState), Enums::toString(newGatheringState)));
         d->gatheringState = newGatheringState;
         Q_EMIT gatheringStateChanged();
     }
