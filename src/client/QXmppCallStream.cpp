@@ -291,6 +291,9 @@ void QXmppCallStreamPrivate::datagramReceived(const QByteArray &datagram, GstEle
 
 void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
 {
+    q->debug(u"Adding encoder for %1 (channels=%2, clockrate=%3)"_s
+                 .arg(codec.name, QString::number(codec.channels), QString::number(codec.clockrate)));
+
     // Remove old encoder and payloader if they exist
     if (encoderBin) {
         if (!gst_bin_remove(GST_BIN(pipeline), encoderBin)) {

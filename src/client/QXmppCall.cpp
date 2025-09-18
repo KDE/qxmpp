@@ -100,11 +100,13 @@ void QXmppCallPrivate::ssrcActive(uint sessionId, uint ssrc)
     GstElement *rtpSession;
     g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(sessionId), &rtpSession);
     // TODO: implement bitrate controller
+    // TODO: display stats like packet drop count
 }
 
 void QXmppCallPrivate::padAdded(GstPad *pad)
 {
-    auto nameParts = QString::fromUtf8(gst_pad_get_name(pad)).split(u'_');
+    auto padName = QString::fromUtf8(gst_pad_get_name(pad));
+    auto nameParts = padName.split(u'_');
     if (nameParts.size() < 4) {
         return;
     }
@@ -123,10 +125,17 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
         if (stream->media() == VIDEO_MEDIA) {
             if (auto codec = find(videoCodecs, pt, &GstCodec::pt)) {
                 stream->d->addDecoder(pad, *codec);
+                q->debug(u"Receiving video from %1 using %2"_s
+                             .arg(padName, codec->name));
             }
         } else if (stream->media() == AUDIO_MEDIA) {
             if (auto codec = find(audioCodecs, pt, &GstCodec::pt)) {
                 stream->d->addDecoder(pad, *codec);
+                q->debug(u"Receiving audio from %1 using %2 (%3 channels, %4)"_s
+                             .arg(padName,
+                                  codec->name,
+                                  QString::number(codec->channels),
+                                  QString::number(codec->clockrate)));
             }
         }
     }
@@ -416,6 +425,8 @@ QXmppCallStream *QXmppCallPrivate::createStream(const QString &media, const QStr
     stream->d->connection->setIceControlling(direction == QXmppCall::OutgoingDirection);
     stream->d->connection->setStunServers(manager->d->stunServers());
     if (auto turnServer = manager->d->turnServer()) {
+        auto turnServerHost = turnServer->host.toString();
+        q->debug(u"Call: Using TURN server: " + turnServerHost + u"/" + QString::number(turnServer->port));
         stream->d->connection->setTurnServer(*turnServer);
     }
     stream->d->connection->bind(QXmppIceComponent::discoverAddresses());
