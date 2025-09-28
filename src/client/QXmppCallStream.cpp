@@ -14,6 +14,7 @@
 
 #include <cstring>
 #include <gst/gst.h>
+#include <gst/rtp/rtp.h>
 
 #include <QRandomGenerator>
 #include <QSslCertificate>
@@ -217,11 +218,6 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
         qFatal("Failed to link rtp send pads to internal ghost pads");
     }
 
-    // We need frequent RTCP reports for the bandwidth controller
-    GstElement *rtpSession;
-    g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(id), &rtpSession);
-    g_object_set(rtpSession, "rtcp-min-interval", 100'000'000, nullptr);
-
     gst_element_sync_state_with_parent(iceReceiveBin);
     gst_element_sync_state_with_parent(iceSendBin);
 
@@ -229,6 +225,15 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     GstPadPtr rtpbinRtcpSendPad = gst_element_request_pad_simple(rtpBin, u"send_rtcp_src_%1"_s.arg(id).toLatin1().data());
     linkPads(rtpbinRtpSendPad, internalRtpPad);
     linkPads(rtpbinRtcpSendPad, internalRtcpPad);
+
+    // We need frequent RTCP reports for the bandwidth controller
+    GstElement *rtpSession;
+    g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(id), &rtpSession);
+    g_object_set(rtpSession, "rtcp-min-interval", 100'000'000, nullptr);
+
+    // RTCP feedback mechanism: Transport-Wide Congestion Control
+    // GstElement *twcc = gst_element_factory_make("rtphdrexttwcc", NULL);
+    // gst_child_proxy_set(GST_CHILD_PROXY(rtpBin), "send-rtp-extmap-3", twcc, NULL);
 }
 
 QXmppCallStreamPrivate::~QXmppCallStreamPrivate()
@@ -323,6 +328,13 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
     }
     g_object_set(pay, "pt", codec.pt, "ssrc", localSsrc, nullptr);
 
+    // add header extensions to payloader
+    auto *hdrext = gst_rtp_header_extension_create_from_uri("urn:ietf:params:rtp-hdrext:ssrc-audio-level");
+    gst_rtp_header_extension_set_id(hdrext, 3);
+    qDebug() << "RTP HEADEREXT created:" << gst_rtp_header_extension_get_uri(hdrext);
+    GstElement *createdHdrExt = nullptr;
+    g_signal_emit_by_name(pay, "request-extension", 3, "urn:ietf:params:rtp-hdrext:ssrc-audio-level", &createdHdrExt);
+
     GstElement *encoder = gst_element_factory_make(codec.gstEnc.data(), nullptr);
     if (!encoder) {
         qFatal("Failed to create encoder");
@@ -372,12 +384,28 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
     gst_element_add_pad(decoderBin, receivePad);
     gst_element_add_pad(decoderBin, internalReceivePad);
 
+    // Create capsfilter that normalizes encoding-name to uppercase
+    GstElement *capsfilter = gst_element_factory_make("capsfilter", nullptr);
+    if (!capsfilter) {
+        qFatal("Failed to create capsfilter");
+        return;
+    }
+    // Force encoding-name to OPUS (uppercase)
+    GstCaps *filterCaps = gst_caps_from_string(
+        "application/x-rtp, media=audio, clock-rate=48000, encoding-name=OPUS, payload=111");
+    g_object_set(capsfilter, "caps", filterCaps, nullptr);
+    gst_caps_unref(filterCaps);
+
     // Create new elements
     GstElement *depay = gst_element_factory_make(codec.gstDepay.data(), nullptr);
     if (!depay) {
         qFatal("Failed to create depayloader");
         return;
     }
+
+    GstRTPHeaderExtension *createdHdrExt = nullptr;
+    g_signal_emit_by_name(depay, "request-extension", 3, "urn:ietf:params:rtp-hdrext:ssrc-audio-level", &createdHdrExt);
+    qDebug() << " >>>>>> request-extension >>>" << gst_rtp_header_extension_get_id(createdHdrExt);
 
     GstElement *decoder = gst_element_factory_make(codec.gstDec.data(), nullptr);
     if (!decoder) {
@@ -391,11 +419,17 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
         return;
     }
 
-    gst_bin_add_many(GST_BIN(decoderBin), depay, decoder, queue, nullptr);
+    gst_bin_add_many(GST_BIN(decoderBin), capsfilter, depay, decoder, queue, nullptr);
 
-    GstPadPtr depaySinkPad = gst_element_get_static_pad(depay, "sink");
-    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(internalReceivePad), depaySinkPad)) {
-        qFatal("Failed to set receive pad");
+    // Ghostpad zeigt auf capsfilter:sink
+    GstPadPtr capsSinkPad = gst_element_get_static_pad(capsfilter, "sink");
+    if (!gst_ghost_pad_set_target(GST_GHOST_PAD(internalReceivePad), capsSinkPad)) {
+        qFatal("Failed to set internalReceivePad target");
+    }
+
+    // Jetzt capsfilter mit depay verlinken
+    if (!gst_element_link(capsfilter, depay)) {
+        qFatal("Failed to link capsfilter -> depay");
     }
 
     GstPadPtr queueSrcPad = gst_element_get_static_pad(queue, "src");
@@ -403,8 +437,15 @@ void QXmppCallStreamPrivate::addDecoder(GstPad *pad, QXmppCallPrivate::GstCodec 
         qFatal("Failed to set receive pad");
     }
 
+    qDebug() << "link pads pad/internalReceivePad";
+    GstCaps *srccaps = gst_pad_query_caps(pad, nullptr);
+    g_print(" input caps: %s\n", gst_caps_to_string(srccaps));
+
+    srccaps = gst_pad_query_caps(internalReceivePad, nullptr);
+    g_print(" internal receive pad caps: %s\n", gst_caps_to_string(srccaps));
+
     linkPads(pad, internalReceivePad);
-    if (!gst_element_link_many(depay, decoder, queue, nullptr)) {
+    if (!gst_element_link_many(capsfilter, depay, decoder, queue, nullptr)) {
         qFatal("Could not link all decoder pads");
         return;
     }

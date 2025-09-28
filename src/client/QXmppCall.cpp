@@ -58,7 +58,8 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
         return;
     }
     // We do not want to build up latency over time
-    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 25, nullptr);
+    g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 25, "do-retransmission", true, nullptr);
+
     if (!gst_bin_add(GST_BIN(pipeline.get()), rtpBin)) {
         qFatal("Could not add rtpbin to the pipeline");
     }
@@ -74,6 +75,8 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
                              this);
     g_signal_connect_swapped(rtpBin, "on-ssrc-active",
                              G_CALLBACK(+[](QXmppCallPrivate *p, uint sessionId, uint ssrc) {
+                                 qDebug() << "\n\n\n\nssrc-active called\n\n\n\n"
+                                          << sessionId << ssrc;
                                  p->ssrcActive(sessionId, ssrc);
                              }),
                              this);
@@ -101,6 +104,30 @@ void QXmppCallPrivate::ssrcActive(uint sessionId, uint ssrc)
     g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(sessionId), &rtpSession);
     // TODO: implement bitrate controller
     // TODO: display stats like packet drop count
+
+    qDebug() << "\n\nMoin ssrcActive \n"
+             << sessionId << ssrc;
+    // print stats
+    GstStructure *stats;
+    g_object_get(rtpSession, "stats", &stats, NULL);
+    if (!stats) {
+        g_print("No stats available\n");
+        return;
+    }
+
+    g_print("RTP session stats:\n");
+    auto fieldCount = gst_structure_n_fields(stats);
+    for (int i = 0; i < fieldCount; i++) {
+        const gchar *name = gst_structure_nth_field_name(stats, i);
+        GValue val = G_VALUE_INIT;
+        if (gst_structure_get(stats, name, &val, nullptr)) {
+            gchar *s = g_strdup_value_contents(&val);
+            g_print("  %s: %s\n", name, s);
+            g_free(s);
+        }
+    }
+
+    gst_structure_free(stats);  // free the returned structure
 }
 
 void QXmppCallPrivate::padAdded(GstPad *pad)
@@ -130,12 +157,19 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
             }
         } else if (stream->media() == AUDIO_MEDIA) {
             if (auto codec = find(audioCodecs, pt, &GstCodec::pt)) {
+                qDebug() << "Adding audio decoder....";
                 stream->d->addDecoder(pad, *codec);
                 q->debug(u"Receiving audio from %1 using %2 (%3 channels, %4)"_s
                              .arg(padName,
                                   codec->name,
                                   QString::number(codec->channels),
                                   QString::number(codec->clockrate)));
+            } else {
+                qDebug() << "Error no decoder found for:" << padName << "pt=" << pt;
+                qDebug() << "Available:";
+                for (const auto &c : audioCodecs) {
+                    qDebug() << "  " << c.pt << c.name;
+                }
             }
         }
     }
@@ -176,7 +210,7 @@ bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJin
     while (it != stream->d->payloadTypes.end()) {
         bool dynamic = it->id() >= 96;
         bool supported = false;
-        auto codecs = stream->media() == AUDIO_MEDIA ? audioCodecs : videoCodecs;
+        auto &codecs = stream->media() == AUDIO_MEDIA ? audioCodecs : videoCodecs;
         for (auto &codec : codecs) {
             if (dynamic) {
                 if (codec.name == it->name() &&
@@ -204,6 +238,10 @@ bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJin
                 }
             }
         }
+
+        // Remove RTP fb parameters: we currently don't support setting them
+        it->setRtpFeedbackProperties({});
+        it->setRtpFeedbackIntervals({});
 
         if (!supported) {
             it = stream->d->payloadTypes.erase(it);

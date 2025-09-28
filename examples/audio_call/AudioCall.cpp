@@ -136,8 +136,10 @@ int main(int argc, char *argv[])
     config.setIgnoreSslErrors(true);
 
     // call manager config
-    callManager->setFallbackStunServers({ StunServer { QHostAddress(QStringLiteral("stun.nextcloud.com")), 443 } });
-    callManager->setFallbackTurnServer(TurnServer { QHostAddress("openrelay.metered.ca"), 80, "openrelayproject", "openrelayproject" });
+    // stun.nextcloud.com
+    callManager->setFallbackStunServers({ StunServer { QHostAddress(QStringLiteral("159.69.191.124")), 443 } });
+    // openrelay.metered.ca
+    callManager->setFallbackTurnServer(TurnServer { QHostAddress("15.235.47.158"), 80, "openrelayproject", "openrelayproject" });
 
     client.connectToServer(config);
 
@@ -167,7 +169,7 @@ int main(int argc, char *argv[])
 
             if (call->videoSupported()) {
                 QTimer::singleShot(5s, call, [call] {
-                    call->addVideo();
+                    // call->addVideo();
                 });
             }
         });
@@ -184,8 +186,8 @@ int main(int argc, char *argv[])
     QObject::connect(&client, &QXmppClient::connected, &app, [&] {
         // wait 1 second for presence of other clients to arrive
         QTimer::singleShot(1s, &app, [&] {
-            // auto bareJid = QStringLiteral("melvo1@olomono.de");
-            auto bareJid = client.configuration().jidBare();
+            auto bareJid = QStringLiteral("lnj1@olomono.de");
+            // auto bareJid = client.configuration().jidBare();
 
             // other resources of our account
             auto otherResources = rosterManager->getResources(bareJid);

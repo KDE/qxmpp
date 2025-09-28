@@ -104,8 +104,8 @@ public:
     };
 
     QList<GstCodec> audioCodecs = {
-        { .pt = 98, .name = u"opus"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = {} },
-        { .pt = 98, .name = u"opus"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = {} },
+        { .pt = 98, .name = u"opus"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = { { "inband-fec"_L1, true }, { "frame-size"_L1, 40 } } },
+        { .pt = 98, .name = u"opus"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = { { "inband-fec"_L1, true }, { "frame-size"_L1, 40 } } },
         { .pt = 97, .name = u"speex"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpspeexpay"_L1, .gstDepay = "rtpspeexdepay"_L1, .gstEnc = "speexenc"_L1, .gstDec = "speexdec"_L1, .encProps = {} },
         { .pt = 97, .name = u"speex"_s, .channels = 1, .clockrate = 44100, .gstPay = "rtpspeexpay"_L1, .gstDepay = "rtpspeexdepay"_L1, .gstEnc = "speexenc"_L1, .gstDec = "speexdec"_L1, .encProps = {} },
         { .pt = 96, .name = u"mpeg4-generic"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
