@@ -63,6 +63,7 @@ public:
     bool videoSupported() const;
 
     void accept();
+    void decline();
     void hangUp();
     void addVideo();
 
