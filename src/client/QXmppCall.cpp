@@ -613,6 +613,8 @@ QXmppCall::~QXmppCall() = default;
 ///
 /// Call this method if you wish to accept an incoming call.
 ///
+/// \sa decline()
+///
 void QXmppCall::accept()
 {
     if (d->direction == IncomingDirection && d->state == ConnectingState) {
@@ -629,6 +631,18 @@ void QXmppCall::accept()
         // check for call establishment
         d->setState(QXmppCall::ActiveState);
     }
+}
+
+///
+/// Rejects the call.
+///
+/// This will terminate the call with reason *decline*.
+///
+/// \sa accept()
+///
+void QXmppCall::decline()
+{
+    d->terminate({ QXmppJingleReason::Decline, {}, {} });
 }
 
 ///
@@ -682,6 +696,8 @@ QXmppCall::Direction QXmppCall::direction() const
 
 ///
 /// Hangs up the call.
+///
+/// Terminates with the reason *success*.
 ///
 void QXmppCall::hangUp()
 {
