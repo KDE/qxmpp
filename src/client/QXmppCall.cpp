@@ -75,6 +75,8 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
                              this);
     g_signal_connect_swapped(rtpBin, "on-ssrc-active",
                              G_CALLBACK(+[](QXmppCallPrivate *p, uint sessionId, uint ssrc) {
+                                 qDebug() << "\n\n\n\nssrc-active called\n\n\n\n"
+                                          << sessionId << ssrc;
                                  p->ssrcActive(sessionId, ssrc);
                              }),
                              this);
@@ -102,6 +104,30 @@ void QXmppCallPrivate::ssrcActive(uint sessionId, uint ssrc)
     g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(sessionId), &rtpSession);
     // TODO: implement bitrate controller
     // TODO: display stats like packet drop count
+
+    qDebug() << "\n\nMoin ssrcActive \n"
+             << sessionId << ssrc;
+    // print stats
+    GstStructure *stats;
+    g_object_get(rtpSession, "stats", &stats, NULL);
+    if (!stats) {
+        g_print("No stats available\n");
+        return;
+    }
+
+    g_print("RTP session stats:\n");
+    auto fieldCount = gst_structure_n_fields(stats);
+    for (int i = 0; i < fieldCount; i++) {
+        const gchar *name = gst_structure_nth_field_name(stats, i);
+        GValue val = G_VALUE_INIT;
+        if (gst_structure_get(stats, name, &val, nullptr)) {
+            gchar *s = g_strdup_value_contents(&val);
+            g_print("  %s: %s\n", name, s);
+            g_free(s);
+        }
+    }
+
+    gst_structure_free(stats);  // free the returned structure
 }
 
 void QXmppCallPrivate::padAdded(GstPad *pad)
