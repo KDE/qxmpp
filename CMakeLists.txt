@@ -84,6 +84,7 @@ endif()
 if(WITH_GSTREAMER)
     pkg_check_modules(GStreamer REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.20)
     pkg_check_modules(GStreamerBase REQUIRED IMPORTED_TARGET gstreamer-base-1.0)
+    pkg_check_modules(GStreamerRtp REQUIRED IMPORTED_TARGET gstreamer-rtp-1.0)
 endif()
 
 add_subdirectory(src)
