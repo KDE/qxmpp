@@ -14,6 +14,7 @@
 
 #include <cstring>
 #include <gst/gst.h>
+#include <gst/rtp/rtp.h>
 
 #include <QRandomGenerator>
 #include <QSslCertificate>
@@ -217,11 +218,6 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
         qFatal("Failed to link rtp send pads to internal ghost pads");
     }
 
-    // We need frequent RTCP reports for the bandwidth controller
-    GstElement *rtpSession;
-    g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(id), &rtpSession);
-    g_object_set(rtpSession, "rtcp-min-interval", 100'000'000, nullptr);
-
     gst_element_sync_state_with_parent(iceReceiveBin);
     gst_element_sync_state_with_parent(iceSendBin);
 
@@ -229,6 +225,15 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     GstPadPtr rtpbinRtcpSendPad = gst_element_request_pad_simple(rtpBin, u"send_rtcp_src_%1"_s.arg(id).toLatin1().data());
     linkPads(rtpbinRtpSendPad, internalRtpPad);
     linkPads(rtpbinRtcpSendPad, internalRtcpPad);
+
+    // We need frequent RTCP reports for the bandwidth controller
+    GstElement *rtpSession;
+    g_signal_emit_by_name(rtpBin, "get-session", static_cast<uint>(id), &rtpSession);
+    g_object_set(rtpSession, "rtcp-min-interval", 100'000'000, nullptr);
+
+    // RTCP feedback mechanism: Transport-Wide Congestion Control
+    // GstElement *twcc = gst_element_factory_make("rtphdrexttwcc", NULL);
+    // gst_child_proxy_set(GST_CHILD_PROXY(rtpBin), "send-rtp-extmap-3", twcc, NULL);
 }
 
 QXmppCallStreamPrivate::~QXmppCallStreamPrivate()
@@ -322,6 +327,13 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
         return;
     }
     g_object_set(pay, "pt", codec.pt, "ssrc", localSsrc, nullptr);
+
+    // add header extensions to payloader
+    auto *hdrext = gst_rtp_header_extension_create_from_uri("urn:ietf:params:rtp-hdrext:ssrc-audio-level");
+    gst_rtp_header_extension_set_id(hdrext, 3);
+    qDebug() << "RTP HEADEREXT created:" << gst_rtp_header_extension_get_uri(hdrext);
+    GstElement *createdHdrExt = nullptr;
+    g_signal_emit_by_name(pay, "request-extension", 3, "urn:ietf:params:rtp-hdrext:ssrc-audio-level", &createdHdrExt);
 
     GstElement *encoder = gst_element_factory_make(codec.gstEnc.data(), nullptr);
     if (!encoder) {
