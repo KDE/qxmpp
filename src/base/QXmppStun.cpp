@@ -22,6 +22,8 @@
 #include <QUdpSocket>
 #include <QVariant>
 
+#undef QXMPP_DEBUG_STUN
+
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
