@@ -203,6 +203,8 @@ const QString &QXmppJingleMessageInitiation::remoteJid() const
 /// Returns the "isProceeded" flag, e.g., if the Jingle Message Initiation has already been
 /// proceeded.
 ///
+/// \since QXmpp 1.12
+///
 bool QXmppJingleMessageInitiation::isProceeded() const
 {
     return d->isProceeded;

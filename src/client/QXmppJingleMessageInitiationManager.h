@@ -42,6 +42,7 @@ public:
     ~QXmppJingleMessageInitiation();
 
     const QString &remoteJid() const;
+    bool isProceeded() const;
 
     QXmppTask<QXmpp::SendResult> ring();
     QXmppTask<QXmpp::SendResult> proceed();
@@ -59,7 +60,6 @@ private:
     QString id() const;
     void setId(const QString &id);
     void setRemoteJid(const QString &remoteJid);
-    bool isProceeded() const;
     void setIsProceeded(bool isProceeded);
 
     std::unique_ptr<QXmppJingleMessageInitiationPrivate> d;
