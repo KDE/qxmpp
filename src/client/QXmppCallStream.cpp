@@ -128,48 +128,47 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
         }
     }
 
-    /* Create appsrc / appsink elements */
+    /* Create send/receive appsink/appsrc elements */
     connection = new QXmppIceConnection(parent);
     connection->addComponent(RTP_COMPONENT);
     connection->addComponent(RTCP_COMPONENT);
-    appRtpSink = gst_element_factory_make("appsink", nullptr);
-    appRtcpSink = gst_element_factory_make("appsink", nullptr);
-    if (!appRtpSink || !appRtcpSink) {
+
+    sendRtp = gst_element_factory_make("appsink", nullptr);
+    sendRtcp = gst_element_factory_make("appsink", nullptr);
+    if (!sendRtp || !sendRtcp) {
         qFatal("Failed to create appsinks");
     }
 
-    g_signal_connect_swapped(appRtpSink, "new-sample",
+    g_object_set(sendRtp, "emit-signals", true, "async", false, "drop", true, "wait-on-eos", false, nullptr);
+    g_object_set(sendRtcp, "emit-signals", true, "async", false, "drop", true, "wait-on-eos", false, nullptr);
+    g_signal_connect_swapped(sendRtp, "new-sample",
                              G_CALLBACK(+[](QXmppCallStreamPrivate *p, GstElement *appsink) -> GstFlowReturn {
                                  return p->sendDatagram(appsink, RTP_COMPONENT);
                              }),
                              this);
-    g_signal_connect_swapped(appRtcpSink, "new-sample",
+    g_signal_connect_swapped(sendRtcp, "new-sample",
                              G_CALLBACK(+[](QXmppCallStreamPrivate *p, GstElement *appsink) -> GstFlowReturn {
                                  return p->sendDatagram(appsink, RTCP_COMPONENT);
                              }),
                              this);
 
-    appRtpSrc = gst_element_factory_make("appsrc", nullptr);
-    appRtcpSrc = gst_element_factory_make("appsrc", nullptr);
-    if (!appRtpSrc || !appRtcpSrc) {
+    receiveRtp = gst_element_factory_make("appsrc", nullptr);
+    receiveRtcp = gst_element_factory_make("appsrc", nullptr);
+    if (!receiveRtp || !receiveRtcp) {
         qFatal("Failed to create appsrcs");
     }
 
-    // TODO check these parameters
-    g_object_set(appRtpSink, "emit-signals", true, "async", false, "max-buffers", 1, "drop", true, nullptr);
-    g_object_set(appRtcpSink, "emit-signals", true, "async", false, nullptr);
-    g_object_set(appRtpSrc, "is-live", true, "max-latency", 5000000, nullptr);
-    g_object_set(appRtcpSrc, "is-live", true, nullptr);
-
+    g_object_set(receiveRtp, "is-live", true, nullptr);
+    g_object_set(receiveRtcp, "is-live", true, nullptr);
     connect(connection->component(RTP_COMPONENT), &QXmppIceComponent::datagramReceived,
-            q, [&](const QByteArray &datagram) { datagramReceived(datagram, appRtpSrc); });
+            q, [&](const QByteArray &datagram) { datagramReceived(datagram, receiveRtp); });
     connect(connection->component(RTCP_COMPONENT), &QXmppIceComponent::datagramReceived,
-            q, [&](const QByteArray &datagram) { datagramReceived(datagram, appRtcpSrc); });
+            q, [&](const QByteArray &datagram) { datagramReceived(datagram, receiveRtcp); });
 
-    if (!gst_bin_add(GST_BIN(iceReceiveBin), appRtpSrc) ||
-        !gst_bin_add(GST_BIN(iceReceiveBin), appRtcpSrc) ||
-        !gst_bin_add(GST_BIN(iceSendBin), appRtpSink) ||
-        !gst_bin_add(GST_BIN(iceSendBin), appRtcpSink)) {
+    if (!gst_bin_add(GST_BIN(iceReceiveBin), receiveRtp) ||
+        !gst_bin_add(GST_BIN(iceReceiveBin), receiveRtcp) ||
+        !gst_bin_add(GST_BIN(iceSendBin), sendRtp) ||
+        !gst_bin_add(GST_BIN(iceSendBin), sendRtcp)) {
         qFatal("Failed to add appsrc / appsink elements to respective bins");
     }
 
@@ -178,8 +177,8 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     dummyPad.reset();
 
     /* Link pads - receiving side */
-    GstPadPtr rtpRecvPad = gst_element_get_static_pad(appRtpSrc, "src");
-    GstPadPtr rtcpRecvPad = gst_element_get_static_pad(appRtcpSrc, "src");
+    GstPadPtr rtpRecvPad = gst_element_get_static_pad(receiveRtp, "src");
+    GstPadPtr rtcpRecvPad = gst_element_get_static_pad(receiveRtcp, "src");
 
     if (useDtls) {
         GstPadPtr dtlsRtpSinkPad = gst_element_get_static_pad(dtlsSrtpDecoder, "sink");
@@ -201,8 +200,8 @@ QXmppCallStreamPrivate::QXmppCallStreamPrivate(QXmppCallStream *parent, GstEleme
     }
 
     /* Link pads - sending side */
-    GstPadPtr rtpSendPad = gst_element_get_static_pad(appRtpSink, "sink");
-    GstPadPtr rtcpSendPad = gst_element_get_static_pad(appRtcpSink, "sink");
+    GstPadPtr rtpSendPad = gst_element_get_static_pad(sendRtp, "sink");
+    GstPadPtr rtcpSendPad = gst_element_get_static_pad(sendRtcp, "sink");
 
     if (useDtls) {
         GstPadPtr dtlsRtpSrcPad = gst_element_get_static_pad(dtlsSrtpEncoder, "src");
