@@ -112,7 +112,7 @@ class QXMPP_EXPORT QXmppJingleRtpFeedbackProperty
 {
 public:
     QXmppJingleRtpFeedbackProperty();
-
+    QXmppJingleRtpFeedbackProperty(const QString &type, const QString &subtype = {});
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleRtpFeedbackProperty)
 
     QString type() const;
@@ -171,7 +171,7 @@ public:
     };
 
     QXmppJingleRtpHeaderExtensionProperty();
-
+    QXmppJingleRtpHeaderExtensionProperty(const QString &uri, uint32_t id);
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleRtpHeaderExtensionProperty)
 
     uint32_t id() const;
@@ -355,7 +355,7 @@ public:
         None,
         /// The party prefers to use an existing session with the peer rather than initiate a new
         /// session; the Jingle session ID of the alternative session SHOULD be provided as the XML
-        /// character data of the <sid/> child.
+        /// character data of the &lt;sid/&gt; child.
         AlternativeSession,
         /// The party is busy and cannot accept a session.
         Busy,
