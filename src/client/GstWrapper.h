@@ -66,6 +66,7 @@ using GstElementFactoryPtr = CustomUniquePtr<GstElementFactory, void, gst_object
 using GstPadPtr = CustomUniquePtr<GstPad, void, gst_object_unref>;
 using GstSamplePtr = CustomUniquePtr<GstSample, GstSample, gst_sample_unref>;
 using GstBufferPtr = CustomUniquePtr<GstBuffer, GstBuffer, gst_buffer_unref>;
+using GstCapsPtr = CustomUniquePtr<GstCaps, GstCaps, gst_caps_unref>;
 using GCharPtr = CustomUniquePtr<gchar, void, g_free>;
 
 enum class GstDtlsConnectionState {
