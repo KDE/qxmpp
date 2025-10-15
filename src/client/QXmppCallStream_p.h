@@ -79,10 +79,10 @@ public:
     GstElement *decoderBin = nullptr;
     GstElement *iceReceiveBin = nullptr;
     GstElement *iceSendBin = nullptr;
-    GstElement *appRtpSrc = nullptr;
-    GstElement *appRtcpSrc = nullptr;
-    GstElement *appRtpSink = nullptr;
-    GstElement *appRtcpSink = nullptr;
+    GstElement *receiveRtp = nullptr;
+    GstElement *receiveRtcp = nullptr;
+    GstElement *sendRtp = nullptr;
+    GstElement *sendRtcp = nullptr;
     // DTLS-SRTP
     GstElement *dtlsSrtpEncoder = nullptr;
     GstElement *dtlsSrtcpEncoder = nullptr;
