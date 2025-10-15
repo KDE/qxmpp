@@ -36,6 +36,13 @@ int getIntProperty(gpointer object, QLatin1String propertyName, int defaultValue
 void linkPads(GstPad *srcPad, GstPad *sinkPad)
 {
     auto result = gst_pad_link(srcPad, sinkPad);
+    if (result == GST_PAD_LINK_NOFORMAT) {
+        auto caps = GstCapsPtr(gst_pad_query_caps(srcPad, nullptr));
+        g_print(" src pad caps: %s\n", gst_caps_to_string(caps));
+
+        caps = gst_pad_query_caps(sinkPad, nullptr);
+        g_print(" sink pad caps: %s\n", gst_caps_to_string(caps));
+    }
     if (result != GST_PAD_LINK_OK) {
         std::ostringstream oss;
         oss << "gst pad link error (" << gst_pad_get_name(srcPad) << " -> " << gst_pad_get_name(sinkPad) << "): " << gst_pad_link_get_name(result);
