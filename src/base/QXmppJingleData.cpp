@@ -2339,12 +2339,18 @@ public:
 /// \since QXmpp 1.5
 ///
 
-///
-/// Constructs a Jingle RTP feedback property.
-///
+/// Default constructor
 QXmppJingleRtpFeedbackProperty::QXmppJingleRtpFeedbackProperty()
     : d(new QXmppJingleRtpFeedbackPropertyPrivate())
 {
+}
+
+/// Default constructor
+QXmppJingleRtpFeedbackProperty::QXmppJingleRtpFeedbackProperty(const QString &type, const QString &subtype)
+    : d(new QXmppJingleRtpFeedbackPropertyPrivate())
+{
+    d->type = type;
+    d->subtype = subtype;
 }
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpFeedbackProperty)
@@ -2539,12 +2545,18 @@ public:
 /// \since QXmpp 1.5
 ///
 
-///
-/// Constructs a Jingle RTP header extension property.
-///
+/// Default constructor
 QXmppJingleRtpHeaderExtensionProperty::QXmppJingleRtpHeaderExtensionProperty()
     : d(new QXmppJingleRtpHeaderExtensionPropertyPrivate())
 {
+}
+
+/// Default constructor
+QXmppJingleRtpHeaderExtensionProperty::QXmppJingleRtpHeaderExtensionProperty(const QString &uri, uint32_t id)
+    : d(new QXmppJingleRtpHeaderExtensionPropertyPrivate())
+{
+    d->uri = uri;
+    d->id = id;
 }
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpHeaderExtensionProperty)
