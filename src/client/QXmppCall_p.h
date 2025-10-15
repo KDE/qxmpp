@@ -105,13 +105,13 @@ public:
 
     QList<GstCodec> audioCodecs = {
         { .pt = 111, .name = u"opus"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = { { "inband-fec"_L1, true }, { "frame-size"_L1, 40 } } },
-        { .pt = 111, .name = u"opus"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = { { "inband-fec"_L1, true }, { "frame-size"_L1, 40 } } },
-        { .pt = 97, .name = u"speex"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpspeexpay"_L1, .gstDepay = "rtpspeexdepay"_L1, .gstEnc = "speexenc"_L1, .gstDec = "speexdec"_L1, .encProps = {} },
+        { .pt = 112, .name = u"opus"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpopuspay"_L1, .gstDepay = "rtpopusdepay"_L1, .gstEnc = "opusenc"_L1, .gstDec = "opusdec"_L1, .encProps = { { "inband-fec"_L1, true }, { "frame-size"_L1, 40 } } },
+        { .pt = 96, .name = u"speex"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpspeexpay"_L1, .gstDepay = "rtpspeexdepay"_L1, .gstEnc = "speexenc"_L1, .gstDec = "speexdec"_L1, .encProps = {} },
         { .pt = 97, .name = u"speex"_s, .channels = 1, .clockrate = 44100, .gstPay = "rtpspeexpay"_L1, .gstDepay = "rtpspeexdepay"_L1, .gstEnc = "speexenc"_L1, .gstDec = "speexdec"_L1, .encProps = {} },
-        { .pt = 96, .name = u"mpeg4-generic"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
-        { .pt = 96, .name = u"mpeg4-generic"_s, .channels = 2, .clockrate = 44100, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
-        { .pt = 96, .name = u"mpeg4-generic"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
-        { .pt = 96, .name = u"mpeg4-generic"_s, .channels = 1, .clockrate = 44100, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 100, .name = u"mpeg4-generic"_s, .channels = 2, .clockrate = 48000, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 101, .name = u"mpeg4-generic"_s, .channels = 2, .clockrate = 44100, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 102, .name = u"mpeg4-generic"_s, .channels = 1, .clockrate = 48000, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
+        { .pt = 103, .name = u"mpeg4-generic"_s, .channels = 1, .clockrate = 44100, .gstPay = "rtpmp4apay"_L1, .gstDepay = "rtpmp4adepay"_L1, .gstEnc = "avenc_aac"_L1, .gstDec = "avdec_aac"_L1, .encProps = {} },
         { .pt = 8, .name = u"PCMA"_s, .channels = 1, .clockrate = 8000, .gstPay = "rtppcmapay"_L1, .gstDepay = "rtppcmadepay"_L1, .gstEnc = "alawenc"_L1, .gstDec = "alawdec"_L1, .encProps = {} },
         { .pt = 0, .name = u"PCMU"_s, .channels = 1, .clockrate = 8000, .gstPay = "rtppcmupay"_L1, .gstDepay = "rtppcmudepay"_L1, .gstEnc = "mulawenc"_L1, .gstDec = "mulawdec"_L1, .encProps = {} },
     };
