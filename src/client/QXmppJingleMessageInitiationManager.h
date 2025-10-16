@@ -84,11 +84,18 @@ public:
     QXmppTask<ProposeResult> propose(
         const QString &remoteJid,
         const QXmppJingleRtpDescription &description);
+    QXmppTask<ProposeResult> propose(
+        const QString &remoteJid,
+        const QList<QXmppJingleRtpDescription> &descriptions);
 
     Q_SIGNAL void proposed(
         const std::shared_ptr<QXmppJingleMessageInitiation> &jmi,
         const QString &id,
         const std::optional<QXmppJingleRtpDescription> &description);
+    Q_SIGNAL void proposeReceived(
+        const std::shared_ptr<QXmppJingleMessageInitiation> &jmi,
+        const QString &id,
+        const QList<QXmppJingleRtpDescription> &descriptions);
 
 protected:
     /// \cond
@@ -96,6 +103,10 @@ protected:
     /// \endcond
 
 private:
+    QXmppTask<ProposeResult> propose(
+        const QString &id,
+        const QString &remoteJid,
+        const QList<QXmppJingleRtpDescription> &descriptions);
     QXmppTask<QXmpp::SendResult> sendMessage(
         const QXmppJingleMessageInitiationElement &jmiElement,
         const QString &remoteJid);

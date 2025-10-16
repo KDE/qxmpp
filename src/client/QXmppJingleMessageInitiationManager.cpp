@@ -279,16 +279,31 @@ QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
 ///
 /// Creates a proposal JMI element and passes it as a message.
 ///
+/// \overload
+///
 QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &remoteJid, const QXmppJingleRtpDescription &description)
 {
-    QXmppPromise<ProposeResult> promise;
+    return propose(QXmppUtils::generateStanzaUuid(), remoteJid, QList<QXmppJingleRtpDescription> { description });
+}
 
-    const auto id = QXmppUtils::generateStanzaUuid();
+///
+/// Creates a proposal JMI element and passes it as a message.
+///
+/// \since QXmpp 1.12
+///
+QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
+{
+    return propose(QXmppUtils::generateStanzaUuid(), remoteJid, descriptions);
+}
+
+QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &id, const QString &remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
+{
+    QXmppPromise<ProposeResult> promise;
 
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Propose);
     jmiElement.setId(id);
-    jmiElement.setDescription(description);
+    jmiElement.setDescriptions(descriptions);
 
     sendMessage(jmiElement, remoteJid).then(this, [this, promise, id, remoteJid](SendResult result) mutable {
         if (auto error = std::get_if<QXmppError>(&result)) {
@@ -445,7 +460,9 @@ bool QXmppJingleMessageInitiationManager::handleProposeJmiElement(const QXmppJin
         return handleTieBreak(*itr, jmiElement, remoteJid);
     }
 
-    Q_EMIT proposed(addJmi(jmiElement.id(), remoteJid), jmiElement.id(), jmiElement.description());
+    auto jmi = addJmi(jmiElement.id(), remoteJid);
+    Q_EMIT proposed(jmi, jmiElement.id(), jmiElement.description());
+    Q_EMIT proposeReceived(jmi, jmiElement.id(), jmiElement.descriptions());
     return true;
 }
 
@@ -583,4 +600,18 @@ const QVector<std::shared_ptr<QXmppJingleMessageInitiation>> &QXmppJingleMessage
 /// \param jmi Jingle Message Initiation object of proposed session
 /// \param id JMI element id
 /// \param description JMI element's description containing media type (i.e., audio, video)
+///
+/// \deprecated
+///
+
+///
+/// \fn QXmppJingleMessageInitiationManager::proposeReceived(const std::shared_ptr<QXmppJingleMessageInitiation> &, const QString &, const QList<QXmppJingleDescription> &)
+///
+/// Emitted when a call has been proposed.
+///
+/// \param jmi Jingle Message Initiation object of proposed session
+/// \param id JMI element id
+/// \param descriptions JMI element's description containing media type (i.e., audio, video)
+///
+/// \since QXmpp 1.12
 ///
