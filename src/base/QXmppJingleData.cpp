@@ -1903,6 +1903,19 @@ QXmppJingleRtpDescription::QXmppJingleRtpDescription()
 {
 }
 
+///
+/// Default constructor
+///
+/// \since QXmpp 1.12
+///
+QXmppJingleRtpDescription::QXmppJingleRtpDescription(const QString &media, quint32 ssrc, const QList<QXmppJinglePayloadType> &payloadTypes)
+    : d(new QXmppJingleRtpDescriptionPrivate())
+{
+    d->media = media;
+    d->ssrc = ssrc;
+    d->payloadTypes = payloadTypes;
+}
+
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpDescription)
 
 ///
@@ -2690,7 +2703,7 @@ public:
     QXmppJingleMessageInitiationElement::Type type = QXmppJingleMessageInitiationElement::Type::None;
     QString id;
 
-    std::optional<QXmppJingleRtpDescription> description;
+    QList<QXmppJingleRtpDescription> descriptions;
     std::optional<QXmppJingleReason> reason;
     QString migratedTo;
 
@@ -2757,19 +2770,46 @@ void QXmppJingleMessageInitiationElement::setId(const QString &id)
 }
 
 ///
-/// Returns the Jingle Message Initiation element description.
+/// Returns the Jingle Message Initiation element descriptions.
 ///
 std::optional<QXmppJingleRtpDescription> QXmppJingleMessageInitiationElement::description() const
 {
-    return d->description;
+    if (d->descriptions.isEmpty()) {
+        return {};
+    }
+    return d->descriptions.first();
 }
 
 ///
-/// Sets the Jingle Message Initiation element description.
+/// Sets the Jingle Message Initiation element descriptions.
 ///
 void QXmppJingleMessageInitiationElement::setDescription(std::optional<QXmppJingleRtpDescription> description)
 {
-    d->description = description;
+    if (description.has_value()) {
+        d->descriptions = { description.value() };
+    } else {
+        d->descriptions.clear();
+    }
+}
+
+///
+/// Returns the Jingle Message Initiation element descriptions.
+///
+/// \since QXmpp 1.12
+///
+QList<QXmppJingleRtpDescription> QXmppJingleMessageInitiationElement::descriptions() const
+{
+    return d->descriptions;
+}
+
+///
+/// Sets the Jingle Message Initiation element descriptions.
+///
+/// \since QXmpp 1.12
+///
+void QXmppJingleMessageInitiationElement::setDescriptions(const QList<QXmppJingleRtpDescription> &descriptions)
+{
+    d->descriptions = descriptions;
 }
 
 ///
@@ -2835,7 +2875,7 @@ void QXmppJingleMessageInitiationElement::parse(const QDomElement &element)
     // Type::Proceed and Type::Ringing don't need any parsing aside of the id.
     switch (d->type) {
     case Type::Propose:
-        d->description = parseOptionalChildElement<QXmppJingleRtpDescription>(element);
+        d->descriptions = parseChildElements<QList<QXmppJingleRtpDescription>>(element);
         break;
     case Type::Reject:
     case Type::Retract:
@@ -2860,7 +2900,7 @@ void QXmppJingleMessageInitiationElement::toXml(QXmlStreamWriter *writer) const
     XmlWriter(writer).write(Element {
         Tag { d->type, ns_jingle_message },
         Attribute { u"id", d->id },
-        d->description,
+        d->descriptions,
         d->reason,
         OptionalContent { d->containsTieBreak, Element { u"tie-break" } },
         OptionalContent {
