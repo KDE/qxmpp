@@ -374,24 +374,23 @@ void QXmppJingleMessageInitiationManager::clearAll()
     d->jmis.clear();
 }
 
-bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageInitiationElement &&jmiElement, const QString &senderJid)
+bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageInitiationElement &&jmiElement, const QString &remoteJid)
 {
     auto jmiElementId = jmiElement.id();
-    auto remoteJid = QXmppUtils::jidToBareJid(senderJid);
 
     if (jmiElementId.isEmpty()) {
-        warning(u"Received JMI element with empty ID from %1. (ignoring)"_s.arg(senderJid));
+        warning(u"Received JMI element with empty ID from %1. (ignoring)"_s.arg(remoteJid));
         return false;
     }
 
     // Check if there's already a JMI object with jmiElementId and remoteJid in JMIs vector.
     // That means that a JMI has already been created with given (J)IDs.
     auto itr = std::find_if(d->jmis.begin(), d->jmis.end(), [&jmiElementId, &remoteJid](const auto &jmi) {
-        return jmi->id() == jmiElementId && jmi->remoteJid() == remoteJid;
+        return jmi->id() == jmiElementId && QXmppUtils::jidToBareJid(jmi->remoteJid()) == QXmppUtils::jidToBareJid(remoteJid);
     });
 
     if (itr != d->jmis.end()) {
-        return handleExistingJmi(*itr, jmiElement, QXmppUtils::jidToResource(senderJid));
+        return handleExistingJmi(*itr, jmiElement, QXmppUtils::jidToResource(remoteJid));
     }
 
     if (jmiElement.type() == JmiType::Propose) {
