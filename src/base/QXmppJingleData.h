@@ -253,6 +253,7 @@ class QXMPP_EXPORT QXmppJingleRtpDescription
 {
 public:
     QXmppJingleRtpDescription();
+    QXmppJingleRtpDescription(const QString &media, quint32 ssrc = 0, const QList<QXmppJinglePayloadType> &payloadTypes = {});
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppJingleRtpDescription)
 
     QString media() const;
@@ -661,6 +662,8 @@ public:
 
     std::optional<QXmppJingleRtpDescription> description() const;
     void setDescription(std::optional<QXmppJingleRtpDescription> description);
+    QList<QXmppJingleRtpDescription> descriptions() const;
+    void setDescriptions(const QList<QXmppJingleRtpDescription> &descriptions);
 
     std::optional<QXmppJingleReason> reason() const;
     void setReason(std::optional<QXmppJingleReason> reason);

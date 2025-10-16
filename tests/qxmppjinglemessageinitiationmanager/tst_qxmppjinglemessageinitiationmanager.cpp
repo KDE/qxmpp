@@ -8,6 +8,7 @@
 #include "QXmppUtils.h"
 
 #include "IntegrationTesting.h"
+#include "TestClient.h"
 #include "util.h"
 
 #include <QTest>
@@ -28,6 +29,7 @@ private:
     Q_SLOT void testClear();
     Q_SLOT void testClearAll();
 
+    Q_SLOT void proposeBase();
     Q_SLOT void testRing();
     Q_SLOT void testProceed();
     Q_SLOT void testReject();
@@ -92,6 +94,23 @@ void tst_QXmppJingleMessageInitiationManager::testClearAll()
 
     m_manager.clearAll();
     QCOMPARE(m_manager.jmis().size(), 0);
+}
+
+void tst_QXmppJingleMessageInitiationManager::proposeBase()
+{
+    TestClient test;
+    auto *jmiM = test.addNewExtension<QXmppJingleMessageInitiationManager>();
+
+    auto result = jmiM->propose(u"id-test1"_s, u"a@example.com"_s, { { u"audio"_s }, { u"video"_s } });
+
+    test.expect(
+        u"<message to=\"a@example.com\" type=\"chat\">"
+        "<store xmlns=\"urn:xmpp:hints\"/>"
+        "<propose xmlns=\"urn:xmpp:jingle-message:0\" id=\"id-test1\">"
+        "<description xmlns=\"urn:xmpp:jingle:apps:rtp:1\" media=\"audio\"/>"
+        "<description xmlns=\"urn:xmpp:jingle:apps:rtp:1\" media=\"video\"/>"
+        "</propose>"
+        "</message>"_s);
 }
 
 void tst_QXmppJingleMessageInitiationManager::testRing()
@@ -489,15 +508,10 @@ void tst_QXmppJingleMessageInitiationManager::testHandleTieBreak()
 void tst_QXmppJingleMessageInitiationManager::testHandleProposeJmiElement()
 {
     QXmppJingleMessageInitiationElement jmiElement;
-
-    QXmppJingleRtpDescription description;
-    description.setMedia("audio");
-    description.setSsrc(321);
-
     jmiElement.setId("ca3cf123-5325-482f-a412-a6e9f832298d");
-    jmiElement.setDescription(description);
+    jmiElement.setDescription(QXmppJingleRtpDescription { u"audio"_s, 321 });
 
-    QString callPartnerJid { "juliet@capulet.example" };
+    QString callPartnerJid = u"juliet@capulet.example"_s;
 
     // --- Tie break ---
 
