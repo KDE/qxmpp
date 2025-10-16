@@ -68,16 +68,9 @@ public:
     void addVideo();
 
     /// \brief This signal is emitted when a call is connected.
-    ///
-    /// Once this signal is emitted, you can connect a QAudioOutput and
-    /// QAudioInput to the call. You can determine the appropriate clockrate
-    /// and the number of channels by calling payloadType().
     Q_SIGNAL void connected();
 
     /// \brief This signal is emitted when a call is finished.
-    ///
-    /// Note: Do not delete the call in the slot connected to this signal,
-    /// instead use deleteLater().
     Q_SIGNAL void finished();
 
     /// \brief This signal is emitted when the remote party is ringing.
