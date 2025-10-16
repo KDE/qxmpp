@@ -114,7 +114,7 @@ private:
     void clear(const std::shared_ptr<QXmppJingleMessageInitiation> &jmi);
     void clearAll();
 
-    bool handleJmiElement(QXmppJingleMessageInitiationElement &&jmiElement, const QString &senderJid);
+    bool handleJmiElement(QXmppJingleMessageInitiationElement &&jmiElement, const QString &remoteJid);
     bool handleExistingJmi(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteResource);
     bool handleProposeJmiElement(const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteJid);
     bool handleTieBreak(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QXmppJingleMessageInitiationElement &jmiElement, const QString &remoteResource);
