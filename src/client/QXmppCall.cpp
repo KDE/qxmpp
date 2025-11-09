@@ -75,8 +75,6 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
                              this);
     g_signal_connect_swapped(rtpBin, "on-ssrc-active",
                              G_CALLBACK(+[](QXmppCallPrivate *p, uint sessionId, uint ssrc) {
-                                 qDebug() << "\n\n\n\nssrc-active called\n\n\n\n"
-                                          << sessionId << ssrc;
                                  p->ssrcActive(sessionId, ssrc);
                              }),
                              this);
@@ -105,8 +103,6 @@ void QXmppCallPrivate::ssrcActive(uint sessionId, uint ssrc)
     // TODO: implement bitrate controller
     // TODO: display stats like packet drop count
 
-    qDebug() << "\n\nMoin ssrcActive \n"
-             << sessionId << ssrc;
     // print stats
     GstStructure *stats;
     g_object_get(rtpSession, "stats", &stats, NULL);
@@ -157,7 +153,6 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
             }
         } else if (stream->media() == AUDIO_MEDIA) {
             if (auto codec = find(audioCodecs, pt, &GstCodec::pt)) {
-                qDebug() << "Adding audio decoder....";
                 stream->d->addDecoder(pad, *codec);
                 q->debug(u"Receiving audio from %1 using %2 (%3 channels, %4)"_s
                              .arg(padName,
@@ -165,10 +160,10 @@ void QXmppCallPrivate::padAdded(GstPad *pad)
                                   QString::number(codec->channels),
                                   QString::number(codec->clockrate)));
             } else {
-                qDebug() << "Error no decoder found for:" << padName << "pt=" << pt;
-                qDebug() << "Available:";
-                for (const auto &c : audioCodecs) {
-                    qDebug() << "  " << c.pt << c.name;
+                q->warning(u"Error no decoder found for: " + padName + u" pt=" + QString::number(pt));
+                q->warning(u"Available:"_s);
+                for (const auto &c : std::as_const(audioCodecs)) {
+                    q->warning(u"  " + QString::number(c.pt) + u' ' + c.name);
                 }
             }
         }
