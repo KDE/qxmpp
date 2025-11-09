@@ -195,7 +195,7 @@ void QXmppJingleMessageInitiation::setRemoteJid(const QString &remoteJid)
 ///
 /// Returns the call partner's bare JID.
 ///
-/// \since QXmpp 1.12
+/// \since QXmpp 1.14
 ///
 const QString &QXmppJingleMessageInitiation::remoteJid() const
 {
@@ -298,7 +298,7 @@ QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessage
 ///
 /// Creates a proposal JMI element and passes it as a message.
 ///
-/// \since QXmpp 1.12
+/// \since QXmpp 1.14
 ///
 QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
 {
@@ -623,5 +623,5 @@ const QVector<std::shared_ptr<QXmppJingleMessageInitiation>> &QXmppJingleMessage
 /// \param id JMI element id
 /// \param descriptions JMI element's description containing media type (i.e., audio, video)
 ///
-/// \since QXmpp 1.12
+/// \since QXmpp 1.14
 ///

@@ -2738,7 +2738,7 @@ void QXmppIceConnection::setRemotePassword(const QString &password)
 ///
 /// \param servers List of the STUN servers.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 void QXmppIceConnection::setStunServers(const QList<QXmpp::StunServer> &servers)
 {
@@ -2750,7 +2750,7 @@ void QXmppIceConnection::setStunServers(const QList<QXmpp::StunServer> &servers)
 ///
 /// \note This may only be called prior to calling bind().
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 void QXmppIceConnection::setTurnServer(const TurnServer &server)
 {

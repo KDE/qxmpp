@@ -273,7 +273,7 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
 /// \note Incoming calls need to be accepted or rejected using QXmppCall::accept() or
 /// QXmppCall::hangUp().
 ///
-/// \since QXmpp 1.11, previously this signal had a different signature.
+/// \since QXmpp 1.14, previously this signal had a different signature.
 ///
 
 ///
@@ -296,7 +296,7 @@ QXmppCallManager::~QXmppCallManager() = default;
 ///
 /// STUN is used to determine server-reflexive addresses and ports.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
 {
@@ -318,7 +318,7 @@ void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
 ///
 /// TURN is used to relay packets in double-NAT configurations.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &server)
 {
@@ -372,7 +372,7 @@ void QXmppCallManager::onUnregistered(QXmppClient *client)
 /// \param media whether initiate with audio or audio and video
 /// \param proposedSid Session ID of the call. If empty, a new session ID will be generated. Must be unique.
 ///
-/// \since QXmpp 1.11, previously this function had a different signature.
+/// \since QXmpp 1.14, previously this function had a different signature.
 ///
 std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media media, const QString &proposedSid)
 {

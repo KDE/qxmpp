@@ -1906,7 +1906,7 @@ QXmppJingleRtpDescription::QXmppJingleRtpDescription()
 ///
 /// Default constructor
 ///
-/// \since QXmpp 1.12
+/// \since QXmpp 1.14
 ///
 QXmppJingleRtpDescription::QXmppJingleRtpDescription(const QString &media, quint32 ssrc, const QList<QXmppJinglePayloadType> &payloadTypes)
     : d(new QXmppJingleRtpDescriptionPrivate())
@@ -2803,7 +2803,7 @@ void QXmppJingleMessageInitiationElement::setDescription(std::optional<QXmppJing
 ///
 /// Returns the Jingle Message Initiation element descriptions.
 ///
-/// \since QXmpp 1.12
+/// \since QXmpp 1.14
 ///
 QList<QXmppJingleRtpDescription> QXmppJingleMessageInitiationElement::descriptions() const
 {
@@ -2813,7 +2813,7 @@ QList<QXmppJingleRtpDescription> QXmppJingleMessageInitiationElement::descriptio
 ///
 /// Sets the Jingle Message Initiation element descriptions.
 ///
-/// \since QXmpp 1.12
+/// \since QXmpp 1.14
 ///
 void QXmppJingleMessageInitiationElement::setDescriptions(const QList<QXmppJingleRtpDescription> &descriptions)
 {

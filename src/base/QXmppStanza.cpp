@@ -352,7 +352,7 @@ void QXmppStanza::Error::setRedirectionUri(const QString &redirectionUri)
 ///
 /// Returns an additional \xep{0166, Jingle}-specific error condition.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 std::optional<QXmpp::JingleErrorCondition> QXmppStanza::Error::jingleErrorCondition() const
 {
@@ -362,7 +362,7 @@ std::optional<QXmpp::JingleErrorCondition> QXmppStanza::Error::jingleErrorCondit
 ///
 /// Sets an additional \xep{0166, Jingle}-specific error condition.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 void QXmppStanza::Error::setJingleErrorCondition(std::optional<QXmpp::JingleErrorCondition> condition)
 {

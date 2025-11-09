@@ -32,7 +32,7 @@ namespace QXmpp {
 ///
 /// \xep{0166, Jingle}-specific error condition, used in QXmppStanza::Error.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 enum class JingleErrorCondition {
     OutOfOrder,

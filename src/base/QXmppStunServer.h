@@ -14,7 +14,7 @@ namespace QXmpp {
 ///
 /// \brief STUN server address
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 struct StunServer {
     /// host address of the STUN server

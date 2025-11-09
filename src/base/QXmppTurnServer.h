@@ -14,7 +14,7 @@ namespace QXmpp {
 ///
 /// \brief TURN server address
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 struct TurnServer {
     /// host address of the TURN server

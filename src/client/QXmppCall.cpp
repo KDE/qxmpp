@@ -784,7 +784,7 @@ QXmppCall::State QXmppCall::state() const
 ///
 /// Returns the error of the call if any occurred.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 std::optional<QXmppError> QXmppCall::error() const
 {
@@ -837,7 +837,7 @@ bool QXmppCall::isEncrypted() const
 ///
 /// Returns whether the remote also supports video calls.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.14
 ///
 bool QXmppCall::videoSupported() const
 {
