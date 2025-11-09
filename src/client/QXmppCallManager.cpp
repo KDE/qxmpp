@@ -369,11 +369,12 @@ void QXmppCallManager::onUnregistered(QXmppClient *client)
 /// Initiates a new outgoing call to the specified recipient.
 ///
 /// \param jid Full-JID of the recipient.
+/// \param media whether initiate with audio or audio and video
 /// \param proposedSid Session ID of the call. If empty, a new session ID will be generated. Must be unique.
 ///
 /// \since QXmpp 1.11, previously this function had a different signature.
 ///
-std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, const QString &proposedSid)
+std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media media, const QString &proposedSid)
 {
     auto sid = proposedSid;
 
@@ -408,7 +409,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, const QStr
 
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
-    discoManager->info(jid).then(call.get(), [this, call = call.get()](auto result) {
+    discoManager->info(jid).then(call.get(), [this, call = call.get(), media](auto result) {
         auto failure = [&](QString &&text) {
             warning(text);
             call->d->error = QXmppError { std::move(text), {} };
@@ -434,7 +435,8 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, const QStr
         if (!testFeature(ns_jingle, u"Remote does not support Jingle"_s) ||
             !testFeature(ns_jingle_rtp, u"Remote does not support Jingle RTP"_s) ||
             !testFeature(ns_jingle_rtp_audio, u"Remote does not support Jingle RTP audio"_s) ||
-            !testFeature(ns_jingle_ice_udp, u"Remote does not support Jingle ICE-UDP"_s)) {
+            !testFeature(ns_jingle_ice_udp, u"Remote does not support Jingle ICE-UDP"_s) ||
+            (media == Media::AudioVideo && !testFeature(ns_jingle_rtp_video, u"Remote does not support Jingle RTP video"_s))) {
             return;
         }
 
@@ -446,8 +448,11 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, const QStr
             return;
         }
 
-        refreshStunTurnConfig().then(call, [this, call] {
-            auto *stream = call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
+        refreshStunTurnConfig().then(call, [this, call, media] {
+            call->d->createStream(u"audio"_s, u"initiator"_s, u"microphone"_s);
+            if (media == Media::AudioVideo) {
+                call->d->createStream(u"video"_s, u"initiator"_s, u"webcam"_s);
+            }
 
             // register call
             d->addCall(call);
@@ -511,45 +516,49 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
             return Error { Error::Cancel, Error::Conflict, u"Invalid 'sid' value."_s };
         }
 
-        const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().constFirst();
-        bool dtlsRequested = !content.transportFingerprint().isEmpty();
-
         // build call
         auto call = std::unique_ptr<QXmppCall>(new QXmppCall(iq.from(), iq.sid(), QXmppCall::IncomingDirection, this));
-        call->d->useDtls = d->supportsDtls && dtlsRequested;
+        const auto contents = iq.contents();
 
-        if (dtlsRequested && !d->supportsDtls) {
-            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS is not supported."_s, {} }, true);
-            return {};
-        }
-        if (!dtlsRequested && d->dtlsRequired) {
-            call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS required."_s, {} }, true);
-            return {};
+        for (const auto &content : contents) {
+            bool dtlsRequested = !content.transportFingerprint().isEmpty();
+            call->d->useDtls = d->supportsDtls && dtlsRequested;
+
+            if (dtlsRequested && !d->supportsDtls) {
+                call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS is not supported."_s, {} }, true);
+                return {};
+            }
+            if (!dtlsRequested && d->dtlsRequired) {
+                call->d->terminate({ QXmppJingleReason::FailedApplication, u"DTLS required."_s, {} }, true);
+                return {};
+            }
         }
 
         // register call
         d->addCall(call.get());
 
         // first send IQ ack (task may finish instantly)
-        later(this, [this, content, callPtr = call.release()]() mutable {
-            refreshStunTurnConfig().then(this, [this, content, callPtr]() mutable {
+        later(this, [this, contents, callPtr = call.release()]() mutable {
+            refreshStunTurnConfig().then(this, [this, contents, callPtr]() mutable {
                 auto call = std::unique_ptr<QXmppCall>(callPtr);
 
-                // create stream (with up-to-date STUN/TURN credentials)
-                auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
-                if (!stream) {
-                    call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
-                    return;
-                }
+                for (const auto &content : contents) {
+                    // create stream (with up-to-date STUN/TURN credentials)
+                    auto *stream = call->d->createStream(content.descriptionMedia(), content.creator(), content.name());
+                    if (!stream) {
+                        call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
+                        return;
+                    }
 
-                // check content description and transport
-                if (!call->d->handleDescription(stream, content) ||
-                    !call->d->handleTransport(stream, content)) {
+                    // check content description and transport
+                    if (!call->d->handleDescription(stream, content) ||
+                        !call->d->handleTransport(stream, content)) {
 
-                    // terminate call
-                    call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
-                    call->terminated();
-                    return;
+                        // terminate call
+                        call->d->terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
+                        call->terminated();
+                        return;
+                    }
                 }
 
                 // send ringing indication
