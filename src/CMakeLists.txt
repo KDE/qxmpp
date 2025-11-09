@@ -354,7 +354,6 @@ if(WITH_GSTREAMER)
         PRIVATE
         PkgConfig::GStreamer
         PkgConfig::GStreamerBase
-        PkgConfig::GStreamerRtp
     )
 endif()
 
