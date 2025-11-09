@@ -990,7 +990,7 @@ QXmppJingleReason::QXmppJingleReason()
 ///
 /// Constructs a QXmppJingleReason with specific type, error text and RTP error condition.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.12
 ///
 QXmppJingleReason::QXmppJingleReason(Type type, const QString &text, std::optional<RtpErrorCondition> rtpError)
     : d(new QXmppJingleIqReasonPrivate { {}, text, type, rtpError.value_or(NoErrorCondition) })

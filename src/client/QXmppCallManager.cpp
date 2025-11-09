@@ -318,7 +318,7 @@ void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
 ///
 /// TURN is used to relay packets in double-NAT configurations.
 ///
-/// \since QXmpp 1.11
+/// \since QXmpp 1.12
 ///
 void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &server)
 {
@@ -372,7 +372,7 @@ void QXmppCallManager::onUnregistered(QXmppClient *client)
 /// \param media whether initiate with audio or audio and video
 /// \param proposedSid Session ID of the call. If empty, a new session ID will be generated. Must be unique.
 ///
-/// \since QXmpp 1.11, previously this function had a different signature.
+/// \since QXmpp 1.12, previously this function had a different signature.
 ///
 std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media media, const QString &proposedSid)
 {
