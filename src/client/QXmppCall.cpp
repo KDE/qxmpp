@@ -327,9 +327,13 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
     }
     case QXmppJingleIq::SessionInfo: {
         // notify user
-        later(q, [this] {
-            Q_EMIT q->ringing();
-        });
+        if (auto sessionState = iq.rtpSessionState()) {
+            if (std::holds_alternative<QXmppJingleIq::RtpSessionStateRinging>(*sessionState)) {
+                later(q, [this] {
+                    Q_EMIT q->ringing();
+                });
+            }
+        }
         break;
     }
     case QXmppJingleIq::SessionTerminate: {
