@@ -26,6 +26,12 @@ class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
+    /// Media type for starting a call.
+    enum class Media {
+        Audio,       /// only contains an audio stream
+        AudioVideo,  /// contains audio and video streams
+    };
+
     QXmppCallManager();
     ~QXmppCallManager() override;
 
@@ -41,7 +47,7 @@ public:
 
     Q_SIGNAL void callReceived(std::unique_ptr<QXmppCall> &call);
 
-    std::unique_ptr<QXmppCall> call(const QString &jid, const QString &proposedSid = {});
+    std::unique_ptr<QXmppCall> call(const QString &jid, Media media = Media::Audio, const QString &proposedSid = {});
 
 protected:
     /// \cond
