@@ -14,7 +14,6 @@
 
 #include <cstring>
 #include <gst/gst.h>
-#include <gst/rtp/rtp.h>
 
 #include <QRandomGenerator>
 #include <QSslCertificate>
@@ -326,13 +325,6 @@ void QXmppCallStreamPrivate::addEncoder(QXmppCallPrivate::GstCodec &codec)
         return;
     }
     g_object_set(pay, "pt", codec.pt, "ssrc", localSsrc, nullptr);
-
-    // add header extensions to payloader
-    auto *hdrext = gst_rtp_header_extension_create_from_uri("urn:ietf:params:rtp-hdrext:ssrc-audio-level");
-    gst_rtp_header_extension_set_id(hdrext, 3);
-    qDebug() << "RTP HEADEREXT created:" << gst_rtp_header_extension_get_uri(hdrext);
-    GstElement *createdHdrExt = nullptr;
-    g_signal_emit_by_name(pay, "request-extension", 3, "urn:ietf:params:rtp-hdrext:ssrc-audio-level", &createdHdrExt);
 
     GstElement *encoder = gst_element_factory_make(codec.gstEnc.data(), nullptr);
     if (!encoder) {
