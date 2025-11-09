@@ -301,7 +301,7 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
     using Error = QXmppStanza::Error;
 
     Q_ASSERT(manager);  // we are called only from the manager
-    const auto content = iq.contents().isEmpty() ? QXmppJingleIq::Content() : iq.contents().constFirst();
+    const auto contents = iq.contents();
 
     switch (iq.action()) {
     case QXmppJingleIq::SessionAccept: {
@@ -309,16 +309,26 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
             return Error { Error::Cancel, Error::BadRequest, u"'session-accept' for outgoing call"_s };
         }
 
-        // check content description and transport
-        auto stream = find(streams, content.name(), &QXmppCallStream::name);
-        if (!stream ||
-            !handleDescription(*stream, content) ||
-            !handleTransport(*stream, content)) {
+        for (const auto &content : contents) {
+            // check content description and transport
+            auto stream = find(streams, content.name(), &QXmppCallStream::name);
+            if (!stream ||
+                !handleDescription(*stream, content) ||
+                !handleTransport(*stream, content)) {
 
-            // terminate call
-            error = { u"Remote formats or transport unsupported"_s, {} };
-            terminate({ QXmppJingleReason::FailedApplication, {}, {} }, true);
-            return {};
+                error = { u"Remote formats or transport unsupported"_s, {} };
+                terminate({ QXmppJingleReason::FailedApplication, u"Formats or transport not supported."_s, {} }, true);
+                return {};
+            }
+        }
+
+        // check if all contents have been accepted
+        for (const auto *stream : std::as_const(streams)) {
+            if (!find(iq.contents(), stream->name(), &QXmppJingleIq::Content::name)) {
+                error = { u"Remote did not include all contents in session-accept."_s, {} };
+                terminate({ QXmppJingleReason::FailedApplication, u"One or more contents are missing in session-accept."_s, {} }, true);
+                return {};
+            }
         }
 
         // check for call establishment
@@ -350,77 +360,86 @@ std::variant<QXmppIq, QXmppStanza::Error> QXmppCallPrivate::handleRequest(QXmppJ
     }
     case QXmppJingleIq::ContentAccept: {
         // TODO: check we are creator of the stream; assure session accepted
-        // check content description and transport
-        auto stream = find(streams, content.name(), &QXmppCallStream::name);
-        if (!stream ||
-            !handleDescription(*stream, content) ||
-            !handleTransport(*stream, content)) {
+        for (const auto &content : contents) {
+            // check content description and transport
+            auto stream = find(streams, content.name(), &QXmppCallStream::name);
+            if (!stream ||
+                !handleDescription(*stream, content) ||
+                !handleTransport(*stream, content)) {
 
-            // FIXME: what action?
-            return {};
+                // FIXME: what action?
+                return {};
+            }
         }
         break;
     }
     case QXmppJingleIq::ContentAdd: {
         // TODO: assure session accepted
         // check media stream does not exist yet
-        if (contains(streams, content.name(), &QXmppCallStream::name)) {
-            return Error { Error::Cancel, Error::Conflict, u"Media stream already exists."_s };
+
+        for (const auto &content : contents) {
+            if (contains(streams, content.name(), &QXmppCallStream::name)) {
+                return Error { Error::Cancel, Error::Conflict, u"Media stream '%1' already exists."_s.arg(content.name()) };
+            }
         }
 
-        // create media stream
-        auto *stream = createStream(content.descriptionMedia(), content.creator(), content.name());
-        if (!stream) {
-            // reject content
-            later(this, [this, name = content.name()]() {
-                QXmppJingleIq::Content content;
-                content.setName(name);
+        for (const auto &content : contents) {
+            // create media stream
+            auto *stream = createStream(content.descriptionMedia(), content.creator(), content.name());
+            if (!stream) {
+                // reject content
+                later(this, [this, name = content.name()]() {
+                    QXmppJingleIq::Content content;
+                    content.setName(name);
 
-                auto iq = createIq(QXmppJingleIq::ContentReject);
-                iq.setContents({ std::move(content) });
-                iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
+                    auto iq = createIq(QXmppJingleIq::ContentReject);
+                    iq.setContents({ std::move(content) });
+                    iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
+                    manager->client()->sendIq(std::move(iq));
+                });
+                continue;
+            }
+
+            // check content description
+            if (!handleDescription(stream, content) ||
+                !handleTransport(stream, content)) {
+
+                // reject content
+                later(this, [this, name = content.name()]() {
+                    QXmppJingleIq::Content content;
+                    content.setName(name);
+
+                    auto iq = createIq(QXmppJingleIq::ContentReject);
+                    iq.setContents({ std::move(content) });
+                    iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
+                    manager->client()->sendIq(std::move(iq));
+                });
+
+                streams.removeAll(stream);
+                delete stream;
+                continue;
+            }
+
+            // accept content
+            later(this, [this, stream] {
+                Q_ASSERT(manager);
+                auto iq = createIq(QXmppJingleIq::ContentAccept);
+                iq.addContent(localContent(stream));
                 manager->client()->sendIq(std::move(iq));
             });
-            return {};
         }
-
-        // check content description
-        if (!handleDescription(stream, content) ||
-            !handleTransport(stream, content)) {
-
-            // reject content
-            later(this, [this, name = content.name()]() {
-                QXmppJingleIq::Content content;
-                content.setName(name);
-
-                auto iq = createIq(QXmppJingleIq::ContentReject);
-                iq.setContents({ std::move(content) });
-                iq.setActionReason(QXmppJingleReason { QXmppJingleReason::FailedApplication, {}, {} });
-                manager->client()->sendIq(std::move(iq));
-            });
-
-            streams.removeAll(stream);
-            delete stream;
-            return {};
-        }
-
-        // accept content
-        later(this, [this, stream] {
-            Q_ASSERT(manager);
-            auto iq = createIq(QXmppJingleIq::ContentAccept);
-            iq.addContent(localContent(stream));
-            manager->client()->sendIq(std::move(iq));
-        });
         break;
     }
     case QXmppJingleIq::TransportInfo: {
         // TODO: assure session accepted
         // check content transport
-        auto stream = find(streams, content.name(), &QXmppCallStream::name);
-        if (!stream ||
-            !handleTransport(*stream, content)) {
-            // FIXME: what action?
-            return {};
+        for (const auto &content : contents) {
+            auto stream = find(streams, content.name(), &QXmppCallStream::name);
+            if (!stream ||
+                !handleTransport(*stream, content)) {
+                // FIXME: what action?
+                return {};
+            }
         }
         break;
     }
@@ -558,12 +577,12 @@ void QXmppCallPrivate::sendInvite()
 {
     Q_ASSERT(manager);
 
-    // create audio stream
-    auto *stream = find(streams, AUDIO_MEDIA, &QXmppCallStream::media).value();
-
     auto iq = createIq(QXmppJingleIq::SessionInitiate);
     iq.setInitiator(manager->client()->configuration().jid());
-    iq.addContent(localContent(stream));
+    iq.addContent(localContent(q->audioStream()));
+    if (auto video = q->videoStream()) {
+        iq.addContent(localContent(video));
+    }
     manager->client()->send(std::move(iq));
 }
 
@@ -656,13 +675,13 @@ void QXmppCall::accept()
 {
     if (d->direction == IncomingDirection && d->state == ConnectingState) {
         Q_ASSERT(d->manager);
-        Q_ASSERT(d->streams.size() == 1);
-        QXmppCallStream *stream = d->streams.first();
 
         // accept incoming call
         auto iq = d->createIq(QXmppJingleIq::SessionAccept);
         iq.setResponder(d->manager->client()->configuration().jid());
-        iq.addContent(d->localContent(stream));
+        for (auto *stream : std::as_const(d->streams)) {
+            iq.addContent(d->localContent(stream));
+        }
         d->manager->client()->sendIq(std::move(iq));
 
         // check for call establishment
@@ -806,6 +825,7 @@ void QXmppCall::addVideo()
     }
 
     if (contains(d->streams, VIDEO_MEDIA, &QXmppCallStream::media)) {
+        warning(u"Video stream already exists."_s);
         return;
     }
 

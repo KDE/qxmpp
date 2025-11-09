@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
             }
 
             // call first JID
-            activeCall = callManager->call(bareJid + u'/' + otherResources.first());
+            activeCall = callManager->call(bareJid + u'/' + otherResources.first(), QXmppCallManager::Media::AudioVideo);
             Q_ASSERT(activeCall != nullptr);
 
             setupCall(activeCall.get());
