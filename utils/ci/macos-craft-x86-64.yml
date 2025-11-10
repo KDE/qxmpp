@@ -1,0 +1,21 @@
+include:
+  - craft-macos-base.yml
+  - project: sysadmin/ci-utilities
+    file:
+      - /gitlab-templates/blocks/workflow.yml
+
+craft_macos_qt6_x86_64:
+  extends: .craft_macos_base
+  variables:
+    KDECI_CRAFT_PLATFORM: macos-64-clang
+    KDECI_CRAFT_CONFIG: ci-utilities/craft/qt6/CraftConfig.ini
+  script:
+    - !reference [.craft_macos_base, script]
+  artifacts:
+    expire_in: 3 days
+    when: always
+    expose_as: "macOS Intel Qt6"
+    paths:
+      - "kde-ci-packages/"
+      - "kde-ci-logs/"
+
