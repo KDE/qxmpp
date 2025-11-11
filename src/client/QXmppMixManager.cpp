@@ -32,6 +32,8 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
+using enum QXmppMixManager::Support;
+
 class QXmppMixManagerPrivate
 {
 public:
@@ -113,36 +115,6 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
 /// Afterwards, you need to add this manager to the client:
 /// \code
 /// auto *manager = client->addNewExtension<QXmppMixManager>();
-/// \endcode
-///
-/// Before calling one of the following methods, you need to request the information once per
-/// connection:
-///     * participantSupport()
-///     * messageArchivingSupport()
-/// That is done via QXmppDiscoveryManager::requestInfo() for the user JID (i.e., no recipient JID):
-/// \code
-/// client->findExtension<QXmppDiscoveryManager>()->requestInfo({});
-/// \endcode
-///
-/// Before calling one of the following methods, you need to request the information once per
-/// connection:
-///     * services()
-/// That is done via QXmppDiscoveryManager::requestDiscoItems() for the server JID and
-/// QXmppDiscoveryManager::requestInfo() for each item it provides:
-/// \code
-/// const auto *discoveryManager = client->findExtension<QXmppDiscoveryManager>();
-/// discoveryManager->requestDiscoItems(client->configuration().domain())
-///     .then(this, [this](QXmppDiscoveryManager::ItemsResult &&result) {
-///         if (const auto *error = std::get_if<QXmppError>(&result)) {
-///             // Handle the error.
-///         } else {
-///             const auto items = std::get<QList<QXmppDiscoveryIq::Item>>(std::move(result));
-///             for (const auto &item : items) {
-///                 discoveryManager->requestInfo(item.jid());
-///             }
-///         }
-///     }
-/// );
 /// \endcode
 ///
 /// If you want to be informed about updates of the channel (e.g., its configuration or allowed
@@ -1049,13 +1021,12 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
     connect(client, &QXmppClient::connected, this, [this, client]() {
         if (client->streamManagementState() == QXmppClient::NewStream) {
             resetCachedData();
+            updateCachedData();
         }
     });
 
     d->discoveryManager = client->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(d->discoveryManager, "QXmppMixManager", "QXmppDiscoveryManager is missing");
-
-    connect(d->discoveryManager, &QXmppDiscoveryManager::infoReceived, this, &QXmppMixManager::handleDiscoInfo);
 
     d->pubSubManager = client->findExtension<QXmppPubSubManager>();
     Q_ASSERT_X(d->pubSubManager, "QXmppMixManager", "QXmppPubSubManager is missing");
@@ -1160,7 +1131,6 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
 
 void QXmppMixManager::onUnregistered(QXmppClient *client)
 {
-    disconnect(d->discoveryManager, &QXmppDiscoveryManager::infoReceived, this, &QXmppMixManager::handleDiscoInfo);
     resetCachedData();
     disconnect(client, &QXmppClient::connected, this, nullptr);
 
@@ -1398,53 +1368,89 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::addJidToNode(const QString 
 }
 
 ///
-/// Handles incoming service infos specified by \xep{0030, Service Discovery}
+/// Updates the cached data.
 ///
-/// \param iq received Service Discovery IQ stanza
-///
-void QXmppMixManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
+void QXmppMixManager::updateCachedData()
 {
-    // Check the server's functionality to support MIX clients.
-    if (iq.from().isEmpty() || iq.from() == client()->configuration().jidBare()) {
-        // Check whether MIX is supported.
-        if (iq.features().contains(ns_mix_pam)) {
-            setParticipantSupport(QXmppMixManager::Support::Supported);
+    updateSupport();
+    updateServices();
+}
 
-            // Check whether MIX archiving is supported.
-            if (iq.features().contains(ns_mix_pam_archiving)) {
-                setMessageArchivingSupport(QXmppMixManager::Support::Supported);
-            }
+void QXmppMixManager::updateSupport()
+{
+    const auto ownJid = client()->configuration().jidBare();
+
+    d->discoveryManager->info(ownJid).then(this, [this, ownJid](Result<QXmppDiscoInfo> &&result) {
+        if (const auto *error = std::get_if<QXmppError>(&result)) {
+            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(ownJid, error->description));
         } else {
-            setParticipantSupport(QXmppMixManager::Support::Unsupported);
-            setMessageArchivingSupport(QXmppMixManager::Support::Unsupported);
+            const auto &features = std::get<QXmppDiscoInfo>(result).features();
+
+            setParticipantSupport(contains(features, ns_mix_pam) ? Supported : Unsupported);
+            setMessageArchivingSupport(contains(features, ns_mix_pam_archiving) ? Supported : Unsupported);
         }
-    }
+    });
+}
 
-    const auto jid = iq.from();
+void QXmppMixManager::updateServices()
+{
+    const auto serverJid = client()->configuration().domain();
 
-    // If no MIX service is provided by the JID, remove it from the cache.
-    if (!iq.features().contains(ns_mix)) {
-        removeService(jid);
-        return;
-    }
+    d->discoveryManager->items(serverJid).then(this, [this, serverJid](Result<QList<QXmppDiscoItem>> &&result) {
+        if (const auto *error = std::get_if<QXmppError>(&result)) {
+            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, error->description));
+        } else {
+            const auto jids = transform<QList<QString>>(std::get<QList<QXmppDiscoItem>>(result), &QXmppDiscoItem::jid);
 
-    const auto identities = iq.identities();
+            // Remove services from the cache that are not available anymore.
+            for (const auto &service : std::as_const(d->services)) {
+                if (!jids.contains(service.jid)) {
+                    removeService(service.jid);
+                }
+            }
 
-    // Search for MIX features provided by the determined MIX service.
-    for (const auto &identity : identities) {
-        // ' || identity.type() == u"text"' is a workaround for older ejabberd versions.
-        if (identity.category() == u"conference" && (identity.type() == MIX_SERVICE_DISCOVERY_NODE || identity.type() == u"text")) {
-            Service service;
-            service.jid = jid;
-            service.channelsSearchable = iq.features().contains(ns_mix_searchable);
-            service.channelCreationAllowed = iq.features().contains(ns_mix_create_channel);
-
-            addService(service);
-            return;
+            for (const auto &jid : jids) {
+                updateService(jid);
+            }
         }
-    }
+    });
+}
 
-    removeService(jid);
+void QXmppMixManager::updateService(const QString &jid)
+{
+    d->discoveryManager->info(jid).then(this, [this, jid](Result<QXmppDiscoInfo> &&result) {
+        if (const auto *error = std::get_if<QXmppError>(&result)) {
+            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, error->description));
+        } else {
+            const auto info = std::get<QXmppDiscoInfo>(std::move(result));
+            const auto &features = info.features();
+
+            // If no MIX service is provided by the item, remove it from the cache.
+            if (!contains(features, ns_mix)) {
+                removeService(jid);
+                return;
+            }
+
+            const auto &identities = info.identities();
+
+            // Search for MIX features provided by the determined MIX service.
+            for (const auto &identity : identities) {
+                // ' || identity.type() == u"text"' is a workaround for older ejabberd versions.
+                if (identity.category() == u"conference" && (identity.type() == MIX_SERVICE_DISCOVERY_NODE || identity.type() == u"text")) {
+                    Service service;
+                    service.jid = jid;
+                    service.channelsSearchable = contains(features, ns_mix_searchable);
+                    service.channelCreationAllowed = contains(features, ns_mix_create_channel);
+
+                    addService(service);
+
+                    return;
+                }
+            }
+
+            removeService(jid);
+        }
+    });
 }
 
 ///
@@ -1520,7 +1526,6 @@ void QXmppMixManager::removeService(const QString &jid)
     }
 
     d->services.erase(itr);
-
     Q_EMIT servicesChanged();
 }
 
@@ -1540,7 +1545,7 @@ void QXmppMixManager::removeServices()
 ///
 void QXmppMixManager::resetCachedData()
 {
-    setParticipantSupport(QXmppMixManager::Support::Unknown);
-    setMessageArchivingSupport(QXmppMixManager::Support::Unknown);
+    setParticipantSupport(Unknown);
+    setMessageArchivingSupport(Unknown);
     removeServices();
 }
