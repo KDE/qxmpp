@@ -40,7 +40,8 @@ using namespace QXmpp::Private;
 /// Handles the PubSub event.
 ///
 /// \param element QDomElement of the &lt;message/&gt; stanza
-/// \param pubSubService JID of the PubSub service
+/// \param pubSubService JID of the PubSub service (if the message's 'from' attribute is empty then
+/// the user's bare JID is used here since QXmpp 1.13)
 /// \param nodeName Name of the PubSub node on the service
 /// \returns Whether the event has been handled and should not be handled by other event handlers.
 ///
@@ -978,7 +979,10 @@ bool QXmppPubSubManager::handleStanza(const QDomElement &element)
 
     auto event = firstChildElement(element, u"event", ns_pubsub_event);
     if (!event.isNull()) {
-        const auto service = element.attribute(u"from"_s);
+        auto service = element.attribute(u"from"_s);
+        if (service.isEmpty()) {
+            service = client()->configuration().jidBare();
+        }
         const auto node = event.firstChildElement().attribute(u"node"_s);
 
         const auto extensions = client()->extensions();
