@@ -130,8 +130,8 @@ public:
     QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions);
     template<typename T>
     QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QVector<T> &items);
-    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, const QString &itemId) { return retractItem(client()->configuration().jidBare(), nodeName, itemId); }
-    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, StandardItemId itemId) { return retractItem(client()->configuration().jidBare(), nodeName, itemId); }
+    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, const QString &itemId, bool notify = false) { return retractItem(client()->configuration().jidBare(), nodeName, itemId, notify); }
+    QXmppTask<Result> retractOwnPepItem(const QString &nodeName, StandardItemId itemId, bool notify = false) { return retractItem(client()->configuration().jidBare(), nodeName, itemId, notify); }
     QXmppTask<Result> purgeOwnPepItems(const QString &nodeName) { return purgeItems(client()->configuration().jidBare(), nodeName); }
     QXmppTask<NodeConfigResult> requestOwnPepNodeConfiguration(const QString &nodeName) { return requestNodeConfiguration(client()->configuration().jidBare(), nodeName); }
     QXmppTask<Result> configureOwnPepNode(const QString &nodeName, const QXmppPubSubNodeConfig &config) { return configureNode(client()->configuration().jidBare(), nodeName, config); }
