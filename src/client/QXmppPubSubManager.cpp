@@ -864,7 +864,7 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 
 ///
-/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, const QString &itemId)
+/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, const QString &itemId, bool notify)
 ///
 /// Deletes an item from a PEP node.
 ///
@@ -873,10 +873,12 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 /// \param nodeName the name of the PEP node to delete the item from
 /// \param itemId the ID of the item to delete
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.13,
+/// default: false)
 ///
 
 ///
-/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, StandardItemId itemId)
+/// \fn QXmppPubSubManager::retractOwnPepItem(const QString &nodeName, StandardItemId itemId, bool notify)
 ///
 /// Deletes an item from a PEP node.
 ///
@@ -885,6 +887,8 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 /// \param nodeName the name of the PEP node to delete the item from
 /// \param itemId the ID of the item to delete
+/// \param notify Whether to generate retraction notifications for subscribers (since QXmpp 1.13,
+/// default: false)
 ///
 
 ///
