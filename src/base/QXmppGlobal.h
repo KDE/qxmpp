@@ -201,9 +201,11 @@ struct TimeoutError { };
 ///
 /// Generic result type offering value or QXmppError
 ///
+/// T defaults to QXmpp::Success since QXmpp 1.13.
+///
 /// \since QXmpp 1.12
 ///
-template<typename T>
+template<typename T = Success>
 using Result = std::variant<T, QXmppError>;
 
 }  // namespace QXmpp
