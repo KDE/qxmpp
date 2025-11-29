@@ -1,15 +1,17 @@
 // SPDX-FileCopyrightText: 2022 Linus Jahn <lnj@kaidan.im>
+// SPDX-FileCopyrightText: 2025 Filipe Azevedo <pasnox@gmail.com>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppHttpUploadManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppTask.h"
-#include "QXmppUploadRequestManager.h"
 #include "QXmppUtils_p.h"
 
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <QFile>
@@ -21,6 +23,93 @@
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
+
+///
+/// \property QXmppHttpUploadManager::support
+///
+/// \see QXmppHttpUploadManager::support()
+///
+/// \since QXmpp 1.13
+///
+
+///
+/// \property QXmppHttpUploadManager::services
+///
+/// \see QXmppHttpUploadManager::services()
+///
+/// \since QXmpp 1.13
+///
+
+///
+/// \enum QXmppHttpUploadManager::Support
+///
+/// Server support for the feature.
+///
+/// \var QXmppHttpUploadManager::Support::Unknown
+///
+/// Whether the server supports the feature is not known.
+///
+/// That means, there is no corresponding information from the server (yet).
+///
+/// \var QXmppHttpUploadManager::Unsupported
+///
+/// The server does not support the feature.
+///
+/// \var QXmppHttpUploadManager::Support::Supported
+///
+/// The server supports the feature.
+///
+/// \since QXmpp 1.13
+///
+
+class QXmppHttpUploadServicePrivate : public QSharedData
+{
+public:
+    QString jid;
+    std::optional<quint64> sizeLimit;
+};
+
+///
+/// \class QXmppHttpUploadService
+///
+/// \brief QXmppHttpUploadService represents an HTTP File Upload service.
+///
+/// It is used to store the JID and maximum file size for uploads.
+///
+
+QXmppHttpUploadService::QXmppHttpUploadService()
+    : d(new QXmppHttpUploadServicePrivate)
+{
+}
+
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppHttpUploadService)
+
+/// Returns the JID of the HTTP File Upload service.
+QString QXmppHttpUploadService::jid() const
+{
+    return d->jid;
+}
+
+/// Sets the JID of the HTTP File Upload service.
+void QXmppHttpUploadService::setJid(const QString &jid)
+{
+    d->jid = jid;
+}
+
+///
+/// Returns the size limit of files that can be uploaded to this upload
+/// service.
+///
+std::optional<quint64> QXmppHttpUploadService::sizeLimit() const
+{
+    return d->sizeLimit;
+}
+
+/// Sets the size limit of files that can be uploaded to this upload service.
+void QXmppHttpUploadService::setSizeLimit(std::optional<quint64> sizeLimit)
+{
+    d->sizeLimit = sizeLimit;
+}
 
 struct QXmppHttpUploadPrivate {
     explicit QXmppHttpUploadPrivate(QXmppHttpUpload *q) : q(q) { }
@@ -130,11 +219,7 @@ QXmppHttpUpload::~QXmppHttpUpload() = default;
 /// The upload manager allows to upload a file to a server via \xep{0363, HTTP File Upload}.
 /// This can be used for sending files to other users.
 ///
-/// QXmppHttpUploadManager depends on QXmppUploadRequestManager. You can enable them using
-/// \code
-/// client.addNewExtension<QXmppUploadRequestManager>();
-/// auto *uploadManager = client.addNewExtension<QXmppHttpUploadManager>();
-/// \endcode
+/// QXmppHttpUploadManager depends on QXmppDiscoveryManager.
 ///
 /// \since QXmpp 1.5
 ///
@@ -208,12 +293,24 @@ QXmppHttpUpload::QXmppHttpUpload()
 }
 
 struct QXmppHttpUploadManagerPrivate {
-    explicit QXmppHttpUploadManagerPrivate(QNetworkAccessManager *netManager)
-        : netManager(netManager)
+    explicit QXmppHttpUploadManagerPrivate(QXmppHttpUploadManager *q, QNetworkAccessManager *netManager)
+        : q(q), netManager(netManager)
     {
     }
 
+    QXmppDiscoveryManager *discoveryManager() const
+    {
+        auto *disco = q->client()->findExtension<QXmppDiscoveryManager>();
+        if (!disco) {
+            qFatal("QXmppDiscoveryManager: Missing required QXmppDiscoveryManager.");
+        }
+        return disco;
+    }
+
+    QXmppHttpUploadManager *q;
     QNetworkAccessManager *netManager;
+    QXmppHttpUploadManager::Support support;
+    QVector<QXmppHttpUploadService> services;
 };
 
 ///
@@ -222,7 +319,7 @@ struct QXmppHttpUploadManagerPrivate {
 /// Creates and uses a new network access manager.
 ///
 QXmppHttpUploadManager::QXmppHttpUploadManager()
-    : d(std::make_unique<QXmppHttpUploadManagerPrivate>(new QNetworkAccessManager(this)))
+    : d(std::make_unique<QXmppHttpUploadManagerPrivate>(this, new QNetworkAccessManager(this)))
 {
 }
 
@@ -233,9 +330,41 @@ QXmppHttpUploadManager::QXmppHttpUploadManager()
 /// manager.
 ///
 QXmppHttpUploadManager::QXmppHttpUploadManager(QNetworkAccessManager *netManager)
-    : d(std::make_unique<QXmppHttpUploadManagerPrivate>(netManager))
+    : d(std::make_unique<QXmppHttpUploadManagerPrivate>(this, netManager))
 {
 }
+
+///
+/// Returns all discovered HTTP File Upload services.
+///
+/// \since QXmpp 1.13
+///
+QVector<QXmppHttpUploadService> QXmppHttpUploadManager::services() const
+{
+    return d->services;
+}
+
+///
+/// \fn QXmppHttpUploadManager::servicesChanged()
+///
+/// \brief Emitted when services have changed.
+///
+
+///
+/// Returns the server's support for upload services.
+///
+/// \since QXmpp 1.13
+///
+QXmppHttpUploadManager::Support QXmppHttpUploadManager::support() const
+{
+    return d->support;
+}
+
+///
+/// \fn QXmppHttpUploadManager::supportChanged()
+///
+/// \brief Emitted when support has changed.
+///
 
 QXmppHttpUploadManager::~QXmppHttpUploadManager() = default;
 
@@ -271,16 +400,7 @@ QXmppHttpUploadManager::~QXmppHttpUploadManager() = default;
 ///
 std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_ptr<QIODevice> data, const QString &filename, const QMimeType &mimeType, qint64 fileSize, const QString &uploadServiceJid)
 {
-    using SlotResult = QXmppUploadRequestManager::SlotResult;
-
     std::shared_ptr<QXmppHttpUpload> upload(new QXmppHttpUpload);
-
-    auto *uploadRequestManager = client()->findExtension<QXmppUploadRequestManager>();
-    if (!uploadRequestManager) {
-        upload->d->reportError({ u"QXmppUploadRequestManager has not been added to the client."_s, std::any() });
-        upload->d->reportFinished();
-        return upload;
-    }
 
     if (!data->isOpen()) {
         upload->d->reportError({ u"Input data device MUST be open."_s, std::any() });
@@ -299,7 +419,7 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
         }
     }
 
-    auto future = client()->findExtension<QXmppUploadRequestManager>()->requestSlot(filename, fileSize, mimeType, uploadServiceJid);
+    auto future = requestSlot(filename, fileSize, mimeType, uploadServiceJid);
     // TODO: rawSourceDevice: could this lead to a memory leak if the "then lambda" is never executed?
     future.then(this, [this, upload, rawSourceDevice = data.release(), mimeType](SlotResult result) mutable {
         // first check whether upload was cancelled in the meantime
@@ -402,4 +522,205 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(const QFileI
         -1,
         uploadServiceJid);
     return upload;
+}
+
+void QXmppHttpUploadManager::onRegistered(QXmppClient *client)
+{
+    connect(client, &QXmppClient::connected, this, [this, client]() {
+        if (client->streamManagementState() == QXmppClient::NewStream) {
+            resetCachedData();
+            updateCachedData();
+        }
+    });
+}
+
+void QXmppHttpUploadManager::onUnregistered(QXmppClient *client)
+{
+    disconnect(client, &QXmppClient::connected, this, nullptr);
+
+    resetCachedData();
+}
+
+QXmppTask<void> QXmppHttpUploadManager::updateService(const QString &jid)
+{
+    QXmppPromise<void> promise;
+
+    d->discoveryManager()->info(jid).then(this, [this, jid, promise](Result<QXmppDiscoInfo> &&result) mutable {
+        if (const auto *error = std::get_if<QXmppError>(&result)) {
+            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, error->description));
+            promise.finish();
+        } else {
+            const auto info = std::get<QXmppDiscoInfo>(std::move(result));
+            const auto &features = info.features();
+
+            if (!contains(features, ns_http_upload)) {
+                promise.finish();
+                return;
+            }
+
+            const auto &identities = info.identities();
+            auto oldSupport = d->support;
+            bool servicesAdded = false;
+
+            for (const auto &identity : identities) {
+                if (identity.category() == u"store" && identity.type() == u"file") {
+                    QXmppHttpUploadService service;
+                    service.setJid(jid);
+
+                    if (auto form = info.dataForm(ns_http_upload)) {
+                        if (auto maxSizeValue = form->fieldValue(u"max-file-size")) {
+                            service.setSizeLimit(parseInt<uint64_t>(maxSizeValue->toString()));
+                        }
+                    }
+
+                    d->services.append(service);
+                    servicesAdded = true;
+                }
+            }
+
+            if (servicesAdded) {
+                Q_EMIT servicesChanged();
+
+                d->support = Support::Supported;
+            }
+
+            if (oldSupport != d->support) {
+                Q_EMIT supportChanged();
+            }
+
+            promise.finish();
+        }
+    });
+
+    return promise.task();
+}
+
+void QXmppHttpUploadManager::updateServices()
+{
+    const auto serverJid = client()->configuration().domain();
+
+    d->discoveryManager()->items(serverJid).then(this, [this, serverJid](Result<QList<QXmppDiscoItem>> &&result) {
+        const auto maybeReportUnsupported = [this]() {
+            // If no services match or errors happens, report unsupported
+            if (d->support == Support::Unknown) {
+                d->support = Support::Unsupported;
+                Q_EMIT supportChanged();
+            }
+        };
+
+        // We should have no support / services at this stage
+        Q_ASSERT(d->support == Support::Unknown);
+        Q_ASSERT(d->services.isEmpty());
+
+        if (const auto *error = std::get_if<QXmppError>(&result)) {
+            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, error->description));
+            maybeReportUnsupported();
+        } else {
+            const auto jids = transform<QList<QString>>(std::get<QList<QXmppDiscoItem>>(result), &QXmppDiscoItem::jid);
+            auto tasks = transform<QList<QXmppTask<void>>>(jids, std::bind(&QXmppHttpUploadManager::updateService, this, std::placeholders::_1));
+            auto task = joinVoidTasks(this, std::move(tasks));
+
+            task.then(this, maybeReportUnsupported);
+        }
+    });
+}
+
+///
+/// Resets the cached data.
+///
+void QXmppHttpUploadManager::resetCachedData()
+{
+    if (!d->services.isEmpty()) {
+        d->services.clear();
+        Q_EMIT servicesChanged();
+    }
+
+    if (d->support != Support::Unknown) {
+        d->support = Support::Unknown;
+        Q_EMIT supportChanged();
+    }
+}
+
+///
+/// Updates the cached data.
+///
+void QXmppHttpUploadManager::updateCachedData()
+{
+    updateServices();
+}
+
+///
+/// Requests an upload slot from the server.
+///
+/// \param file The info of the file to be uploaded.
+/// \param uploadService The HTTP File Upload service that is used to request
+///                      the upload slot. If this is empty, the first
+///                      discovered one is used.
+///
+/// \since QXmpp 1.13
+///
+QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlot(const QFileInfo &file,
+                                                                                  const QString &uploadService)
+{
+    return requestSlot(file, file.fileName(), uploadService);
+}
+
+///
+/// Requests an upload slot from the server.
+///
+/// \param file The info of the file to be uploaded.
+/// \param customFileName This name is used instead of the file's actual name
+///                       for requesting the upload slot.
+/// \param uploadService The HTTP File Upload service that is used to request
+///                      the upload slot. If this is empty, the first
+///                      discovered one is used.
+///
+/// \since QXmpp 1.13
+///
+QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlot(const QFileInfo &file,
+                                                                                  const QString &customFileName,
+                                                                                  const QString &uploadService)
+{
+    return requestSlot(customFileName, file.size(),
+                       QMimeDatabase().mimeTypeForFile(file),
+                       uploadService);
+}
+
+///
+/// Requests an upload slot from the server.
+///
+/// \param fileName The name of the file to be uploaded. This may be used by
+///                 the server to generate the URL.
+/// \param fileSize The size of the file to be uploaded. The server may reject
+///                 too large files.
+/// \param mimeType The content-type of the file. This can be used by the
+///                 server to set the HTTP MIME-type of the URL.
+/// \param uploadService The HTTP File Upload service that is used to request
+///                      the upload slot. If this is empty, the first
+///                      discovered one is used.
+///
+/// \since QXmpp 1.13
+///
+QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlot(const QString &fileName,
+                                                                                  qint64 fileSize,
+                                                                                  const QMimeType &mimeType,
+                                                                                  const QString &uploadService)
+{
+    if (support() != Support::Supported && uploadService.isEmpty()) {
+        return makeReadyTask(SlotResult(QXmppError {
+            u"Couldn't request upload slot: No service found."_s, {} }));
+    }
+
+    QXmppHttpUploadRequestIq iq;
+    if (uploadService.isEmpty()) {
+        iq.setTo(d->services.first().jid());
+    } else {
+        iq.setTo(uploadService);
+    }
+    iq.setType(QXmppIq::Get);
+    iq.setFileName(fileName);
+    iq.setSize(fileSize);
+    iq.setContentType(mimeType);
+
+    return chainIq<SlotResult>(client()->sendIq(std::move(iq)), this);
 }

@@ -11,7 +11,6 @@
 #include "QXmppFileShare.h"
 #include "QXmppHashing_p.h"
 #include "QXmppThumbnail.h"
-#include "QXmppUploadRequestManager.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
