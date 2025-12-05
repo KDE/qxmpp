@@ -185,7 +185,13 @@ bool QXmppCallPrivate::handleDescription(QXmppCallStream *stream, const QXmppJin
     while (it != stream->d->payloadTypes.end()) {
         bool dynamic = it->id() >= 96;
         bool supported = false;
-        auto &codecs = stream->media() == AUDIO_MEDIA ? audioCodecs : videoCodecs;
+        auto isVideoStream = stream->media() == VIDEO_MEDIA;
+
+        if (!videoSupported && isVideoStream) {
+            videoSupported = true;
+        }
+
+        auto &codecs = isVideoStream ? videoCodecs : audioCodecs;
         for (auto &codec : codecs) {
             if (dynamic) {
                 if (codec.name == it->name() &&
