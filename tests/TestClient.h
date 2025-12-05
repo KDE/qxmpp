@@ -41,8 +41,15 @@ public:
     template<typename String>
     void inject(const String &xml)
     {
-        d->stream->handleIqResponse(xmlToDom(xml));
-        QCoreApplication::processEvents();
+        auto element = xmlToDom(xml);
+
+        if (!d->stream->handleIqResponse(element)) {
+            for (auto *extension : std::as_const(d->extensions)) {
+                if (extension->handleStanza(element)) {
+                    break;
+                }
+            }
+        }
         if (autoResetEnabled) {
             resetIdCount();
         }
