@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2021 Linus Jahn <lnj@kaidan.im>
+// SPDX-FileCopyrightText: 2025 Filipe Azevedo <pasnox@gmail.com>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -102,6 +103,26 @@ auto chainMapSuccess(QXmppTask<Input> &&source, QObject *context, Converter conv
     return chain<std::variant<decltype(convert({})), QXmppError>>(std::move(source), context, [convert](Input &&input) {
         return mapSuccess(std::move(input), convert);
     });
+}
+
+// Creates a task for multiple tasks without a return value.
+template<typename T>
+QXmppTask<void> joinVoidTasks(QObject *context, QList<QXmppTask<T>> &&tasks)
+{
+    int taskCount = tasks.size();
+    auto finishedTaskCount = std::make_shared<int>();
+
+    QXmppPromise<void> promise;
+
+    for (auto task : tasks) {
+        task.then(context, [=]() mutable {
+            if (++(*finishedTaskCount) == taskCount) {
+                promise.finish();
+            }
+        });
+    }
+
+    return promise.task();
 }
 
 }  // namespace QXmpp::Private
