@@ -25,6 +25,7 @@ private:
     Q_SLOT void testPresenceWithMucSupport();
     Q_SLOT void testPresenceWithMuji();
     Q_SLOT void testPresenceWithLastUserInteraction();
+    Q_SLOT void mucOccupantId();
     Q_SLOT void testPresenceWithMix();
     Q_SLOT void testPresenceWithVCard();
 };
@@ -310,6 +311,21 @@ void tst_QXmppPresence::testPresenceWithLastUserInteraction()
     QDateTime another(QDate(2025, 2, 5), QTime(15, 32, 8), TimeZoneUTC);
     presence.setLastUserInteraction(another);
     QCOMPARE(presence.lastUserInteraction(), another);
+}
+
+void tst_QXmppPresence::mucOccupantId()
+{
+    const QByteArray xml(
+        "<presence to=\"hag99@shakespeare.example\" "
+        "from=\"123435#coven@mix.shakespeare.example/UUID-a1j/7533\">"
+        "<show>dnd</show>"
+        "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='dd72603deec90a38ba552f7c68cbcc61bca202cd'/>"
+        "</presence>");
+
+    QXmppPresence presence;
+    parsePacket(presence, xml);
+    QCOMPARE(presence.mucOccupantId(), u"dd72603deec90a38ba552f7c68cbcc61bca202cd"_s);
+    serializePacket(presence, xml);
 }
 
 void tst_QXmppPresence::testPresenceWithMix()

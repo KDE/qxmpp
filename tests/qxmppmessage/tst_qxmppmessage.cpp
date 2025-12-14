@@ -63,6 +63,7 @@ private:
     Q_SLOT void testE2eeFallbackBody();
     Q_SLOT void testFileSharing();
     Q_SLOT void testEncryptedFileSource();
+    Q_SLOT void mucOccupantId();
     Q_SLOT void testReplies();
     Q_SLOT void testJingleMessageInitiationElement();
 };
@@ -1418,6 +1419,20 @@ void tst_QXmppMessage::testEncryptedFileSource()
         parsePacket(encryptedSource, xml);
         serializePacket(encryptedSource, xml);
     }
+}
+
+void tst_QXmppMessage::mucOccupantId()
+{
+    const QByteArray xml =
+        "<message id='message-id2' to='anna@example.com' type='chat'>"
+        "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='dd72603deec90a38ba552f7c68cbcc61bca202cd'/>"
+        "<body>Great idea!</body>"
+        "</message>";
+
+    QXmppMessage m;
+    parsePacket(m, xml);
+    QCOMPARE(m.mucOccupantId(), u"dd72603deec90a38ba552f7c68cbcc61bca202cd"_s);
+    serializePacket(m, xml);
 }
 
 void tst_QXmppMessage::testReplies()

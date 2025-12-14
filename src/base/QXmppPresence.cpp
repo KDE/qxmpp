@@ -17,6 +17,7 @@
 #include <QDateTime>
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 template<>
@@ -91,6 +92,9 @@ public:
 
     // XEP-0283: Moved
     QString oldJid;
+
+    // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+    QString mucOccupantId;
 };
 
 QXmppPresencePrivate::QXmppPresencePrivate()
@@ -439,6 +443,28 @@ void QXmppPresence::setMixUserNick(const QString &mixUserNick)
     d->mixUserNick = mixUserNick;
 }
 
+///
+/// Returns the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
+/// MUCs}.
+///
+/// \since QXmpp 1.13
+///
+QString QXmppPresence::mucOccupantId() const
+{
+    return d->mucOccupantId;
+}
+
+///
+/// Sets the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
+/// MUCs}.
+///
+/// \since QXmpp 1.13
+///
+void QXmppPresence::setMucOccupantId(const QString &id)
+{
+    d->mucOccupantId = id;
+}
+
 /// \cond
 void QXmppPresence::parse(const QDomElement &element)
 {
@@ -521,6 +547,10 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
     } else if (element.tagName() == u"mix" && element.namespaceURI() == ns_mix_presence) {
         d->mixUserJid = element.firstChildElement(u"jid"_s).text();
         d->mixUserNick = element.firstChildElement(u"nick"_s).text();
+
+        // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+    } else if (isElement<MucOccupantId>(element)) {
+        d->mucOccupantId = element.attribute(u"id"_s);
     } else {
         unknownElements << element;
     }
@@ -604,6 +634,11 @@ void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
                 OptionalTextElement { u"jid", d->mixUserJid },
                 OptionalTextElement { u"nick", d->mixUserNick },
             },
+        },
+        // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+        OptionalContent {
+            !d->mucOccupantId.isEmpty(),
+            Element { MucOccupantId::XmlTag, Attribute { u"id", d->mucOccupantId } },
         },
         // unknown extensions
         [&] { QXmppStanza::extensionsToXml(xmlWriter); },

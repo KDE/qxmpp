@@ -129,6 +129,10 @@ public:
     QString mixUserNick() const;
     void setMixUserNick(const QString &);
 
+    // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+    QString mucOccupantId() const;
+    void setMucOccupantId(const QString &);
+
     /// \cond
     void parse(const QDomElement &element) override;
     void toXml(QXmlStreamWriter *writer) const override;

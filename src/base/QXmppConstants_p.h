@@ -252,6 +252,8 @@ inline constexpr QStringView ns_mix_node_banned = u"urn:xmpp:mix:nodes:banned";
 inline constexpr QStringView ns_mix_node_config = u"urn:xmpp:mix:nodes:config";
 // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
 inline constexpr QStringView ns_mix_misc = u"urn:xmpp:mix:misc:0";
+// XEP-0421: Occupant identifiers for semi-anonymous MUCs
+inline constexpr QStringView ns_muc_occupant_id = u"urn:xmpp:occupant-id:0";
 // XEP-0428: Fallback Indication
 inline constexpr QStringView ns_fallback_indication = u"urn:xmpp:fallback:0";
 // XEP-0434: Trust Messages (TM)
@@ -272,6 +274,11 @@ inline constexpr QStringView ns_reply = u"urn:xmpp:reply:0";
 inline constexpr QStringView ns_call_invites = u"urn:xmpp:call-invites:0";
 // XEP-0484: Fast Authentication Streamlining Tokens
 inline constexpr QStringView ns_fast = u"urn:xmpp:fast:0";
+
+// XEP-0421: Occupant identifiers for semi-anonymous MUCs
+struct MucOccupantId {
+    constexpr static std::tuple<QStringView, QStringView> XmlTag = { u"occupant-id", ns_muc_occupant_id };
+};
 
 }  // namespace QXmpp::Private
 

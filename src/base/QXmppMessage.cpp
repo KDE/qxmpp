@@ -28,6 +28,7 @@
 #include "QXmppTrustMessageElement.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
+#include "QXmppXmlTags_p.h"
 
 #include "XmlWriter.h"
 
@@ -193,8 +194,12 @@ public:
     // XEP-0384: OMEMO Encryption
     std::optional<QXmppOmemoElement> omemoElement;
 #endif
+
     // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
     std::optional<QXmppMixInvitation> mixInvitation;
+
+    // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+    QString mucOccupantId;
 
     // XEP-0428: Fallback Indication
     QVector<QXmppFallback> fallbackMarkers;
@@ -1281,6 +1286,28 @@ void QXmppMessage::setMixInvitation(const std::optional<QXmppMixInvitation> &mix
 }
 
 ///
+/// Returns the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
+/// MUCs}.
+///
+/// \since QXmpp 1.13
+///
+QString QXmppMessage::mucOccupantId() const
+{
+    return d->mucOccupantId;
+}
+
+///
+/// Sets the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
+/// MUCs}.
+///
+/// \since QXmpp 1.13
+///
+void QXmppMessage::setMucOccupantId(const QString &id)
+{
+    d->mucOccupantId = id;
+}
+
+///
 /// Sets whether this message is only a fallback according to \xep{0428, Fallback Indication}.
 ///
 /// This is useful for clients not supporting end-to-end encryption to indicate
@@ -1710,6 +1737,11 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             return true;
         }
 #endif
+        // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+        if (isElement<MucOccupantId>(element)) {
+            d->mucOccupantId = element.attribute(u"id"_s);
+            return true;
+        }
         // XEP-0482: Call Invites
         if (QXmppCallInviteElement::isCallInviteElement(element)) {
             d->callInviteElement = parseOptionalElement<QXmppCallInviteElement>(element);
@@ -1958,6 +1990,11 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
                 Attribute { u"namespace", d->encryptionMethod },
                 OptionalAttribute { u"name", d->encryptionName },
             });
+        }
+
+        // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+        if (!d->mucOccupantId.isEmpty()) {
+            w.write(Element { MucOccupantId::XmlTag, Attribute { u"id", d->mucOccupantId } });
         }
 
 #ifdef BUILD_OMEMO

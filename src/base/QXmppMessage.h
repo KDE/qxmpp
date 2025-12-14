@@ -291,6 +291,10 @@ public:
     std::optional<QXmppMixInvitation> mixInvitation() const;
     void setMixInvitation(const std::optional<QXmppMixInvitation> &mixInvitation);
 
+    // XEP-0421: Occupant identifiers for semi-anonymous MUCs
+    QString mucOccupantId() const;
+    void setMucOccupantId(const QString &occupantId);
+
     // XEP-0428: Fallback Indication
 #if QXMPP_DEPRECATED_SINCE(1, 7)
     [[deprecated("Use fallbackMarkers()")]]
