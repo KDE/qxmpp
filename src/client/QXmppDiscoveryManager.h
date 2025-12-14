@@ -65,8 +65,8 @@ public:
 #if QXMPP_DEPRECATED_SINCE(1, 12)
     QT_WARNING_PUSH
     QT_WARNING_DISABLE_DEPRECATED
-    using InfoResult [[deprecated]] = std::variant<QXmppDiscoveryIq, QXmppError>;
-    using ItemsResult [[deprecated]] = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
+    using InfoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
+    using ItemsResult = std::variant<QList<QXmppDiscoveryIq::Item>, QXmppError>;
     [[deprecated("Use info()")]]
     QXmppTask<InfoResult> requestDiscoInfo(const QString &jid, const QString &node = {});
     [[deprecated("Use items()")]]

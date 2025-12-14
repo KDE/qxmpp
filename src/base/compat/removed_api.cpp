@@ -463,9 +463,11 @@ void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         d->dataForms,
     });
 }
+/// \endcond
 
 // EntityTimeIq
 
+/// \cond
 bool QXmppEntityTimeIq::isEntityTimeIq(const QDomElement &element)
 {
     return isIqType(element, u"time", ns_entity_time);
@@ -595,6 +597,7 @@ void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(ns_session.toString());
     writer->writeEndElement();
 }
+/// \endcond
 
 // PubSubIq
 

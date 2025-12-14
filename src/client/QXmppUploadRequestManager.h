@@ -100,15 +100,9 @@ public:
                               const QString &uploadService = QString());
 
     using SlotResult = std::variant<QXmppHttpUploadSlotIq, QXmppError>;
-    QXmppTask<SlotResult> requestSlot(const QFileInfo &file,
-                                      const QString &uploadService = {});
-    QXmppTask<SlotResult> requestSlot(const QFileInfo &file,
-                                      const QString &customFileName,
-                                      const QString &uploadService = {});
-    QXmppTask<SlotResult> requestSlot(const QString &fileName,
-                                      qint64 fileSize,
-                                      const QMimeType &mimeType,
-                                      const QString &uploadService = {});
+    auto requestSlot(const QFileInfo &file, const QString &uploadService = {}) -> QXmppTask<SlotResult>;
+    auto requestSlot(const QFileInfo &file, const QString &customFileName, const QString &uploadService = {}) -> QXmppTask<SlotResult>;
+    auto requestSlot(const QString &fileName, qint64 fileSize, const QMimeType &mimeType, const QString &uploadService = {}) -> QXmppTask<SlotResult>;
 
     bool serviceFound() const;
 
@@ -116,17 +110,16 @@ public:
 
     bool handleStanza(const QDomElement &stanza) override;
 
-Q_SIGNALS:
     /// Emitted when an upload slot was received.
-    void slotReceived(const QXmppHttpUploadSlotIq &slot);
+    Q_SIGNAL void slotReceived(const QXmppHttpUploadSlotIq &slot);
 
     /// Emitted when the slot request failed.
     ///
     /// \param request The sent IQ with an QXmppStanza::Error from the server.
-    void requestFailed(const QXmppHttpUploadRequestIq &request);
+    Q_SIGNAL void requestFailed(const QXmppHttpUploadRequestIq &request);
 
     /// Emitted when the first upload service has been found.
-    void serviceFoundChanged();
+    Q_SIGNAL void serviceFoundChanged();
 
 protected:
     void onRegistered(QXmppClient *client) override;

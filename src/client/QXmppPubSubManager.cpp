@@ -339,7 +339,7 @@ auto QXmppPubSubManager::createNode(const QString &jid, const QString &nodeName,
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \return
 ///
-QXmppTask<QXmppPubSubManager::InstantNodeResult> QXmppPubSubManager::createInstantNode(const QString &jid)
+auto QXmppPubSubManager::createInstantNode(const QString &jid) -> QXmppTask<InstantNodeResult>
 {
     PubSubIq request;
     request.setType(QXmppIq::Set);

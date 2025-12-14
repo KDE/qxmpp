@@ -28,8 +28,8 @@ public:
 
     QStringList discoveryFeatures() const override;
 
-    QXmppTask<GetResult> request(const QString &jid);
-    QXmppTask<PublishResult> publish(const QXmppTuneItem &);
+    auto request(const QString &jid) -> QXmppTask<GetResult>;
+    auto publish(const QXmppTuneItem &item) -> QXmppTask<PublishResult>;
 
     Q_SIGNAL void itemReceived(const QString &jid, const QXmppTuneItem &item);
 

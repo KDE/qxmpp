@@ -37,7 +37,7 @@ struct TaskData {
 /// Unlike QFuture, this is *not* thread-safe!! This avoids the need to do mutex locking at every
 /// access though.
 ///
-/// \ingroup Core classes
+/// \ingroup Core
 ///
 /// \since QXmpp 1.5
 ///
