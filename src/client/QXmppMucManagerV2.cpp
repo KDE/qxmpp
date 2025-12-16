@@ -5,9 +5,12 @@
 #include "QXmppMucManagerV2.h"
 
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
+#include "QXmppMucForms.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppUtils_p.h"
+#include "QXmppVCardIq.h"
 
 #include "StringLiterals.h"
 #include "XmlWriter.h"
@@ -125,6 +128,7 @@ struct QXmppMucManagerV2Private {
     std::optional<QList<QXmppMucBookmark>> bookmarks;
 
     QXmppPubSubManager *pubsub();
+    QXmppDiscoveryManager *disco();
     void setBookmarks(QVector<Bookmarks2ConferenceItem> &&items);
     void resetBookmarks();
     QXmppTask<EmptyResult> setBookmark(QXmppMucBookmark &&bookmark);
@@ -185,6 +189,102 @@ QStringList QXmppMucManagerV2::discoveryFeatures() const { return { ns_bookmarks
 
 /// Retrieved bookmarks.
 const std::optional<QList<QXmppMucBookmark>> &QXmppMucManagerV2::bookmarks() const { return d->bookmarks; }
+
+///
+/// Sets the avatar of a MUC room.
+///
+/// Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
+/// entity" of the MUC.
+///
+/// \param jid JID of the MUC room
+/// \param avatar Avatar to be set
+///
+QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(const QString &jid, const Avatar &avatar)
+{
+    QXmppVCardIq vCardIq;
+    vCardIq.setTo(jid);
+    vCardIq.setFrom({});
+    vCardIq.setType(QXmppIq::Set);
+    vCardIq.setPhotoType(avatar.contentType);
+    vCardIq.setPhoto(avatar.data);
+    return client()->sendGenericIq(std::move(vCardIq));
+}
+
+///
+/// Removes the avatar of a MUC room.
+///
+/// Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
+/// entity" of the MUC.
+///
+/// \param jid JID of the MUC room
+///
+QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(const QString &jid)
+{
+    QXmppVCardIq vCardIq;
+    vCardIq.setTo(jid);
+    vCardIq.setFrom({});
+    vCardIq.setType(QXmppIq::Set);
+    return client()->sendGenericIq(std::move(vCardIq));
+}
+
+///
+/// Fetches the Avatar of a MUC room
+///
+/// First fetches the avatar hashes via the `muc#roominfo` form from service discovery information
+/// and then fetches the avatar itself via vcard-temp.
+///
+/// \note This currently does not do any caching and does not listen for avatar changes.
+/// \param jid JID of the MUC room
+/// \return nullopt if VCards are not supported in this MUC or no avatar has been published, otherwise the published avatar
+///
+QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::fetchRoomAvatar(const QString &jid)
+{
+    QXmppPromise<Result<std::optional<Avatar>>> p;
+    auto t = p.task();
+
+    d->disco()->info(jid).then(this, [this, jid, p = std::move(p)](auto result) mutable {
+        auto *info = std::get_if<QXmppDiscoInfo>(&result);
+        if (!info) {
+            p.finish(std::get<QXmppError>(std::move(result)));
+            return;
+        }
+
+        if (!contains(info->features(), ns_vcard)) {
+            p.finish(std::nullopt);
+            return;
+        }
+
+        auto roomInfo = info->template dataForm<QXmppMucRoomInfo>();
+        if (!roomInfo.has_value()) {
+            p.finish(std::nullopt);
+            return;
+        }
+        auto hashes = roomInfo->avatarHashes();
+        if (hashes.isEmpty()) {
+            p.finish(std::nullopt);
+            return;
+        }
+
+        client()->sendIq(QXmppVCardIq(jid)).then(this, [this, hashes, p = std::move(p)](auto &&result) mutable {
+            auto iqResponse = parseIq<QXmppVCardIq, Result<QXmppVCardIq>>(std::move(result));
+            if (std::holds_alternative<QXmppError>(iqResponse)) {
+                p.finish(std::get<QXmppError>(std::move(iqResponse)));
+                return;
+            }
+
+            const auto &vcard = std::get<QXmppVCardIq>(iqResponse);
+
+            auto hexHash = QString::fromUtf8(QCryptographicHash::hash(vcard.photo(), QCryptographicHash::Sha1).toHex());
+            if (!contains(hashes, hexHash)) {
+                p.finish(QXmppError { u"Avatar hash mismatch"_s });
+            } else {
+                p.finish(Avatar { vcard.photoType(), vcard.photo() });
+            }
+        });
+    });
+
+    return t;
+}
 
 /// Handles incoming PubSub events.
 bool QXmppMucManagerV2::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
@@ -347,6 +447,18 @@ QXmppPubSubManager *QXmppMucManagerV2Private::pubsub()
         return manager;
     }
     qFatal("MucManagerV2: Missing required PubSubManager.");
+    return nullptr;
+}
+
+QXmppDiscoveryManager *QXmppMucManagerV2Private::disco()
+{
+    if (!q->client()) {
+        qFatal("MucManagerV2: Not registered.");
+    }
+    if (auto manager = q->client()->findExtension<QXmppDiscoveryManager>()) {
+        return manager;
+    }
+    qFatal("MucManagerV2: Missing required DiscoveryManager.");
     return nullptr;
 }
 

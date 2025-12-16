@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMucForms.h"
 #include "QXmppMucManagerV2.h"
 #include "QXmppPubSubManager.h"
@@ -18,9 +19,13 @@ class tst_QXmppMuc : public QObject
     Q_OBJECT
 
 private:
+    // PEP bookmarks
     Q_SLOT void bookmarks2Updates();
     Q_SLOT void bookmarks2Set();
     Q_SLOT void bookmarks2Remove();
+
+    // MUC avatars
+    Q_SLOT void avatarFetch();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -126,6 +131,40 @@ void tst_QXmppMuc::bookmarks2Remove()
     test.inject(u"<iq id='qx1' type='result'/>"_s);
 
     expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppMuc::avatarFetch()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto avatarTask = muc->fetchRoomAvatar(u"garden@chat.shakespeare.example.org"_s);
+    test.inject(
+        u"<iq type='result' id='qx1' to='juliet@capulet.lit/balcony' from='garden@chat.shakespeare.example.org'>"
+        "<query xmlns='http://jabber.org/protocol/disco#info'>"
+        "<identity category='conference' type='text' name='The Garden'/>"
+        "<feature var='http://jabber.org/protocol/muc'/>"
+        "<feature var='vcard-temp'/>"
+        "<x xmlns='jabber:x:data' type='result'>"
+        "<field var='FORM_TYPE' type='hidden'><value>http://jabber.org/protocol/muc#roominfo</value></field>"
+        "<field var='muc#roominfo_avatarhash' type='text-multi' label='Avatar hash'><value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value></field>"
+        "</x>"
+        "</query>"
+        "</iq>"_s);
+
+    test.inject(
+        u"<iq type='result' id='qx3' to='juliet@capulet.example.com/balcony' from='garden@chat.shakespeare.example.org'><vCard xmlns='vcard-temp'>"
+        "<PHOTO>"
+        "<TYPE>image/svg+xml</TYPE>"
+        "<BINVAL>PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiI+CiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9InJlZCIvPgo8L3N2Zz4K</BINVAL>"
+        "</PHOTO>"
+        "</vCard></iq>"_s);
+
+    auto avatar = expectFutureVariant<std::optional<QXmppMucManagerV2::Avatar>>(avatarTask);
+    QVERIFY(avatar.has_value());
+    QCOMPARE(avatar->contentType, u"image/svg+xml"_s);
 }
 
 void tst_QXmppMuc::roomInfoForm()

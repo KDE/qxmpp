@@ -58,6 +58,11 @@ public:
         QXmppMucBookmark newBookmark;
     };
 
+    struct Avatar {
+        QString contentType;
+        QByteArray data;
+    };
+
     QXmppMucManagerV2();
     ~QXmppMucManagerV2();
 
@@ -71,6 +76,10 @@ public:
 
     QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
     QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
+
+    QXmppTask<QXmpp::Result<>> setRoomAvatar(const QString &jid, const Avatar &avatar);
+    QXmppTask<QXmpp::Result<>> removeRoomAvatar(const QString &jid);
+    QXmppTask<QXmpp::Result<std::optional<Avatar>>> fetchRoomAvatar(const QString &jid);
 
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
 
