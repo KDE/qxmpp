@@ -188,7 +188,7 @@ void QXmppVCardManager::onRegistered(QXmppClient *client)
 void QXmppVCardManager::onUnregistered(QXmppClient *client)
 {
     if (auto manager = client->findExtension<QXmppAccountMigrationManager>()) {
-        manager->unregisterExportData<QXmppVCardIq>();
+        manager->unregisterExportData<VCardData>();
     }
 }
 /// \endcond
