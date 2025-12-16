@@ -57,6 +57,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppMixIq_p.h
     base/QXmppMixParticipantItem.h
     base/QXmppMucIq.h
+    base/QXmppMucForms.h
     base/QXmppNonza.h
     base/QXmppNonSASLAuth.h
     base/QXmppOutOfBandUrl.h
@@ -206,6 +207,7 @@ set(SOURCE_FILES
     base/QXmppMixIq.cpp
     base/QXmppMixItems.cpp
     base/QXmppMucIq.cpp
+    base/QXmppMucForms.cpp
     base/QXmppNonza.cpp
     base/QXmppNonSASLAuth.cpp
     base/QXmppOutOfBandUrl.cpp

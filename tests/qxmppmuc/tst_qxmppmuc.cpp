@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppConstants_p.h"
+#include "QXmppMucForms.h"
 #include "QXmppMucManagerV2.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppPubSubSubAuthorization.h"
 
 #include "TestClient.h"
 
@@ -19,6 +21,9 @@ private:
     Q_SLOT void bookmarks2Updates();
     Q_SLOT void bookmarks2Set();
     Q_SLOT void bookmarks2Remove();
+
+    // muc#roominfo form
+    Q_SLOT void roomInfoForm();
 };
 
 void tst_QXmppMuc::bookmarks2Updates()
@@ -121,6 +126,56 @@ void tst_QXmppMuc::bookmarks2Remove()
     test.inject(u"<iq id='qx1' type='result'/>"_s);
 
     expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppMuc::roomInfoForm()
+{
+    QByteArray xml(R"(
+<x xmlns='jabber:x:data' type='result'>
+<field var='FORM_TYPE' type='hidden'><value>http://jabber.org/protocol/muc#roominfo</value></field>
+<field var='muc#roominfo_description' label='Description'><value>The place for all good witches!</value></field>
+<field var='muc#roominfo_contactjid' label='Contact Addresses'><value>crone1@shakespeare.lit</value></field>
+<field var='muc#roominfo_subject' label='Current Discussion Topic'><value>Spells</value></field>
+<field var='muc#roominfo_subjectmod' label='Subject can be modified'><value>true</value></field>
+<field var='muc#roominfo_occupants' label='Number of occupants'><value>3</value></field>
+<field var='muc#roominfo_ldapgroup' label='Associated LDAP Group'><value>cn=witches,dc=shakespeare,dc=lit</value></field>
+<field var='muc#roominfo_lang' label='Language of discussion'><value>en</value></field>
+<field var='muc#roominfo_logs' label='URL for discussion logs'><value>http://www.shakespeare.lit/chatlogs/coven/</value></field>
+<field var='muc#maxhistoryfetch' label='Maximum Number of History Messages Returned by Room'><value>50</value></field>
+<field var='muc#roominfo_pubsub' label='Associated pubsub node'><value>xmpp:pubsub.shakespeare.lit?;node=the-coven-node</value></field>
+<field var='muc#roominfo_avatarhash' type='text-multi' label='Avatar hash'><value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value><value>b9b256f999ded52c2fa14fb007c2e5b979450cbb</value></field>
+</x>)");
+
+    QXmppDataForm form;
+    parsePacket(form, xml);
+
+    auto roomInfo = QXmppMucRoomInfo::fromDataForm(form);
+    QCOMPARE(roomInfo->description(), u"The place for all good witches!");
+    QCOMPARE(roomInfo->contactJids(), QStringList { u"crone1@shakespeare.lit"_s });
+    QCOMPARE(roomInfo->subject(), u"Spells");
+    QVERIFY(roomInfo->subjectChangeable().has_value());
+    QCOMPARE(roomInfo->subjectChangeable(), std::optional { true });
+    QCOMPARE(roomInfo->occupants(), 3);
+    QCOMPARE(roomInfo->language(), u"en");
+    QCOMPARE(roomInfo->maxHistoryFetch(), 50);
+    auto hashes = QStringList { u"a31c4bd04de69663cfd7f424a8453f4674da37ff"_s, u"b9b256f999ded52c2fa14fb007c2e5b979450cbb"_s };
+    QCOMPARE(roomInfo->avatarHashes(), hashes);
+
+    form = roomInfo->toDataForm();
+    QVERIFY(!form.isNull());
+    auto xml2 = QByteArrayLiteral(
+        "<x xmlns=\"jabber:x:data\" type=\"form\">"
+        "<field type=\"hidden\" var=\"FORM_TYPE\"><value>http://jabber.org/protocol/muc#roominfo</value></field>"
+        "<field type=\"text-single\" var=\"muc#maxhistoryfetch\"><value>50</value></field>"
+        "<field type=\"jid-multi\" var=\"muc#roominfo_contactjid\"><value>crone1@shakespeare.lit</value></field>"
+        "<field type=\"text-single\" var=\"muc#roominfo_description\"><value>The place for all good witches!</value></field>"
+        "<field type=\"text-single\" var=\"muc#roominfo_lang\"><value>en</value></field>"
+        "<field type=\"text-single\" var=\"muc#roominfo_occupants\"><value>3</value></field>"
+        "<field type=\"text-single\" var=\"muc#roominfo_subject\"><value>Spells</value></field>"
+        "<field type=\"boolean\" var=\"muc#roominfo_subjectmod\"><value>true</value></field>"
+        "<field type='text-multi' var='muc#roominfo_avatarhash'><value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value><value>b9b256f999ded52c2fa14fb007c2e5b979450cbb</value></field>"
+        "</x>");
+    serializePacket(form, xml2);
 }
 
 QTEST_MAIN(tst_QXmppMuc)

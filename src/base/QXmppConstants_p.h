@@ -59,6 +59,7 @@ inline constexpr QStringView ns_muc = u"http://jabber.org/protocol/muc";
 inline constexpr QStringView ns_muc_admin = u"http://jabber.org/protocol/muc#admin";
 inline constexpr QStringView ns_muc_owner = u"http://jabber.org/protocol/muc#owner";
 inline constexpr QStringView ns_muc_user = u"http://jabber.org/protocol/muc#user";
+inline constexpr QStringView ns_muc_roominfo = u"http://jabber.org/protocol/muc#roominfo";
 // XEP-0047: In-Band Bytestreams
 inline constexpr QStringView ns_ibb = u"http://jabber.org/protocol/ibb";
 // XEP-0048: Bookmarks
