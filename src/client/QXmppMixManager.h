@@ -29,7 +29,7 @@ public:
         Unsupported,
         Supported,
     };
-    Q_ENUM(Support);
+    Q_ENUM(Support)
 
     struct QXMPP_EXPORT Service {
         QString jid;
