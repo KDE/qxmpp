@@ -357,7 +357,6 @@ if(WITH_GSTREAMER)
     target_link_libraries(${QXMPP_TARGET}
         PRIVATE
         PkgConfig::GStreamer
-        PkgConfig::GStreamerBase
     )
 endif()
 
