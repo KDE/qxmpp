@@ -92,16 +92,16 @@ void setupVideoStream(GstElement *pipeline, QXmppCallStream *stream)
         qDebug() << "[AVCall] Video playback (receive pad) set up.";
     });
     stream->setSendPadCallback([pipeline](GstPad *sendPad) {
-        GstElement *output = gst_parse_bin_from_description("videotestsrc", true, nullptr);
-        if (!gst_bin_add(GST_BIN(pipeline), output)) {
+        GstElement *input = gst_parse_bin_from_description("videotestsrc", true, nullptr);
+        if (!gst_bin_add(GST_BIN(pipeline), input)) {
             qFatal("[AVCall] Failed to add video test source to pipeline");
             return;
         }
 
-        if (gst_pad_link(gst_element_get_static_pad(output, "src"), sendPad) != GST_PAD_LINK_OK) {
+        if (gst_pad_link(gst_element_get_static_pad(input, "src"), sendPad) != GST_PAD_LINK_OK) {
             qFatal("[AVCall] Failed to link video test source to send pad.");
         }
-        gst_element_sync_state_with_parent(output);
+        gst_element_sync_state_with_parent(input);
 
         qDebug() << "[AVCall] Video test source (send pad) set up.";
     });
