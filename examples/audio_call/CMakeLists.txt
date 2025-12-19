@@ -8,5 +8,4 @@ target_link_libraries(audio_call
     PUBLIC
     ${QXMPP_TARGET}
     PkgConfig::GStreamer
-    PkgConfig::GStreamerBase
 )
