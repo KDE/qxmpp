@@ -33,7 +33,8 @@ public:
     QXmppJingleMessageInitiationManager *manager;
     QString id;
     QString remoteJid;
-    bool isProceeded = false;
+    bool proceeded = false;
+    bool finished = false;
 };
 
 ///
@@ -144,6 +145,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJ
 ///
 QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJingleReason> reason, const QString &migratedTo)
 {
+    d->finished = true;
+
     JmiElement jmiElement;
     jmiElement.setType(JmiType::Finish);
 
@@ -200,21 +203,29 @@ const QString &QXmppJingleMessageInitiation::remoteJid() const
 }
 
 ///
-/// Returns the "isProceeded" flag, e.g., if the Jingle Message Initiation has already been
-/// proceeded.
+/// Returns the "proceeded" flag, e.g., if the Jingle Message Initiation has already been proceeded.
 ///
 bool QXmppJingleMessageInitiation::isProceeded() const
 {
-    return d->isProceeded;
+    return d->proceeded;
 }
 
 ///
-/// Sets the "isProceeded" flag, e.g., if the Jingle Message Initiation has already been
-/// proceeded.
+/// Sets the "proceeded" flag, e.g., if the Jingle Message Initiation has already been proceeded.
 ///
 void QXmppJingleMessageInitiation::setIsProceeded(bool isProceeded)
 {
-    d->isProceeded = isProceeded;
+    d->proceeded = isProceeded;
+}
+
+///
+/// Returns whether the call is finished.
+///
+/// This is needed to avoid a loop while responding to a </finish> element with the same one.
+///
+bool QXmppJingleMessageInitiation::isFinished() const
+{
+    return d->finished;
 }
 
 ///
@@ -425,9 +436,11 @@ bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_pt
             Jmi::Retracted { jmiElement.reason(), jmiElement.containsTieBreak() });
         return true;
     case JmiType::Finish:
-        existingJmi->finish(jmiElement.reason(), jmiElement.migratedTo());
-        Q_EMIT existingJmi->closed(
-            Jmi::Finished { jmiElement.reason(), jmiElement.migratedTo() });
+        if (!existingJmi->isFinished()) {
+            existingJmi->finish(jmiElement.reason(), jmiElement.migratedTo());
+            Q_EMIT existingJmi->closed(
+                Jmi::Finished { jmiElement.reason(), jmiElement.migratedTo() });
+        }
         return true;
     default:
         return false;

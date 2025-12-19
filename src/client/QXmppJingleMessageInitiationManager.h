@@ -61,6 +61,7 @@ private:
     void setRemoteJid(const QString &remoteJid);
     bool isProceeded() const;
     void setIsProceeded(bool isProceeded);
+    bool isFinished() const;
 
     std::unique_ptr<QXmppJingleMessageInitiationPrivate> d;
 
