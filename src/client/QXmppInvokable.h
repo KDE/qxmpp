@@ -44,11 +44,10 @@ public:
      */
     virtual bool isAuthorized(const QString &jid) const = 0;
 
-public Q_SLOTS:
     /**
      * This provides a list of interfaces for introspection of the presented interface.
      */
-    QStringList interfaces() const;
+    Q_SLOT QStringList interfaces() const;
 
 private:
     void buildMethodHash();

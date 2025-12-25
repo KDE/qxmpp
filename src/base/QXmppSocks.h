@@ -20,14 +20,12 @@ public:
     QXmppSocksClient(const QString &proxyHost, quint16 proxyPort, QObject *parent = nullptr);
     void connectToHost(const QString &hostName, quint16 hostPort);
 
-Q_SIGNALS:
-    void ready();
-
-private Q_SLOTS:
-    void slotConnected();
-    void slotReadyRead();
+    Q_SIGNAL void ready();
 
 private:
+    Q_SLOT void slotConnected();
+    Q_SLOT void slotReadyRead();
+
     QString m_proxyHost;
     quint16 m_proxyPort;
     QString m_hostName;
@@ -46,14 +44,12 @@ public:
 
     quint16 serverPort() const;
 
-Q_SIGNALS:
-    void newConnection(QTcpSocket *socket, QString hostName, quint16 port);
-
-private Q_SLOTS:
-    void slotNewConnection();
-    void slotReadyRead();
+    Q_SIGNAL void newConnection(QTcpSocket *socket, QString hostName, quint16 port);
 
 private:
+    Q_SLOT void slotNewConnection();
+    Q_SLOT void slotReadyRead();
+
     QTcpServer *m_server;
     QTcpServer *m_server_v6;
     QMap<QTcpSocket *, int> m_states;

@@ -37,10 +37,9 @@ public:
     std::variant<QXmppEntityTimeIq, QXmppStanza::Error> handleIq(QXmppEntityTimeIq iq);
     /// \endcond
 
-Q_SIGNALS:
     /// \brief This signal is emitted when a time response is received. It's not
     /// emitted when the QFuture-based request is used.
-    void timeReceived(const QXmppEntityTimeIq &);
+    Q_SIGNAL void timeReceived(const QXmppEntityTimeIq &);
 };
 
 #endif  // QXMPPENTITYTIMEMANAGER_H

@@ -68,15 +68,11 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when an archived message is received
-    void archivedMessageReceived(const QString &queryId,
-                                 const QXmppMessage &message);
+    Q_SIGNAL void archivedMessageReceived(const QString &queryId, const QXmppMessage &message);
 
     /// This signal is emitted when all results for a request have been received
-    void resultsRecieved(const QString &queryId,
-                         const QXmppResultSetReply &resultSetReply,
-                         bool complete);
+    Q_SIGNAL void resultsRecieved(const QString &queryId, const QXmppResultSetReply &resultSetReply, bool complete);
 
 private:
     std::unique_ptr<QXmppMamManagerPrivate> d;

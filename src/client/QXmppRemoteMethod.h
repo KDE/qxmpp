@@ -32,14 +32,12 @@ public:
     QXmppRemoteMethod(const QString &jid, const QString &method, const QVariantList &args, QXmppClient *client);
     QXmppRemoteMethodResult call();
 
-private Q_SLOTS:
-    void gotError(const QXmppRpcErrorIq &iq);
-    void gotResult(const QXmppRpcResponseIq &iq);
-
-Q_SIGNALS:
-    void callDone();
+    Q_SIGNAL void callDone();
 
 private:
+    Q_SLOT void gotError(const QXmppRpcErrorIq &iq);
+    Q_SLOT void gotResult(const QXmppRpcResponseIq &iq);
+
     QXmppRpcInvokeIq m_payload;
     QXmppClient *m_client;
     QXmppRemoteMethodResult m_result;

@@ -147,10 +147,9 @@ public:
     qint64 fileSize() const;
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when an error is encountered while
     /// processing the transfer job.
-    void error(QXmppTransferJob::Error error);
+    Q_SIGNAL void error(QXmppTransferJob::Error error);
 
     /// This signal is emitted when the transfer job is finished.
     ///
@@ -159,27 +158,26 @@ Q_SIGNALS:
     ///
     /// Note: Do not delete the job in the slot connected to this signal,
     /// instead use deleteLater().
-    void finished();
+    Q_SIGNAL void finished();
 
     /// This signal is emitted when the local file URL changes.
-    void localFileUrlChanged(const QUrl &localFileUrl);
+    Q_SIGNAL void localFileUrlChanged(const QUrl &localFileUrl);
 
     /// This signal is emitted to indicate the progress of this transfer job.
-    void progress(qint64 done, qint64 total);
+    Q_SIGNAL void progress(qint64 done, qint64 total);
 
     /// This signal is emitted when the transfer job changes state.
-    void stateChanged(QXmppTransferJob::State state);
+    Q_SIGNAL void stateChanged(QXmppTransferJob::State state);
 
-public Q_SLOTS:
-    void abort();
-    void accept(const QString &filePath);
-    void accept(QIODevice *output);
-
-private Q_SLOTS:
-    void _q_terminated();
+    Q_SLOT void abort();
+    Q_SLOT void accept(const QString &filePath);
+    Q_SLOT void accept(QIODevice *output);
 
 private:
     QXmppTransferJob(const QString &jid, QXmppTransferJob::Direction direction, QXmppClient *client, QObject *parent);
+
+    Q_SLOT void _q_terminated();
+
     void setState(QXmppTransferJob::State state);
     void terminate(QXmppTransferJob::Error error);
 
@@ -228,24 +226,22 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when a new file transfer offer is received.
     ///
     /// To accept the transfer job, call the job's QXmppTransferJob::accept() method.
     /// To refuse the transfer job, call the job's QXmppTransferJob::abort() method.
-    void fileReceived(QXmppTransferJob *job);
+    Q_SIGNAL void fileReceived(QXmppTransferJob *job);
 
     /// This signal is emitted whenever a transfer job is started.
-    void jobStarted(QXmppTransferJob *job);
+    Q_SIGNAL void jobStarted(QXmppTransferJob *job);
 
     /// This signal is emitted whenever a transfer job is finished.
     ///
     /// \sa QXmppTransferJob::finished()
-    void jobFinished(QXmppTransferJob *job);
+    Q_SIGNAL void jobFinished(QXmppTransferJob *job);
 
-public Q_SLOTS:
-    QXmppTransferJob *sendFile(const QString &jid, const QString &filePath, const QString &description = QString());
-    QXmppTransferJob *sendFile(const QString &jid, QIODevice *device, const QXmppTransferFileInfo &fileInfo, const QString &sid = QString());
+    Q_SLOT QXmppTransferJob *sendFile(const QString &jid, const QString &filePath, const QString &description = QString());
+    Q_SLOT QXmppTransferJob *sendFile(const QString &jid, QIODevice *device, const QXmppTransferFileInfo &fileInfo, const QString &sid = QString());
 
 protected:
     /// \cond
@@ -253,16 +249,13 @@ protected:
     void onUnregistered(QXmppClient *client) override;
     /// \endcond
 
-private Q_SLOTS:
-    void _q_iqReceived(const QXmppIq &);
-    void _q_jobDestroyed(QObject *object);
-    void _q_jobError(QXmppTransferJob::Error error);
-    void _q_jobFinished();
-    void _q_jobStateChanged(QXmppTransferJob::State state);
-    void _q_socksServerConnected(QTcpSocket *socket, const QString &hostName, quint16 port);
-
 private:
-    const std::unique_ptr<QXmppTransferManagerPrivate> d;
+    Q_SLOT void _q_iqReceived(const QXmppIq &);
+    Q_SLOT void _q_jobDestroyed(QObject *object);
+    Q_SLOT void _q_jobError(QXmppTransferJob::Error error);
+    Q_SLOT void _q_jobFinished();
+    Q_SLOT void _q_jobStateChanged(QXmppTransferJob::State state);
+    Q_SLOT void _q_socksServerConnected(QTcpSocket *socket, const QString &hostName, quint16 port);
 
     void byteStreamIqReceived(const QXmppByteStreamIq &);
     void byteStreamResponseReceived(const QXmppIq &);
@@ -276,6 +269,8 @@ private:
     void streamInitiationResultReceived(const QXmppStreamInitiationIq &);
     void streamInitiationSetReceived(const QXmppStreamInitiationIq &);
     void socksServerSendOffer(QXmppTransferJob *job);
+
+    const std::unique_ptr<QXmppTransferManagerPrivate> d;
 
     friend class QXmppTransferManagerPrivate;
 };

@@ -78,31 +78,29 @@ public:
 
     void addIncomingClient(QXmppIncomingClient *stream);
 
-Q_SIGNALS:
     /// This signal is emitted when a client has connected.
-    void clientConnected(const QString &jid);
+    Q_SIGNAL void clientConnected(const QString &jid);
 
     /// This signal is emitted when a client has disconnected.
-    void clientDisconnected(const QString &jid);
+    Q_SIGNAL void clientDisconnected(const QString &jid);
 
     /// This signal is emitted when the logger changes.
-    void loggerChanged(QXmppLogger *logger);
+    Q_SIGNAL void loggerChanged(QXmppLogger *logger);
 
-public Q_SLOTS:
-    void handleElement(const QDomElement &element);
-
-private Q_SLOTS:
-    void _q_clientConnection(QSslSocket *socket);
-    void _q_clientConnected();
-    void _q_clientDisconnected();
-    void _q_dialbackRequestReceived(const QXmppDialback &dialback);
-    void _q_outgoingServerDisconnected();
-    void _q_serverConnection(QSslSocket *socket);
-    void _q_serverDisconnected();
+    Q_SLOT void handleElement(const QDomElement &element);
 
 private:
-    friend class QXmppServerPrivate;
+    Q_SLOT void _q_clientConnection(QSslSocket *socket);
+    Q_SLOT void _q_clientConnected();
+    Q_SLOT void _q_clientDisconnected();
+    Q_SLOT void _q_dialbackRequestReceived(const QXmppDialback &dialback);
+    Q_SLOT void _q_outgoingServerDisconnected();
+    Q_SLOT void _q_serverConnection(QSslSocket *socket);
+    Q_SLOT void _q_serverDisconnected();
+
     const std::unique_ptr<QXmppServerPrivate> d;
+
+    friend class QXmppServerPrivate;
 };
 
 class QXmppSslServerPrivate;
@@ -122,9 +120,8 @@ public:
     void setLocalCertificate(const QSslCertificate &certificate);
     void setPrivateKey(const QSslKey &key);
 
-Q_SIGNALS:
     /// This signal is emitted when a new connection is established.
-    void newConnection(QSslSocket *socket);
+    Q_SIGNAL void newConnection(QSslSocket *socket);
 
 private:
     void incomingConnection(qintptr socketDescriptor) override;

@@ -44,9 +44,8 @@ public:
     QXmppVersionIq handleIq(QXmppVersionIq &&iq);
     /// \endcond
 
-Q_SIGNALS:
     /// \brief This signal is emitted when a version response is received.
-    void versionReceived(const QXmppVersionIq &);
+    Q_SIGNAL void versionReceived(const QXmppVersionIq &);
 
 private:
     const std::unique_ptr<QXmppVersionManagerPrivate> d;

@@ -56,13 +56,12 @@ protected:
     void handleStanza(const QDomElement &element);
     /// \endcond
 
-private Q_SLOTS:
-    void onDigestReply();
-    void onPasswordReply();
-    void onSocketDisconnected();
-    void onTimeout();
-
 private:
+    Q_SLOT void onDigestReply();
+    Q_SLOT void onPasswordReply();
+    Q_SLOT void onSocketDisconnected();
+    Q_SLOT void onTimeout();
+
     void onSasl2Authenticated();
     void sendStreamFeatures();
 

@@ -68,14 +68,13 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when the requested vCard is received
     /// after calling the requestVCard() function.
-    void vCardReceived(const QXmppVCardIq &);
+    Q_SIGNAL void vCardReceived(const QXmppVCardIq &);
 
     /// This signal is emitted when the client's vCard is received
     /// after calling the requestClientVCard() function.
-    void clientVCardReceived();
+    Q_SIGNAL void clientVCardReceived();
 
 protected:
     void onRegistered(QXmppClient *client) override;

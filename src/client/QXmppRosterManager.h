@@ -111,16 +111,14 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-public Q_SLOTS:
-    bool acceptSubscription(const QString &bareJid, const QString &reason = {});
-    bool refuseSubscription(const QString &bareJid, const QString &reason = {});
-    bool addItem(const QString &bareJid, const QString &name = {}, const QSet<QString> &groups = {});
-    bool removeItem(const QString &bareJid);
-    bool renameItem(const QString &bareJid, const QString &name);
-    bool subscribe(const QString &bareJid, const QString &reason = {});
-    bool unsubscribe(const QString &bareJid, const QString &reason = {});
+    Q_SLOT bool acceptSubscription(const QString &bareJid, const QString &reason = {});
+    Q_SLOT bool refuseSubscription(const QString &bareJid, const QString &reason = {});
+    Q_SLOT bool addItem(const QString &bareJid, const QString &name = {}, const QSet<QString> &groups = {});
+    Q_SLOT bool removeItem(const QString &bareJid);
+    Q_SLOT bool renameItem(const QString &bareJid, const QString &name);
+    Q_SLOT bool subscribe(const QString &bareJid, const QString &reason = {});
+    Q_SLOT bool unsubscribe(const QString &bareJid, const QString &reason = {});
 
-Q_SIGNALS:
     /// This signal is emitted when the Roster IQ is received after a successful
     /// connection. That is the roster entries are empty before this signal is emitted.
     /// One should use getRosterBareJids() and getRosterEntry() only after
@@ -129,10 +127,10 @@ Q_SIGNALS:
     /// \note If the previous stream could be resumed, this signal is not
     /// emitted since QXmpp 1.4. Changes since the last connection are reported
     /// via the itemAdded(), itemChanged() and itemRemoved() signals.
-    void rosterReceived();
+    Q_SIGNAL void rosterReceived();
 
     /// This signal is emitted when the presence of a particular bareJid and resource changes.
-    void presenceChanged(const QString &bareJid, const QString &resource);
+    Q_SIGNAL void presenceChanged(const QString &bareJid, const QString &resource);
 
     /// This signal is emitted when a contact asks to subscribe to your presence.
     ///
@@ -143,33 +141,32 @@ Q_SIGNALS:
     /// signal will not be emitted. This is only valid for non moved or verified moved subscription.
     /// If the subscription is a moved one and the roster's old-jid's subscription is not either from
     /// or both then QXmppConfiguration::autoAcceptSubscriptions() is ignored.
-    void subscriptionReceived(const QString &bareJid);
+    Q_SIGNAL void subscriptionReceived(const QString &bareJid);
 
-    void subscriptionRequestReceived(const QString &subscriberBareJid, const QXmppPresence &presence);
+    Q_SIGNAL void subscriptionRequestReceived(const QString &subscriberBareJid, const QXmppPresence &presence);
 
     /// This signal is emitted when the roster entry of a particular bareJid is
     /// added as a result of roster push.
-    void itemAdded(const QString &bareJid);
+    Q_SIGNAL void itemAdded(const QString &bareJid);
 
     /// This signal is emitted when the roster entry of a particular bareJid
     /// changes as a result of roster push.
-    void itemChanged(const QString &bareJid);
+    Q_SIGNAL void itemChanged(const QString &bareJid);
 
     /// This signal is emitted when the roster entry of a particular bareJid is
     /// removed as a result of roster push.
-    void itemRemoved(const QString &bareJid);
+    Q_SIGNAL void itemRemoved(const QString &bareJid);
 
 protected:
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
 
-private Q_SLOTS:
-    void _q_connected();
-    void _q_disconnected();
-    void _q_presenceReceived(const QXmppPresence &);
-
 private:
     using RosterResult = std::variant<QXmppRosterIq, QXmppError>;
+
+    Q_SLOT void _q_connected();
+    Q_SLOT void _q_disconnected();
+    Q_SLOT void _q_presenceReceived(const QXmppPresence &);
 
     void handleSubscriptionRequest(const QString &bareJid, const QXmppPresence &presence);
     QXmppTask<RosterResult> requestRoster();

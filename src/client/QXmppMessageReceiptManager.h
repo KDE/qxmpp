@@ -27,11 +27,10 @@ public:
     bool handleMessage(const QXmppMessage &) override;
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when receipt for the message with the
     /// given id is received. The id could be previously obtained by
     /// calling QXmppMessage::id().
-    void messageDelivered(const QString &jid, const QString &id);
+    Q_SIGNAL void messageDelivered(const QString &jid, const QString &id);
 };
 
 #endif  // QXMPPMESSAGERECEIPTMANAGER_H

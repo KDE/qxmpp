@@ -61,13 +61,11 @@ public:
 
     bool isFinished() const;
 
-public Q_SLOTS:
-    void finish();
-    void finishLater();
+    Q_SLOT void finish();
+    Q_SLOT void finishLater();
 
-Q_SIGNALS:
     /// This signal is emitted when the reply has finished.
-    void finished();
+    Q_SIGNAL void finished();
 
 private:
     QByteArray m_digest;

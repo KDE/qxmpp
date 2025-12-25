@@ -61,12 +61,11 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-Q_SIGNALS:
     /// This signal is emitted when an invitation to a chat room is received.
-    void invitationReceived(const QString &roomJid, const QString &inviter, const QString &reason);
+    Q_SIGNAL void invitationReceived(const QString &roomJid, const QString &inviter, const QString &reason);
 
     /// This signal is emitted when a new room is managed.
-    void roomAdded(QXmppMucRoom *room);
+    Q_SIGNAL void roomAdded(QXmppMucRoom *room);
 
 protected:
     /// \cond
@@ -74,11 +73,10 @@ protected:
     void onUnregistered(QXmppClient *client) override;
     /// \endcond
 
-private Q_SLOTS:
-    void _q_messageReceived(const QXmppMessage &message);
-    void _q_roomDestroyed(QObject *object);
-
 private:
+    Q_SLOT void _q_messageReceived(const QXmppMessage &message);
+    Q_SLOT void _q_roomDestroyed(QObject *object);
+
     const std::unique_ptr<QXmppMucManagerPrivate> d;
 };
 
@@ -169,76 +167,74 @@ public:
     QString subject() const;
     void setSubject(const QString &subject);
 
-Q_SIGNALS:
     /// This signal is emitted when the allowed actions change.
-    void allowedActionsChanged(QXmppMucRoom::Actions actions);
+    Q_SIGNAL void allowedActionsChanged(QXmppMucRoom::Actions actions);
 
     /// This signal is emitted when the configuration form for the room is received.
-    void configurationReceived(const QXmppDataForm &configuration);
+    Q_SIGNAL void configurationReceived(const QXmppDataForm &configuration);
 
     /// This signal is emitted when an error is encountered.
-    void error(const QXmppStanza::Error &error);
+    Q_SIGNAL void error(const QXmppStanza::Error &error);
 
     /// This signal is emitted once you have joined the room.
-    void joined();
+    Q_SIGNAL void joined();
 
     /// This signal is emitted if you get kicked from the room.
-    void kicked(const QString &jid, const QString &reason);
+    Q_SIGNAL void kicked(const QString &jid, const QString &reason);
 
     /// \cond
-    void isJoinedChanged();
+    Q_SIGNAL void isJoinedChanged();
     /// \endcond
 
     /// This signal is emitted once you have left the room.
-    void left();
+    Q_SIGNAL void left();
 
     /// This signal is emitted when a message is received.
-    void messageReceived(const QXmppMessage &message);
+    Q_SIGNAL void messageReceived(const QXmppMessage &message);
 
     /// This signal is emitted when the room's human-readable name changes.
-    void nameChanged(const QString &name);
+    Q_SIGNAL void nameChanged(const QString &name);
 
     /// This signal is emitted when your own nick name changes.
-    void nickNameChanged(const QString &nickName);
+    Q_SIGNAL void nickNameChanged(const QString &nickName);
 
     /// This signal is emitted when a participant joins the room.
-    void participantAdded(const QString &jid);
+    Q_SIGNAL void participantAdded(const QString &jid);
 
     /// This signal is emitted when a participant changes.
-    void participantChanged(const QString &jid);
+    Q_SIGNAL void participantChanged(const QString &jid);
 
     /// This signal is emitted when a participant leaves the room.
-    void participantRemoved(const QString &jid);
+    Q_SIGNAL void participantRemoved(const QString &jid);
 
     /// \cond
-    void participantsChanged();
+    Q_SIGNAL void participantsChanged();
     /// \endcond
 
     /// This signal is emitted when the room's permissions are received.
-    void permissionsReceived(const QList<QXmppMucItem> &permissions);
+    Q_SIGNAL void permissionsReceived(const QList<QXmppMucItem> &permissions);
 
     /// This signal is emitted when the room's subject changes.
-    void subjectChanged(const QString &subject);
+    Q_SIGNAL void subjectChanged(const QString &subject);
 
-public Q_SLOTS:
-    bool ban(const QString &jid, const QString &reason);
-    bool join();
-    bool kick(const QString &jid, const QString &reason);
-    bool leave(const QString &message = QString());
-    bool requestConfiguration();
-    bool requestPermissions();
-    bool setConfiguration(const QXmppDataForm &form);
-    bool setPermissions(const QList<QXmppMucItem> &permissions);
-    bool sendInvitation(const QString &jid, const QString &reason);
-    bool sendMessage(const QString &text);
-
-private Q_SLOTS:
-    void _q_disconnected();
-    void _q_messageReceived(const QXmppMessage &message);
-    void _q_presenceReceived(const QXmppPresence &presence);
+    Q_SLOT bool ban(const QString &jid, const QString &reason);
+    Q_SLOT bool join();
+    Q_SLOT bool kick(const QString &jid, const QString &reason);
+    Q_SLOT bool leave(const QString &message = QString());
+    Q_SLOT bool requestConfiguration();
+    Q_SLOT bool requestPermissions();
+    Q_SLOT bool setConfiguration(const QXmppDataForm &form);
+    Q_SLOT bool setPermissions(const QList<QXmppMucItem> &permissions);
+    Q_SLOT bool sendInvitation(const QString &jid, const QString &reason);
+    Q_SLOT bool sendMessage(const QString &text);
 
 private:
     QXmppMucRoom(QXmppClient *client, const QString &jid, QObject *parent);
+
+    Q_SLOT void _q_disconnected();
+    Q_SLOT void _q_messageReceived(const QXmppMessage &message);
+    Q_SLOT void _q_presenceReceived(const QXmppPresence &presence);
+
     const std::unique_ptr<QXmppMucRoomPrivate> d;
     friend class QXmppMucManager;
 };

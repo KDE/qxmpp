@@ -28,21 +28,18 @@ public:
     QTime allowedAttemptsTimeInterval() const;
     void setAllowedAttemptsTimeInterval(QTime interval);
 
-public Q_SLOTS:
-    QString requestAttention(const QString &jid, const QString &message = {});
+    Q_SLOT QString requestAttention(const QString &jid, const QString &message = {});
 
-Q_SIGNALS:
-    void attentionRequested(const QXmppMessage &message, bool isTrusted);
-    void attentionRequestRateLimited(const QXmppMessage &message);
+    Q_SIGNAL void attentionRequested(const QXmppMessage &message, bool isTrusted);
+    Q_SIGNAL void attentionRequestRateLimited(const QXmppMessage &message);
 
 protected:
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
 
-private Q_SLOTS:
-    void handleMessageReceived(const QXmppMessage &message);
-
 private:
+    Q_SLOT void handleMessageReceived(const QXmppMessage &message);
+
     const std::unique_ptr<QXmppAttentionManagerPrivate> d;
 };
 

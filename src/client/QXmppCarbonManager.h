@@ -38,9 +38,8 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
-Q_SIGNALS:
-    void messageReceived(const QXmppMessage &);
-    void messageSent(const QXmppMessage &);
+    Q_SIGNAL void messageReceived(const QXmppMessage &);
+    Q_SIGNAL void messageSent(const QXmppMessage &);
 
 private:
     bool m_carbonsEnabled;
