@@ -29,20 +29,9 @@ class QXmppRegistrationManagerPrivate;
 /// <h3>Setting up service discovery correctly for this manager</h3>
 ///
 /// This manager automatically recognizes whether the local server supports
-/// \xep{0077} (see supportedByServer()). You just need to request the service
-/// discovery information from the server on connect as below:
-///
-/// \code
-/// connect(client, &QXmppClient::connected, [=]() {
-///     // The service discovery manager is added to the client by default.
-///     auto *discoManager = client->findExtension<QXmppDiscoveryManager>();
-///     discoManager->requestInfo(client->configuration().server());
-/// });
-/// \endcode
-///
-/// As soon as the result is retrieved, the supportedByServer() property should
-/// be correct and could be used to display the user whether account management
-/// tasks can be performed on this server.
+/// \xep{0077}. As soon as the result is retrieved, the supportedByServer() property should be
+/// correct and could be used to display the user whether account management tasks can be
+/// performed on this server.
 ///
 /// However, this is not relevant if you only want to
 /// <a href="#register-account">register a new account on a server</a>.
@@ -336,7 +325,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    void handleDiscoInfo(const QXmppDiscoveryIq &iq);
+    void onConnected();
     void setSupportedByServer(bool supportedByServer);
     void handleAccountDeleted();
 

@@ -8,6 +8,7 @@
 #include "QXmppStreamFeatures.h"
 
 #include "Iq.h"
+#include "TestClient.h"
 #include "util.h"
 
 using namespace QXmpp::Private;
@@ -185,31 +186,35 @@ void tst_QXmppRegistrationManager::testRegisterOnConnectGetSet()
 
 void tst_QXmppRegistrationManager::testServiceDiscovery()
 {
-    setManagerConfig(u"bob"_s);
+    TestClient test(true);
+    test.configuration().setJid(u"bob@example.org"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *localManager = test.addNewExtension<QXmppRegistrationManager>();
 
     bool signalEmitted = false;
-    QObject *context = new QObject(this);
-    connect(manager, &QXmppRegistrationManager::supportedByServerChanged, context, [&]() {
+    auto context = std::make_unique<QObject>(this);
+    connect(localManager, &QXmppRegistrationManager::supportedByServerChanged, context.get(), [&]() {
         signalEmitted = true;
-        QCOMPARE(manager->supportedByServer(), true);
+        QCOMPARE(localManager->supportedByServer(), true);
     });
 
     ResultIq<QXmppDiscoInfo> iq {
-        u"1"_s,
+        u"qx2"_s,
         u"example.org"_s,
         u"bob@example.org"_s,
         {},
         QXmppDiscoInfo { {}, {}, QStringList { u"jabber:iq:register"_s } },
     };
-    client.findExtension<QXmppDiscoveryManager>()->handleStanza(writePacketToDom(iq));
+    Q_EMIT test.connected();
+    test.inject(writePacketToDom(iq));
 
     QVERIFY(signalEmitted);
-    QVERIFY(manager->supportedByServer());
-    delete context;
+    QVERIFY(localManager->supportedByServer());
+    context.reset();
 
     // on disconnect, supportedByServer needs to be reset
-    Q_EMIT client.disconnected();
-    QVERIFY(!manager->supportedByServer());
+    Q_EMIT test.disconnected();
+    QVERIFY(!localManager->supportedByServer());
 }
 
 void tst_QXmppRegistrationManager::testSendCachedRegistrationForm_data()

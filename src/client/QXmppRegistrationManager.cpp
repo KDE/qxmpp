@@ -305,12 +305,7 @@ bool QXmppRegistrationManager::handleStanza(const QDomElement &stanza)
 
 void QXmppRegistrationManager::onRegistered(QXmppClient *client)
 {
-    // get service discovery manager
-    auto *disco = client->findExtension<QXmppDiscoveryManager>();
-    if (disco != nullptr) {
-        connect(disco, &QXmppDiscoveryManager::infoReceived, this, &QXmppRegistrationManager::handleDiscoInfo);
-    }
-
+    connect(client, &QXmppClient::connected, this, &QXmppRegistrationManager::onConnected);
     connect(client, &QXmppClient::disconnected, this, [this, client]() {
         setSupportedByServer(false);
         client->setIgnoredStreamErrors({});
@@ -324,17 +319,19 @@ void QXmppRegistrationManager::onRegistered(QXmppClient *client)
 
 void QXmppRegistrationManager::onUnregistered(QXmppClient *client)
 {
-    // TODO: Proper clean up of connections (currently no issue because extensions are deleted
-    // on removal)
+    disconnect(client, nullptr, this, nullptr);
 }
 
-void QXmppRegistrationManager::handleDiscoInfo(const QXmppDiscoveryIq &iq)
+void QXmppRegistrationManager::onConnected()
 {
-    // check features of own server
-    if (iq.from().isEmpty() || iq.from() == client()->configuration().domain()) {
-        if (iq.features().contains(ns_register)) {
-            setSupportedByServer(true);
-        }
+    if (auto *disco = client()->findExtension<QXmppDiscoveryManager>()) {
+        disco->info(client()->configuration().domain()).then(this, [this](auto result) {
+            if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
+                setSupportedByServer(info->features().contains(ns_register));
+            } else {
+                warning(u"RegistrationManager: Error fetching server's features: %1"_s.arg(std::get<QXmppError>(result).description));
+            }
+        });
     }
 }
 
