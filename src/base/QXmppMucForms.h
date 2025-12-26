@@ -12,6 +12,7 @@ struct QXmppMucRoomInfoPrivate;
 class QXMPP_EXPORT QXmppMucRoomInfo : public QXmppExtensibleDataFormBase
 {
 public:
+    /// FORM_TYPE of this data form
     static constexpr QStringView DataFormType = QXmpp::Private::ns_muc_roominfo;
     static std::optional<QXmppMucRoomInfo> fromDataForm(const QXmppDataForm &);
 
