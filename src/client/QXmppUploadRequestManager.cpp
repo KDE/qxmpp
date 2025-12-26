@@ -312,8 +312,11 @@ void QXmppUploadRequestManager::onRegistered(QXmppClient *client)
     auto *disco = client->findExtension<QXmppDiscoveryManager>();
     if (disco) {
         // scan info of all entities for upload services
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
         connect(disco, &QXmppDiscoveryManager::infoReceived,
                 this, &QXmppUploadRequestManager::handleDiscoInfo);
+        QT_WARNING_POP
 
         // on client disconnect remove all upload services
         connect(client, &QXmppClient::disconnected, this, [this]() {

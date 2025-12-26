@@ -56,11 +56,17 @@ public:
     bool handleStanza(const QDomElement &element) override;
     /// \endcond
 
+#if QXMPP_DEPRECATED_SINCE(1, 13)
     /// This signal is emitted when an information response is received.
+    /// \deprecated
+    [[deprecated("Use info()")]]
     Q_SIGNAL void infoReceived(const QXmppDiscoveryIq &);
 
     /// This signal is emitted when an items response is received.
+    /// \deprecated
+    [[deprecated("Use items()")]]
     Q_SIGNAL void itemsReceived(const QXmppDiscoveryIq &);
+#endif
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)
     QT_WARNING_PUSH
