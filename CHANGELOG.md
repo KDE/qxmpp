@@ -4,6 +4,22 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.13.0 (December 26, 2025)
+--------------------------------
+
+ - Implement XEP-0402: PEP Native Bookmarks (@lnj, !712)
+ - Implement XEP-0421: MUC Occupant IDs (@lnj, !727)
+ - Implement XEP-0486: MUC Avatars (@lnj, !728)
+ - MixManager: New service discovery API, request discovery info and items on our own (@melvo, !725)
+ - HttpUploadManager: Upload component discovery changes (@fazevedo, !724)
+   - Add support and services properties
+   - Request discovery info and items on our own with new API
+   - Move functionality from UploadRequestManager into HttpUploadManager
+   - Remove dependency on UploadRequestManager
+ - Use new service discovery API in MovedManager, RegistrationManager (@lnj, !729)
+ - Result<T>: Make T QXmpp::Success by default (@lnj, !712)
+ - Result<T>: Add new hasValue/hasError/getValue/getError helper functions (@lnj, !730)
+
 QXmpp 1.12.0 (November 9, 2025)
 -------------------------------
 
