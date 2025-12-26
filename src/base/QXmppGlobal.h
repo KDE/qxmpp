@@ -208,6 +208,47 @@ struct TimeoutError { };
 template<typename T = Success>
 using Result = std::variant<T, QXmppError>;
 
+///
+/// Returns whether a result contains the expected value
+/// \since QXmpp 1.13
+///
+template<typename T>
+bool hasValue(const Result<T> &r) { return std::holds_alternative<T>(r); }
+
+///
+/// Returns whether a result contains an error
+///
+/// \since QXmpp 1.13
+///
+template<typename T>
+bool hasError(const Result<T> &r) { return std::holds_alternative<QXmppError>(r); }
+
+///
+/// Returns the value of a result or throws
+///
+/// \since QXmpp 1.13
+///
+template<typename T>
+const T &getValue(const Result<T> &r) { return std::get<T>(r); }
+
+///
+/// Returns the value of a result or throws
+///
+/// \since QXmpp 1.13
+///
+template<typename T>
+T &getValue(Result<T> &r) { return std::get<T>(r); }
+
+///
+/// Returns the value of a result or throws
+///
+/// \since QXmpp 1.13
+///
+template<typename T>
+T getValue(Result<T> &&r) { return std::get<T>(std::move(r)); }
+
+// getError() is defined in QXmppError.h
+
 }  // namespace QXmpp
 
 #endif  // QXMPPGLOBAL_H
