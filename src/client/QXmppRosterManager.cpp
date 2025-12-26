@@ -169,10 +169,10 @@ void QXmppRosterManager::_q_connected()
 
     if (!d->isRosterReceived && client()->isAuthenticated()) {
         requestRoster().then(this, [this](auto &&result) {
-            if (auto *rosterIq = std::get_if<QXmppRosterIq>(&result)) {
+            if (hasValue(result)) {
                 // reset entries
                 d->entries.clear();
-                const auto items = rosterIq->items();
+                const auto items = getValue(result).items();
                 for (const auto &item : items) {
                     d->entries.insert(item.bareJid(), item);
                 }
@@ -571,8 +571,8 @@ void QXmppRosterManager::onRegistered(QXmppClient *client)
                         return;
                     }
 
-                    if (auto error = std::get_if<QXmppError>(&result); error) {
-                        return promise.finish(std::move(*error));
+                    if (hasError(result)) {
+                        return promise.finish(getError(std::move(result)));
                     }
 
                     if ((--(*counter)) == 0) {

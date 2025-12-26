@@ -262,9 +262,9 @@ QXmppTask<QXmppCallInviteManager::ProposeResult> QXmppCallInviteManager::invite(
     }
 
     sendMessage(callInviteElement, callPartnerJid).then(this, [this, promise, callPartnerJid](SendResult result) mutable {
-        if (auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Error sending Call Invite proposal: " + error->description);
-            promise.finish(*error);
+        if (hasError(result)) {
+            warning(u"Error sending Call Invite proposal: " + getError(result).description);
+            promise.finish(getError(std::move(result)));
         } else {
             promise.finish(addCallInvite(callPartnerJid));
         }

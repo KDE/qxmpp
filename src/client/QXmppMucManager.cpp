@@ -15,6 +15,7 @@
 #include <QDomElement>
 #include <QMap>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 class QXmppMucManagerPrivate
@@ -618,12 +619,12 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
                 // request room information
                 if (d->discoManager) {
                     d->discoManager->info(d->jid).then(this, [this](auto &&result) {
-                        if (!std::holds_alternative<QXmppDiscoInfo>(result)) {
+                        if (!hasValue(result)) {
                             return;
                         }
 
                         QString name;
-                        const auto &identities = std::get<QXmppDiscoInfo>(result).identities();
+                        const auto &identities = getValue(result).identities();
                         for (const auto &identity : identities) {
                             if (identity.category() == u"conference") {
                                 name = identity.name();

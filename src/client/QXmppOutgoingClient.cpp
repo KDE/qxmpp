@@ -93,19 +93,19 @@ static QXmppTask<ServerAddressesResult> lookupXmppClientHybridRecords(const QStr
         context,
         [](ServerAddressesResult &&r1, ServerAddressesResult &&r2) -> ServerAddressesResult {
             std::vector<ServerAddress> addresses;
-            bool isError1 = std::holds_alternative<QXmppError>(r1);
-            bool isError2 = std::holds_alternative<QXmppError>(r2);
+            bool isError1 = hasError(r1);
+            bool isError2 = hasError(r2);
 
             // no records could be fetched
             if (isError1 && isError2) {
-                return std::get<QXmppError>(std::move(r2));
+                return getError(std::move(r2));
             }
             if (!isError1) {
-                addresses = std::get<std::vector<ServerAddress>>(std::move(r1));
+                addresses = getValue(std::move(r1));
             }
             if (!isError2) {
                 // append other addresses
-                auto &&addresses2 = std::get<std::vector<ServerAddress>>(std::move(r2));
+                auto &&addresses2 = getValue(std::move(r2));
                 addresses.insert(addresses.end(),
                                  std::make_move_iterator(addresses2.begin()),
                                  std::make_move_iterator(addresses2.end()));
@@ -271,9 +271,8 @@ void QXmppOutgoingClient::connectToHost()
         : lookupXmppClientRecords(domain, this);
 
     recordsTask.then(this, [this, domain](auto result) {
-        if (auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Lookup for domain %1 failed: %2"_s
-                        .arg(domain, error->description));
+        if (hasError(result)) {
+            warning(u"Lookup for domain %1 failed: %2"_s.arg(domain, getError(result).description));
 
             // as a fallback, use domain as hostname
             d->connectToAddressList({
@@ -283,7 +282,7 @@ void QXmppOutgoingClient::connectToHost()
             return;
         }
 
-        if (std::get<std::vector<ServerAddress>>(result).empty()) {
+        if (getValue(result).empty()) {
             warning(u"'%1' has no xmpp-client service records."_s.arg(domain));
 
             // as a fallback, use domain as hostname
@@ -294,7 +293,7 @@ void QXmppOutgoingClient::connectToHost()
             return;
         }
 
-        d->connectToAddressList(std::get<std::vector<ServerAddress>>(std::move(result)));
+        d->connectToAddressList(getValue(std::move(result)));
     });
 }
 
@@ -446,7 +445,7 @@ void QXmppOutgoingClient::startNonSaslAuth()
 
             auto task = std::get<NonSaslAuthManager>(d->listener).authenticate(plainText, d->config.user(), d->config.password(), d->config.resource(), d->streamId);
             task.then(this, [this](auto result) {
-                if (std::holds_alternative<Success>(result)) {
+                if (hasValue(result)) {
                     // successful Non-SASL Authentication
                     debug(u"Authenticated (Non-SASL)"_s);
                     d->isAuthenticated = true;
@@ -456,7 +455,7 @@ void QXmppOutgoingClient::startNonSaslAuth()
                     openSession();
                 } else {
                     // TODO: errors: should trigger error signal
-                    auto &error = std::get<QXmppError>(result);
+                    auto &error = getError(result);
                     warning(u"Could not authenticate using Non-SASL Authentication: "_s + error.description);
                     disconnectFromHost();
                     return;
@@ -464,7 +463,7 @@ void QXmppOutgoingClient::startNonSaslAuth()
             });
         } else {
             // TODO: errors: should trigger error signal
-            auto &error = std::get<QXmppError>(result);
+            auto &error = getError(result);
             warning(u"Couldn't list Non-SASL Authentication mechanisms: "_s + error.description);
             disconnectFromHost();
         }
@@ -724,9 +723,8 @@ HandleElementResult QXmppOutgoingClient::handleElement(const QDomElement &nodeRe
         handleStreamFeatures(features);
         return Accepted;
     } else if (ns == ns_stream && nodeRecv.tagName() == u"error") {
-        auto result = StreamErrorElement::fromDom(nodeRecv);
-        if (auto *streamError = std::get_if<StreamErrorElement>(&result)) {
-            handleStreamError(*streamError);
+        if (auto result = StreamErrorElement::fromDom(nodeRecv); hasValue(result)) {
+            handleStreamError(getValue(result));
         }
         return Accepted;
     } else if (ns == ns_client) {
@@ -1182,8 +1180,8 @@ QXmppTask<IqResult> OutgoingIqManager::sendIq(QXmppPacket &&packet, const QStrin
 
     // send request IQ and report sending errors (sending success is not reported in any way)
     m_streamAckManager.send(std::move(packet)).then(l, [this, id](SendResult result) {
-        if (std::holds_alternative<QXmppError>(result)) {
-            finish(id, std::get<QXmppError>(std::move(result)));
+        if (hasError(result)) {
+            finish(id, getError(std::move(result)));
         }
     });
 

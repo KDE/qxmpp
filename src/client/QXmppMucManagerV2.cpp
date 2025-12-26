@@ -243,18 +243,18 @@ QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::f
     auto t = p.task();
 
     d->disco()->info(jid).then(this, [this, jid, p = std::move(p)](auto result) mutable {
-        auto *info = std::get_if<QXmppDiscoInfo>(&result);
-        if (!info) {
-            p.finish(std::get<QXmppError>(std::move(result)));
+        if (!hasValue(result)) {
+            p.finish(getError(std::move(result)));
             return;
         }
 
-        if (!contains(info->features(), ns_vcard)) {
+        auto &info = getValue(result);
+        if (!contains(info.features(), ns_vcard)) {
             p.finish(std::nullopt);
             return;
         }
 
-        auto roomInfo = info->template dataForm<QXmppMucRoomInfo>();
+        auto roomInfo = info.template dataForm<QXmppMucRoomInfo>();
         if (!roomInfo.has_value()) {
             p.finish(std::nullopt);
             return;
@@ -267,12 +267,12 @@ QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::f
 
         client()->sendIq(QXmppVCardIq(jid)).then(this, [this, hashes, p = std::move(p)](auto &&result) mutable {
             auto iqResponse = parseIq<QXmppVCardIq, Result<QXmppVCardIq>>(std::move(result));
-            if (std::holds_alternative<QXmppError>(iqResponse)) {
-                p.finish(std::get<QXmppError>(std::move(iqResponse)));
+            if (hasError(iqResponse)) {
+                p.finish(getError(std::move(iqResponse)));
                 return;
             }
 
-            const auto &vcard = std::get<QXmppVCardIq>(iqResponse);
+            const auto &vcard = getValue(iqResponse);
 
             auto hexHash = QString::fromUtf8(QCryptographicHash::hash(vcard.photo(), QCryptographicHash::Sha1).toHex());
             if (!contains(hashes, hexHash)) {
@@ -385,13 +385,13 @@ void QXmppMucManagerV2::onConnected()
 
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
         d->pubsub()->requestItems<Bookmarks2ConferenceItem>({}, ns_bookmarks2.toString()).then(this, [this](auto &&result) {
-            if (std::holds_alternative<QXmppError>(result)) {
-                warning(u"Could not fetch MUC Bookmarks: " + std::get<QXmppError>(result).description);
+            if (hasError(result)) {
+                warning(u"Could not fetch MUC Bookmarks: " + getError(result).description);
                 d->resetBookmarks();
                 return;
             }
 
-            auto items = std::get<PubSub::Items<Bookmarks2ConferenceItem>>(std::move(result));
+            auto items = getValue(std::move(result));
             d->setBookmarks(std::move(items.items));
         });
     }
@@ -412,8 +412,8 @@ auto QXmppMucManagerV2Private::setBookmark(QXmppMucBookmark &&bookmark) -> QXmpp
         pubsub()->publishItem({}, ns_bookmarks2.toString(), item, opts),
         q,
         [this, bookmark](auto &&result) mutable -> EmptyResult {
-            if (std::holds_alternative<QXmppError>(result)) {
-                return std::get<QXmppError>(std::move(result));
+            if (hasError(result)) {
+                return getError(std::move(result));
             }
             if (bookmarks) {
                 bookmarks->append(std::move(bookmark));
@@ -425,8 +425,8 @@ auto QXmppMucManagerV2Private::setBookmark(QXmppMucBookmark &&bookmark) -> QXmpp
 QXmppTask<EmptyResult> QXmppMucManagerV2Private::removeBookmark(const QString &jid)
 {
     return chain<EmptyResult>(pubsub()->retractOwnPepItem(ns_bookmarks2.toString(), jid, true), q, [this, jid](auto &&result) -> EmptyResult {
-        if (std::holds_alternative<QXmppError>(result)) {
-            return std::get<QXmppError>(std::move(result));
+        if (hasError(result)) {
+            return getError(std::move(result));
         }
         if (bookmarks) {
             if (auto it = std::ranges::find(*bookmarks, jid, &QXmppMucBookmark::jid);

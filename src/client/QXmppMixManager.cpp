@@ -196,10 +196,10 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
 /// you can request an invitation from the channel (if permitted to do so):
 /// \code
 /// manager->requestInvitation().then(this, [](QXmppMixManager::InvitationResult &&result) mutable {
-///     if (auto *error = std::get_if<QXmppError>(&result)) {
+///     if (QXmpp::hasError(result)) {
 ///         // Handle the error.
 ///     } else {
-///         auto invitation = std::get<QXmppMixInvitation>(std::move(result));
+///         auto invitation = QXmpp::getValue(std::move(result));
 ///         // Create and send the invitation.
 ///     }
 /// });
@@ -1055,8 +1055,8 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
                     }
 
                     // We do not break import/export on mix errors, we only notify about it
-                    if (auto error = std::get_if<QXmppError>(&result); error) {
-                        Q_EMIT manager->errorOccurred(std::move(*error));
+                    if (hasError(result)) {
+                        Q_EMIT manager->errorOccurred(getError(std::move(result)));
                     }
 
                     if ((--(*counter)) == 0) {
@@ -1073,11 +1073,11 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
             QXmppPromise<ExportResult> promise;
 
             rosterManager->requestRoster().then(this, [this, manager, promise](auto &&rosterResult) mutable {
-                if (auto error = std::get_if<QXmppError>(&rosterResult); error) {
-                    return promise.finish(std::move(*error));
+                if (hasError(rosterResult)) {
+                    return promise.finish(getError(std::move(rosterResult)));
                 }
 
-                const auto iq = std::move(std::get<QXmppRosterIq>(rosterResult));
+                auto &iq = getValue(rosterResult);
                 const auto iqItems = transformFilter<QList<QXmppRosterIq::Item>>(iq.items(), [](const auto &item) -> std::optional<QXmppRosterIq::Item> {
                     if (item.isMixChannel()) {
                         return item;
@@ -1102,10 +1102,10 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
                         }
 
                         // We do not break import/export on mix errors, we only notify about it
-                        if (auto error = std::get_if<QXmppError>(&participantsResult); error) {
-                            Q_EMIT manager->errorOccurred(std::move(*error));
+                        if (hasError(participantsResult)) {
+                            Q_EMIT manager->errorOccurred(getError(participantsResult));
                         } else {
-                            const auto participants = std::get<QVector<QXmppMixParticipantItem>>(participantsResult);
+                            const auto &participants = getValue(participantsResult);
 
                             for (const QXmppMixParticipantItem &participant : participants) {
                                 if (participant.id() == participantId) {
@@ -1381,10 +1381,10 @@ void QXmppMixManager::updateSupport()
     const auto ownJid = client()->configuration().jidBare();
 
     d->discoveryManager->info(ownJid).then(this, [this, ownJid](Result<QXmppDiscoInfo> &&result) {
-        if (const auto *error = std::get_if<QXmppError>(&result)) {
-            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(ownJid, error->description));
+        if (hasError(result)) {
+            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(ownJid, getError(result).description));
         } else {
-            const auto &features = std::get<QXmppDiscoInfo>(result).features();
+            const auto &features = getValue(result).features();
 
             setParticipantSupport(contains(features, ns_mix_pam) ? Supported : Unsupported);
             setMessageArchivingSupport(contains(features, ns_mix_pam_archiving) ? Supported : Unsupported);
@@ -1397,10 +1397,10 @@ void QXmppMixManager::updateServices()
     const auto serverJid = client()->configuration().domain();
 
     d->discoveryManager->items(serverJid).then(this, [this, serverJid](Result<QList<QXmppDiscoItem>> &&result) {
-        if (const auto *error = std::get_if<QXmppError>(&result)) {
-            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, error->description));
+        if (hasError(result)) {
+            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, getError(result).description));
         } else {
-            const auto jids = transform<QList<QString>>(std::get<QList<QXmppDiscoItem>>(result), &QXmppDiscoItem::jid);
+            const auto jids = transform<QList<QString>>(getValue(result), &QXmppDiscoItem::jid);
 
             // Remove services from the cache that are not available anymore.
             for (const auto &service : std::as_const(d->services)) {
@@ -1419,10 +1419,10 @@ void QXmppMixManager::updateServices()
 void QXmppMixManager::updateService(const QString &jid)
 {
     d->discoveryManager->info(jid).then(this, [this, jid](Result<QXmppDiscoInfo> &&result) {
-        if (const auto *error = std::get_if<QXmppError>(&result)) {
-            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, error->description));
+        if (hasError(result)) {
+            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, getError(result).description));
         } else {
-            const auto info = std::get<QXmppDiscoInfo>(std::move(result));
+            const auto &info = getValue(result);
             const auto &features = info.features();
 
             // If no MIX service is provided by the item, remove it from the cache.

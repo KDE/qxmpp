@@ -298,15 +298,15 @@ QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(con
         auto &state = itr->second;
 
         // handle IQ sending errors
-        if (std::holds_alternative<QXmppError>(result)) {
-            state.promise.finish(std::get<QXmppError>(result));
+        if (hasError(result)) {
+            state.promise.finish(getError(result));
             d->ongoingRequests.erase(itr);
             return;
         }
 
         // parse IQ
         auto &iq = state.iq;
-        iq.parse(std::get<QDomElement>(result));
+        iq.parse(getValue(result));
 
         // decrypt encrypted messages
         if (auto *e2eeExt = client()->encryptionExtension()) {

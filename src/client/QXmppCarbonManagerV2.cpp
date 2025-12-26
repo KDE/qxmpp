@@ -38,20 +38,22 @@ public:
 
 auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optional<QXmppError>
 {
-    if (auto el = std::get_if<QDomElement>(&sendResult)) {
-        auto iqType = el->attribute(u"type"_s);
+    if (hasValue(sendResult)) {
+        auto &el = getValue(sendResult);
+
+        auto iqType = el.attribute(u"type"_s);
         if (iqType == u"result") {
             return {};
         }
         QXmppIq iq;
-        iq.parse(*el);
+        iq.parse(el);
         if (auto error = iq.errorOptional()) {
             return QXmppError { error->text(), std::move(*error) };
         }
         // Only happens with IQs with type=error, but no <error/> element
         return QXmppError { u"Unknown error received."_s, QXmppStanza::Error() };
-    } else if (auto err = std::get_if<QXmppError>(&sendResult)) {
-        return *err;
+    } else if (hasError(sendResult)) {
+        return getError(std::move(sendResult));
     }
     return {};
 }

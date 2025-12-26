@@ -24,6 +24,7 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 ///
@@ -221,11 +222,11 @@ QXmppTask<QXmppPubSubManager::FeaturesResult> QXmppPubSubManager::requestFeature
     Q_ASSERT(discoManager);
 
     return chain<FeaturesResult>(discoManager->info(serviceJid), this, [=](auto &&result) -> FeaturesResult {
-        if (auto *error = std::get_if<QXmppError>(&result)) {
-            return std::move(*error);
+        if (hasError(result)) {
+            return getError(std::move(result));
         }
 
-        auto &info = std::get<QXmppDiscoInfo>(result);
+        auto &info = getValue(result);
         const auto &identities = info.identities();
         const auto isPubSubServiceFound = std::any_of(identities.cbegin(), identities.cend(), [=](const QXmppDiscoIdentity &identity) {
             if (identity.category() == u"pubsub") {

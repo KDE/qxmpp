@@ -326,10 +326,10 @@ void QXmppRegistrationManager::onConnected()
 {
     if (auto *disco = client()->findExtension<QXmppDiscoveryManager>()) {
         disco->info(client()->configuration().domain()).then(this, [this](auto result) {
-            if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
-                setSupportedByServer(info->features().contains(ns_register));
+            if (hasValue(result)) {
+                setSupportedByServer(getValue(result).features().contains(ns_register));
             } else {
-                warning(u"RegistrationManager: Error fetching server's features: %1"_s.arg(std::get<QXmppError>(result).description));
+                warning(u"RegistrationManager: Error fetching server's features: %1"_s.arg(getError(result).description));
             }
         });
     }

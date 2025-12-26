@@ -83,8 +83,8 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
                 this,
                 [this, jid, node](auto &&result) -> Result<QXmppDiscoInfo> {
                     // only cache successful responses for now (permanent errors could also be cached)
-                    if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
-                        d->infoCache.insert({ jid, node }, new QXmppDiscoInfo { *info });
+                    if (hasValue(result)) {
+                        d->infoCache.insert({ jid, node }, new QXmppDiscoInfo { getValue(result) });
                     }
                     return result;
                 });
@@ -117,7 +117,7 @@ QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QStr
                         d->itemsCache.insert({ jid, node }, new QList<QXmppDiscoItem> { itemsPayload->items() });
                         return itemsPayload->items();
                     } else {
-                        return std::get<QXmppError>(std::move(result));
+                        return getError(std::move(result));
                     }
                 });
         },

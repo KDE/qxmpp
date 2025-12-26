@@ -26,6 +26,7 @@
 #include <QDomElement>
 #include <QTimer>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
@@ -192,8 +193,7 @@ QXmppCall *QXmppCallManager::call(const QString &jid)
         }
 
         // determine supported features of remote
-        auto &&info = std::get<QXmppDiscoInfo>(std::move(result));
-        bool remoteSupportsDtls = contains(info.features(), ns_jingle_dtls);
+        bool remoteSupportsDtls = contains(getValue(result).features(), ns_jingle_dtls);
 
         call->d->useDtls = d->supportsDtls && remoteSupportsDtls;
 

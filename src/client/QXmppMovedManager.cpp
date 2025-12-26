@@ -189,8 +189,8 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(const QS
 
                                 const auto result = QXmppUri::fromString(e->redirectionUri());
 
-                                if (std::holds_alternative<QXmppUri>(result)) {
-                                    return std::get<QXmppUri>(result).jid();
+                                if (hasValue(result)) {
+                                    return getValue(result).jid();
                                 }
 
                                 return {};
@@ -237,10 +237,10 @@ void QXmppMovedManager::onRegistered(QXmppClient *client)
 
             if (auto *disco = this->client()->findExtension<QXmppDiscoveryManager>()) {
                 disco->info(this->client()->configuration().domain()).then(this, [this](auto &&result) {
-                    if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
-                        setSupportedByServer(info->features().contains(ns_moved));
+                    if (hasValue(result)) {
+                        setSupportedByServer(getValue(result).features().contains(ns_moved));
                     } else {
-                        warning(u"MovedManager: Could not fetch server features: %1"_s.arg(std::get<QXmppError>(result).description));
+                        warning(u"MovedManager: Could not fetch server features: %1"_s.arg(getError(result).description));
                     }
                 });
             } else {
@@ -281,7 +281,7 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
     case QXmppRosterIq::Item::From:
     case QXmppRosterIq::Item::Both:
         return chain<QXmppPresence>(verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from())), this, [this, presence = presence](Result &&result) mutable {
-            if (std::holds_alternative<QXmppError>(result)) {
+            if (hasError(result)) {
                 warning(presence.from() + u" sent a presence subscription request with the invalid old JID "_s + presence.oldJid());
                 presence.setOldJid({});
             }

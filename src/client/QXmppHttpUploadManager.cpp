@@ -428,11 +428,11 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
             return;
         }
 
-        if (std::holds_alternative<QXmppError>(result)) {
-            upload->d->reportError(std::get<QXmppError>(std::move(result)));
+        if (hasError(result)) {
+            upload->d->reportError(getError(std::move(result)));
             upload->d->reportFinished();
         } else {
-            auto slot = std::get<QXmppHttpUploadSlotIq>(std::move(result));
+            auto slot = getValue(std::move(result));
 
             if (slot.getUrl().scheme() != u"https" || slot.putUrl().scheme() != u"https") {
                 auto message = u"The server replied with an insecure non-https url. This is forbidden by XEP-0363."_s;
@@ -546,11 +546,11 @@ QXmppTask<void> QXmppHttpUploadManager::updateService(const QString &jid)
     QXmppPromise<void> promise;
 
     d->discoveryManager()->info(jid).then(this, [this, jid, promise](Result<QXmppDiscoInfo> &&result) mutable {
-        if (const auto *error = std::get_if<QXmppError>(&result)) {
-            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, error->description));
+        if (hasError(result)) {
+            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, getError(result).description));
             promise.finish();
         } else {
-            const auto info = std::get<QXmppDiscoInfo>(std::move(result));
+            auto info = getValue(std::move(result));
             const auto &features = info.features();
 
             if (!contains(features, ns_http_upload)) {
@@ -612,11 +612,11 @@ void QXmppHttpUploadManager::updateServices()
         Q_ASSERT(d->support == Support::Unknown);
         Q_ASSERT(d->services.isEmpty());
 
-        if (const auto *error = std::get_if<QXmppError>(&result)) {
-            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, error->description));
+        if (hasError(result)) {
+            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, getError(result).description));
             maybeReportUnsupported();
         } else {
-            const auto jids = transform<QList<QString>>(std::get<QList<QXmppDiscoItem>>(result), &QXmppDiscoItem::jid);
+            const auto jids = transform<QList<QString>>(getValue(result), &QXmppDiscoItem::jid);
             auto tasks = transform<QList<QXmppTask<void>>>(jids, std::bind(&QXmppHttpUploadManager::updateService, this, std::placeholders::_1));
             auto task = joinVoidTasks(this, std::move(tasks));
 

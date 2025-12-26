@@ -290,9 +290,9 @@ QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessage
     jmiElement.setDescription(description);
 
     sendMessage(jmiElement, callPartnerJid).then(this, [this, promise, callPartnerJid](SendResult result) mutable {
-        if (auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Error sending Jingle Message Initiation proposal: " + error->description);
-            promise.finish(*error);
+        if (hasError(result)) {
+            warning(u"Error sending Jingle Message Initiation proposal: " + getError(result).description);
+            promise.finish(getError(std::move(result)));
         } else {
             promise.finish(addJmi(callPartnerJid));
         }
@@ -484,15 +484,15 @@ bool QXmppJingleMessageInitiationManager::handleExistingSession(const std::share
     Q_EMIT existingJmi->closed(Jmi::Finished { reason, jmiElementId });
 
     existingJmi->finish(reason, jmiElementId).then(this, [this, existingJmi, jmiElementId](SendResult result) {
-        if (auto *error = std::get_if<QXmppError>(&result)) {
-            Q_EMIT existingJmi->closed(*error);
+        if (hasError(result)) {
+            Q_EMIT existingJmi->closed(getError(std::move(result)));
         } else {
             // Then, proceed (accept) the new proposal and set the JMI ID
             // to the ID of the received JMI element.
             existingJmi->setId(jmiElementId);
             existingJmi->proceed().then(this, [existingJmi](SendResult result) {
-                if (auto *error = std::get_if<QXmppError>(&result)) {
-                    Q_EMIT existingJmi->closed(*error);
+                if (hasError(result)) {
+                    Q_EMIT existingJmi->closed(getError(std::move(result)));
                 } else {
                     // The session is now closed as it is finished.
                     existingJmi->setIsProceeded(true);
@@ -521,23 +521,23 @@ bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::sh
         // Jingle message initiator with lower ID rejects the other proposal.
         existingJmi->setId(jmiElementId);
         existingJmi->reject(std::move(reason), true).then(this, [existingJmi](auto result) {
-            if (auto *error = std::get_if<QXmppError>(&result)) {
-                Q_EMIT existingJmi->closed(*error);
+            if (hasError(result)) {
+                Q_EMIT existingJmi->closed(getError(std::move(result)));
             }
         });
     } else {
         // Jingle message initiator with higher ID retracts its proposal.
         existingJmi->retract(std::move(reason), true).then(this, [this, existingJmi, jmiElementId, callPartnerResource](auto result) {
-            if (auto error = std::get_if<QXmppError>(&result)) {
-                Q_EMIT existingJmi->closed(*error);
+            if (hasError(result)) {
+                Q_EMIT existingJmi->closed(getError(std::move(result)));
             } else {
                 // Afterwards, JMI ID is changed to lower ID.
                 existingJmi->setId(jmiElementId);
 
                 // Finally, the call is being accepted.
                 existingJmi->proceed().then(this, [existingJmi, jmiElementId, callPartnerResource](SendResult result) {
-                    if (auto *error = std::get_if<QXmppError>(&result)) {
-                        Q_EMIT existingJmi->closed(*error);
+                    if (hasError(result)) {
+                        Q_EMIT existingJmi->closed(getError(std::move(result)));
                     } else {
                         existingJmi->setIsProceeded(true);
                         Q_EMIT existingJmi->proceeded(jmiElementId, callPartnerResource);

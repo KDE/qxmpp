@@ -107,11 +107,11 @@ std::variant<QXmppExportData, QXmppError> QXmppExportData::fromDom(const QDomEle
             const auto &[_, parse] = *parser;
 
             auto result = parse(extension);
-            if (std::holds_alternative<QXmppError>(result)) {
-                return std::get<QXmppError>(std::move(result));
+            if (hasError(result)) {
+                return getError(std::move(result));
             }
 
-            auto extensionValue = std::get<std::any>(std::move(result));
+            auto extensionValue = getValue(std::move(result));
             data.d->extensions.emplace(extensionValue.type(), std::move(extensionValue));
         }
     }
@@ -300,8 +300,8 @@ QXmppTask<QXmppAccountMigrationManager::Result<>> QXmppAccountMigrationManager::
                 return;
             }
 
-            if (std::holds_alternative<QXmppError>(result)) {
-                return promise.finish(std::get<QXmppError>(std::move(result)));
+            if (hasError(result)) {
+                return promise.finish(getError(std::move(result)));
             }
 
             if ((--(*counter)) == 0) {
@@ -341,11 +341,11 @@ QXmppTask<QXmppAccountMigrationManager::Result<QXmppExportData>> QXmppAccountMig
                 return;
             }
 
-            if (std::holds_alternative<QXmppError>(result)) {
-                return p.finish(std::move(std::get<QXmppError>(result)));
+            if (hasError(result)) {
+                return p.finish(getError(std::move(result)));
             }
 
-            data.setExtension(std::get<std::any>(std::move(result)));
+            data.setExtension(getValue(std::move(result)));
 
             if (--counter == 0) {
                 p.finish(std::move(data));

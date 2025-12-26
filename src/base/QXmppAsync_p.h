@@ -115,7 +115,7 @@ template<typename Result, typename Input>
 auto chainIq(QXmppTask<Input> &&input, QObject *context) -> QXmppTask<Result>
 {
     // IQ type is first std::variant parameter
-    using IqType = std::decay_t<decltype(std::get<0>(Result {}))>;
+    using IqType = std::decay_t<decltype(getValue(Result {}))>;
     return chain<Result>(std::move(input), context, [](Input &&sendResult) mutable {
         return parseIq<IqType, Result>(sendResult);
     });

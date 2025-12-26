@@ -103,7 +103,7 @@ struct QXmppBlockingManagerPrivate {
 /// You can use block() and unblock() for this purpose.
 /// ```
 /// manager->block("baduser@spam.im").then(this, [](auto result) {
-///     if (std::holds_alternative<QXmpp::Success>(result)) {
+///     if (QXmpp::hasValue(result)) {
 ///         qDebug() << "Blocked baduser@spam.im!";
 ///     } else if (auto *err = std::get_if<QXmppError>(&result)) {
 ///         qDebug() << "Error:" << err->description;
