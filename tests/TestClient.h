@@ -39,10 +39,10 @@ public:
     QXmppOutgoingClientPrivate *streamPrivate() const { return d->stream->d.get(); }
 
     template<typename String>
-    void inject(const String &xml)
-    {
-        auto element = xmlToDom(xml);
+    void inject(const String &xml) { inject(xmlToDom(xml)); }
 
+    void inject(const QDomElement &element)
+    {
         if (!d->stream->handleIqResponse(element)) {
             for (auto *extension : std::as_const(d->extensions)) {
                 if (extension->handleStanza(element)) {
@@ -54,6 +54,7 @@ public:
             resetIdCount();
         }
     }
+
     void expect(QString &&packet)
     {
         QVERIFY2(!m_sentPackets.empty(), "No packet was sent!");
