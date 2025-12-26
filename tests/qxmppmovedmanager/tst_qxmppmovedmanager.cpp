@@ -6,6 +6,8 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMovedManager.h"
 #include "QXmppPubSubManager.h"
+
+#include "Iq.h"
 #ifdef BUILD_INTERNAL_TESTS
 #include "QXmppMovedItem_p.h"
 #endif
@@ -135,20 +137,23 @@ void tst_QXmppMovedManager::testResetCachedData()
 void tst_QXmppMovedManager::testHandleDiscoInfo()
 {
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
+    client.setStreamManagementState(QXmppClient::NewStream);
 
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-    QXmppDiscoveryIq iq;
-    iq.setFeatures({ ns_moved.toString() });
-    QT_WARNING_POP
-
-    manager->handleDiscoInfo(iq);
+    ResultIq<QXmppDiscoInfo> iq {
+        u"qx1"_s,
+        u"shakespeare.example"_s,
+        u"hag66@shakespeare.example"_s,
+        {},
+        QXmppDiscoInfo { {}, {}, QStringList { u"urn:xmpp:moved:1"_s } },
+    };
+    Q_EMIT client.connected();
+    client.inject(writePacketToDom(iq));
 
     QVERIFY(manager->supportedByServer());
 
-    iq.setFeatures({});
-
-    manager->handleDiscoInfo(iq);
+    Q_EMIT client.connected();
+    iq.payload.setFeatures({});
+    client.inject(writePacketToDom(iq));
 
     QVERIFY(!manager->supportedByServer());
 }
@@ -170,12 +175,15 @@ void tst_QXmppMovedManager::testOnRegistered()
 
     QVERIFY(!manager.supportedByServer());
 
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-    QXmppDiscoveryIq iq;
-    QT_WARNING_POP
-    iq.setFeatures({ ns_moved.toString() });
-    Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
+    ResultIq<QXmppDiscoInfo> iq {
+        u"qx1"_s,
+        u"shakespeare.example"_s,
+        u"hag66@shakespeare.example"_s,
+        {},
+        QXmppDiscoInfo { {}, {}, QStringList { u"urn:xmpp:moved:1"_s } },
+    };
+    Q_EMIT client.connected();
+    client.inject(writePacketToDom(iq));
 
     QVERIFY(manager.supportedByServer());
 }
@@ -192,13 +200,6 @@ void tst_QXmppMovedManager::testOnUnregistered()
 
     manager.setSupportedByServer(true);
     manager.onUnregistered(&client);
-
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-    QXmppDiscoveryIq iq;
-    QT_WARNING_POP
-    iq.setFeatures({ ns_moved.toString() });
-    Q_EMIT manager.client()->findExtension<QXmppDiscoveryManager>()->infoReceived(iq);
 
     QVERIFY(!manager.supportedByServer());
 

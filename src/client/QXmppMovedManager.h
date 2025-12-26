@@ -42,7 +42,6 @@ protected:
 
 private:
     QXmppTask<QXmppPresence> processSubscriptionRequest(QXmppPresence presence);
-    void handleDiscoInfo(const QXmppDiscoveryIq &iq);
     Result movedJidsMatch(const QString &newBareJid, const QString &pepBareJid) const;
 
     void setSupportedByServer(bool supportedByServer);
