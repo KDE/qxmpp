@@ -124,7 +124,7 @@ If you are interested in contributing to QXmpp, please have a look at our [contr
 [xeps]: https://doc.qxmpp.org/qxmpp-1/xep.html
 [contributing]: /CONTRIBUTING.md
 [examples]: /examples
-[issues]: https://github.com/qxmpp-project/qxmpp/issues
+[issues]: https://invent.kde.org/libraries/qxmpp/-/issues
 [omemo]: /src/omemo/README.md
 [qxmpp-documentation]: https://doc.qxmpp.org
 [qxmpp-master-documentation]: https://doc.qxmpp.org/qxmpp-dev/
