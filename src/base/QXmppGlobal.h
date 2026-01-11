@@ -48,15 +48,6 @@ inline QLatin1String QXmppVersion()
 // This works exactly like QT_DEPRECATED_SINCE, but checks QXMPP_DISABLE_DEPRECATED_BEFORE instead.
 #define QXMPP_DEPRECATED_SINCE(major, minor) (QT_VERSION_CHECK(major, minor, 0) > QXMPP_DISABLE_DEPRECATED_BEFORE)
 
-// workaround for Qt < 5.12
-#ifndef Q_DECL_ENUMERATOR_DEPRECATED_X
-#define Q_DECL_ENUMERATOR_DEPRECATED_X(msg)
-#endif
-
-#ifndef QT_WARNING_DISABLE_DEPRECATED
-#define QT_WARNING_DISABLE_DEPRECATED
-#endif
-
 // Adds constructor and operator declarations to a ".h" file corresponding to the rule of six.
 // A default constructor has to be declared manually.
 #define QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(name) \
