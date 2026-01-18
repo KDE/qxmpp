@@ -309,67 +309,68 @@ set(SOURCE_FILES
     server/QXmppServerPlugin.cpp
 )
 
-if(BUILD_SHARED)
-    add_library(${QXMPP_TARGET} SHARED ${SOURCE_FILES})
-else()
-    add_library(${QXMPP_TARGET} STATIC ${SOURCE_FILES})
+#
+# internal static library with all symbols visible
+#
+
+add_library(${QXMPP_TARGET}_internal OBJECT ${SOURCE_FILES})
+target_include_directories(${QXMPP_TARGET}_internal
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/base ${CMAKE_CURRENT_SOURCE_DIR}/client ${CMAKE_CURRENT_SOURCE_DIR}/server
+    ${CMAKE_CURRENT_BINARY_DIR}
+)
+target_link_libraries(${QXMPP_TARGET}_internal
+    PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Xml
+)
+
+if(WITH_GSTREAMER)
+    set(INSTALL_HEADER_FILES
+        ${INSTALL_HEADER_FILES} client/QXmppCall.h client/QXmppCallManager.h client/QXmppCallStream.h)
+    target_sources(${QXMPP_TARGET}_internal
+        PRIVATE client/GstWrapper.cpp client/QXmppCall.cpp client/QXmppCallManager.cpp client/QXmppCallStream.cpp)
+    target_link_libraries(${QXMPP_TARGET}_internal PUBLIC PkgConfig::GStreamer)
 endif()
 
+if(BUILD_OMEMO)
+    # required to be used in QXmppMessage
+    target_sources(${QXMPP_TARGET}_internal PRIVATE base/QXmppOmemoDataBase.cpp)
+endif()
+
+if(WITH_QCA)
+    target_sources(${QXMPP_TARGET}_internal
+        PRIVATE client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp client/QcaInitializer.cpp)
+    set(INSTALL_HEADER_FILES ${INSTALL_HEADER_FILES} client/QXmppEncryptedFileSharingProvider.h)
+    target_link_libraries(${QXMPP_TARGET}_internal PUBLIC qca-qt${QT_VERSION_MAJOR})
+endif()
+
+#
+# public shared/static library, only with exported symbols
+#
+
+if(BUILD_SHARED)
+    add_library(${QXMPP_TARGET} SHARED)
+else()
+    add_library(${QXMPP_TARGET} STATIC)
+endif()
+
+target_sources(${QXMPP_TARGET} PRIVATE $<TARGET_OBJECTS:${QXMPP_TARGET}_internal>)
 set_target_properties(${QXMPP_TARGET} PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${SO_VERSION}
     EXPORT_NAME QXmpp
 )
-
+target_link_libraries(${QXMPP_TARGET}
+    PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Xml
+    PRIVATE ${QXMPP_TARGET}_internal
+)
 target_include_directories(${QXMPP_TARGET}
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/base>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/client>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/server>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<INSTALL_INTERFACE:include/${QXMPP_TARGET}>
-    PRIVATE
-    ${CMAKE_CURRENT_BINARY_DIR}
 )
-
-target_link_libraries(${QXMPP_TARGET}
-    PUBLIC
-    Qt${QT_VERSION_MAJOR}::Core
-    Qt${QT_VERSION_MAJOR}::Network
-    Qt${QT_VERSION_MAJOR}::Xml
-)
-
-if(WITH_GSTREAMER)
-    set(INSTALL_HEADER_FILES
-        ${INSTALL_HEADER_FILES}
-        client/QXmppCall.h
-        client/QXmppCallManager.h
-        client/QXmppCallStream.h
-    )
-
-    target_sources(${QXMPP_TARGET}
-        PRIVATE
-        client/GstWrapper.cpp
-        client/QXmppCall.cpp
-        client/QXmppCallManager.cpp
-        client/QXmppCallStream.cpp
-    )
-
-    target_link_libraries(${QXMPP_TARGET}
-        PRIVATE
-        PkgConfig::GStreamer
-    )
-endif()
-
-if(BUILD_OMEMO)
-    # required to be used in QXmppMessage
-    target_sources(${QXMPP_TARGET} PRIVATE base/QXmppOmemoDataBase.cpp)
-endif()
-
-if(WITH_QCA)
-    target_sources(${QXMPP_TARGET} PRIVATE client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp client/QcaInitializer.cpp)
-    set(INSTALL_HEADER_FILES ${INSTALL_HEADER_FILES} client/QXmppEncryptedFileSharingProvider.h)
-    target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt${QT_VERSION_MAJOR})
-endif()
 
 # qxmpp_export.h generation
 if(BUILD_SHARED)

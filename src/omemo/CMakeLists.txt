@@ -20,27 +20,30 @@ set(OMEMO_SOURCE_FILES
     QXmppOmemoStorage.cpp
 )
 
+# internal object library, all symbols
+add_library(${QXMPPOMEMO_TARGET}_internal OBJECT ${OMEMO_SOURCE_FILES})
+target_link_libraries(${QXMPPOMEMO_TARGET}_internal
+    PUBLIC ${QXMPP_TARGET} ${QXMPP_TARGET}_internal PkgConfig::OmemoC qca-qt${QT_VERSION_MAJOR}
+)
+target_include_directories(${QXMPPOMEMO_TARGET}_internal PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+# public shared/static library, only exported symbols
 if(BUILD_SHARED)
-    add_library(${QXMPPOMEMO_TARGET} SHARED ${OMEMO_SOURCE_FILES})
+    add_library(${QXMPPOMEMO_TARGET} SHARED)
 else()
-    add_library(${QXMPPOMEMO_TARGET} STATIC ${OMEMO_SOURCE_FILES})
+    add_library(${QXMPPOMEMO_TARGET} STATIC)
 endif()
+target_sources(${QXMPPOMEMO_TARGET} PRIVATE $<TARGET_OBJECTS:${QXMPPOMEMO_TARGET}_internal>)
 
 target_link_libraries(${QXMPPOMEMO_TARGET}
-    PUBLIC
-    ${QXMPP_TARGET}
-    Qt${QT_VERSION_MAJOR}::Core
-    PRIVATE
-    PkgConfig::OmemoC
-    qca-qt${QT_VERSION_MAJOR}
+    PUBLIC ${QXMPP_TARGET}
+    PRIVATE ${QXMPPOMEMO_TARGET}_internal
 )
 target_include_directories(${QXMPPOMEMO_TARGET}
-    INTERFACE
+    PUBLIC
     $<INSTALL_INTERFACE:include/${QXMPP_TARGET}/Omemo>
-    PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${PROJECT_BINARY_DIR}/src
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
 generate_export_header(${QXMPPOMEMO_TARGET} BASE_NAME qxmppomemo)
