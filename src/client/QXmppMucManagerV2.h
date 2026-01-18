@@ -6,14 +6,18 @@
 #define QXMPPMUCMANAGERV2_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppMessageHandler.h"
+#include "QXmppMucData.h"
 #include "QXmppPubSubEventHandler.h"
 #include "QXmppTask.h"
 
 #include <variant>
 
+class QXmppPresence;
 namespace QXmpp::Private {
 struct Bookmarks2Conference;
 struct Bookmarks2ConferenceItem;
+struct MucRoomData;
 }  // namespace QXmpp::Private
 
 class QXmppError;
@@ -46,9 +50,10 @@ private:
 
 Q_DECLARE_METATYPE(QXmppMucBookmark);
 
+class QXmppMucRoomV2;
 struct QXmppMucManagerV2Private;
 
-class QXMPP_EXPORT QXmppMucManagerV2 : public QXmppClientExtension, public QXmppPubSubEventHandler
+class QXMPP_EXPORT QXmppMucManagerV2 : public QXmppClientExtension, public QXmppPubSubEventHandler, public QXmppMessageHandler
 {
     Q_OBJECT
 
@@ -81,6 +86,14 @@ public:
     QXmppTask<QXmpp::Result<>> removeRoomAvatar(const QString &jid);
     QXmppTask<QXmpp::Result<std::optional<Avatar>>> fetchRoomAvatar(const QString &jid);
 
+    QXmppMucRoomV2 room(const QString &jid);
+
+    QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname);
+    Q_SIGNAL void participantJoined(const QString &roomJid, const QString &participant);
+    Q_SIGNAL void participantLeft(const QString &roomJid, const QString &participant);
+    Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
+
+    bool handleMessage(const QXmppMessage &) override;
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
 
 protected:
@@ -90,11 +103,72 @@ protected:
 private:
     void onConnected();
 
+    const QXmpp::Private::MucRoomData *roomData(const QString &jid) const;
+
     friend class QXmppMucManagerV2Private;
+    friend class QXmppMucRoomV2;
     friend class tst_QXmppMuc;
     const std::unique_ptr<QXmppMucManagerV2Private> d;
 };
 
 Q_DECLARE_METATYPE(QXmppMucManagerV2::BookmarkChange);
+
+///
+/// \class QXmppMucRoomV2
+///
+/// \note Lifetime note: QXmppMucRoomV2 and QXmppMucParticipant are lightweight handles and do not
+/// own any data.
+/// They access state stored in the QXmppMucManager. The manager must remain alive for the lifetime
+/// of any room or participant handle.
+/// Accessing a handle after the manager is destroyed is undefined behavior.
+///
+/// \note Always call isValid() before accessing properties, especially if the room might have
+/// been left or participants removed.
+///
+/// \since QXmpp 1.15
+///
+class QXMPP_EXPORT QXmppMucRoomV2
+{
+public:
+    bool isValid() const;
+    QBindable<QString> subject() const;
+    QBindable<QString> nickname() const;
+    QBindable<bool> joined() const;
+
+    template<typename Func>
+    QMetaObject::Connection onParticipantJoined(QObject *context, Func &&f) const
+    {
+        return QObject::connect(m_manager, &QXmppMucManagerV2::participantJoined, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QString &id) {
+            if (roomJid == jid) {
+                f(id);
+            }
+        });
+    }
+
+    template<typename Func>
+    QMetaObject::Connection onParticipantLeft(QObject *context, Func &&f) const
+    {
+        return QObject::connect(m_manager, &QXmppMucManagerV2::participantLeft, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QString &id) {
+            if (roomJid == jid) {
+                f(id);
+            }
+        });
+    }
+
+private:
+    QXmppMucRoomV2(QXmppMucManagerV2 *manager, const QString &jid)
+        : m_manager(manager), m_jid(jid)
+    {
+    }
+
+    friend class QXmppMucManagerV2;
+    QXmppMucManagerV2 *m_manager;
+    QString m_jid;
+};
+
+inline QXmppMucRoomV2 QXmppMucManagerV2::room(const QString &jid)
+{
+    return QXmppMucRoomV2(this, jid);
+}
 
 #endif  // QXMPPMUCMANAGERV2_H
