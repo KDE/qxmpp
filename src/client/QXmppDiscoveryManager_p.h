@@ -69,7 +69,7 @@ struct AttachableRequests {
     QXmppTask<Response> produce(Params key, std::function<QXmppTask<Response>(Params)> requestFunction, QObject *context)
     {
         if (auto task = attach(key)) {
-            return *task;
+            return std::move(*task);
         }
         auto task = makeNew(key);
         requestFunction(key).then(context, [this, key](auto &&response) {
