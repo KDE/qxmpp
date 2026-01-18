@@ -4,8 +4,10 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppMessage.h"
 #include "QXmppMucForms.h"
 #include "QXmppMucManagerV2.h"
+#include "QXmppPresence.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppPubSubSubAuthorization.h"
 
@@ -27,6 +29,9 @@ private:
     // MUC avatars
     Q_SLOT void avatarFetch();
 
+    // MUC joining
+    Q_SLOT void joinRoom();
+
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
 };
@@ -36,6 +41,7 @@ void tst_QXmppMuc::bookmarks2Updates()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppPubSubManager>();
+    test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     QSignalSpy resetSignal(muc, &QXmppMucManagerV2::bookmarksReset);
@@ -86,6 +92,7 @@ void tst_QXmppMuc::bookmarks2Set()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppPubSubManager>();
+    test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto task = muc->setBookmark(QXmppMucBookmark { u"theplay@conference.shakespeare.lit"_s, u"The Play's the Thing"_s, true, u"JC"_s, {} });
@@ -116,6 +123,7 @@ void tst_QXmppMuc::bookmarks2Remove()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppPubSubManager>();
+    test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto task = muc->removeBookmark(u"theplay@conference.shakespeare.lit"_s);
@@ -165,6 +173,37 @@ void tst_QXmppMuc::avatarFetch()
     auto avatar = expectFutureVariant<std::optional<QXmppMucManagerV2::Avatar>>(avatarTask);
     QVERIFY(avatar.has_value());
     QCOMPARE(avatar->contentType, u"image/svg+xml"_s);
+}
+
+void tst_QXmppMuc::joinRoom()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // Inject self-presence (status 110): transitions JoiningOccupantPresences → JoiningRoomHistory
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    // Inject subject message: transitions JoiningRoomHistory → Joined and resolves task
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task);
+    QVERIFY(room.isValid());
+    QCOMPARE(room.subject().value(), u"Cauldron"_s);
 }
 
 void tst_QXmppMuc::roomInfoForm()

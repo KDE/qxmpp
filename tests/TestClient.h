@@ -41,6 +41,8 @@ public:
     template<typename String>
     void inject(const String &xml) { inject(xmlToDom(xml)); }
 
+    void injectPresence(const QXmppPresence &presence) { Q_EMIT presenceReceived(presence); }
+
     void inject(const QDomElement &element)
     {
         if (!d->stream->handleIqResponse(element)) {
