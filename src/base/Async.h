@@ -114,7 +114,7 @@ QXmppTask<void> joinVoidTasks(QObject *context, QList<QXmppTask<T>> &&tasks)
 
     QXmppPromise<void> promise;
 
-    for (auto task : tasks) {
+    for (auto &task : tasks) {
         task.then(context, [=]() mutable {
             if (++(*finishedTaskCount) == taskCount) {
                 promise.finish();
