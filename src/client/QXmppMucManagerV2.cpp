@@ -4,6 +4,7 @@
 
 #include "QXmppMucManagerV2.h"
 
+#include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMucForms.h"
@@ -11,12 +12,53 @@
 #include "QXmppPubSubManager.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
+#include <QXmppUtils.h>
 
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
+#include <unordered_map>
+
+#include <QProperty>
+
 using namespace QXmpp;
 using namespace QXmpp::Private;
+
+static std::optional<QXmpp::Muc::Affiliation> affiliationFromLegacy(QXmppMucItem::Affiliation affiliation)
+{
+    switch (affiliation) {
+    case QXmppMucItem::UnspecifiedAffiliation:
+        return {};
+    case QXmppMucItem::OutcastAffiliation:
+        return QXmpp::Muc::Affiliation::Outcast;
+    case QXmppMucItem::NoAffiliation:
+        return QXmpp::Muc::Affiliation::None;
+    case QXmppMucItem::MemberAffiliation:
+        return QXmpp::Muc::Affiliation::Member;
+    case QXmppMucItem::AdminAffiliation:
+        return QXmpp::Muc::Affiliation::Admin;
+    case QXmppMucItem::OwnerAffiliation:
+        return QXmpp::Muc::Affiliation::Owner;
+    }
+    return {};
+}
+
+static std::optional<Muc::Role> roleFromLegacy(QXmppMucItem::Role role)
+{
+    switch (role) {
+    case QXmppMucItem::UnspecifiedRole:
+        return {};
+    case QXmppMucItem::NoRole:
+        return Muc::Role::None;
+    case QXmppMucItem::VisitorRole:
+        return Muc::Role::Visitor;
+    case QXmppMucItem::ParticipantRole:
+        return Muc::Role::Participant;
+    case QXmppMucItem::ModeratorRole:
+        return Muc::Role::Moderator;
+    }
+    return {};
+}
 
 //
 // Serialization
@@ -123,16 +165,79 @@ void QXmppMucBookmark::setAutojoin(bool autojoin) { d->payload.autojoin = autojo
 
 using EmptyResult = std::variant<Success, QXmppError>;
 
+namespace QXmpp::Private {
+
+struct MucParticipantData {
+    QProperty<QString> nickname;
+    QProperty<QString> jid;
+    QString occupantId;
+    QProperty<Muc::Role> role;
+    QProperty<Muc::Affiliation> affiliation;
+    QProperty<QXmppPresence> presence;
+
+    MucParticipantData(const QXmppPresence &presence)
+        : occupantId(presence.mucOccupantId())
+    {
+        setBindings();
+        setPresence(presence);
+    }
+
+    void setBindings()
+    {
+        nickname.setBinding([&] {
+            return QXmppUtils::jidToResource(presence.value().from());
+        });
+        jid.setBinding([&] {
+            return presence.value().mucItem().jid();
+        });
+        role.setBinding([&] {
+            return roleFromLegacy(presence.value().mucItem().role()).value_or(Muc::Role::None);
+        });
+        affiliation.setBinding([&] {
+            return affiliationFromLegacy(presence.value().mucItem().affiliation()).value_or(Muc::Affiliation::None);
+        });
+    }
+    void setPresence(const QXmppPresence &newPresence) { presence = newPresence; }
+};
+
+enum class MucRoomState {
+    NotJoined,
+    JoiningOccupantPresences,
+    JoiningRoomHistory,
+    JoiningSubject,
+    Joined,
+};
+
+struct MucRoomData {
+    MucRoomState state = MucRoomState::NotJoined;
+    QProperty<QString> subject;
+    QProperty<QString> nickname;
+    QProperty<bool> joined;
+    std::unordered_map<uint32_t, MucParticipantData> participants;
+};
+
+}  // namespace QXmpp::Private
+
 struct QXmppMucManagerV2Private {
     QXmppMucManagerV2 *q = nullptr;
     std::optional<QList<QXmppMucBookmark>> bookmarks;
+    std::unordered_map<QString, MucRoomData> rooms;
+    uint32_t participantIdCounter = 0;
 
     QXmppPubSubManager *pubsub();
     QXmppDiscoveryManager *disco();
+
+    // Bookmarks 2
     void setBookmarks(QVector<Bookmarks2ConferenceItem> &&items);
     void resetBookmarks();
     QXmppTask<EmptyResult> setBookmark(QXmppMucBookmark &&bookmark);
     QXmppTask<EmptyResult> removeBookmark(const QString &jid);
+
+    // MUC Core
+    void handlePresence(const QXmppPresence &);
+    void handleRoomPresence(const QString &roomJid, MucRoomData &data, const QXmppPresence &);
+    void throwRoomError(QXmppError &&);
+    uint32_t generateParticipantId() { return participantIdCounter++; }
 };
 
 ///
@@ -286,6 +391,21 @@ QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::f
     return t;
 }
 
+QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid, const QString &nickname)
+{
+    // nickname empty check
+    if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
+        return makeReadyTask<Result<QXmppMucRoomV2>>(room(jid));
+    }
+
+    QXmppPresence p;
+    p.setTo(jid + u'/' + nickname);
+    p.setMucSupported(true);
+    client()->send(std::move(p));
+
+    return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError {});
+}
+
 /// Handles incoming PubSub events.
 bool QXmppMucManagerV2::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
@@ -372,6 +492,7 @@ QXmppTask<Result<>> QXmppMucManagerV2::removeBookmark(const QString &jid)
 void QXmppMucManagerV2::onRegistered(QXmppClient *client)
 {
     connect(client, &QXmppClient::connected, this, &QXmppMucManagerV2::onConnected);
+    connect(client, &QXmppClient::presenceReceived, this, [this](const auto &p) { d->handlePresence(p); });
 }
 
 void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
@@ -396,6 +517,18 @@ void QXmppMucManagerV2::onConnected()
         });
     }
 }
+
+const MucRoomData *QXmppMucManagerV2::roomData(const QString &jid) const
+{
+    if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
+        return &itr->second;
+    }
+    return nullptr;
+}
+
+//
+// Manager private: Bookmarks 2
+//
 
 auto QXmppMucManagerV2Private::setBookmark(QXmppMucBookmark &&bookmark) -> QXmppTask<EmptyResult>
 {
@@ -476,4 +609,100 @@ void QXmppMucManagerV2Private::resetBookmarks()
         bookmarks.reset();
         Q_EMIT q->bookmarksReset();
     }
+}
+
+//
+// Manager private: MUC Core
+//
+
+void QXmppMucManagerV2Private::handlePresence(const QXmppPresence &p)
+{
+    auto bareFrom = QXmppUtils::jidToBareJid(p.from());
+    if (auto itr = rooms.find(bareFrom); itr != rooms.end()) {
+        handleRoomPresence(bareFrom, itr->second, p);
+    }
+}
+
+void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &presence)
+{
+    using enum MucRoomState;
+
+    auto nickname = QXmppUtils::jidToResource(presence.from());
+
+    // TODO: clear occupant ID in presence at this point if not supported by MUC to prevent occupant ID injection
+
+    switch (data.state) {
+    case NotJoined:
+        // did not request to join; ignore
+        break;
+    case JoiningOccupantPresences:
+        if (presence.type() == QXmppPresence::Available) {
+            for (const auto &[pId, participant] : data.participants) {
+                if (participant.nickname == nickname) {
+                    // room sent two presences for the same nickname
+                    throwRoomError(QXmppError { u"MUC reported two presences for the same nickname"_s });
+                    return;
+                } else if (participant.occupantId == presence.mucOccupantId()) {
+                    // sent two presences with the same occupant ID
+                    throwRoomError(QXmppError { u"MUC reported two presences for the same occupant ID"_s });
+                    return;
+                }
+            }
+
+            // store new presence
+            auto [itr, inserted] = data.participants.emplace(generateParticipantId(), presence);
+            QX_ALWAYS_ASSERT();
+
+            // this is our presence (must be last)
+            if (presence.mucStatusCodes().contains(110)) {
+                data.state = JoiningRoomHistory;
+                data.nickname.setBinding([])
+            }
+        } else if (presence.type() == QXmppPresence::Error) {
+            auto error = presence.error();
+            throwRoomError(QXmppError { u"Cannot join MUC: "_s + error.text(), std::move(error) });
+            return;
+        }
+        break;
+    case JoiningRoomHistory:
+    case JoiningSubject:
+    case Joined:
+    }
+}
+
+void QXmppMucManagerV2Private::throwRoomError(QXmppError &&)
+{
+}
+
+//
+// MucRoom
+//
+
+bool QXmppMucRoomV2::isValid() const
+{
+    return m_manager->roomData(m_jid) != nullptr;
+}
+
+QBindable<QString> QXmppMucRoomV2::subject() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->subject) };
+    }
+    return {};
+}
+
+QBindable<QString> QXmppMucRoomV2::nickname() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->nickname) };
+    }
+    return {};
+}
+
+QBindable<bool> QXmppMucRoomV2::joined() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->joined) };
+    }
+    return {};
 }

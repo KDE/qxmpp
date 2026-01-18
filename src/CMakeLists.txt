@@ -310,7 +310,8 @@ set(SOURCE_FILES
 )
 
 if(BUILD_SHARED)
-    add_library(${QXMPP_TARGET} SHARED ${SOURCE_FILES})
+    add_library(${QXMPP_TARGET} SHARED ${SOURCE_FILES}
+        base/QXmppMucData.h)
 else()
     add_library(${QXMPP_TARGET} STATIC ${SOURCE_FILES})
 endif()
