@@ -42,7 +42,6 @@ protected:
 
 private:
     QXmppTask<QXmppPresence> processSubscriptionRequest(QXmppPresence presence);
-    Result movedJidsMatch(const QString &newBareJid, const QString &pepBareJid) const;
 
     void setSupportedByServer(bool supportedByServer);
     void resetCachedData();
