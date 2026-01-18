@@ -24,11 +24,9 @@ class tst_QXmppStream : public QObject
 private:
     Q_SLOT void initTestCase();
     Q_SLOT void testProcessData();
-#ifdef BUILD_INTERNAL_TESTS
     Q_SLOT void streamOpen();
     Q_SLOT void testStreamError();
     Q_SLOT void starttlsPackets();
-#endif
 
     // parsing
     Q_SLOT void testStartTlsPacket_data();
@@ -108,7 +106,6 @@ void tst_QXmppStream::testProcessData()
     socket.processData(R"(</stream:stream>)");
 }
 
-#ifdef BUILD_INTERNAL_TESTS
 void tst_QXmppStream::streamOpen()
 {
     auto xml = "<?xml version='1.0' encoding='UTF-8'?><stream:stream from='juliet@im.example.com' to='im.example.com' id='abcdefg' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>";
@@ -179,7 +176,6 @@ void tst_QXmppStream::starttlsPackets()
     auto proceed = unwrap(StarttlsProceed::fromDom(xmlToDom(xml2)));
     serializePacket(proceed, xml2);
 }
-#endif
 
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED

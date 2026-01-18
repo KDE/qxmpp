@@ -13,6 +13,7 @@
 #include "QXmppMessage.h"
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoManager.h"
+#include "QXmppOmemoManager_p.h"
 #include "QXmppOmemoMemoryStorage.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppUtils.h"
@@ -21,10 +22,6 @@
 #include "util.h"
 
 #include <QObject>
-
-#if BUILD_INTERNAL_TESTS
-#include "QXmppOmemoManager_p.h"
-#endif
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -164,12 +161,10 @@ void tst_QXmppOmemoManager::testInit()
 {
     auto omemoStorage = std::make_unique<QXmppOmemoMemoryStorage>();
     auto manager = std::make_unique<QXmppOmemoManager>(omemoStorage.get());
-#if BUILD_INTERNAL_TESTS
     QVERIFY(manager->d->initGlobalContext());
     QVERIFY(manager->d->initLocking());
     QVERIFY(manager->d->initCryptoProvider());
     // TODO: Test initStores()
-#endif
 }
 
 void tst_QXmppOmemoManager::testSetUp()

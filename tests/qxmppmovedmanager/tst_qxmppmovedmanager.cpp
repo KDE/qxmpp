@@ -4,14 +4,11 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppMovedItem_p.h"
 #include "QXmppMovedManager.h"
 #include "QXmppPubSubManager.h"
 
 #include "Iq.h"
-#ifdef BUILD_INTERNAL_TESTS
-#include "QXmppMovedItem_p.h"
-#endif
-
 #include "TestClient.h"
 
 using namespace QXmpp::Private;
@@ -39,9 +36,7 @@ class tst_QXmppMovedManager : public QObject
     Q_OBJECT
 
 private:
-#ifdef BUILD_INTERNAL_TESTS
     Q_SLOT void testMovedItem();
-#endif
     Q_SLOT void testMovedPresence();
     Q_SLOT void testDiscoveryFeatures();
     Q_SLOT void testSupportedByServer();
@@ -57,7 +52,6 @@ private:
     void testError(QXmppTask<T> &task, TestClient &client, const QString &id, const QString &from);
 };
 
-#ifdef BUILD_INTERNAL_TESTS
 void tst_QXmppMovedManager::testMovedItem()
 {
     const auto expected = u"<item id=\"current\"><moved xmlns=\"urn:xmpp:moved:1\"><new-jid>new@shakespeare.example</new-jid></moved></item>"_s;
@@ -77,7 +71,6 @@ void tst_QXmppMovedManager::testMovedItem()
         QVERIFY(!packet.newJid().isEmpty());
     }
 }
-#endif
 
 void tst_QXmppMovedManager::testMovedPresence()
 {

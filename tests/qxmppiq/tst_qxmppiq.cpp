@@ -150,12 +150,10 @@ private:
     Q_SLOT void rpcResponseFault();
 
     // StreamInitiationIq
-#if BUILD_INTERNAL_TESTS
     Q_SLOT void streamInitiationFileInfo_data();
     Q_SLOT void streamInitiationFileInfo();
     Q_SLOT void streamInitiationOffer();
     Q_SLOT void streamInitiationResult();
-#endif
 
     // VCardIq
     Q_SLOT void vcardAddress_data();
@@ -1899,7 +1897,6 @@ void tst_QXmppIq::rpcResponseFault()
     serializePacket(iq, xml);
 }
 
-#if BUILD_INTERNAL_TESTS
 void tst_QXmppIq::streamInitiationFileInfo_data()
 {
     QTest::addColumn<QByteArray>("xml");
@@ -1997,7 +1994,6 @@ void tst_QXmppIq::streamInitiationResult()
     QVERIFY(iq.fileInfo().isNull());
     serializePacket(iq, xml);
 }
-#endif  // BUILD_INTERNAL_TESTS
 
 void tst_QXmppIq::vcardAddress_data()
 {
