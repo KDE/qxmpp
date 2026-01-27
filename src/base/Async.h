@@ -188,6 +188,41 @@ struct AttachableRequests {
     }
 };
 
+template<typename T>
+struct MultiPromise {
+    std::vector<QXmppPromise<T>> promises;
+
+    void finish(T &&response)
+    {
+        for (auto it = promises.begin(); it != promises.end(); ++it) {
+            // copy unless this is the last iteration (then do move)
+            it->finish(std::next(it) == promises.end() ? std::move(response) : response);
+        }
+    }
+    QXmppTask<T> generateTask()
+    {
+        promises.push_back(QXmppPromise<T>());
+        return promises.back().task();
+    }
+};
+
+template<>
+struct MultiPromise<void> {
+    std::vector<QXmppPromise<void>> promises;
+
+    void finish()
+    {
+        for (auto &p : promises) {
+            p.finish();
+        }
+    }
+    QXmppTask<void> generateTask()
+    {
+        promises.push_back(QXmppPromise<void>());
+        return promises.back().task();
+    }
+};
+
 }  // namespace QXmpp::Private
 
 #endif  // ASYNC_H

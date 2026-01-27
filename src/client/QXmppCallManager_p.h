@@ -13,6 +13,8 @@
 #include "QXmppStunServer.h"
 #include "QXmppTurnServer.h"
 
+#include "Async.h"
+
 #include <QDateTime>
 
 class QXmppCallManager;
@@ -68,7 +70,7 @@ public:
     QList<QXmppCall *> calls;
 
     // STUN/TURN config
-    std::optional<QXmppPromise<void>> refreshStunTurnConfigPromise;
+    std::optional<QXmpp::Private::MultiPromise<void>> refreshStunTurnConfigPromise;
     std::optional<QXmpp::Private::StunTurnConfig> stunTurnServers;
     QList<QXmpp::StunServer> fallbackStunServers;
     std::optional<QXmpp::TurnServer> fallbackTurnServer;

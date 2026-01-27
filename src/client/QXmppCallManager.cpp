@@ -615,7 +615,7 @@ QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
 {
     if (d->refreshStunTurnConfigPromise.has_value()) {
         // attach to ongoing task
-        return d->refreshStunTurnConfigPromise->task();
+        return d->refreshStunTurnConfigPromise->generateTask();
     } else {
         if (d->stunTurnServers.has_value()) {
             // TODO: check expiry and refresh credentials
@@ -623,7 +623,8 @@ QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
         }
 
         // initial request of STUN/TURN credentials
-        d->refreshStunTurnConfigPromise = QXmppPromise<void>();
+        d->refreshStunTurnConfigPromise = MultiPromise<void>();
+        auto task = d->refreshStunTurnConfigPromise->generateTask();
 
         requestStunTurnConfig(client(), this).then(this, [this](const auto &result) {
             if (auto *error = std::get_if<QXmppError>(&result)) {
@@ -638,6 +639,6 @@ QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
             p.finish();
         });
 
-        return d->refreshStunTurnConfigPromise->task();
+        return task;
     }
 }
