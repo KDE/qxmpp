@@ -9,15 +9,18 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
 # optional QtGui support (for testing header-only usage)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui QUIET)
 
-add_library(testutils STATIC util.h TestClient.h)
-target_link_libraries(testutils PUBLIC Qt${QT_VERSION_MAJOR}::Test ${QXMPP_TARGET} ${QXMPP_TARGET}_internal)
+add_library(testutils OBJECT util.h TestClient.h)
+target_link_libraries(testutils PUBLIC Qt${QT_VERSION_MAJOR}::Test ${QXMPP_TARGET}_internal)
 
 macro(add_simple_test TEST_NAME)
-    add_executable(tst_${TEST_NAME} ${TEST_NAME}/tst_${TEST_NAME}.cpp ${ARGN})
+    add_executable(tst_${TEST_NAME} ${TEST_NAME}/tst_${TEST_NAME}.cpp $<TARGET_OBJECTS:testutils> ${ARGN})
     add_test(tst_${TEST_NAME} tst_${TEST_NAME})
-    target_link_libraries(tst_${TEST_NAME} testutils)
+    target_link_libraries(tst_${TEST_NAME} Qt${QT_VERSION_MAJOR}::Test ${QXMPP_TARGET}_internal)
+    target_compile_definitions(tst_${TEST_NAME} PRIVATE QXMPP_STATIC_DEFINE)
+
     if(${TEST_NAME} MATCHES "^qxmppomemo")
-        target_link_libraries(tst_${TEST_NAME} ${QXMPPOMEMO_TARGET} ${QXMPPOMEMO_TARGET}_internal)
+        target_link_libraries(tst_${TEST_NAME} ${QXMPPOMEMO_TARGET}_internal)
+        target_compile_definitions(tst_${TEST_NAME} PRIVATE QXMPPOMEMO_STATIC_DEFINE)
     endif()
 endmacro()
 

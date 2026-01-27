@@ -315,13 +315,14 @@ set(SOURCE_FILES
 
 add_library(${QXMPP_TARGET}_internal OBJECT ${SOURCE_FILES})
 target_include_directories(${QXMPP_TARGET}_internal
-    PRIVATE
+    PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/base ${CMAKE_CURRENT_SOURCE_DIR}/client ${CMAKE_CURRENT_SOURCE_DIR}/server
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(${QXMPP_TARGET}_internal
     PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Xml
 )
+target_compile_definitions(${QXMPP_TARGET}_internal PRIVATE ${QXMPP_TARGET}_EXPORTS)
 
 if(WITH_GSTREAMER)
     set(INSTALL_HEADER_FILES
