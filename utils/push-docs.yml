@@ -6,7 +6,7 @@ push_documentation:
   stage: validate
   image: alpine:latest
   before_script:
-    - apk add --no-cache git cmake
+    - apk add --no-cache git cmake make doxygen graphviz g++ qt6-qtbase-dev
     - git config --global user.email "noreply@qxmpp.org"
     - git config --global user.name "QXmpp CI Bot"
   script:
