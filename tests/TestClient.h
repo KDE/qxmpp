@@ -145,6 +145,16 @@ public:
         }
     }
 
+    void waitForConnect()
+    {
+        QEventLoop loop;
+        connect(this, &QXmppClient::connected, &loop, &QEventLoop::quit);
+        connect(this, &QXmppClient::disconnected, &loop, &QEventLoop::quit);
+        loop.exec();
+
+        QVERIFY(isConnected());
+    }
+
 private:
     void onLoggerMessage(QXmppLogger::MessageType type, const QString &text)
     {

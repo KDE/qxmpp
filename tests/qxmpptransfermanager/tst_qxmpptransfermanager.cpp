@@ -6,6 +6,7 @@
 #include "QXmppServer.h"
 #include "QXmppTransferManager.h"
 
+#include "TestClient.h"
 #include "util.h"
 
 #include <QBuffer>
@@ -84,15 +85,11 @@ void tst_QXmppTransferManager::testSendFile()
     server.listenForClients(testHost, testPort);
 
     // prepare sender
-    QXmppClient sender;
+    TestClient sender;
     auto *senderManager = new QXmppTransferManager;
     senderManager->setSupportedMethods(senderMethods);
     sender.addExtension(senderManager);
     sender.setLogger(&logger);
-
-    QEventLoop senderLoop;
-    connect(&sender, &QXmppClient::connected, &senderLoop, &QEventLoop::quit);
-    connect(&sender, &QXmppClient::disconnected, &senderLoop, &QEventLoop::quit);
 
     QXmppConfiguration config;
     config.setDomain(testDomain);
@@ -101,11 +98,11 @@ void tst_QXmppTransferManager::testSendFile()
     config.setUser("sender");
     config.setPassword("testpwd");
     sender.connectToServer(config);
-    senderLoop.exec();
+    sender.waitForConnect();
     QCOMPARE(sender.isConnected(), true);
 
     // prepare receiver
-    QXmppClient receiver;
+    TestClient receiver;
     auto *receiverManager = new QXmppTransferManager;
     receiverManager->setSupportedMethods(receiverMethods);
     connect(receiverManager, &QXmppTransferManager::fileReceived,
@@ -113,14 +110,10 @@ void tst_QXmppTransferManager::testSendFile()
     receiver.addExtension(receiverManager);
     receiver.setLogger(&logger);
 
-    QEventLoop receiverLoop;
-    connect(&receiver, &QXmppClient::connected, &receiverLoop, &QEventLoop::quit);
-    connect(&receiver, &QXmppClient::disconnected, &receiverLoop, &QEventLoop::quit);
-
     config.setUser("receiver");
     config.setPassword("testpwd");
     receiver.connectToServer(config);
-    receiverLoop.exec();
+    receiver.waitForConnect();
     QCOMPARE(receiver.isConnected(), true);
 
     // send file

@@ -169,10 +169,6 @@ void tst_QXmppCallManager::testCall()
     sender.addNewExtension<QXmppDiscoveryManager>();
     auto *senderManager = sender.addNewExtension<QXmppCallManager>();
 
-    QEventLoop senderLoop;
-    connect(&sender, &QXmppClient::connected, &senderLoop, &QEventLoop::quit);
-    connect(&sender, &QXmppClient::disconnected, &senderLoop, &QEventLoop::quit);
-
     QXmppConfiguration config;
     config.setDomain(testDomain);
     config.setHost(testHost.toString());
@@ -180,7 +176,7 @@ void tst_QXmppCallManager::testCall()
     config.setUser("sender");
     config.setPassword("testpwd");
     sender.connectToServer(config);
-    senderLoop.exec();
+    sender.waitForConnect();
     QCOMPARE(sender.isConnected(), true);
 
     // prepare receiver
@@ -192,14 +188,10 @@ void tst_QXmppCallManager::testCall()
         receiverCall->accept();
     });
 
-    QEventLoop receiverLoop;
-    connect(&receiver, &QXmppClient::connected, &receiverLoop, &QEventLoop::quit);
-    connect(&receiver, &QXmppClient::disconnected, &receiverLoop, &QEventLoop::quit);
-
     config.setUser("receiver");
     config.setPassword("testpwd");
     receiver.connectToServer(config);
-    receiverLoop.exec();
+    receiver.waitForConnect();
     QCOMPARE(receiver.isConnected(), true);
 
     // connect call
