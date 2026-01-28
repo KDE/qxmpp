@@ -4,6 +4,24 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.14.0 (January 28, 2026)
+-------------------------------
+
+ - Updated and completed audio/video calls implementation (@lnj, !702, !734)
+   - Fetch STUN/TURN configuraiton from server
+   - Fix crashes in TURN implementation
+   - Fix injection into other calls
+   - Add IQ error descriptions
+   - Fix memory leaks on errors
+   - New API with explicit ownership of calls (unique_ptr)
+   - Check Jingle features on remote entities
+   - Expose in API whether adding video is possible
+   - Refactor and fix parsing of Jingle IQs and elements
+   - Fix Jingle Message Initiation implementation
+   - Fixes in codec selection (opus with conversations/dino)
+ - Enable visibility=hidden on linux (@lnj, !732, !733)
+   - Drop internal unit tests: all tests can access all symbols on all platforms
+
 QXmpp 1.13.0 (December 26, 2025)
 --------------------------------
 

@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: CC0-1.0
 
 cmake_minimum_required(VERSION 3.16)
-project(qxmpp VERSION 1.13.0)
+project(qxmpp VERSION 1.14.0)
 
-set(SO_VERSION 7)
+set(SO_VERSION 8)
 
 # C/C++ settings
 set(CMAKE_CXX_STANDARD 20)
