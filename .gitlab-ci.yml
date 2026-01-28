@@ -8,8 +8,14 @@ include:
       - /gitlab-templates/reuse-lint.yml
       - /gitlab-templates/xml-lint.yml
       - /gitlab-templates/clang-format.yml
-      - /gitlab-templates/linux-qt6.yml
       - /gitlab-templates/linux-qt6-next.yml
       - /gitlab-templates/alpine-qt6.yml
       - /gitlab-templates/freebsd-qt6.yml
       - /gitlab-templates/windows-qt6.yml
+
+  # only build linux-qt6 (not next) on master for CI cache
+  - project: sysadmin/ci-utilities
+    file:
+      - /gitlab-templates/linux-qt6.yml
+    rules:
+      - if: '$CI_COMMIT_BRANCH == "master"'
