@@ -67,6 +67,7 @@ void tst_QXmppCallManager::invalidSid()
 
     TestClient client;
     auto *manager = client.addNewExtension<QXmppCallManager>();
+    client.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
 
     // take over ownership of all incoming calls (so they are not deleted)
     std::vector<std::unique_ptr<QXmppCall>> calls;
@@ -78,7 +79,11 @@ void tst_QXmppCallManager::invalidSid()
     QVERIFY(manager->handleStanza(xmlToDom(xml.arg("abc1"))));
     QCoreApplication::processEvents();
     client.expect(u"<iq id='ph37a419' to='romeo@montague.lit/orchard' type='result'/>"_s);
-    client.expect(u"<iq id='qxmpp3' to='romeo@montague.lit/orchard' type='set'><jingle xmlns='urn:xmpp:jingle:1' action='session-info' sid='abc1'><ringing xmlns='urn:xmpp:jingle:apps:rtp:info:1'/></jingle></iq>"_s);
+    client.expect(u"<iq id=\"qx3\" to=\"capulet.lit\" type=\"get\"><services xmlns=\"urn:xmpp:extdisco:2\"/></iq>"_s);
+    client.inject(u"<iq id='qx3' from='capulet.lit' type='result'><services xmlns='urn:xmpp:extdisco:2'/></iq>");
+    QCoreApplication::processEvents();
+    client.expect(u"<iq id=\"qx2\" to=\"romeo@montague.lit/orchard\" from=\"juliet@capulet.lit/balcony\" type=\"set\"><jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=\"abc1\"><ringing xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\"/></jingle></iq>"_s);
+
     // same sid
     auto error = expectVariant<Error>(manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml.arg("abc1")))));
     QCOMPARE(error.type(), Error::Cancel);
@@ -108,6 +113,7 @@ void tst_QXmppCallManager::senderImpersonation()
 
     TestClient client;
     auto *manager = client.addNewExtension<QXmppCallManager>();
+    client.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
 
     // session initiate
     auto result = manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml.arg("abc1"))));
@@ -148,9 +154,6 @@ void tst_QXmppCallManager::testCall()
     const QHostAddress testHost(QHostAddress::LocalHost);
     const quint16 testPort = 12345;
 
-    QXmppLogger logger;
-    // logger.setLoggingType(QXmppLogger::StdoutLogging);
-
     // prepare server
     TestPasswordChecker passwordChecker;
     passwordChecker.addCredentials("sender", "testpwd");
@@ -162,10 +165,9 @@ void tst_QXmppCallManager::testCall()
     server.listenForClients(testHost, testPort);
 
     // prepare sender
-    QXmppClient sender;
-    auto *senderManager = new QXmppCallManager;
-    sender.addExtension(senderManager);
-    sender.setLogger(&logger);
+    TestClient sender;
+    sender.addNewExtension<QXmppDiscoveryManager>();
+    auto *senderManager = sender.addNewExtension<QXmppCallManager>();
 
     QEventLoop senderLoop;
     connect(&sender, &QXmppClient::connected, &senderLoop, &QEventLoop::quit);
@@ -182,14 +184,13 @@ void tst_QXmppCallManager::testCall()
     QCOMPARE(sender.isConnected(), true);
 
     // prepare receiver
-    QXmppClient receiver;
-    auto *receiverManager = new QXmppCallManager;
+    TestClient receiver;
+    receiver.addNewExtension<QXmppDiscoveryManager>();
+    auto *receiverManager = receiver.addNewExtension<QXmppCallManager>();
     connect(receiverManager, &QXmppCallManager::callReceived, this, [&receiverCall](std::unique_ptr<QXmppCall> &call) {
         receiverCall = std::move(call);
         receiverCall->accept();
     });
-    receiver.addExtension(receiverManager);
-    receiver.setLogger(&logger);
 
     QEventLoop receiverLoop;
     connect(&receiver, &QXmppClient::connected, &receiverLoop, &QEventLoop::quit);
