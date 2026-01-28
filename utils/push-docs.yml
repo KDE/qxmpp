@@ -1,0 +1,25 @@
+push_documentation:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git cmake
+    - git config --global user.email "noreply@qxmpp.org"
+    - git config --global user.name "QXmpp CI Bot"
+  script:
+    # Generate documentation
+    - mkdir build && cd build
+    - cmake .. -DBUILD_DOCUMENTATION=ON -DWITH_QCA=OFF
+    - cmake --build . --target doc
+    - cp -r doc/html ../documentation_output
+    # Switch branch and add a remote using the CI_JOB_TOKEN
+    - git checkout -B work/doc-qxmpp-org
+    - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
+    # Make changes
+    - echo "Updated by CI" > file.txt
+    - git add file.txt
+    - git commit -m "Update from CI"
+    # Push back to the branch
+    - git push origin work/doc-qxmpp-org
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'work/lnj/doc-push'
+

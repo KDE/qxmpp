@@ -19,3 +19,5 @@ include:
       - /gitlab-templates/linux-qt6.yml
     rules:
       - if: '$CI_COMMIT_BRANCH == "master"'
+  
+  - local: utils/push-docs.yml
