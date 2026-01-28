@@ -234,9 +234,19 @@ struct IsTaskHelper<QXmppTask<T>> {
 
 }  // namespace Private
 
+///
+/// Returns whether `T` is a `QXmppTask<U>`
+///
+/// \since QXmpp 1.14
+///
 template<typename T>
 concept IsTask = Private::IsTaskHelper<T>::Value;
 
+///
+/// Returns the type `T` of a `QXmppTask<T>`
+///
+/// \since QXmpp 1.14
+///
 template<IsTask T>
 using TaskValueType = typename Private::IsTaskHelper<T>::Type;
 
