@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 push_documentation:
-  stage: deploy
+  stage: validate
   image: alpine:latest
   before_script:
     - apk add --no-cache git cmake
