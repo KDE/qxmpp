@@ -535,6 +535,7 @@ auto QXmppCallManager::handleIq(QXmppJingleIq &&iq) -> IncomingIqResult
 
         // register call
         d->addCall(call.get());
+        debug(u"Adding new incoming call (sid=%1)"_s.arg(iq.sid()));
 
         // first send IQ ack (task may finish instantly)
         later(this, [this, contents, callPtr = call.release()]() mutable {
