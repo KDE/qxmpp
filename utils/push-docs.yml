@@ -16,13 +16,14 @@ push_documentation:
     - cmake --build . --target doc
     - cp -r doc/html ../documentation_output
     # Switch branch and add a remote using the CI_JOB_TOKEN
-    - git checkout -B work/doc-qxmpp-org
+    - git fetch origin work/doc-qxmpp-org:work/doc-qxmpp-org
+    - git checkout work/doc-qxmpp-org
     - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
-    # Make changes
     - echo "Updated by CI" > file.txt
-    - git add file.txt
-    - git commit -m "Update from CI"
-    # Push back to the branch
+    - mv ../documentation_output qxmpp-dev
+    - git add qxmpp-dev
+    - git commit -m "Update documentation for commit ${CI_COMMIT_SHA}"
+    - echo "Pushing to work/doc-qxmpp-org branch…"
     - git push origin work/doc-qxmpp-org
   rules:
     - if: $CI_COMMIT_BRANCH == 'work/lnj/doc-push'
