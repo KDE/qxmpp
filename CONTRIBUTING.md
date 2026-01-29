@@ -18,21 +18,21 @@ cd qxmpp
 ```
 This requires `git-clang-format` to be installed, though.
 
-## Pull-requests (PRs)
+## Merge-requests (MRs)
 
-You can submit suggestions for changes via GitHub pull-requests.
+You can submit suggestions for changes via merge-requests on [KDE invent][invent].
 The maintainers of QXmpp will review your code. However, everybody is welcome to review the code and give feedback.
 You can find the current maintainers and other people involved in the project in the `AUTHORS` file.
 
-### Guidelines for Creating PRs
+### Guidelines for Creating MRs
 
-1. Do not use the *master* branch of your personal fork to create PRs. It leads to confusion and
+1. Do not use the *master* branch of your personal fork to create MRs. It leads to confusion and
    makes it harder to check out your branch, making changes to it and in the end also merging your
-   PR into the *master* branch of the main repository.
+   MR into the *master* branch of the main repository.
 1. For fixes, target the branch of the latest release (e.g. *1.3*) instead of the *master* branch.
 1. Write short commit messages starting with an upper case letter and the imperative.
 1. Split your commits logically.
-1. Do not mix unrelated changes in the same PR.
+1. Do not mix unrelated changes in the same MR.
 1. Check the tasks in the pull-request template when they are done or no changes were needed.
 
 ## Testing
@@ -85,4 +85,5 @@ copyright header. This is recommended for large changes.
 If the file does not allow such a header, add a `.license` file for the copyright information.
 
 [doap-rendering]: /doc/doap-rendering/README.md
+[invent]: https://invent.kde.org/libraries/qxmpp
 [reuse]: https://api.reuse.software/info/github.com/qxmpp-project/qxmpp
