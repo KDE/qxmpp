@@ -80,7 +80,7 @@ void tst_QXmppCallManager::invalidSid()
     QCoreApplication::processEvents();
     client.expect(u"<iq id='ph37a419' to='romeo@montague.lit/orchard' type='result'/>"_s);
     client.expect(u"<iq id=\"qx3\" to=\"capulet.lit\" type=\"get\"><services xmlns=\"urn:xmpp:extdisco:2\"/></iq>"_s);
-    client.inject(u"<iq id='qx3' from='capulet.lit' type='result'><services xmlns='urn:xmpp:extdisco:2'/></iq>");
+    client.inject(u"<iq id='qx3' from='capulet.lit' type='result'><services xmlns='urn:xmpp:extdisco:2'/></iq>"_s);
     QCoreApplication::processEvents();
     client.expect(u"<iq id=\"qx2\" to=\"romeo@montague.lit/orchard\" from=\"juliet@capulet.lit/balcony\" type=\"set\"><jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=\"abc1\"><ringing xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\"/></jingle></iq>"_s);
 
