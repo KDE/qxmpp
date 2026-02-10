@@ -4,6 +4,11 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.14.1 (February 10, 2026)
+--------------------------------
+
+ - Fix build with Qt 5 (@lnj, !380)
+
 QXmpp 1.14.0 (January 28, 2026)
 -------------------------------
 
@@ -25,7 +30,7 @@ QXmpp 1.14.0 (January 28, 2026)
 QXmpp 1.13.1 (February 10, 2026)
 --------------------------------
 
- - Fix build with Qt 5 (@lnj, !739)
+ - Fix build with Qt 5 (@lnj, !379)
 
 QXmpp 1.13.0 (December 26, 2025)
 --------------------------------
