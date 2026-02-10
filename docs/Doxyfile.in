@@ -4,14 +4,14 @@
 
 PROJECT_NAME           = "QXmpp"
 PROJECT_NUMBER         = "Version: @PROJECT_VERSION@"
-INPUT                  = @PROJECT_SOURCE_DIR@/doc/index.doc \
-                         @PROJECT_SOURCE_DIR@/doc/using.doc \
-                         @PROJECT_SOURCE_DIR@/doc/xep.doc \
+INPUT                  = @PROJECT_SOURCE_DIR@/docs/index.doc \
+                         @PROJECT_SOURCE_DIR@/docs/using.doc \
+                         @PROJECT_SOURCE_DIR@/docs/xep.doc \
                          @PROJECT_SOURCE_DIR@/src
-HTML_EXTRA_FILES       = @PROJECT_SOURCE_DIR@/doc/doap.xml \
-                         @PROJECT_SOURCE_DIR@/doc/doap-rendering/doap.xsl \
-                         @PROJECT_SOURCE_DIR@/doc/doap-rendering/xeplist.xml \
-                         @PROJECT_SOURCE_DIR@/doc/doap-rendering/doap.css
+HTML_EXTRA_FILES       = @PROJECT_SOURCE_DIR@/docs/doap.xml \
+                         @PROJECT_SOURCE_DIR@/docs/doap-rendering/doap.xsl \
+                         @PROJECT_SOURCE_DIR@/docs/doap-rendering/xeplist.xml \
+                         @PROJECT_SOURCE_DIR@/docs/doap-rendering/doap.css
 ALIASES                = "xep{1}=<a href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1</a>" \
                          "xep{2}=<a href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1: \2</a>"
 ALPHABETICAL_INDEX     = NO

@@ -102,7 +102,7 @@ if(BUILD_TESTING)
 endif()
 
 if(BUILD_DOCUMENTATION)
-    add_subdirectory(doc)
+    add_subdirectory(docs)
 endif()
 
 if(BUILD_EXAMPLES)
