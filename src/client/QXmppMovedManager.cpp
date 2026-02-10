@@ -238,7 +238,7 @@ void QXmppMovedManager::onRegistered(QXmppClient *client)
             if (auto *disco = this->client()->findExtension<QXmppDiscoveryManager>()) {
                 disco->info(this->client()->configuration().domain()).then(this, [this](auto &&result) {
                     if (hasValue(result)) {
-                        setSupportedByServer(getValue(result).features().contains(ns_moved));
+                        setSupportedByServer(contains(getValue(result).features(), ns_moved));
                     } else {
                         warning(u"MovedManager: Could not fetch server features: %1"_s.arg(getError(result).description));
                     }
