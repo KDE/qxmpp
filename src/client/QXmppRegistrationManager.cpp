@@ -13,6 +13,7 @@
 #include "QXmppStreamFeatures.h"
 #include "QXmppUtils.h"
 
+#include "Algorithms.h"
 #include "StringLiterals.h"
 
 #include <QDomElement>
@@ -327,7 +328,7 @@ void QXmppRegistrationManager::onConnected()
     if (auto *disco = client()->findExtension<QXmppDiscoveryManager>()) {
         disco->info(client()->configuration().domain()).then(this, [this](auto result) {
             if (hasValue(result)) {
-                setSupportedByServer(getValue(result).features().contains(ns_register));
+                setSupportedByServer(contains(getValue(result).features(), ns_register));
             } else {
                 warning(u"RegistrationManager: Error fetching server's features: %1"_s.arg(getError(result).description));
             }

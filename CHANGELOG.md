@@ -22,6 +22,11 @@ QXmpp 1.14.0 (January 28, 2026)
  - Enable visibility=hidden on linux (@lnj, !732, !733)
    - Drop internal unit tests: all tests can access all symbols on all platforms
 
+QXmpp 1.13.1 (February 10, 2026)
+--------------------------------
+
+ - Fix build with Qt 5 (@lnj, !379)
+
 QXmpp 1.13.0 (December 26, 2025)
 --------------------------------
 
