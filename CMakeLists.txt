@@ -40,9 +40,14 @@ endif()
 
 include(GNUInstallDirs)
 
+# deprecated options
+if(DEFINED BUILD_TESTS)
+    set(BUILD_TESTING ${BUILD_TESTS})
+endif()
+
 option(BUILD_WITH_QT6 "Force build with Qt 6")
 option(BUILD_SHARED "Build shared library" ON)
-option(BUILD_TESTS "Build tests." ON)
+option(BUILD_TESTING "Build tests." ON)
 option(BUILD_DOCUMENTATION "Build API documentation." OFF)
 option(BUILD_EXAMPLES "Build examples." ON)
 option(BUILD_OMEMO "Build the OMEMO module" OFF)
@@ -91,7 +96,7 @@ endif()
 
 add_subdirectory(src)
 
-if(BUILD_TESTS)
+if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
 endif()

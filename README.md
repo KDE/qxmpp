@@ -70,15 +70,14 @@ Option | Default | Description
 `BUILD_SHARED` | `ON` | Build as shared library, otherwise static
 `BUILD_DOCUMENTATION` | `ON` | Build documentation, requires Doxygen
 `BUILD_EXAMPLES` | `ON` | Build examples
-`BUILD_TESTS` | `ON` | Build unit tests
-`BUILD_INTERNAL_TESTS` | `OFF` | Build unit tests testing private parts of the API
+`BUILD_TESTING` | `ON` | Build unit tests
 `BUILD_OMEMO` | `OFF` | Build the [OMEMO module][omemo]
 `WITH_GSTREAMER` | `OFF` | Enable audio/video over Jingle
 `QT_VERSION_MAJOR=5/6` | | to build with a specific Qt major version, prefers Qt 6 if undefined
 
 For example, to build without unit tests you could do:
 ```
-cmake .. -DBUILD_TESTS=OFF
+cmake .. -DBUILD_TESTING=OFF
 ```
 
 ## Installing

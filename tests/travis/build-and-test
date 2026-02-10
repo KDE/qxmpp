@@ -8,7 +8,7 @@
 set -e
 
 HOST_SYSTEM=$(uname -s)
-CMAKE_ARGS="-DBUILD_TESTS:BOOL=True"
+CMAKE_ARGS="-DBUILD_TESTING:BOOL=True"
 
 case "$CONFIG" in
 full*)
@@ -20,7 +20,7 @@ full*)
     fi
     ;;
 *debug*)
-    CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_BUILD_TYPE:STRING=Debug -DBUILD_INTERNAL_TESTS:BOOL=True"
+    CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_BUILD_TYPE:STRING=Debug"
     ;;
 esac
 

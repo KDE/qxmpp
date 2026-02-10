@@ -96,7 +96,7 @@ jobs:
           mkdir D:/a/usr
           git clone https://invent.kde.org/libraries/qca
           cd qca
-          cmake . -DCMAKE_INSTALL_PREFIX="D:/a/usr" -DBUILD_TESTS=OFF -DBUILD_TOOLS=OFF -DBUILD_WITH_QT6=${BUILD_WITH_QT6}
+          cmake . -DCMAKE_INSTALL_PREFIX="D:/a/usr" -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_WITH_QT6=${BUILD_WITH_QT6}
           cmake --build . --config Release --parallel
           cmake --install . --config Release
           cd ..

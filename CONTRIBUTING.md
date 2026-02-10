@@ -37,7 +37,7 @@ You can find the current maintainers and other people involved in the project in
 
 ## Testing
 
-After building QXmpp with `-DBUILD_TESTS=ON`, you can run QXmpp's unit tests in the build directory with:
+After building QXmpp with `-DBUILD_TESTING=ON`, you can run QXmpp's unit tests in the build directory with:
 ```
 make test
 ```
