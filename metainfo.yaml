@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+fancyname: QXmpp
+description: Qt XMPP library
+maintainer: lnj
+public_lib: true
+logo: logo.svg
+platforms:
+    - name: Linux
+    - name: FreeBSD
+    - name: Android
+    - name: iOS
+    - name: Windows
+    - name: macOS
+deprecated: false
+release: true
+libraries:
+    - cmake: QXmpp::QXmpp
+cmakename: QXmppQt6

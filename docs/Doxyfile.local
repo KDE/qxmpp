@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# This configuration is used for api.kde.org (not manual cmake).
+
+PROJECT_NAME           = "QXmpp"
+# Currently does not work as path is unknown to our project.
+#HTML_EXTRA_FILES       = doc/doap.xml \
+#                         doc/doap-rendering/doap.xsl \
+#                         doc/doap-rendering/xeplist.xml \
+#                         doc/doap-rendering/doap.css
+FILE_PATTERNS         += *.doc
+ALIASES               += "xep{1}=<a href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1</a>" \
+                         "xep{2}=<a href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1: \2</a>"
+EXCLUDE_PATTERNS      += */moc_* */mod_* */QXmppCodec.cpp */QXmppSasl.cpp
+PREDEFINED            += "QXMPP_DEPRECATED_SINCE(major, minor)=1" "QT_DEPRECATED_X(msg)=" "QXMPP_DOC"
