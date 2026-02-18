@@ -3325,6 +3325,7 @@ bool ManagerPrivate::buildSession(signal_protocol_address address, const QXmppOm
     const auto publicPreKeys = deviceBundle.publicPreKeys();
     if (publicPreKeys.isEmpty()) {
         warning(u"No public pre key could be found in device bundle"_s);
+        return false;
     }
     const auto publicPreKeyIds = publicPreKeys.keys();
     const auto publicPreKeyIndex = QRandomGenerator::system()->bounded(publicPreKeyIds.size());
