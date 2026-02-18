@@ -3319,8 +3319,6 @@ QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(const QString &jid,
 //
 bool ManagerPrivate::buildSession(signal_protocol_address address, const QXmppOmemoDeviceBundle &deviceBundle)
 {
-    QXmppPromise<bool> interface;
-
     // Choose a pre key randomly.
     const auto publicPreKeys = deviceBundle.publicPreKeys();
     if (publicPreKeys.isEmpty()) {
