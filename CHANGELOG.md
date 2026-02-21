@@ -4,6 +4,12 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.14.2 (February 21, 2026)
+--------------------------------
+
+ - OmemoManager: Abort building session without public pre keys (@melvo, !742)
+ - JMI: Fix JMI objects not being removed (@melvo, !737)
+
 QXmpp 1.14.1 (February 10, 2026)
 --------------------------------
 
