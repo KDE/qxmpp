@@ -97,6 +97,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::proceed()
 ///
 QXmppTask<SendResult> QXmppJingleMessageInitiation::reject(std::optional<QXmppJingleReason> reason, bool containsTieBreak)
 {
+    QXmppPromise<SendResult> promise;
+
     JmiElement jmiElement;
     jmiElement.setType(JmiType::Reject);
 
@@ -109,7 +111,17 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::reject(std::optional<QXmppJi
     jmiElement.setReason(reason);
     jmiElement.setContainsTieBreak(containsTieBreak);
 
-    return d->request(std::move(jmiElement));
+    d->request(std::move(jmiElement)).then(this, [this, promise](SendResult &&result) mutable {
+        if (hasError(result)) {
+            Q_EMIT closed(getError(result));
+        } else {
+            Q_EMIT closed(Rejected {});
+        }
+
+        promise.finish(std::move(result));
+    });
+
+    return promise.task();
 }
 
 ///
@@ -121,6 +133,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::reject(std::optional<QXmppJi
 ///
 QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJingleReason> reason, bool containsTieBreak)
 {
+    QXmppPromise<SendResult> promise;
+
     JmiElement jmiElement;
     jmiElement.setType(JmiType::Retract);
 
@@ -133,7 +147,17 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJ
     jmiElement.setReason(reason);
     jmiElement.setContainsTieBreak(containsTieBreak);
 
-    return d->request(std::move(jmiElement));
+    d->request(std::move(jmiElement)).then(this, [this, promise](SendResult &&result) mutable {
+        if (hasError(result)) {
+            Q_EMIT closed(getError(result));
+        } else {
+            Q_EMIT closed(Retracted {});
+        }
+
+        promise.finish(std::move(result));
+    });
+
+    return promise.task();
 }
 
 ///
@@ -145,6 +169,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJ
 ///
 QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJingleReason> reason, const QString &migratedTo)
 {
+    QXmppPromise<SendResult> promise;
+
     d->finished = true;
 
     JmiElement jmiElement;
@@ -159,7 +185,17 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJi
     jmiElement.setReason(reason);
     jmiElement.setMigratedTo(migratedTo);
 
-    return d->request(std::move(jmiElement));
+    d->request(std::move(jmiElement)).then(this, [this, promise](SendResult &&result) mutable {
+        if (hasError(result)) {
+            Q_EMIT closed(getError(result));
+        } else {
+            Q_EMIT closed(Finished {});
+        }
+
+        promise.finish(std::move(result));
+    });
+
+    return promise.task();
 }
 
 ///
@@ -590,6 +626,12 @@ bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::sh
 std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManager::addJmi(const QString &id, const QString &remoteJid)
 {
     auto jmi = std::shared_ptr<QXmppJingleMessageInitiation>(new QXmppJingleMessageInitiation(this, id, remoteJid));
+
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [this, jmi]() {
+        debug(u"JMI with ID '%1' for remote JID '%2' is closed and thus being removed"_s.arg(jmi->id(), jmi->remoteJid()));
+        clear(jmi);
+    });
+
     d->jmis.append(jmi);
     return jmi;
 }

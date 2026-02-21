@@ -3319,12 +3319,11 @@ QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(const QString &jid,
 //
 bool ManagerPrivate::buildSession(signal_protocol_address address, const QXmppOmemoDeviceBundle &deviceBundle)
 {
-    QXmppPromise<bool> interface;
-
     // Choose a pre key randomly.
     const auto publicPreKeys = deviceBundle.publicPreKeys();
     if (publicPreKeys.isEmpty()) {
         warning(u"No public pre key could be found in device bundle"_s);
+        return false;
     }
     const auto publicPreKeyIds = publicPreKeys.keys();
     const auto publicPreKeyIndex = QRandomGenerator::system()->bounded(publicPreKeyIds.size());
