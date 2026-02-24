@@ -42,6 +42,7 @@ private:
     Q_SLOT void sendMessageError();
     Q_SLOT void sendPrivateMessage();
     Q_SLOT void setSubject();
+    Q_SLOT void changeNickname();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -549,6 +550,56 @@ void tst_QXmppMuc::setSubject()
     QVERIFY(subjectTask.isFinished());
     expectVariant<QXmpp::Success>(subjectTask.result());
     QCOMPARE(room.subject().value(), u"New Spells"_s);
+}
+
+void tst_QXmppMuc::changeNickname()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join the room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QCOMPARE(room.nickname().value(), u"thirdwitch"_s);
+
+    // Change nickname
+    auto nickTask = room.setNickname(u"oldhag"_s);
+    QVERIFY(!nickTask.isFinished());
+
+    // Verify presence sent to new nick
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/oldhag'/>"_s);
+
+    // Inject unavailable presence with 303 (old nick goes away, new nick in item)
+    QXmppPresence unavail;
+    parsePacket(unavail,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' nick='oldhag' role='participant'/>"
+                "<status code='303'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(unavail);
+
+    QVERIFY(nickTask.isFinished());
+    expectVariant<QXmpp::Success>(nickTask.result());
+    QCOMPARE(room.nickname().value(), u"oldhag"_s);
 }
 
 void tst_QXmppMuc::roomInfoForm()

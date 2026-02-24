@@ -229,6 +229,7 @@ struct MucRoomData {
     QList<QXmppMessage> historyMessages;
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
     std::unordered_map<QString, PendingMessage> pendingMessages;
+    std::optional<QXmppPromise<Result<>>> nickChangePromise;
 };
 
 }  // namespace QXmpp::Private
@@ -762,6 +763,25 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
         break;
     case JoiningRoomHistory:
     case Joined:
+        if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(303)) {
+            // Nickname change (XEP-0045 §7.6): unavailable with 303 + new nick in item
+            auto newNick = presence.mucItem().nick();
+            auto isSelf = presence.mucStatusCodes().contains(110);
+
+            if (isSelf && !newNick.isEmpty()) {
+                data.nickname = newNick;
+                if (data.nickChangePromise) {
+                    auto promise = std::move(*data.nickChangePromise);
+                    data.nickChangePromise.reset();
+                    promise.finish(Success());
+                }
+            }
+        } else if (presence.type() == QXmppPresence::Error && data.nickChangePromise) {
+            auto error = presence.error();
+            auto promise = std::move(*data.nickChangePromise);
+            data.nickChangePromise.reset();
+            promise.finish(QXmppError { error.text(), std::move(error) });
+        }
         break;
     }
 }
@@ -921,4 +941,40 @@ QXmppTask<Result<>> QXmppMucRoomV2::setSubject(const QString &subject)
     QXmppMessage message;
     message.setSubject(subject);
     return sendMessage(std::move(message));
+}
+
+///
+/// Changes the user's nickname in the room.
+///
+/// Sends a presence to the new occupant JID. The returned task completes
+/// when the MUC service confirms the change (status code 303), or with an
+/// error if it is rejected.
+///
+/// \sa nickname()
+///
+QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
+{
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end() || itr->second.state != MucRoomState::Joined) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+    }
+
+    auto &data = itr->second;
+
+    // Cancel any pending nickname change
+    if (data.nickChangePromise) {
+        auto oldPromise = std::move(*data.nickChangePromise);
+        data.nickChangePromise.reset();
+        oldPromise.finish(QXmppError { u"Superseded by a new nickname change request."_s });
+    }
+
+    QXmppPromise<Result<>> promise;
+    auto task = promise.task();
+    data.nickChangePromise = std::move(promise);
+
+    QXmppPresence p;
+    p.setTo(m_jid + u'/' + newNick);
+    m_manager->client()->send(std::move(p));
+
+    return task;
 }
