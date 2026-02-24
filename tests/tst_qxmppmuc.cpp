@@ -36,6 +36,9 @@ private:
     Q_SLOT void joinRoomTimeout();
     Q_SLOT void joinRoomTimerStopped();
 
+    // MUC messages
+    Q_SLOT void receiveMessage();
+
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
 };
@@ -299,6 +302,47 @@ void tst_QXmppMuc::joinRoomTimerStopped()
     QVERIFY(task.isFinished());
     auto result = expectVariant<QXmppMucRoomV2>(task.result());
     QVERIFY(result.isValid());
+}
+
+void tst_QXmppMuc::receiveMessage()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join the room first
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    expectFutureVariant<QXmppMucRoomV2>(task);
+
+    // Now receive a live message
+    QXmppMessage receivedMsg;
+    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &roomJid, const QXmppMessage &msg) {
+        QCOMPARE(roomJid, u"coven@chat.shakespeare.lit"_s);
+        receivedMsg = msg;
+    });
+
+    QXmppMessage liveMsg;
+    parsePacket(liveMsg,
+                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                "<body>Thrice the brinded cat hath mew'd.</body>"
+                "</message>");
+    QVERIFY(muc->handleMessage(liveMsg));
+    QCOMPARE(receivedMsg.body(), u"Thrice the brinded cat hath mew'd."_s);
 }
 
 void tst_QXmppMuc::roomInfoForm()

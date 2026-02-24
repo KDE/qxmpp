@@ -95,6 +95,7 @@ public:
     Q_SIGNAL void participantJoined(const QString &roomJid, const QString &participant);
     Q_SIGNAL void participantLeft(const QString &roomJid, const QString &participant);
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
+    Q_SIGNAL void messageReceived(const QString &roomJid, const QXmppMessage &message);
 
     bool handleMessage(const QXmppMessage &) override;
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;

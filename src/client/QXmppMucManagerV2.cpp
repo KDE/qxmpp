@@ -458,7 +458,11 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
         }
         return true;
     case MucRoomState::Joined:
-        return false;
+        if (message.hasSubject() && message.body().isEmpty()) {
+            data.subject = message.subject();
+        }
+        Q_EMIT messageReceived(bareFrom, message);
+        return true;
     default:
         return false;
     }
