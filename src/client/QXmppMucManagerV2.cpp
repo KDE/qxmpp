@@ -381,6 +381,12 @@ QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::f
 
 QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid, const QString &nickname)
 {
+    return joinRoom(jid, nickname, std::nullopt);
+}
+
+QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid, const QString &nickname,
+                                                              std::optional<QXmpp::Muc::HistoryOptions> history)
+{
     // nickname empty check
     if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
         return makeReadyTask<Result<QXmppMucRoomV2>>(room(jid));
@@ -400,9 +406,8 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     QXmppPresence p;
     p.setTo(jid + u'/' + nickname);
     p.setMucSupported(true);
+    p.setMucHistory(history);
     client()->send(std::move(p));
-
-    // history settings
 
     // start timeout timer
 
