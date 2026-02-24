@@ -43,6 +43,7 @@ private:
     Q_SLOT void sendPrivateMessage();
     Q_SLOT void setSubject();
     Q_SLOT void changeNickname();
+    Q_SLOT void changePresence();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -600,6 +601,46 @@ void tst_QXmppMuc::changeNickname()
     QVERIFY(nickTask.isFinished());
     expectVariant<QXmpp::Success>(nickTask.result());
     QCOMPARE(room.nickname().value(), u"oldhag"_s);
+}
+
+void tst_QXmppMuc::changePresence()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join the room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Change availability
+    QXmppPresence away;
+    away.setAvailableStatusType(QXmppPresence::Away);
+    away.setStatusText(u"brewing"_s);
+    room.setPresence(std::move(away));
+
+    // Verify presence sent to correct occupant JID
+    auto sent = test.takePacket();
+    QXmppPresence sentPresence;
+    parsePacket(sentPresence, sent.toUtf8());
+    QCOMPARE(sentPresence.to(), u"coven@chat.shakespeare.lit/thirdwitch"_s);
+    QCOMPARE(sentPresence.availableStatusType(), QXmppPresence::Away);
+    QCOMPARE(sentPresence.statusText(), u"brewing"_s);
 }
 
 void tst_QXmppMuc::roomInfoForm()

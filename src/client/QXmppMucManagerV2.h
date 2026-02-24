@@ -152,6 +152,7 @@ public:
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QString &occupantNick, QXmppMessage message);
     QXmppTask<QXmpp::Result<>> setSubject(const QString &subject);
     QXmppTask<QXmpp::Result<>> setNickname(const QString &newNick);
+    QXmppTask<QXmpp::SendResult> setPresence(QXmppPresence presence);
 
     /// Connects to the participantJoined signal, filtered for this room.
     template<typename Func>

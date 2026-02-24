@@ -978,3 +978,20 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
 
     return task;
 }
+
+///
+/// Changes the user's presence in the room.
+///
+/// The presence is addressed to the user's current occupant JID. The returned
+/// task completes when the presence has been sent to the server.
+///
+QXmppTask<SendResult> QXmppMucRoomV2::setPresence(QXmppPresence presence)
+{
+    auto *data = m_manager->roomData(m_jid);
+    if (!data) {
+        return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
+    }
+
+    presence.setTo(m_jid + u'/' + data->nickname.value());
+    return m_manager->client()->send(std::move(presence));
+}
