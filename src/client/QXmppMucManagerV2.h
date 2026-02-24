@@ -94,9 +94,11 @@ public:
     /// Joins the MUC room at \a jid with the given \a nickname.
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname);
     /// \overload
-    /// Joins the room with optional \a history request parameters.
+    /// Joins the room with optional \a history request parameters and an optional \a password
+    /// for password-protected rooms (XEP-0045 §7.2.5).
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname,
-                                                      std::optional<QXmpp::Muc::HistoryOptions> history);
+                                                      std::optional<QXmpp::Muc::HistoryOptions> history,
+                                                      const QString &password = {});
     /// Emitted when a participant joins a room.
     Q_SIGNAL void participantJoined(const QString &roomJid, const QString &participant);
     /// Emitted when a participant leaves a room.
