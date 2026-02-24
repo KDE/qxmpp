@@ -47,6 +47,8 @@ private:
     Q_SLOT void participantNicknameChange();
     Q_SLOT void participantJoinLeave();
     Q_SLOT void participantsList();
+    Q_SLOT void participantKicked();
+    Q_SLOT void selfBanned();
     Q_SLOT void changePresence();
     Q_SLOT void leaveRoom();
     Q_SLOT void leaveRoomTimeout();
@@ -766,10 +768,12 @@ void tst_QXmppMuc::participantJoinLeave()
     // Track participantLeft signal
     QXmppMucParticipant leftParticipant(muc, u""_s, 0);
     bool leftSignalReceived = false;
+    Muc::LeaveReason leftReason = Muc::LeaveReason::Left;
     QObject::connect(muc, &QXmppMucManagerV2::participantLeft, muc,
-                     [&](const QString &roomJid, const QXmppMucParticipant &p) {
+                     [&](const QString &roomJid, const QXmppMucParticipant &p, Muc::LeaveReason reason) {
                          leftSignalReceived = true;
                          leftParticipant = p;
+                         leftReason = reason;
                      });
 
     // firstwitch leaves
@@ -783,6 +787,7 @@ void tst_QXmppMuc::participantJoinLeave()
     test.injectPresence(firstWitchLeave);
 
     QVERIFY(leftSignalReceived);
+    QCOMPARE(leftReason, Muc::LeaveReason::Left);
     // After the signal, participant data is cleaned up
     QVERIFY(!joinedParticipant.isValid());
 }
@@ -843,6 +848,120 @@ void tst_QXmppMuc::participantsList()
     participants = room.participants();
     QCOMPARE(participants.size(), 1);
     QCOMPARE(participants.first().nickname().value(), u"thirdwitch"_s);
+}
+
+void tst_QXmppMuc::participantKicked()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // firstwitch joins
+    QXmppPresence firstWitchJoin;
+    parsePacket(firstWitchJoin,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(firstWitchJoin);
+
+    // firstwitch is kicked (status 307)
+    Muc::LeaveReason receivedReason = Muc::LeaveReason::Left;
+    bool leftSignalReceived = false;
+    QObject::connect(muc, &QXmppMucManagerV2::participantLeft, muc,
+                     [&](const QString &, const QXmppMucParticipant &, Muc::LeaveReason reason) {
+                         leftSignalReceived = true;
+                         receivedReason = reason;
+                     });
+
+    QXmppPresence kickPresence;
+    parsePacket(kickPresence,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<status code='307'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(kickPresence);
+
+    QVERIFY(leftSignalReceived);
+    QCOMPARE(receivedReason, Muc::LeaveReason::Kicked);
+    QCOMPARE(room.participants().size(), 1);
+}
+
+void tst_QXmppMuc::selfBanned()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Track removedFromRoom signal
+    Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
+    bool removedSignalReceived = false;
+    bool roomValidDuringSignal = false;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                     [&](const QString &, Muc::LeaveReason reason) {
+                         removedSignalReceived = true;
+                         removedReason = reason;
+                         roomValidDuringSignal = room.isValid();
+                     });
+
+    // We are banned (status 301 + 110)
+    QXmppPresence banPresence;
+    parsePacket(banPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='outcast' role='none'/>"
+                "<status code='301'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(banPresence);
+
+    QVERIFY(removedSignalReceived);
+    QCOMPARE(removedReason, Muc::LeaveReason::Banned);
+    QVERIFY(roomValidDuringSignal);
+    // After signal handlers, room is cleaned up
+    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::changePresence()

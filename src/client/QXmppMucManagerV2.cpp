@@ -62,6 +62,23 @@ static std::optional<Muc::Role> roleFromLegacy(QXmppMucItem::Role role)
     return {};
 }
 
+static Muc::LeaveReason leaveReasonFromStatusCodes(const QList<int> &codes)
+{
+    if (codes.contains(301)) {
+        return Muc::LeaveReason::Banned;
+    }
+    if (codes.contains(307)) {
+        return Muc::LeaveReason::Kicked;
+    }
+    if (codes.contains(321)) {
+        return Muc::LeaveReason::AffiliationChanged;
+    }
+    if (codes.contains(332)) {
+        return Muc::LeaveReason::MembersOnly;
+    }
+    return Muc::LeaveReason::Left;
+}
+
 //
 // Serialization
 //
@@ -810,10 +827,16 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             }
         } else if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
             // Self-unavailable without 303: we left the room
+            auto reason = leaveReasonFromStatusCodes(presence.mucStatusCodes());
             std::optional<QXmppPromise<Result<>>> promise;
             if (data.leavePromise) {
                 promise = std::move(data.leavePromise);
             }
+
+            if (reason != Muc::LeaveReason::Left) {
+                Q_EMIT q->removedFromRoom(roomJid, reason);
+            }
+
             rooms.erase(roomJid);
 
             if (promise) {
@@ -821,10 +844,11 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             }
         } else if (presence.type() == QXmppPresence::Unavailable && !presence.mucStatusCodes().contains(110)) {
             // Another participant left the room
+            auto reason = leaveReasonFromStatusCodes(presence.mucStatusCodes());
             for (auto pItr = data.participants.begin(); pItr != data.participants.end(); ++pItr) {
                 if (pItr->second.nickname.value() == nickname) {
                     auto participantId = pItr->first;
-                    Q_EMIT q->participantLeft(roomJid, QXmppMucParticipant(q, roomJid, participantId));
+                    Q_EMIT q->participantLeft(roomJid, QXmppMucParticipant(q, roomJid, participantId), reason);
                     data.participants.erase(pItr);
                     break;
                 }

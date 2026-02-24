@@ -78,6 +78,24 @@ enum class Role {
     Moderator,
 };
 
+///
+/// \brief Reason why a participant left a MUC room.
+///
+/// \since QXmpp 1.15
+///
+enum class LeaveReason {
+    /// The participant left the room voluntarily.
+    Left,
+    /// The participant was kicked by a moderator (XEP-0045 §8.2, status 307).
+    Kicked,
+    /// The participant was banned from the room (XEP-0045 §8.4, status 301).
+    Banned,
+    /// The participant was removed because their affiliation changed (status 321).
+    AffiliationChanged,
+    /// The participant was removed because the room became members-only (status 332).
+    MembersOnly,
+};
+
 }  // namespace Muc
 
 }  // namespace QXmpp
