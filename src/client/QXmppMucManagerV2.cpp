@@ -21,6 +21,7 @@
 #include <unordered_map>
 
 #include <QProperty>
+#include <QTimer>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -208,6 +209,10 @@ enum class MucRoomState {
     Joined,
 };
 
+struct DeleteLaterDeleter {
+    void operator()(QObject *obj) const { obj->deleteLater(); }
+};
+
 struct MucRoomData {
     MucRoomState state = MucRoomState::NotJoined;
     QProperty<QString> subject;
@@ -217,31 +222,12 @@ struct MucRoomData {
     std::unordered_map<uint32_t, MucParticipantData> participants;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     QList<QXmppMessage> historyMessages;
+    std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
 };
 
 }  // namespace QXmpp::Private
 
-struct QXmppMucManagerV2Private {
-    QXmppMucManagerV2 *q = nullptr;
-    std::optional<QList<QXmppMucBookmark>> bookmarks;
-    std::unordered_map<QString, MucRoomData> rooms;
-    uint32_t participantIdCounter = 0;
-
-    QXmppPubSubManager *pubsub();
-    QXmppDiscoveryManager *disco();
-
-    // Bookmarks 2
-    void setBookmarks(QVector<Bookmarks2ConferenceItem> &&items);
-    void resetBookmarks();
-    QXmppTask<EmptyResult> setBookmark(QXmppMucBookmark &&bookmark);
-    QXmppTask<EmptyResult> removeBookmark(const QString &jid);
-
-    // MUC Core
-    void handlePresence(const QXmppPresence &);
-    void handleRoomPresence(const QString &roomJid, MucRoomData &data, const QXmppPresence &);
-    void throwRoomError(const QString &roomJid, QXmppError &&error);
-    uint32_t generateParticipantId() { return participantIdCounter++; }
-};
+#include "QXmppMucManagerV2_p.h"
 
 ///
 /// \class QXmppMucManagerV2
@@ -425,6 +411,13 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     client()->send(std::move(p));
 
     // start timeout timer
+    auto *timer = new QTimer();
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, this, [this, roomJid = jid]() {
+        d->handleJoinTimeout(roomJid);
+    });
+    roomData.joinTimer.reset(timer);
+    timer->start(d->joinTimeout);
 
     return task;
 }
@@ -452,6 +445,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
             data.subject = message.subject();
             data.state = MucRoomState::Joined;
             data.joined = true;
+            data.joinTimer.reset();
 
             auto history = std::move(data.historyMessages);
             auto promise = std::move(*data.joinPromise);
@@ -754,11 +748,19 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
     if (itr->second.joinPromise) {
         promise = std::move(itr->second.joinPromise);
     }
+    itr->second.joinTimer.reset();
     rooms.erase(itr);
 
     if (promise) {
         promise->finish(std::move(error));
     }
+}
+
+void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
+{
+    using namespace std::chrono;
+    auto secs = duration_cast<seconds>(joinTimeout).count();
+    throwRoomError(roomJid, QXmppError { u"Joining room timed out after %1 seconds."_s.arg(secs) });
 }
 
 //

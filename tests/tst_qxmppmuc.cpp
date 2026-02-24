@@ -7,6 +7,7 @@
 #include "QXmppMessage.h"
 #include "QXmppMucForms.h"
 #include "QXmppMucManagerV2.h"
+#include "QXmppMucManagerV2_p.h"
 #include "QXmppPresence.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppPubSubSubAuthorization.h"
@@ -32,6 +33,8 @@ private:
     // MUC joining
     Q_SLOT void joinRoom();
     Q_SLOT void joinRoomWithHistory();
+    Q_SLOT void joinRoomTimeout();
+    Q_SLOT void joinRoomTimerStopped();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -235,6 +238,67 @@ void tst_QXmppMuc::joinRoomWithHistory()
 
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QVERIFY(room.isValid());
+}
+
+void tst_QXmppMuc::joinRoomTimeout()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Set a short timeout for testing (100ms)
+    muc->d->joinTimeout = std::chrono::milliseconds(100);
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // Don't inject any response, let the timer expire
+    QTest::qWait(150);
+
+    // Task should fail with timeout error
+    QVERIFY(task.isFinished());
+    auto result = expectVariant<QXmppError>(task.result());
+    QVERIFY(result.description.contains(u"timed out"_s));
+}
+
+void tst_QXmppMuc::joinRoomTimerStopped()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Set a short timeout for testing (1 second)
+    muc->d->joinTimeout = std::chrono::milliseconds(1000);
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // Inject self-presence (status 110)
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    // Inject subject message: this should complete the join and stop the timer
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task);
+    QVERIFY(room.isValid());
+
+    // Wait to ensure timer doesn't fire after join completion
+    QTest::qWait(1500);
+
+    // Task should still be completed successfully (not timed out)
+    QVERIFY(task.isFinished());
+    auto result = expectVariant<QXmppMucRoomV2>(task.result());
+    QVERIFY(result.isValid());
 }
 
 void tst_QXmppMuc::roomInfoForm()
