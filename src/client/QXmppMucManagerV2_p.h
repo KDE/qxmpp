@@ -43,6 +43,7 @@ struct QXmppMucManagerV2Private {
     void handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &);
     void throwRoomError(const QString &roomJid, QXmppError &&error);
     void handleJoinTimeout(const QString &roomJid);
+    void handleMessageTimeout(const QString &roomJid, const QString &originId);
     uint32_t generateParticipantId() { return participantIdCounter++; }
 };
 
