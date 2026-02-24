@@ -9,6 +9,7 @@
 #include "QXmppMessageHandler.h"
 #include "QXmppMucData.h"
 #include "QXmppPubSubEventHandler.h"
+#include "QXmppSendResult.h"
 #include "QXmppTask.h"
 
 #include <optional>
@@ -148,6 +149,7 @@ public:
     QBindable<bool> joined() const;
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
+    QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QString &occupantNick, QXmppMessage message);
 
     /// Connects to the participantJoined signal, filtered for this room.
     template<typename Func>

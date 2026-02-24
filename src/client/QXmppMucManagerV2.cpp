@@ -888,3 +888,21 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
     m_manager->client()->send(std::move(message));
     return task;
 }
+
+///
+/// Sends a private message to a room occupant.
+///
+/// The message is addressed to the occupant's room JID (room\@service/nick).
+/// The returned task completes when the message has been sent to the server.
+///
+QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QString &occupantNick, QXmppMessage message)
+{
+    if (!isValid()) {
+        return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
+    }
+
+    message.setTo(m_jid + u'/' + occupantNick);
+    message.setType(QXmppMessage::Chat);
+
+    return m_manager->client()->send(std::move(message));
+}

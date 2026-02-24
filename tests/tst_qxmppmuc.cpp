@@ -40,6 +40,7 @@ private:
     Q_SLOT void receiveMessage();
     Q_SLOT void sendMessage();
     Q_SLOT void sendMessageError();
+    Q_SLOT void sendPrivateMessage();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -453,6 +454,45 @@ void tst_QXmppMuc::sendMessageError()
     QVERIFY(sendTask.isFinished());
     auto error = expectVariant<QXmppError>(sendTask.result());
     QVERIFY(!error.description.isEmpty());
+}
+
+void tst_QXmppMuc::sendPrivateMessage()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join the room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Send a private message
+    QXmppMessage pm;
+    pm.setBody(u"I'll give thee a wind."_s);
+    room.sendPrivateMessage(u"firstwitch"_s, std::move(pm));
+
+    // Verify the sent XML
+    auto sent = test.takePacket();
+    QXmppMessage sentMsg;
+    parsePacket(sentMsg, sent.toUtf8());
+    QCOMPARE(sentMsg.type(), QXmppMessage::Chat);
+    QCOMPARE(sentMsg.to(), u"coven@chat.shakespeare.lit/firstwitch"_s);
+    QCOMPARE(sentMsg.body(), u"I'll give thee a wind."_s);
 }
 
 void tst_QXmppMuc::roomInfoForm()
