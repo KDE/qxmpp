@@ -314,7 +314,7 @@ void QXmppMessage::setType(QXmppMessage::Type type)
 ///
 /// Returns the message's subject, or an empty string if not set.
 ///
-/// \note Use hasSubject() to distinguish between a missing and an empty \c <subject/> element.
+/// \note Use hasSubject() to distinguish between a missing and an empty \c &lt;subject/&gt; element.
 ///
 QString QXmppMessage::subject() const
 {
@@ -322,7 +322,7 @@ QString QXmppMessage::subject() const
 }
 
 ///
-/// Returns whether the message contains a \c <subject/> element.
+/// Returns whether the message contains a \c &lt;subject/&gt; element.
 ///
 /// \since QXmpp 1.15
 ///
@@ -332,7 +332,7 @@ bool QXmppMessage::hasSubject() const
 }
 
 ///
-/// Sets or clears the message's subject. Pass \c std::nullopt to remove the \c <subject/> element.
+/// Sets or clears the message's subject. Pass \c std::nullopt to remove the \c &lt;subject/&gt; element.
 ///
 /// \note The setter previously accepted a \c QString. It accepts \c std::optional<QString>
 /// (enabling \c std::nullopt to remove the element) since QXmpp 1.15.
