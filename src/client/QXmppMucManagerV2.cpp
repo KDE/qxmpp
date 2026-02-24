@@ -230,6 +230,8 @@ struct MucRoomData {
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
     std::unordered_map<QString, PendingMessage> pendingMessages;
     std::optional<QXmppPromise<Result<>>> nickChangePromise;
+    std::optional<QXmppPromise<Result<>>> leavePromise;
+    std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
 };
 
 }  // namespace QXmpp::Private
@@ -763,24 +765,44 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
         break;
     case JoiningRoomHistory:
     case Joined:
-        if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(303)) {
-            // Nickname change (XEP-0045 §7.6): unavailable with 303 + new nick in item
-            auto newNick = presence.mucItem().nick();
-            auto isSelf = presence.mucStatusCodes().contains(110);
+        if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
+            if (presence.mucStatusCodes().contains(303)) {
+                // Nickname change (XEP-0045 §7.6): unavailable with 303 + new nick in item
+                auto newNick = presence.mucItem().nick();
 
-            if (isSelf && !newNick.isEmpty()) {
-                data.nickname = newNick;
-                if (data.nickChangePromise) {
-                    auto promise = std::move(*data.nickChangePromise);
-                    data.nickChangePromise.reset();
-                    promise.finish(Success());
+                if (!newNick.isEmpty()) {
+                    data.nickname = newNick;
+                    if (data.nickChangePromise) {
+                        auto promise = std::move(*data.nickChangePromise);
+                        data.nickChangePromise.reset();
+                        promise.finish(Success());
+                    }
+                }
+            } else {
+                // Self-unavailable without 303: we left the room
+                std::optional<QXmppPromise<Result<>>> promise;
+                if (data.leavePromise) {
+                    promise = std::move(data.leavePromise);
+                }
+                rooms.erase(roomJid);
+
+                if (promise) {
+                    promise->finish(Success());
                 }
             }
-        } else if (presence.type() == QXmppPresence::Error && data.nickChangePromise) {
-            auto error = presence.error();
-            auto promise = std::move(*data.nickChangePromise);
-            data.nickChangePromise.reset();
-            promise.finish(QXmppError { error.text(), std::move(error) });
+        } else if (presence.type() == QXmppPresence::Error) {
+            if (data.leavePromise) {
+                auto error = presence.error();
+                auto promise = std::move(*data.leavePromise);
+                data.leavePromise.reset();
+                data.leaveTimer.reset();
+                promise.finish(QXmppError { error.text(), std::move(error) });
+            } else if (data.nickChangePromise) {
+                auto error = presence.error();
+                auto promise = std::move(*data.nickChangePromise);
+                data.nickChangePromise.reset();
+                promise.finish(QXmppError { error.text(), std::move(error) });
+            }
         }
         break;
     }
@@ -811,6 +833,24 @@ void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
     using namespace std::chrono;
     auto secs = duration_cast<seconds>(joinTimeout).count();
     throwRoomError(roomJid, QXmppError { u"Joining room timed out after %1 seconds."_s.arg(secs) });
+}
+
+void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
+{
+    auto itr = rooms.find(roomJid);
+    if (itr == rooms.end()) {
+        return;
+    }
+
+    std::optional<QXmppPromise<Result<>>> promise;
+    if (itr->second.leavePromise) {
+        promise = std::move(itr->second.leavePromise);
+    }
+    rooms.erase(itr);
+
+    if (promise) {
+        promise->finish(QXmppError { u"Leaving room timed out."_s });
+    }
 }
 
 void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, const QString &originId)
@@ -987,11 +1027,57 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::setPresence(QXmppPresence presence)
 {
-    auto *data = m_manager->roomData(m_jid);
-    if (!data) {
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end()) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
-    presence.setTo(m_jid + u'/' + data->nickname.value());
+    presence.setTo(m_jid + u'/' + itr->second.nickname.value());
     return m_manager->client()->send(std::move(presence));
+}
+
+///
+/// Leaves the room by sending an unavailable presence (XEP-0045 §7.14).
+///
+/// The returned task completes when the server confirms the leave with a
+/// self-unavailable presence containing status code 110.
+///
+QXmppTask<Result<>> QXmppMucRoomV2::leave()
+{
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end()) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+    }
+
+    auto &data = itr->second;
+    if (data.leavePromise) {
+        return makeReadyTask<Result<>>(QXmppError { u"Already leaving the room."_s });
+    }
+
+    QXmppPresence p;
+    p.setTo(m_jid + u'/' + data.nickname.value());
+    p.setType(QXmppPresence::Unavailable);
+
+    auto sendResult = m_manager->client()->send(std::move(p));
+    // Check if send failed immediately
+    if (sendResult.isFinished()) {
+        if (std::holds_alternative<QXmppError>(sendResult.result())) {
+            return makeReadyTask<Result<>>(std::get<QXmppError>(std::move(sendResult.result())));
+        }
+    }
+
+    QXmppPromise<Result<>> promise;
+    auto task = promise.task();
+    data.leavePromise = std::move(promise);
+
+    // Start timeout timer
+    auto *timer = new QTimer();
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, m_manager, [this]() {
+        m_manager->d->handleLeaveTimeout(m_jid);
+    });
+    data.leaveTimer.reset(timer);
+    timer->start(m_manager->d->joinTimeout);
+
+    return task;
 }

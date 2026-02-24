@@ -153,6 +153,7 @@ public:
     QXmppTask<QXmpp::Result<>> setSubject(const QString &subject);
     QXmppTask<QXmpp::Result<>> setNickname(const QString &newNick);
     QXmppTask<QXmpp::SendResult> setPresence(QXmppPresence presence);
+    QXmppTask<QXmpp::Result<>> leave();
 
     /// Connects to the participantJoined signal, filtered for this room.
     template<typename Func>
