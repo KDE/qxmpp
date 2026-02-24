@@ -219,7 +219,12 @@ enum class MucRoomState {
 };
 
 struct DeleteLaterDeleter {
-    void operator()(QObject *obj) const { obj->deleteLater(); }
+    void operator()(QObject *obj) const
+    {
+        if (obj) {
+            obj->deleteLater();
+        }
+    }
 };
 
 struct PendingMessage {
