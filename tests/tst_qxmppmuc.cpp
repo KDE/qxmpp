@@ -31,6 +31,7 @@ private:
 
     // MUC joining
     Q_SLOT void joinRoom();
+    Q_SLOT void joinRoomWithHistory();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -200,6 +201,40 @@ void tst_QXmppMuc::joinRoom()
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QVERIFY(room.isValid());
     QCOMPARE(room.subject().value(), u"Cauldron"_s);
+}
+
+void tst_QXmppMuc::joinRoomWithHistory()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    Muc::HistoryOptions historyOpts;
+    historyOpts.setMaxStanzas(20);
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, historyOpts);
+    test.expect(
+        u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'>"
+        u"<history maxstanzas=\"20\"/></x></presence>"_s);
+
+    // Inject self-presence
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    // Inject subject message
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task);
+    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::roomInfoForm()

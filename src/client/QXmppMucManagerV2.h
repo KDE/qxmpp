@@ -11,6 +11,7 @@
 #include "QXmppPubSubEventHandler.h"
 #include "QXmppTask.h"
 
+#include <optional>
 #include <variant>
 
 class QXmppPresence;
@@ -89,6 +90,8 @@ public:
     QXmppMucRoomV2 room(const QString &jid);
 
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname);
+    QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname,
+                                                      std::optional<QXmpp::Muc::HistoryOptions> history);
     Q_SIGNAL void participantJoined(const QString &roomJid, const QString &participant);
     Q_SIGNAL void participantLeft(const QString &roomJid, const QString &participant);
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);

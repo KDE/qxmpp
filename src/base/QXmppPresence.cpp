@@ -65,6 +65,7 @@ public:
     QString mucPassword;
     QList<int> mucStatusCodes;
     bool mucSupported;
+    std::optional<Muc::HistoryOptions> mucHistory;
 
     // XEP-0115: Entity Capabilities
     QString capabilityHash;
@@ -361,6 +362,18 @@ void QXmppPresence::setMucSupported(bool supported)
     d->mucSupported = supported;
 }
 
+/// Returns the MUC history options for joining, or \c std::nullopt if not set.
+std::optional<QXmpp::Muc::HistoryOptions> QXmppPresence::mucHistory() const
+{
+    return d->mucHistory;
+}
+
+/// Sets the MUC history options for joining. Pass \c std::nullopt to clear.
+void QXmppPresence::setMucHistory(std::optional<QXmpp::Muc::HistoryOptions> history)
+{
+    d->mucHistory = history;
+}
+
 ///
 /// Returns the \xep{0283, Moved} user's old jid.
 ///
@@ -498,6 +511,7 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
     if (element.tagName() == u"x" && element.namespaceURI() == ns_muc) {
         d->mucSupported = true;
         d->mucPassword = element.firstChildElement(u"password"_s).text();
+        d->mucHistory = parseOptionalChildElement<Muc::HistoryOptions>(element);
     } else if (element.tagName() == u"x" && element.namespaceURI() == ns_muc_user) {
         d->mucItem.parse(firstChildElement(element, u"item"));
 
@@ -573,7 +587,11 @@ void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
         // XEP-0045: Multi-User Chat
         OptionalContent {
             d->mucSupported,
-            Element { { u"x", ns_muc }, OptionalTextElement { u"password", d->mucPassword } },
+            Element {
+                { u"x", ns_muc },
+                OptionalTextElement { u"password", d->mucPassword },
+                d->mucHistory,
+            },
         },
         OptionalContent {
             !d->mucItem.isNull() || !d->mucStatusCodes.isEmpty(),

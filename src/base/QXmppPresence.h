@@ -8,6 +8,7 @@
 #define QXMPPPRESENCE_H
 
 #include "QXmppJingleIq.h"
+#include "QXmppMucData.h"
 #include "QXmppMucIq.h"
 #include "QXmppStanza.h"
 
@@ -89,6 +90,9 @@ public:
 
     bool isMucSupported() const;
     void setMucSupported(bool supported);
+
+    std::optional<QXmpp::Muc::HistoryOptions> mucHistory() const;
+    void setMucHistory(std::optional<QXmpp::Muc::HistoryOptions>);
 
     // XEP-0153: vCard-Based Avatars
     QByteArray photoHash() const;
