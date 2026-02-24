@@ -144,7 +144,8 @@ public:
     void setE2eeFallbackBody(const QString &fallbackBody);
 
     QString subject() const;
-    void setSubject(const QString &);
+    bool hasSubject() const;
+    void setSubject(std::optional<QString>);
 
     QString thread() const;
     void setThread(const QString &);

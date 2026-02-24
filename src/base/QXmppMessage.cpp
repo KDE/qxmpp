@@ -120,7 +120,7 @@ class QXmppMessagePrivate : public QSharedData
 public:
     QString body;
     QString e2eeFallbackBody;
-    QString subject;
+    std::optional<QString> subject;
     QString thread;
     QString parentThread;
     QXmppMessage::Type type = QXmppMessage::Chat;
@@ -311,16 +311,35 @@ void QXmppMessage::setType(QXmppMessage::Type type)
     d->type = type;
 }
 
-/// Returns the message's subject.
+///
+/// Returns the message's subject, or an empty string if not set.
+///
+/// \note Use hasSubject() to distinguish between a missing and an empty \c <subject/> element.
+///
 QString QXmppMessage::subject() const
 {
-    return d->subject;
+    return d->subject.value_or(QString {});
 }
 
-/// Sets the message's subject.
-void QXmppMessage::setSubject(const QString &subject)
+///
+/// Returns whether the message contains a \c <subject/> element.
+///
+/// \since QXmpp 1.15
+///
+bool QXmppMessage::hasSubject() const
 {
-    d->subject = subject;
+    return d->subject.has_value();
+}
+
+///
+/// Sets or clears the message's subject. Pass \c std::nullopt to remove the \c <subject/> element.
+///
+/// \note The setter previously accepted a \c QString. It accepts \c std::optional<QString>
+/// (enabling \c std::nullopt to remove the element) since QXmpp 1.15.
+///
+void QXmppMessage::setSubject(std::optional<QString> subject)
+{
+    d->subject = std::move(subject);
 }
 
 /// Returns the message's thread.
@@ -1369,7 +1388,7 @@ QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, co
     // sort by begin of fallback
     std::ranges::sort(references, {}, &QXmppFallback::Range::start);
 
-    const auto &fullText = element == QXmppFallback::Subject ? d->subject : d->body;
+    const QString fullText = element == QXmppFallback::Subject ? subject() : d->body;
     QString output;
     qsizetype index = 0;
     for (const auto &range : std::as_const(references)) {
@@ -1404,7 +1423,7 @@ QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, co
 ///
 QString QXmppMessage::readFallbackText(QXmppFallback::Element element, QStringView forNamespace) const
 {
-    const auto &fullText = element == QXmppFallback::Subject ? d->subject : d->body;
+    const QString fullText = element == QXmppFallback::Subject ? subject() : d->body;
 
     // filter out all QXmppFallback::Reference s
     auto markers = d->fallbackMarkers |

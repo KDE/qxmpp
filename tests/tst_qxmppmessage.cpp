@@ -66,6 +66,7 @@ private:
     Q_SLOT void mucOccupantId();
     Q_SLOT void testReplies();
     Q_SLOT void testJingleMessageInitiationElement();
+    Q_SLOT void testSubject();
 };
 
 void tst_QXmppMessage::testBasic_data()
@@ -140,6 +141,7 @@ void tst_QXmppMessage::testBasic()
     QCOMPARE(int(message.type()), type);
     QCOMPARE(message.body(), body);
     QCOMPARE(message.subject(), subject);
+    QCOMPARE(message.hasSubject(), !subject.isNull());
     QCOMPARE(message.thread(), thread);
     QCOMPARE(message.parentThread(), parentThread);
     QCOMPARE(message.state(), QXmppMessage::None);
@@ -171,7 +173,9 @@ void tst_QXmppMessage::testBasic()
     message.setFrom(u"bar@example.com/QXmpp"_s);
     message.setType(QXmppMessage::Type(type));
     message.setBody(body);
-    message.setSubject(subject);
+    if (!subject.isNull()) {
+        message.setSubject(subject);
+    }
     message.setThread(thread);
     message.setParentThread(parentThread);
     serializePacket(message, xml);
@@ -1470,6 +1474,43 @@ void tst_QXmppMessage::testJingleMessageInitiationElement()
     message2.addHint(QXmppMessage::Store);
     message2.setJingleMessageInitiationElement(QXmppJingleMessageInitiationElement());
     QVERIFY(message2.jingleMessageInitiationElement());
+}
+
+void tst_QXmppMessage::testSubject()
+{
+    QXmppMessage msg;
+
+    // No <subject/> element
+    parsePacket(msg, "<message type=\"chat\"/>");
+    QVERIFY(!msg.hasSubject());
+    QVERIFY(msg.subject().isEmpty());
+
+    // Non-empty <subject/>: round-trip
+    msg = QXmppMessage();
+    parsePacket(msg, "<message type=\"chat\"><subject>Room topic</subject></message>");
+    QVERIFY(msg.hasSubject());
+    QCOMPARE(msg.subject(), u"Room topic"_s);
+    serializePacket(msg, "<message type=\"chat\"><subject>Room topic</subject></message>");
+
+    // Empty <subject/>: round-trip
+    msg = QXmppMessage();
+    parsePacket(msg, "<message type=\"chat\"><subject/></message>");
+    QVERIFY(msg.hasSubject());
+    QVERIFY(msg.subject().isEmpty());
+    serializePacket(msg, "<message type=\"chat\"><subject/></message>");
+
+    // setSubject(std::nullopt): no element serialized
+    msg = QXmppMessage();
+    msg.setSubject(std::nullopt);
+    QVERIFY(!msg.hasSubject());
+    serializePacket(msg, "<message type=\"chat\"/>");
+
+    // setSubject(""): empty element serialized
+    msg = QXmppMessage();
+    msg.setSubject(QString());
+    QVERIFY(msg.hasSubject());
+    QVERIFY(msg.subject().isEmpty());
+    serializePacket(msg, "<message type=\"chat\"><subject/></message>");
 }
 
 QTEST_MAIN(tst_QXmppMessage)
