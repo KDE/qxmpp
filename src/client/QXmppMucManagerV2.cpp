@@ -962,6 +962,23 @@ QBindable<bool> QXmppMucRoomV2::joined() const
 }
 
 ///
+/// Returns a list of all participants currently in the room.
+///
+/// The returned handles are lightweight and do not own any data.
+///
+QList<QXmppMucParticipant> QXmppMucRoomV2::participants() const
+{
+    QList<QXmppMucParticipant> result;
+    if (auto *data = m_manager->roomData(m_jid)) {
+        result.reserve(data->participants.size());
+        for (const auto &[id, _] : data->participants) {
+            result.append(QXmppMucParticipant(m_manager, m_jid, id));
+        }
+    }
+    return result;
+}
+
+///
 /// Sends a groupchat message to the room.
 ///
 /// The message's \c to and \c type fields are set automatically. An \c origin-id
