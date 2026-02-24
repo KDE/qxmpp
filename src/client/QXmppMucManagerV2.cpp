@@ -380,7 +380,8 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
 }
 
 QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid, const QString &nickname,
-                                                              std::optional<QXmpp::Muc::HistoryOptions> history)
+                                                              std::optional<QXmpp::Muc::HistoryOptions> history,
+                                                              const QString &password)
 {
     // nickname empty check
     if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
@@ -402,6 +403,7 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     p.setTo(jid + u'/' + nickname);
     p.setMucSupported(true);
     p.setMucHistory(history);
+    p.setMucPassword(password);
     client()->send(std::move(p));
 
     // start timeout timer
