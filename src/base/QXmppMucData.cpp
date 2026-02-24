@@ -17,6 +17,7 @@ using namespace QXmpp::Private;
 
 namespace QXmpp::Muc {
 
+/// \cond
 std::optional<HistoryOptions> HistoryOptions::fromDom(const QDomElement &el)
 {
     HistoryOptions opts;
@@ -45,5 +46,6 @@ void HistoryOptions::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"since", m_since },
     });
 }
+/// \endcond
 
 }  // namespace QXmpp::Muc
