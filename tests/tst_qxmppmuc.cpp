@@ -495,9 +495,18 @@ void tst_QXmppMuc::sendPrivateMessage()
     test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room
+    // Join the room — firstwitch is already in the room
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence firstWitchPresence;
+    parsePacket(firstWitchPresence,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(firstWitchPresence);
 
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
@@ -514,10 +523,15 @@ void tst_QXmppMuc::sendPrivateMessage()
     muc->handleMessage(subjectMsg);
     auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
+    // firstwitch was the first participant injected, so has ID 0
+    auto participant = QXmppMucParticipant(muc, u"coven@chat.shakespeare.lit"_s, 0);
+    QVERIFY(participant.isValid());
+    QCOMPARE(participant.nickname().value(), u"firstwitch"_s);
+
     // Send a private message
     QXmppMessage pm;
     pm.setBody(u"I'll give thee a wind."_s);
-    room.sendPrivateMessage(u"firstwitch"_s, std::move(pm));
+    room.sendPrivateMessage(participant, std::move(pm));
 
     // Verify the sent XML
     auto sent = test.takePacket();

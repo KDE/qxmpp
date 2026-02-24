@@ -20,6 +20,7 @@ namespace QXmpp::Private {
 struct Bookmarks2Conference;
 struct Bookmarks2ConferenceItem;
 struct MucRoomData;
+struct MucParticipantData;
 }  // namespace QXmpp::Private
 
 class QXmppError;
@@ -53,6 +54,7 @@ private:
 Q_DECLARE_METATYPE(QXmppMucBookmark);
 
 class QXmppMucRoomV2;
+class QXmppMucParticipant;
 struct QXmppMucManagerV2Private;
 
 class QXMPP_EXPORT QXmppMucManagerV2 : public QXmppClientExtension, public QXmppPubSubEventHandler, public QXmppMessageHandler
@@ -119,9 +121,11 @@ private:
     void onConnected();
 
     const QXmpp::Private::MucRoomData *roomData(const QString &jid) const;
+    const QXmpp::Private::MucParticipantData *participantData(const QString &roomJid, uint32_t participantId) const;
 
     friend class QXmppMucManagerV2Private;
     friend class QXmppMucRoomV2;
+    friend class QXmppMucParticipant;
     friend class tst_QXmppMuc;
     const std::unique_ptr<QXmppMucManagerV2Private> d;
 };
@@ -151,7 +155,7 @@ public:
     QBindable<bool> joined() const;
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
-    QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QString &occupantNick, QXmppMessage message);
+    QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);
     QXmppTask<QXmpp::Result<>> setSubject(const QString &subject);
     QXmppTask<QXmpp::Result<>> setNickname(const QString &newNick);
     QXmppTask<QXmpp::SendResult> setPresence(QXmppPresence presence);
@@ -188,6 +192,44 @@ private:
     friend class QXmppMucManagerV2;
     QXmppMucManagerV2 *m_manager;
     QString m_jid;
+};
+
+///
+/// \class QXmppMucParticipant
+///
+/// Lightweight handle to a participant in a MUC room, backed by data in QXmppMucManagerV2.
+///
+/// \note Lifetime note: This is a lightweight handle and does not own any data.
+/// The manager must remain alive for the lifetime of any participant handle.
+///
+/// \since QXmpp 1.15
+///
+class QXMPP_EXPORT QXmppMucParticipant
+{
+public:
+    /// Returns whether the participant handle refers to a valid participant.
+    bool isValid() const;
+    /// Returns the participant's nickname in the room.
+    QBindable<QString> nickname() const;
+    /// Returns the participant's real JID if known.
+    QBindable<QString> jid() const;
+    /// Returns the participant's role in the room.
+    QBindable<QXmpp::Muc::Role> role() const;
+    /// Returns the participant's affiliation with the room.
+    QBindable<QXmpp::Muc::Affiliation> affiliation() const;
+
+private:
+    QXmppMucParticipant(QXmppMucManagerV2 *manager, const QString &roomJid, uint32_t participantId)
+        : m_manager(manager), m_roomJid(roomJid), m_participantId(participantId)
+    {
+    }
+
+    friend class QXmppMucManagerV2;
+    friend class QXmppMucRoomV2;
+    friend class tst_QXmppMuc;
+    QXmppMucManagerV2 *m_manager;
+    QString m_roomJid;
+    uint32_t m_participantId;
 };
 
 inline QXmppMucRoomV2 QXmppMucManagerV2::room(const QString &jid)

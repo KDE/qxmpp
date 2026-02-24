@@ -624,6 +624,16 @@ const MucRoomData *QXmppMucManagerV2::roomData(const QString &jid) const
     return nullptr;
 }
 
+const MucParticipantData *QXmppMucManagerV2::participantData(const QString &roomJid, uint32_t participantId) const
+{
+    if (auto roomItr = d->rooms.find(roomJid); roomItr != d->rooms.end()) {
+        if (auto pItr = roomItr->second.participants.find(participantId); pItr != roomItr->second.participants.end()) {
+            return &pItr->second;
+        }
+    }
+    return nullptr;
+}
+
 //
 // Manager private: Bookmarks 2
 //
@@ -740,7 +750,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     // room sent two presences for the same nickname
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same nickname"_s });
                     return;
-                } else if (participant.occupantId == presence.mucOccupantId()) {
+                } else if (!participant.occupantId.isEmpty() && participant.occupantId == presence.mucOccupantId()) {
                     // sent two presences with the same occupant ID
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same occupant ID"_s });
                     return;
@@ -959,16 +969,21 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
 ///
 /// Sends a private message to a room occupant.
 ///
-/// The message is addressed to the occupant's room JID (room\@service/nick).
+/// The message is addressed to the occupant's current room JID (room\@service/nick).
 /// The returned task completes when the message has been sent to the server.
 ///
-QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QString &occupantNick, QXmppMessage message)
+QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message)
 {
     if (!isValid()) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
-    message.setTo(m_jid + u'/' + occupantNick);
+    auto *pData = m_manager->participantData(m_jid, participant.m_participantId);
+    if (!pData) {
+        return makeReadyTask<SendResult>(QXmppError { u"Participant is no longer in the room."_s });
+    }
+
+    message.setTo(m_jid + u'/' + pData->nickname.value());
     message.setType(QXmppMessage::Chat);
 
     return m_manager->client()->send(std::move(message));
@@ -1087,4 +1102,45 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
     timer->start(m_manager->d->joinTimeout);
 
     return task;
+}
+
+//
+// MucParticipant
+//
+
+bool QXmppMucParticipant::isValid() const
+{
+    return m_manager->participantData(m_roomJid, m_participantId) != nullptr;
+}
+
+QBindable<QString> QXmppMucParticipant::nickname() const
+{
+    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
+        return { &(data->nickname) };
+    }
+    return {};
+}
+
+QBindable<QString> QXmppMucParticipant::jid() const
+{
+    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
+        return { &(data->jid) };
+    }
+    return {};
+}
+
+QBindable<Muc::Role> QXmppMucParticipant::role() const
+{
+    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
+        return { &(data->role) };
+    }
+    return {};
+}
+
+QBindable<Muc::Affiliation> QXmppMucParticipant::affiliation() const
+{
+    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
+        return { &(data->affiliation) };
+    }
+    return {};
 }
