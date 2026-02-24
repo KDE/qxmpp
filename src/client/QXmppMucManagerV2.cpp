@@ -782,29 +782,49 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
         break;
     case JoiningRoomHistory:
     case Joined:
-        if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
-            if (presence.mucStatusCodes().contains(303)) {
-                // Nickname change (XEP-0045 §7.6): unavailable with 303 + new nick in item
-                auto newNick = presence.mucItem().nick();
+        if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(303)) {
+            // Nickname change (XEP-0045 §7.6): unavailable with 303 + new nick in item
+            auto newNick = presence.mucItem().nick();
+            auto isSelf = presence.mucStatusCodes().contains(110);
 
-                if (!newNick.isEmpty()) {
-                    data.nickname = newNick;
-                    if (data.nickChangePromise) {
-                        auto promise = std::move(*data.nickChangePromise);
-                        data.nickChangePromise.reset();
-                        promise.finish(Success());
+            if (isSelf && !newNick.isEmpty()) {
+                data.nickname = newNick;
+                if (data.nickChangePromise) {
+                    auto promise = std::move(*data.nickChangePromise);
+                    data.nickChangePromise.reset();
+                    promise.finish(Success());
+                }
+            }
+
+            // Update participant's presence with new nickname so the
+            // following available presence matches by nickname.
+            if (!newNick.isEmpty()) {
+                for (auto &[pId, pData] : data.participants) {
+                    if (pData.nickname.value() == nickname) {
+                        auto updated = presence;
+                        updated.setFrom(roomJid + u'/' + newNick);
+                        pData.setPresence(updated);
+                        break;
                     }
                 }
-            } else {
-                // Self-unavailable without 303: we left the room
-                std::optional<QXmppPromise<Result<>>> promise;
-                if (data.leavePromise) {
-                    promise = std::move(data.leavePromise);
-                }
-                rooms.erase(roomJid);
+            }
+        } else if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
+            // Self-unavailable without 303: we left the room
+            std::optional<QXmppPromise<Result<>>> promise;
+            if (data.leavePromise) {
+                promise = std::move(data.leavePromise);
+            }
+            rooms.erase(roomJid);
 
-                if (promise) {
-                    promise->finish(Success());
+            if (promise) {
+                promise->finish(Success());
+            }
+        } else if (presence.type() == QXmppPresence::Available) {
+            // Presence update for existing participant
+            for (auto &[pId, pData] : data.participants) {
+                if (pData.nickname.value() == nickname) {
+                    pData.setPresence(presence);
+                    break;
                 }
             }
         } else if (presence.type() == QXmppPresence::Error) {

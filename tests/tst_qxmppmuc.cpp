@@ -44,6 +44,7 @@ private:
     Q_SLOT void sendPrivateMessage();
     Q_SLOT void setSubject();
     Q_SLOT void changeNickname();
+    Q_SLOT void participantNicknameChange();
     Q_SLOT void changePresence();
     Q_SLOT void leaveRoom();
     Q_SLOT void leaveRoomTimeout();
@@ -645,6 +646,71 @@ void tst_QXmppMuc::changeNickname()
     QVERIFY(nickTask.isFinished());
     expectVariant<QXmpp::Success>(nickTask.result());
     QCOMPARE(room.nickname().value(), u"oldhag"_s);
+}
+
+void tst_QXmppMuc::participantNicknameChange()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join room with firstwitch already present
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence firstWitchPresence;
+    parsePacket(firstWitchPresence,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(firstWitchPresence);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Get firstwitch participant handle (ID 0)
+    auto participant = QXmppMucParticipant(muc, u"coven@chat.shakespeare.lit"_s, 0);
+    QVERIFY(participant.isValid());
+    QCOMPARE(participant.nickname().value(), u"firstwitch"_s);
+
+    // firstwitch changes nickname: unavailable with 303
+    QXmppPresence nickUnavailable;
+    parsePacket(nickUnavailable,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant' nick='witch1'/>"
+                "<status code='303'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(nickUnavailable);
+
+    // Then available with new nickname
+    QXmppPresence nickAvailable;
+    parsePacket(nickAvailable,
+                "<presence from='coven@chat.shakespeare.lit/witch1'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(nickAvailable);
+
+    // Same participant handle, new nickname
+    QVERIFY(participant.isValid());
+    QCOMPARE(participant.nickname().value(), u"witch1"_s);
 }
 
 void tst_QXmppMuc::changePresence()
