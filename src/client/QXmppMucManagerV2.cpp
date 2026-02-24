@@ -213,6 +213,11 @@ struct DeleteLaterDeleter {
     void operator()(QObject *obj) const { obj->deleteLater(); }
 };
 
+struct PendingMessage {
+    QXmppPromise<Result<>> promise;
+    std::unique_ptr<QTimer, DeleteLaterDeleter> timer;
+};
+
 struct MucRoomData {
     MucRoomState state = MucRoomState::NotJoined;
     QProperty<QString> subject;
@@ -223,6 +228,7 @@ struct MucRoomData {
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     QList<QXmppMessage> historyMessages;
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
+    std::unordered_map<QString, PendingMessage> pendingMessages;
 };
 
 }  // namespace QXmpp::Private
@@ -424,7 +430,7 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
 
 bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
 {
-    if (message.type() != QXmppMessage::GroupChat) {
+    if (message.type() != QXmppMessage::GroupChat && message.type() != QXmppMessage::Error) {
         return false;
     }
 
@@ -435,6 +441,19 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
     }
 
     auto &data = itr->second;
+
+    // Handle error responses to sent messages
+    if (message.type() == QXmppMessage::Error) {
+        if (auto originId = message.originId(); !originId.isEmpty()) {
+            if (auto pendingItr = data.pendingMessages.find(originId); pendingItr != data.pendingMessages.end()) {
+                pendingItr->second.promise.finish(QXmppError { message.error().text(), message.error() });
+                data.pendingMessages.erase(pendingItr);
+                return true;
+            }
+        }
+        return false;
+    }
+
     switch (data.state) {
     case MucRoomState::JoiningRoomHistory:
         if (!message.body().isEmpty()) {
@@ -458,6 +477,13 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
         }
         return true;
     case MucRoomState::Joined:
+        // Check for reflected message (match by origin-id)
+        if (auto originId = message.originId(); !originId.isEmpty()) {
+            if (auto pendingItr = data.pendingMessages.find(originId); pendingItr != data.pendingMessages.end()) {
+                pendingItr->second.promise.finish(Success());
+                data.pendingMessages.erase(pendingItr);
+            }
+        }
         if (message.hasSubject() && message.body().isEmpty()) {
             data.subject = message.subject();
         }
@@ -767,15 +793,33 @@ void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
     throwRoomError(roomJid, QXmppError { u"Joining room timed out after %1 seconds."_s.arg(secs) });
 }
 
+void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, const QString &originId)
+{
+    auto itr = rooms.find(roomJid);
+    if (itr == rooms.end()) {
+        return;
+    }
+
+    auto pendingItr = itr->second.pendingMessages.find(originId);
+    if (pendingItr == itr->second.pendingMessages.end()) {
+        return;
+    }
+
+    pendingItr->second.promise.finish(QXmppError { u"Sending message timed out."_s });
+    itr->second.pendingMessages.erase(pendingItr);
+}
+
 //
 // MucRoom
 //
 
+/// Returns whether the room handle refers to a valid, active room.
 bool QXmppMucRoomV2::isValid() const
 {
     return m_manager->roomData(m_jid) != nullptr;
 }
 
+/// Returns the room subject as a bindable property.
 QBindable<QString> QXmppMucRoomV2::subject() const
 {
     if (auto *data = m_manager->roomData(m_jid)) {
@@ -784,6 +828,7 @@ QBindable<QString> QXmppMucRoomV2::subject() const
     return {};
 }
 
+/// Returns the user's nickname in the room as a bindable property.
 QBindable<QString> QXmppMucRoomV2::nickname() const
 {
     if (auto *data = m_manager->roomData(m_jid)) {
@@ -792,10 +837,54 @@ QBindable<QString> QXmppMucRoomV2::nickname() const
     return {};
 }
 
+/// Returns whether the room is currently joined as a bindable property.
 QBindable<bool> QXmppMucRoomV2::joined() const
 {
     if (auto *data = m_manager->roomData(m_jid)) {
         return { &(data->joined) };
     }
     return {};
+}
+
+///
+/// Sends a groupchat message to the room.
+///
+/// The message's \c to and \c type fields are set automatically. An \c origin-id
+/// (\xep{0359, Unique and Stable Stanza IDs}) is generated if not already set,
+/// and is used to match the server's reflected message.
+///
+/// The returned task completes with success when the message is reflected back
+/// by the MUC service, or with an error if the service responds with an error
+/// or the request times out.
+///
+QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
+{
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end() || itr->second.state != MucRoomState::Joined) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+    }
+
+    auto &data = itr->second;
+
+    message.setTo(m_jid);
+    message.setType(QXmppMessage::GroupChat);
+    if (message.originId().isEmpty()) {
+        message.setOriginId(QXmppUtils::generateStanzaUuid());
+    }
+    auto originId = message.originId();
+
+    QXmppPromise<Result<>> promise;
+    auto task = promise.task();
+
+    auto *timer = new QTimer();
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, m_manager, [d = m_manager->d.get(), roomJid = m_jid, originId]() {
+        d->handleMessageTimeout(roomJid, originId);
+    });
+
+    data.pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
+    timer->start(m_manager->d->joinTimeout);
+
+    m_manager->client()->send(std::move(message));
+    return task;
 }

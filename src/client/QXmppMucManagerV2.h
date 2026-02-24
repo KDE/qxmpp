@@ -87,14 +87,22 @@ public:
     QXmppTask<QXmpp::Result<>> removeRoomAvatar(const QString &jid);
     QXmppTask<QXmpp::Result<std::optional<Avatar>>> fetchRoomAvatar(const QString &jid);
 
+    /// Returns a lightweight handle for the room with the given \a jid.
     QXmppMucRoomV2 room(const QString &jid);
 
+    /// Joins the MUC room at \a jid with the given \a nickname.
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname);
+    /// \overload
+    /// Joins the room with optional \a history request parameters.
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname,
                                                       std::optional<QXmpp::Muc::HistoryOptions> history);
+    /// Emitted when a participant joins a room.
     Q_SIGNAL void participantJoined(const QString &roomJid, const QString &participant);
+    /// Emitted when a participant leaves a room.
     Q_SIGNAL void participantLeft(const QString &roomJid, const QString &participant);
+    /// Emitted when room history messages are received during joining.
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
+    /// Emitted when a groupchat message is received in a joined room.
     Q_SIGNAL void messageReceived(const QString &roomJid, const QXmppMessage &message);
 
     bool handleMessage(const QXmppMessage &) override;
@@ -139,6 +147,9 @@ public:
     QBindable<QString> nickname() const;
     QBindable<bool> joined() const;
 
+    QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
+
+    /// Connects to the participantJoined signal, filtered for this room.
     template<typename Func>
     QMetaObject::Connection onParticipantJoined(QObject *context, Func &&f) const
     {
@@ -149,6 +160,7 @@ public:
         });
     }
 
+    /// Connects to the participantLeft signal, filtered for this room.
     template<typename Func>
     QMetaObject::Connection onParticipantLeft(QObject *context, Func &&f) const
     {

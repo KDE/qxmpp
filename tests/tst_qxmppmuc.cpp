@@ -38,6 +38,8 @@ private:
 
     // MUC messages
     Q_SLOT void receiveMessage();
+    Q_SLOT void sendMessage();
+    Q_SLOT void sendMessageError();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -343,6 +345,114 @@ void tst_QXmppMuc::receiveMessage()
                 "</message>");
     QVERIFY(muc->handleMessage(liveMsg));
     QCOMPARE(receivedMsg.body(), u"Thrice the brinded cat hath mew'd."_s);
+}
+
+void tst_QXmppMuc::sendMessage()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join the room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Send a message
+    QXmppMessage msgToSend;
+    msgToSend.setBody(u"Thrice the brinded cat hath mew'd."_s);
+    auto sendTask = room.sendMessage(std::move(msgToSend));
+    QVERIFY(!sendTask.isFinished());
+
+    // Verify the sent XML contains origin-id and correct structure
+    auto sent = test.takePacket();
+    QXmppMessage sentMsg;
+    parsePacket(sentMsg, sent.toUtf8());
+    QCOMPARE(sentMsg.type(), QXmppMessage::GroupChat);
+    QCOMPARE(sentMsg.to(), u"coven@chat.shakespeare.lit"_s);
+    QCOMPARE(sentMsg.body(), u"Thrice the brinded cat hath mew'd."_s);
+    QVERIFY(!sentMsg.originId().isEmpty());
+
+    // Inject reflected message with same origin-id
+    QXmppMessage reflected;
+    parsePacket(reflected,
+                QStringLiteral("<message from='coven@chat.shakespeare.lit/thirdwitch' type='groupchat'>"
+                               "<body>Thrice the brinded cat hath mew'd.</body>"
+                               "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
+                               "</message>")
+                    .arg(sentMsg.originId())
+                    .toUtf8());
+    muc->handleMessage(reflected);
+
+    QVERIFY(sendTask.isFinished());
+    expectVariant<QXmpp::Success>(sendTask.result());
+}
+
+void tst_QXmppMuc::sendMessageError()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join the room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Send a message
+    QXmppMessage msgToSend;
+    msgToSend.setBody(u"Hello!"_s);
+    auto sendTask = room.sendMessage(std::move(msgToSend));
+    QVERIFY(!sendTask.isFinished());
+
+    auto sent = test.takePacket();
+    QXmppMessage sentMsg;
+    parsePacket(sentMsg, sent.toUtf8());
+
+    // Inject error response with same origin-id
+    QXmppMessage errorMsg;
+    parsePacket(errorMsg,
+                QStringLiteral("<message from='coven@chat.shakespeare.lit' type='error'>"
+                               "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
+                               "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                               "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>You are not allowed to send messages</text>"
+                               "</error>"
+                               "</message>")
+                    .arg(sentMsg.originId())
+                    .toUtf8());
+    muc->handleMessage(errorMsg);
+
+    QVERIFY(sendTask.isFinished());
+    auto error = expectVariant<QXmppError>(sendTask.result());
+    QVERIFY(!error.description.isEmpty());
 }
 
 void tst_QXmppMuc::roomInfoForm()
