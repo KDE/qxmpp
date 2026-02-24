@@ -102,9 +102,9 @@ public:
                                                       std::optional<QXmpp::Muc::HistoryOptions> history,
                                                       const QString &password = {});
     /// Emitted when a participant joins a room.
-    Q_SIGNAL void participantJoined(const QString &roomJid, const QString &participant);
+    Q_SIGNAL void participantJoined(const QString &roomJid, const QXmppMucParticipant &participant);
     /// Emitted when a participant leaves a room.
-    Q_SIGNAL void participantLeft(const QString &roomJid, const QString &participant);
+    Q_SIGNAL void participantLeft(const QString &roomJid, const QXmppMucParticipant &participant);
     /// Emitted when room history messages are received during joining.
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
     /// Emitted when a groupchat message is received in a joined room.
@@ -165,9 +165,9 @@ public:
     template<typename Func>
     QMetaObject::Connection onParticipantJoined(QObject *context, Func &&f) const
     {
-        return QObject::connect(m_manager, &QXmppMucManagerV2::participantJoined, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QString &id) {
+        return QObject::connect(m_manager, &QXmppMucManagerV2::participantJoined, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant) {
             if (roomJid == jid) {
-                f(id);
+                f(participant);
             }
         });
     }
@@ -176,9 +176,9 @@ public:
     template<typename Func>
     QMetaObject::Connection onParticipantLeft(QObject *context, Func &&f) const
     {
-        return QObject::connect(m_manager, &QXmppMucManagerV2::participantLeft, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QString &id) {
+        return QObject::connect(m_manager, &QXmppMucManagerV2::participantLeft, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant) {
             if (roomJid == jid) {
-                f(id);
+                f(participant);
             }
         });
     }
@@ -225,6 +225,7 @@ private:
     }
 
     friend class QXmppMucManagerV2;
+    friend class QXmppMucManagerV2Private;
     friend class QXmppMucRoomV2;
     friend class tst_QXmppMuc;
     QXmppMucManagerV2 *m_manager;
