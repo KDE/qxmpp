@@ -67,7 +67,7 @@ using namespace QXmpp::Private;
 ///
 /// \note To subscribe to PEP event notifications use the
 /// QXmppClientExtension::discoveryFeatures method of your client extension
-/// according to section 9.2 of \xep{0060}. For example:
+/// according to section 9.2 of \xep{0060, Publish-Subscribe}. For example:
 /// \code
 /// QStringList YourExtension::discoveryFeatures() const
 /// {
@@ -290,7 +290,7 @@ QXmppTask<QXmppPubSubManager::NodesResult> QXmppPubSubManager::requestNodes(cons
 ///
 /// Calling this before QXmppPubSubManager::publishItems is usually not
 /// necessary when publishing to a node for the first time if the service
-/// suppports the auto-create feature (Section 7.1.4 of \xep{0060}).
+/// suppports the auto-create feature (Section 7.1.4 of \xep{0060, Publish-Subscribe}).
 ///
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \param nodeName the name of the node to be created
@@ -312,7 +312,7 @@ auto QXmppPubSubManager::createNode(const QString &jid, const QString &nodeName)
 ///
 /// Calling this before QXmppPubSubManager::publishItems is usually not
 /// necessary when publishing to a node for the first time if the service
-/// suppports the auto-create feature (Section 7.1.4 of \xep{0060}).
+/// suppports the auto-create feature (Section 7.1.4 of \xep{0060, Publish-Subscribe}).
 ///
 /// \param jid Jabber ID of the entity hosting the pubsub service
 /// \param nodeName the name of the node to be created
@@ -782,7 +782,7 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 /// Calling this before QXmppPubSubManager::publishOwnPepItems is usually not
 /// necessary when publishing to a node for the first time if the service
-/// suppports the auto-create feature (Section 7.1.4 of \xep{0060}).
+/// suppports the auto-create feature (Section 7.1.4 of \xep{0060, Publish-Subscribe}).
 ///
 /// \param nodeName the name of the PEP node to be created
 /// \return
@@ -798,7 +798,7 @@ QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::unsubscribeFromNode(co
 ///
 /// Calling this before QXmppPubSubManager::publishOwnPepItems is usually not
 /// necessary when publishing to a node for the first time if the service
-/// suppports the auto-create feature (Section 7.1.4 of \xep{0060}).
+/// suppports the auto-create feature (Section 7.1.4 of \xep{0060, Publish-Subscribe}).
 ///
 /// \param nodeName the name of the PEP node to be created
 /// \param config The configuration for the node

@@ -40,11 +40,11 @@ public:
         XA,          ///< The entity or resource is away for an extended period.
         DND,         ///< The entity or resource is busy ("Do Not Disturb").
         Chat,        ///< The entity or resource is actively interested in chatting.
-        Invisible    ///< obsolete \xep{0018}: Invisible Presence
+        Invisible    ///< obsolete \xep{0018, Invisible Presence}
     };
 
     /// This enum is used to describe vCard updates as defined by
-    /// \xep{0153}: vCard-Based Avatars
+    /// \xep{0153, vCard-Based Avatars}
     enum VCardUpdateType {
         VCardUpdateNone = 0,    ///< Protocol is not supported
         VCardUpdateNoPhoto,     ///< User is not using any image

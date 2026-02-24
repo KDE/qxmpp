@@ -21,7 +21,7 @@ class QXmppMamManagerPrivate;
 
 ///
 /// \brief The QXmppMamManager class makes it possible to access message
-/// archives as defined by \xep{0313}: Message Archive Management.
+/// archives as defined by \xep{0313, Message Archive Management}.
 ///
 /// To make use of this manager, you need to instantiate it and load it into
 /// the QXmppClient instance as follows:

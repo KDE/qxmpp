@@ -89,7 +89,7 @@ public:
     };
     Q_ENUM(State)
 
-    /// Describes the use of \xep{0198}: Stream Management
+    /// Describes the use of \xep{0198, Stream Management}
     enum StreamManagementState {
         /// Stream Management is not used.
         NoStreamManagement,

@@ -125,7 +125,7 @@ QString QXmppUtils::datetimeToString(const QDateTime &dt)
 
 ///
 /// Parses a timezone offset (in seconds) from a string according to
-/// \xep{0082}: XMPP Date and Time Profiles.
+/// \xep{0082, XMPP Date and Time Profiles}.
 ///
 int QXmppUtils::timezoneOffsetFromString(const QString &str)
 {

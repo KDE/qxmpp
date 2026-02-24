@@ -17,7 +17,7 @@ struct QXmppError;
 
 ///
 /// \brief The QXmppVCardManager class gets/sets XMPP vCards. It is an
-/// implementation of \xep{0054}: vcard-temp.
+/// implementation of \xep{0054, vcard-temp}.
 ///
 /// \note Its object should not be created using its constructor. Instead
 /// \c QXmppClient::findExtension<QXmppVCardManager>() should be used to get

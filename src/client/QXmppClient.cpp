@@ -742,7 +742,7 @@ void QXmppClient::setActive(bool active)
 }
 
 ///
-/// Returns the current \xep{0198}: Stream Management state of the connection.
+/// Returns the current \xep{0198, Stream Management} state of the connection.
 ///
 /// Upon connection of the client this can be used to check whether the
 /// previous stream has been resumed.

@@ -229,37 +229,37 @@ void QXmppPresence::setVCardUpdateType(VCardUpdateType type)
     d->vCardUpdateType = type;
 }
 
-/// \xep{0115}: Entity Capabilities
+/// \xep{0115, Entity Capabilities}
 QString QXmppPresence::capabilityHash() const
 {
     return d->capabilityHash;
 }
 
-/// \xep{0115}: Entity Capabilities
+/// \xep{0115, Entity Capabilities}
 void QXmppPresence::setCapabilityHash(const QString &hash)
 {
     d->capabilityHash = hash;
 }
 
-/// \xep{0115}: Entity Capabilities
+/// \xep{0115, Entity Capabilities}
 QString QXmppPresence::capabilityNode() const
 {
     return d->capabilityNode;
 }
 
-/// \xep{0115}: Entity Capabilities
+/// \xep{0115, Entity Capabilities}
 void QXmppPresence::setCapabilityNode(const QString &node)
 {
     d->capabilityNode = node;
 }
 
-/// \xep{0115}: Entity Capabilities
+/// \xep{0115, Entity Capabilities}
 QByteArray QXmppPresence::capabilityVer() const
 {
     return d->capabilityVer;
 }
 
-/// \xep{0115}: Entity Capabilities
+/// \xep{0115, Entity Capabilities}
 void QXmppPresence::setCapabilityVer(const QByteArray &ver)
 {
     d->capabilityVer = ver;
@@ -383,7 +383,7 @@ void QXmppPresence::setOldJid(const QString &oldJid)
 
 ///
 /// Returns when the last user interaction with the client took place. See
-/// \xep{0319}: Last User Interaction in Presence for details.
+/// \xep{0319, Last User Interaction in Presence} for details.
 ///
 /// \since QXmpp 1.0
 ///
@@ -393,8 +393,8 @@ QDateTime QXmppPresence::lastUserInteraction() const
 }
 
 ///
-/// Sets the time of the last user interaction as defined in \xep{0319}: Last
-/// User Interaction in Presence.
+/// Sets the time of the last user interaction as defined in
+/// \xep{0319, Last User Interaction in Presence}.
 ///
 /// \since QXmpp 1.0
 ///

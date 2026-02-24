@@ -47,7 +47,7 @@ enum class JingleErrorCondition {
 /// \brief Represents an extended address as defined by \xep{0033, Extended
 /// Stanza Addressing}.
 ///
-/// Extended addresses maybe of different types: some are defined by \xep{0033},
+/// Extended addresses maybe of different types: some are defined by \xep{0033, Extended Stanza Addressing},
 /// others are defined in separate XEPs (for instance \xep{0146, Remote
 /// Controlling Clients}). That is why the "type" property is a string rather
 /// than an enumerated type.

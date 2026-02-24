@@ -18,7 +18,7 @@ public:
 };
 
 /// \brief The QXmppRpcResponseIq class represents an IQ used to carry
-/// an RPC response as specified by \xep{0009}: Jabber-RPC.
+/// an RPC response as specified by \xep{0009, Jabber-RPC}.
 ///
 /// \ingroup Stanzas
 
@@ -53,7 +53,7 @@ private:
 };
 
 /// \brief The QXmppRpcInvokeIq class represents an IQ used to carry
-/// an RPC invocation as specified by \xep{0009}: Jabber-RPC.
+/// an RPC invocation as specified by \xep{0009, Jabber-RPC}.
 ///
 /// \ingroup Stanzas
 

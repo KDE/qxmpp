@@ -468,8 +468,7 @@ void QXmppDataForm::Field::setValue(const QVariant &value)
 }
 
 ///
-/// Returns the size of the attached media according to \xep{0221}: Data Forms
-/// Media Element.
+/// Returns the size of the attached media according to \xep{0221, Data Forms Media Element}.
 ///
 /// \since QXmpp 1.1
 ///
@@ -479,8 +478,7 @@ QSize QXmppDataForm::Field::mediaSize() const
 }
 
 ///
-/// Sets the size of the attached media according to \xep{0221}: Data Forms Media
-/// Element.
+/// Sets the size of the attached media according to \xep{0221, Data Forms Media Element}.
 ///
 /// \since QXmpp 1.1
 ///
@@ -490,8 +488,7 @@ void QXmppDataForm::Field::setMediaSize(const QSize &size)
 }
 
 ///
-/// Returns the sources for the attached media according to \xep{0221}: Data
-/// Forms Media Element.
+/// Returns the sources for the attached media according to \xep{0221, Data Forms Media Element}.
 ///
 /// \since QXmpp 1.1
 ///
@@ -501,8 +498,7 @@ QVector<QXmppDataForm::MediaSource> QXmppDataForm::Field::mediaSources() const
 }
 
 ///
-/// Sets the sources to the attached media of the field according to \xep{0221}:
-/// Data Forms Media Element.
+/// Sets the sources to the attached media of the field according to \xep{0221, Data Forms Media Element}.
 ///
 /// \since QXmpp 1.1
 ///

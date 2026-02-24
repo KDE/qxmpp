@@ -61,7 +61,7 @@ QXmppRosterManager &QXmppClient::rosterManager()
 }
 
 ///
-/// Returns the reference to QXmppVCardManager, implementation of \xep{0054}.
+/// Returns the reference to QXmppVCardManager, implementation of \xep{0054, vcard-temp}.
 ///
 /// \deprecated This method is deprecated since QXmpp 1.1. Use
 /// \c QXmppClient::findExtension<QXmppVCardManager>() instead.
@@ -72,7 +72,7 @@ QXmppVCardManager &QXmppClient::vCardManager()
 }
 
 ///
-/// Returns the reference to QXmppVersionManager, implementation of \xep{0092}.
+/// Returns the reference to QXmppVersionManager, implementation of \xep{0092, Software Version}.
 ///
 /// \deprecated This method is deprecated since QXmpp 1.1. Use
 /// \c QXmppClient::findExtension<QXmppVersionManager>() instead.

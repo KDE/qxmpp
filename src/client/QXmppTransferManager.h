@@ -101,8 +101,8 @@ public:
     /// This enum is used to describe a transfer method.
     enum Method {
         NoMethod = 0,      ///< No transfer method.
-        InBandMethod = 1,  ///< \xep{0047}: In-Band Bytestreams
-        SocksMethod = 2,   ///< \xep{0065}: SOCKS5 Bytestreams
+        InBandMethod = 1,  ///< \xep{0047, In-Band Bytestreams}
+        SocksMethod = 2,   ///< \xep{0065, SOCKS5 Bytestreams}
         AnyMethod = 3      ///< Any supported transfer method.
     };
     Q_ENUM(Method)

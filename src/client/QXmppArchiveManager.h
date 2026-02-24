@@ -12,7 +12,7 @@
 #include <QDateTime>
 
 /// \brief The QXmppArchiveManager class makes it possible to access message
-/// archives as defined by \xep{0136}: Message Archiving.
+/// archives as defined by \xep{0136, Message Archiving}.
 ///
 /// To make use of this manager, you need to instantiate it and load it into
 /// the QXmppClient instance as follows:

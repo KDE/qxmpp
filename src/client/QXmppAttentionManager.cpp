@@ -155,7 +155,7 @@ void QXmppAttentionManager::setAllowedAttemptsTimeInterval(QTime interval)
 ///
 /// Sends a message of type chat with an attention request to the specified JID.
 ///
-/// \xep{0224} allows to include other elements with an attention request, but
+/// \xep{0224, Attention} allows to include other elements with an attention request, but
 /// the QXmppAttentionManager has no method for this purpose. However, such a
 /// request can still be made manually.
 ///

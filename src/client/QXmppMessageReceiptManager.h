@@ -12,7 +12,7 @@
 ///
 /// \brief The QXmppMessageReceiptManager class makes it possible to
 /// send and receive message delivery receipts as defined in
-/// \xep{0184}: Message Delivery Receipts.
+/// \xep{0184, Message Delivery Receipts}.
 ///
 /// \ingroup Managers
 ///

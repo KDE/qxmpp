@@ -29,7 +29,7 @@ class QXmppRegistrationManagerPrivate;
 /// <h3>Setting up service discovery correctly for this manager</h3>
 ///
 /// This manager automatically recognizes whether the local server supports
-/// \xep{0077}. As soon as the result is retrieved, the supportedByServer() property should be
+/// \xep{0077, In-Band Registration}. As soon as the result is retrieved, the supportedByServer() property should be
 /// correct and could be used to display the user whether account management tasks can be
 /// performed on this server.
 ///

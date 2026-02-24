@@ -611,7 +611,7 @@ void QXmppJingleIq::Content::setRtpHeaderExtensionMixingAllowed(bool isRtpHeader
 ///
 /// Returns the fingerprint hash value for the transport key.
 ///
-/// This is used for DTLS-SRTP as defined in \xep{0320}.
+/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
 ///
 /// \since QXmpp 0.9
 ///
@@ -623,7 +623,7 @@ QByteArray QXmppJingleIq::Content::transportFingerprint() const
 ///
 /// Sets the fingerprint hash value for the transport key.
 ///
-/// This is used for DTLS-SRTP as defined in \xep{0320}.
+/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
 ///
 /// \since QXmpp 0.9
 ///
@@ -635,7 +635,7 @@ void QXmppJingleIq::Content::setTransportFingerprint(const QByteArray &fingerpri
 ///
 /// Returns the fingerprint hash algorithm for the transport key.
 ///
-/// This is used for DTLS-SRTP as defined in \xep{0320}.
+/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
 ///
 /// \since QXmpp 0.9
 ///
@@ -647,7 +647,7 @@ QString QXmppJingleIq::Content::transportFingerprintHash() const
 ///
 /// Sets the fingerprint hash algorithm for the transport key.
 ///
-/// This is used for DTLS-SRTP as defined in \xep{0320}.
+/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
 ///
 /// \since QXmpp 0.9
 ///
@@ -659,7 +659,7 @@ void QXmppJingleIq::Content::setTransportFingerprintHash(const QString &hash)
 ///
 /// Returns the setup role for the encrypted transport.
 ///
-/// This is used for DTLS-SRTP as defined in \xep{0320}.
+/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
 ///
 /// \since QXmpp 0.9
 ///
@@ -671,7 +671,7 @@ QString QXmppJingleIq::Content::transportFingerprintSetup() const
 ///
 /// Sets the setup role for the encrypted transport.
 ///
-/// This is used for DTLS-SRTP as defined in \xep{0320}.
+/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
 ///
 /// \since QXmpp 0.9
 ///

@@ -46,8 +46,7 @@ private:
 };
 
 ///
-/// \brief The QXmppUploadRequestManager implements the core of \xep{0369}: HTTP
-/// File Upload.
+/// \brief The QXmppUploadRequestManager implements the core of \xep{0363, HTTP File Upload}.
 ///
 /// It handles the discovery of QXmppUploadServices and can send upload
 /// requests and outputs the upload slots. It doesn't do the actual upload via.

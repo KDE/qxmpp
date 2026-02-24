@@ -82,7 +82,7 @@ private:
 
 ///
 /// \brief The QXmppMucRoom class represents a multi-user chat room
-/// as defined by \xep{0045}: Multi-User Chat.
+/// as defined by \xep{0045, Multi-User Chat}.
 ///
 /// \sa QXmppMucManager
 ///

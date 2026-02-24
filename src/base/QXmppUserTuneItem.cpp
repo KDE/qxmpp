@@ -220,7 +220,7 @@ void QXmppTuneItem::setUri(QUrl uri)
 }
 
 ///
-/// Returns true, if the element is a valid \xep{0118}: User Tune PubSub item.
+/// Returns true, if the element is a valid \xep{0118, User Tune} PubSub item.
 ///
 bool QXmppTuneItem::isItem(const QDomElement &itemElement)
 {

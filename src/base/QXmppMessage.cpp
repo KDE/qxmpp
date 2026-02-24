@@ -360,7 +360,7 @@ void QXmppMessage::setParentThread(const QString &parent)
 }
 
 ///
-/// Returns a possibly attached URL from \xep{0066}: Out of Band Data
+/// Returns a possibly attached URL from \xep{0066, Out of Band Data}
 ///
 /// \since QXmpp 1.0
 ///
@@ -374,7 +374,7 @@ QString QXmppMessage::outOfBandUrl() const
 }
 
 ///
-/// Sets the attached URL for \xep{0066}: Out of Band Data
+/// Sets the attached URL for \xep{0066, Out of Band Data}
 ///
 /// This overrides all other urls that may be contained in the list of out of band urls.
 ///
@@ -388,7 +388,7 @@ void QXmppMessage::setOutOfBandUrl(const QString &url)
 }
 
 ///
-/// Returns possibly attached URLs from \xep{0066}: Out of Band Data
+/// Returns possibly attached URLs from \xep{0066, Out of Band Data}
 ///
 /// \since QXmpp 1.5
 ///
@@ -398,7 +398,7 @@ QVector<QXmppOutOfBandUrl> QXmppMessage::outOfBandUrls() const
 }
 
 ///
-/// Sets the attached URLs for \xep{0066}: Out of Band Data
+/// Sets the attached URLs for \xep{0066, Out of Band Data}
 ///
 /// \since QXmpp 1.5
 ///
@@ -408,7 +408,7 @@ void QXmppMessage::setOutOfBandUrls(const QVector<QXmppOutOfBandUrl> &urls)
 }
 
 ///
-/// Returns the message's XHTML body as defined by \xep{0071}: XHTML-IM.
+/// Returns the message's XHTML body as defined by \xep{0071, XHTML-IM}.
 ///
 /// \since QXmpp 0.6.2
 ///
@@ -418,7 +418,7 @@ QString QXmppMessage::xhtml() const
 }
 
 ///
-/// Sets the message's XHTML body as defined by \xep{0071}: XHTML-IM.
+/// Sets the message's XHTML body as defined by \xep{0071, XHTML-IM}.
 ///
 /// \since QXmpp 0.6.2
 ///
@@ -428,8 +428,7 @@ void QXmppMessage::setXhtml(const QString &xhtml)
 }
 
 ///
-/// Returns the the chat state notification according to \xep{0085}: Chat State
-/// Notifications.
+/// Returns the the chat state notification according to \xep{0085, Chat State Notifications}.
 ///
 /// \since QXmpp 0.2
 ///
@@ -439,8 +438,7 @@ QXmppMessage::State QXmppMessage::state() const
 }
 
 ///
-/// Sets the the chat state notification according to \xep{0085}: Chat State
-/// Notifications.
+/// Sets the the chat state notification according to \xep{0085, Chat State Notifications}.
 ///
 /// \since QXmpp 0.2
 ///
@@ -450,8 +448,8 @@ void QXmppMessage::setState(QXmppMessage::State state)
 }
 
 ///
-/// Returns the optional timestamp of the message specified using \xep{0093}:
-/// Legacy Delayed Delivery or using \xep{0203}: Delayed Delivery (preferred).
+/// Returns the optional timestamp of the message specified using \xep{0093, Legacy Delayed Delivery}
+/// or using \xep{0203, Delayed Delivery} (preferred).
 ///
 /// \since QXmpp 0.2
 ///
@@ -462,7 +460,7 @@ QDateTime QXmppMessage::stamp() const
 
 ///
 /// Sets the message's timestamp without modifying the type of the stamp
-/// (\xep{0093}: Legacy Delayed Delivery or \xep{0203}: Delayed Delivery).
+/// (\xep{0093, Legacy Delayed Delivery} or \xep{0203, Delayed Delivery}).
 ///
 /// By default messages are constructed with the new delayed delivery XEP, but
 /// parsed messages keep their type.
@@ -475,8 +473,7 @@ void QXmppMessage::setStamp(const QDateTime &stamp)
 }
 
 ///
-/// Returns true if a delivery receipt is requested, as defined by \xep{0184}:
-/// Message Delivery Receipts.
+/// Returns true if a delivery receipt is requested, as defined by \xep{0184, Message Delivery Receipts}.
 ///
 /// \since QXmpp 0.4
 ///
@@ -486,8 +483,7 @@ bool QXmppMessage::isReceiptRequested() const
 }
 
 ///
-/// Sets whether a delivery receipt is requested, as defined by \xep{0184}:
-/// Message Delivery Receipts.
+/// Sets whether a delivery receipt is requested, as defined by \xep{0184, Message Delivery Receipts}.
 ///
 /// \since QXmpp 0.4
 ///
@@ -521,8 +517,7 @@ void QXmppMessage::setReceiptId(const QString &id)
 }
 
 ///
-/// Returns true if the user's attention is requested, as defined by \xep{0224}:
-/// Attention.
+/// Returns true if the user's attention is requested, as defined by \xep{0224, Attention}.
 ///
 /// \since QXmpp 0.4
 ///
@@ -532,8 +527,7 @@ bool QXmppMessage::isAttentionRequested() const
 }
 
 ///
-/// Sets whether the user's attention is requested, as defined by \xep{0224}:
-/// Attention.
+/// Sets whether the user's attention is requested, as defined by \xep{0224, Attention}.
 ///
 /// \param requested Whether to request attention (true) or not (false)
 ///
@@ -545,7 +539,7 @@ void QXmppMessage::setAttentionRequested(bool requested)
 }
 
 ///
-/// Returns a list of data packages attached using \xep{0231}: Bits of Binary.
+/// Returns a list of data packages attached using \xep{0231, Bits of Binary}.
 ///
 /// This could be used to resolve \c cid: URIs found in the X-HTML body.
 ///
@@ -557,7 +551,7 @@ QXmppBitsOfBinaryDataList QXmppMessage::bitsOfBinaryData() const
 }
 
 ///
-/// Returns a list of data attached using \xep{0231}: Bits of Binary.
+/// Returns a list of data attached using \xep{0231, Bits of Binary}.
 ///
 /// This could be used to resolve \c cid: URIs found in the X-HTML body.
 ///
@@ -569,7 +563,7 @@ QXmppBitsOfBinaryDataList &QXmppMessage::bitsOfBinaryData()
 }
 
 ///
-/// Sets a list of \xep{0231}: Bits of Binary attachments to be included.
+/// Sets a list of \xep{0231, Bits of Binary} attachments to be included.
 ///
 /// \since QXmpp 1.2
 ///
@@ -579,8 +573,7 @@ void QXmppMessage::setBitsOfBinaryData(const QXmppBitsOfBinaryDataList &bitsOfBi
 }
 
 ///
-/// Returns whether the given text is a '/me command' as defined in \xep{0245}:
-/// The /me Command.
+/// Returns whether the given text is a '/me command' as defined in \xep{0245, The /me Command}.
 ///
 /// \since QXmpp 1.3
 ///
@@ -591,7 +584,7 @@ bool QXmppMessage::isSlashMeCommand(const QString &body)
 
 ///
 /// Returns whether the body of the message is a '/me command' as defined in
-/// \xep{0245}: The /me Command.
+/// \xep{0245, The /me Command}.
 ///
 /// \note If you want to check a custom string for the /me command, you can use
 /// the static version of this method. This can be helpful when checking user
@@ -609,7 +602,7 @@ bool QXmppMessage::isSlashMeCommand() const
 ///
 /// This cuts off '/me ' (with the space) from the body, in case the body
 /// starts with that. In case the body does not contain a /me command as
-/// defined in \xep{0245}: The /me Command, a null string is returned.
+/// defined in \xep{0245, The /me Command}, a null string is returned.
 ///
 /// This is useful when displaying the /me command correctly to the user.
 ///
@@ -628,7 +621,7 @@ QString QXmppMessage::slashMeCommandText(const QString &body)
 ///
 /// This cuts off '/me ' (with the space) from the body, in case the body
 /// starts with that. In case the body does not contain a /me command as
-/// defined in \xep{0245}: The /me Command, a null string is returned.
+/// defined in \xep{0245, The /me Command}, a null string is returned.
 ///
 /// This is useful when displaying the /me command correctly to the user.
 ///
@@ -641,7 +634,7 @@ QString QXmppMessage::slashMeCommandText() const
 
 ///
 /// Returns the JID for a multi-user chat direct invitation as defined by
-/// \xep{0249}: Direct MUC Invitations.
+/// \xep{0249, Direct MUC Invitations}.
 ///
 /// \since QXmpp 0.7.4
 ///
@@ -652,7 +645,7 @@ QString QXmppMessage::mucInvitationJid() const
 
 ///
 /// Sets the JID for a multi-user chat direct invitation as defined by
-/// \xep{0249}: Direct MUC Invitations.
+/// \xep{0249, Direct MUC Invitations}.
 ///
 /// \since QXmpp 0.7.4
 ///
@@ -663,7 +656,7 @@ void QXmppMessage::setMucInvitationJid(const QString &jid)
 
 ///
 /// Returns the password for a multi-user chat direct invitation as defined by
-/// \xep{0249}: Direct MUC Invitations.
+/// \xep{0249, Direct MUC Invitations}.
 ///
 /// \since QXmpp 0.7.4
 ///
@@ -674,7 +667,7 @@ QString QXmppMessage::mucInvitationPassword() const
 
 ///
 /// Sets the \a password for a multi-user chat direct invitation as defined by
-/// \xep{0249}: Direct MUC Invitations.
+/// \xep{0249, Direct MUC Invitations}.
 ///
 /// \since QXmpp 0.7.4
 ///
@@ -685,7 +678,7 @@ void QXmppMessage::setMucInvitationPassword(const QString &password)
 
 ///
 /// Returns the reason for a multi-user chat direct invitation as defined by
-/// \xep{0249}: Direct MUC Invitations.
+/// \xep{0249, Direct MUC Invitations}.
 ///
 /// \since QXmpp 0.7.4
 ///
@@ -696,7 +689,7 @@ QString QXmppMessage::mucInvitationReason() const
 
 ///
 /// Sets the \a reason for a multi-user chat direct invitation as defined by
-/// \xep{0249}: Direct MUC Invitations.
+/// \xep{0249, Direct MUC Invitations}.
 ///
 /// \since QXmpp 0.7.4
 ///
@@ -707,8 +700,7 @@ void QXmppMessage::setMucInvitationReason(const QString &reason)
 
 ///
 /// Returns if the message is marked with a &lt;private/&gt; tag, in which case
-/// it will not be forwarded to other resources according to \xep{0280}: Message
-/// Carbons.
+/// it will not be forwarded to other resources according to \xep{0280, Message Carbons}.
 ///
 /// \since QXmpp 1.0
 ///
@@ -720,7 +712,7 @@ bool QXmppMessage::isPrivate() const
 ///
 /// If true is passed, the message is marked with a &lt;private/&gt; tag, in
 /// which case it will not be forwarded to other resources according to
-/// \xep{0280}: Message Carbons.
+/// \xep{0280, Message Carbons}.
 ///
 /// \since QXmpp 1.0
 ///
@@ -752,9 +744,8 @@ void QXmppMessage::setCarbonForwarded(bool forwarded)
 }
 
 ///
-/// Returns the message id to replace with this message as used in \xep{0308}:
-/// Last Message Correction. If the returned string is empty, this message is
-/// not replacing another.
+/// Returns the message id to replace with this message as used in \xep{0308, Last Message Correction}.
+/// If the returned string is empty, this message is not replacing another.
 ///
 /// \since QXmpp 1.0
 ///
@@ -764,8 +755,7 @@ QString QXmppMessage::replaceId() const
 }
 
 ///
-/// Sets the message id to replace with this message as in \xep{0308}: Last
-/// Message Correction.
+/// Sets the message id to replace with this message as in \xep{0308, Last Message Correction}.
 ///
 /// \since QXmpp 1.0
 ///
@@ -775,8 +765,7 @@ void QXmppMessage::setReplaceId(const QString &replaceId)
 }
 
 ///
-/// Returns true if a message is markable, as defined by \xep{0333}: Chat
-/// Markers.
+/// Returns true if a message is markable, as defined by \xep{0333, Chat Markers}.
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -786,7 +775,7 @@ bool QXmppMessage::isMarkable() const
 }
 
 ///
-/// Sets if the message is markable, as defined by \xep{0333}: Chat Markers.
+/// Sets if the message is markable, as defined by \xep{0333, Chat Markers}.
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -796,7 +785,7 @@ void QXmppMessage::setMarkable(const bool markable)
 }
 
 ///
-/// Returns the message's marker id, as defined by \xep{0333}: Chat Markers.
+/// Returns the message's marker id, as defined by \xep{0333, Chat Markers}.
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -806,7 +795,7 @@ QString QXmppMessage::markedId() const
 }
 
 ///
-/// Sets the message's marker id, as defined by \xep{0333}: Chat Markers.
+/// Sets the message's marker id, as defined by \xep{0333, Chat Markers}.
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -816,7 +805,7 @@ void QXmppMessage::setMarkerId(const QString &markerId)
 }
 
 ///
-/// Returns the message's marker thread, as defined by \xep{0333}: Chat Markers.
+/// Returns the message's marker thread, as defined by \xep{0333, Chat Markers}.
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -826,7 +815,7 @@ QString QXmppMessage::markedThread() const
 }
 
 ///
-/// Sets the message's marked thread, as defined by \xep{0333}: Chat Markers.
+/// Sets the message's marked thread, as defined by \xep{0333, Chat Markers}.
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -836,7 +825,7 @@ void QXmppMessage::setMarkedThread(const QString &markedThread)
 }
 
 ///
-/// Returns the message's marker, as defined by \xep{0333}: Chat Markers.
+/// Returns the message's marker, as defined by \xep{0333, Chat Markers}.
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -846,7 +835,7 @@ QXmppMessage::Marker QXmppMessage::marker() const
 }
 
 ///
-/// Sets the message's marker, as defined by \xep{0333}: Chat Markers
+/// Sets the message's marker, as defined by \xep{0333, Chat Markers}
 ///
 /// \since QXmpp 0.8.1
 ///
@@ -857,7 +846,7 @@ void QXmppMessage::setMarker(const Marker marker)
 
 ///
 /// Returns true if the message contains the hint passed, as defined in
-/// \xep{0334}: Message Processing Hints
+/// \xep{0334, Message Processing Hints}
 ///
 /// \since QXmpp 1.1
 ///
@@ -867,8 +856,7 @@ bool QXmppMessage::hasHint(const Hint hint) const
 }
 
 ///
-/// Adds a hint to the message, as defined in \xep{0334}: Message Processing
-/// Hints
+/// Adds a hint to the message, as defined in \xep{0334, Message Processing Hints}
 ///
 /// \since QXmpp 1.1
 ///
@@ -878,8 +866,7 @@ void QXmppMessage::addHint(const Hint hint)
 }
 
 ///
-/// Removes a hint from the message, as defined in \xep{0334}: Message
-/// Processing Hints
+/// Removes a hint from the message, as defined in \xep{0334, Message Processing Hints}
 ///
 /// \since QXmpp 1.1
 ///
@@ -889,8 +876,7 @@ void QXmppMessage::removeHint(const Hint hint)
 }
 
 ///
-/// Removes all hints from the message, as defined in \xep{0334}: Message
-/// Processing Hints
+/// Removes all hints from the message, as defined in \xep{0334, Message Processing Hints}
 ///
 /// \since QXmpp 1.1
 ///
@@ -900,8 +886,7 @@ void QXmppMessage::removeAllHints()
 }
 
 ///
-/// Returns a Jingle Message Initiation element as defined in \xep{0353}: Jingle Message
-/// Initiation.
+/// Returns a Jingle Message Initiation element as defined in \xep{0353, Jingle Message Initiation}.
 ///
 std::optional<QXmppJingleMessageInitiationElement> QXmppMessage::jingleMessageInitiationElement() const
 {
@@ -909,8 +894,7 @@ std::optional<QXmppJingleMessageInitiationElement> QXmppMessage::jingleMessageIn
 }
 
 ///
-/// Sets a Jingle Message Initiation element as defined in \xep{0353}: Jingle Message
-/// Initiation.
+/// Sets a Jingle Message Initiation element as defined in \xep{0353, Jingle Message Initiation}.
 ///
 void QXmppMessage::setJingleMessageInitiationElement(const std::optional<QXmppJingleMessageInitiationElement> &jingleMessageInitiationElement)
 {
@@ -918,8 +902,7 @@ void QXmppMessage::setJingleMessageInitiationElement(const std::optional<QXmppJi
 }
 
 ///
-/// Returns the stanza ID of the message according to \xep{0359}: Unique and
-/// Stable Stanza IDs.
+/// Returns the stanza ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
 ///
 /// \deprecated Use stanzaIds() instead.
 ///
@@ -931,8 +914,7 @@ QString QXmppMessage::stanzaId() const
 }
 
 ///
-/// Sets the stanza ID of the message according to \xep{0359}: Unique and
-/// Stable Stanza IDs.
+/// Sets the stanza ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
 ///
 /// \deprecated Use setStanzaIds() instead.
 ///
@@ -948,8 +930,7 @@ void QXmppMessage::setStanzaId(const QString &id)
 }
 
 ///
-/// Returns the creator of the stanza ID according to \xep{0359}: Unique and
-/// Stable Stanza IDs.
+/// Returns the creator of the stanza ID according to \xep{0359, Unique and Stable Stanza IDs}.
 ///
 /// \deprecated Use stanzaIds() instead.
 ///
@@ -961,8 +942,7 @@ QString QXmppMessage::stanzaIdBy() const
 }
 
 ///
-/// Sets the creator of the stanza ID according to \xep{0359}: Unique and
-/// Stable Stanza IDs.
+/// Sets the creator of the stanza ID according to \xep{0359, Unique and Stable Stanza IDs}.
 ///
 /// \deprecated Use setStanzaIds() instead.
 ///
@@ -998,8 +978,7 @@ void QXmppMessage::setStanzaIds(const QVector<QXmppStanzaId> &ids)
 }
 
 ///
-/// Returns the origin ID of the message according to \xep{0359}: Unique and
-/// Stable Stanza IDs.
+/// Returns the origin ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
 ///
 /// \since QXmpp 1.3
 ///
@@ -1009,8 +988,7 @@ QString QXmppMessage::originId() const
 }
 
 ///
-/// Sets the origin ID of the message according to \xep{0359}: Unique and
-/// Stable Stanza IDs.
+/// Sets the origin ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
 ///
 /// \since QXmpp 1.3
 ///
@@ -1020,8 +998,7 @@ void QXmppMessage::setOriginId(const QString &id)
 }
 
 ///
-/// Returns the message id this message is linked/attached to. See \xep{0367}:
-/// Message Attaching for details.
+/// Returns the message id this message is linked/attached to. See \xep{0367, Message Attaching} for details.
 ///
 /// \since QXmpp 1.1
 ///
@@ -1031,7 +1008,7 @@ QString QXmppMessage::attachId() const
 }
 
 ///
-/// Sets the id of the attached message as in \xep{0367}: Message Attaching.
+/// Sets the id of the attached message as in \xep{0367, Message Attaching}.
 /// This can be used for a "reply to" or "reaction" function.
 ///
 /// The used message id depends on the message context, see the Business rules
@@ -1166,8 +1143,7 @@ QString QXmppMessage::encryptionName() const
 }
 
 ///
-/// Sets the name of the encryption method for \xep{0380}: Explicit Message
-/// Encryption.
+/// Sets the name of the encryption method for \xep{0380, Explicit Message Encryption}.
 ///
 /// \note This should only be used, if the encryption method is custom and is
 /// not one of the methods listed in the XEP.
@@ -1180,8 +1156,8 @@ void QXmppMessage::setEncryptionName(const QString &encryptionName)
 }
 
 ///
-/// Returns true, if this is a spoiler message according to \xep{0382}: Spoiler
-/// messages. The spoiler hint however can still be empty.
+/// Returns true, if this is a spoiler message according to \xep{0382, Spoiler Messages}.
+/// The spoiler hint however can still be empty.
 ///
 /// A spoiler message's content should not be visible to the user by default.
 ///
@@ -1193,8 +1169,7 @@ bool QXmppMessage::isSpoiler() const
 }
 
 ///
-/// Sets whether this is a spoiler message as specified in \xep{0382}: Spoiler
-/// messages.
+/// Sets whether this is a spoiler message as specified in \xep{0382, Spoiler Messages}.
 ///
 /// The content of spoiler messages will not be displayed by default to the
 /// user. However, clients not supporting spoiler messages will still display
@@ -1208,7 +1183,7 @@ void QXmppMessage::setIsSpoiler(bool isSpoiler)
 }
 
 ///
-/// Returns the spoiler hint as specified in \xep{0382}: Spoiler messages.
+/// Returns the spoiler hint as specified in \xep{0382, Spoiler Messages}.
 ///
 /// The hint may be empty, even if isSpoiler is true.
 ///
@@ -1220,7 +1195,7 @@ QString QXmppMessage::spoilerHint() const
 }
 
 ///
-/// Sets a spoiler hint for \xep{0382}: Spoiler messages. If the spoiler hint
+/// Sets a spoiler hint for \xep{0382, Spoiler Messages}. If the spoiler hint
 /// is not empty, isSpoiler will be set to true.
 ///
 /// A spoiler hint is optional for spoiler messages.
