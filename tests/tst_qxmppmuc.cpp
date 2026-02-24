@@ -41,6 +41,7 @@ private:
     Q_SLOT void sendMessage();
     Q_SLOT void sendMessageError();
     Q_SLOT void sendPrivateMessage();
+    Q_SLOT void setSubject();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -493,6 +494,61 @@ void tst_QXmppMuc::sendPrivateMessage()
     QCOMPARE(sentMsg.type(), QXmppMessage::Chat);
     QCOMPARE(sentMsg.to(), u"coven@chat.shakespeare.lit/firstwitch"_s);
     QCOMPARE(sentMsg.body(), u"I'll give thee a wind."_s);
+}
+
+void tst_QXmppMuc::setSubject()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join the room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QCOMPARE(room.subject().value(), u"Cauldron"_s);
+
+    // Change subject
+    auto subjectTask = room.setSubject(u"New Spells"_s);
+    QVERIFY(!subjectTask.isFinished());
+
+    // Verify the sent XML
+    auto sent = test.takePacket();
+    QXmppMessage sentMsg;
+    parsePacket(sentMsg, sent.toUtf8());
+    QCOMPARE(sentMsg.type(), QXmppMessage::GroupChat);
+    QCOMPARE(sentMsg.subject(), u"New Spells"_s);
+    QVERIFY(sentMsg.body().isEmpty());
+    QVERIFY(!sentMsg.originId().isEmpty());
+
+    // Inject reflected subject message with same origin-id
+    QXmppMessage reflected;
+    parsePacket(reflected,
+                QStringLiteral("<message from='coven@chat.shakespeare.lit/thirdwitch' type='groupchat'>"
+                               "<subject>New Spells</subject>"
+                               "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
+                               "</message>")
+                    .arg(sentMsg.originId())
+                    .toUtf8());
+    muc->handleMessage(reflected);
+
+    QVERIFY(subjectTask.isFinished());
+    expectVariant<QXmpp::Success>(subjectTask.result());
+    QCOMPARE(room.subject().value(), u"New Spells"_s);
 }
 
 void tst_QXmppMuc::roomInfoForm()

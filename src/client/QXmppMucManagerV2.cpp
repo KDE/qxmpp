@@ -906,3 +906,19 @@ QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QString &occupant
 
     return m_manager->client()->send(std::move(message));
 }
+
+///
+/// Changes the room subject.
+///
+/// Sends a subject-only groupchat message. The returned task completes when
+/// the MUC service reflects the subject change, or with an error if the
+/// service rejects it or the request times out.
+///
+/// \sa subject()
+///
+QXmppTask<Result<>> QXmppMucRoomV2::setSubject(const QString &subject)
+{
+    QXmppMessage message;
+    message.setSubject(subject);
+    return sendMessage(std::move(message));
+}
