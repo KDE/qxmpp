@@ -153,6 +153,7 @@ public:
     QBindable<QString> subject() const;
     QBindable<QString> nickname() const;
     QBindable<bool> joined() const;
+    QList<QXmppMucParticipant> participants() const;
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);
