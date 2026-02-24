@@ -27,7 +27,7 @@ struct QXmppMucManagerV2Private {
     std::optional<QList<QXmppMucBookmark>> bookmarks;
     std::unordered_map<QString, QXmpp::Private::MucRoomData> rooms;
     uint32_t participantIdCounter = 0;
-    std::chrono::milliseconds joinTimeout { QXmpp::Private::MucJoinTimeout };
+    std::chrono::milliseconds timeout { QXmpp::Private::MucJoinTimeout };
 
     QXmppPubSubManager *pubsub();
     QXmppDiscoveryManager *disco();
