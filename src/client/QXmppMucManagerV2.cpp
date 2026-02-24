@@ -228,7 +228,6 @@ struct MucRoomData {
     QProperty<QString> subject;
     QProperty<QString> nickname;
     QProperty<bool> joined = QProperty<bool> { false };
-    std::optional<uint32_t> participantId;
     std::unordered_map<uint32_t, MucParticipantData> participants;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     QList<QXmppMessage> historyMessages;
@@ -252,8 +251,6 @@ struct MucRoomData {
 /// bookmarksReset(), bookmarksAdded(), bookmarksRemoved() and bookmarksChanged().
 ///
 /// The QXmppPubSubManager must be registered with the client.
-///
-/// \note This manager is work-in-progress and joining MUCs is not yet implemented.
 ///
 /// \ingroup Managers
 /// \since QXmpp 1.13
@@ -404,6 +401,9 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
                                                               const QString &password)
 {
     // nickname empty check
+    if (nickname.isEmpty()) {
+        return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Nickname must not be empty."_s });
+    }
     if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
         return makeReadyTask<Result<QXmppMucRoomV2>>(room(jid));
     }
@@ -433,7 +433,7 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
         d->handleJoinTimeout(roomJid);
     });
     roomData.joinTimer.reset(timer);
-    timer->start(d->joinTimeout);
+    timer->start(d->timeout);
 
     return task;
 }
@@ -746,7 +746,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
     case JoiningOccupantPresences:
         if (presence.type() == QXmppPresence::Available) {
             for (const auto &[pId, participant] : data.participants) {
-                if (participant.nickname == nickname) {
+                if (participant.nickname.value() == nickname) {
                     // room sent two presences for the same nickname
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same nickname"_s });
                     return;
@@ -886,7 +886,7 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
 void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
 {
     using namespace std::chrono;
-    auto secs = duration_cast<seconds>(joinTimeout).count();
+    auto secs = duration_cast<seconds>(timeout).count();
     throwRoomError(roomJid, QXmppError { u"Joining room timed out after %1 seconds."_s.arg(secs) });
 }
 
@@ -998,7 +998,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
     });
 
     data.pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
-    timer->start(m_manager->d->joinTimeout);
+    timer->start(m_manager->d->timeout);
 
     m_manager->client()->send(std::move(message));
     return task;
@@ -1133,11 +1133,11 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
     // Start timeout timer
     auto *timer = new QTimer();
     timer->setSingleShot(true);
-    QObject::connect(timer, &QTimer::timeout, m_manager, [this]() {
-        m_manager->d->handleLeaveTimeout(m_jid);
+    QObject::connect(timer, &QTimer::timeout, m_manager, [d = m_manager->d.get(), roomJid = m_jid]() {
+        d->handleLeaveTimeout(roomJid);
     });
     data.leaveTimer.reset(timer);
-    timer->start(m_manager->d->joinTimeout);
+    timer->start(m_manager->d->timeout);
 
     return task;
 }

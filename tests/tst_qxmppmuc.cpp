@@ -288,7 +288,7 @@ void tst_QXmppMuc::joinRoomTimeout()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     // Set a short timeout for testing (100ms)
-    muc->d->joinTimeout = std::chrono::milliseconds(100);
+    muc->d->timeout = std::chrono::milliseconds(100);
 
     auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
@@ -309,7 +309,7 @@ void tst_QXmppMuc::joinRoomTimerStopped()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     // Set a short timeout for testing (1 second)
-    muc->d->joinTimeout = std::chrono::milliseconds(1000);
+    muc->d->timeout = std::chrono::milliseconds(1000);
 
     auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
@@ -881,7 +881,7 @@ void tst_QXmppMuc::leaveRoomTimeout()
     TestClient test(true);
     test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
-    muc->d->joinTimeout = std::chrono::milliseconds(50);
+    muc->d->timeout = std::chrono::milliseconds(50);
 
     // Join the room
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
