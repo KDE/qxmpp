@@ -45,6 +45,7 @@ private:
     Q_SLOT void setSubject();
     Q_SLOT void changeNickname();
     Q_SLOT void participantNicknameChange();
+    Q_SLOT void participantJoinLeave();
     Q_SLOT void changePresence();
     Q_SLOT void leaveRoom();
     Q_SLOT void leaveRoomTimeout();
@@ -711,6 +712,78 @@ void tst_QXmppMuc::participantNicknameChange()
     // Same participant handle, new nickname
     QVERIFY(participant.isValid());
     QCOMPARE(participant.nickname().value(), u"witch1"_s);
+}
+
+void tst_QXmppMuc::participantJoinLeave()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Track participantJoined signal
+    QXmppMucParticipant joinedParticipant(muc, u""_s, 0);
+    bool joinSignalReceived = false;
+    QObject::connect(muc, &QXmppMucManagerV2::participantJoined, muc,
+                     [&](const QString &roomJid, const QXmppMucParticipant &p) {
+                         joinSignalReceived = true;
+                         joinedParticipant = p;
+                     });
+
+    // firstwitch joins
+    QXmppPresence firstWitchJoin;
+    parsePacket(firstWitchJoin,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(firstWitchJoin);
+
+    QVERIFY(joinSignalReceived);
+    QVERIFY(joinedParticipant.isValid());
+    QCOMPARE(joinedParticipant.nickname().value(), u"firstwitch"_s);
+
+    // Track participantLeft signal
+    QXmppMucParticipant leftParticipant(muc, u""_s, 0);
+    bool leftSignalReceived = false;
+    QObject::connect(muc, &QXmppMucManagerV2::participantLeft, muc,
+                     [&](const QString &roomJid, const QXmppMucParticipant &p) {
+                         leftSignalReceived = true;
+                         leftParticipant = p;
+                     });
+
+    // firstwitch leaves
+    QXmppPresence firstWitchLeave;
+    parsePacket(firstWitchLeave,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='none'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(firstWitchLeave);
+
+    QVERIFY(leftSignalReceived);
+    // After the signal, participant data is cleaned up
+    QVERIFY(!joinedParticipant.isValid());
 }
 
 void tst_QXmppMuc::changePresence()

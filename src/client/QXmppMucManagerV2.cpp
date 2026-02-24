@@ -819,13 +819,31 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             if (promise) {
                 promise->finish(Success());
             }
+        } else if (presence.type() == QXmppPresence::Unavailable && !presence.mucStatusCodes().contains(110)) {
+            // Another participant left the room
+            for (auto pItr = data.participants.begin(); pItr != data.participants.end(); ++pItr) {
+                if (pItr->second.nickname.value() == nickname) {
+                    auto participantId = pItr->first;
+                    Q_EMIT q->participantLeft(roomJid, QXmppMucParticipant(q, roomJid, participantId));
+                    data.participants.erase(pItr);
+                    break;
+                }
+            }
         } else if (presence.type() == QXmppPresence::Available) {
-            // Presence update for existing participant
+            // Check if participant already exists
+            bool found = false;
             for (auto &[pId, pData] : data.participants) {
                 if (pData.nickname.value() == nickname) {
                     pData.setPresence(presence);
+                    found = true;
                     break;
                 }
+            }
+            if (!found) {
+                // New participant joined
+                auto id = generateParticipantId();
+                data.participants.emplace(id, presence);
+                Q_EMIT q->participantJoined(roomJid, QXmppMucParticipant(q, roomJid, id));
             }
         } else if (presence.type() == QXmppPresence::Error) {
             if (data.leavePromise) {
