@@ -104,7 +104,11 @@ public:
     /// Emitted when a participant joins a room.
     Q_SIGNAL void participantJoined(const QString &roomJid, const QXmppMucParticipant &participant);
     /// Emitted when a participant leaves a room.
-    Q_SIGNAL void participantLeft(const QString &roomJid, const QXmppMucParticipant &participant);
+    Q_SIGNAL void participantLeft(const QString &roomJid, const QXmppMucParticipant &participant, QXmpp::Muc::LeaveReason reason);
+    /// Emitted when we are forcibly removed from a room (kicked, banned, etc.).
+    /// The room state is still accessible during this signal's emission.
+    /// After all handlers return, the room state is cleaned up.
+    Q_SIGNAL void removedFromRoom(const QString &roomJid, QXmpp::Muc::LeaveReason reason);
     /// Emitted when room history messages are received during joining.
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
     /// Emitted when a groupchat message is received in a joined room.
@@ -177,9 +181,9 @@ public:
     template<typename Func>
     QMetaObject::Connection onParticipantLeft(QObject *context, Func &&f) const
     {
-        return QObject::connect(m_manager, &QXmppMucManagerV2::participantLeft, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant) {
+        return QObject::connect(m_manager, &QXmppMucManagerV2::participantLeft, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant, QXmpp::Muc::LeaveReason reason) {
             if (roomJid == jid) {
-                f(participant);
+                f(participant, reason);
             }
         });
     }
