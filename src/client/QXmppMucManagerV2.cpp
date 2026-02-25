@@ -62,8 +62,12 @@ static std::optional<Muc::Role> roleFromLegacy(QXmppMucItem::Role role)
     return {};
 }
 
-static Muc::LeaveReason leaveReasonFromStatusCodes(const QList<int> &codes)
+static Muc::LeaveReason leaveReasonFromPresence(const QXmppPresence &presence)
 {
+    if (presence.mucDestroy()) {
+        return Muc::LeaveReason::RoomDestroyed;
+    }
+    const auto &codes = presence.mucStatusCodes();
     if (codes.contains(301)) {
         return Muc::LeaveReason::Banned;
     }
@@ -827,14 +831,14 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             }
         } else if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
             // Self-unavailable without 303: we left the room
-            auto reason = leaveReasonFromStatusCodes(presence.mucStatusCodes());
+            auto reason = leaveReasonFromPresence(presence);
             std::optional<QXmppPromise<Result<>>> promise;
             if (data.leavePromise) {
                 promise = std::move(data.leavePromise);
             }
 
             if (reason != Muc::LeaveReason::Left) {
-                Q_EMIT q->removedFromRoom(roomJid, reason);
+                Q_EMIT q->removedFromRoom(roomJid, reason, presence.mucDestroy());
             }
 
             rooms.erase(roomJid);
@@ -844,7 +848,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             }
         } else if (presence.type() == QXmppPresence::Unavailable && !presence.mucStatusCodes().contains(110)) {
             // Another participant left the room
-            auto reason = leaveReasonFromStatusCodes(presence.mucStatusCodes());
+            auto reason = leaveReasonFromPresence(presence);
             for (auto pItr = data.participants.begin(); pItr != data.participants.end(); ++pItr) {
                 if (pItr->second.nickname.value() == nickname) {
                     auto participantId = pItr->first;

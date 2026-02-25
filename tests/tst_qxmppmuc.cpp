@@ -49,6 +49,7 @@ private:
     Q_SLOT void participantsList();
     Q_SLOT void participantKicked();
     Q_SLOT void selfBanned();
+    Q_SLOT void roomDestroyed();
     Q_SLOT void changePresence();
     Q_SLOT void leaveRoom();
     Q_SLOT void leaveRoomTimeout();
@@ -939,7 +940,7 @@ void tst_QXmppMuc::selfBanned()
     bool removedSignalReceived = false;
     bool roomValidDuringSignal = false;
     QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
-                     [&](const QString &, Muc::LeaveReason reason) {
+                     [&](const QString &, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &) {
                          removedSignalReceived = true;
                          removedReason = reason;
                          roomValidDuringSignal = room.isValid();
@@ -961,6 +962,64 @@ void tst_QXmppMuc::selfBanned()
     QCOMPARE(removedReason, Muc::LeaveReason::Banned);
     QVERIFY(roomValidDuringSignal);
     // After signal handlers, room is cleaned up
+    QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::roomDestroyed()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Track removedFromRoom signal
+    Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
+    std::optional<Muc::Destroy> destroyInfo;
+    bool removedSignalReceived = false;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                     [&](const QString &, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &destroy) {
+                         removedSignalReceived = true;
+                         removedReason = reason;
+                         destroyInfo = destroy;
+                     });
+
+    // Room is destroyed (XEP-0045 §10.9)
+    QXmppPresence destroyPresence;
+    parsePacket(destroyPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<destroy jid='darkcave@chat.shakespeare.lit'>"
+                "<reason>Moved to a new room</reason>"
+                "</destroy>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(destroyPresence);
+
+    QVERIFY(removedSignalReceived);
+    QCOMPARE(removedReason, Muc::LeaveReason::RoomDestroyed);
+    QVERIFY(destroyInfo.has_value());
+    QCOMPARE(destroyInfo->alternateRoom(), u"darkcave@chat.shakespeare.lit"_s);
+    QCOMPARE(destroyInfo->reason(), u"Moved to a new room"_s);
     QVERIFY(!room.isValid());
 }
 

@@ -94,6 +94,41 @@ enum class LeaveReason {
     AffiliationChanged,
     /// The participant was removed because the room became members-only (status 332).
     MembersOnly,
+    /// The room was destroyed by its owner (XEP-0045 §10.9).
+    RoomDestroyed,
+};
+
+///
+/// \brief Information about a destroyed MUC room (XEP-0045 §10.9).
+///
+/// When a room owner destroys a room, the server sends an unavailable presence
+/// containing a \c &lt;destroy/&gt; element. This may include an alternate room
+/// JID and a human-readable reason.
+///
+/// \since QXmpp 1.15
+///
+class QXMPP_EXPORT Destroy
+{
+public:
+    /// Returns the JID of an alternate room, or an empty string if none was provided.
+    QString alternateRoom() const { return m_alternateRoom; }
+    /// Sets the JID of an alternate room.
+    void setAlternateRoom(const QString &alternateRoom) { m_alternateRoom = alternateRoom; }
+
+    /// Returns the human-readable reason for the room destruction.
+    QString reason() const { return m_reason; }
+    /// Sets the human-readable reason for the room destruction.
+    void setReason(const QString &reason) { m_reason = reason; }
+
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"destroy", QXmpp::Private::ns_muc_user };
+    static std::optional<Destroy> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+    /// \endcond
+
+private:
+    QString m_alternateRoom;
+    QString m_reason;
 };
 
 }  // namespace Muc

@@ -108,7 +108,8 @@ public:
     /// Emitted when we are forcibly removed from a room (kicked, banned, etc.).
     /// The room state is still accessible during this signal's emission.
     /// After all handlers return, the room state is cleaned up.
-    Q_SIGNAL void removedFromRoom(const QString &roomJid, QXmpp::Muc::LeaveReason reason);
+    /// The \a destroy parameter contains room destruction info if the reason is \c RoomDestroyed.
+    Q_SIGNAL void removedFromRoom(const QString &roomJid, QXmpp::Muc::LeaveReason reason, const std::optional<QXmpp::Muc::Destroy> &destroy);
     /// Emitted when room history messages are received during joining.
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
     /// Emitted when a groupchat message is received in a joined room.
