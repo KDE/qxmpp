@@ -124,6 +124,7 @@ protected:
 
 private:
     void onConnected();
+    void onDisconnected();
 
     const QXmpp::Private::MucRoomData *roomData(const QString &jid) const;
     const QXmpp::Private::MucParticipantData *participantData(const QString &roomJid, uint32_t participantId) const;

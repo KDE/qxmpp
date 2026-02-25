@@ -42,6 +42,8 @@ public:
     void inject(const String &xml) { inject(xmlToDom(xml)); }
 
     void injectPresence(const QXmppPresence &presence) { Q_EMIT presenceReceived(presence); }
+    void simulateConnected() { Q_EMIT connected(); }
+    void simulateDisconnected() { Q_EMIT disconnected(); }
 
     void inject(const QDomElement &element)
     {
