@@ -54,4 +54,38 @@ private:
     QSharedDataPointer<QXmppMucRoomInfoPrivate> d;
 };
 
+struct QXmppMucVoiceRequestPrivate;
+
+class QXMPP_EXPORT QXmppMucVoiceRequest : public QXmppExtensibleDataFormBase
+{
+public:
+    /// FORM_TYPE of this data form
+    static constexpr QStringView DataFormType = QXmpp::Private::ns_muc_request;
+    static std::optional<QXmppMucVoiceRequest> fromDataForm(const QXmppDataForm &);
+
+    QXmppMucVoiceRequest();
+    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppMucVoiceRequest)
+
+    QString jid() const;
+    void setJid(const QString &jid);
+
+    QString nick() const;
+    void setNick(const QString &nick);
+
+    std::optional<bool> requestAllow() const;
+    void setRequestAllow(std::optional<bool> allow);
+
+    QXmppDataForm toDataForm() const override;
+
+protected:
+    QString formType() const override;
+    bool parseField(const QXmppDataForm::Field &) override;
+    void serializeForm(QXmppDataForm &) const override;
+
+private:
+    QSharedDataPointer<QXmppMucVoiceRequestPrivate> d;
+};
+
+Q_DECLARE_METATYPE(QXmppMucVoiceRequest)
+
 #endif  // QXMPPMUCFORMS_H
