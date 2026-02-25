@@ -55,6 +55,13 @@ make doc
 # Output: doc/html/index.html
 ```
 
+Documentation strings are preferrably written in the cpp file. Use \since tags for new functions with QXmpp X.Y with X.Y being the next version.
+
+## Git Commit style
+
+Abbreviate QXmpp in class names (QXmppMessage -> Message).
+Start commit messages with a context (e.g. class) followed by a colon and a concise description of the change. Use uppercase for the first letter of the description.
+
 ## Code Formatting
 
 Uses clang-format (`.clang-format` at repo root). Install the pre-commit hook:
@@ -106,7 +113,7 @@ Stanza types implement `parse(const QDomElement &)` for deserialization and `toX
 **Namespace constants:**  
 XMPP XML namespaces are `constexpr QStringView` values in `QXmppConstants_p.h` under `QXmpp::Private`.
 
-**REUSE compliance:**  
+**REUSE compliance:**
 Every file must have an SPDX copyright header. Library source files use `LGPL-2.1-or-later`; build/config files use `CC0-1.0`. Binary/image files without inline headers get a companion `.license` file.
 
 **CMake targets:**  
