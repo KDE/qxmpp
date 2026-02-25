@@ -193,3 +193,15 @@ void QXmppMucRoomInfo::setAvatarHashes(const QStringList &hashes)
 {
     d->avatarHashes = hashes;
 }
+
+bool QXmppMucRoomInfo::operator==(const QXmppMucRoomInfo &other) const
+{
+    return d->maxHistoryFetch == other.d->maxHistoryFetch &&
+        d->contactJids == other.d->contactJids &&
+        d->description == other.d->description &&
+        d->language == other.d->language &&
+        d->occupants == other.d->occupants &&
+        d->subject == other.d->subject &&
+        d->subjectChangeable == other.d->subjectChangeable &&
+        d->avatarHashes == other.d->avatarHashes;
+}
