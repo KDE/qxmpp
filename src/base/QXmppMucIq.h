@@ -132,6 +132,13 @@ public:
     QXmppDataForm form() const;
     void setForm(const QXmppDataForm &form);
 
+    QString destroyJid() const;
+    void setDestroyJid(const QString &jid);
+
+    QString destroyReason() const;
+    void setDestroyReason(const QString &reason);
+
+
     static bool isMucOwnerIq(const QDomElement &element);
 
 protected:
@@ -140,6 +147,8 @@ protected:
 
 private:
     QXmppDataForm m_form;
+    QString m_destroyJid;
+    QString m_destroyReason;
 };
 
 #endif
