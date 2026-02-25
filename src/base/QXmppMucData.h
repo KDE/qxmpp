@@ -131,6 +131,58 @@ private:
     QString m_reason;
 };
 
+///
+/// \brief A MUC room item carrying role and/or affiliation data (XEP-0045).
+///
+/// Used as a typed, modern replacement for QXmppMucItem in the V2 API.
+/// Items are returned from QXmppMucRoomV2::requestAffiliationList() and
+/// can represent any combination of JID, nickname, role, affiliation,
+/// reason, and actor.
+///
+/// \since QXmpp 1.15
+///
+class QXMPP_EXPORT Item
+{
+public:
+    /// Returns the (bare) JID of the user, or an empty string if not set.
+    QString jid() const { return m_jid; }
+    /// Sets the (bare) JID of the user.
+    void setJid(const QString &jid) { m_jid = jid; }
+
+    /// Returns the nickname of the occupant, or an empty string if not set.
+    QString nick() const { return m_nick; }
+    /// Sets the nickname of the occupant.
+    void setNick(const QString &nick) { m_nick = nick; }
+
+    /// Returns the affiliation, or \c std::nullopt if unspecified.
+    std::optional<Affiliation> affiliation() const { return m_affiliation; }
+    /// Sets the affiliation.
+    void setAffiliation(std::optional<Affiliation> affiliation) { m_affiliation = affiliation; }
+
+    /// Returns the role, or \c std::nullopt if unspecified.
+    std::optional<Role> role() const { return m_role; }
+    /// Sets the role.
+    void setRole(std::optional<Role> role) { m_role = role; }
+
+    /// Returns the human-readable reason, or an empty string if not set.
+    QString reason() const { return m_reason; }
+    /// Sets the human-readable reason.
+    void setReason(const QString &reason) { m_reason = reason; }
+
+    /// Returns the JID of the actor who performed the action, or an empty string if not set.
+    QString actor() const { return m_actor; }
+    /// Sets the JID of the actor.
+    void setActor(const QString &actor) { m_actor = actor; }
+
+private:
+    QString m_jid;
+    QString m_nick;
+    std::optional<Affiliation> m_affiliation;
+    std::optional<Role> m_role;
+    QString m_reason;
+    QString m_actor;
+};
+
 }  // namespace Muc
 
 }  // namespace QXmpp

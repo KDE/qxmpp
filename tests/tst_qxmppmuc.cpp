@@ -1630,10 +1630,10 @@ void tst_QXmppMuc::requestAffiliationList()
                 "</query></iq>"_s);
 
     QVERIFY(task.isFinished());
-    auto items = expectVariant<QList<QXmppMucItem>>(task.result());
+    auto items = expectVariant<QList<QXmpp::Muc::Item>>(task.result());
     QCOMPARE(items.size(), 2);
     QCOMPARE(items[0].jid(), u"macbeth@shakespeare.lit"_s);
-    QCOMPARE(items[0].affiliation(), QXmppMucItem::OutcastAffiliation);
+    QCOMPARE(items[0].affiliation(), QXmpp::Muc::Affiliation::Outcast);
     QCOMPARE(items[0].reason(), u"Treason"_s);
     QCOMPARE(items[1].jid(), u"iago@shakespeare.lit"_s);
 }

@@ -1993,7 +1993,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
 ///
 /// Only admins and owners are allowed to retrieve these lists.
 ///
-QXmppTask<Result<QList<QXmppMucItem>>> QXmppMucRoomV2::requestAffiliationList(QXmpp::Muc::Affiliation affiliation)
+QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp::Muc::Affiliation affiliation)
 {
     QXmppMucItem item;
     item.setAffiliation(affiliationToLegacy(affiliation));
@@ -2004,8 +2004,20 @@ QXmppTask<Result<QList<QXmppMucItem>>> QXmppMucRoomV2::requestAffiliationList(QX
     iq.setItems({ item });
 
     return chainIq(m_manager->client()->sendIq(std::move(iq)), m_manager,
-                   [](QXmppMucAdminIq &&iq) -> Result<QList<QXmppMucItem>> {
-                       return iq.items();
+                   [](QXmppMucAdminIq &&iq) -> Result<QList<Muc::Item>> {
+                       QList<Muc::Item> result;
+                       result.reserve(iq.items().size());
+                       for (const auto &legacy : iq.items()) {
+                           Muc::Item entry;
+                           entry.setJid(legacy.jid());
+                           entry.setNick(legacy.nick());
+                           entry.setAffiliation(affiliationFromLegacy(legacy.affiliation()));
+                           entry.setRole(roleFromLegacy(legacy.role()));
+                           entry.setReason(legacy.reason());
+                           entry.setActor(legacy.actor());
+                           result.append(std::move(entry));
+                       }
+                       return result;
                    });
 }
 
