@@ -215,6 +215,12 @@ public:
     void setWatchRoomConfig(bool watch);
     bool isWatchingRoomConfig() const;
 
+    QBindable<QStringList> avatarHashes() const;
+    QBindable<std::optional<QXmppMucManagerV2::Avatar>> avatar() const;
+    void setWatchAvatar(bool watch);
+    bool isWatchingAvatar() const;
+    QXmppTask<QXmpp::Result<>> setAvatar(std::optional<QXmppMucManagerV2::Avatar> avatar);
+
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);
     QXmppTask<QXmpp::Result<>> setSubject(const QString &subject);
