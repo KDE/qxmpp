@@ -69,11 +69,6 @@ public:
         QXmppMucBookmark newBookmark;
     };
 
-    struct Avatar {
-        QString contentType;
-        QByteArray data;
-    };
-
     QXmppMucManagerV2();
     ~QXmppMucManagerV2();
 
@@ -212,10 +207,10 @@ public:
     bool isWatchingRoomConfig() const;
 
     QBindable<QStringList> avatarHashes() const;
-    QBindable<std::optional<QXmppMucManagerV2::Avatar>> avatar() const;
+    QBindable<std::optional<QXmpp::Muc::Avatar>> avatar() const;
     void setWatchAvatar(bool watch);
     bool isWatchingAvatar() const;
-    QXmppTask<QXmpp::Result<>> setAvatar(std::optional<QXmppMucManagerV2::Avatar> avatar);
+    QXmppTask<QXmpp::Result<>> setAvatar(std::optional<QXmpp::Muc::Avatar> avatar);
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);

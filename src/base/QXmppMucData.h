@@ -183,6 +183,16 @@ private:
     QString m_actor;
 };
 
+///
+/// \brief Room avatar data (content type and raw bytes).
+///
+/// \since QXmpp 1.15
+///
+struct QXMPP_EXPORT Avatar {
+    QString contentType;
+    QByteArray data;
+};
+
 }  // namespace Muc
 
 }  // namespace QXmpp
