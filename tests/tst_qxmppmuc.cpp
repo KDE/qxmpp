@@ -72,6 +72,8 @@ private:
     Q_SLOT void roomInfoProperties();
     Q_SLOT void roomInfoStatus104();
     Q_SLOT void roomInfoBindable();
+    Q_SLOT void roomFeatureProperties();
+    Q_SLOT void roomFeatureStatus172_173();
     Q_SLOT void requestVoice();
     Q_SLOT void voiceRequestReceived();
     Q_SLOT void answerVoiceRequest();
@@ -1875,6 +1877,111 @@ void tst_QXmppMuc::answerVoiceRequest()
                 "</x>"
                 "</message>"_s);
     QVERIFY(!task.isFinished());
+}
+
+void tst_QXmppMuc::roomFeatureProperties()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Before disco#info: defaults
+    QVERIFY(!room.isNonAnonymous().value());
+    QVERIFY(room.isPublic().value());
+    QVERIFY(!room.isMembersOnly().value());
+    QVERIFY(!room.isModerated().value());
+    QVERIFY(!room.isPersistent().value());
+    QVERIFY(!room.isPasswordProtected().value());
+
+    // Inject disco#info with all room feature flags set
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='muc_nonanonymous'/>"
+                "<feature var='muc_membersonly'/>"
+                "<feature var='muc_moderated'/>"
+                "<feature var='muc_persistent'/>"
+                "<feature var='muc_passwordprotected'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(room.isNonAnonymous().value());
+    QVERIFY(!room.isPublic().value());  // muc_public absent → not public
+    QVERIFY(room.isMembersOnly().value());
+    QVERIFY(room.isModerated().value());
+    QVERIFY(room.isPersistent().value());
+    QVERIFY(room.isPasswordProtected().value());
+}
+
+void tst_QXmppMuc::roomFeatureStatus172_173()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Initially semi-anonymous
+    QVERIFY(!room.isNonAnonymous().value());
+
+    // Status 172: room is now non-anonymous
+    QXmppPresence status172;
+    parsePacket(status172,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='172'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(status172);
+    QVERIFY(room.isNonAnonymous().value());
+
+    // Status 173: room is now semi-anonymous again
+    QXmppPresence status173;
+    parsePacket(status173,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='173'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(status173);
+    QVERIFY(!room.isNonAnonymous().value());
 }
 
 QTEST_MAIN(tst_QXmppMuc)

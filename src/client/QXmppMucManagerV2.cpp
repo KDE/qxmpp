@@ -291,7 +291,14 @@ struct MucRoomData {
     std::optional<QXmppPromise<Result<>>> nickChangePromise;
     std::optional<QXmppPromise<Result<>>> leavePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
-    // Room feature flags populated from disco#info after joining
+    // Room feature flags populated from disco#info after joining (re-fetched on status code 104).
+    // isNonAnonymous is additionally updated on status codes 172/173.
+    QProperty<bool> isNonAnonymous;
+    QProperty<bool> isPublic = QProperty<bool> { true };
+    QProperty<bool> isMembersOnly;
+    QProperty<bool> isModerated;
+    QProperty<bool> isPersistent;
+    QProperty<bool> isPasswordProtected;
     // Room info fields populated from muc#roominfo (re-fetched on status code 104)
     QProperty<std::optional<QXmppMucRoomInfo>> roomInfo;
     // Convenience bindings derived from roomInfo
@@ -1014,6 +1021,13 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 promise.finish(QXmppError { error.text(), std::move(error) });
             }
         }
+        // Status 172/173: privacy-related anonymity change (XEP-0045 §10.2)
+        const auto &codes = presence.mucStatusCodes();
+        if (codes.contains(172)) {
+            data.isNonAnonymous = true;
+        } else if (codes.contains(173)) {
+            data.isNonAnonymous = false;
+        }
         break;
     }
 }
@@ -1083,7 +1097,16 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
         if (itr == rooms.end() || hasError(result)) {
             return;
         }
-        itr->second.roomInfo = getValue(result).template dataForm<QXmppMucRoomInfo>();
+        auto &info = getValue(result);
+        auto &data = itr->second;
+        data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
+        const auto &features = info.features();
+        data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
+        data.isPublic = features.contains(muc_feat_public);
+        data.isMembersOnly = features.contains(muc_feat_membersonly);
+        data.isModerated = features.contains(muc_feat_moderated);
+        data.isPersistent = features.contains(muc_feat_persistent);
+        data.isPasswordProtected = features.contains(muc_feat_passwordprotected);
     });
 }
 
@@ -1263,6 +1286,132 @@ QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
 }
 
 ///
+/// Returns whether the room is non-anonymous (XEP-0045 §4.2).
+///
+/// In a non-anonymous room, all occupants can see each other's real JIDs.
+/// In a semi-anonymous room (the default), only moderators can see real JIDs.
+///
+/// Populated from the \c muc_nonanonymous disco feature on join and re-fetched
+/// on status code 104. Also updated immediately on status codes 172 (now non-anonymous)
+/// and 173 (now semi-anonymous), without a round-trip.
+///
+/// Defaults to \c false (semi-anonymous) until disco\#info arrives.
+///
+/// \since QXmpp 1.15
+///
+QBindable<bool> QXmppMucRoomV2::isNonAnonymous() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->isNonAnonymous) };
+    }
+    return {};
+}
+
+///
+/// Returns whether the room is publicly listed (XEP-0045 §4.2).
+///
+/// Public rooms (\c muc_public) appear in service discovery results.
+/// Hidden rooms (\c muc_hidden) do not.
+///
+/// Populated from the \c muc_public disco feature on join and re-fetched
+/// on status code 104.
+///
+/// Defaults to \c true until disco\#info arrives.
+///
+/// \since QXmpp 1.15
+///
+QBindable<bool> QXmppMucRoomV2::isPublic() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->isPublic) };
+    }
+    return {};
+}
+
+///
+/// Returns whether the room is members-only (XEP-0045 §4.2).
+///
+/// In a members-only room (\c muc_membersonly), users must be on the member
+/// list to enter. Open rooms (\c muc_open) allow any non-banned user to join.
+///
+/// Populated from the \c muc_membersonly disco feature on join and re-fetched
+/// on status code 104.
+///
+/// Defaults to \c false until disco\#info arrives.
+///
+/// \since QXmpp 1.15
+///
+QBindable<bool> QXmppMucRoomV2::isMembersOnly() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->isMembersOnly) };
+    }
+    return {};
+}
+
+///
+/// Returns whether the room is moderated (XEP-0045 §4.2).
+///
+/// In a moderated room (\c muc_moderated), only occupants with voice
+/// (role Participant or Moderator) can send messages. Visitors cannot.
+///
+/// Populated from the \c muc_moderated disco feature on join and re-fetched
+/// on status code 104.
+///
+/// Defaults to \c false until disco\#info arrives.
+///
+/// \since QXmpp 1.15
+///
+QBindable<bool> QXmppMucRoomV2::isModerated() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->isModerated) };
+    }
+    return {};
+}
+
+///
+/// Returns whether the room is persistent (XEP-0045 §4.2).
+///
+/// A persistent room (\c muc_persistent) is not destroyed when the last
+/// occupant exits. A temporary room (\c muc_temporary) is destroyed automatically.
+///
+/// Populated from the \c muc_persistent disco feature on join and re-fetched
+/// on status code 104.
+///
+/// Defaults to \c false until disco\#info arrives.
+///
+/// \since QXmpp 1.15
+///
+QBindable<bool> QXmppMucRoomV2::isPersistent() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->isPersistent) };
+    }
+    return {};
+}
+
+///
+/// Returns whether the room requires a password to enter (XEP-0045 §4.2).
+///
+/// Password-protected rooms (\c muc_passwordprotected) require the correct
+/// password when joining (XEP-0045 §7.2.5).
+///
+/// Populated from the \c muc_passwordprotected disco feature on join and
+/// re-fetched on status code 104.
+///
+/// Defaults to \c false until disco\#info arrives.
+///
+/// \since QXmpp 1.15
+///
+QBindable<bool> QXmppMucRoomV2::isPasswordProtected() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->isPasswordProtected) };
+    }
+    return {};
+}
+
 /// Returns the full \c muc#roominfo data form from \xep{0045, Multi-User Chat}.
 ///
 /// The form is fetched via \c disco\#info automatically on join and re-fetched whenever
