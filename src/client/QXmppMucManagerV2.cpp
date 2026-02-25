@@ -594,97 +594,18 @@ QStringList QXmppMucManagerV2::discoveryFeatures() const
 const std::optional<QList<QXmppMucBookmark>> &QXmppMucManagerV2::bookmarks() const { return d->bookmarks; }
 
 /*!
-    Sets the avatar of a MUC room.
+    Joins the MUC room at \a jid with the given \a nickname.
 
-    Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
-    entity" of the MUC.
+    Sends an initial presence to the room and waits for all occupant presences that the MUC service
+    sends back. The returned task resolves once the server sends the self-presence with status code
+    110, meaning the participant list is already fully populated when the task finishes.
 
-    \a jid is the JID of the MUC room. \a avatar is the avatar to be set.
+    If a join for the same room is already in progress the task fails immediately. If the room is
+    already joined the existing room handle is returned as a success.
+
+    \a jid is the bare JID of the room (e.g. \c room\@conference.example.org).
+    \a nickname is the desired nickname — must not be empty.
 */
-QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(QString jid, const Avatar &avatar)
-{
-    QXmppVCardIq vCardIq;
-    vCardIq.setTo(jid);
-    vCardIq.setFrom({});
-    vCardIq.setType(QXmppIq::Set);
-    vCardIq.setPhotoType(avatar.contentType);
-    vCardIq.setPhoto(avatar.data);
-    return client()->sendGenericIq(std::move(vCardIq));
-}
-
-/*!
-    Removes the avatar of the MUC room with JID \a jid.
-
-    Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
-    entity" of the MUC.
-*/
-QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(QString jid)
-{
-    QXmppVCardIq vCardIq;
-    vCardIq.setTo(jid);
-    vCardIq.setFrom({});
-    vCardIq.setType(QXmppIq::Set);
-    return client()->sendGenericIq(std::move(vCardIq));
-}
-
-/*!
-    Fetches the avatar of the MUC room with JID \a jid.
-
-    First fetches the avatar hashes via the `muc#roominfo` form from service discovery information
-    and then fetches the avatar itself via vcard-temp.
-
-    \note This currently does not do any caching and does not listen for avatar changes.
-
-    Returns nullopt if VCards are not supported in this MUC or no avatar has been published,
-    otherwise the published avatar.
-*/
-QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::fetchRoomAvatar(QString jid)
-{
-    auto infoResult = co_await d->disco()->info(jid).withContext(this);
-    if (!hasValue(infoResult)) {
-        co_return getError(std::move(infoResult));
-    }
-
-    auto &info = getValue(infoResult);
-    if (!contains(info.features(), ns_vcard)) {
-        co_return std::nullopt;
-    }
-
-    auto roomInfo = info.template dataForm<QXmppMucRoomInfo>();
-    if (!roomInfo.has_value()) {
-        co_return std::nullopt;
-    }
-    auto hashes = roomInfo->avatarHashes();
-    if (hashes.isEmpty()) {
-        co_return std::nullopt;
-    }
-
-    auto iqResponse = parseIq<QXmppVCardIq>(co_await client()->sendIq(QXmppVCardIq(jid)).withContext(this));
-    if (hasError(iqResponse)) {
-        co_return getError(std::move(iqResponse));
-    }
-
-    const auto &vcard = getValue(iqResponse);
-    auto hexHash = QString::fromUtf8(QCryptographicHash::hash(vcard.photo(), QCryptographicHash::Sha1).toHex());
-    if (!contains(hashes, hexHash)) {
-        co_return QXmppError { u"Avatar hash mismatch"_s };
-    }
-    co_return Avatar { vcard.photoType(), vcard.photo() };
-}
-
-///
-/// Joins the MUC room at \a jid with the given \a nickname.
-///
-/// Sends an initial presence to the room and waits for all occupant presences that the MUC service
-/// sends back. The returned task resolves once the server sends the self-presence with status code
-/// 110, meaning the participant list is already fully populated when the task finishes.
-///
-/// If a join for the same room is already in progress the task fails immediately. If the room is
-/// already joined the existing room handle is returned as a success.
-///
-/// \param jid Bare JID of the room (e.g. \c room\@conference.example.org).
-/// \param nickname Desired nickname. Must not be empty.
-///
 QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid, const QString &nickname)
 {
     return joinRoom(jid, nickname, std::nullopt);
@@ -2017,10 +1938,15 @@ bool QXmppMucRoomV2::isWatchingAvatar() const
 ///
 QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmppMucManagerV2::Avatar> newAvatar)
 {
+    QXmppVCardIq vCardIq;
+    vCardIq.setTo(m_jid);
+    vCardIq.setFrom({});
+    vCardIq.setType(QXmppIq::Set);
     if (newAvatar) {
-        return m_manager->setRoomAvatar(m_jid, *newAvatar);
+        vCardIq.setPhotoType(newAvatar->contentType);
+        vCardIq.setPhoto(newAvatar->data);
     }
-    return m_manager->removeRoomAvatar(m_jid);
+    return m_manager->client()->sendGenericIq(std::move(vCardIq));
 }
 
 ///

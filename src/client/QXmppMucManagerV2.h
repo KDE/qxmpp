@@ -88,10 +88,6 @@ public:
     QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
     QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 
-    QXmppTask<QXmpp::Result<>> setRoomAvatar(QString jid, const Avatar &avatar);
-    QXmppTask<QXmpp::Result<>> removeRoomAvatar(QString jid);
-    QXmppTask<QXmpp::Result<std::optional<Avatar>>> fetchRoomAvatar(QString jid);
-
     /// Returns a lightweight handle for the room with the given \a jid.
     QXmppMucRoomV2 room(const QString &jid);
 
