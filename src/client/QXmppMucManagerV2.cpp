@@ -313,6 +313,13 @@ struct MucRoomData {
     bool watchingRoomConfig = false;
     bool fetchingRoomConfig = false;
     std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> roomConfigWaiters;
+    // Avatar — populated when setWatchAvatar(true) is called, re-fetched on status 104
+    QProperty<QStringList> avatarHashes;
+    QProperty<std::optional<QXmppMucManagerV2::Avatar>> avatar;
+    bool supportsVCard = false;
+    bool watchingAvatar = false;
+    bool fetchingAvatar = false;
+    bool avatarOutdated = true;
     // Convenience bindings derived from roomInfo
     QProperty<bool> subjectChangeable;
     QProperty<QString> description;
@@ -344,6 +351,10 @@ struct MucRoomData {
         contactJids.setBinding([this]() -> QStringList {
             const auto &info = roomInfo.value();
             return info ? info->contactJids() : QStringList {};
+        });
+        avatarHashes.setBinding([this]() -> QStringList {
+            const auto &info = roomInfo.value();
+            return info ? info->avatarHashes() : QStringList {};
         });
     }
 
@@ -1358,14 +1369,64 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
         }
         auto &info = getValue(result);
         auto &data = itr->second;
+        const auto oldHashes = data.avatarHashes.value();
         data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
         const auto &features = info.features();
+        data.supportsVCard = features.contains(ns_vcard);
         data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
         data.isPublic = features.contains(muc_feat_public);
         data.isMembersOnly = features.contains(muc_feat_membersonly);
         data.isModerated = features.contains(muc_feat_moderated);
         data.isPersistent = features.contains(muc_feat_persistent);
         data.isPasswordProtected = features.contains(muc_feat_passwordprotected);
+        if (data.avatarHashes.value() != oldHashes) {
+            data.avatarOutdated = true;
+        }
+        if (data.watchingAvatar && !data.fetchingAvatar && data.avatarOutdated) {
+            fetchAvatar(roomJid);
+        }
+    });
+}
+
+void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
+{
+    auto itr = rooms.find(roomJid);
+    if (itr == rooms.end()) {
+        return;
+    }
+    auto &data = itr->second;
+    const auto hashes = data.avatarHashes.value();
+    data.avatarOutdated = false;
+
+    if (!data.supportsVCard || hashes.isEmpty()) {
+        data.avatar = std::nullopt;
+        return;
+    }
+
+    data.fetchingAvatar = true;
+    q->client()->sendIq(QXmppVCardIq(roomJid)).then(q, [this, roomJid, hashes](auto &&result) mutable {
+        auto itr = rooms.find(roomJid);
+        if (itr == rooms.end()) {
+            return;
+        }
+        auto &data = itr->second;
+        data.fetchingAvatar = false;
+
+        auto iqResponse = parseIq<QXmppVCardIq, Result<QXmppVCardIq>>(std::move(result));
+        if (hasError(iqResponse)) {
+            return;
+        }
+
+        const auto &vcard = getValue(iqResponse);
+        const auto hexHash = QString::fromUtf8(QCryptographicHash::hash(vcard.photo(), QCryptographicHash::Sha1).toHex());
+        if (!contains(hashes, hexHash)) {
+            return;
+        }
+        if (vcard.photo().isEmpty()) {
+            data.avatar = std::nullopt;
+        } else {
+            data.avatar = QXmppMucManagerV2::Avatar { vcard.photoType(), vcard.photo() };
+        }
     });
 }
 
@@ -1853,7 +1914,106 @@ bool QXmppMucRoomV2::isWatchingRoomConfig() const
 }
 
 ///
-/// Returns the room description from \xep{0045, Multi-User Chat} \c muc#roominfo.
+/// Returns the avatar hashes for the room from \xep{0045, Multi-User Chat} \c muc#roominfo.
+///
+/// The hashes are derived from the \c muc#roominfo_avatarhash field of the \c disco\#info
+/// response. They are automatically updated on join and whenever a status code 104
+/// (room configuration changed) is received.
+///
+/// Returns an empty list until the first \c disco\#info response has arrived or if no avatar
+/// has been published.
+///
+/// \sa avatar(), setWatchAvatar()
+/// \since QXmpp 1.15
+///
+QBindable<QStringList> QXmppMucRoomV2::avatarHashes() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->avatarHashes) };
+    }
+    return {};
+}
+
+///
+/// Returns the cached room avatar.
+///
+/// Populated after setWatchAvatar(true) has been called and the vcard-temp fetch has completed.
+/// Automatically re-fetched whenever a status code 104 (room configuration changed) causes the
+/// avatar hashes to change.
+///
+/// Returns \c std::nullopt until the first fetch completes, or if the room has no avatar or the
+/// MUC service does not support vcard-temp.
+///
+/// \sa avatarHashes(), setWatchAvatar()
+/// \since QXmpp 1.15
+///
+QBindable<std::optional<QXmppMucManagerV2::Avatar>> QXmppMucRoomV2::avatar() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->avatar) };
+    }
+    return {};
+}
+
+///
+/// Enables or disables automatic avatar updates.
+///
+/// When set to \c true, the avatar is fetched immediately if the room info is already available
+/// and the hashes have not been fetched yet. Whenever a status code 104 (room configuration
+/// changed) causes the avatar hashes to change, the avatar is re-fetched automatically.
+///
+/// When set to \c false, auto-refresh is disabled. The last fetched avatar remains available in
+/// avatar() but is no longer updated automatically.
+///
+/// \sa avatar(), avatarHashes()
+/// \since QXmpp 1.15
+///
+void QXmppMucRoomV2::setWatchAvatar(bool watch)
+{
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end()) {
+        return;
+    }
+    auto &data = itr->second;
+    const bool needsFetch = watch && !data.watchingAvatar && data.roomInfo.value().has_value() && !data.fetchingAvatar && data.avatarOutdated;
+    data.watchingAvatar = watch;
+    if (needsFetch) {
+        m_manager->d->fetchAvatar(m_jid);
+    }
+}
+
+///
+/// Returns whether automatic avatar updates are enabled.
+///
+/// \sa setWatchAvatar()
+/// \since QXmpp 1.15
+///
+bool QXmppMucRoomV2::isWatchingAvatar() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return data->watchingAvatar;
+    }
+    return false;
+}
+
+///
+/// Sets or removes the avatar of the room via vcard-temp.
+///
+/// Pass an \c Avatar to publish a new avatar, or \c std::nullopt to remove the current one.
+///
+/// Requires the MUC service to support "vcard-temp" and the local user to be an owner or other
+/// privileged entity of the room.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmppMucManagerV2::Avatar> newAvatar)
+{
+    if (newAvatar) {
+        return m_manager->setRoomAvatar(m_jid, *newAvatar);
+    }
+    return m_manager->removeRoomAvatar(m_jid);
+}
+
 ///
 /// The description is populated from the \c muc#roominfo_description field of the
 /// \c disco\#info response. It is fetched automatically on join and re-fetched whenever
