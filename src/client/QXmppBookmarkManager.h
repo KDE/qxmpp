@@ -15,6 +15,8 @@ class QXmppBookmarkSet;
 /// \brief The QXmppBookmarkManager class allows you to store and retrieve
 /// bookmarks as defined by \xep{0048, Bookmarks}.
 ///
+/// \ingroup Managers
+///
 
 class QXMPP_EXPORT QXmppBookmarkManager : public QXmppClientExtension
 {

@@ -216,6 +216,8 @@ QXmppHttpUpload::~QXmppHttpUpload() = default;
 ///
 /// \class QXmppHttpUploadManager
 ///
+/// \ingroup Managers
+///
 /// The upload manager allows to upload a file to a server via \xep{0363, HTTP File Upload}.
 /// This can be used for sending files to other users.
 ///
