@@ -1220,12 +1220,17 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
     });
 }
 
-void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
+QXmppTask<QXmppClient::IqResult> QXmppMucManagerV2Private::sendOwnerFormRequest(const QString &roomJid)
 {
     QXmppMucOwnerIq iq;
     iq.setTo(roomJid);
     iq.setType(QXmppIq::Get);
-    q->client()->sendIq(std::move(iq)).then(q, [this, roomJid](QXmppClient::IqResult &&result) {
+    return q->client()->sendIq(std::move(iq));
+}
+
+void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
+{
+    sendOwnerFormRequest(roomJid).then(q, [this, roomJid](QXmppClient::IqResult &&result) {
         auto itr = rooms.find(roomJid);
         if (itr == rooms.end() || itr->second.state != MucRoomState::Creating) {
             return;
@@ -1256,10 +1261,7 @@ void QXmppMucManagerV2Private::fetchRoomConfigSubscribed(const QString &roomJid)
     }
     itr->second.fetchingRoomConfig = true;
 
-    QXmppMucOwnerIq iq;
-    iq.setTo(roomJid);
-    iq.setType(QXmppIq::Get);
-    q->client()->sendIq(std::move(iq)).then(q, [this, roomJid](QXmppClient::IqResult &&result) {
+    sendOwnerFormRequest(roomJid).then(q, [this, roomJid](QXmppClient::IqResult &&result) {
         auto itr = rooms.find(roomJid);
         if (itr == rooms.end()) {
             return;
@@ -1762,6 +1764,7 @@ QBindable<QStringList> QXmppMucRoomV2::contactJids() const
 }
 
 ///
+/// Sends a groupchat message to the room.
 ///
 /// The message's \c to and \c type fields are set automatically. An \c origin-id
 /// (\xep{0359, Unique and Stable Stanza IDs}) is generated if not already set,
