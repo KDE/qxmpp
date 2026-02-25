@@ -351,6 +351,8 @@ public:
 ///
 /// \class QXmppFileSharingManager
 ///
+/// \ingroup Managers
+///
 /// The file sharing manager allows to easily send and retrieve files in a chat.
 ///
 /// \since QXmpp 1.5
