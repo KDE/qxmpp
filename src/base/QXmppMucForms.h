@@ -43,6 +43,8 @@ public:
     QStringList avatarHashes() const;
     void setAvatarHashes(const QStringList &hashes);
 
+    bool operator==(const QXmppMucRoomInfo &other) const;
+
 protected:
     QString formType() const override;
     bool parseField(const QXmppDataForm::Field &) override;
