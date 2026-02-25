@@ -165,7 +165,11 @@ public:
 ///
 /// \class QXmppMucBookmark
 ///
-/// Bookmark data for a MUC room, retrieved via \xep{0402, PEP Native Bookmarks}.
+/// \brief Bookmark data for a MUC room stored via \xep{0402, PEP Native Bookmarks}.
+///
+/// A bookmark records the JID of a room together with the user's preferred nickname, an optional
+/// password, a human-readable display name, and an autojoin flag. Bookmarks are managed through
+/// QXmppMucManagerV2::setBookmark() and QXmppMucManagerV2::removeBookmark().
 ///
 /// \since QXmpp 1.13
 ///
@@ -377,12 +381,137 @@ struct MucRoomData {
 ///
 /// \class QXmppMucManagerV2
 ///
-/// \brief \xep{0045, Multi-User Chat} Manager with support for \xep{0402, PEP Native Bookmarks}.
+/// \brief \xep{0045, Multi-User Chat} manager with support for \xep{0402, PEP Native Bookmarks}.
 ///
-/// The manager automatically fetches bookmarks on session establishment and afterwards emits
-/// bookmarksReset(), bookmarksAdded(), bookmarksRemoved() and bookmarksChanged().
+/// \section setup Setup
 ///
-/// The QXmppPubSubManager must be registered with the client.
+/// QXmppMucManagerV2 requires QXmppPubSubManager and QXmppDiscoManager to be registered with the
+/// client. Add all three before connecting:
+///
+/// \code
+/// auto *muc   = new QXmppMucManagerV2;
+/// auto *pubsub = new QXmppPubSubManager;
+/// auto *disco  = new QXmppDiscoManager;
+/// client.addExtension(muc);
+/// client.addExtension(pubsub);
+/// client.addExtension(disco);
+/// \endcode
+///
+/// \section bookmarks Bookmark management
+///
+/// Bookmarks are automatically fetched using \xep{0402, PEP Native Bookmarks} when the session is
+/// established. Changes made from other clients arrive as PubSub event notifications and trigger
+/// the corresponding signals.
+///
+/// \code
+/// // React to the initial fetch and to subsequent updates
+/// connect(muc, &QXmppMucManagerV2::bookmarksReset, this, [muc]() {
+///     for (const auto &bm : *muc->bookmarks()) {
+///         qDebug() << bm.jid() << bm.name();
+///     }
+/// });
+///
+/// // Save a bookmark
+/// QXmppMucBookmark bm;
+/// bm.setJid(u"room@conference.example.org"_s);
+/// bm.setName(u"My Room"_s);
+/// bm.setNick(u"alice"_s);
+/// bm.setAutojoin(true);
+/// muc->setBookmark(std::move(bm)).then(this, [](auto result) {
+///     if (std::holds_alternative<QXmppError>(result)) { /* handle error */ }
+/// });
+/// \endcode
+///
+/// \section joining Joining a room
+///
+/// Call joinRoom() to join a room. The returned task resolves once all initial occupant presences
+/// have been received, so the participant list is already populated when the task finishes.
+///
+/// \code
+/// muc->joinRoom(u"room@conference.example.org"_s, u"alice"_s).then(this, [](auto result) {
+///     if (auto *room = std::get_if<QXmppMucRoomV2>(&result)) {
+///         qDebug() << "Joined as" << room->nickname().value();
+///     }
+/// });
+/// \endcode
+///
+/// After joining, retrieve the room handle at any time via room():
+///
+/// \code
+/// auto r = muc->room(u"room@conference.example.org"_s);
+/// if (r.isValid()) { /* use r */ }
+/// \endcode
+///
+/// \section sending Sending messages
+///
+/// \code
+/// auto r = muc->room(u"room@conference.example.org"_s);
+/// QXmppMessage msg;
+/// msg.setBody(u"Hello, room!"_s);
+/// r.sendMessage(std::move(msg)).then(this, [](auto result) { /* ... */ });
+/// \endcode
+///
+/// \section creating Creating a room
+///
+/// createRoom() creates a new reserved (locked) room. The task resolves once the server confirms
+/// room creation and the configuration form has been fetched. Configure the room via
+/// setRoomConfig() to unlock it, or cancel with cancelRoomCreation().
+///
+/// \code
+/// muc->createRoom(u"newroom@conference.example.org"_s, u"alice"_s).then(this, [](auto result) {
+///     if (auto *room = std::get_if<QXmppMucRoomV2>(&result)) {
+///         auto config = room->roomConfig().value().value_or(QXmppMucRoomConfig{});
+///         config.setName(u"My New Room"_s);
+///         room->setRoomConfig(config);
+///     }
+/// });
+/// \endcode
+///
+/// \section moderation Moderation and affiliation management
+///
+/// Use setRole() to change a participant's role (e.g. kick or grant/revoke voice) and
+/// setAffiliation() to change a user's persistent affiliation (e.g. ban or grant membership).
+/// Use requestAffiliationList() to retrieve the full list of users with a given affiliation.
+///
+/// \code
+/// // Kick a participant
+/// r.setRole(participant, QXmpp::Muc::Role::None, u"Misbehaving"_s);
+///
+/// // Ban a user
+/// r.setAffiliation(u"user@example.org"_s, QXmpp::Muc::Affiliation::Outcast);
+///
+/// // Fetch the member list
+/// r.requestAffiliationList(QXmpp::Muc::Affiliation::Member).then(this, [](auto result) {
+///     if (auto *list = std::get_if<QList<QXmpp::Muc::Item>>(&result)) {
+///         for (const auto &item : *list) {
+///             qDebug() << item.jid() << item.affiliation();
+///         }
+///     }
+/// });
+/// \endcode
+///
+/// \section config Room configuration
+///
+/// Call requestRoomConfig() to retrieve a typed configuration form. Edit the returned
+/// QXmppMucRoomConfig and submit it with setRoomConfig(). Pass \c watch = \c true (or call
+/// setWatchRoomConfig()) to be notified of configuration changes via the roomConfig() bindable.
+///
+/// \code
+/// r.requestRoomConfig(true).then(this, [r](auto result) mutable {
+///     if (auto *config = std::get_if<QXmppMucRoomConfig>(&result)) {
+///         config->setMaxUsers(50);
+///         r.setRoomConfig(*config);
+///     }
+/// });
+/// \endcode
+///
+/// \section participants Participants and permissions
+///
+/// participants() returns lightweight handles to all current occupants. selfParticipant() returns
+/// your own participant entry, which exposes your current role and affiliation as QBindables.
+///
+/// The capability QBindables (canSendMessages(), canSetRoles(), canConfigureRoom(), …) update
+/// automatically whenever the MUC service changes your permissions.
 ///
 /// \ingroup Managers
 /// \since QXmpp 1.13
@@ -427,7 +556,8 @@ QStringList QXmppMucManagerV2::discoveryFeatures() const
     return { ns_muc.toString(), ns_bookmarks2 + u"+notify" };
 }
 
-/// Retrieved bookmarks.
+/// Returns the currently cached list of bookmarks, or \c std::nullopt if they haven't been
+/// fetched yet. Connect to bookmarksReset() to be notified once the initial fetch completes.
 const std::optional<QList<QXmppMucBookmark>> &QXmppMucManagerV2::bookmarks() const { return d->bookmarks; }
 
 ///
@@ -526,6 +656,19 @@ QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::f
     return t;
 }
 
+///
+/// Joins the MUC room at \a jid with the given \a nickname.
+///
+/// Sends an initial presence to the room and waits for all occupant presences that the MUC service
+/// sends back. The returned task resolves once the server sends the self-presence with status code
+/// 110, meaning the participant list is already fully populated when the task finishes.
+///
+/// If a join for the same room is already in progress the task fails immediately. If the room is
+/// already joined the existing room handle is returned as a success.
+///
+/// \param jid Bare JID of the room (e.g. \c room\@conference.example.org).
+/// \param nickname Desired nickname. Must not be empty.
+///
 QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid, const QString &nickname)
 {
     return joinRoom(jid, nickname, std::nullopt);
@@ -781,13 +924,26 @@ bool QXmppMucManagerV2::handlePubSubEvent(const QDomElement &element, const QStr
     return false;
 }
 
-/// Adds or updates the bookmark for a MUC.
+///
+/// Publishes or updates a bookmark via \xep{0402, PEP Native Bookmarks}.
+///
+/// If a bookmark for the same JID already exists it is replaced. The change is
+/// propagated to all connected clients via PubSub event notification, which will
+/// trigger bookmarksChanged() on this manager.
+///
+/// \param bookmark Bookmark to publish. The JID must not be empty.
+///
 QXmppTask<Result<>> QXmppMucManagerV2::setBookmark(QXmppMucBookmark &&bookmark)
 {
     return d->setBookmark(std::move(bookmark));
 }
 
-/// Removes a bookmark.
+///
+/// Retracts the bookmark for the room at \a jid via \xep{0402, PEP Native Bookmarks}.
+///
+/// Does nothing if no bookmark for \a jid exists. The retraction is propagated to all connected
+/// clients, which will trigger bookmarksRemoved() on this manager.
+///
 QXmppTask<Result<>> QXmppMucManagerV2::removeBookmark(const QString &jid)
 {
     return d->removeBookmark(jid);
@@ -1637,14 +1793,13 @@ QBindable<std::optional<QXmppMucRoomInfo>> QXmppMucRoomV2::roomInfo() const
 ///
 /// Returns the current room configuration form from \xep{0045, Multi-User Chat}.
 ///
-/// The form is only populated after subscribeToRoomConfig(true) has been called
-/// and the initial fetch has completed. It is automatically re-fetched whenever a
-/// status code 104 (room configuration changed) is received.
+/// The form is populated after requestRoomConfig() or setWatchRoomConfig(true) has been called
+/// and the initial fetch has completed. While watching is active, the form is automatically
+/// re-fetched whenever a status code 104 (room configuration changed) is received.
 ///
-/// Returns \c std::nullopt until the first response has arrived or if
-/// subscribeToRoomConfig() has not been called.
+/// Returns \c std::nullopt until the first response has arrived.
 ///
-/// \sa subscribeToRoomConfig()
+/// \sa requestRoomConfig(), setWatchRoomConfig()
 /// \since QXmpp 1.15
 ///
 QBindable<std::optional<QXmppMucRoomConfig>> QXmppMucRoomV2::roomConfig() const
