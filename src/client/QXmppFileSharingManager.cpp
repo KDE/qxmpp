@@ -332,6 +332,7 @@ public:
 /*!
     \class QXmppFileSharingManager
     \inmodule QXmpp
+    \ingroup Managers
 
     The file sharing manager allows to easily send and retrieve files in a chat.
 
