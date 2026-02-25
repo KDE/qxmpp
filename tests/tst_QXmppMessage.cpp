@@ -1455,7 +1455,8 @@ void tst_QXmppMessage::mucStatusCodes()
 
     QXmppMessage m;
     parsePacket(m, xml);
-    QCOMPARE(m.mucStatusCodes(), (QList<uint32_t> { 104, 172 }));
+    QVERIFY(m.mucUserQuery().has_value());
+    QCOMPARE(m.mucUserQuery()->statusCodes(), (QList<uint32_t> { 104, 172 }));
     serializePacket(m, xml);
 }
 
