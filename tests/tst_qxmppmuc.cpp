@@ -70,6 +70,7 @@ private:
     Q_SLOT void permissionsSubjectChangeable();
     Q_SLOT void roomInfoProperties();
     Q_SLOT void roomInfoStatus104();
+    Q_SLOT void roomInfoBindable();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -1697,6 +1698,49 @@ void tst_QXmppMuc::roomInfoStatus104()
                 "</query></iq>"_s);
 
     QCOMPARE(room.description().value(), u"Updated Coven"_s);
+}
+
+void tst_QXmppMuc::roomInfoBindable()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Before disco#info: roomInfo is nullopt
+    QVERIFY(!room.roomInfo().value().has_value());
+
+    // Inject disco#info with full roominfo
+    test.inject(discoRoomInfo);
+
+    // roomInfo() now holds the full form
+    auto info = room.roomInfo().value();
+    QVERIFY(info.has_value());
+    QCOMPARE(info->description(), u"A Witch Coven"_s);
+    QCOMPARE(info->language(), u"en"_s);
+    QCOMPARE(info->contactJids(), (QStringList { u"hag66@shakespeare.lit"_s, u"wiccarocks@shakespeare.lit"_s }));
+
+    // Convenience bindings are also populated from the same source
+    QCOMPARE(room.description().value(), u"A Witch Coven"_s);
+    QCOMPARE(room.language().value(), u"en"_s);
 }
 
 QTEST_MAIN(tst_QXmppMuc)

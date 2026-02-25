@@ -8,6 +8,7 @@
 #include "QXmppClientExtension.h"
 #include "QXmppMessageHandler.h"
 #include "QXmppMucData.h"
+#include "QXmppMucForms.h"
 #include "QXmppMucIq.h"
 #include "QXmppPubSubEventHandler.h"
 #include "QXmppSendResult.h"
@@ -171,6 +172,7 @@ public:
     QBindable<QString> description() const;
     QBindable<QString> language() const;
     QBindable<QStringList> contactJids() const;
+    QBindable<std::optional<QXmppMucRoomInfo>> roomInfo() const;
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);

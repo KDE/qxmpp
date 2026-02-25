@@ -292,8 +292,10 @@ struct MucRoomData {
     std::optional<QXmppPromise<Result<>>> leavePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
     // Room feature flags populated from disco#info after joining
-    QProperty<bool> subjectChangeable;
     // Room info fields populated from muc#roominfo (re-fetched on status code 104)
+    QProperty<std::optional<QXmppMucRoomInfo>> roomInfo;
+    // Convenience bindings derived from roomInfo
+    QProperty<bool> subjectChangeable;
     QProperty<QString> description;
     QProperty<QString> language;
     QProperty<QStringList> contactJids;
@@ -305,6 +307,26 @@ struct MucRoomData {
     QProperty<bool> canSetRoles;
     QProperty<bool> canSetAffiliations;
     QProperty<bool> canConfigureRoom;
+
+    MucRoomData()
+    {
+        subjectChangeable.setBinding([this]() -> bool {
+            const auto &info = roomInfo.value();
+            return info && info->subjectChangeable().value_or(false);
+        });
+        description.setBinding([this]() -> QString {
+            const auto &info = roomInfo.value();
+            return info ? info->description() : QString {};
+        });
+        language.setBinding([this]() -> QString {
+            const auto &info = roomInfo.value();
+            return info ? info->language() : QString {};
+        });
+        contactJids.setBinding([this]() -> QStringList {
+            const auto &info = roomInfo.value();
+            return info ? info->contactJids() : QStringList {};
+        });
+    }
 
     void setupPermissionBindings()
     {
@@ -1049,16 +1071,7 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
         if (itr == rooms.end() || hasError(result)) {
             return;
         }
-        auto &data = itr->second;
-        auto &info = getValue(result);
-        if (auto roomInfo = info.template dataForm<QXmppMucRoomInfo>()) {
-            if (auto changeable = roomInfo->subjectChangeable()) {
-                data.subjectChangeable = *changeable;
-            }
-            data.description = roomInfo->description();
-            data.language = roomInfo->language();
-            data.contactJids = roomInfo->contactJids();
-        }
+        itr->second.roomInfo = getValue(result).template dataForm<QXmppMucRoomInfo>();
     });
 }
 
@@ -1233,6 +1246,29 @@ QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
 {
     if (auto *data = m_manager->roomData(m_jid)) {
         return { &(data->canConfigureRoom) };
+    }
+    return {};
+}
+
+///
+/// Returns the full \c muc#roominfo data form from \xep{0045, Multi-User Chat}.
+///
+/// The form is fetched via \c disco\#info automatically on join and re-fetched whenever
+/// a status code 104 (room configuration changed) is received.
+/// It gives access to all available room info fields in one object, including fields
+/// not individually exposed (e.g. \c muc#roominfo_subject, \c muc#roominfo_occupants,
+/// \c muc#roominfo_avatarhash).
+///
+/// Returns \c std::nullopt until the first \c disco\#info response has arrived or if
+/// the room's disco\#info does not include a \c muc#roominfo form.
+///
+/// \sa description(), language(), contactJids()
+/// \since QXmpp 1.15
+///
+QBindable<std::optional<QXmppMucRoomInfo>> QXmppMucRoomV2::roomInfo() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->roomInfo) };
     }
     return {};
 }
