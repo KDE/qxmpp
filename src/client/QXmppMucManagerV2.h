@@ -176,6 +176,12 @@ public:
     QBindable<bool> canSetRoles() const;
     QBindable<bool> canSetAffiliations() const;
     QBindable<bool> canConfigureRoom() const;
+    QBindable<bool> isNonAnonymous() const;
+    QBindable<bool> isPublic() const;
+    QBindable<bool> isMembersOnly() const;
+    QBindable<bool> isModerated() const;
+    QBindable<bool> isPersistent() const;
+    QBindable<bool> isPasswordProtected() const;
     QBindable<QString> description() const;
     QBindable<QString> language() const;
     QBindable<QStringList> contactJids() const;
