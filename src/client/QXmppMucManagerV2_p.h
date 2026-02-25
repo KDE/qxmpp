@@ -13,31 +13,21 @@
 #include <optional>
 #include <unordered_map>
 
-class QXmppPubSubManager;
 class QXmppDiscoveryManager;
 
 namespace QXmpp::Private {
 struct MucRoomData;
-struct Bookmarks2ConferenceItem;
 
 constexpr auto MucJoinTimeout = std::chrono::seconds(30);
 }  // namespace QXmpp::Private
 
 struct QXmppMucManagerV2Private {
     QXmppMucManagerV2 *q = nullptr;
-    std::optional<QList<QXmppMucBookmark>> bookmarks;
     std::unordered_map<QString, QXmpp::Private::MucRoomData> rooms;
     uint32_t participantIdCounter = 0;
     std::chrono::milliseconds timeout { QXmpp::Private::MucJoinTimeout };
 
-    QXmppPubSubManager *pubsub();
     QXmppDiscoveryManager *disco();
-
-    // Bookmarks 2
-    void setBookmarks(QVector<QXmpp::Private::Bookmarks2ConferenceItem> &&items);
-    void resetBookmarks();
-    QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
-    QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 
     // MUC Core
     void clearAllRooms();
