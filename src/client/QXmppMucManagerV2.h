@@ -163,6 +163,12 @@ public:
     QList<QXmppMucParticipant> participants() const;
     std::optional<QXmppMucParticipant> selfParticipant() const;
 
+    QBindable<bool> canSendMessages() const;
+    QBindable<bool> canChangeSubject() const;
+    QBindable<bool> canSetRoles() const;
+    QBindable<bool> canSetAffiliations() const;
+    QBindable<bool> canConfigureRoom() const;
+
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);
     QXmppTask<QXmpp::Result<>> setSubject(const QString &subject);

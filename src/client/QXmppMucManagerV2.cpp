@@ -282,6 +282,7 @@ struct MucRoomData {
     QProperty<QString> subject;
     QProperty<QString> nickname;
     QProperty<bool> joined = QProperty<bool> { false };
+    std::optional<uint32_t> selfParticipantId;
     std::unordered_map<uint32_t, MucParticipantData> participants;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     QList<QXmppMessage> historyMessages;
@@ -290,6 +291,42 @@ struct MucRoomData {
     std::optional<QXmppPromise<Result<>>> nickChangePromise;
     std::optional<QXmppPromise<Result<>>> leavePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
+    // Room feature flags populated from disco#info after joining
+    QProperty<bool> subjectChangeable;
+    // Permission properties — bindings set up in setupPermissionBindings()
+    // after selfParticipantId is known. Declared after `participants` so that
+    // `participants` outlives these bindings during destruction.
+    QProperty<bool> canSendMessages;
+    QProperty<bool> canChangeSubject;
+    QProperty<bool> canSetRoles;
+    QProperty<bool> canSetAffiliations;
+    QProperty<bool> canConfigureRoom;
+
+    void setupPermissionBindings()
+    {
+        Q_ASSERT(selfParticipantId.has_value());
+        auto &pData = participants.at(*selfParticipantId);
+
+        canSendMessages.setBinding([&pData]() {
+            auto role = pData.role.value();
+            return role == Muc::Role::Participant || role == Muc::Role::Moderator;
+        });
+        canChangeSubject.setBinding([this, &pData]() {
+            auto role = pData.role.value();
+            return role == Muc::Role::Moderator ||
+                (role == Muc::Role::Participant && subjectChangeable.value());
+        });
+        canSetRoles.setBinding([&pData]() {
+            return pData.role.value() == Muc::Role::Moderator;
+        });
+        canSetAffiliations.setBinding([&pData]() {
+            auto affil = pData.affiliation.value();
+            return affil == Muc::Affiliation::Admin || affil == Muc::Affiliation::Owner;
+        });
+        canConfigureRoom.setBinding([&pData]() {
+            return pData.affiliation.value() == Muc::Affiliation::Owner;
+        });
+    }
 };
 
 }  // namespace QXmpp::Private
@@ -465,12 +502,26 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
         return makeReadyTask<Result<QXmppMucRoomV2>>(room(jid));
     }
 
-    // request MUC features?
-
     // create MUC room state
     auto &roomData = d->rooms[jid];
     roomData.state = MucRoomState::JoiningOccupantPresences;
     roomData.nickname = nickname;
+
+    // Fetch room features in parallel; updates subjectChangeable when it arrives.
+    if (auto *disco = client()->findExtension<QXmppDiscoveryManager>()) {
+        disco->info(jid).then(this, [this, jid](auto &&result) {
+            auto itr = d->rooms.find(jid);
+            if (itr == d->rooms.end() || hasError(result)) {
+                return;
+            }
+            auto &info = getValue(result);
+            if (auto roomInfo = info.template dataForm<QXmppMucRoomInfo>()) {
+                if (auto changeable = roomInfo->subjectChangeable()) {
+                    itr->second.subjectChangeable = *changeable;
+                }
+            }
+        });
+    }
 
     QXmppPromise<Result<QXmppMucRoomV2>> promise;
     auto task = promise.task();
@@ -829,6 +880,8 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
 
             // this is our presence (must be last)
             if (presence.mucStatusCodes().contains(110)) {
+                data.selfParticipantId = itr->first;
+                data.setupPermissionBindings();
                 data.state = JoiningRoomHistory;
                 if (nickname != data.nickname) {
                     if (presence.mucStatusCodes().contains(210)) {
@@ -1099,18 +1152,73 @@ QList<QXmppMucParticipant> QXmppMucRoomV2::participants() const
 std::optional<QXmppMucParticipant> QXmppMucRoomV2::selfParticipant() const
 {
     if (auto *data = m_manager->roomData(m_jid)) {
-        const auto &selfNick = data->nickname.value();
-        for (const auto &[id, pData] : data->participants) {
-            if (pData.nickname.value() == selfNick) {
-                return QXmppMucParticipant(m_manager, m_jid, id);
-            }
+        if (data->selfParticipantId.has_value()) {
+            return QXmppMucParticipant(m_manager, m_jid, *data->selfParticipantId);
         }
     }
     return std::nullopt;
 }
 
+/// Returns whether the local user can send groupchat messages.
 ///
-/// Sends a groupchat message to the room.
+/// True when the user's role is Participant or Moderator.
+/// In unmoderated rooms the server assigns Participant by default.
+QBindable<bool> QXmppMucRoomV2::canSendMessages() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->canSendMessages) };
+    }
+    return {};
+}
+
+/// Returns whether the local user can change the room subject.
+///
+/// True for Moderators, or for Participants when the room allows it
+/// (\c muc#roominfo_subjectmod). Defaults to false until disco\#info arrives.
+QBindable<bool> QXmppMucRoomV2::canChangeSubject() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->canChangeSubject) };
+    }
+    return {};
+}
+
+/// Returns whether the local user can change other participants' roles (XEP-0045 §8.4–8.6).
+///
+/// True when the user's role is Moderator. This covers role changes including kicking
+/// (setting role to None) and granting/revoking voice.
+QBindable<bool> QXmppMucRoomV2::canSetRoles() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->canSetRoles) };
+    }
+    return {};
+}
+
+/// Returns whether the local user can change affiliations (XEP-0045 §9).
+///
+/// True when the user's affiliation is Admin or Owner. This covers banning,
+/// granting and revoking membership, and querying affiliation lists.
+QBindable<bool> QXmppMucRoomV2::canSetAffiliations() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->canSetAffiliations) };
+    }
+    return {};
+}
+
+/// Returns whether the local user can configure the room (XEP-0045 §10).
+///
+/// True when the user's affiliation is Owner.
+QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->canConfigureRoom) };
+    }
+    return {};
+}
+
+///
 ///
 /// The message's \c to and \c type fields are set automatically. An \c origin-id
 /// (\xep{0359, Unique and Stable Stanza IDs}) is generated if not already set,

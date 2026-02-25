@@ -66,6 +66,8 @@ private:
     Q_SLOT void setAffiliation();
     Q_SLOT void requestAffiliationList();
     Q_SLOT void selfParticipant();
+    Q_SLOT void permissions();
+    Q_SLOT void permissionsSubjectChangeable();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -1498,6 +1500,90 @@ void tst_QXmppMuc::selfParticipant()
     QCOMPARE(self->nickname().value(), u"thirdwitch"_s);
     QCOMPARE(self->role().value(), QXmpp::Muc::Role::Moderator);
     QCOMPARE(self->affiliation().value(), QXmpp::Muc::Affiliation::Admin);
+}
+
+void tst_QXmppMuc::permissions()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Not joined: all false, QBindable is empty (default-constructed bool = false)
+    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    QVERIFY(!room.canSendMessages().value());
+    QVERIFY(!room.canChangeSubject().value());
+    QVERIFY(!room.canSetRoles().value());
+    QVERIFY(!room.canSetAffiliations().value());
+    QVERIFY(!room.canConfigureRoom().value());
+
+    // Joined as moderator + admin (from joinedRoom() fixture)
+    auto room2 = joinedRoom(test, muc);
+    QVERIFY(room2.canSendMessages().value());
+    QVERIFY(room2.canChangeSubject().value());  // moderator -> always true
+    QVERIFY(room2.canSetRoles().value());
+    QVERIFY(room2.canSetAffiliations().value());  // admin
+    QVERIFY(!room2.canConfigureRoom().value());   // not owner
+
+    // Server changes our role to visitor -> can no longer send or set roles
+    QXmppPresence demotion;
+    parsePacket(demotion,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='admin' role='visitor'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(demotion);
+
+    QVERIFY(!room2.canSendMessages().value());
+    QVERIFY(!room2.canChangeSubject().value());
+    QVERIFY(!room2.canSetRoles().value());
+    QVERIFY(room2.canSetAffiliations().value());  // affiliation unchanged
+}
+
+void tst_QXmppMuc::permissionsSubjectChangeable()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join as participant (not moderator)
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    // First: presence sent; second: disco#info request fired by joinRoom
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // participant: canChangeSubject is false until disco#info arrives
+    QVERIFY(room.canSendMessages().value());
+    QVERIFY(!room.canChangeSubject().value());
+
+    // Inject disco#info result with subjectChangeable = true (muc#roominfo_subjectmod)
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/ns/protocols/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='http://jabber.org/protocol/muc'/>"
+                "<x xmlns='jabber:x:data' type='result'>"
+                "<field var='FORM_TYPE' type='hidden'><value>http://jabber.org/protocol/muc#roominfo</value></field>"
+                "<field var='muc#roominfo_subjectmod'><value>1</value></field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    QVERIFY(room.canChangeSubject().value());
 }
 
 QTEST_MAIN(tst_QXmppMuc)
