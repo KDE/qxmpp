@@ -291,6 +291,7 @@ struct MucRoomData {
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
     std::unordered_map<QString, PendingMessage> pendingMessages;
     std::optional<QXmppPromise<Result<>>> nickChangePromise;
+    std::unique_ptr<QTimer, DeleteLaterDeleter> nickChangeTimer;
     std::optional<QXmppPromise<Result<>>> leavePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
     // Room feature flags populated from disco#info after joining (re-fetched on status code 104).
@@ -1024,6 +1025,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 if (data.nickChangePromise) {
                     auto promise = std::move(*data.nickChangePromise);
                     data.nickChangePromise.reset();
+                    data.nickChangeTimer.reset();
                     promise.finish(Success());
                 }
             }
@@ -1095,6 +1097,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 auto error = presence.error();
                 auto promise = std::move(*data.nickChangePromise);
                 data.nickChangePromise.reset();
+                data.nickChangeTimer.reset();
                 promise.finish(QXmppError { error.text(), std::move(error) });
             }
         }
@@ -1286,6 +1289,24 @@ void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
     if (promise) {
         promise->finish(QXmppError { u"Leaving room timed out."_s });
     }
+}
+
+void QXmppMucManagerV2Private::handleNickChangeTimeout(const QString &roomJid)
+{
+    auto itr = rooms.find(roomJid);
+    if (itr == rooms.end()) {
+        return;
+    }
+
+    auto &data = itr->second;
+    if (!data.nickChangePromise) {
+        return;
+    }
+
+    auto promise = std::move(*data.nickChangePromise);
+    data.nickChangePromise.reset();
+    data.nickChangeTimer.reset();
+    promise.finish(QXmppError { u"Changing nickname timed out."_s });
 }
 
 void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, const QString &originId)
@@ -1812,6 +1833,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
     if (data.nickChangePromise) {
         auto oldPromise = std::move(*data.nickChangePromise);
         data.nickChangePromise.reset();
+        data.nickChangeTimer.reset();
         oldPromise.finish(QXmppError { u"Superseded by a new nickname change request."_s });
     }
 
@@ -1822,6 +1844,14 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
     QXmppPresence p;
     p.setTo(m_jid + u'/' + newNick);
     m_manager->client()->send(std::move(p));
+
+    auto *timer = new QTimer();
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, m_manager, [d = m_manager->d.get(), roomJid = m_jid]() {
+        d->handleNickChangeTimeout(roomJid);
+    });
+    data.nickChangeTimer.reset(timer);
+    timer->start(m_manager->d->timeout);
 
     return task;
 }
