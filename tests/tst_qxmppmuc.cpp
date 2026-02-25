@@ -65,6 +65,7 @@ private:
     Q_SLOT void setRoleParticipantGone();
     Q_SLOT void setAffiliation();
     Q_SLOT void requestAffiliationList();
+    Q_SLOT void selfParticipant();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -1478,6 +1479,25 @@ void tst_QXmppMuc::requestAffiliationList()
     QCOMPARE(items[0].affiliation(), QXmppMucItem::OutcastAffiliation);
     QCOMPARE(items[0].reason(), u"Treason"_s);
     QCOMPARE(items[1].jid(), u"iago@shakespeare.lit"_s);
+}
+
+void tst_QXmppMuc::selfParticipant()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Not yet joined: no self participant
+    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    QVERIFY(!room.selfParticipant().has_value());
+
+    // Joined room with admin affiliation and moderator role
+    auto room2 = joinedRoom(test, muc);
+    auto self = room2.selfParticipant();
+    QVERIFY(self.has_value());
+    QCOMPARE(self->nickname().value(), u"thirdwitch"_s);
+    QCOMPARE(self->role().value(), QXmpp::Muc::Role::Moderator);
+    QCOMPARE(self->affiliation().value(), QXmpp::Muc::Affiliation::Admin);
 }
 
 QTEST_MAIN(tst_QXmppMuc)

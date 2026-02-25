@@ -1086,6 +1086,30 @@ QList<QXmppMucParticipant> QXmppMucRoomV2::participants() const
 }
 
 ///
+/// Returns a handle to the local user's own participant entry, if joined.
+///
+/// Returns \c std::nullopt before joinRoom() has completed or after leaving the room.
+/// Use the returned handle's role() and affiliation() QBindables to reactively
+/// observe your own permissions — they update automatically when the MUC service
+/// grants or revokes permissions.
+///
+/// \note The participant handle is only valid while the room is joined.
+/// Do not use it after leaving the room or after a non-resumed reconnect.
+///
+std::optional<QXmppMucParticipant> QXmppMucRoomV2::selfParticipant() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        const auto &selfNick = data->nickname.value();
+        for (const auto &[id, pData] : data->participants) {
+            if (pData.nickname.value() == selfNick) {
+                return QXmppMucParticipant(m_manager, m_jid, id);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+///
 /// Sends a groupchat message to the room.
 ///
 /// The message's \c to and \c type fields are set automatically. An \c origin-id
