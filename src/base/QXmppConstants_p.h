@@ -61,6 +61,18 @@ inline constexpr QStringView ns_muc_owner = u"http://jabber.org/protocol/muc#own
 inline constexpr QStringView ns_muc_user = u"http://jabber.org/protocol/muc#user";
 inline constexpr QStringView ns_muc_roominfo = u"http://jabber.org/protocol/muc#roominfo";
 inline constexpr QStringView ns_muc_request = u"http://jabber.org/protocol/muc#request";
+inline constexpr QStringView muc_feat_nonanonymous = u"muc_nonanonymous";
+inline constexpr QStringView muc_feat_semianonymous = u"muc_semianonymous";
+inline constexpr QStringView muc_feat_public = u"muc_public";
+inline constexpr QStringView muc_feat_hidden = u"muc_hidden";
+inline constexpr QStringView muc_feat_membersonly = u"muc_membersonly";
+inline constexpr QStringView muc_feat_open = u"muc_open";
+inline constexpr QStringView muc_feat_moderated = u"muc_moderated";
+inline constexpr QStringView muc_feat_unmoderated = u"muc_unmoderated";
+inline constexpr QStringView muc_feat_persistent = u"muc_persistent";
+inline constexpr QStringView muc_feat_temporary = u"muc_temporary";
+inline constexpr QStringView muc_feat_passwordprotected = u"muc_passwordprotected";
+inline constexpr QStringView muc_feat_unsecured = u"muc_unsecured";
 // XEP-0047: In-Band Bytestreams
 inline constexpr QStringView ns_ibb = u"http://jabber.org/protocol/ibb";
 // XEP-0048: Bookmarks
