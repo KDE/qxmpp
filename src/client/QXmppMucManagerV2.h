@@ -34,7 +34,6 @@ public:
 
     QXmppMucBookmark();
     QXmppMucBookmark(const QString &jid, const QString &name, bool autojoin, const QString &nick, const QString &password);
-    QXmppMucBookmark(const QString &jid, QXmpp::Private::Bookmarks2Conference conference);
 
     const QString &jid() const;
     void setJid(const QString &jid);
@@ -48,7 +47,9 @@ public:
     void setAutojoin(bool autojoin);
 
 private:
+    friend class QXmppMucManagerV2;
     friend class QXmppMucManagerV2Private;
+    QXmppMucBookmark(const QString &jid, QXmpp::Private::Bookmarks2Conference conference);
     QSharedDataPointer<QXmppMucBookmarkPrivate> d;
 };
 
