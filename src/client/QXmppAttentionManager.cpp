@@ -20,6 +20,8 @@ using namespace QXmpp::Private;
 ///
 /// \class QXmppAttentionManager
 ///
+/// \ingroup Managers
+///
 /// \brief The QXmppAttentionManager class manages attention requests as defined
 /// by \xep{0224, Attention}.
 ///
