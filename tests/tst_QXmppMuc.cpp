@@ -100,6 +100,31 @@ private:
     Q_SLOT void roomConfigForm();
 };
 
+static QString roomConfigRequestXml(const QString &roomJid = u"coven@chat.shakespeare.lit"_s)
+{
+    return u"<iq id='qx1' to='" + roomJid + u"' type='get'>"
+                                            "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                                            "</iq>"_s;
+}
+
+static QString roomConfigResultXml(const QString &name = {})
+{
+    return u"<iq id='qx1' type='result'>"
+           "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+           "<x xmlns='jabber:x:data' type='form'>"
+           "<field type='hidden' var='FORM_TYPE'>"
+           "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+           "</field>"_s +
+        (name.isEmpty()
+             ? QString {}
+             : u"<field type='text-single' var='muc#roomconfig_roomname'>"
+               "<value>"_s +
+                 name + u"</value>"
+                        "</field>"_s) +
+        u"</x>"
+        "</query></iq>"_s;
+}
+
 void tst_QXmppMuc::bookmarks2Updates()
 {
     TestClient test(true);
@@ -485,6 +510,59 @@ void tst_QXmppMuc::joinRoomAlreadyInProgress()
     QVERIFY(expectVariant<QXmppMucRoomV2>(task3.result()).isValid());
 }
 
+static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
+                                 const QString &roomJid = u"coven@chat.shakespeare.lit"_s,
+                                 const QString &nick = u"thirdwitch"_s)
+{
+    auto joinTask = muc->joinRoom(roomJid, nick);
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                QStringLiteral("<presence from='%1/%2'>"
+                               "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                               "<item affiliation='admin' role='moderator'/>"
+                               "<status code='110'/>"
+                               "</x>"
+                               "</presence>")
+                    .arg(roomJid, nick)
+                    .toUtf8());
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg,
+                QStringLiteral("<message from='%1' type='groupchat'><subject>Test</subject></message>")
+                    .arg(roomJid)
+                    .toUtf8());
+    muc->handleMessage(subjectMsg);
+    return expectFutureVariant<QXmppMucRoomV2>(joinTask);
+}
+
+// Completes muc->createRoom() up to the Creating state with config form fetched.
+// Returns the room handle in Creating state.
+static QXmppMucRoomV2 createdRoom(TestClient &test, QXmppMucManagerV2 *muc,
+                                  const QString &roomJid = u"newroom@chat.shakespeare.lit"_s,
+                                  const QString &nick = u"thirdwitch"_s)
+{
+    auto createTask = muc->createRoom(roomJid, nick);
+    test.ignore();  // presence
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                QStringLiteral("<presence from='%1/%2'>"
+                               "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                               "<item affiliation='owner' role='moderator'/>"
+                               "<status code='110'/>"
+                               "<status code='201'/>"
+                               "</x>"
+                               "</presence>")
+                    .arg(roomJid, nick)
+                    .toUtf8());
+    test.injectPresence(selfPresence);
+    test.ignore();  // config form IQ get
+    test.inject(roomConfigResultXml());
+    return expectFutureVariant<QXmppMucRoomV2>(createTask);
+}
+
 void tst_QXmppMuc::receiveMessage()
 {
     TestClient test(true);
@@ -492,24 +570,7 @@ void tst_QXmppMuc::receiveMessage()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room first
-    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    expectFutureVariant<QXmppMucRoomV2>(task);
+    joinedRoom(test, muc);
 
     // Now receive a live message
     QXmppMessage receivedMsg;
@@ -534,24 +595,7 @@ void tst_QXmppMuc::sendMessage()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Send a message
     QXmppMessage msgToSend;
@@ -590,24 +634,7 @@ void tst_QXmppMuc::sendMessageError()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Send a message
     QXmppMessage msgToSend;
@@ -698,25 +725,8 @@ void tst_QXmppMuc::setSubject()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
-    QCOMPARE(room.subject().value(), u"Cauldron"_s);
+    auto room = joinedRoom(test, muc);
+    QCOMPARE(room.subject().value(), u"Test"_s);
 
     // Change subject
     auto subjectTask = room.setSubject(u"New Spells"_s);
@@ -754,24 +764,7 @@ void tst_QXmppMuc::changeNickname()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
     QCOMPARE(room.nickname().value(), u"thirdwitch"_s);
 
     // Change nickname
@@ -806,24 +799,7 @@ void tst_QXmppMuc::changeNicknameTimeout()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     muc->d->timeout = std::chrono::milliseconds(50);
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Change nickname but never receive the server confirmation
     auto nickTask = room.setNickname(u"oldhag"_s);
@@ -913,24 +889,7 @@ void tst_QXmppMuc::participantJoinLeave()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Track participantJoined signal
     QXmppMucParticipant joinedParticipant(muc, u""_s, 0);
@@ -989,24 +948,7 @@ void tst_QXmppMuc::participantsList()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Initially only self participant
     auto participants = room.participants();
@@ -1048,24 +990,7 @@ void tst_QXmppMuc::participantKicked()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // firstwitch joins
     QXmppPresence firstWitchJoin;
@@ -1108,24 +1033,7 @@ void tst_QXmppMuc::selfBanned()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Track removedFromRoom signal
     Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
@@ -1164,24 +1072,7 @@ void tst_QXmppMuc::roomDestroyed()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Track removedFromRoom signal
     Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
@@ -1223,24 +1114,7 @@ void tst_QXmppMuc::changePresence()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Change availability
     QXmppPresence away;
@@ -1264,24 +1138,7 @@ void tst_QXmppMuc::leaveRoom()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     QVERIFY(room.isValid());
     QCOMPARE(room.joined().value(), true);
@@ -1316,24 +1173,7 @@ void tst_QXmppMuc::leaveRoomTimeout()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     muc->d->timeout = std::chrono::milliseconds(50);
 
-    // Join the room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
 
     // Leave the room
     auto leaveTask = room.leave();
@@ -1405,22 +1245,7 @@ void tst_QXmppMuc::disconnectNoStreamManagement()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join a room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.ignore();
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
     QVERIFY(room.isValid());
     QVERIFY(room.joined().value());
 
@@ -1439,22 +1264,7 @@ void tst_QXmppMuc::disconnectResumedStream()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join a room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.ignore();
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
     QVERIFY(room.isValid());
 
     // Simulate network drop (SM enabled, disconnect without clearing SM)
@@ -1481,22 +1291,7 @@ void tst_QXmppMuc::disconnectNewStream()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Join a room
-    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.ignore();
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='none' role='participant'/>"
-                "<status code='110'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = joinedRoom(test, muc);
     QVERIFY(room.isValid());
 
     // Simulate network drop (SM enabled)
@@ -1512,34 +1307,6 @@ void tst_QXmppMuc::disconnectNewStream()
     // Room must be cleared now — server no longer knows about our presence
     QVERIFY(!room.isValid());
     QVERIFY(!room.joined().value());
-}
-
-static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
-                                 const QString &roomJid = u"coven@chat.shakespeare.lit"_s,
-                                 const QString &nick = u"thirdwitch"_s)
-{
-    auto joinTask = muc->joinRoom(roomJid, nick);
-    test.ignore();  // presence
-
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                QStringLiteral("<presence from='%1/%2'>"
-                               "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                               "<item affiliation='admin' role='moderator'/>"
-                               "<status code='110'/>"
-                               "</x>"
-                               "</presence>")
-                    .arg(roomJid, nick)
-                    .toUtf8());
-    test.injectPresence(selfPresence);
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg,
-                QStringLiteral("<message from='%1' type='groupchat'><subject>Test</subject></message>")
-                    .arg(roomJid)
-                    .toUtf8());
-    muc->handleMessage(subjectMsg);
-    return expectFutureVariant<QXmppMucRoomV2>(joinTask);
 }
 
 void tst_QXmppMuc::setRole()
@@ -2282,29 +2049,7 @@ void tst_QXmppMuc::setRoomConfigCreation()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Create the room and get to Creating state
-    auto createTask = muc->createRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.ignore();  // presence
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='owner' role='moderator'/>"
-                "<status code='110'/>"
-                "<status code='201'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-    test.ignore();  // config form IQ get
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(createTask);
+    auto room = createdRoom(test, muc);
     QVERIFY(!room.joined().value());
 
     // Submit config — room should become joined after IQ result
@@ -2337,29 +2082,7 @@ void tst_QXmppMuc::cancelRoomCreation()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Get to Creating state
-    auto createTask = muc->createRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.ignore();  // presence
-    QXmppPresence selfPresence;
-    parsePacket(selfPresence,
-                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
-                "<x xmlns='http://jabber.org/protocol/muc#user'>"
-                "<item affiliation='owner' role='moderator'/>"
-                "<status code='110'/>"
-                "<status code='201'/>"
-                "</x>"
-                "</presence>");
-    test.injectPresence(selfPresence);
-    test.ignore();  // config form IQ get
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(createTask);
+    auto room = createdRoom(test, muc);
 
     auto task = room.cancelRoomCreation();
     test.expect(u"<iq id='qx1' to='newroom@chat.shakespeare.lit' type='set'>"
@@ -2384,9 +2107,7 @@ void tst_QXmppMuc::reconfigureRoom()
 
     // Request current config
     auto reqTask = room.requestRoomConfig();
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
+    test.expect(roomConfigRequestXml());
     test.inject(u"<iq id='qx1' type='result'>"
                 "<query xmlns='http://jabber.org/protocol/muc#owner'>"
                 "<x xmlns='jabber:x:data' type='form'>"
@@ -2535,22 +2256,10 @@ void tst_QXmppMuc::subscribeToRoomConfig()
     // requestRoomConfig(true) — fetches fresh and enables watch
     auto reqTask = room.requestRoomConfig(true);
     QVERIFY(room.isWatchingRoomConfig());
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
+    test.expect(roomConfigRequestXml());
     QVERIFY(!reqTask.isFinished());
 
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>The Coven</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.inject(roomConfigResultXml(u"The Coven"_s));
 
     QVERIFY(reqTask.isFinished());
     auto config = expectFutureVariant<QXmppMucRoomConfig>(reqTask);
@@ -2573,20 +2282,8 @@ void tst_QXmppMuc::subscribeToRoomConfig()
                 "</x>"
                 "</message>");
     muc->handleMessage(status104);
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>The New Coven</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml(u"The New Coven"_s));
     QCOMPARE(room.roomConfig().value()->name(), u"The New Coven"_s);
 
     // setWatchRoomConfig(false) — stop watching, cached value stays
@@ -2597,40 +2294,16 @@ void tst_QXmppMuc::subscribeToRoomConfig()
     // requestRoomConfig() after disabling watch must re-fetch (cache may be stale)
     auto staleTask = room.requestRoomConfig();
     QVERIFY(!staleTask.isFinished());
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>The New Coven</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml(u"The New Coven"_s));
     QVERIFY(staleTask.isFinished());
     QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(staleTask).name(), u"The New Coven"_s);
 
     // setWatchRoomConfig(true) after watch was disabled — always re-fetches (cache may be stale)
     room.setWatchRoomConfig(true);
     QVERIFY(room.isWatchingRoomConfig());
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>The New Coven</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml(u"The New Coven"_s));
     QCOMPARE(room.roomConfig().value()->name(), u"The New Coven"_s);
 }
 
@@ -2646,17 +2319,8 @@ void tst_QXmppMuc::setWatchRoomConfigFetch()
     QVERIFY(!room.roomConfig().value().has_value());
     room.setWatchRoomConfig(true);
     QVERIFY(room.isWatchingRoomConfig());
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml());
     QVERIFY(room.roomConfig().value().has_value());
 }
 
@@ -2673,20 +2337,8 @@ void tst_QXmppMuc::rewatchRoomConfigStaleCache()
 
     // Enable watching — triggers initial fetch
     room.setWatchRoomConfig(true);
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>Old Name</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml(u"Old Name"_s));
     QCOMPARE(room.roomConfig().value()->name(), u"Old Name"_s);
 
     // Disable watching — cache stays but is now potentially stale
@@ -2698,20 +2350,8 @@ void tst_QXmppMuc::rewatchRoomConfigStaleCache()
     // Re-enable watching via setWatchRoomConfig — must re-fetch, not use stale cache
     room.setWatchRoomConfig(true);
     QVERIFY(room.isWatchingRoomConfig());
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>New Name</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml(u"New Name"_s));
     QCOMPARE(room.roomConfig().value()->name(), u"New Name"_s);
 
     // requestRoomConfig() now returns the fresh config from cache (watching is active)
@@ -2724,20 +2364,8 @@ void tst_QXmppMuc::rewatchRoomConfigStaleCache()
     auto freshTask = room.requestRoomConfig(true);
     QVERIFY(room.isWatchingRoomConfig());
     QVERIFY(!freshTask.isFinished());
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>New Name</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml(u"New Name"_s));
     QVERIFY(freshTask.isFinished());
     QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(freshTask).name(), u"New Name"_s);
 }
@@ -2754,20 +2382,8 @@ void tst_QXmppMuc::requestRoomConfigJoinsInFlightFetch()
 
     // Enable watching — triggers initial fetch
     room.setWatchRoomConfig(true);
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>Old Name</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.expect(roomConfigRequestXml());
+    test.inject(roomConfigResultXml(u"Old Name"_s));
     QCOMPARE(room.roomConfig().value()->name(), u"Old Name"_s);
 
     // Status 104: config changed, re-fetch starts but IQ response not yet received
@@ -2779,26 +2395,14 @@ void tst_QXmppMuc::requestRoomConfigJoinsInFlightFetch()
                 "</x>"
                 "</message>");
     muc->handleMessage(status104);
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
-                "</iq>"_s);
+    test.expect(roomConfigRequestXml());
 
     // requestRoomConfig() while fetch is in flight — must wait for the fresh result
     auto task = room.requestRoomConfig();
     QVERIFY(!task.isFinished());
 
     // Now the in-flight IQ response arrives with the updated config
-    test.inject(u"<iq id='qx1' type='result'>"
-                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
-                "<x xmlns='jabber:x:data' type='form'>"
-                "<field type='hidden' var='FORM_TYPE'>"
-                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
-                "</field>"
-                "<field type='text-single' var='muc#roomconfig_roomname'>"
-                "<value>New Name</value>"
-                "</field>"
-                "</x>"
-                "</query></iq>"_s);
+    test.inject(roomConfigResultXml(u"New Name"_s));
 
     QVERIFY(task.isFinished());
     QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(task).name(), u"New Name"_s);
