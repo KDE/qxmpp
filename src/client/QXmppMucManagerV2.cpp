@@ -2028,6 +2028,9 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
 /// QXmppMucRoomConfig that can be edited and submitted via setRoomConfig().
 /// Also updates the roomConfig() bindable on success.
 ///
+/// If a configuration has already been fetched (cached in roomConfig()), it
+/// is returned immediately without sending a network request.
+///
 /// If \a watch is \c true, enables automatic re-fetching on status code 104
 /// (room configuration changed). Equivalent to calling setWatchRoomConfig(true)
 /// before this call.
@@ -2046,6 +2049,11 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
 
     if (watch) {
         itr->second.watchingRoomConfig = true;
+    }
+
+    // Return cached value if available
+    if (const auto &cached = itr->second.roomConfig.value()) {
+        return makeReadyTask<Result<QXmppMucRoomConfig>>(*cached);
     }
 
     QXmppMucOwnerIq iq;
