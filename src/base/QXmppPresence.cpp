@@ -327,6 +327,114 @@ void QXmppPresence::setMucItem(const QXmppMucItem &item)
     d->mucItem = item;
 }
 
+///
+/// Returns the MUC participant item containing role and affiliation data.
+///
+/// This is the modern replacement for mucItem(). It is populated from the
+/// \c &lt;item/&gt; element inside the \c muc\#user \c &lt;x/&gt; block of
+/// incoming MUC presences.
+///
+/// \since QXmpp 1.15
+///
+QXmpp::Muc::Item QXmppPresence::mucParticipantItem() const
+{
+    Muc::Item item;
+    item.setJid(d->mucItem.jid());
+    item.setNick(d->mucItem.nick());
+    item.setReason(d->mucItem.reason());
+    item.setActor(d->mucItem.actor());
+    using A = QXmppMucItem::Affiliation;
+    switch (d->mucItem.affiliation()) {
+    case A::UnspecifiedAffiliation:
+        break;
+    case A::OutcastAffiliation:
+        item.setAffiliation(Muc::Affiliation::Outcast);
+        break;
+    case A::NoAffiliation:
+        item.setAffiliation(Muc::Affiliation::None);
+        break;
+    case A::MemberAffiliation:
+        item.setAffiliation(Muc::Affiliation::Member);
+        break;
+    case A::AdminAffiliation:
+        item.setAffiliation(Muc::Affiliation::Admin);
+        break;
+    case A::OwnerAffiliation:
+        item.setAffiliation(Muc::Affiliation::Owner);
+        break;
+    }
+    using R = QXmppMucItem::Role;
+    switch (d->mucItem.role()) {
+    case R::UnspecifiedRole:
+        break;
+    case R::NoRole:
+        item.setRole(Muc::Role::None);
+        break;
+    case R::VisitorRole:
+        item.setRole(Muc::Role::Visitor);
+        break;
+    case R::ParticipantRole:
+        item.setRole(Muc::Role::Participant);
+        break;
+    case R::ModeratorRole:
+        item.setRole(Muc::Role::Moderator);
+        break;
+    }
+    return item;
+}
+
+///
+/// Sets the MUC participant item.
+///
+/// \since QXmpp 1.15
+///
+void QXmppPresence::setMucParticipantItem(const QXmpp::Muc::Item &newItem)
+{
+    QXmppMucItem legacy;
+    legacy.setJid(newItem.jid());
+    legacy.setNick(newItem.nick());
+    legacy.setReason(newItem.reason());
+    legacy.setActor(newItem.actor());
+    if (auto a = newItem.affiliation()) {
+        using A = QXmppMucItem::Affiliation;
+        switch (*a) {
+        case Muc::Affiliation::None:
+            legacy.setAffiliation(A::NoAffiliation);
+            break;
+        case Muc::Affiliation::Outcast:
+            legacy.setAffiliation(A::OutcastAffiliation);
+            break;
+        case Muc::Affiliation::Member:
+            legacy.setAffiliation(A::MemberAffiliation);
+            break;
+        case Muc::Affiliation::Admin:
+            legacy.setAffiliation(A::AdminAffiliation);
+            break;
+        case Muc::Affiliation::Owner:
+            legacy.setAffiliation(A::OwnerAffiliation);
+            break;
+        }
+    }
+    if (auto r = newItem.role()) {
+        using R = QXmppMucItem::Role;
+        switch (*r) {
+        case Muc::Role::None:
+            legacy.setRole(R::NoRole);
+            break;
+        case Muc::Role::Visitor:
+            legacy.setRole(R::VisitorRole);
+            break;
+        case Muc::Role::Participant:
+            legacy.setRole(R::ParticipantRole);
+            break;
+        case Muc::Role::Moderator:
+            legacy.setRole(R::ModeratorRole);
+            break;
+        }
+    }
+    d->mucItem = legacy;
+}
+
 /// Returns the password used to join a MUC room.
 QString QXmppPresence::mucPassword() const
 {
@@ -526,7 +634,8 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
         d->mucPassword = element.firstChildElement(u"password"_s).text();
         d->mucHistory = parseOptionalChildElement<Muc::HistoryOptions>(element);
     } else if (element.tagName() == u"x" && element.namespaceURI() == ns_muc_user) {
-        d->mucItem.parse(firstChildElement(element, u"item"));
+        const auto itemEl = firstChildElement(element, u"item");
+        d->mucItem.parse(itemEl);
 
         d->mucStatusCodes.clear();
         for (const auto &statusElement : iterChildElements(element, u"status")) {
