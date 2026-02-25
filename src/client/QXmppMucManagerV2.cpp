@@ -26,42 +26,6 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-static std::optional<QXmpp::Muc::Affiliation> affiliationFromLegacy(QXmppMucItem::Affiliation affiliation)
-{
-    switch (affiliation) {
-    case QXmppMucItem::UnspecifiedAffiliation:
-        return {};
-    case QXmppMucItem::OutcastAffiliation:
-        return QXmpp::Muc::Affiliation::Outcast;
-    case QXmppMucItem::NoAffiliation:
-        return QXmpp::Muc::Affiliation::None;
-    case QXmppMucItem::MemberAffiliation:
-        return QXmpp::Muc::Affiliation::Member;
-    case QXmppMucItem::AdminAffiliation:
-        return QXmpp::Muc::Affiliation::Admin;
-    case QXmppMucItem::OwnerAffiliation:
-        return QXmpp::Muc::Affiliation::Owner;
-    }
-    return {};
-}
-
-static std::optional<Muc::Role> roleFromLegacy(QXmppMucItem::Role role)
-{
-    switch (role) {
-    case QXmppMucItem::UnspecifiedRole:
-        return {};
-    case QXmppMucItem::NoRole:
-        return Muc::Role::None;
-    case QXmppMucItem::VisitorRole:
-        return Muc::Role::Visitor;
-    case QXmppMucItem::ParticipantRole:
-        return Muc::Role::Participant;
-    case QXmppMucItem::ModeratorRole:
-        return Muc::Role::Moderator;
-    }
-    return {};
-}
-
 static QXmppMucItem::Role roleToLegacy(Muc::Role role)
 {
     switch (role) {
@@ -92,6 +56,55 @@ static QXmppMucItem::Affiliation affiliationToLegacy(Muc::Affiliation affiliatio
         return QXmppMucItem::OwnerAffiliation;
     }
     return QXmppMucItem::NoAffiliation;
+}
+
+// Converts a QXmppMucItem (from a QXmppMucAdminIq response) to the modern QXmpp::Muc::Item.
+// TODO: remove once QXmppMucAdminIq is replaced by Iq<T>.
+static Muc::Item itemFromLegacy(const QXmppMucItem &legacy)
+{
+    Muc::Item entry;
+    entry.setJid(legacy.jid());
+    entry.setNick(legacy.nick());
+    entry.setReason(legacy.reason());
+    entry.setActor(legacy.actor());
+    using A = QXmppMucItem::Affiliation;
+    switch (legacy.affiliation()) {
+    case A::UnspecifiedAffiliation:
+        break;
+    case A::OutcastAffiliation:
+        entry.setAffiliation(Muc::Affiliation::Outcast);
+        break;
+    case A::NoAffiliation:
+        entry.setAffiliation(Muc::Affiliation::None);
+        break;
+    case A::MemberAffiliation:
+        entry.setAffiliation(Muc::Affiliation::Member);
+        break;
+    case A::AdminAffiliation:
+        entry.setAffiliation(Muc::Affiliation::Admin);
+        break;
+    case A::OwnerAffiliation:
+        entry.setAffiliation(Muc::Affiliation::Owner);
+        break;
+    }
+    using R = QXmppMucItem::Role;
+    switch (legacy.role()) {
+    case R::UnspecifiedRole:
+        break;
+    case R::NoRole:
+        entry.setRole(Muc::Role::None);
+        break;
+    case R::VisitorRole:
+        entry.setRole(Muc::Role::Visitor);
+        break;
+    case R::ParticipantRole:
+        entry.setRole(Muc::Role::Participant);
+        break;
+    case R::ModeratorRole:
+        entry.setRole(Muc::Role::Moderator);
+        break;
+    }
+    return entry;
 }
 
 static Muc::LeaveReason leaveReasonFromPresence(const QXmppPresence &presence)
@@ -144,13 +157,13 @@ struct MucParticipantData {
             return QXmppUtils::jidToResource(presence.value().from());
         });
         jid.setBinding([&] {
-            return presence.value().mucItem().jid();
+            return presence.value().mucParticipantItem().jid();
         });
         role.setBinding([&] {
-            return roleFromLegacy(presence.value().mucItem().role()).value_or(Muc::Role::None);
+            return presence.value().mucParticipantItem().role().value_or(Muc::Role::None);
         });
         affiliation.setBinding([&] {
-            return affiliationFromLegacy(presence.value().mucItem().affiliation()).value_or(Muc::Affiliation::None);
+            return presence.value().mucParticipantItem().affiliation().value_or(Muc::Affiliation::None);
         });
     }
     void setPresence(const QXmppPresence &newPresence) { presence = newPresence; }
@@ -761,7 +774,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
     case Joined:
         if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(303)) {
             // Nickname change (XEP-0045 §7.6): unavailable with 303 + new nick in item
-            auto newNick = presence.mucItem().nick();
+            auto newNick = presence.mucParticipantItem().nick();
             auto isSelf = presence.mucStatusCodes().contains(110);
 
             if (isSelf && !newNick.isEmpty()) {
@@ -1896,14 +1909,7 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
                        QList<Muc::Item> result;
                        result.reserve(iq.items().size());
                        for (const auto &legacy : iq.items()) {
-                           Muc::Item entry;
-                           entry.setJid(legacy.jid());
-                           entry.setNick(legacy.nick());
-                           entry.setAffiliation(affiliationFromLegacy(legacy.affiliation()));
-                           entry.setRole(roleFromLegacy(legacy.role()));
-                           entry.setReason(legacy.reason());
-                           entry.setActor(legacy.actor());
-                           result.append(std::move(entry));
+                           result.append(itemFromLegacy(legacy));
                        }
                        return result;
                    });

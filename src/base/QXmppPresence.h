@@ -79,8 +79,14 @@ public:
     void setStatusText(const QString &statusText);
 
     // XEP-0045: Multi-User Chat
+    /// \deprecated Use mucParticipantItem() instead.
+    [[deprecated("Use mucParticipantItem()")]]
     QXmppMucItem mucItem() const;
+    /// \deprecated Use setMucParticipantItem() instead.
+    [[deprecated("Use setMucParticipantItem()")]]
     void setMucItem(const QXmppMucItem &item);
+    QXmpp::Muc::Item mucParticipantItem() const;
+    void setMucParticipantItem(const QXmpp::Muc::Item &item);
 
     QString mucPassword() const;
     void setMucPassword(const QString &password);

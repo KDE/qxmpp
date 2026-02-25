@@ -304,7 +304,7 @@ void tst_QXmppMuc::avatarFetch()
         "</PHOTO>"
         "</vCard></iq>"_s);
 
-    auto avatar = expectFutureVariant<std::optional<QXmppMucManagerV2::Avatar>>(avatarTask);
+    auto avatar = expectFutureVariant<std::optional<QXmpp::Muc::Avatar>>(avatarTask);
     QVERIFY(avatar.has_value());
     QCOMPARE(avatar->contentType, u"image/svg+xml"_s);
 }

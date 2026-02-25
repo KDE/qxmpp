@@ -15,6 +15,29 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
+template<>
+struct Enums::Data<QXmpp::Muc::Affiliation> {
+    using enum QXmpp::Muc::Affiliation;
+    static constexpr auto Values = makeValues<QXmpp::Muc::Affiliation>({
+        { Outcast, u"outcast" },
+        { None, u"none" },
+        { Member, u"member" },
+        { Admin, u"admin" },
+        { Owner, u"owner" },
+    });
+};
+
+template<>
+struct Enums::Data<QXmpp::Muc::Role> {
+    using enum QXmpp::Muc::Role;
+    static constexpr auto Values = makeValues<QXmpp::Muc::Role>({
+        { None, u"none" },
+        { Visitor, u"visitor" },
+        { Participant, u"participant" },
+        { Moderator, u"moderator" },
+    });
+};
+
 namespace QXmpp::Muc {
 
 /// \cond
@@ -63,6 +86,34 @@ void Destroy::toXml(QXmlStreamWriter *writer) const
         u"destroy",
         OptionalAttribute { u"jid", m_alternateRoom },
         OptionalTextElement { u"reason", m_reason },
+    });
+}
+/// \endcond
+
+/// \cond
+std::optional<Item> Item::fromDom(const QDomElement &el)
+{
+    Item item;
+    item.m_jid = el.attribute(u"jid"_s);
+    item.m_nick = el.attribute(u"nick"_s);
+    item.m_affiliation = Enums::fromString<Affiliation>(el.attribute(u"affiliation"_s));
+    item.m_role = Enums::fromString<Role>(el.attribute(u"role"_s));
+    item.m_reason = el.firstChildElement(u"reason"_s).text();
+    item.m_actor = el.firstChildElement(u"actor"_s).attribute(u"jid"_s);
+    return item;
+}
+
+void Item::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter w(writer);
+    w.write(Element {
+        Tag { u"item", ns_muc_admin },
+        OptionalAttribute { u"jid", m_jid },
+        OptionalAttribute { u"nick", m_nick },
+        OptionalAttribute { u"affiliation", m_affiliation },
+        OptionalAttribute { u"role", m_role },
+        OptionalTextElement { u"reason", m_reason },
+        OptionalContent { !m_actor.isEmpty(), Element { u"actor", Attribute { u"jid", m_actor } } },
     });
 }
 /// \endcond
