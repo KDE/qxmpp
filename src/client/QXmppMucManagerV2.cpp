@@ -306,7 +306,8 @@ struct MucRoomData {
     // Room config — populated when subscribeToRoomConfig(true) is called, re-fetched on status 104
     QProperty<std::optional<QXmppMucRoomConfig>> roomConfig;
     bool watchingRoomConfig = false;
-    std::vector<QXmppPromise<Result<>>> roomConfigWaiters;
+    bool fetchingRoomConfig = false;
+    std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> roomConfigWaiters;
     // Convenience bindings derived from roomInfo
     QProperty<bool> subjectChangeable;
     QProperty<QString> description;
@@ -1231,6 +1232,12 @@ void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
 
 void QXmppMucManagerV2Private::fetchRoomConfigSubscribed(const QString &roomJid)
 {
+    auto itr = rooms.find(roomJid);
+    if (itr == rooms.end()) {
+        return;
+    }
+    itr->second.fetchingRoomConfig = true;
+
     QXmppMucOwnerIq iq;
     iq.setTo(roomJid);
     iq.setType(QXmppIq::Get);
@@ -1240,6 +1247,7 @@ void QXmppMucManagerV2Private::fetchRoomConfigSubscribed(const QString &roomJid)
             return;
         }
         auto &data = itr->second;
+        data.fetchingRoomConfig = false;
         auto waiters = std::move(data.roomConfigWaiters);
 
         if (auto *error = std::get_if<QXmppError>(&result)) {
@@ -1258,9 +1266,9 @@ void QXmppMucManagerV2Private::fetchRoomConfigSubscribed(const QString &roomJid)
             }
             return;
         }
-        data.roomConfig = std::move(config);
+        data.roomConfig = *config;
         for (auto &p : waiters) {
-            p.finish(QXmpp::Success {});
+            p.finish(*config);
         }
     });
 }
@@ -1631,7 +1639,7 @@ void QXmppMucRoomV2::setWatchRoomConfig(bool watch)
         return;
     }
     auto &data = itr->second;
-    const bool needsFetch = watch && !data.watchingRoomConfig && !data.roomConfig.value().has_value();
+    const bool needsFetch = watch && !data.watchingRoomConfig;
     data.watchingRoomConfig = watch;
     if (needsFetch) {
         m_manager->d->fetchRoomConfigSubscribed(m_jid);
@@ -2028,8 +2036,10 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
 /// QXmppMucRoomConfig that can be edited and submitted via setRoomConfig().
 /// Also updates the roomConfig() bindable on success.
 ///
-/// If a configuration has already been fetched (cached in roomConfig()), it
-/// is returned immediately without sending a network request.
+/// If watching is active (setWatchRoomConfig(true) or \a watch = \c true) and
+/// the configuration has already been fetched, the cached value is returned
+/// immediately without a network request. When watching is disabled the cached
+/// value may be stale, so a fresh fetch is always performed in that case.
 ///
 /// If \a watch is \c true, enables automatic re-fetching on status code 104
 /// (room configuration changed). Equivalent to calling setWatchRoomConfig(true)
@@ -2047,13 +2057,26 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
         return makeReadyTask<Result<QXmppMucRoomConfig>>(QXmppError { u"Room is not in Creating or Joined state."_s });
     }
 
+    // Capture wasWatching before potentially enabling watch, so we only use the cache
+    // when watching was already active (status 104 was keeping it current).
+    // If we're just (re-)enabling watch now, the cache may be stale — always re-fetch.
+    const bool wasWatching = itr->second.watchingRoomConfig;
     if (watch) {
         itr->second.watchingRoomConfig = true;
     }
 
-    // Return cached value if available
-    if (const auto &cached = itr->second.roomConfig.value()) {
-        return makeReadyTask<Result<QXmppMucRoomConfig>>(*cached);
+    if (wasWatching) {
+        // If a status-104 re-fetch is in progress, join it — its result will be fresher
+        // than the current cache. Otherwise return the cache directly.
+        if (itr->second.fetchingRoomConfig) {
+            QXmppPromise<Result<QXmppMucRoomConfig>> p;
+            auto task = p.task();
+            itr->second.roomConfigWaiters.push_back(std::move(p));
+            return task;
+        }
+        if (const auto &cached = itr->second.roomConfig.value()) {
+            return makeReadyTask<Result<QXmppMucRoomConfig>>(*cached);
+        }
     }
 
     QXmppMucOwnerIq iq;

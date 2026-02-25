@@ -88,6 +88,8 @@ private:
     Q_SLOT void destroyRoom();
     Q_SLOT void subscribeToRoomConfig();
     Q_SLOT void setWatchRoomConfigFetch();
+    Q_SLOT void rewatchRoomConfigStaleCache();
+    Q_SLOT void requestRoomConfigJoinsInFlightFetch();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -2383,7 +2385,7 @@ void tst_QXmppMuc::subscribeToRoomConfig()
     QVERIFY(room.roomConfig().value().has_value());
     QCOMPARE(room.roomConfig().value()->name(), u"The Coven"_s);
 
-    // Second requestRoomConfig() returns cached value immediately — no IQ sent
+    // Second requestRoomConfig() returns cached value immediately — watching is active
     auto cachedTask = room.requestRoomConfig();
     QVERIFY(cachedTask.isFinished());
     QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(cachedTask).name(), u"The Coven"_s);
@@ -2418,9 +2420,44 @@ void tst_QXmppMuc::subscribeToRoomConfig()
     QVERIFY(!room.isWatchingRoomConfig());
     QCOMPARE(room.roomConfig().value()->name(), u"The New Coven"_s);
 
-    // setWatchRoomConfig(true) with config already loaded — just re-enables flag, no fetch
+    // requestRoomConfig() after disabling watch must re-fetch (cache may be stale)
+    auto staleTask = room.requestRoomConfig();
+    QVERIFY(!staleTask.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>The New Coven</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QVERIFY(staleTask.isFinished());
+    QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(staleTask).name(), u"The New Coven"_s);
+
+    // setWatchRoomConfig(true) after watch was disabled — always re-fetches (cache may be stale)
     room.setWatchRoomConfig(true);
     QVERIFY(room.isWatchingRoomConfig());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>The New Coven</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QCOMPARE(room.roomConfig().value()->name(), u"The New Coven"_s);
 }
 
 void tst_QXmppMuc::setWatchRoomConfigFetch()
@@ -2446,6 +2483,149 @@ void tst_QXmppMuc::setWatchRoomConfigFetch()
                 "</x>"
                 "</query></iq>"_s);
     QVERIFY(room.roomConfig().value().has_value());
+}
+
+void tst_QXmppMuc::rewatchRoomConfigStaleCache()
+{
+    // Regression test: re-enabling watch after it was disabled must not serve
+    // a stale cached config. The cache may have been populated while watching
+    // was active, but the room config could have changed while watching was off.
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    // Enable watching — triggers initial fetch
+    room.setWatchRoomConfig(true);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>Old Name</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QCOMPARE(room.roomConfig().value()->name(), u"Old Name"_s);
+
+    // Disable watching — cache stays but is now potentially stale
+    room.setWatchRoomConfig(false);
+    QVERIFY(!room.isWatchingRoomConfig());
+
+    // Config changed on server while not watching (no status 104 received)
+
+    // Re-enable watching via setWatchRoomConfig — must re-fetch, not use stale cache
+    room.setWatchRoomConfig(true);
+    QVERIFY(room.isWatchingRoomConfig());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>New Name</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QCOMPARE(room.roomConfig().value()->name(), u"New Name"_s);
+
+    // requestRoomConfig() now returns the fresh config from cache (watching is active)
+    auto cachedTask = room.requestRoomConfig();
+    QVERIFY(cachedTask.isFinished());
+    QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(cachedTask).name(), u"New Name"_s);
+
+    // Re-enable watching via requestRoomConfig(true) when watching was off must also re-fetch
+    room.setWatchRoomConfig(false);
+    auto freshTask = room.requestRoomConfig(true);
+    QVERIFY(room.isWatchingRoomConfig());
+    QVERIFY(!freshTask.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>New Name</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QVERIFY(freshTask.isFinished());
+    QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(freshTask).name(), u"New Name"_s);
+}
+
+void tst_QXmppMuc::requestRoomConfigJoinsInFlightFetch()
+{
+    // When a status-104 re-fetch is already in progress, requestRoomConfig() must join it
+    // rather than returning the (about-to-be-superseded) cached value.
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    // Enable watching — triggers initial fetch
+    room.setWatchRoomConfig(true);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>Old Name</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QCOMPARE(room.roomConfig().value()->name(), u"Old Name"_s);
+
+    // Status 104: config changed, re-fetch starts but IQ response not yet received
+    QXmppMessage status104;
+    parsePacket(status104,
+                "<message from='coven@chat.shakespeare.lit' type='groupchat'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<status code='104'/>"
+                "</x>"
+                "</message>");
+    muc->handleMessage(status104);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+
+    // requestRoomConfig() while fetch is in flight — must wait for the fresh result
+    auto task = room.requestRoomConfig();
+    QVERIFY(!task.isFinished());
+
+    // Now the in-flight IQ response arrives with the updated config
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>New Name</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    QVERIFY(task.isFinished());
+    QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(task).name(), u"New Name"_s);
+    QCOMPARE(room.roomConfig().value()->name(), u"New Name"_s);
 }
 
 QTEST_MAIN(tst_QXmppMuc)
