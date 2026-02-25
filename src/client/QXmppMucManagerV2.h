@@ -188,7 +188,8 @@ public:
     QBindable<QStringList> contactJids() const;
     QBindable<std::optional<QXmppMucRoomInfo>> roomInfo() const;
     QBindable<std::optional<QXmppMucRoomConfig>> roomConfig() const;
-    QXmppTask<QXmpp::Result<>> subscribeToRoomConfig(bool enabled);
+    void setWatchRoomConfig(bool watch);
+    bool isWatchingRoomConfig() const;
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);
@@ -204,8 +205,8 @@ public:
     QXmppTask<QXmpp::SendResult> requestVoice();
     QXmppTask<QXmpp::SendResult> answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow);
 
-    QXmppTask<QXmpp::Result<QXmppMucRoomConfig>> requestRoomConfig();
-    QXmppTask<QXmpp::Result<>> submitRoomConfig(const QXmppMucRoomConfig &config);
+    QXmppTask<QXmpp::Result<QXmppMucRoomConfig>> requestRoomConfig(bool watch = false);
+    QXmppTask<QXmpp::Result<>> setRoomConfig(const QXmppMucRoomConfig &config);
     QXmppTask<QXmpp::Result<>> cancelRoomCreation();
     QXmppTask<QXmpp::Result<>> destroyRoom(const QString &reason = {}, const QString &alternateJid = {});
 

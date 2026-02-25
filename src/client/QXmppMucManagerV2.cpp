@@ -576,7 +576,7 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
 /// Creates a new reserved MUC room at \a jid with the given \a nickname.
 ///
 /// The room is created in a locked state; no other users can join until the
-/// owner submits the configuration form via QXmppMucRoomV2::submitRoomConfig().
+/// owner submits the configuration form via QXmppMucRoomV2::setRoomConfig().
 ///
 /// The returned task resolves once the server has confirmed room creation
 /// (XEP-0045 status code 201) and the configuration form has been fetched.
@@ -1611,53 +1611,45 @@ QBindable<std::optional<QXmppMucRoomConfig>> QXmppMucRoomV2::roomConfig() const
 }
 
 ///
-/// Subscribes to or unsubscribes from automatic room configuration updates.
+/// Enables or disables automatic room configuration updates.
 ///
-/// When called with \c true and no subscription is active yet, fetches the room
-/// configuration form immediately and stores it in the roomConfig() bindable.
-/// Subsequent status code 104 messages (room configuration changed) will
-/// automatically trigger a re-fetch to keep roomConfig() current.
+/// When set to \c true, status code 104 messages (room configuration changed)
+/// will automatically trigger a re-fetch to keep roomConfig() current. If the
+/// configuration has not been fetched yet, a fetch is triggered immediately
+/// (fire-and-forget; use requestRoomConfig() if you need the result).
 ///
-/// When called with \c true and the configuration has already been fetched
-/// (e.g. from a previous call), the returned task resolves immediately.
+/// When set to \c false, disables auto-refresh. The last fetched configuration
+/// remains available in roomConfig() but is no longer updated automatically.
 ///
-/// When called with \c false, disables the auto-refresh subscription. The
-/// last fetched configuration remains available in roomConfig() but is no
-/// longer updated automatically.
-///
-/// \sa roomConfig()
+/// \sa roomConfig(), requestRoomConfig()
 /// \since QXmpp 1.15
 ///
-QXmppTask<Result<>> QXmppMucRoomV2::subscribeToRoomConfig(bool enabled)
+void QXmppMucRoomV2::setWatchRoomConfig(bool watch)
 {
-    using enum MucRoomState;
     auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() || itr->second.state != Joined) {
-        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+    if (itr == m_manager->d->rooms.end()) {
+        return;
     }
     auto &data = itr->second;
-
-    if (!enabled) {
-        data.watchingRoomConfig = false;
-        return makeReadyTask<Result<>>(QXmpp::Success {});
-    }
-
-    // Already fetched — resolve immediately
-    if (data.roomConfig.value().has_value()) {
-        data.watchingRoomConfig = true;
-        return makeReadyTask<Result<>>(QXmpp::Success {});
-    }
-
-    // Fetch in progress or first call — add to waiters and kick off fetch if needed
-    QXmppPromise<Result<>> promise;
-    auto task = promise.task();
-    const bool needsFetch = !data.watchingRoomConfig;
-    data.watchingRoomConfig = true;
-    data.roomConfigWaiters.push_back(std::move(promise));
+    const bool needsFetch = watch && !data.watchingRoomConfig && !data.roomConfig.value().has_value();
+    data.watchingRoomConfig = watch;
     if (needsFetch) {
         m_manager->d->fetchRoomConfigSubscribed(m_jid);
     }
-    return task;
+}
+
+///
+/// Returns whether automatic room configuration updates are enabled.
+///
+/// \sa setWatchRoomConfig()
+/// \since QXmpp 1.15
+///
+bool QXmppMucRoomV2::isWatchingRoomConfig() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return data->watchingRoomConfig;
+    }
+    return false;
 }
 
 ///
@@ -2033,11 +2025,17 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
 /// Requests the current room configuration form from the server.
 ///
 /// Valid in both the \c Creating and \c Joined states. Returns a
-/// QXmppMucRoomConfig that can be edited and submitted via submitRoomConfig().
+/// QXmppMucRoomConfig that can be edited and submitted via setRoomConfig().
+/// Also updates the roomConfig() bindable on success.
 ///
+/// If \a watch is \c true, enables automatic re-fetching on status code 104
+/// (room configuration changed). Equivalent to calling setWatchRoomConfig(true)
+/// before this call.
+///
+/// \sa setRoomConfig(), roomConfig(), setWatchRoomConfig()
 /// \since QXmpp 1.15
 ///
-QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig()
+QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool watch)
 {
     using enum MucRoomState;
     auto itr = m_manager->d->rooms.find(m_jid);
@@ -2046,14 +2044,21 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig()
         return makeReadyTask<Result<QXmppMucRoomConfig>>(QXmppError { u"Room is not in Creating or Joined state."_s });
     }
 
+    if (watch) {
+        itr->second.watchingRoomConfig = true;
+    }
+
     QXmppMucOwnerIq iq;
     iq.setTo(m_jid);
     iq.setType(QXmppIq::Get);
     return chainIq(m_manager->client()->sendIq(std::move(iq)), m_manager,
-                   [](QXmppMucOwnerIq &&iq) -> Result<QXmppMucRoomConfig> {
+                   [this, jid = m_jid](QXmppMucOwnerIq &&iq) -> Result<QXmppMucRoomConfig> {
                        auto config = QXmppMucRoomConfig::fromDataForm(iq.form());
                        if (!config) {
                            return QXmppError { u"Server returned an invalid or missing muc#roomconfig form."_s };
+                       }
+                       if (auto itr2 = m_manager->d->rooms.find(jid); itr2 != m_manager->d->rooms.end()) {
+                           itr2->second.roomConfig = config;
                        }
                        return std::move(*config);
                    });
@@ -2068,7 +2073,7 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig()
 ///
 /// \since QXmpp 1.15
 ///
-QXmppTask<Result<>> QXmppMucRoomV2::submitRoomConfig(const QXmppMucRoomConfig &config)
+QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &config)
 {
     using enum MucRoomState;
     auto itr = m_manager->d->rooms.find(m_jid);
@@ -2104,7 +2109,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::submitRoomConfig(const QXmppMucRoomConfig &c
 /// Cancels room creation and destroys the locked room on the server.
 ///
 /// Only valid in the \c Creating state (i.e. after createRoom() has resolved
-/// but before submitRoomConfig() has been called). Sending the cancel form
+/// but before setRoomConfig() has been called). Sending the cancel form
 /// instructs the server to destroy the still-locked room.
 ///
 /// \since QXmpp 1.15
