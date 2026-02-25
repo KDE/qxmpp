@@ -39,6 +39,7 @@ private:
     Q_SLOT void joinRoomWithPassword();
     Q_SLOT void joinRoomTimeout();
     Q_SLOT void joinRoomTimerStopped();
+    Q_SLOT void joinRoomAlreadyInProgress();
 
     // MUC messages
     Q_SLOT void receiveMessage();
@@ -441,6 +442,47 @@ void tst_QXmppMuc::joinRoomTimerStopped()
     QVERIFY(task.isFinished());
     auto result = expectVariant<QXmppMucRoomV2>(task.result());
     QVERIFY(result.isValid());
+}
+
+void tst_QXmppMuc::joinRoomAlreadyInProgress()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // First join — not yet completed
+    auto task1 = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+    QVERIFY(!task1.isFinished());
+
+    // Second join while first is still in progress must fail immediately
+    auto task2 = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    QVERIFY(task2.isFinished());
+    expectVariant<QXmppError>(task2.result());
+
+    // Complete the first join
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task1);
+    QVERIFY(room.isValid());
+
+    // Third join after fully joined must succeed idempotently
+    auto task3 = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    QVERIFY(task3.isFinished());
+    QVERIFY(expectVariant<QXmppMucRoomV2>(task3.result()).isValid());
 }
 
 void tst_QXmppMuc::receiveMessage()
