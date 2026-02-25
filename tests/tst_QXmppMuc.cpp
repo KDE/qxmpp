@@ -2423,6 +2423,11 @@ void tst_QXmppMuc::subscribeToRoomConfig()
     QVERIFY(room.roomConfig().value().has_value());
     QCOMPARE(room.roomConfig().value()->name(), u"The Coven"_s);
 
+    // Second requestRoomConfig() returns cached value immediately — no IQ sent
+    auto cachedTask = room.requestRoomConfig();
+    QVERIFY(cachedTask.isFinished());
+    QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(cachedTask).name(), u"The Coven"_s);
+
     // Status 104: config re-fetched automatically
     QXmppMessage status104;
     parsePacket(status104,
