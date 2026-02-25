@@ -24,6 +24,7 @@ class QXmppFallback;
 class QXmppJingleMessageInitiationElement;
 class QXmppMessageReaction;
 class QXmppMixInvitation;
+class QXmppMucVoiceRequest;
 #ifdef BUILD_OMEMO
 class QXmppOmemoElement;
 #endif
@@ -200,6 +201,8 @@ public:
     // XEP-0045: Multi-User Chat (since QXmpp 1.15)
     QList<uint32_t> mucStatusCodes() const;
     void setMucStatusCodes(const QList<uint32_t> &codes);
+    std::optional<QXmppMucVoiceRequest> mucVoiceRequest() const;
+    void setMucVoiceRequest(std::optional<QXmppMucVoiceRequest> request);
 
     // XEP-0249: Direct MUC Invitations
     QString mucInvitationJid() const;
