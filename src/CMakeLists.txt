@@ -150,6 +150,7 @@ set(INSTALL_HEADER_FILES
     client/QXmppMucManagerV2.h
     client/QXmppOutgoingClient.h
     client/QXmppRegistrationManager.h
+    client/QXmppPepBookmarkManager.h
     client/QXmppPubSubEventHandler.h
     client/QXmppPubSubManager.h
     client/QXmppRemoteMethod.h
@@ -271,6 +272,7 @@ set(SOURCE_FILES
     client/QXmppAtmTrustStorage.cpp
     client/QXmppAttentionManager.cpp
     client/QXmppBlockingManager.cpp
+    client/QXmppPepBookmarkManager.cpp
     client/QXmppBookmarkManager.cpp
     client/QXmppCallInviteManager.cpp
     client/QXmppCarbonManager.cpp
