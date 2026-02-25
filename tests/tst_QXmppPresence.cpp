@@ -207,11 +207,11 @@ void tst_QXmppPresence::testPresenceWithMucItem()
     QCOMPARE(presence.to(), QLatin1String("pistol@shakespeare.lit/harfleur"));
     QCOMPARE(presence.from(), QLatin1String("harfleur@henryv.shakespeare.lit/pistol"));
     QCOMPARE(presence.type(), QXmppPresence::Unavailable);
-    QCOMPARE(presence.mucItem().actor(), QLatin1String("fluellen@shakespeare.lit"));
-    QCOMPARE(presence.mucItem().affiliation(), QXmppMucItem::NoAffiliation);
-    QCOMPARE(presence.mucItem().jid(), QString());
-    QCOMPARE(presence.mucItem().reason(), QLatin1String("Avaunt, you cullion!"));
-    QCOMPARE(presence.mucItem().role(), QXmppMucItem::NoRole);
+    QCOMPARE(presence.mucParticipantItem().actor(), QLatin1String("fluellen@shakespeare.lit"));
+    QCOMPARE(presence.mucParticipantItem().affiliation(), QXmppMucItem::NoAffiliation);
+    QCOMPARE(presence.mucParticipantItem().jid(), QString());
+    QCOMPARE(presence.mucParticipantItem().reason(), QLatin1String("Avaunt, you cullion!"));
+    QCOMPARE(presence.mucParticipantItem().role(), QXmppMucItem::NoRole);
     QCOMPARE(presence.mucStatusCodes(), QList<int>() << 307);
     serializePacket(presence, xml);
 }
