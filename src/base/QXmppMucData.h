@@ -174,6 +174,11 @@ public:
     /// Sets the JID of the actor.
     void setActor(const QString &actor) { m_actor = actor; }
 
+    /// \cond
+    static std::optional<Item> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+    /// \endcond
+
 private:
     QString m_jid;
     QString m_nick;
