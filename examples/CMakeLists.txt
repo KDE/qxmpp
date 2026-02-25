@@ -20,6 +20,10 @@ add_simple_example(8_server)
 add_simple_example(9_vCard)
 target_link_libraries(9_vCard Qt${QT_VERSION_MAJOR}::Gui)
 
+# MUC Bot
+add_executable(muc_bot muc_bot/muc_bot.cpp)
+target_link_libraries(muc_bot ${QXMPP_TARGET})
+
 # AV Calls
 if(WITH_GSTREAMER)
     add_executable(audio_call audio_call/AudioCall.cpp)

@@ -118,3 +118,7 @@ The main library target is `QXmppQt5` or `QXmppQt6` (variable `${QXMPP_TARGET}`)
 - `expectVariant<T>(variant)` — asserts a `std::variant` holds `T` and returns it
 - `unwrap(variant<T, QXmppError>)` — fails the test on error, returns value
 - `expectFutureVariant<T>(task)` — asserts task is finished and holds `T`
+
+## Code style
+
+- Qt macros: Use Q_SLOT/Q_SIGNAL on function directly, no Q_SLOTS/Q_SIGNALS or slots/signals
