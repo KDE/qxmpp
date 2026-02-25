@@ -540,7 +540,10 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
         return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Nickname must not be empty."_s });
     }
     if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
-        return makeReadyTask<Result<QXmppMucRoomV2>>(room(jid));
+        if (itr->second.state == MucRoomState::Joined) {
+            return makeReadyTask<Result<QXmppMucRoomV2>>(room(jid));
+        }
+        return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Room join already in progress."_s });
     }
 
     // create MUC room state
