@@ -572,102 +572,6 @@ QStringList QXmppMucManagerV2::discoveryFeatures() const
 const std::optional<QList<QXmppMucBookmark>> &QXmppMucManagerV2::bookmarks() const { return d->bookmarks; }
 
 ///
-/// Sets the avatar of a MUC room.
-///
-/// Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
-/// entity" of the MUC.
-///
-/// \param jid JID of the MUC room
-/// \param avatar Avatar to be set
-///
-QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(const QString &jid, const Avatar &avatar)
-{
-    QXmppVCardIq vCardIq;
-    vCardIq.setTo(jid);
-    vCardIq.setFrom({});
-    vCardIq.setType(QXmppIq::Set);
-    vCardIq.setPhotoType(avatar.contentType);
-    vCardIq.setPhoto(avatar.data);
-    return client()->sendGenericIq(std::move(vCardIq));
-}
-
-///
-/// Removes the avatar of a MUC room.
-///
-/// Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
-/// entity" of the MUC.
-///
-/// \param jid JID of the MUC room
-///
-QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(const QString &jid)
-{
-    QXmppVCardIq vCardIq;
-    vCardIq.setTo(jid);
-    vCardIq.setFrom({});
-    vCardIq.setType(QXmppIq::Set);
-    return client()->sendGenericIq(std::move(vCardIq));
-}
-
-///
-/// Fetches the Avatar of a MUC room
-///
-/// First fetches the avatar hashes via the `muc#roominfo` form from service discovery information
-/// and then fetches the avatar itself via vcard-temp.
-///
-/// \note This currently does not do any caching and does not listen for avatar changes.
-/// \param jid JID of the MUC room
-/// \return nullopt if VCards are not supported in this MUC or no avatar has been published, otherwise the published avatar
-///
-QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::fetchRoomAvatar(const QString &jid)
-{
-    QXmppPromise<Result<std::optional<Avatar>>> p;
-    auto t = p.task();
-
-    d->disco()->info(jid).then(this, [this, jid, p = std::move(p)](auto result) mutable {
-        if (!hasValue(result)) {
-            p.finish(getError(std::move(result)));
-            return;
-        }
-
-        auto &info = getValue(result);
-        if (!contains(info.features(), ns_vcard)) {
-            p.finish(std::nullopt);
-            return;
-        }
-
-        auto roomInfo = info.template dataForm<QXmppMucRoomInfo>();
-        if (!roomInfo.has_value()) {
-            p.finish(std::nullopt);
-            return;
-        }
-        auto hashes = roomInfo->avatarHashes();
-        if (hashes.isEmpty()) {
-            p.finish(std::nullopt);
-            return;
-        }
-
-        client()->sendIq(QXmppVCardIq(jid)).then(this, [this, hashes, p = std::move(p)](auto &&result) mutable {
-            auto iqResponse = parseIq<QXmppVCardIq, Result<QXmppVCardIq>>(std::move(result));
-            if (hasError(iqResponse)) {
-                p.finish(getError(std::move(iqResponse)));
-                return;
-            }
-
-            const auto &vcard = getValue(iqResponse);
-
-            auto hexHash = QString::fromUtf8(QCryptographicHash::hash(vcard.photo(), QCryptographicHash::Sha1).toHex());
-            if (!contains(hashes, hexHash)) {
-                p.finish(QXmppError { u"Avatar hash mismatch"_s });
-            } else {
-                p.finish(Avatar { vcard.photoType(), vcard.photo() });
-            }
-        });
-    });
-
-    return t;
-}
-
-///
 /// Joins the MUC room at \a jid with the given \a nickname.
 ///
 /// Sends an initial presence to the room and waits for all occupant presences that the MUC service
@@ -2008,10 +1912,15 @@ bool QXmppMucRoomV2::isWatchingAvatar() const
 ///
 QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmppMucManagerV2::Avatar> newAvatar)
 {
+    QXmppVCardIq vCardIq;
+    vCardIq.setTo(m_jid);
+    vCardIq.setFrom({});
+    vCardIq.setType(QXmppIq::Set);
     if (newAvatar) {
-        return m_manager->setRoomAvatar(m_jid, *newAvatar);
+        vCardIq.setPhotoType(newAvatar->contentType);
+        vCardIq.setPhoto(newAvatar->data);
     }
-    return m_manager->removeRoomAvatar(m_jid);
+    return m_manager->client()->sendGenericIq(std::move(vCardIq));
 }
 
 ///
