@@ -168,6 +168,9 @@ public:
     QBindable<bool> canSetRoles() const;
     QBindable<bool> canSetAffiliations() const;
     QBindable<bool> canConfigureRoom() const;
+    QBindable<QString> description() const;
+    QBindable<QString> language() const;
+    QBindable<QStringList> contactJids() const;
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);
@@ -176,11 +179,8 @@ public:
     QXmppTask<QXmpp::SendResult> setPresence(QXmppPresence presence);
     QXmppTask<QXmpp::Result<>> leave();
 
-    /// Changes the role of a room participant (XEP-0045 §8.4–8.6).
     QXmppTask<QXmpp::Result<>> setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason = {});
-    /// Changes the affiliation of a user by bare JID (XEP-0045 §9).
     QXmppTask<QXmpp::Result<>> setAffiliation(const QString &jid, QXmpp::Muc::Affiliation affiliation, const QString &reason = {});
-    /// Requests the list of all users with a given affiliation (XEP-0045 §9.5–9.8).
     QXmppTask<QXmpp::Result<QList<QXmppMucItem>>> requestAffiliationList(QXmpp::Muc::Affiliation affiliation);
 
     /// Connects to the participantJoined signal, filtered for this room.
