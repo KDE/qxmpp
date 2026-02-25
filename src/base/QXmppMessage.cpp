@@ -151,8 +151,8 @@ public:
     QXmppBitsOfBinaryDataList bitsOfBinaryData;
 
     // XEP-0045: Multi-User Chat
-    QList<uint32_t> mucStatusCodes;
     std::optional<QXmppMucVoiceRequest> mucVoiceRequest;
+    std::optional<Muc::UserQuery> mucUserQuery;
 
     // XEP-0249: Direct MUC Invitations
     QString mucInvitationJid;
@@ -658,32 +658,6 @@ QString QXmppMessage::slashMeCommandText() const
 }
 
 ///
-/// Returns the MUC status codes from a \xep{0045, Multi-User Chat} message.
-///
-/// Status codes are sent by the server to notify about room configuration changes,
-/// role/affiliation changes, and other events (e.g., code 104 for room config change).
-///
-/// \since QXmpp 1.15
-///
-QList<uint32_t> QXmppMessage::mucStatusCodes() const
-{
-    return d->mucStatusCodes;
-}
-
-///
-/// Sets the MUC status codes for a \xep{0045, Multi-User Chat} message.
-///
-/// This is primarily useful for constructing test messages or forwarded stanzas.
-/// For messages received from the server, status codes are parsed automatically.
-///
-/// \since QXmpp 1.15
-///
-void QXmppMessage::setMucStatusCodes(const QList<uint32_t> &codes)
-{
-    d->mucStatusCodes = codes;
-}
-
-///
 /// Returns the \xep{0045, Multi-User Chat} voice request contained in this message, if any.
 ///
 /// Voice requests use a \c muc#request data form in a normal-type message.
@@ -701,13 +675,35 @@ std::optional<QXmppMucVoiceRequest> QXmppMessage::mucVoiceRequest() const
 ///
 /// This is primarily useful for constructing messages in tests or for forwarding stanzas.
 /// When responding to a received voice request as a moderator, use
-/// \l QXmppMucRoomV2::answerVoiceRequest() instead.
+/// \ref QXmppMucRoomV2::answerVoiceRequest() instead.
 ///
 /// \since QXmpp 1.15
 ///
 void QXmppMessage::setMucVoiceRequest(std::optional<QXmppMucVoiceRequest> request)
 {
     d->mucVoiceRequest = std::move(request);
+}
+
+///
+/// Returns the parsed \c x element with namespace \c muc\#user, if any.
+///
+/// This element carries mediated invitations, invitation declines, and status codes.
+///
+/// \since QXmpp 1.15
+///
+std::optional<QXmpp::Muc::UserQuery> QXmppMessage::mucUserQuery() const
+{
+    return d->mucUserQuery;
+}
+
+///
+/// Sets the \c x element with namespace \c muc\#user on this message.
+///
+/// \since QXmpp 1.15
+///
+void QXmppMessage::setMucUserQuery(std::optional<QXmpp::Muc::UserQuery> element)
+{
+    d->mucUserQuery = std::move(element);
 }
 
 ///
@@ -1835,9 +1831,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             }
             // XEP-0045: Multi-User Chat
             if (element.namespaceURI() == ns_muc_user) {
-                d->mucStatusCodes = transformFilter<QList<uint32_t>>(parseSingleAttributeElements<QList<QString>>(element, u"status", ns_muc_user, u"code"_s), [](const auto &string) {
-                    return parseInt<uint32_t>(string);
-                });
+                d->mucUserQuery = QXmpp::Muc::UserQuery::fromDom(element);
                 return true;
             }
             // XEP-0045: Multi-User Chat voice request (muc#request form)
@@ -2145,11 +2139,8 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
         }
 
         // XEP-0045: Multi-User Chat
-        if (!d->mucStatusCodes.isEmpty()) {
-            w.write(Element {
-                { u"x", ns_muc_user },
-                SingleAttributeElements { u"status", u"code", d->mucStatusCodes },
-            });
+        if (d->mucUserQuery) {
+            d->mucUserQuery->toXml(writer);
         }
         if (d->mucVoiceRequest) {
             d->mucVoiceRequest->toDataForm().toXml(writer);

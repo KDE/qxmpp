@@ -194,8 +194,128 @@ private:
 /// \since QXmpp 1.15
 ///
 struct QXMPP_EXPORT Avatar {
-    QString contentType;
-    QByteArray data;
+    QString contentType;  ///< MIME type of the avatar image (e.g. \c "image/png").
+    QByteArray data;      ///< Raw avatar image bytes.
+};
+
+///
+/// \brief A mediated MUC invitation as defined by \xep{0045, Multi-User Chat} §7.8.2.
+///
+/// When sending an invitation, set \e to to the invitee's JID.
+/// When receiving a forwarded invitation from the room, \e from holds the inviter's JID.
+///
+/// \since QXmpp 1.15
+///
+class QXMPP_EXPORT Invite
+{
+public:
+    /// Returns the invitee's JID this invitation is addressed to (set when sending).
+    QString to() const { return m_to; }
+    /// Sets the invitee's JID.
+    void setTo(const QString &jid) { m_to = jid; }
+
+    /// Returns the inviter's JID (set by the room when forwarding to the invitee).
+    QString from() const { return m_from; }
+    /// Sets the from JID.
+    void setFrom(const QString &jid) { m_from = jid; }
+
+    /// Returns the optional human-readable reason.
+    QString reason() const { return m_reason; }
+    /// Sets the optional human-readable reason.
+    void setReason(const QString &reason) { m_reason = reason; }
+
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"invite", QStringView {} };
+    static std::optional<Invite> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+    /// \endcond
+
+private:
+    QString m_to;
+    QString m_from;
+    QString m_reason;
+};
+
+///
+/// \brief A mediated MUC invitation decline as defined by \xep{0045, Multi-User Chat} §7.8.2.
+///
+/// When sending a decline, set \e to to the original inviter's JID.
+/// When receiving a forwarded decline from the room, \e from holds the invitee's JID.
+///
+/// \since QXmpp 1.15
+///
+class QXMPP_EXPORT Decline
+{
+public:
+    /// Returns the JID of the inviter this decline is addressed to (set when sending).
+    QString to() const { return m_to; }
+    /// Sets the JID to send the decline to.
+    void setTo(const QString &jid) { m_to = jid; }
+
+    /// Returns the JID of the invitee who declined (set by the room when forwarding).
+    QString from() const { return m_from; }
+    /// Sets the from JID.
+    void setFrom(const QString &jid) { m_from = jid; }
+
+    /// Returns the optional human-readable reason.
+    QString reason() const { return m_reason; }
+    /// Sets the optional human-readable reason.
+    void setReason(const QString &reason) { m_reason = reason; }
+
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"decline", QStringView {} };
+    static std::optional<Decline> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+    /// \endcond
+
+private:
+    QString m_to;
+    QString m_from;
+    QString m_reason;
+};
+
+///
+/// \brief Represents the \c x element with namespace \c muc\#user
+/// as defined by \xep{0045, Multi-User Chat}.
+///
+/// Used in messages to carry mediated invitations, invitation declines, and status codes.
+///
+/// \since QXmpp 1.15
+///
+class QXMPP_EXPORT UserQuery
+{
+public:
+    /// Returns the MUC status codes carried in this element.
+    QList<uint32_t> statusCodes() const { return m_statusCodes; }
+    /// Sets the MUC status codes.
+    void setStatusCodes(QList<uint32_t> codes) { m_statusCodes = std::move(codes); }
+
+    /// Returns the mediated invitation, if present.
+    std::optional<Invite> invite() const { return m_invite; }
+    /// Sets the mediated invitation.
+    void setInvite(std::optional<Invite> invite) { m_invite = std::move(invite); }
+
+    /// Returns the room password for password-protected rooms (empty if none).
+    QString password() const { return m_password; }
+    /// Sets the room password.
+    void setPassword(const QString &password) { m_password = password; }
+
+    /// Returns the invitation decline, if present.
+    std::optional<Decline> decline() const { return m_decline; }
+    /// Sets the invitation decline.
+    void setDecline(std::optional<Decline> decline) { m_decline = std::move(decline); }
+
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_muc_user };
+    static std::optional<UserQuery> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+    /// \endcond
+
+private:
+    QList<uint32_t> m_statusCodes;
+    std::optional<Invite> m_invite;
+    QString m_password;
+    std::optional<Decline> m_decline;
 };
 
 }  // namespace Muc
