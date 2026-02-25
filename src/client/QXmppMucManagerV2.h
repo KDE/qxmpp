@@ -9,7 +9,6 @@
 #include "QXmppMessageHandler.h"
 #include "QXmppMucData.h"
 #include "QXmppMucForms.h"
-#include "QXmppMucIq.h"
 #include "QXmppPubSubEventHandler.h"
 #include "QXmppSendResult.h"
 #include "QXmppTask.h"
@@ -200,7 +199,7 @@ public:
 
     QXmppTask<QXmpp::Result<>> setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason = {});
     QXmppTask<QXmpp::Result<>> setAffiliation(const QString &jid, QXmpp::Muc::Affiliation affiliation, const QString &reason = {});
-    QXmppTask<QXmpp::Result<QList<QXmppMucItem>>> requestAffiliationList(QXmpp::Muc::Affiliation affiliation);
+    QXmppTask<QXmpp::Result<QList<QXmpp::Muc::Item>>> requestAffiliationList(QXmpp::Muc::Affiliation affiliation);
 
     QXmppTask<QXmpp::SendResult> requestVoice();
     QXmppTask<QXmpp::SendResult> answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow);
