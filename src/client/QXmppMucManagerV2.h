@@ -103,6 +103,8 @@ public:
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname,
                                                       std::optional<QXmpp::Muc::HistoryOptions> history,
                                                       const QString &password = {});
+    /// Creates a new reserved MUC room at \a jid with the given \a nickname.
+    /// \since QXmpp 1.15
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoom(const QString &jid, const QString &nickname);
     /// Emitted when a participant joins a room.
     Q_SIGNAL void participantJoined(const QString &roomJid, const QXmppMucParticipant &participant);
@@ -151,14 +153,36 @@ Q_DECLARE_METATYPE(QXmppMucManagerV2::BookmarkChange);
 ///
 /// \class QXmppMucRoomV2
 ///
-/// \note Lifetime note: QXmppMucRoomV2 and QXmppMucParticipant are lightweight handles and do not
-/// own any data.
+/// \brief Lightweight handle to a joined MUC room, backed by state in QXmppMucManagerV2.
+///
+/// A handle is obtained from QXmppMucManagerV2::joinRoom(), QXmppMucManagerV2::createRoom(), or
+/// QXmppMucManagerV2::room(). It is cheap to copy and does not own any data — all state lives in
+/// the manager.
+///
+/// \par Validity
+/// Always check isValid() before accessing properties. A handle becomes invalid when the room is
+/// left or the manager is destroyed. Accessing an invalid handle is safe (properties return default
+/// QBindables / empty lists / errors) but carries no data.
+///
+/// \par Bindable properties
+/// Most observable state (subject(), nickname(), joined(), canSendMessages(), …) is exposed as
+/// QBindable<T>. You can connect them to QProperty observers or read them directly:
+/// \code
+/// auto canSend = room.canSendMessages();
+/// canSend.addNotifier([canSend]() {
+///     qDebug() << "canSendMessages changed:" << canSend.value();
+/// });
+/// \endcode
+///
+/// \par Participants
+/// participants() returns a snapshot list of lightweight QXmppMucParticipant handles. Connect to
+/// QXmppMucManagerV2::participantJoined() and participantLeft() (or the convenience helpers
+/// onParticipantJoined() / onParticipantLeft()) to be notified of changes.
+///
+/// \note QXmppMucRoomV2 and QXmppMucParticipant are lightweight handles and do not own any data.
 /// They access state stored in the QXmppMucManager. The manager must remain alive for the lifetime
 /// of any room or participant handle.
 /// Accessing a handle after the manager is destroyed is undefined behavior.
-///
-/// \note Always call isValid() before accessing properties, especially if the room might have
-/// been left or participants removed.
 ///
 /// \since QXmpp 1.15
 ///
