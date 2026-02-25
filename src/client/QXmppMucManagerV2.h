@@ -187,6 +187,8 @@ public:
     QBindable<QString> language() const;
     QBindable<QStringList> contactJids() const;
     QBindable<std::optional<QXmppMucRoomInfo>> roomInfo() const;
+    QBindable<std::optional<QXmppMucRoomConfig>> roomConfig() const;
+    QXmppTask<QXmpp::Result<>> subscribeToRoomConfig(bool enabled);
 
     QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);

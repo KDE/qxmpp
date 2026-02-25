@@ -303,6 +303,10 @@ struct MucRoomData {
     QProperty<bool> isPasswordProtected;
     // Room info fields populated from muc#roominfo (re-fetched on status code 104)
     QProperty<std::optional<QXmppMucRoomInfo>> roomInfo;
+    // Room config — populated when subscribeToRoomConfig(true) is called, re-fetched on status 104
+    QProperty<std::optional<QXmppMucRoomConfig>> roomConfig;
+    bool watchingRoomConfig = false;
+    std::vector<QXmppPromise<Result<>>> roomConfigWaiters;
     // Convenience bindings derived from roomInfo
     QProperty<bool> subjectChangeable;
     QProperty<QString> description;
@@ -687,9 +691,12 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
         if (message.hasSubject() && message.body().isEmpty()) {
             data.subject = message.subject();
         }
-        // Status 104: room configuration changed — re-fetch roominfo
+        // Status 104: room configuration changed — re-fetch roominfo and config (if subscribed)
         if (message.mucStatusCodes().contains(104)) {
             d->fetchRoomInfo(bareFrom);
+            if (data.watchingRoomConfig) {
+                d->fetchRoomConfigSubscribed(bareFrom);
+            }
         }
         Q_EMIT messageReceived(bareFrom, message);
         return true;
@@ -1222,6 +1229,42 @@ void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
     });
 }
 
+void QXmppMucManagerV2Private::fetchRoomConfigSubscribed(const QString &roomJid)
+{
+    QXmppMucOwnerIq iq;
+    iq.setTo(roomJid);
+    iq.setType(QXmppIq::Get);
+    q->client()->sendIq(std::move(iq)).then(q, [this, roomJid](QXmppClient::IqResult &&result) {
+        auto itr = rooms.find(roomJid);
+        if (itr == rooms.end()) {
+            return;
+        }
+        auto &data = itr->second;
+        auto waiters = std::move(data.roomConfigWaiters);
+
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            for (auto &p : waiters) {
+                p.finish(QXmppError { error->description });
+            }
+            return;
+        }
+
+        QXmppMucOwnerIq iqResult;
+        iqResult.parse(std::get<QDomElement>(result));
+        auto config = QXmppMucRoomConfig::fromDataForm(iqResult.form());
+        if (!config) {
+            for (auto &p : waiters) {
+                p.finish(QXmppError { u"Server returned an invalid or missing muc#roomconfig form."_s });
+            }
+            return;
+        }
+        data.roomConfig = std::move(config);
+        for (auto &p : waiters) {
+            p.finish(QXmpp::Success {});
+        }
+    });
+}
+
 void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
 {
     using namespace std::chrono;
@@ -1544,6 +1587,77 @@ QBindable<std::optional<QXmppMucRoomInfo>> QXmppMucRoomV2::roomInfo() const
         return { &(data->roomInfo) };
     }
     return {};
+}
+
+///
+/// Returns the current room configuration form from \xep{0045, Multi-User Chat}.
+///
+/// The form is only populated after subscribeToRoomConfig(true) has been called
+/// and the initial fetch has completed. It is automatically re-fetched whenever a
+/// status code 104 (room configuration changed) is received.
+///
+/// Returns \c std::nullopt until the first response has arrived or if
+/// subscribeToRoomConfig() has not been called.
+///
+/// \sa subscribeToRoomConfig()
+/// \since QXmpp 1.15
+///
+QBindable<std::optional<QXmppMucRoomConfig>> QXmppMucRoomV2::roomConfig() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->roomConfig) };
+    }
+    return {};
+}
+
+///
+/// Subscribes to or unsubscribes from automatic room configuration updates.
+///
+/// When called with \c true and no subscription is active yet, fetches the room
+/// configuration form immediately and stores it in the roomConfig() bindable.
+/// Subsequent status code 104 messages (room configuration changed) will
+/// automatically trigger a re-fetch to keep roomConfig() current.
+///
+/// When called with \c true and the configuration has already been fetched
+/// (e.g. from a previous call), the returned task resolves immediately.
+///
+/// When called with \c false, disables the auto-refresh subscription. The
+/// last fetched configuration remains available in roomConfig() but is no
+/// longer updated automatically.
+///
+/// \sa roomConfig()
+/// \since QXmpp 1.15
+///
+QXmppTask<Result<>> QXmppMucRoomV2::subscribeToRoomConfig(bool enabled)
+{
+    using enum MucRoomState;
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end() || itr->second.state != Joined) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+    }
+    auto &data = itr->second;
+
+    if (!enabled) {
+        data.watchingRoomConfig = false;
+        return makeReadyTask<Result<>>(QXmpp::Success {});
+    }
+
+    // Already fetched — resolve immediately
+    if (data.roomConfig.value().has_value()) {
+        data.watchingRoomConfig = true;
+        return makeReadyTask<Result<>>(QXmpp::Success {});
+    }
+
+    // Fetch in progress or first call — add to waiters and kick off fetch if needed
+    QXmppPromise<Result<>> promise;
+    auto task = promise.task();
+    const bool needsFetch = !data.watchingRoomConfig;
+    data.watchingRoomConfig = true;
+    data.roomConfigWaiters.push_back(std::move(promise));
+    if (needsFetch) {
+        m_manager->d->fetchRoomConfigSubscribed(m_jid);
+    }
+    return task;
 }
 
 ///

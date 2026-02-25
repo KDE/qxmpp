@@ -86,6 +86,7 @@ private:
     Q_SLOT void cancelRoomCreation();
     Q_SLOT void reconfigureRoom();
     Q_SLOT void destroyRoom();
+    Q_SLOT void subscribeToRoomConfig();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -2342,6 +2343,76 @@ void tst_QXmppMuc::roomConfigForm()
                                              "<field type=\"jid-multi\" var=\"muc#roomconfig_roomowners\"><value>crone1@shakespeare.lit</value></field>"
                                              "<field type=\"jid-multi\" var=\"muc#roomconfig_roomadmins\"><value>wiccarocks@shakespeare.lit</value></field>"
                                              "</x>"));
+}
+
+void tst_QXmppMuc::subscribeToRoomConfig()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    QVERIFY(!room.roomConfig().value().has_value());
+
+    // Subscribe — triggers initial fetch
+    auto subTask = room.subscribeToRoomConfig(true);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    QVERIFY(!subTask.isFinished());
+
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>The Coven</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    QVERIFY(subTask.isFinished());
+    expectVariant<QXmpp::Success>(subTask.result());
+    QVERIFY(room.roomConfig().value().has_value());
+    QCOMPARE(room.roomConfig().value()->name(), u"The Coven"_s);
+
+    // Second call resolves immediately with cached config
+    auto subTask2 = room.subscribeToRoomConfig(true);
+    QVERIFY(subTask2.isFinished());
+    expectVariant<QXmpp::Success>(subTask2.result());
+
+    // Status 104: config re-fetched automatically
+    QXmppMessage status104;
+    parsePacket(status104,
+                "<message from='coven@chat.shakespeare.lit' type='groupchat'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<status code='104'/>"
+                "</x>"
+                "</message>");
+    muc->handleMessage(status104);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>The New Coven</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QCOMPARE(room.roomConfig().value()->name(), u"The New Coven"_s);
+
+    // Unsubscribe — no more re-fetches, cached value stays
+    auto unsubTask = room.subscribeToRoomConfig(false);
+    QVERIFY(unsubTask.isFinished());
+    expectVariant<QXmpp::Success>(unsubTask.result());
+    QCOMPARE(room.roomConfig().value()->name(), u"The New Coven"_s);
 }
 
 QTEST_MAIN(tst_QXmppMuc)
