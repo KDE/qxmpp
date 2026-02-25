@@ -94,6 +94,9 @@ public:
     std::optional<QXmpp::Muc::HistoryOptions> mucHistory() const;
     void setMucHistory(std::optional<QXmpp::Muc::HistoryOptions>);
 
+    std::optional<QXmpp::Muc::Destroy> mucDestroy() const;
+    void setMucDestroy(std::optional<QXmpp::Muc::Destroy>);
+
     // XEP-0153: vCard-Based Avatars
     QByteArray photoHash() const;
     void setPhotoHash(const QByteArray &);
