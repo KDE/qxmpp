@@ -868,7 +868,12 @@ auto QXmppMucManagerV2Private::setBookmark(QXmppMucBookmark &&bookmark) -> QXmpp
                 return getError(std::move(result));
             }
             if (bookmarks) {
-                bookmarks->append(std::move(bookmark));
+                if (auto it = std::ranges::find(*bookmarks, bookmark.jid(), &QXmppMucBookmark::jid);
+                    it != bookmarks->end()) {
+                    *it = std::move(bookmark);
+                } else {
+                    bookmarks->append(std::move(bookmark));
+                }
             }
             return Success();
         });

@@ -27,6 +27,7 @@ private:
     // PEP bookmarks
     Q_SLOT void bookmarks2Updates();
     Q_SLOT void bookmarks2Set();
+    Q_SLOT void bookmarks2SetUpdate();
     Q_SLOT void bookmarks2Remove();
 
     // MUC avatars
@@ -175,6 +176,53 @@ void tst_QXmppMuc::bookmarks2Set()
     test.inject(u"<iq to='juliet@capulet.lit/balcony' type='result' id='qx1'/>"_s);
 
     expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppMuc::bookmarks2SetUpdate()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.addNewExtension<QXmppPubSubManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Pre-populate the bookmark list (simulate initial fetch)
+    muc->onConnected();
+    test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                u"<items node='urn:xmpp:bookmarks:1'>"
+                u"<item id='theplay@conference.shakespeare.lit'><conference xmlns='urn:xmpp:bookmarks:1' name='The Play' autojoin='true'><nick>JC</nick></conference></item>"
+                u"</items></pubsub></iq>"_s);
+
+    QVERIFY(muc->bookmarks().has_value());
+    QCOMPARE(muc->bookmarks()->size(), 1);
+    QCOMPARE(muc->bookmarks()->at(0).name(), u"The Play"_s);
+
+    // Update the same bookmark with a new name
+    auto task = muc->setBookmark(QXmppMucBookmark { u"theplay@conference.shakespeare.lit"_s, u"The Play's the Thing"_s, true, u"JC"_s, {} });
+    test.expect(
+        u"<iq id='qx1' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+        "<publish node='urn:xmpp:bookmarks:1'>"
+        "<item id='theplay@conference.shakespeare.lit'>"
+        "<conference xmlns='urn:xmpp:bookmarks:1' autojoin='true' name=\"The Play's the Thing\"><nick>JC</nick></conference></item>"
+        "</publish>"
+        "<publish-options>"
+        "<x xmlns='jabber:x:data' type='submit'>"
+        "<field type='hidden' var='FORM_TYPE'><value>http://jabber.org/protocol/pubsub#publish-options</value></field>"
+        "<field type='list-single' var='pubsub#access_model'><value>whitelist</value></field>"
+        "<field type='text-single' var='pubsub#max_items'><value>max</value></field>"
+        "<field type='boolean' var='pubsub#persist_items'><value>true</value></field>"
+        "<field type='list-single' var='pubsub#send_last_published_item'><value>never</value></field>"
+        "</x>"
+        "</publish-options>"
+        "</pubsub>"
+        "</iq>"_s);
+    test.inject(u"<iq to='juliet@capulet.lit/balcony' type='result' id='qx1'/>"_s);
+
+    expectFutureVariant<Success>(task);
+
+    // Must be updated in-place, no duplicate
+    QCOMPARE(muc->bookmarks()->size(), 1);
+    QCOMPARE(muc->bookmarks()->at(0).name(), u"The Play's the Thing"_s);
 }
 
 void tst_QXmppMuc::bookmarks2Remove()
