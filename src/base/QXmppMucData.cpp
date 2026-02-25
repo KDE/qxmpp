@@ -48,4 +48,23 @@ void HistoryOptions::toXml(QXmlStreamWriter *writer) const
 }
 /// \endcond
 
+/// \cond
+std::optional<Destroy> Destroy::fromDom(const QDomElement &el)
+{
+    Destroy d;
+    d.m_alternateRoom = el.attribute(u"jid"_s);
+    d.m_reason = el.firstChildElement(u"reason"_s).text();
+    return d;
+}
+
+void Destroy::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        u"destroy",
+        OptionalAttribute { u"jid", m_alternateRoom },
+        OptionalTextElement { u"reason", m_reason },
+    });
+}
+/// \endcond
+
 }  // namespace QXmpp::Muc
