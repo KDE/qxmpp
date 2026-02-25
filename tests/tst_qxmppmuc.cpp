@@ -9,6 +9,7 @@
 #include "QXmppMucIq.h"
 #include "QXmppMucManagerV2.h"
 #include "QXmppMucManagerV2_p.h"
+#include "QXmppPepBookmarkManager.h"
 #include "QXmppPresence.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppPubSubSubAuthorization.h"
@@ -130,16 +131,16 @@ void tst_QXmppMuc::bookmarks2Updates()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppPubSubManager>();
-    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
 
-    QSignalSpy resetSignal(muc, &QXmppMucManagerV2::bookmarksReset);
-    QSignalSpy addedSignal(muc, &QXmppMucManagerV2::bookmarksAdded);
-    QSignalSpy changedSignal(muc, &QXmppMucManagerV2::bookmarksChanged);
-    QSignalSpy removedSignal(muc, &QXmppMucManagerV2::bookmarksRemoved);
+    QSignalSpy resetSignal(bm, &QXmppPepBookmarkManager::bookmarksReset);
+    QSignalSpy addedSignal(bm, &QXmppPepBookmarkManager::bookmarksAdded);
+    QSignalSpy changedSignal(bm, &QXmppPepBookmarkManager::bookmarksChanged);
+    QSignalSpy removedSignal(bm, &QXmppPepBookmarkManager::bookmarksRemoved);
 
-    QVERIFY(!muc->bookmarks().has_value());
+    QVERIFY(!bm->bookmarks().has_value());
 
-    muc->onConnected();
+    bm->onConnected();
     test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
     test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'>"
                 u"<item id='theplay@conference.shakespeare.lit'><conference xmlns='urn:xmpp:bookmarks:1' name='The Play&apos;s the Thing' autojoin='true'><nick>JC</nick></conference></item>"
@@ -148,8 +149,8 @@ void tst_QXmppMuc::bookmarks2Updates()
 
     QCOMPARE(resetSignal.size(), 1);
 
-    QVERIFY(muc->bookmarks().has_value());
-    QCOMPARE(muc->bookmarks()->size(), 2);
+    QVERIFY(bm->bookmarks().has_value());
+    QCOMPARE(bm->bookmarks()->size(), 2);
 
     test.inject(u"<message from='juliet@capulet.lit' to='juliet@capulet.lit/balcony' type='headline' id='removed-room1'>"
                 "<event xmlns='http://jabber.org/protocol/pubsub#event'>"
@@ -180,9 +181,9 @@ void tst_QXmppMuc::bookmarks2Set()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppPubSubManager>();
-    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
 
-    auto task = muc->setBookmark(QXmppMucBookmark { u"theplay@conference.shakespeare.lit"_s, u"The Play's the Thing"_s, true, u"JC"_s, {} });
+    auto task = bm->setBookmark(QXmppMucBookmark { u"theplay@conference.shakespeare.lit"_s, u"The Play's the Thing"_s, true, u"JC"_s, {} });
     test.expect(
         u"<iq id='qx1' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:bookmarks:1'>"
@@ -210,22 +211,22 @@ void tst_QXmppMuc::bookmarks2SetUpdate()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppPubSubManager>();
-    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
 
     // Pre-populate the bookmark list (simulate initial fetch)
-    muc->onConnected();
+    bm->onConnected();
     test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
     test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                 u"<items node='urn:xmpp:bookmarks:1'>"
                 u"<item id='theplay@conference.shakespeare.lit'><conference xmlns='urn:xmpp:bookmarks:1' name='The Play' autojoin='true'><nick>JC</nick></conference></item>"
                 u"</items></pubsub></iq>"_s);
 
-    QVERIFY(muc->bookmarks().has_value());
-    QCOMPARE(muc->bookmarks()->size(), 1);
-    QCOMPARE(muc->bookmarks()->at(0).name(), u"The Play"_s);
+    QVERIFY(bm->bookmarks().has_value());
+    QCOMPARE(bm->bookmarks()->size(), 1);
+    QCOMPARE(bm->bookmarks()->at(0).name(), u"The Play"_s);
 
     // Update the same bookmark with a new name
-    auto task = muc->setBookmark(QXmppMucBookmark { u"theplay@conference.shakespeare.lit"_s, u"The Play's the Thing"_s, true, u"JC"_s, {} });
+    auto task = bm->setBookmark(QXmppMucBookmark { u"theplay@conference.shakespeare.lit"_s, u"The Play's the Thing"_s, true, u"JC"_s, {} });
     test.expect(
         u"<iq id='qx1' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
         "<publish node='urn:xmpp:bookmarks:1'>"
@@ -248,8 +249,8 @@ void tst_QXmppMuc::bookmarks2SetUpdate()
     expectFutureVariant<Success>(task);
 
     // Must be updated in-place, no duplicate
-    QCOMPARE(muc->bookmarks()->size(), 1);
-    QCOMPARE(muc->bookmarks()->at(0).name(), u"The Play's the Thing"_s);
+    QCOMPARE(bm->bookmarks()->size(), 1);
+    QCOMPARE(bm->bookmarks()->at(0).name(), u"The Play's the Thing"_s);
 }
 
 void tst_QXmppMuc::bookmarks2Remove()
@@ -257,9 +258,9 @@ void tst_QXmppMuc::bookmarks2Remove()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppPubSubManager>();
-    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
 
-    auto task = muc->removeBookmark(u"theplay@conference.shakespeare.lit"_s);
+    auto task = bm->removeBookmark(u"theplay@conference.shakespeare.lit"_s);
 
     test.expect(
         u"<iq id='qx1' to='juliet@capulet.lit' type='set'>"

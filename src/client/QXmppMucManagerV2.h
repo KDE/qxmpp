@@ -9,7 +9,6 @@
 #include "QXmppMessageHandler.h"
 #include "QXmppMucData.h"
 #include "QXmppMucForms.h"
-#include "QXmppPubSubEventHandler.h"
 #include "QXmppSendResult.h"
 #include "QXmppTask.h"
 
@@ -18,70 +17,25 @@
 
 class QXmppPresence;
 namespace QXmpp::Private {
-struct Bookmarks2Conference;
-struct Bookmarks2ConferenceItem;
 struct MucRoomData;
 struct MucParticipantData;
 }  // namespace QXmpp::Private
 
 class QXmppError;
-class QXmppMucBookmarkPrivate;
-
-class QXMPP_EXPORT QXmppMucBookmark
-{
-public:
-    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppMucBookmark)
-
-    QXmppMucBookmark();
-    QXmppMucBookmark(const QString &jid, const QString &name, bool autojoin, const QString &nick, const QString &password);
-
-    const QString &jid() const;
-    void setJid(const QString &jid);
-    const QString &name() const;
-    void setName(const QString &name);
-    const QString &nick() const;
-    void setNick(const QString &nick);
-    const QString &password() const;
-    void setPassword(const QString &password);
-    bool autojoin() const;
-    void setAutojoin(bool autojoin);
-
-private:
-    friend class QXmppMucManagerV2;
-    friend class QXmppMucManagerV2Private;
-    QXmppMucBookmark(const QString &jid, QXmpp::Private::Bookmarks2Conference conference);
-    QSharedDataPointer<QXmppMucBookmarkPrivate> d;
-};
-
-Q_DECLARE_METATYPE(QXmppMucBookmark);
 
 class QXmppMucRoomV2;
 class QXmppMucParticipant;
 struct QXmppMucManagerV2Private;
 
-class QXMPP_EXPORT QXmppMucManagerV2 : public QXmppClientExtension, public QXmppPubSubEventHandler, public QXmppMessageHandler
+class QXMPP_EXPORT QXmppMucManagerV2 : public QXmppClientExtension, public QXmppMessageHandler
 {
     Q_OBJECT
 
 public:
-    struct BookmarkChange {
-        QXmppMucBookmark oldBookmark;
-        QXmppMucBookmark newBookmark;
-    };
-
     QXmppMucManagerV2();
     ~QXmppMucManagerV2();
 
     QStringList discoveryFeatures() const override;
-
-    const std::optional<QList<QXmppMucBookmark>> &bookmarks() const;
-    Q_SIGNAL void bookmarksReset();
-    Q_SIGNAL void bookmarksAdded(const QList<QXmppMucBookmark> &newBookmarks);
-    Q_SIGNAL void bookmarksChanged(const QList<QXmppMucManagerV2::BookmarkChange> &bookmarkUpdates);
-    Q_SIGNAL void bookmarksRemoved(const QList<QString> &removedBookmarkJids);
-
-    QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
-    QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 
     /// Returns a lightweight handle for the room with the given \a jid.
     QXmppMucRoomV2 room(const QString &jid);
@@ -119,7 +73,6 @@ public:
     Q_SIGNAL void voiceRequestReceived(const QString &roomJid, const QXmppMucVoiceRequest &request);
 
     bool handleMessage(const QXmppMessage &) override;
-    bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
 
 protected:
     void onRegistered(QXmppClient *client) override;
@@ -138,8 +91,6 @@ private:
     friend class tst_QXmppMuc;
     const std::unique_ptr<QXmppMucManagerV2Private> d;
 };
-
-Q_DECLARE_METATYPE(QXmppMucManagerV2::BookmarkChange);
 
 ///
 /// \class QXmppMucRoomV2

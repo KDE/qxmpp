@@ -14,6 +14,7 @@
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMucManagerV2.h"
+#include "QXmppPepBookmarkManager.h"
 #include "QXmppPubSubManager.h"
 
 #include <QCoreApplication>
@@ -80,13 +81,14 @@ private:
             });
 
             // Save a bookmark with autojoin enabled
+            auto *bm = m_client.addNewExtension<QXmppPepBookmarkManager>();
             QXmppMucBookmark bookmark(m_roomJid, QStringLiteral("My Room"), true, m_nick, {});
-            m_muc->setBookmark(std::move(bookmark)).then(this, [this](Result<> result) {
+            bm->setBookmark(std::move(bookmark)).then(this, [bm](Result<> result) {
                 if (const auto *error = std::get_if<QXmppError>(&result)) {
                     qWarning() << "Failed to set bookmark:" << error->description;
                     return;
                 }
-                if (const auto &bookmarks = m_muc->bookmarks()) {
+                if (const auto &bookmarks = bm->bookmarks()) {
                     qDebug() << "Bookmarks count:" << bookmarks->size();
                 }
             });
