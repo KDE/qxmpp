@@ -68,6 +68,8 @@ private:
     Q_SLOT void selfParticipant();
     Q_SLOT void permissions();
     Q_SLOT void permissionsSubjectChangeable();
+    Q_SLOT void roomInfoProperties();
+    Q_SLOT void roomInfoStatus104();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -1584,6 +1586,117 @@ void tst_QXmppMuc::permissionsSubjectChangeable()
                 "</query></iq>"_s);
 
     QVERIFY(room.canChangeSubject().value());
+}
+
+static const auto discoRoomInfo =
+    u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+    "<query xmlns='http://jabber.org/ns/protocols/disco#info'>"
+    "<identity category='conference' type='text'/>"
+    "<feature var='http://jabber.org/protocol/muc'/>"
+    "<x xmlns='jabber:x:data' type='result'>"
+    "<field var='FORM_TYPE' type='hidden'><value>http://jabber.org/protocol/muc#roominfo</value></field>"
+    "<field var='muc#roominfo_description'><value>A Witch Coven</value></field>"
+    "<field var='muc#roominfo_lang'><value>en</value></field>"
+    "<field var='muc#roominfo_contactjid' type='jid-multi'>"
+    "<value>hag66@shakespeare.lit</value>"
+    "<value>wiccarocks@shakespeare.lit</value>"
+    "</field>"
+    "</x>"
+    "</query></iq>"_s;
+
+void tst_QXmppMuc::roomInfoProperties()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Before disco#info arrives: empty
+    QVERIFY(room.description().value().isEmpty());
+    QVERIFY(room.language().value().isEmpty());
+    QVERIFY(room.contactJids().value().isEmpty());
+
+    test.inject(discoRoomInfo);
+
+    QCOMPARE(room.description().value(), u"A Witch Coven"_s);
+    QCOMPARE(room.language().value(), u"en"_s);
+    QCOMPARE(room.contactJids().value(), (QStringList { u"hag66@shakespeare.lit"_s, u"wiccarocks@shakespeare.lit"_s }));
+}
+
+void tst_QXmppMuc::roomInfoStatus104()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Answer the initial disco#info with an empty result
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/ns/protocols/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "</query></iq>"_s);
+    QVERIFY(room.description().value().isEmpty());
+
+    // Inject a status-104 message — triggers a new disco#info fetch (CachePolicy::Strict)
+    QXmppMessage status104;
+    parsePacket(status104,
+                "<message from='coven@chat.shakespeare.lit' type='groupchat'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<status code='104'/>"
+                "</x>"
+                "</message>");
+    muc->handleMessage(status104);
+
+    // A new disco#info IQ should have been sent (also id qx1 since counter was reset)
+    test.ignore();  // consume the new disco#info request
+
+    // Inject updated roominfo
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/ns/protocols/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<x xmlns='jabber:x:data' type='result'>"
+                "<field var='FORM_TYPE' type='hidden'><value>http://jabber.org/protocol/muc#roominfo</value></field>"
+                "<field var='muc#roominfo_description'><value>Updated Coven</value></field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    QCOMPARE(room.description().value(), u"Updated Coven"_s);
 }
 
 QTEST_MAIN(tst_QXmppMuc)

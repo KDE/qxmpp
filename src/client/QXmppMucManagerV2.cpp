@@ -293,6 +293,10 @@ struct MucRoomData {
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
     // Room feature flags populated from disco#info after joining
     QProperty<bool> subjectChangeable;
+    // Room info fields populated from muc#roominfo (re-fetched on status code 104)
+    QProperty<QString> description;
+    QProperty<QString> language;
+    QProperty<QStringList> contactJids;
     // Permission properties — bindings set up in setupPermissionBindings()
     // after selfParticipantId is known. Declared after `participants` so that
     // `participants` outlives these bindings during destruction.
@@ -507,21 +511,8 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     roomData.state = MucRoomState::JoiningOccupantPresences;
     roomData.nickname = nickname;
 
-    // Fetch room features in parallel; updates subjectChangeable when it arrives.
-    if (auto *disco = client()->findExtension<QXmppDiscoveryManager>()) {
-        disco->info(jid).then(this, [this, jid](auto &&result) {
-            auto itr = d->rooms.find(jid);
-            if (itr == d->rooms.end() || hasError(result)) {
-                return;
-            }
-            auto &info = getValue(result);
-            if (auto roomInfo = info.template dataForm<QXmppMucRoomInfo>()) {
-                if (auto changeable = roomInfo->subjectChangeable()) {
-                    itr->second.subjectChangeable = *changeable;
-                }
-            }
-        });
-    }
+    // Fetch room features in parallel; updates roominfo properties when it arrives.
+    d->fetchRoomInfo(jid);
 
     QXmppPromise<Result<QXmppMucRoomV2>> promise;
     auto task = promise.task();
@@ -604,6 +595,10 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
         }
         if (message.hasSubject() && message.body().isEmpty()) {
             data.subject = message.subject();
+        }
+        // Status 104: room configuration changed — re-fetch roominfo
+        if (message.mucStatusCodes().contains(104)) {
+            d->fetchRoomInfo(bareFrom);
         }
         Q_EMIT messageReceived(bareFrom, message);
         return true;
@@ -1043,6 +1038,30 @@ void QXmppMucManagerV2Private::clearAllRooms()
     }
 }
 
+void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
+{
+    auto *disco = q->client()->findExtension<QXmppDiscoveryManager>();
+    if (!disco) {
+        return;
+    }
+    disco->info(roomJid, {}, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [this, roomJid](auto &&result) {
+        auto itr = rooms.find(roomJid);
+        if (itr == rooms.end() || hasError(result)) {
+            return;
+        }
+        auto &data = itr->second;
+        auto &info = getValue(result);
+        if (auto roomInfo = info.template dataForm<QXmppMucRoomInfo>()) {
+            if (auto changeable = roomInfo->subjectChangeable()) {
+                data.subjectChangeable = *changeable;
+            }
+            data.description = roomInfo->description();
+            data.language = roomInfo->language();
+            data.contactJids = roomInfo->contactJids();
+        }
+    });
+}
+
 void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
 {
     using namespace std::chrono;
@@ -1214,6 +1233,65 @@ QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
 {
     if (auto *data = m_manager->roomData(m_jid)) {
         return { &(data->canConfigureRoom) };
+    }
+    return {};
+}
+
+///
+/// Returns the room description from \xep{0045, Multi-User Chat} \c muc#roominfo.
+///
+/// The description is populated from the \c muc#roominfo_description field of the
+/// \c disco\#info response. It is fetched automatically on join and re-fetched whenever
+/// a status code 104 (room configuration changed) is received.
+///
+/// Returns an empty string until the \c disco\#info response has arrived.
+///
+/// \since QXmpp 1.15
+///
+QBindable<QString> QXmppMucRoomV2::description() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->description) };
+    }
+    return {};
+}
+
+///
+/// Returns the language of the room discussion from \xep{0045, Multi-User Chat} \c muc#roominfo.
+///
+/// The language tag is populated from the \c muc#roominfo_lang field of the
+/// \c disco\#info response, following BCP 47 (e.g. \c "en" or \c "de"). It is fetched
+/// automatically on join and re-fetched whenever a status code 104 is received.
+///
+/// Returns an empty string until the \c disco\#info response has arrived.
+///
+/// \since QXmpp 1.15
+///
+QBindable<QString> QXmppMucRoomV2::language() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->language) };
+    }
+    return {};
+}
+
+///
+/// Returns the list of admin contact JIDs for the room from \xep{0045, Multi-User Chat} \c muc#roominfo.
+///
+/// The JIDs are populated from the \c muc#roominfo_contactjid field of the
+/// \c disco\#info response. They represent real JIDs of people responsible for the
+/// room, which may differ from the room's current affiliations list. The list is fetched
+/// automatically on join and re-fetched whenever a status code 104 is received.
+///
+/// Returns an empty list until the \c disco\#info response has arrived or if the
+/// room has no contact JIDs configured.
+///
+/// \since QXmpp 1.15
+///
+QBindable<QStringList> QXmppMucRoomV2::contactJids() const
+{
+    if (auto *data = m_manager->roomData(m_jid)) {
+        return { &(data->contactJids) };
     }
     return {};
 }
