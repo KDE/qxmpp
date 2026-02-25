@@ -11,6 +11,7 @@
 
 #include "QXmppFallback.h"
 #include "QXmppFileShare.h"
+#include "QXmppMucData.h"
 #include "QXmppStanza.h"
 
 #include <optional>
@@ -199,10 +200,10 @@ public:
     QString slashMeCommandText() const;
 
     // XEP-0045: Multi-User Chat (since QXmpp 1.15)
-    QList<uint32_t> mucStatusCodes() const;
-    void setMucStatusCodes(const QList<uint32_t> &codes);
     std::optional<QXmppMucVoiceRequest> mucVoiceRequest() const;
     void setMucVoiceRequest(std::optional<QXmppMucVoiceRequest> request);
+    std::optional<QXmpp::Muc::UserQuery> mucUserQuery() const;
+    void setMucUserQuery(std::optional<QXmpp::Muc::UserQuery> element);
 
     // XEP-0249: Direct MUC Invitations
     QString mucInvitationJid() const;

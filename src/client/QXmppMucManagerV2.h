@@ -71,8 +71,26 @@ public:
     ///
     /// \since QXmpp 1.15
     Q_SIGNAL void voiceRequestReceived(const QString &roomJid, const QXmppMucVoiceRequest &request);
+    /// Emitted when a mediated invitation is received from a room.
+    ///
+    /// The user is not yet in the room at this point. Call QXmppMucManagerV2::joinRoom() to accept
+    /// or QXmppMucManagerV2::declineInvitation() to decline.
+    ///
+    /// \since QXmpp 1.15
+    Q_SIGNAL void invitationReceived(const QString &roomJid, const QXmpp::Muc::Invite &invite, const QString &password);
+    /// Emitted when a room reports that an invitee declined an invitation.
+    ///
+    /// \since QXmpp 1.15
+    Q_SIGNAL void invitationDeclined(const QString &roomJid, const QXmpp::Muc::Decline &decline);
 
     bool handleMessage(const QXmppMessage &) override;
+
+    /// Sends a decline for a mediated invitation to \a roomJid.
+    ///
+    /// Can be called before joining the room.
+    ///
+    /// \since QXmpp 1.15
+    QXmppTask<QXmpp::SendResult> declineInvitation(const QString &roomJid, QXmpp::Muc::Decline decline);
 
 protected:
     void onRegistered(QXmppClient *client) override;
@@ -176,6 +194,7 @@ public:
 
     QXmppTask<QXmpp::SendResult> requestVoice();
     QXmppTask<QXmpp::SendResult> answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow);
+    QXmppTask<QXmpp::SendResult> inviteUser(QXmpp::Muc::Invite invite);
 
     QXmppTask<QXmpp::Result<QXmppMucRoomConfig>> requestRoomConfig(bool watch = false);
     QXmppTask<QXmpp::Result<>> setRoomConfig(const QXmppMucRoomConfig &config);

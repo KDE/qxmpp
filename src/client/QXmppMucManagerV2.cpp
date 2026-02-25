@@ -545,6 +545,16 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
     }
 
     auto bareFrom = QXmppUtils::jidToBareJid(message.from());
+
+    // Handle mediated invitations from rooms the user hasn't joined yet (§7.8.2).
+    // These are Normal messages with <invite from=...> inside <x xmlns='muc#user'>.
+    if (type == QXmppMessage::Normal) {
+        if (const auto &ue = message.mucUserQuery(); ue && ue->invite() && !ue->invite()->from().isEmpty()) {
+            Q_EMIT invitationReceived(bareFrom, *ue->invite(), ue->password());
+            return true;
+        }
+    }
+
     auto itr = d->rooms.find(bareFrom);
     if (itr == d->rooms.end()) {
         return false;
@@ -564,11 +574,15 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
         return false;
     }
 
-    // Handle Normal-type messages from the room (e.g., voice request approval forms)
+    // Handle Normal-type messages from the room (e.g., voice request approval forms, declines)
     if (message.type() == QXmppMessage::Normal) {
         if (data.state == MucRoomState::Joined) {
             if (auto voiceRequest = message.mucVoiceRequest()) {
                 Q_EMIT voiceRequestReceived(bareFrom, *voiceRequest);
+                return true;
+            }
+            if (const auto &ue = message.mucUserQuery(); ue && ue->decline() && !ue->decline()->from().isEmpty()) {
+                Q_EMIT invitationDeclined(bareFrom, *ue->decline());
                 return true;
             }
         }
@@ -609,7 +623,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
             data.subject = message.subject();
         }
         // Status 104: room configuration changed — re-fetch roominfo and config (if subscribed)
-        if (message.mucStatusCodes().contains(104)) {
+        if (message.mucUserQuery() && message.mucUserQuery()->statusCodes().contains(104)) {
             d->fetchRoomInfo(bareFrom);
             if (data.watchingRoomConfig) {
                 d->fetchRoomConfigSubscribed(bareFrom);
@@ -620,6 +634,24 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
     default:
         return false;
     }
+}
+
+///
+/// Declines a mediated invitation by sending a \c decline message to \a roomJid.
+///
+/// Can be called before joining the room. Set \c decline.to() to the inviter's JID.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<SendResult> QXmppMucManagerV2::declineInvitation(const QString &roomJid, QXmpp::Muc::Decline decline)
+{
+    QXmppMessage message;
+    message.setTo(roomJid);
+    message.setType(QXmppMessage::Normal);
+    QXmpp::Muc::UserQuery ue;
+    ue.setDecline(std::move(decline));
+    message.setMucUserQuery(std::move(ue));
+    return client()->send(std::move(message));
 }
 
 void QXmppMucManagerV2::onRegistered(QXmppClient *client)
@@ -1968,6 +2000,29 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
     message.setTo(m_jid);
     message.setType(QXmppMessage::Normal);
     message.setMucVoiceRequest(std::move(response));
+    return m_manager->client()->send(std::move(message));
+}
+
+///
+/// Sends a mediated invitation to \a invite.to() via this room.
+///
+/// The room must be currently joined. The room service will forward the invitation to the
+/// specified invitee and add the room password automatically for password-protected rooms.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<SendResult> QXmppMucRoomV2::inviteUser(QXmpp::Muc::Invite invite)
+{
+    if (!isRoomJoined(m_manager->d.get(), m_jid)) {
+        return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
+    }
+
+    QXmppMessage message;
+    message.setTo(m_jid);
+    message.setType(QXmppMessage::Normal);
+    QXmpp::Muc::UserQuery ue;
+    ue.setInvite(std::move(invite));
+    message.setMucUserQuery(std::move(ue));
     return m_manager->client()->send(std::move(message));
 }
 

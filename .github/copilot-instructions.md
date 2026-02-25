@@ -117,6 +117,14 @@ Stanza types implement `parse(const QDomElement &)` for deserialization and `toX
 - Lambda overload: `w.write([&]() { ... })` — use for conditional logic inside `Element` children
 - `XmlWriter::write(std::optional<T>)` — skips automatically if empty
 
+**DOM parsing helpers (`QXmppUtils_p.h`):**  
+Types that implement `static std::optional<T> fromDom(const QDomElement &)` satisfy the `DomParsableV3` concept. Define `static constexpr std::tuple XmlTag = { u"tag", ns_foo }` on a type to enable tag-inferring overloads. Key helpers:
+- `parseOptionalChildElement<T>(parentEl)` — finds first child matching `T::XmlTag`, returns `std::optional<T>` via `T::fromDom`
+- `parseOptionalChildElement<T>(parentEl, tagName, xmlns)` — same but with explicit tag/namespace
+- `parseChildElements<Container>(parentEl)` — collects all matching children into a container
+- `iterChildElements(el, tagName, xmlns)` — range-for-compatible iterator over matching child elements
+- `firstChildElement(el, tagName, xmlns)` — finds first matching child (namespace optional)
+
 **Enum registration:**  
 Enums used in string serialization (e.g. in XML or data forms) are registered via `template<> struct Enums::Data<MyEnum>` specializations in a `*_p.h` private header. Define `static constexpr auto Values = makeValues<MyEnum>({ { MyEnum::Foo, u"foo" }, ... })` — values must be in enum declaration order. Use `Enums::fromString<T>(str)` → `std::optional<T>` and `Enums::toString(value)` → `QStringView` for conversion.
 

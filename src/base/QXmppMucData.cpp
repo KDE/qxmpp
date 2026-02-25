@@ -6,7 +6,9 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppUtils.h"
+#include "QXmppUtils_p.h"
 
+#include "Algorithms.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -114,6 +116,74 @@ void Item::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"role", m_role },
         OptionalTextElement { u"reason", m_reason },
         OptionalContent { !m_actor.isEmpty(), Element { u"actor", Attribute { u"jid", m_actor } } },
+    });
+}
+/// \endcond
+
+/// \cond
+std::optional<Invite> Invite::fromDom(const QDomElement &el)
+{
+    Invite invite;
+    invite.m_from = el.attribute(u"from"_s);
+    invite.m_to = el.attribute(u"to"_s);
+    invite.m_reason = el.firstChildElement(u"reason"_s).text();
+    return invite;
+}
+
+void Invite::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        u"invite",
+        OptionalAttribute { u"to", m_to },
+        OptionalAttribute { u"from", m_from },
+        OptionalTextElement { u"reason", m_reason },
+    });
+}
+/// \endcond
+
+/// \cond
+std::optional<Decline> Decline::fromDom(const QDomElement &el)
+{
+    Decline decline;
+    decline.m_from = el.attribute(u"from"_s);
+    decline.m_to = el.attribute(u"to"_s);
+    decline.m_reason = el.firstChildElement(u"reason"_s).text();
+    return decline;
+}
+
+void Decline::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        u"decline",
+        OptionalAttribute { u"to", m_to },
+        OptionalAttribute { u"from", m_from },
+        OptionalTextElement { u"reason", m_reason },
+    });
+}
+/// \endcond
+
+/// \cond
+std::optional<UserQuery> UserQuery::fromDom(const QDomElement &el)
+{
+    UserQuery ue;
+    ue.m_statusCodes = transformFilter<QList<uint32_t>>(parseSingleAttributeElements<QList<QString>>(el, u"status", ns_muc_user, u"code"_s), [](const auto &string) {
+        return parseInt<uint32_t>(string);
+    });
+    ue.m_invite = parseOptionalChildElement<Invite>(el);
+    ue.m_password = firstChildElement(el, u"password").text();
+    ue.m_decline = parseOptionalChildElement<Decline>(el);
+    return ue;
+}
+
+void UserQuery::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter w(writer);
+    w.write(Element {
+        Tag { u"x", ns_muc_user },
+        SingleAttributeElements { u"status", u"code", m_statusCodes },
+        m_invite,
+        OptionalTextElement { u"password", m_password },
+        m_decline,
     });
 }
 /// \endcond

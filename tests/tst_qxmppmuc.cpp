@@ -81,6 +81,11 @@ private:
     Q_SLOT void requestVoice();
     Q_SLOT void voiceRequestReceived();
     Q_SLOT void answerVoiceRequest();
+    Q_SLOT void inviteUser();
+    Q_SLOT void invitationReceived();
+    Q_SLOT void invitationReceivedUnknownRoom();
+    Q_SLOT void declineInvitation();
+    Q_SLOT void invitationDeclined();
 
     // Room creation and configuration
     Q_SLOT void joinRoomNotFound();
@@ -280,33 +285,64 @@ void tst_QXmppMuc::avatarFetch()
     TestClient test(true);
     test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
     test.addNewExtension<QXmppDiscoveryManager>();
-    auto muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto avatarTask = muc->fetchRoomAvatar(u"garden@chat.shakespeare.example.org"_s);
+    // Join manually so we can inject the disco#info result before enabling avatar watch.
+    auto joinTask = muc->joinRoom(u"garden@chat.shakespeare.example.org"_s, u"juliet"_s);
+    test.ignore();  // disco#info IQ (qx1)
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='garden@chat.shakespeare.example.org/juliet'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='garden@chat.shakespeare.example.org' type='groupchat'><subject>The Garden</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Inject disco#info result (qx1) with avatar hash + vcard-temp support.
+    // Since watchAvatar is still false, this only populates roomInfo — no fetch yet.
     test.inject(
-        u"<iq type='result' id='qx1' to='juliet@capulet.lit/balcony' from='garden@chat.shakespeare.example.org'>"
+        u"<iq id='qx1' type='result' from='garden@chat.shakespeare.example.org'>"
         "<query xmlns='http://jabber.org/protocol/disco#info'>"
         "<identity category='conference' type='text' name='The Garden'/>"
         "<feature var='http://jabber.org/protocol/muc'/>"
         "<feature var='vcard-temp'/>"
         "<x xmlns='jabber:x:data' type='result'>"
         "<field var='FORM_TYPE' type='hidden'><value>http://jabber.org/protocol/muc#roominfo</value></field>"
-        "<field var='muc#roominfo_avatarhash' type='text-multi' label='Avatar hash'><value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value></field>"
+        "<field var='muc#roominfo_avatarhash' type='text-multi'>"
+        "<value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value>"
+        "</field>"
         "</x>"
         "</query>"
         "</iq>"_s);
 
+    QVERIFY(!room.avatar().value().has_value());
+
+    // Now enable avatar watching — roomInfo is already available so fetch starts immediately.
+    // The vcard IQ is sent with id=qx1 (counter was reset by the disco#info inject above).
+    room.setWatchAvatar(true);
+    test.ignore();  // consume the vcard IQ
+
+    // Inject vcard result
     test.inject(
-        u"<iq type='result' id='qx3' to='juliet@capulet.example.com/balcony' from='garden@chat.shakespeare.example.org'><vCard xmlns='vcard-temp'>"
+        u"<iq id='qx1' type='result' from='garden@chat.shakespeare.example.org'>"
+        "<vCard xmlns='vcard-temp'>"
         "<PHOTO>"
         "<TYPE>image/svg+xml</TYPE>"
         "<BINVAL>PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiI+CiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9InJlZCIvPgo8L3N2Zz4K</BINVAL>"
         "</PHOTO>"
-        "</vCard></iq>"_s);
+        "</vCard>"
+        "</iq>"_s);
 
-    auto avatar = expectFutureVariant<std::optional<QXmpp::Muc::Avatar>>(avatarTask);
-    QVERIFY(avatar.has_value());
-    QCOMPARE(avatar->contentType, u"image/svg+xml"_s);
+    QVERIFY(room.avatar().value().has_value());
+    QCOMPARE(room.avatar().value()->contentType, u"image/svg+xml"_s);
 }
 
 void tst_QXmppMuc::joinRoom()
@@ -2362,6 +2398,141 @@ void tst_QXmppMuc::requestRoomConfigJoinsInFlightFetch()
     QVERIFY(task.isFinished());
     QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(task).name(), u"New Name"_s);
     QCOMPARE(room.roomConfig().value()->name(), u"New Name"_s);
+}
+
+void tst_QXmppMuc::inviteUser()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"crone1@shakespeare.lit/desktop"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinTestRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"firstwitch"_s);
+
+    QXmpp::Muc::Invite invite;
+    invite.setTo(u"hecate@shakespeare.lit"_s);
+    invite.setReason(u"Hey Hecate!"_s);
+
+    auto task = room.inviteUser(invite);
+    test.expect(u"<message to='coven@chat.shakespeare.lit' type='normal'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<invite to='hecate@shakespeare.lit'>"
+                "<reason>Hey Hecate!</reason>"
+                "</invite>"
+                "</x>"
+                "</message>"_s);
+    QVERIFY(!task.isFinished());
+}
+
+void tst_QXmppMuc::invitationReceived()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    joinTestRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+
+    QSignalSpy spy(muc, &QXmppMucManagerV2::invitationReceived);
+
+    QXmppMessage msg;
+    parsePacket(msg,
+                "<message from='coven@chat.shakespeare.lit' to='hecate@shakespeare.lit'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<invite from='crone1@shakespeare.lit/desktop'>"
+                "<reason>Hey Hecate!</reason>"
+                "</invite>"
+                "<password>cauldronburn</password>"
+                "</x>"
+                "</message>");
+    muc->handleMessage(msg);
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toString(), u"coven@chat.shakespeare.lit");
+    auto invite = spy.at(0).at(1).value<QXmpp::Muc::Invite>();
+    QCOMPARE(invite.from(), u"crone1@shakespeare.lit/desktop");
+    QCOMPARE(invite.reason(), u"Hey Hecate!");
+    QCOMPARE(spy.at(0).at(2).toString(), u"cauldronburn");
+}
+
+void tst_QXmppMuc::invitationReceivedUnknownRoom()
+{
+    // Invitation from a room the user hasn't joined yet must still be signalled.
+    TestClient test(true);
+    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    QSignalSpy spy(muc, &QXmppMucManagerV2::invitationReceived);
+
+    QXmppMessage msg;
+    parsePacket(msg,
+                "<message from='coven@chat.shakespeare.lit' to='hecate@shakespeare.lit'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<invite from='crone1@shakespeare.lit/desktop'>"
+                "<reason>Join us!</reason>"
+                "</invite>"
+                "</x>"
+                "</message>");
+    muc->handleMessage(msg);
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toString(), u"coven@chat.shakespeare.lit");
+    auto invite = spy.at(0).at(1).value<QXmpp::Muc::Invite>();
+    QCOMPARE(invite.from(), u"crone1@shakespeare.lit/desktop");
+    QCOMPARE(invite.reason(), u"Join us!");
+    QVERIFY(spy.at(0).at(2).toString().isEmpty());
+}
+
+void tst_QXmppMuc::declineInvitation()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    QXmpp::Muc::Decline decline;
+    decline.setTo(u"crone1@shakespeare.lit/desktop"_s);
+    decline.setReason(u"Too busy."_s);
+
+    auto task = muc->declineInvitation(u"coven@chat.shakespeare.lit"_s, decline);
+    test.expect(u"<message to='coven@chat.shakespeare.lit' type='normal'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<decline to='crone1@shakespeare.lit/desktop'>"
+                "<reason>Too busy.</reason>"
+                "</decline>"
+                "</x>"
+                "</message>"_s);
+    QVERIFY(!task.isFinished());
+}
+
+void tst_QXmppMuc::invitationDeclined()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"crone1@shakespeare.lit/desktop"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    joinTestRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"firstwitch"_s);
+
+    QSignalSpy spy(muc, &QXmppMucManagerV2::invitationDeclined);
+
+    QXmppMessage msg;
+    parsePacket(msg,
+                "<message from='coven@chat.shakespeare.lit' to='crone1@shakespeare.lit/desktop'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<decline from='hecate@shakespeare.lit'>"
+                "<reason>Too busy.</reason>"
+                "</decline>"
+                "</x>"
+                "</message>");
+    muc->handleMessage(msg);
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toString(), u"coven@chat.shakespeare.lit");
+    auto decline = spy.at(0).at(1).value<QXmpp::Muc::Decline>();
+    QCOMPARE(decline.from(), u"hecate@shakespeare.lit");
+    QCOMPARE(decline.reason(), u"Too busy.");
 }
 
 QTEST_MAIN(tst_QXmppMuc)
