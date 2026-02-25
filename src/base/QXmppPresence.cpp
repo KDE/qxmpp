@@ -67,6 +67,7 @@ public:
     QList<int> mucStatusCodes;
     bool mucSupported;
     std::optional<Muc::HistoryOptions> mucHistory;
+    std::optional<Muc::Destroy> mucDestroy;
 
     // XEP-0115: Entity Capabilities
     QString capabilityHash;
@@ -378,6 +379,18 @@ void QXmppPresence::setMucHistory(std::optional<QXmpp::Muc::HistoryOptions> hist
     d->mucHistory = history;
 }
 
+/*! Returns the MUC room destruction info, or \c std::nullopt if none. */
+std::optional<QXmpp::Muc::Destroy> QXmppPresence::mucDestroy() const
+{
+    return d->mucDestroy;
+}
+
+/*! Sets the MUC room destruction \a info. Pass \c std::nullopt to clear. */
+void QXmppPresence::setMucDestroy(std::optional<QXmpp::Muc::Destroy> destroy)
+{
+    d->mucDestroy = std::move(destroy);
+}
+
 /*!
     Returns the \xep{0283}{Moved} user's old jid.
 
@@ -552,6 +565,8 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
         for (const auto &statusElement : iterChildElements(element, u"status")) {
             d->mucStatusCodes << statusElement.attribute(u"code"_s).toInt();
         }
+
+        d->mucDestroy = parseOptionalChildElement<Muc::Destroy>(element);
         // XEP-0115: Entity Capabilities
     } else if (element.tagName() == u"c" && element.namespaceURI() == ns_capabilities) {
         d->capabilityNode = element.attribute(u"node"_s);
@@ -627,11 +642,12 @@ void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
             },
         },
         OptionalContent {
-            !d->mucItem.isNull() || !d->mucStatusCodes.isEmpty(),
+            !d->mucItem.isNull() || !d->mucStatusCodes.isEmpty() || d->mucDestroy,
             Element {
                 { u"x", ns_muc_user },
                 d->mucItem,
                 SingleAttributeElements { u"status", u"code", d->mucStatusCodes },
+                d->mucDestroy,
             },
         },
         // XEP-0115: Entity Capabilities
