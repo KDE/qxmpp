@@ -41,6 +41,7 @@ struct QXmppMucManagerV2Private {
     // MUC Core
     void clearAllRooms();
     void fetchRoomInfo(const QString &roomJid);
+    void fetchConfigForm(const QString &roomJid);
     void handlePresence(const QXmppPresence &);
     void handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &);
     void throwRoomError(const QString &roomJid, QXmppError &&error);

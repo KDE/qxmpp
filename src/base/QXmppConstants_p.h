@@ -61,6 +61,7 @@ inline constexpr QStringView ns_muc_owner = u"http://jabber.org/protocol/muc#own
 inline constexpr QStringView ns_muc_user = u"http://jabber.org/protocol/muc#user";
 inline constexpr QStringView ns_muc_roominfo = u"http://jabber.org/protocol/muc#roominfo";
 inline constexpr QStringView ns_muc_request = u"http://jabber.org/protocol/muc#request";
+inline constexpr QStringView ns_muc_roomconfig = u"http://jabber.org/protocol/muc#roomconfig";
 inline constexpr QStringView muc_feat_nonanonymous = u"muc_nonanonymous";
 inline constexpr QStringView muc_feat_semianonymous = u"muc_semianonymous";
 inline constexpr QStringView muc_feat_public = u"muc_public";
