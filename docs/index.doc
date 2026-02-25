@@ -1,46 +1,135 @@
 // SPDX-FileCopyrightText: 2014 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2025 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: CC0-1.0
 
 /*! \mainpage
 
-QXmpp is a cross-platform C++ XMPP client library based on the Qt
-framework. It tries to use Qt's programming conventions in order to ease
-the learning curve for new programmers.
+\section intro Introduction
 
-QXmpp based clients are built using QXmppClient instances which handle the
-establishment of the XMPP connection and provide a number of high-level
-"managers" to perform specific tasks. You can write your own managers to
-extend QXmpp by subclassing QXmppClientExtension.
+QXmpp is a cross-platform C++ XMPP client and server library built on top of the Qt framework
+(Qt 5.15+ and Qt 6.x). It implements a large number of XMPP Extension Protocols (XEPs) and
+exposes a modern, reactive API based on C++20 and Qt's property system.
 
-<B>Main Class:</B>
-- QXmppClient
+\section getting_started Getting Started
 
-<B>Managers to perform specific tasks:</B>
-- QXmppRosterManager
-- QXmppVCardManager
-- QXmppTransferManager
-- QXmppMamManager
-- QXmppMucManager
-- QXmppCallManager
-- QXmppArchiveManager
-- QXmppVersionManager
-- QXmppDiscoveryManager
-- QXmppEntityTimeManager
-- QXmppUploadRequestManager
-- QXmppRegistrationManager
-- QXmppAttentionManager
-- QXmppPubSubManager
-- QXmppOmemoManager
-- QXmppBlockingManager
+The central class is QXmppClient. Create one, register the managers you need, then connect:
 
-<B>XMPP stanzas:</B> If you are interested in a more low-level API, you can refer to these
-classes.
+\code
+auto *client = new QXmppClient(this);
+
+// Register managers
+auto *pubsub  = client->addNewExtension<QXmppPubSubManager>();
+auto *disco   = client->addNewExtension<QXmppDiscoveryManager>();
+auto *muc     = client->addNewExtension<QXmppMucManagerV2>();
+
+// Connect
+QXmppConfiguration config;
+config.setJid("user@example.org");
+config.setPassword("secret");
+client->connectToServer(config);
+\endcode
+
+\section async Async API
+
+All network operations return a QXmppTask<T>, which represents a pending result. Use
+\c .then() to attach a callback when it completes:
+
+\code
+muc->joinRoom("room@conference.example.org", "MyNick").then(this, [](auto result) {
+    if (auto *err = std::get_if<QXmppError>(&result)) {
+        qWarning() << "Join failed:" << err->description;
+    }
+});
+\endcode
+
+Results are typically \c QXmpp::Result<T>, a \c std::variant<T, QXmppError>.
+
+\section reactive Reactive Properties
+
+Selected APIs expose observable state via QBindable<T>, backed by Qt's QProperty system.
+QXmppMucRoomV2 is the primary example — room info, config and avatar are all exposed as
+bindable properties that update automatically when the server reports changes:
+
+\code
+auto room = muc->room("room@conference.example.org");
+room.setWatchAvatar(true);
+
+auto avatar = room.avatar();
+avatar.addNotifier([avatar]() {
+    // called whenever the room avatar changes
+    auto val = avatar.value();
+});
+\endcode
+
+\section managers Managers
+
+Managers are the primary way to use XMPP features. Register them with QXmppClient and extend
+QXmppClient by subclassing QXmppClientExtension.
+
+See the \ref Managers module for the full list.
+
+<b>Messaging</b>
+- QXmppCarbonManagerV2 — Message carbons (\xep{0280})
+- QXmppMamManager — Message archive management (\xep{0313})
+- QXmppMessageReceiptManager — Message delivery receipts (\xep{0184})
+- QXmppAttentionManager — Attention requests (\xep{0224})
+
+<b>Contacts &amp; Roster</b>
+- QXmppRosterManager — Contact list (\xep{0162})
+- QXmppVCardManager — vCards (vcard-temp)
+- QXmppUserLocationManager — User location (\xep{0080})
+- QXmppUserTuneManager — User tune (\xep{0118})
+- QXmppVersionManager — Software version (\xep{0092})
+- QXmppEntityTimeManager — Entity time (\xep{0202})
+
+<b>Groupchat</b>
+- QXmppMucManagerV2 — Multi-user chat with reactive API (\xep{0045})
+- QXmppMixManager — Mediated Information eXchange (\xep{0369})
+
+<b>File Sharing</b>
+- QXmppFileSharingManager — Stateless file sharing (\xep{0447})
+- QXmppHttpUploadManager — HTTP file upload service (\xep{0363})
+- QXmppUploadRequestManager — HTTP upload slot requests (\xep{0363})
+- QXmppTransferManager — In-band / SOCKS5 file transfer (\xep{0047}, \xep{0065})
+
+<b>End-to-End Encryption</b>
+- QXmppOmemoManager — OMEMO 2 end-to-end encryption (\xep{0384})
+- QXmppAtmManager — Automatic trust management (\xep{0450})
+- QXmppTrustManager — Trust level storage and queries
+
+<b>Calls</b>
+- QXmppCallManager — Jingle audio/video calls (\xep{0166})
+- QXmppCallInviteManager — Call invites (\xep{0482})
+- QXmppJingleMessageInitiationManager — Jingle message initiation (\xep{0353})
+
+<b>Bookmarks &amp; PubSub</b>
+- QXmppPepBookmarkManager — PEP native bookmarks (\xep{0402})
+- QXmppPubSubManager — Publish-subscribe (\xep{0060})
+
+<b>Service Discovery &amp; Utilities</b>
+- QXmppDiscoveryManager — Service discovery (\xep{0030})
+- QXmppBlockingManager — Contact blocking (\xep{0191})
+- QXmppExternalServiceDiscoveryManager — External service discovery (\xep{0215})
+- QXmppRegistrationManager — In-band registration (\xep{0077})
+- QXmppAccountMigrationManager — Account data migration (\xep{0227})
+- QXmppMovedManager — Account migration hints (\xep{0283})
+
+<b>Legacy (deprecated)</b>
+- QXmppMucManager — superseded by QXmppMucManagerV2
+- QXmppCarbonManager — superseded by QXmppCarbonManagerV2
+- QXmppBookmarkManager — superseded by QXmppPepBookmarkManager
+- QXmppArchiveManager — superseded by QXmppMamManager
+- QXmppRpcManager — RPC (\xep{0009})
+
+\section stanzas Low-Level Stanza API
+
+For direct access to XMPP stanzas:
 - QXmppIq
 - QXmppMessage
 - QXmppPresence
 
-<B>Project Details:</B>
+\section links Project Links
 
 - Project Page: https://invent.kde.org/libraries/qxmpp
 - Report Issues: https://invent.kde.org/libraries/qxmpp/-/issues
