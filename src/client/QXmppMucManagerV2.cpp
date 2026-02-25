@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMucForms.h"
+#include "QXmppMucIq.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppUtils_p.h"
@@ -60,6 +61,38 @@ static std::optional<Muc::Role> roleFromLegacy(QXmppMucItem::Role role)
         return Muc::Role::Moderator;
     }
     return {};
+}
+
+static QXmppMucItem::Role roleToLegacy(Muc::Role role)
+{
+    switch (role) {
+    case Muc::Role::None:
+        return QXmppMucItem::NoRole;
+    case Muc::Role::Visitor:
+        return QXmppMucItem::VisitorRole;
+    case Muc::Role::Participant:
+        return QXmppMucItem::ParticipantRole;
+    case Muc::Role::Moderator:
+        return QXmppMucItem::ModeratorRole;
+    }
+    return QXmppMucItem::NoRole;
+}
+
+static QXmppMucItem::Affiliation affiliationToLegacy(Muc::Affiliation affiliation)
+{
+    switch (affiliation) {
+    case Muc::Affiliation::None:
+        return QXmppMucItem::NoAffiliation;
+    case Muc::Affiliation::Outcast:
+        return QXmppMucItem::OutcastAffiliation;
+    case Muc::Affiliation::Member:
+        return QXmppMucItem::MemberAffiliation;
+    case Muc::Affiliation::Admin:
+        return QXmppMucItem::AdminAffiliation;
+    case Muc::Affiliation::Owner:
+        return QXmppMucItem::OwnerAffiliation;
+    }
+    return QXmppMucItem::NoAffiliation;
 }
 
 static Muc::LeaveReason leaveReasonFromPresence(const QXmppPresence &presence)
@@ -1231,6 +1264,78 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
     timer->start(m_manager->d->timeout);
 
     return task;
+}
+
+///
+/// Changes the role of a room participant (XEP-0045 §8.4–8.6).
+///
+/// Role changes are transient and apply only for the current session.
+/// The \a participant must still be in the room. Roles are identified by
+/// the participant's current nickname.
+///
+QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason)
+{
+    auto *pData = m_manager->participantData(m_jid, participant.m_participantId);
+    if (!pData) {
+        return makeReadyTask<Result<>>(QXmppError { u"Participant is no longer in the room."_s });
+    }
+
+    QXmppMucItem item;
+    item.setNick(pData->nickname.value());
+    item.setRole(roleToLegacy(role));
+    item.setReason(reason);
+
+    QXmppMucAdminIq iq;
+    iq.setType(QXmppIq::Set);
+    iq.setTo(m_jid);
+    iq.setItems({ item });
+
+    return m_manager->client()->sendGenericIq(std::move(iq));
+}
+
+///
+/// Changes the affiliation of a user by bare JID (XEP-0045 §9).
+///
+/// Affiliation changes are persistent. The \a jid must be a bare JID.
+/// The user does not need to be currently in the room.
+///
+QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Muc::Affiliation affiliation, const QString &reason)
+{
+    QXmppMucItem item;
+    item.setJid(jid);
+    item.setAffiliation(affiliationToLegacy(affiliation));
+    item.setReason(reason);
+
+    QXmppMucAdminIq iq;
+    iq.setType(QXmppIq::Set);
+    iq.setTo(m_jid);
+    iq.setItems({ item });
+
+    return m_manager->client()->sendGenericIq(std::move(iq));
+}
+
+///
+/// Requests the list of all users with a given \a affiliation (XEP-0045 §9.5–9.8).
+///
+/// Returns a snapshot of the affiliation list. There are no live updates;
+/// call this method again after making changes if you need a fresh list.
+///
+/// Only admins and owners are allowed to retrieve these lists.
+///
+QXmppTask<Result<QList<QXmppMucItem>>> QXmppMucRoomV2::requestAffiliationList(QXmpp::Muc::Affiliation affiliation)
+{
+    QXmppMucItem item;
+    item.setAffiliation(affiliationToLegacy(affiliation));
+
+    QXmppMucAdminIq iq;
+    iq.setType(QXmppIq::Get);
+    iq.setTo(m_jid);
+    iq.setItems({ item });
+
+    return chainIq(m_manager->client()->sendIq(std::move(iq)), m_manager,
+                   [](QXmppMucAdminIq &&iq) -> Result<QList<QXmppMucItem>> {
+                       return iq.items();
+                   });
 }
 
 //

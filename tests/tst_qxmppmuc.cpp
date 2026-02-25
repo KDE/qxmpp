@@ -6,6 +6,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMucForms.h"
+#include "QXmppMucIq.h"
 #include "QXmppMucManagerV2.h"
 #include "QXmppMucManagerV2_p.h"
 #include "QXmppPresence.h"
@@ -58,6 +59,12 @@ private:
     Q_SLOT void disconnectNoStreamManagement();
     Q_SLOT void disconnectResumedStream();
     Q_SLOT void disconnectNewStream();
+
+    // Role and affiliation management
+    Q_SLOT void setRole();
+    Q_SLOT void setRoleParticipantGone();
+    Q_SLOT void setAffiliation();
+    Q_SLOT void requestAffiliationList();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -1318,6 +1325,159 @@ void tst_QXmppMuc::disconnectNewStream()
     // Room must be cleared now — server no longer knows about our presence
     QVERIFY(!room.isValid());
     QVERIFY(!room.joined().value());
+}
+
+static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
+                                 const QString &roomJid = u"coven@chat.shakespeare.lit"_s,
+                                 const QString &nick = u"thirdwitch"_s)
+{
+    auto joinTask = muc->joinRoom(roomJid, nick);
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                QStringLiteral("<presence from='%1/%2'>"
+                               "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                               "<item affiliation='admin' role='moderator'/>"
+                               "<status code='110'/>"
+                               "</x>"
+                               "</presence>")
+                    .arg(roomJid, nick)
+                    .toUtf8());
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg,
+                QStringLiteral("<message from='%1' type='groupchat'><subject>Test</subject></message>")
+                    .arg(roomJid)
+                    .toUtf8());
+    muc->handleMessage(subjectMsg);
+    return expectFutureVariant<QXmppMucRoomV2>(joinTask);
+}
+
+void tst_QXmppMuc::setRole()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    // Inject another participant into the room
+    QXmppPresence presence;
+    parsePacket(presence,
+                "<presence from='coven@chat.shakespeare.lit/pistol'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(presence);
+    auto participants = room.participants();
+    auto it = std::ranges::find_if(participants, [](const QXmppMucParticipant &p) {
+        return p.nickname().value() == u"pistol"_s;
+    });
+    QVERIFY(it != participants.end());
+    auto pistol = *it;
+
+    // Change role to moderator
+    auto task = room.setRole(pistol, QXmpp::Muc::Role::Moderator);
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#admin'>"
+                "<item nick='pistol' role='moderator'/>"
+                "</query></iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+}
+
+void tst_QXmppMuc::setRoleParticipantGone()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    // Capture a participant handle while they are in the room
+    QXmppPresence joinPresence;
+    parsePacket(joinPresence,
+                "<presence from='coven@chat.shakespeare.lit/pistol'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(joinPresence);
+    auto participants = room.participants();
+    auto it = std::ranges::find_if(participants, [](const QXmppMucParticipant &p) {
+        return p.nickname().value() == u"pistol"_s;
+    });
+    QVERIFY(it != participants.end());
+    auto pistol = *it;
+
+    // Participant leaves
+    QXmppPresence leavePresence;
+    parsePacket(leavePresence,
+                "<presence from='coven@chat.shakespeare.lit/pistol' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(leavePresence);
+
+    QVERIFY(!pistol.isValid());
+    auto task = room.setRole(pistol, QXmpp::Muc::Role::Moderator);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmppError>(task.result());
+}
+
+void tst_QXmppMuc::setAffiliation()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    auto task = room.setAffiliation(u"macbeth@shakespeare.lit"_s, QXmpp::Muc::Affiliation::Outcast, u"Treason"_s);
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#admin'>"
+                "<item affiliation='outcast' jid='macbeth@shakespeare.lit'>"
+                "<reason>Treason</reason>"
+                "</item>"
+                "</query></iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+}
+
+void tst_QXmppMuc::requestAffiliationList()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    auto task = room.requestAffiliationList(QXmpp::Muc::Affiliation::Outcast);
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#admin'>"
+                "<item affiliation='outcast'/>"
+                "</query></iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#admin'>"
+                "<item affiliation='outcast' jid='macbeth@shakespeare.lit'><reason>Treason</reason></item>"
+                "<item affiliation='outcast' jid='iago@shakespeare.lit'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(task.isFinished());
+    auto items = expectVariant<QList<QXmppMucItem>>(task.result());
+    QCOMPARE(items.size(), 2);
+    QCOMPARE(items[0].jid(), u"macbeth@shakespeare.lit"_s);
+    QCOMPARE(items[0].affiliation(), QXmppMucItem::OutcastAffiliation);
+    QCOMPARE(items[0].reason(), u"Treason"_s);
+    QCOMPARE(items[1].jid(), u"iago@shakespeare.lit"_s);
 }
 
 QTEST_MAIN(tst_QXmppMuc)
