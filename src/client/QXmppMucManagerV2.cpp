@@ -315,7 +315,7 @@ struct MucRoomData {
     std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> roomConfigWaiters;
     // Avatar — populated when setWatchAvatar(true) is called, re-fetched on status 104
     QProperty<QStringList> avatarHashes;
-    QProperty<std::optional<QXmppMucManagerV2::Avatar>> avatar;
+    QProperty<std::optional<QXmpp::Muc::Avatar>> avatar;
     bool supportsVCard = false;
     bool watchingAvatar = false;
     bool fetchingAvatar = false;
@@ -1330,7 +1330,7 @@ void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
         if (vcard.photo().isEmpty()) {
             data.avatar = std::nullopt;
         } else {
-            data.avatar = QXmppMucManagerV2::Avatar { vcard.photoType(), vcard.photo() };
+            data.avatar = QXmpp::Muc::Avatar { vcard.photoType(), vcard.photo() };
         }
     });
 }
@@ -1852,7 +1852,7 @@ QBindable<QStringList> QXmppMucRoomV2::avatarHashes() const
 /// \sa avatarHashes(), setWatchAvatar()
 /// \since QXmpp 1.16
 ///
-QBindable<std::optional<QXmppMucManagerV2::Avatar>> QXmppMucRoomV2::avatar() const
+QBindable<std::optional<QXmpp::Muc::Avatar>> QXmppMucRoomV2::avatar() const
 {
     if (auto *data = m_manager->roomData(m_jid)) {
         return { &(data->avatar) };
@@ -1911,7 +1911,7 @@ bool QXmppMucRoomV2::isWatchingAvatar() const
 ///
 /// \since QXmpp 1.16
 ///
-QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmppMucManagerV2::Avatar> newAvatar)
+QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmpp::Muc::Avatar> newAvatar)
 {
     QXmppVCardIq vCardIq;
     vCardIq.setTo(m_jid);
