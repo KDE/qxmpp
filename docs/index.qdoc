@@ -65,6 +65,23 @@ Results are typically \c QXmpp::Result<T>, a \c std::variant<T, QXmppError>.
 Always pass a context object (\c this) to \c .then() or \c .withContext() to
 ensure the callback is not invoked after the object has been destroyed.
 
+\section1 Reactive Properties
+
+Selected APIs expose observable state via QBindable<T>, backed by Qt's QProperty system.
+QXmppMucRoomV2 is the primary example — room info, config, and participant state are all exposed
+as bindable properties that update automatically when the server reports changes:
+
+\code
+auto room = muc->room("room@conference.example.org");
+room.setWatchAvatar(true);
+
+auto avatar = room.avatar();
+avatar.addNotifier([avatar]() {
+    // called whenever the room avatar changes
+    auto val = avatar.value();
+});
+\endcode
+
 \section1 Managers
 
 Managers are the primary way to use XMPP features. Register them with
@@ -91,7 +108,7 @@ QXmppClient and extend QXmppClient by subclassing QXmppClientExtension. See the
 
 \section2 Groupchat
 \list
-\li QXmppMucManagerV2 — In development: Multi-user chat with reactive API (\xepn{0045})
+\li QXmppMucManagerV2 — Multi-user chat with reactive API (\xepn{0045})
 \li QXmppMixManager — Mediated Information eXchange (\xepn{0369})
 \endlist
 
