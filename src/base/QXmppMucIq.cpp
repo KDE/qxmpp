@@ -206,6 +206,48 @@ void QXmppMucOwnerIq::setForm(const QXmppDataForm &form)
     m_form = form;
 }
 
+///
+/// Returns the alternate room JID to redirect occupants to after destroying the room.
+///
+/// Only set when the IQ represents a destroy request. Empty otherwise.
+///
+/// \since QXmpp 1.15
+///
+QString QXmppMucOwnerIq::destroyJid() const
+{
+    return m_destroyJid;
+}
+
+///
+/// Sets the alternate room JID to redirect occupants to when destroying the room.
+///
+/// \since QXmpp 1.15
+///
+void QXmppMucOwnerIq::setDestroyJid(const QString &jid)
+{
+    m_destroyJid = jid;
+}
+
+///
+/// Returns the reason for destroying the room.
+///
+/// \since QXmpp 1.15
+///
+QString QXmppMucOwnerIq::destroyReason() const
+{
+    return m_destroyReason;
+}
+
+///
+/// Sets the reason for destroying the room.
+///
+/// \since QXmpp 1.15
+///
+void QXmppMucOwnerIq::setDestroyReason(const QString &reason)
+{
+    m_destroyReason = reason;
+}
+
 /// \cond
 bool QXmppMucOwnerIq::isMucOwnerIq(const QDomElement &element)
 {
@@ -217,10 +259,25 @@ void QXmppMucOwnerIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
     m_form.parse(queryElement.firstChildElement(u"x"_s));
+    QDomElement destroyEl = queryElement.firstChildElement(u"destroy"_s);
+    if (!destroyEl.isNull()) {
+        m_destroyJid = destroyEl.attribute(u"jid"_s);
+        m_destroyReason = destroyEl.firstChildElement(u"reason"_s).text();
+    }
 }
 
 void QXmppMucOwnerIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
-    XmlWriter(writer).write(Element { { u"query", ns_muc_owner }, m_form });
+    XmlWriter w(writer);
+    w.write(Element { Tag { u"query", ns_muc_owner },
+                      [&]() {
+                          if (!m_destroyJid.isNull() || !m_destroyReason.isNull()) {
+                              w.write(Element { u"destroy",
+                                                OptionalAttribute { u"jid", m_destroyJid },
+                                                OptionalTextElement { u"reason", m_destroyReason } });
+                          } else {
+                              m_form.toXml(writer);
+                          }
+                      } });
 }
 /// \endcond

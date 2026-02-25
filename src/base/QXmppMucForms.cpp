@@ -4,6 +4,8 @@
 
 #include "QXmppMucForms.h"
 
+#include "QXmppMucForms_p.h"
+
 #include "StringLiterals.h"
 
 #include <QDebug>
@@ -342,4 +344,512 @@ std::optional<bool> QXmppMucVoiceRequest::requestAllow() const
 void QXmppMucVoiceRequest::setRequestAllow(std::optional<bool> allow)
 {
     d->requestAllow = allow;
+}
+
+///
+/// \class QXmppMucRoomConfig
+///
+/// \brief Represents the \c muc#roomconfig data form for configuring a MUC room.
+///
+/// Used by room owners to set room properties during creation (reserved-room flow,
+/// see QXmppMucManagerV2::createRoom()) and during subsequent reconfiguration
+/// (see QXmppMucRoomV2::requestRoomConfig() / QXmppMucRoomV2::submitRoomConfig()).
+///
+/// \since QXmpp 1.15
+///
+
+struct QXmppMucRoomConfigPrivate : QSharedData {
+    QString name;
+    QString description;
+    QString language;
+    std::optional<bool> isPublic;
+    std::optional<bool> isPersistent;
+    std::optional<bool> isMembersOnly;
+    std::optional<bool> isModerated;
+    std::optional<bool> isPasswordProtected;
+    QString password;
+    std::optional<QXmppMucRoomConfig::WhoCanDiscoverJids> whoCanDiscoverJids;
+    std::optional<bool> canOccupantsChangeSubject;
+    std::optional<bool> canMembersInvite;
+    std::optional<QXmppMucRoomConfig::AllowPrivateMessages> allowPrivateMessages;
+    std::optional<bool> enableLogging;
+    std::optional<int> maxUsers;
+    QStringList owners;
+    QStringList admins;
+};
+
+/// Tries to parse \a form into a QXmppMucRoomConfig.
+std::optional<QXmppMucRoomConfig> QXmppMucRoomConfig::fromDataForm(const QXmppDataForm &form)
+{
+    if (auto parsed = QXmppMucRoomConfig();
+        QXmppDataFormBase::fromDataForm(form, parsed)) {
+        return parsed;
+    }
+    return std::nullopt;
+}
+
+QXmppMucRoomConfig::QXmppMucRoomConfig()
+    : d(new QXmppMucRoomConfigPrivate {})
+{
+}
+
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMucRoomConfig)
+
+QString QXmppMucRoomConfig::formType() const
+{
+    return ns_muc_roomconfig.toString();
+}
+
+bool QXmppMucRoomConfig::parseField(const QXmppDataForm::Field &field)
+{
+    using Type = QXmppDataForm::Field::Type;
+    if (field.type() == Type::HiddenField) {
+        return false;
+    }
+
+    const auto key = field.key();
+    const auto value = field.value();
+
+    if (key == u"muc#roomconfig_roomname") {
+        d->name = value.toString();
+    } else if (key == u"muc#roomconfig_roomdesc") {
+        d->description = value.toString();
+    } else if (key == u"muc#roomconfig_lang") {
+        d->language = value.toString();
+    } else if (key == u"muc#roomconfig_publicroom") {
+        d->isPublic = parseBool(value);
+    } else if (key == u"muc#roomconfig_persistentroom") {
+        d->isPersistent = parseBool(value);
+    } else if (key == u"muc#roomconfig_membersonly") {
+        d->isMembersOnly = parseBool(value);
+    } else if (key == u"muc#roomconfig_moderatedroom") {
+        d->isModerated = parseBool(value);
+    } else if (key == u"muc#roomconfig_passwordprotectedroom") {
+        d->isPasswordProtected = parseBool(value);
+    } else if (key == u"muc#roomconfig_roomsecret") {
+        d->password = value.toString();
+    } else if (key == u"muc#roomconfig_whois") {
+        d->whoCanDiscoverJids = Enums::fromString<WhoCanDiscoverJids>(value.toString());
+    } else if (key == u"muc#roomconfig_changesubject") {
+        d->canOccupantsChangeSubject = parseBool(value);
+    } else if (key == u"muc#roomconfig_allowinvites") {
+        d->canMembersInvite = parseBool(value);
+    } else if (key == u"muc#roomconfig_allowpm") {
+        d->allowPrivateMessages = Enums::fromString<AllowPrivateMessages>(value.toString());
+    } else if (key == u"muc#roomconfig_enablelogging") {
+        d->enableLogging = parseBool(value);
+    } else if (key == u"muc#roomconfig_maxusers") {
+        const auto str = value.toString();
+        if (str == u"none" || str.isEmpty()) {
+            d->maxUsers = 0;
+        } else {
+            bool ok = false;
+            const int n = str.toInt(&ok);
+            if (ok) {
+                d->maxUsers = n;
+            }
+        }
+    } else if (key == u"muc#roomconfig_roomowners") {
+        d->owners = value.toStringList();
+    } else if (key == u"muc#roomconfig_roomadmins") {
+        d->admins = value.toStringList();
+    } else {
+        return false;
+    }
+    return true;
+}
+
+void QXmppMucRoomConfig::serializeForm(QXmppDataForm &f) const
+{
+    using Type = QXmppDataForm::Field::Type;
+    serializeEmptyable(f, Type::TextSingleField, u"muc#roomconfig_roomname", d->name);
+    serializeEmptyable(f, Type::TextSingleField, u"muc#roomconfig_roomdesc", d->description);
+    serializeEmptyable(f, Type::TextSingleField, u"muc#roomconfig_lang", d->language);
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_publicroom", d->isPublic);
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_persistentroom", d->isPersistent);
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_membersonly", d->isMembersOnly);
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_moderatedroom", d->isModerated);
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_passwordprotectedroom", d->isPasswordProtected);
+    serializeEmptyable(f, Type::TextPrivateField, u"muc#roomconfig_roomsecret", d->password);
+    if (d->whoCanDiscoverJids.has_value()) {
+        const QString val = (*d->whoCanDiscoverJids == WhoCanDiscoverJids::Anyone) ? u"anyone"_s : u"moderators"_s;
+        serializeValue(f, Type::ListSingleField, u"muc#roomconfig_whois"_s, val);
+    }
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_changesubject", d->canOccupantsChangeSubject);
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_allowinvites", d->canMembersInvite);
+    if (d->allowPrivateMessages.has_value()) {
+        QString val;
+        switch (*d->allowPrivateMessages) {
+        case AllowPrivateMessages::Anyone:
+            val = u"anyone"_s;
+            break;
+        case AllowPrivateMessages::Participants:
+            val = u"participants"_s;
+            break;
+        case AllowPrivateMessages::Moderators:
+            val = u"moderators"_s;
+            break;
+        case AllowPrivateMessages::Nobody:
+            val = u"none"_s;
+            break;
+        }
+        serializeValue(f, Type::ListSingleField, u"muc#roomconfig_allowpm"_s, val);
+    }
+    serializeOptional(f, Type::BooleanField, u"muc#roomconfig_enablelogging", d->enableLogging);
+    if (d->maxUsers.has_value()) {
+        const QString val = (*d->maxUsers == 0) ? u"none"_s : QString::number(*d->maxUsers);
+        serializeValue(f, Type::ListSingleField, u"muc#roomconfig_maxusers"_s, val);
+    }
+    serializeEmptyable(f, Type::JidMultiField, u"muc#roomconfig_roomowners", d->owners);
+    serializeEmptyable(f, Type::JidMultiField, u"muc#roomconfig_roomadmins", d->admins);
+}
+
+///
+/// Returns the natural-language name of the room.
+///
+/// Corresponds to \c muc#roomconfig_roomname.
+///
+///
+QString QXmppMucRoomConfig::name() const
+{
+    return d->name;
+}
+
+///
+/// Sets the natural-language name of the room.
+///
+///
+void QXmppMucRoomConfig::setName(const QString &name)
+{
+    d->name = name;
+}
+
+///
+/// Returns the short description of the room.
+///
+/// Corresponds to \c muc#roomconfig_roomdesc.
+///
+///
+QString QXmppMucRoomConfig::description() const
+{
+    return d->description;
+}
+
+///
+/// Sets the short description of the room.
+///
+///
+void QXmppMucRoomConfig::setDescription(const QString &description)
+{
+    d->description = description;
+}
+
+///
+/// Returns the natural language for room discussions (BCP 47 language tag).
+///
+/// Corresponds to \c muc#roomconfig_lang.
+///
+///
+QString QXmppMucRoomConfig::language() const
+{
+    return d->language;
+}
+
+///
+/// Sets the natural language for room discussions (BCP 47 language tag).
+///
+///
+void QXmppMucRoomConfig::setLanguage(const QString &language)
+{
+    d->language = language;
+}
+
+///
+/// Returns whether the room is publicly searchable via service discovery.
+///
+/// Corresponds to \c muc#roomconfig_publicroom. Returns \c nullopt if the
+/// server did not include this field in the configuration form.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::isPublic() const
+{
+    return d->isPublic;
+}
+
+///
+/// Sets whether the room is publicly searchable via service discovery.
+///
+///
+void QXmppMucRoomConfig::setPublic(std::optional<bool> value)
+{
+    d->isPublic = value;
+}
+
+///
+/// Returns whether the room persists after the last occupant exits.
+///
+/// Corresponds to \c muc#roomconfig_persistentroom. Returns \c nullopt if not
+/// included in the form.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::isPersistent() const
+{
+    return d->isPersistent;
+}
+
+///
+/// Sets whether the room persists after the last occupant exits.
+///
+///
+void QXmppMucRoomConfig::setPersistent(std::optional<bool> value)
+{
+    d->isPersistent = value;
+}
+
+///
+/// Returns whether only members are allowed to enter the room.
+///
+/// Corresponds to \c muc#roomconfig_membersonly.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::isMembersOnly() const
+{
+    return d->isMembersOnly;
+}
+
+///
+/// Sets whether only members are allowed to enter the room.
+///
+///
+void QXmppMucRoomConfig::setMembersOnly(std::optional<bool> value)
+{
+    d->isMembersOnly = value;
+}
+
+///
+/// Returns whether only participants with voice may send messages to all occupants.
+///
+/// Corresponds to \c muc#roomconfig_moderatedroom.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::isModerated() const
+{
+    return d->isModerated;
+}
+
+///
+/// Sets whether the room is moderated (only voice holders may send messages).
+///
+///
+void QXmppMucRoomConfig::setModerated(std::optional<bool> value)
+{
+    d->isModerated = value;
+}
+
+///
+/// Returns whether a password is required to enter the room.
+///
+/// Corresponds to \c muc#roomconfig_passwordprotectedroom.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::isPasswordProtected() const
+{
+    return d->isPasswordProtected;
+}
+
+///
+/// Sets whether a password is required to enter the room.
+///
+/// If set to \c true, also set password() to a non-empty string.
+///
+///
+void QXmppMucRoomConfig::setPasswordProtected(std::optional<bool> value)
+{
+    d->isPasswordProtected = value;
+}
+
+///
+/// Returns the room password.
+///
+/// Only relevant when isPasswordProtected() is \c true. Corresponds to
+/// \c muc#roomconfig_roomsecret.
+///
+///
+QString QXmppMucRoomConfig::password() const
+{
+    return d->password;
+}
+
+///
+/// Sets the room entry password.
+///
+///
+void QXmppMucRoomConfig::setPassword(const QString &password)
+{
+    d->password = password;
+}
+
+///
+/// Returns which occupants may discover the real JIDs of other occupants.
+///
+/// Corresponds to \c muc#roomconfig_whois. \c WhoCanDiscoverJids::Moderators
+/// means the room is semi-anonymous; \c WhoCanDiscoverJids::Anyone means
+/// non-anonymous.
+///
+///
+std::optional<QXmppMucRoomConfig::WhoCanDiscoverJids> QXmppMucRoomConfig::whoCanDiscoverJids() const
+{
+    return d->whoCanDiscoverJids;
+}
+
+///
+/// Sets which occupants may discover the real JIDs of other occupants.
+///
+///
+void QXmppMucRoomConfig::setWhoCanDiscoverJids(std::optional<WhoCanDiscoverJids> value)
+{
+    d->whoCanDiscoverJids = value;
+}
+
+///
+/// Returns whether regular occupants are allowed to change the room subject.
+///
+/// Corresponds to \c muc#roomconfig_changesubject.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::canOccupantsChangeSubject() const
+{
+    return d->canOccupantsChangeSubject;
+}
+
+///
+/// Sets whether regular occupants are allowed to change the room subject.
+///
+///
+void QXmppMucRoomConfig::setCanOccupantsChangeSubject(std::optional<bool> value)
+{
+    d->canOccupantsChangeSubject = value;
+}
+
+///
+/// Returns whether members are allowed to invite others to the room.
+///
+/// Corresponds to \c muc#roomconfig_allowinvites.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::canMembersInvite() const
+{
+    return d->canMembersInvite;
+}
+
+///
+/// Sets whether members are allowed to invite others to the room.
+///
+///
+void QXmppMucRoomConfig::setCanMembersInvite(std::optional<bool> value)
+{
+    d->canMembersInvite = value;
+}
+
+///
+/// Returns who is allowed to send private messages inside the room.
+///
+/// Corresponds to \c muc#roomconfig_allowpm.
+///
+///
+std::optional<QXmppMucRoomConfig::AllowPrivateMessages> QXmppMucRoomConfig::allowPrivateMessages() const
+{
+    return d->allowPrivateMessages;
+}
+
+///
+/// Sets who is allowed to send private messages inside the room.
+///
+///
+void QXmppMucRoomConfig::setAllowPrivateMessages(std::optional<AllowPrivateMessages> value)
+{
+    d->allowPrivateMessages = value;
+}
+
+///
+/// Returns whether public logging of the room is enabled.
+///
+/// Corresponds to \c muc#roomconfig_enablelogging.
+///
+///
+std::optional<bool> QXmppMucRoomConfig::enableLogging() const
+{
+    return d->enableLogging;
+}
+
+///
+/// Sets whether public logging of the room is enabled.
+///
+///
+void QXmppMucRoomConfig::setEnableLogging(std::optional<bool> value)
+{
+    d->enableLogging = value;
+}
+
+///
+/// Returns the maximum number of occupants allowed in the room.
+///
+/// A value of 0 means unlimited. Corresponds to \c muc#roomconfig_maxusers.
+/// Returns \c nullopt if not included in the form.
+///
+///
+std::optional<int> QXmppMucRoomConfig::maxUsers() const
+{
+    return d->maxUsers;
+}
+
+///
+/// Sets the maximum number of occupants allowed in the room.
+///
+/// Use 0 for unlimited. Corresponds to \c muc#roomconfig_maxusers.
+///
+///
+void QXmppMucRoomConfig::setMaxUsers(std::optional<int> value)
+{
+    d->maxUsers = value;
+}
+
+///
+/// Returns the list of room owner JIDs.
+///
+/// Corresponds to \c muc#roomconfig_roomowners.
+///
+///
+QStringList QXmppMucRoomConfig::owners() const
+{
+    return d->owners;
+}
+
+///
+/// Sets the list of room owner JIDs.
+///
+///
+void QXmppMucRoomConfig::setOwners(const QStringList &owners)
+{
+    d->owners = owners;
+}
+
+///
+/// Returns the list of room admin JIDs.
+///
+/// Corresponds to \c muc#roomconfig_roomadmins.
+///
+///
+QStringList QXmppMucRoomConfig::admins() const
+{
+    return d->admins;
+}
+
+///
+/// Sets the list of room admin JIDs.
+///
+///
+void QXmppMucRoomConfig::setAdmins(const QStringList &admins)
+{
+    d->admins = admins;
 }

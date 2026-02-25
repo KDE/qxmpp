@@ -38,7 +38,7 @@ Optional features require external packages:
 make test ARGS="--rerun-failed --output-on-failure"
 
 # Run a single test executable from the build directory
-./tests/qxmppmessage/tst_qxmppmessage
+./tests/tst_qxmppmessage
 
 # Integration tests (requires a real XMPP server)
 export QXMPP_TESTS_INTEGRATION_ENABLED=1
@@ -109,7 +109,19 @@ Use `QXMPP_DEPRECATED_SINCE(major, minor)` guarded blocks (mirrors Qt's `QT_DEPR
 Include `StringLiterals.h` (private) to use `u"..."_s` (QString) and `"..."_L1` (QLatin1String) across all Qt versions.
 
 **XML serialization:**  
-Stanza types implement `parse(const QDomElement &)` for deserialization and `toXml(QXmpp::Private::XmlWriter &)` for serialization. `XmlWriter` wraps `QXmlStreamWriter` with helpers for typed attribute writing.
+Stanza types implement `parse(const QDomElement &)` for deserialization and `toXml(QXmpp::Private::XmlWriter &)` for serialization. `XmlWriter` wraps `QXmlStreamWriter` with helpers for typed attribute/element writing. Key types in `XmlWriter.h`:
+- `Element { tag, children... }` — writes a start/end element with child values; use `Tag { u"name", ns_foo }` for namespaced elements
+- `Attribute { u"name", value }` / `OptionalAttribute { u"name", value }` — write an attribute (optional variant skips if `isEmpty()`)
+- `TextElement { u"name", value }` / `OptionalTextElement { u"name", value }` — write a text child element
+- `Characters { value }` / `OptionalCharacters { value }` — write raw text content
+- Lambda overload: `w.write([&]() { ... })` — use for conditional logic inside `Element` children
+- `XmlWriter::write(std::optional<T>)` — skips automatically if empty
+
+**Enum registration:**  
+Enums used in string serialization (e.g. in XML or data forms) are registered via `template<> struct Enums::Data<MyEnum>` specializations in a `*_p.h` private header. Define `static constexpr auto Values = makeValues<MyEnum>({ { MyEnum::Foo, u"foo" }, ... })` — values must be in enum declaration order. Use `Enums::fromString<T>(str)` → `std::optional<T>` and `Enums::toString(value)` → `QStringView` for conversion.
+
+**Typed data form wrappers:**  
+Subclass `QXmppExtensibleDataFormBase` (in `QXmppDataForm_p.h`) for typed wrappers around XMPP data forms (XEP-0004). Override `parseField(key, value)` and `serializeForm(QXmppDataForm &)`. Helper free functions: `serializeOptional`, `serializeEmptyable`, `serializeValue`, `parseBool`.
 
 **Namespace constants:**  
 XMPP XML namespaces are `constexpr QStringView` values in `QXmppConstants_p.h` under `QXmpp::Private`.

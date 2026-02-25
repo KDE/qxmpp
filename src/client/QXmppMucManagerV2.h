@@ -103,6 +103,7 @@ public:
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname,
                                                       std::optional<QXmpp::Muc::HistoryOptions> history,
                                                       const QString &password = {});
+    QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoom(const QString &jid, const QString &nickname);
     /// Emitted when a participant joins a room.
     Q_SIGNAL void participantJoined(const QString &roomJid, const QXmppMucParticipant &participant);
     /// Emitted when a participant leaves a room.
@@ -200,6 +201,11 @@ public:
 
     QXmppTask<QXmpp::SendResult> requestVoice();
     QXmppTask<QXmpp::SendResult> answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow);
+
+    QXmppTask<QXmpp::Result<QXmppMucRoomConfig>> requestRoomConfig();
+    QXmppTask<QXmpp::Result<>> submitRoomConfig(const QXmppMucRoomConfig &config);
+    QXmppTask<QXmpp::Result<>> cancelRoomCreation();
+    QXmppTask<QXmpp::Result<>> destroyRoom(const QString &reason = {}, const QString &alternateJid = {});
 
     /// Connects to the participantJoined signal, filtered for this room.
     template<typename Func>

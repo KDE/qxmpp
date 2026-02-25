@@ -78,8 +78,19 @@ private:
     Q_SLOT void voiceRequestReceived();
     Q_SLOT void answerVoiceRequest();
 
+    // Room creation and configuration
+    Q_SLOT void joinRoomNotFound();
+    Q_SLOT void createRoom();
+    Q_SLOT void createRoomAlreadyExists();
+    Q_SLOT void submitRoomConfigCreation();
+    Q_SLOT void cancelRoomCreation();
+    Q_SLOT void reconfigureRoom();
+    Q_SLOT void destroyRoom();
+
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
+    // muc#roomconfig form
+    Q_SLOT void roomConfigForm();
 };
 
 void tst_QXmppMuc::bookmarks2Updates()
@@ -1982,6 +1993,355 @@ void tst_QXmppMuc::roomFeatureStatus172_173()
                 "</presence>");
     test.injectPresence(status173);
     QVERIFY(!room.isNonAnonymous().value());
+}
+
+void tst_QXmppMuc::joinRoomNotFound()
+{
+    // joinRoom() on a non-existent room (status 201) must fail with an error
+    // and send a cancel IQ to destroy the accidentally-created locked room.
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence sent
+
+    // Server responds with status 201 (new locked room) + 110 (self-presence)
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='owner' role='moderator'/>"
+                "<status code='110'/>"
+                "<status code='201'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    // Manager sends cancel IQ to destroy the locked room
+    test.expect(u"<iq id='qx1' to='newroom@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='cancel'/>"
+                "</query></iq>"_s);
+
+    // joinRoom task must have failed
+    QVERIFY(task.isFinished());
+    expectVariant<QXmppError>(task.result());
+}
+
+void tst_QXmppMuc::createRoom()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->createRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc'/>"
+                "</presence>"_s);
+
+    // Server creates locked room, sends status 201 + 110
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='owner' role='moderator'/>"
+                "<status code='110'/>"
+                "<status code='201'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    // Manager auto-requests config form
+    test.expect(u"<iq id='qx1' to='newroom@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    QVERIFY(!task.isFinished());
+
+    // Server returns config form
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>New Room</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    // createRoom task must now resolve
+    QVERIFY(task.isFinished());
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task);
+    QVERIFY(room.isValid());
+    QVERIFY(!room.joined().value());  // still locked
+    QVERIFY(room.canConfigureRoom().value());
+}
+
+void tst_QXmppMuc::createRoomAlreadyExists()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->createRoom(u"existing@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+
+    // Server grants entry without status 201: room already existed
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='existing@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QVERIFY(task.isFinished());
+    expectFutureVariant<QXmppError>(task);
+}
+
+void tst_QXmppMuc::submitRoomConfigCreation()
+{
+    TestClient test(true);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Create the room and get to Creating state
+    auto createTask = muc->createRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='owner' role='moderator'/>"
+                "<status code='110'/>"
+                "<status code='201'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    test.ignore();  // config form IQ get
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(createTask);
+    QVERIFY(!room.joined().value());
+
+    // Submit config — room should become joined after IQ result
+    QXmppMucRoomConfig config;
+    config.setName(u"New Room"_s);
+    auto task = room.submitRoomConfig(config);
+    test.expect(u"<iq id='qx1' to='newroom@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='submit'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>New Room</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QVERIFY(!task.isFinished());
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+    QVERIFY(room.joined().value());
+}
+
+void tst_QXmppMuc::cancelRoomCreation()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Get to Creating state
+    auto createTask = muc->createRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='owner' role='moderator'/>"
+                "<status code='110'/>"
+                "<status code='201'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    test.ignore();  // config form IQ get
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(createTask);
+
+    auto task = room.cancelRoomCreation();
+    test.expect(u"<iq id='qx1' to='newroom@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='cancel'/>"
+                "</query></iq>"_s);
+    QVERIFY(!task.isFinished());
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+    QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::reconfigureRoom()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    // Request current config
+    auto reqTask = room.requestRoomConfig();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>The Coven</value>"
+                "</field>"
+                "<field type='boolean' var='muc#roomconfig_persistentroom'>"
+                "<value>1</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    QVERIFY(reqTask.isFinished());
+    auto config = expectFutureVariant<QXmppMucRoomConfig>(reqTask);
+    QCOMPARE(config.name(), u"The Coven"_s);
+    QCOMPARE(config.isPersistent(), std::optional<bool>(true));
+
+    // Submit updated config
+    config.setName(u"The New Coven"_s);
+    auto submitTask = room.submitRoomConfig(config);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='submit'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomconfig_roomname'>"
+                "<value>The New Coven</value>"
+                "</field>"
+                "<field type='boolean' var='muc#roomconfig_persistentroom'>"
+                "<value>true</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(submitTask.isFinished());
+    expectVariant<QXmpp::Success>(submitTask.result());
+    QVERIFY(room.joined().value());  // still joined after reconfig
+}
+
+void tst_QXmppMuc::destroyRoom()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    auto task = room.destroyRoom(u"Meeting adjourned"_s, u"coven2@chat.shakespeare.lit"_s);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<destroy jid='coven2@chat.shakespeare.lit'>"
+                "<reason>Meeting adjourned</reason>"
+                "</destroy>"
+                "</query></iq>"_s);
+    QVERIFY(!task.isFinished());
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+    QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::roomConfigForm()
+{
+    QByteArray xml(R"(
+<x xmlns='jabber:x:data' type='form'>
+<field type='hidden' var='FORM_TYPE'><value>http://jabber.org/protocol/muc#roomconfig</value></field>
+<field type='text-single' var='muc#roomconfig_roomname'><value>The Coven</value></field>
+<field type='text-single' var='muc#roomconfig_roomdesc'><value>A place for witches.</value></field>
+<field type='text-single' var='muc#roomconfig_lang'><value>en</value></field>
+<field type='boolean' var='muc#roomconfig_publicroom'><value>0</value></field>
+<field type='boolean' var='muc#roomconfig_persistentroom'><value>1</value></field>
+<field type='boolean' var='muc#roomconfig_membersonly'><value>1</value></field>
+<field type='boolean' var='muc#roomconfig_moderatedroom'><value>1</value></field>
+<field type='boolean' var='muc#roomconfig_passwordprotectedroom'><value>0</value></field>
+<field type='list-single' var='muc#roomconfig_whois'><value>moderators</value></field>
+<field type='boolean' var='muc#roomconfig_changesubject'><value>0</value></field>
+<field type='boolean' var='muc#roomconfig_allowinvites'><value>1</value></field>
+<field type='list-single' var='muc#roomconfig_allowpm'><value>participants</value></field>
+<field type='boolean' var='muc#roomconfig_enablelogging'><value>0</value></field>
+<field type='list-single' var='muc#roomconfig_maxusers'><value>50</value></field>
+<field type='jid-multi' var='muc#roomconfig_roomowners'><value>crone1@shakespeare.lit</value></field>
+<field type='jid-multi' var='muc#roomconfig_roomadmins'><value>wiccarocks@shakespeare.lit</value></field>
+</x>)");
+
+    QXmppDataForm form;
+    parsePacket(form, xml);
+
+    auto config = QXmppMucRoomConfig::fromDataForm(form);
+    QVERIFY(config.has_value());
+    QCOMPARE(config->name(), u"The Coven"_s);
+    QCOMPARE(config->description(), u"A place for witches."_s);
+    QCOMPARE(config->language(), u"en"_s);
+    QCOMPARE(config->isPublic(), std::optional<bool>(false));
+    QCOMPARE(config->isPersistent(), std::optional<bool>(true));
+    QCOMPARE(config->isMembersOnly(), std::optional<bool>(true));
+    QCOMPARE(config->isModerated(), std::optional<bool>(true));
+    QCOMPARE(config->isPasswordProtected(), std::optional<bool>(false));
+    QCOMPARE(config->whoCanDiscoverJids(), std::optional(QXmppMucRoomConfig::WhoCanDiscoverJids::Moderators));
+    QCOMPARE(config->canOccupantsChangeSubject(), std::optional<bool>(false));
+    QCOMPARE(config->canMembersInvite(), std::optional<bool>(true));
+    QCOMPARE(config->allowPrivateMessages(), std::optional(QXmppMucRoomConfig::AllowPrivateMessages::Participants));
+    QCOMPARE(config->enableLogging(), std::optional<bool>(false));
+    QCOMPARE(config->maxUsers(), std::optional<int>(50));
+    QCOMPARE(config->owners(), QStringList { u"crone1@shakespeare.lit"_s });
+    QCOMPARE(config->admins(), QStringList { u"wiccarocks@shakespeare.lit"_s });
+
+    // Round-trip: serialize and check
+    auto form2 = config->toDataForm();
+    QVERIFY(!form2.isNull());
+    serializePacket(form2, QByteArrayLiteral("<x xmlns=\"jabber:x:data\" type=\"form\">"
+                                             "<field type=\"hidden\" var=\"FORM_TYPE\"><value>http://jabber.org/protocol/muc#roomconfig</value></field>"
+                                             "<field type=\"text-single\" var=\"muc#roomconfig_roomname\"><value>The Coven</value></field>"
+                                             "<field type=\"text-single\" var=\"muc#roomconfig_roomdesc\"><value>A place for witches.</value></field>"
+                                             "<field type=\"text-single\" var=\"muc#roomconfig_lang\"><value>en</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_publicroom\"><value>false</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_persistentroom\"><value>true</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_membersonly\"><value>true</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_moderatedroom\"><value>true</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_passwordprotectedroom\"><value>false</value></field>"
+                                             "<field type=\"list-single\" var=\"muc#roomconfig_whois\"><value>moderators</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_changesubject\"><value>false</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_allowinvites\"><value>true</value></field>"
+                                             "<field type=\"list-single\" var=\"muc#roomconfig_allowpm\"><value>participants</value></field>"
+                                             "<field type=\"boolean\" var=\"muc#roomconfig_enablelogging\"><value>false</value></field>"
+                                             "<field type=\"list-single\" var=\"muc#roomconfig_maxusers\"><value>50</value></field>"
+                                             "<field type=\"jid-multi\" var=\"muc#roomconfig_roomowners\"><value>crone1@shakespeare.lit</value></field>"
+                                             "<field type=\"jid-multi\" var=\"muc#roomconfig_roomadmins\"><value>wiccarocks@shakespeare.lit</value></field>"
+                                             "</x>"));
 }
 
 QTEST_MAIN(tst_QXmppMuc)

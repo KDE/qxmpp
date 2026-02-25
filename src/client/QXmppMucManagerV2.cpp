@@ -260,6 +260,7 @@ enum class MucRoomState {
     NotJoined,
     JoiningOccupantPresences,
     JoiningRoomHistory,
+    Creating,
     Joined,
 };
 
@@ -285,6 +286,7 @@ struct MucRoomData {
     std::optional<uint32_t> selfParticipantId;
     std::unordered_map<uint32_t, MucParticipantData> participants;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
+    std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> createPromise;
     QList<QXmppMessage> historyMessages;
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
     std::unordered_map<QString, PendingMessage> pendingMessages;
@@ -555,6 +557,54 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     client()->send(std::move(p));
 
     // start timeout timer
+    auto *timer = new QTimer();
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, this, [this, roomJid = jid]() {
+        d->handleJoinTimeout(roomJid);
+    });
+    roomData.joinTimer.reset(timer);
+    timer->start(d->timeout);
+
+    return task;
+}
+
+///
+/// Creates a new reserved MUC room at \a jid with the given \a nickname.
+///
+/// The room is created in a locked state; no other users can join until the
+/// owner submits the configuration form via QXmppMucRoomV2::submitRoomConfig().
+///
+/// The returned task resolves once the server has confirmed room creation
+/// (XEP-0045 status code 201) and the configuration form has been fetched.
+/// If the room already exists the join will succeed normally and the task
+/// will fail with an error. If the local state machine detects that the room
+/// already exists (already tracked) the task fails immediately.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoom(const QString &jid, const QString &nickname)
+{
+    if (nickname.isEmpty()) {
+        return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Nickname must not be empty."_s });
+    }
+    if (d->rooms.count(jid)) {
+        return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Room is already tracked (join or create already in progress)."_s });
+    }
+
+    auto &roomData = d->rooms[jid];
+    roomData.state = MucRoomState::JoiningOccupantPresences;
+    roomData.nickname = nickname;
+
+    QXmppPromise<Result<QXmppMucRoomV2>> promise;
+    auto task = promise.task();
+    roomData.createPromise = std::move(promise);
+
+    QXmppPresence p;
+    p.setTo(jid + u'/' + nickname);
+    p.setMucSupported(true);
+    client()->send(std::move(p));
+
+    // start timeout timer (reuse join timeout)
     auto *timer = new QTimer();
     timer->setSingleShot(true);
     QObject::connect(timer, &QTimer::timeout, this, [this, roomJid = jid]() {
@@ -918,7 +968,6 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             if (presence.mucStatusCodes().contains(110)) {
                 data.selfParticipantId = itr->first;
                 data.setupPermissionBindings();
-                data.state = JoiningRoomHistory;
                 if (nickname != data.nickname) {
                     if (presence.mucStatusCodes().contains(210)) {
                         // service modified nickname
@@ -926,6 +975,35 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     } else {
                         throwRoomError(roomJid, QXmppError { u"MUC modified nickname without sending status 210."_s });
                         return;
+                    }
+                }
+
+                if (presence.mucStatusCodes().contains(201)) {
+                    // New room was created and is locked (XEP-0045 §10.1).
+                    if (data.createPromise) {
+                        // createRoom() flow: transition to Creating state.
+                        // Fetch the config form; the promise is resolved when the form arrives.
+                        data.state = Creating;
+                        data.joinTimer.reset();
+                        fetchConfigForm(roomJid);
+                    } else {
+                        // joinRoom() flow: we accidentally created a new room.
+                        // Send cancel IQ to destroy the locked room and fail the join.
+                        QXmppMucOwnerIq cancelIq;
+                        cancelIq.setTo(roomJid);
+                        cancelIq.setType(QXmppIq::Set);
+                        QXmppDataForm cancelForm;
+                        cancelForm.setType(QXmppDataForm::Cancel);
+                        cancelIq.setForm(cancelForm);
+                        q->client()->sendIq(std::move(cancelIq));
+                        throwRoomError(roomJid, QXmppError { u"Room does not exist."_s });
+                    }
+                } else {
+                    if (data.createPromise) {
+                        // createRoom() flow: the room already existed — fail.
+                        throwRoomError(roomJid, QXmppError { u"Room already exists."_s });
+                    } else {
+                        data.state = JoiningRoomHistory;
                     }
                 }
             }
@@ -936,6 +1014,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
         }
         break;
     case JoiningRoomHistory:
+    case Creating:
     case Joined:
         if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(303)) {
             // Nickname change (XEP-0045 §7.6): unavailable with 303 + new nick in item
@@ -1043,6 +1122,8 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> promise;
     if (itr->second.joinPromise) {
         promise = std::move(itr->second.joinPromise);
+    } else if (itr->second.createPromise) {
+        promise = std::move(itr->second.createPromise);
     }
     itr->second.joinTimer.reset();
     rooms.erase(itr);
@@ -1064,6 +1145,9 @@ void QXmppMucManagerV2Private::clearAllRooms()
 
         if (data.joinPromise) {
             joinPromises.push_back(std::move(*data.joinPromise));
+        }
+        if (data.createPromise) {
+            joinPromises.push_back(std::move(*data.createPromise));
         }
         if (data.leavePromise) {
             otherPromises.push_back(std::move(*data.leavePromise));
@@ -1107,6 +1191,34 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
         data.isModerated = features.contains(muc_feat_moderated);
         data.isPersistent = features.contains(muc_feat_persistent);
         data.isPasswordProtected = features.contains(muc_feat_passwordprotected);
+    });
+}
+
+void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
+{
+    QXmppMucOwnerIq iq;
+    iq.setTo(roomJid);
+    iq.setType(QXmppIq::Get);
+    q->client()->sendIq(std::move(iq)).then(q, [this, roomJid](QXmppClient::IqResult &&result) {
+        auto itr = rooms.find(roomJid);
+        if (itr == rooms.end() || itr->second.state != MucRoomState::Creating) {
+            return;
+        }
+        auto &data = itr->second;
+
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            throwRoomError(roomJid, std::move(*error));
+            return;
+        }
+
+        // Parse the owner IQ response DOM element
+        auto iqResult = QXmppMucOwnerIq();
+        iqResult.parse(std::get<QDomElement>(result));
+
+        // Resolve the createPromise — room is locked, owner can now configure it
+        auto promise = std::move(*data.createPromise);
+        data.createPromise.reset();
+        promise.finish(q->room(roomJid));
     });
 }
 
@@ -1803,9 +1915,138 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
     return m_manager->client()->send(std::move(message));
 }
 
-//
-// MucParticipant
-//
+///
+/// Requests the current room configuration form from the server.
+///
+/// Valid in both the \c Creating and \c Joined states. Returns a
+/// QXmppMucRoomConfig that can be edited and submitted via submitRoomConfig().
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig()
+{
+    using enum MucRoomState;
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end() ||
+        (itr->second.state != Creating && itr->second.state != Joined)) {
+        return makeReadyTask<Result<QXmppMucRoomConfig>>(QXmppError { u"Room is not in Creating or Joined state."_s });
+    }
+
+    QXmppMucOwnerIq iq;
+    iq.setTo(m_jid);
+    iq.setType(QXmppIq::Get);
+    return chainIq(m_manager->client()->sendIq(std::move(iq)), m_manager,
+                   [](QXmppMucOwnerIq &&iq) -> Result<QXmppMucRoomConfig> {
+                       auto config = QXmppMucRoomConfig::fromDataForm(iq.form());
+                       if (!config) {
+                           return QXmppError { u"Server returned an invalid or missing muc#roomconfig form."_s };
+                       }
+                       return std::move(*config);
+                   });
+}
+
+///
+/// Submits the room configuration to the server.
+///
+/// In the \c Creating state (after createRoom()) this unlocks the room and
+/// transitions it to the \c Joined state. In the \c Joined state this
+/// updates an existing room's configuration.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<Result<>> QXmppMucRoomV2::submitRoomConfig(const QXmppMucRoomConfig &config)
+{
+    using enum MucRoomState;
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end() ||
+        (itr->second.state != Creating && itr->second.state != Joined)) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not in Creating or Joined state."_s });
+    }
+
+    auto form = config.toDataForm();
+    form.setType(QXmppDataForm::Submit);
+
+    QXmppMucOwnerIq iq;
+    iq.setTo(m_jid);
+    iq.setType(QXmppIq::Set);
+    iq.setForm(std::move(form));
+
+    const bool wasCreating = (itr->second.state == Creating);
+    return chainIq(m_manager->client()->sendIq(std::move(iq)), m_manager,
+                   [this, wasCreating](QXmppMucOwnerIq &&) -> Result<> {
+                       auto itr2 = m_manager->d->rooms.find(m_jid);
+                       if (itr2 != m_manager->d->rooms.end() && wasCreating) {
+                           // Unlock the room: transition to Joined state
+                           itr2->second.state = MucRoomState::Joined;
+                           itr2->second.joined = true;
+                           // Fetch room info now that the room is configured
+                           m_manager->d->fetchRoomInfo(m_jid);
+                       }
+                       return Success();
+                   });
+}
+
+///
+/// Cancels room creation and destroys the locked room on the server.
+///
+/// Only valid in the \c Creating state (i.e. after createRoom() has resolved
+/// but before submitRoomConfig() has been called). Sending the cancel form
+/// instructs the server to destroy the still-locked room.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
+{
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end() ||
+        itr->second.state != MucRoomState::Creating) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not in Creating state."_s });
+    }
+
+    QXmppDataForm cancelForm;
+    cancelForm.setType(QXmppDataForm::Cancel);
+
+    QXmppMucOwnerIq iq;
+    iq.setTo(m_jid);
+    iq.setType(QXmppIq::Set);
+    iq.setForm(std::move(cancelForm));
+
+    return chainIq(m_manager->client()->sendIq(std::move(iq)), m_manager,
+                   [this](QXmppMucOwnerIq &&) -> Result<> {
+                       m_manager->d->rooms.erase(m_jid);
+                       return Success();
+                   });
+}
+
+///
+/// Destroys the MUC room on the server.
+///
+/// Only valid in the \c Joined state. Sends a destroy IQ to the MUC service.
+/// An optional \a reason and an \a alternateJid can be provided; the alternate
+/// JID is sent to occupants so they may join an alternative room.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QString &alternateJid)
+{
+    auto itr = m_manager->d->rooms.find(m_jid);
+    if (itr == m_manager->d->rooms.end() ||
+        itr->second.state != MucRoomState::Joined) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+    }
+
+    QXmppMucOwnerIq iq;
+    iq.setTo(m_jid);
+    iq.setType(QXmppIq::Set);
+    iq.setDestroyJid(alternateJid);
+    iq.setDestroyReason(reason);
+
+    return chainIq(m_manager->client()->sendIq(std::move(iq)), m_manager,
+                   [this](QXmppMucOwnerIq &&) -> Result<> {
+                       m_manager->d->rooms.erase(m_jid);
+                       return Success();
+                   });
+}
 
 bool QXmppMucParticipant::isValid() const
 {
