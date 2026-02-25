@@ -54,6 +54,11 @@ private:
     Q_SLOT void leaveRoom();
     Q_SLOT void leaveRoomTimeout();
 
+    // Disconnect state management
+    Q_SLOT void disconnectNoStreamManagement();
+    Q_SLOT void disconnectResumedStream();
+    Q_SLOT void disconnectNewStream();
+
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
 };
@@ -1201,6 +1206,118 @@ void tst_QXmppMuc::roomInfoForm()
         "<field type='text-multi' var='muc#roominfo_avatarhash'><value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value><value>b9b256f999ded52c2fa14fb007c2e5b979450cbb</value></field>"
         "</x>");
     serializePacket(form, xml2);
+}
+
+void tst_QXmppMuc::disconnectNoStreamManagement()
+{
+    TestClient test(true);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join a room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QVERIFY(room.isValid());
+    QVERIFY(room.joined().value());
+
+    // Simulate disconnect without stream management (intentional disconnect)
+    test.setStreamManagementState(QXmppClient::NoStreamManagement);
+    test.simulateDisconnected();
+
+    // Room state must be cleared immediately
+    QVERIFY(!room.isValid());
+    QVERIFY(!room.joined().value());
+}
+
+void tst_QXmppMuc::disconnectResumedStream()
+{
+    TestClient test(true);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join a room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QVERIFY(room.isValid());
+
+    // Simulate network drop (SM enabled, disconnect without clearing SM)
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateDisconnected();
+
+    // Room state must be preserved (stream can potentially be resumed)
+    QVERIFY(room.isValid());
+    QVERIFY(room.joined().value());
+
+    // Simulate successful stream resumption
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    test.simulateConnected();
+
+    // Room state must still be intact after resume
+    QVERIFY(room.isValid());
+    QVERIFY(room.joined().value());
+}
+
+void tst_QXmppMuc::disconnectNewStream()
+{
+    TestClient test(true);
+    test.addNewExtension<QXmppPubSubManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join a room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QVERIFY(room.isValid());
+
+    // Simulate network drop (SM enabled)
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateDisconnected();
+
+    // Room preserved while resumption is possible
+    QVERIFY(room.isValid());
+
+    // Simulate reconnect where stream resumption failed (NewStream)
+    test.simulateConnected();
+
+    // Room must be cleared now — server no longer knows about our presence
+    QVERIFY(!room.isValid());
+    QVERIFY(!room.joined().value());
 }
 
 QTEST_MAIN(tst_QXmppMuc)

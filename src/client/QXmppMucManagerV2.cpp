@@ -311,7 +311,10 @@ QXmppMucManagerV2::QXmppMucManagerV2()
 QXmppMucManagerV2::~QXmppMucManagerV2() = default;
 
 /// Supported service discovery features.
-QStringList QXmppMucManagerV2::discoveryFeatures() const { return { ns_bookmarks2 + u"+notify" }; }
+QStringList QXmppMucManagerV2::discoveryFeatures() const
+{
+    return { ns_muc.toString(), ns_bookmarks2 + u"+notify" };
+}
 
 /// Retrieved bookmarks.
 const std::optional<QList<QXmppMucBookmark>> &QXmppMucManagerV2::bookmarks() const { return d->bookmarks; }
@@ -611,6 +614,7 @@ QXmppTask<Result<>> QXmppMucManagerV2::removeBookmark(const QString &jid)
 void QXmppMucManagerV2::onRegistered(QXmppClient *client)
 {
     connect(client, &QXmppClient::connected, this, &QXmppMucManagerV2::onConnected);
+    connect(client, &QXmppClient::disconnected, this, &QXmppMucManagerV2::onDisconnected);
     connect(client, &QXmppClient::presenceReceived, this, [this](const auto &p) { d->handlePresence(p); });
 }
 
@@ -624,6 +628,7 @@ void QXmppMucManagerV2::onConnected()
     using PubSub = QXmppPubSubManager;
 
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
+        d->clearAllRooms();
         d->pubsub()->requestItems<Bookmarks2ConferenceItem>({}, ns_bookmarks2.toString()).then(this, [this](auto &&result) {
             if (hasError(result)) {
                 warning(u"Could not fetch MUC Bookmarks: " + getError(result).description);
@@ -634,6 +639,13 @@ void QXmppMucManagerV2::onConnected()
             auto items = getValue(std::move(result));
             d->setBookmarks(std::move(items.items));
         });
+    }
+}
+
+void QXmppMucManagerV2::onDisconnected()
+{
+    if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
+        d->clearAllRooms();
     }
 }
 
@@ -908,6 +920,40 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
 
     if (promise) {
         promise->finish(std::move(error));
+    }
+}
+
+void QXmppMucManagerV2Private::clearAllRooms()
+{
+    // Collect pending promises before clearing so their callbacks see a clean (empty) room state.
+    std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
+    std::vector<QXmppPromise<Result<>>> otherPromises;
+
+    for (auto &[jid, data] : rooms) {
+        // Notify QBindable observers while the room data is still valid
+        data.joined = false;
+
+        if (data.joinPromise) {
+            joinPromises.push_back(std::move(*data.joinPromise));
+        }
+        if (data.leavePromise) {
+            otherPromises.push_back(std::move(*data.leavePromise));
+        }
+        if (data.nickChangePromise) {
+            otherPromises.push_back(std::move(*data.nickChangePromise));
+        }
+        for (auto &[msgId, pending] : data.pendingMessages) {
+            otherPromises.push_back(std::move(pending.promise));
+        }
+    }
+    rooms.clear();
+
+    const auto error = QXmppError { u"Disconnected from server."_s };
+    for (auto &promise : joinPromises) {
+        promise.finish(error);
+    }
+    for (auto &promise : otherPromises) {
+        promise.finish(error);
     }
 }
 
