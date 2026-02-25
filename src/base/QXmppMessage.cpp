@@ -10,12 +10,14 @@
 
 #include "QXmppBitsOfBinaryDataList.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDataForm.h"
 #include "QXmppFallback.h"
 #include "QXmppFileShare.h"
 #include "QXmppJingleData.h"
 #include "QXmppMessageReaction.h"
 #include "QXmppMessage_p.h"
 #include "QXmppMixInvitation.h"
+#include "QXmppMucForms.h"
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
@@ -150,6 +152,7 @@ public:
 
     // XEP-0045: Multi-User Chat
     QList<uint32_t> mucStatusCodes;
+    std::optional<QXmppMucVoiceRequest> mucVoiceRequest;
 
     // XEP-0249: Direct MUC Invitations
     QString mucInvitationJid;
@@ -678,6 +681,33 @@ QList<uint32_t> QXmppMessage::mucStatusCodes() const
 void QXmppMessage::setMucStatusCodes(const QList<uint32_t> &codes)
 {
     d->mucStatusCodes = codes;
+}
+
+///
+/// Returns the \xep{0045, Multi-User Chat} voice request contained in this message, if any.
+///
+/// Voice requests use a \c muc#request data form in a normal-type message.
+/// Moderators receive these when a visitor requests voice in a moderated room.
+///
+/// \since QXmpp 1.15
+///
+std::optional<QXmppMucVoiceRequest> QXmppMessage::mucVoiceRequest() const
+{
+    return d->mucVoiceRequest;
+}
+
+///
+/// Sets the \xep{0045, Multi-User Chat} voice request for this message.
+///
+/// This is primarily useful for constructing messages in tests or for forwarding stanzas.
+/// When responding to a received voice request as a moderator, use
+/// \l QXmppMucRoomV2::answerVoiceRequest() instead.
+///
+/// \since QXmpp 1.15
+///
+void QXmppMessage::setMucVoiceRequest(std::optional<QXmppMucVoiceRequest> request)
+{
+    d->mucVoiceRequest = std::move(request);
 }
 
 ///
@@ -1810,6 +1840,15 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
                 });
                 return true;
             }
+            // XEP-0045: Multi-User Chat voice request (muc#request form)
+            if (element.namespaceURI() == ns_data) {
+                QXmppDataForm form;
+                form.parse(element);
+                if (auto voiceRequest = QXmppMucVoiceRequest::fromDataForm(form)) {
+                    d->mucVoiceRequest = std::move(voiceRequest);
+                    return true;
+                }
+            }
             // XEP-0249: Direct MUC Invitations
             if (element.namespaceURI() == ns_conference) {
                 d->mucInvitationJid = element.attribute(u"jid"_s);
@@ -2111,6 +2150,9 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
                 { u"x", ns_muc_user },
                 SingleAttributeElements { u"status", u"code", d->mucStatusCodes },
             });
+        }
+        if (d->mucVoiceRequest) {
+            d->mucVoiceRequest->toDataForm().toXml(writer);
         }
 
         // XEP-0249: Direct MUC Invitations

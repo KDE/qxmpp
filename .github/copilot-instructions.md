@@ -56,6 +56,7 @@ make doc
 ```
 
 Documentation strings are preferrably written in the cpp file. Use \since tags for new functions with QXmpp X.Y with X.Y being the next version.
+Do not add \since to a function in a new class with the same since tag.
 
 ## Git Commit style
 

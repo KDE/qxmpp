@@ -194,6 +194,7 @@ void QXmppMucRoomInfo::setAvatarHashes(const QStringList &hashes)
     d->avatarHashes = hashes;
 }
 
+/// Equality operator
 bool QXmppMucRoomInfo::operator==(const QXmppMucRoomInfo &other) const
 {
     return d->maxHistoryFetch == other.d->maxHistoryFetch &&
@@ -204,4 +205,141 @@ bool QXmppMucRoomInfo::operator==(const QXmppMucRoomInfo &other) const
         d->subject == other.d->subject &&
         d->subjectChangeable == other.d->subjectChangeable &&
         d->avatarHashes == other.d->avatarHashes;
+}
+
+///
+/// \class QXmppMucVoiceRequest
+///
+/// \brief Represents a voice request data form (muc#request) for moderated rooms.
+///
+/// Used for both requesting and approving/denying voice in a moderated MUC room,
+/// as defined in \xep{0045, Multi-User Chat}, §7.13 and §8.6.
+///
+/// \since QXmpp 1.15
+///
+
+struct QXmppMucVoiceRequestPrivate : QSharedData {
+    QString jid;
+    QString nick;
+    std::optional<bool> requestAllow;
+};
+
+/// Tries to parse \a form into a QXmppMucVoiceRequest.
+std::optional<QXmppMucVoiceRequest> QXmppMucVoiceRequest::fromDataForm(const QXmppDataForm &form)
+{
+    if (auto parsed = QXmppMucVoiceRequest();
+        QXmppDataFormBase::fromDataForm(form, parsed)) {
+        return parsed;
+    }
+    return std::nullopt;
+}
+
+QXmppMucVoiceRequest::QXmppMucVoiceRequest()
+    : d(new QXmppMucVoiceRequestPrivate {})
+{
+}
+
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMucVoiceRequest)
+
+QString QXmppMucVoiceRequest::formType() const
+{
+    return ns_muc_request.toString();
+}
+
+bool QXmppMucVoiceRequest::parseField(const QXmppDataForm::Field &field)
+{
+    using Type = QXmppDataForm::Field::Type;
+    if (field.type() == Type::HiddenField) {
+        return false;
+    }
+
+    const auto key = field.key();
+    const auto value = field.value();
+
+    if (key == u"muc#jid") {
+        d->jid = value.toString();
+    } else if (key == u"muc#roomnick") {
+        d->nick = value.toString();
+    } else if (key == u"muc#request_allow") {
+        d->requestAllow = parseBool(value);
+    } else {
+        return false;
+    }
+    return true;
+}
+
+void QXmppMucVoiceRequest::serializeForm(QXmppDataForm &f) const
+{
+    using Type = QXmppDataForm::Field::Type;
+    // muc#role is always "participant" for voice requests
+    serializeEmptyable(f, Type::ListSingleField, u"muc#role", u"participant"_s);
+    serializeEmptyable(f, Type::JidSingleField, u"muc#jid", d->jid);
+    serializeEmptyable(f, Type::TextSingleField, u"muc#roomnick", d->nick);
+    serializeOptional(f, Type::BooleanField, u"muc#request_allow", d->requestAllow);
+}
+
+QXmppDataForm QXmppMucVoiceRequest::toDataForm() const
+{
+    auto form = QXmppDataFormBase::toDataForm();
+    form.setType(QXmppDataForm::Submit);
+    return form;
+}
+
+///
+/// Returns the full JID of the user requesting voice.
+///
+/// This is set by the room when forwarding the request to moderators.
+///
+QString QXmppMucVoiceRequest::jid() const
+{
+    return d->jid;
+}
+
+///
+/// Sets the full JID of the user requesting voice.
+///
+void QXmppMucVoiceRequest::setJid(const QString &jid)
+{
+    d->jid = jid;
+}
+
+///
+/// Returns the room nickname of the user requesting voice.
+///
+/// This is set by the room when forwarding the request to moderators.
+///
+QString QXmppMucVoiceRequest::nick() const
+{
+    return d->nick;
+}
+
+///
+/// Sets the room nickname of the user requesting voice.
+///
+void QXmppMucVoiceRequest::setNick(const QString &nick)
+{
+    d->nick = nick;
+}
+
+///
+/// Returns whether voice is granted or denied.
+///
+/// This is \c nullopt in incoming requests (before the moderator has responded).
+/// When the moderator calls QXmppMucRoomV2::answerVoiceRequest(), this is set to
+/// \c true (approve) or \c false (deny).
+///
+std::optional<bool> QXmppMucVoiceRequest::requestAllow() const
+{
+    return d->requestAllow;
+}
+
+///
+/// Sets whether the voice request is approved or denied.
+///
+/// Pass \c true to approve or \c false to deny. This is set internally by
+/// QXmppMucRoomV2::answerVoiceRequest() before sending the response form.
+///
+void QXmppMucVoiceRequest::setRequestAllow(std::optional<bool> allow)
+{
+    d->requestAllow = allow;
 }

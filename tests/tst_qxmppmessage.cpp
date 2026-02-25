@@ -13,6 +13,7 @@
 #include "QXmppMessage.h"
 #include "QXmppMessageReaction.h"
 #include "QXmppMixInvitation.h"
+#include "QXmppMucForms.h"
 #include "QXmppOutOfBandUrl.h"
 #include "QXmppTrustMessageElement.h"
 
@@ -65,6 +66,7 @@ private:
     Q_SLOT void testEncryptedFileSource();
     Q_SLOT void mucOccupantId();
     Q_SLOT void mucStatusCodes();
+    Q_SLOT void mucVoiceRequest();
     Q_SLOT void testReplies();
     Q_SLOT void testJingleMessageInitiationElement();
     Q_SLOT void testSubject();
@@ -1453,8 +1455,43 @@ void tst_QXmppMessage::mucStatusCodes()
 
     QXmppMessage m;
     parsePacket(m, xml);
-    QCOMPARE(m.mucStatusCodes(), (QList<int> { 104, 172 }));
+    QCOMPARE(m.mucStatusCodes(), (QList<uint32_t> { 104, 172 }));
     serializePacket(m, xml);
+}
+
+void tst_QXmppMessage::mucVoiceRequest()
+{
+    // XEP-0045 §8.6: voice request approval form forwarded to moderator by the room
+    const QByteArray xml =
+        "<message from='coven@chat.shakespeare.lit' id='approve' to='crone1@shakespeare.lit/pda'>"
+        "<x xmlns='jabber:x:data' type='form'>"
+        "<field type='hidden' var='FORM_TYPE'>"
+        "<value>http://jabber.org/protocol/muc#request</value>"
+        "</field>"
+        "<field type='list-single' var='muc#role'>"
+        "<value>participant</value>"
+        "</field>"
+        "<field type='jid-single' var='muc#jid'>"
+        "<value>hag66@shakespeare.lit/pda</value>"
+        "</field>"
+        "<field type='text-single' var='muc#roomnick'>"
+        "<value>thirdwitch</value>"
+        "</field>"
+        "<field type='boolean' var='muc#request_allow'>"
+        "<value>false</value>"
+        "</field>"
+        "</x>"
+        "</message>";
+
+    QXmppMessage m;
+    parsePacket(m, xml);
+
+    QVERIFY(m.mucVoiceRequest().has_value());
+    const auto &req = *m.mucVoiceRequest();
+    QCOMPARE(req.jid(), u"hag66@shakespeare.lit/pda");
+    QCOMPARE(req.nick(), u"thirdwitch");
+    QVERIFY(req.requestAllow().has_value());
+    QCOMPARE(*req.requestAllow(), false);
 }
 
 void tst_QXmppMessage::testReplies()
