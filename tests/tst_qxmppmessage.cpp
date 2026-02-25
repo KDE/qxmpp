@@ -64,6 +64,7 @@ private:
     Q_SLOT void testFileSharing();
     Q_SLOT void testEncryptedFileSource();
     Q_SLOT void mucOccupantId();
+    Q_SLOT void mucStatusCodes();
     Q_SLOT void testReplies();
     Q_SLOT void testJingleMessageInitiationElement();
     Q_SLOT void testSubject();
@@ -1436,6 +1437,23 @@ void tst_QXmppMessage::mucOccupantId()
     QXmppMessage m;
     parsePacket(m, xml);
     QCOMPARE(m.mucOccupantId(), u"dd72603deec90a38ba552f7c68cbcc61bca202cd"_s);
+    serializePacket(m, xml);
+}
+
+void tst_QXmppMessage::mucStatusCodes()
+{
+    // XEP-0045 §9.2.1: status code 104 — room configuration changed
+    const QByteArray xml =
+        "<message from='darkcave@macbeth.shakespeare.lit' type='groupchat'>"
+        "<x xmlns='http://jabber.org/protocol/muc#user'>"
+        "<status code='104'/>"
+        "<status code='172'/>"
+        "</x>"
+        "</message>";
+
+    QXmppMessage m;
+    parsePacket(m, xml);
+    QCOMPARE(m.mucStatusCodes(), (QList<int> { 104, 172 }));
     serializePacket(m, xml);
 }
 

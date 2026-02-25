@@ -197,6 +197,10 @@ public:
     static QString slashMeCommandText(const QString &body);
     QString slashMeCommandText() const;
 
+    // XEP-0045: Multi-User Chat (since QXmpp 1.15)
+    QList<uint32_t> mucStatusCodes() const;
+    void setMucStatusCodes(const QList<uint32_t> &codes);
+
     // XEP-0249: Direct MUC Invitations
     QString mucInvitationJid() const;
     void setMucInvitationJid(const QString &jid);
