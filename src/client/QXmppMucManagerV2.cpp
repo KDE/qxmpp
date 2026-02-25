@@ -1347,6 +1347,12 @@ void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, cons
 // MucRoom
 //
 
+static bool isRoomJoined(QXmppMucManagerV2Private *d, const QString &jid)
+{
+    auto itr = d->rooms.find(jid);
+    return itr != d->rooms.end() && itr->second.state == MucRoomState::Joined;
+}
+
 /// Returns whether the room handle refers to a valid, active room.
 bool QXmppMucRoomV2::isValid() const
 {
@@ -1883,7 +1889,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
 QXmppTask<SendResult> QXmppMucRoomV2::setPresence(QXmppPresence presence)
 {
     auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end()) {
+    if (itr == m_manager->d->rooms.end() || itr->second.state != MucRoomState::Joined) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
@@ -2036,8 +2042,7 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::requestVoice()
 {
-    if (m_manager->d->rooms.find(m_jid) == m_manager->d->rooms.end() ||
-        m_manager->d->rooms.at(m_jid).state != MucRoomState::Joined) {
+    if (!isRoomJoined(m_manager->d.get(), m_jid)) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
@@ -2064,8 +2069,7 @@ QXmppTask<SendResult> QXmppMucRoomV2::requestVoice()
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow)
 {
-    if (m_manager->d->rooms.find(m_jid) == m_manager->d->rooms.end() ||
-        m_manager->d->rooms.at(m_jid).state != MucRoomState::Joined) {
+    if (!isRoomJoined(m_manager->d.get(), m_jid)) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
