@@ -39,6 +39,7 @@ struct QXmppMucManagerV2Private {
     QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 
     // MUC Core
+    void clearAllRooms();
     void handlePresence(const QXmppPresence &);
     void handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &);
     void throwRoomError(const QString &roomJid, QXmppError &&error);
