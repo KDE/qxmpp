@@ -116,6 +116,13 @@ public:
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
     /// Emitted when a groupchat message is received in a joined room.
     Q_SIGNAL void messageReceived(const QString &roomJid, const QXmppMessage &message);
+    /// Emitted when a voice request is received in a joined moderated room.
+    ///
+    /// This signal is only emitted for moderators. The moderator can approve or
+    /// deny the request by calling QXmppMucRoomV2::answerVoiceRequest().
+    ///
+    /// \since QXmpp 1.15
+    Q_SIGNAL void voiceRequestReceived(const QString &roomJid, const QXmppMucVoiceRequest &request);
 
     bool handleMessage(const QXmppMessage &) override;
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
@@ -184,6 +191,9 @@ public:
     QXmppTask<QXmpp::Result<>> setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason = {});
     QXmppTask<QXmpp::Result<>> setAffiliation(const QString &jid, QXmpp::Muc::Affiliation affiliation, const QString &reason = {});
     QXmppTask<QXmpp::Result<QList<QXmppMucItem>>> requestAffiliationList(QXmpp::Muc::Affiliation affiliation);
+
+    QXmppTask<QXmpp::SendResult> requestVoice();
+    QXmppTask<QXmpp::SendResult> answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow);
 
     /// Connects to the participantJoined signal, filtered for this room.
     template<typename Func>

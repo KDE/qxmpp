@@ -561,7 +561,8 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
 
 bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
 {
-    if (message.type() != QXmppMessage::GroupChat && message.type() != QXmppMessage::Error) {
+    const auto type = message.type();
+    if (type != QXmppMessage::GroupChat && type != QXmppMessage::Error && type != QXmppMessage::Normal) {
         return false;
     }
 
@@ -579,6 +580,17 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
             if (auto pendingItr = data.pendingMessages.find(originId); pendingItr != data.pendingMessages.end()) {
                 pendingItr->second.promise.finish(QXmppError { message.error().text(), message.error() });
                 data.pendingMessages.erase(pendingItr);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Handle Normal-type messages from the room (e.g., voice request approval forms)
+    if (message.type() == QXmppMessage::Normal) {
+        if (data.state == MucRoomState::Joined) {
+            if (auto voiceRequest = message.mucVoiceRequest()) {
+                Q_EMIT voiceRequestReceived(bareFrom, *voiceRequest);
                 return true;
             }
         }
@@ -1582,6 +1594,64 @@ QXmppTask<Result<QList<QXmppMucItem>>> QXmppMucRoomV2::requestAffiliationList(QX
                    [](QXmppMucAdminIq &&iq) -> Result<QList<QXmppMucItem>> {
                        return iq.items();
                    });
+}
+
+///
+/// Requests voice in a moderated room as a visitor.
+///
+/// Sends a \c muc#request data form to the room. The MUC service forwards an
+/// approval form to all moderators, who can then call answerVoiceRequest()
+/// to grant or deny voice.
+///
+/// The returned task reflects the stream-management acknowledgement:
+/// QXmpp::SendSuccess::acknowledged is \c true once the server has confirmed
+/// receipt. Returns an error task immediately if the room is not currently joined.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<SendResult> QXmppMucRoomV2::requestVoice()
+{
+    if (m_manager->d->rooms.find(m_jid) == m_manager->d->rooms.end() ||
+        m_manager->d->rooms.at(m_jid).state != MucRoomState::Joined) {
+        return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
+    }
+
+    QXmppMessage message;
+    message.setTo(m_jid);
+    message.setType(QXmppMessage::Normal);
+    message.setMucVoiceRequest(QXmppMucVoiceRequest {});
+    return m_manager->client()->send(std::move(message));
+}
+
+///
+/// Approves or denies a voice request as a moderator.
+///
+/// Sends the \a request form back to the room with \c muc#request_allow set to
+/// \a allow. If \a allow is \c true the MUC service promotes the visitor to
+/// participant; if \c false the request is denied and the visitor remains a
+/// visitor.
+///
+/// The returned task reflects the stream-management acknowledgement:
+/// QXmpp::SendSuccess::acknowledged is \c true once the server has confirmed
+/// receipt. Returns an error task immediately if the room is not currently joined.
+///
+/// \since QXmpp 1.15
+///
+QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow)
+{
+    if (m_manager->d->rooms.find(m_jid) == m_manager->d->rooms.end() ||
+        m_manager->d->rooms.at(m_jid).state != MucRoomState::Joined) {
+        return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
+    }
+
+    auto response = request;
+    response.setRequestAllow(allow);
+
+    QXmppMessage message;
+    message.setTo(m_jid);
+    message.setType(QXmppMessage::Normal);
+    message.setMucVoiceRequest(std::move(response));
+    return m_manager->client()->send(std::move(message));
 }
 
 //

@@ -12,6 +12,7 @@
 #include "QXmppPresence.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppPubSubSubAuthorization.h"
+#include "QXmppSendResult.h"
 
 #include "TestClient.h"
 
@@ -71,6 +72,9 @@ private:
     Q_SLOT void roomInfoProperties();
     Q_SLOT void roomInfoStatus104();
     Q_SLOT void roomInfoBindable();
+    Q_SLOT void requestVoice();
+    Q_SLOT void voiceRequestReceived();
+    Q_SLOT void answerVoiceRequest();
 
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
@@ -1741,6 +1745,136 @@ void tst_QXmppMuc::roomInfoBindable()
     // Convenience bindings are also populated from the same source
     QCOMPARE(room.description().value(), u"A Witch Coven"_s);
     QCOMPARE(room.language().value(), u"en"_s);
+}
+
+// Helper: join a room and return the QXmppMucRoomV2
+static QXmppMucRoomV2 joinTestRoom(TestClient &test, QXmppMucManagerV2 *muc, const QString &roomJid, const QString &nick)
+{
+    auto joinTask = muc->joinRoom(roomJid, nick);
+    test.ignore();  // disco#info or presence
+    test.ignore();
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                QString("<presence from='%1/%2'>"
+                        "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                        "<item affiliation='member' role='participant'/>"
+                        "<status code='110'/>"
+                        "</x>"
+                        "</presence>")
+                    .arg(roomJid, nick)
+                    .toUtf8());
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, QString("<message from='%1' type='groupchat'><subject>Test</subject></message>").arg(roomJid).toUtf8());
+    muc->handleMessage(subjectMsg);
+    return expectFutureVariant<QXmppMucRoomV2>(joinTask);
+}
+
+void tst_QXmppMuc::requestVoice()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinTestRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+
+    auto task = room.requestVoice();
+    test.expect(u"<message to='coven@chat.shakespeare.lit' type='normal'>"
+                "<x xmlns='jabber:x:data' type='submit'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#request</value>"
+                "</field>"
+                "<field type='list-single' var='muc#role'>"
+                "<value>participant</value>"
+                "</field>"
+                "</x>"
+                "</message>"_s);
+    QVERIFY(!task.isFinished());
+}
+
+void tst_QXmppMuc::voiceRequestReceived()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"crone1@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    joinTestRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"firstwitch"_s);
+
+    QSignalSpy spy(muc, &QXmppMucManagerV2::voiceRequestReceived);
+
+    // Room forwards voice request approval form to moderator
+    QXmppMessage voiceReqMsg;
+    parsePacket(voiceReqMsg,
+                "<message from='coven@chat.shakespeare.lit' to='crone1@shakespeare.lit/pda'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#request</value>"
+                "</field>"
+                "<field type='list-single' var='muc#role'>"
+                "<value>participant</value>"
+                "</field>"
+                "<field type='jid-single' var='muc#jid'>"
+                "<value>hag66@shakespeare.lit/pda</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomnick'>"
+                "<value>thirdwitch</value>"
+                "</field>"
+                "<field type='boolean' var='muc#request_allow'>"
+                "<value>false</value>"
+                "</field>"
+                "</x>"
+                "</message>");
+    muc->handleMessage(voiceReqMsg);
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toString(), u"coven@chat.shakespeare.lit");
+    auto req = spy.at(0).at(1).value<QXmppMucVoiceRequest>();
+    QCOMPARE(req.jid(), u"hag66@shakespeare.lit/pda");
+    QCOMPARE(req.nick(), u"thirdwitch");
+    QVERIFY(req.requestAllow().has_value());
+    QCOMPARE(*req.requestAllow(), false);
+}
+
+void tst_QXmppMuc::answerVoiceRequest()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"crone1@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinTestRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"firstwitch"_s);
+
+    // Construct an incoming voice request
+    QXmppMucVoiceRequest req;
+    req.setJid(u"hag66@shakespeare.lit/pda"_s);
+    req.setNick(u"thirdwitch"_s);
+    req.setRequestAllow(false);
+
+    // Approve: moderator sends form back with muc#request_allow=true
+    auto task = room.answerVoiceRequest(req, true);
+    test.expect(u"<message to='coven@chat.shakespeare.lit' type='normal'>"
+                "<x xmlns='jabber:x:data' type='submit'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#request</value>"
+                "</field>"
+                "<field type='list-single' var='muc#role'>"
+                "<value>participant</value>"
+                "</field>"
+                "<field type='jid-single' var='muc#jid'>"
+                "<value>hag66@shakespeare.lit/pda</value>"
+                "</field>"
+                "<field type='text-single' var='muc#roomnick'>"
+                "<value>thirdwitch</value>"
+                "</field>"
+                "<field type='boolean' var='muc#request_allow'>"
+                "<value>true</value>"
+                "</field>"
+                "</x>"
+                "</message>"_s);
+    QVERIFY(!task.isFinished());
 }
 
 QTEST_MAIN(tst_QXmppMuc)
