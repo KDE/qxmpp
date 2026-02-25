@@ -67,7 +67,7 @@ struct QXmppPepBookmarkManagerPrivate;
 /// Bookmarks are automatically fetched when the session is established. Changes made from other
 /// clients arrive as PubSub event notifications and trigger the corresponding signals.
 ///
-/// \section setup Setup
+/// \section pepbookmarkmanager-setup Setup
 ///
 /// QXmppPepBookmarkManager requires QXmppPubSubManager to be registered with the client:
 ///
