@@ -47,6 +47,7 @@ private:
     Q_SLOT void sendPrivateMessage();
     Q_SLOT void setSubject();
     Q_SLOT void changeNickname();
+    Q_SLOT void changeNicknameTimeout();
     Q_SLOT void participantNicknameChange();
     Q_SLOT void participantJoinLeave();
     Q_SLOT void participantsList();
@@ -738,6 +739,47 @@ void tst_QXmppMuc::changeNickname()
     QVERIFY(nickTask.isFinished());
     expectVariant<QXmpp::Success>(nickTask.result());
     QCOMPARE(room.nickname().value(), u"oldhag"_s);
+}
+
+void tst_QXmppMuc::changeNicknameTimeout()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    muc->d->timeout = std::chrono::milliseconds(50);
+
+    // Join the room
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Change nickname but never receive the server confirmation
+    auto nickTask = room.setNickname(u"oldhag"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/oldhag'/>"_s);
+    QVERIFY(!nickTask.isFinished());
+
+    // Wait for timeout
+    QTest::qWait(100);
+
+    QVERIFY(nickTask.isFinished());
+    auto error = expectVariant<QXmppError>(nickTask.result());
+    QVERIFY(error.description.contains(u"timed out"_s));
+    // Room should still be valid after a nick-change timeout
+    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::participantNicknameChange()
