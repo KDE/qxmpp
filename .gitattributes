@@ -1,0 +1,2 @@
+# Keep test resource files as-is to ensure consistent hashes across platforms
+tests/resources/test.svg -text
