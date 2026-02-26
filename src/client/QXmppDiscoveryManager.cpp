@@ -15,6 +15,7 @@
 
 #include "Async.h"
 #include "Iq.h"
+#include "IqSending.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>

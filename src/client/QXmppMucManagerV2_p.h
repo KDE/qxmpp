@@ -6,6 +6,8 @@
 #define QXMPPMUCMANAGERV2_P_H
 
 #include "QXmppClient.h"
+#include "QXmppMucData.h"
+#include "QXmppMucData_p.h"
 #include "QXmppMucManagerV2.h"
 #include "QXmppTask.h"
 
@@ -33,7 +35,7 @@ struct QXmppMucManagerV2Private {
     void clearAllRooms();
     void fetchRoomInfo(const QString &roomJid);
     void fetchAvatar(const QString &roomJid);
-    QXmppTask<QXmppClient::IqResult> sendOwnerFormRequest(const QString &roomJid);
+    QXmppTask<QXmpp::Result<QXmpp::Private::MucOwnerQuery>> sendOwnerFormRequest(const QString &roomJid);
     void fetchConfigForm(const QString &roomJid);
     void fetchRoomConfigSubscribed(const QString &roomJid);
     void handlePresence(const QXmppPresence &);
