@@ -357,20 +357,22 @@ void tst_QXmppAccountMigrationManager::testSerialization()
                    "</iq>"_s);
     client->inject(packetToXml(newRoster(client.get(), 1, "qx2", QXmppIq::Result)));
 
-    client->expect(u"<iq id='qx3' from='pasnox@xmpp.example/QXmpp' type='get'>"
-                   "<query xmlns='jabber:iq:roster'>"
-                   "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
-                   "</query>"
-                   "</iq>"_s);
-    client->inject(packetToXml(newRoster(client.get(), 1, "qx3", QXmppIq::Result)));
+    auto rosterPacketId = client->expectPacketRandomOrder(
+        u"<iq from='pasnox@xmpp.example/QXmpp' type='get'>"
+        "<query xmlns='jabber:iq:roster'>"
+        "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
+        "</query>"
+        "</iq>"_s);
+    client->inject(packetToXml(newRoster(client.get(), 1, rosterPacketId, QXmppIq::Result)));
 
-    client->expect(u"<iq id='qx4' to='pasnox@xmpp.example' type='get'>"
-                   "<vCard xmlns='vcard-temp'>"
-                   "<TITLE/>"
-                   "<ROLE/>"
-                   "</vCard>"
-                   "</iq>"_s);
-    client->inject(packetToXml(newClientVCard(client.get(), 1, "qx4", QXmppIq::Result)));
+    auto vcardPacketId = client->expectPacketRandomOrder(
+        u"<iq to='pasnox@xmpp.example' type='get'>"
+        "<vCard xmlns='vcard-temp'>"
+        "<TITLE/>"
+        "<ROLE/>"
+        "</vCard>"
+        "</iq>"_s);
+    client->inject(packetToXml(newClientVCard(client.get(), 1, vcardPacketId, QXmppIq::Result)));
 
     auto packetId = client->expectPacketRandomOrder(
         u"<iq to='mix2@gamer.com' type='get'>"
