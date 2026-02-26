@@ -71,7 +71,7 @@ void tst_QXmppTransferManager::testSendFile()
     const quint16 testPort = 12345;
 
     QXmppLogger logger;
-    // logger.setLoggingType(QXmppLogger::StdoutLogging);
+    logger.setLoggingType(QXmppLogger::StdoutLogging);
 
     // prepare server
     TestPasswordChecker passwordChecker;
