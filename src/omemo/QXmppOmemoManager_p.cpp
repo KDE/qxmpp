@@ -595,33 +595,35 @@ signal_protocol_session_store ManagerPrivate::createSessionStore() const
 //
 QXmppTask<bool> ManagerPrivate::setUpDeviceId()
 {
-    auto result = co_await pubSubManager->requestOwnPepItemIds(ns_omemo_2_bundles.toString()).withContext(q);
-    // There can be the following cases:
-    // 1. There is no PubSub node for device bundles: XEP-0030 states that a server must
-    // respond with an error (at least ejabberd 22.05 responds with an empty node instead).
-    // 2. There is an empty PubSub node for device bundles: XEP-0030 states that a server must
-    // respond with a node without included items.
-    auto error = std::get_if<QXmppError>(&result);
-    if (error) {
-        if (auto stanzaErr = error->value<QXmppStanza::Error>()) {
-            // allow Cancel|ItemNotFound here
-            if (!(stanzaErr->type() == Error::Cancel && stanzaErr->condition() == Error::ItemNotFound)) {
-                warning(u"Existing / Published device IDs could not be retrieved: " + errorToString(*error));
-                co_return false;
+    auto future = pubSubManager->requestOwnPepItemIds(ns_omemo_2_bundles.toString());
+    return chain<bool>(std::move(future), q, [this](QXmppPubSubManager::ItemIdsResult result) mutable {
+        // There can be the following cases:
+        // 1. There is no PubSub node for device bundles: XEP-0030 states that a server must
+        // respond with an error (at least ejabberd 22.05 responds with an empty node instead).
+        // 2. There is an empty PubSub node for device bundles: XEP-0030 states that a server must
+        // respond with a node without included items.
+        auto error = std::get_if<QXmppError>(&result);
+        if (error) {
+            if (auto stanzaErr = error->value<QXmppStanza::Error>()) {
+                // allow Cancel|ItemNotFound here
+                if (!(stanzaErr->type() == Error::Cancel && stanzaErr->condition() == Error::ItemNotFound)) {
+                    warning(u"Existing / Published device IDs could not be retrieved: " + errorToString(*error));
+                    return false;
+                }
+                // do not return here
+            } else {
+                return false;
             }
-            // do not return here
-        } else {
-            co_return false;
         }
-    }
 
-    // The first generated device ID can be used if no device bundle node exists.
-    // Otherwise, duplicates must be avoided.
-    auto deviceId = error ? generateDeviceId() : generateDeviceId(std::get<QVector<QString>>(result));
-    if (deviceId) {
-        ownDevice.id = *deviceId;
-    }
-    co_return deviceId.has_value();
+        // The first generated device ID can be used if no device bundle node exists.
+        // Otherwise, duplicates must be avoided.
+        auto deviceId = error ? generateDeviceId() : generateDeviceId(std::get<QVector<QString>>(result));
+        if (deviceId) {
+            ownDevice.id = *deviceId;
+        }
+        return deviceId.has_value();
+    });
 }
 
 //
@@ -738,7 +740,7 @@ void ManagerPrivate::renewSignedPreKeyPairs()
         // Store the own device containing the new signed pre key ID.
         omemoStorage->setOwnDevice(ownDevice);
 
-        publishDeviceBundleItem().then(q, [this](bool isPublished) {
+        publishDeviceBundleItem([this](bool isPublished) {
             if (!isPublished) {
                 warning(u"Own device bundle item could not be published during renewal of signed pre key pairs"_s);
             }
@@ -830,7 +832,7 @@ bool ManagerPrivate::renewPreKeyPairs(uint32_t keyPairBeingRenewed)
     // Store the own device containing the new pre key ID.
     omemoStorage->setOwnDevice(ownDevice);
 
-    publishDeviceBundleItem().then(q, [this](bool isPublished) {
+    publishDeviceBundleItem([this](bool isPublished) {
         if (!isPublished) {
             warning(u"Own device bundle item could not be published during renewal of pre key pairs"_s);
         }
@@ -949,60 +951,69 @@ void ManagerPrivate::removeDevicesRemovedFromServer()
 //
 QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessageForRecipients(QXmppMessage &&message, QVector<QString> recipientJids, TrustLevels acceptedTrustLevels)
 {
+    QXmppPromise<QXmppE2eeExtension::MessageEncryptResult> interface;
+
     if (!initialized) {
-        co_return QXmppError {
+        QXmppError error {
             u"OMEMO manager must be initialized before encrypting"_s,
             SendError::EncryptionError
         };
+        interface.finish(std::move(error));
+    } else {
+        recipientJids.append(ownBareJid());
+
+        auto future = encryptStanza(message, recipientJids, acceptedTrustLevels);
+        future.then(q, [=, message = std::move(message)](std::optional<QXmppOmemoElement> omemoElement) mutable {
+            if (!omemoElement) {
+                QXmppError error {
+                    u"OMEMO element could not be created"_s,
+                    QXmpp::SendError::EncryptionError,
+                };
+                interface.finish(std::move(error));
+            } else {
+                // Messages with a body or trust messages use
+                // \xep{0380, Explicit Message Encryption} and a fallback body.
+                //
+                // In the former case, a client can display the fallback body to its user if it does
+                // not support the used encrpytion.
+                // Furthermore, a message processing hint for instructing the server to store the
+                // message is not needed because of the unencrypted (i.e., public) fallback body.
+                // Without a public (fallback) body and a message processing hint, the server could
+                // not determine whether the message should be stored because the encrypted body
+                // would not be visible to the server.
+                //
+                // In the latter case, a trust message could otherwise be detected by an attacker.
+                // By applying the same rules as for a message with a body, the trust message looks
+                // like a normal message.
+                // An attacker can therefore either stop all communication or none.
+                // But the attacker cannot prevent the chat partners from authenticating their keys
+                // while allowing them to exchange encrypted messages that can be read by an active
+                // attack.
+                //
+                // Whether to advise the server to store other kinds of messages is up to the
+                // client.
+                // That facilitates a consistent handling of message processing hints.
+
+                // reset fallback markers: they are serialized in both public and private modes,
+                // so this is needed to avoid leaking sensitive content
+                message.setFallbackMarkers({});
+
+                if (!message.body().isEmpty() || message.trustMessageElement()) {
+                    QXmppFallback fallback { ns_omemo_2.toString(), { { QXmppFallback::Body, {} } } };
+
+                    message.setEncryptionMethod(QXmpp::Omemo2);
+                    message.setE2eeFallbackBody(u"This message is encrypted with %1 but could not be decrypted"_s.arg(message.encryptionName()));
+                    message.setFallbackMarkers({ fallback });
+                }
+
+                message.setOmemoElement(omemoElement);
+
+                interface.finish(std::make_unique<QXmppMessage>(std::move(message)));
+            }
+        });
     }
-    recipientJids.append(ownBareJid());
 
-    auto omemoElement = co_await encryptStanza(message, recipientJids, acceptedTrustLevels);
-    if (!omemoElement) {
-        co_return QXmppError {
-            u"OMEMO element could not be created"_s,
-            QXmpp::SendError::EncryptionError,
-        };
-    }
-
-    // Messages with a body or trust messages use
-    // \xep{0380, Explicit Message Encryption} and a fallback body.
-    //
-    // In the former case, a client can display the fallback body to its user if it does
-    // not support the used encrpytion.
-    // Furthermore, a message processing hint for instructing the server to store the
-    // message is not needed because of the unencrypted (i.e., public) fallback body.
-    // Without a public (fallback) body and a message processing hint, the server could
-    // not determine whether the message should be stored because the encrypted body
-    // would not be visible to the server.
-    //
-    // In the latter case, a trust message could otherwise be detected by an attacker.
-    // By applying the same rules as for a message with a body, the trust message looks
-    // like a normal message.
-    // An attacker can therefore either stop all communication or none.
-    // But the attacker cannot prevent the chat partners from authenticating their keys
-    // while allowing them to exchange encrypted messages that can be read by an active
-    // attack.
-    //
-    // Whether to advise the server to store other kinds of messages is up to the
-    // client.
-    // That facilitates a consistent handling of message processing hints.
-
-    // reset fallback markers: they are serialized in both public and private modes,
-    // so this is needed to avoid leaking sensitive content
-    message.setFallbackMarkers({});
-
-    if (!message.body().isEmpty() || message.trustMessageElement()) {
-        QXmppFallback fallback { ns_omemo_2.toString(), { { QXmppFallback::Body, {} } } };
-
-        message.setEncryptionMethod(QXmpp::Omemo2);
-        message.setE2eeFallbackBody(u"This message is encrypted with %1 but could not be decrypted"_s.arg(message.encryptionName()));
-        message.setFallbackMarkers({ fallback });
-    }
-
-    message.setOmemoElement(omemoElement);
-
-    co_return std::make_unique<QXmppMessage>(std::move(message));
+    return interface.task();
 }
 
 //
@@ -1360,6 +1371,8 @@ QXmppTask<std::optional<QXmppMessage>> ManagerPrivate::decryptMessage(QXmppMessa
     const auto omemoElement = *stanza.omemoElement();
 
     if (const auto omemoEnvelope = omemoElement.searchEnvelope(ownBareJid(), ownDevice.id)) {
+        QXmppPromise<std::optional<QXmppMessage>> interface;
+
         const auto mixUserJid = stanza.mixUserJid();
         const auto senderJid = mixUserJid.isEmpty() ? QXmppUtils::jidToBareJid(stanza.from()) : mixUserJid;
         const auto senderDeviceId = omemoElement.senderDeviceId();
@@ -1371,28 +1384,43 @@ QXmppTask<std::optional<QXmppMessage>> ManagerPrivate::decryptMessage(QXmppMessa
         // for it after building the initial session or sent by devices to build a new session
         // with this device.
         if (omemoPayload.isEmpty()) {
-            auto payloadDecryptionData = co_await extractPayloadDecryptionData(senderJid, senderDeviceId, *omemoEnvelope).withContext(q);
-            if (!payloadDecryptionData) {
-                warning(u"Empty OMEMO message could not be successfully processed"_s);
-            } else {
-                q->debug(u"Successfully processed empty OMEMO message"_s);
-            }
-            co_return {};
+            auto future = extractPayloadDecryptionData(senderJid, senderDeviceId, *omemoEnvelope);
+            future.then(q, [=, this](std::optional<QCA::SecureArray> payloadDecryptionData) mutable {
+                if (!payloadDecryptionData) {
+                    warning(u"Empty OMEMO message could not be successfully processed"_s);
+                } else {
+                    q->debug(u"Successfully processed empty OMEMO message"_s);
+                }
+
+                interface.finish(std::nullopt);
+            });
+        } else {
+            auto future = decryptStanza(stanza, senderJid, senderDeviceId, *omemoEnvelope, omemoPayload);
+            future.then(q, [=](std::optional<DecryptionResult> optionalDecryptionResult) mutable {
+                if (optionalDecryptionResult) {
+                    // prevent that public fallback markers are used on the private body
+                    stanza.setFallbackMarkers({});
+
+                    const auto decryptionResult = std::move(*optionalDecryptionResult);
+                    stanza.parseExtensions(decryptionResult.sceContent, SceSensitive);
+
+                    // Remove the OMEMO element from the message because it is not needed
+                    // anymore after decryption.
+                    stanza.setOmemoElement({});
+
+                    stanza.setE2eeMetadata(decryptionResult.e2eeMetadata);
+
+                    interface.finish(stanza);
+                } else {
+                    interface.finish(std::nullopt);
+                }
+            });
         }
 
-        if (auto decrypted = co_await decryptStanza(stanza, senderJid, senderDeviceId, *omemoEnvelope, omemoPayload).withContext(q)) {
-            // prevent that public fallback markers are used on the private body
-            stanza.setFallbackMarkers({});
-            stanza.parseExtensions(decrypted->sceContent, SceSensitive);
-            // Remove the OMEMO element from the message because it is not needed
-            // anymore after decryption.
-            stanza.setOmemoElement({});
-            stanza.setE2eeMetadata(decrypted->e2eeMetadata);
-
-            co_return stanza;
-        }
+        return interface.task();
+    } else {
+        return makeReadyTask<std::optional<QXmppMessage>>(std::nullopt);
     }
-    co_return {};
 }
 
 //
@@ -1419,15 +1447,18 @@ QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(const QDo
 
         subscribeToNewDeviceLists(senderJid, senderDeviceId);
 
-        if (auto result = co_await decryptStanza(iq, senderJid, senderDeviceId, *omemoEnvelope, omemoElement.payload(), false).withContext(q)) {
-            auto decryptedElement = iqElement.cloneNode(true).toElement();
-            replaceChildElements(decryptedElement, result->sceContent);
+        auto future = decryptStanza(iq, senderJid, senderDeviceId, *omemoEnvelope, omemoElement.payload(), false);
+        return chain<Result>(std::move(future), q, [iqElement](auto result) -> Result {
+            if (result) {
+                auto decryptedElement = iqElement.cloneNode(true).toElement();
+                replaceChildElements(decryptedElement, result->sceContent);
 
-            co_return IqDecryptionResult { decryptedElement, result->e2eeMetadata };
-        }
-        co_return {};
+                return IqDecryptionResult { decryptedElement, result->e2eeMetadata };
+            }
+            return {};
+        });
     }
-    co_return {};
+    return makeReadyTask<Result>(std::nullopt);
 }
 
 //
@@ -1450,55 +1481,60 @@ QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(const QDo
 template<typename T>
 QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanza, const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, const QByteArray &omemoPayload, bool isMessageStanza)
 {
-    auto serializedSceEnvelope = co_await extractSceEnvelope(senderJid, senderDeviceId, omemoEnvelope, omemoPayload, isMessageStanza)
-                                     .withContext(q);
+    QXmppPromise<std::optional<DecryptionResult>> interface;
 
-    if (serializedSceEnvelope.isEmpty()) {
-        warning(u"SCE envelope could not be extracted"_s);
-        co_return {};
-    }
-
-    QDomDocument document;
+    auto future = extractSceEnvelope(senderJid, senderDeviceId, omemoEnvelope, omemoPayload, isMessageStanza);
+    future.then(q, [=, this](QByteArray serializedSceEnvelope) mutable {
+        if (serializedSceEnvelope.isEmpty()) {
+            warning(u"SCE envelope could not be extracted"_s);
+            interface.finish(std::nullopt);
+        } else {
+            QDomDocument document;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    document.setContent(serializedSceEnvelope, QDomDocument::ParseOption::UseNamespaceProcessing);
+            document.setContent(serializedSceEnvelope, QDomDocument::ParseOption::UseNamespaceProcessing);
 #else
-    document.setContent(serializedSceEnvelope, true);
+            document.setContent(serializedSceEnvelope, true);
 #endif
-    QXmppSceEnvelopeReader sceEnvelopeReader(document.documentElement());
+            QXmppSceEnvelopeReader sceEnvelopeReader(document.documentElement());
 
-    if (sceEnvelopeReader.from() != senderJid) {
-        q->info(u"Sender '" + senderJid + u"' of stanza does not match SCE 'from' affix element '" + sceEnvelopeReader.from() + u"'");
-    }
+            if (sceEnvelopeReader.from() != senderJid) {
+                q->info(u"Sender '" + senderJid + u"' of stanza does not match SCE 'from' affix element '" + sceEnvelopeReader.from() + u"'");
+            }
 
-    if (isMessageStanza) {
-        // For messages from group chats, their "from" element corresponds to the SCE affix element "to".
-        if (const auto &message = dynamic_cast<const QXmppMessage &>(stanza); message.type() == QXmppMessage::GroupChat && (sceEnvelopeReader.to() != QXmppUtils::jidToBareJid(stanza.from()))) {
-            warning(u"Recipient of group chat message does not match SCE affix element '<to/>'"_s);
-            co_return {};
+            if (isMessageStanza) {
+                // For messages from group chats, their "from" element corresponds to the SCE affix element "to".
+                if (const auto &message = dynamic_cast<const QXmppMessage &>(stanza); message.type() == QXmppMessage::GroupChat && (sceEnvelopeReader.to() != QXmppUtils::jidToBareJid(stanza.from()))) {
+                    warning(u"Recipient of group chat message does not match SCE affix element '<to/>'"_s);
+                    interface.finish(std::nullopt);
+                    return;
+                }
+            } else if (sceEnvelopeReader.to() != QXmppUtils::jidToBareJid(stanza.to())) {
+                q->info(u"Recipient of IQ does not match SCE affix element '<to/>'"_s);
+            }
+
+            auto &device = devices[senderJid][senderDeviceId];
+            device.unrespondedSentStanzasCount = 0;
+
+            // Send a heartbeat message to the sender if too many stanzas were
+            // received responding to none.
+            if (device.unrespondedReceivedStanzasCount == UNRESPONDED_STANZAS_UNTIL_HEARTBEAT_MESSAGE_IS_SENT) {
+                sendEmptyMessage(senderJid, senderDeviceId);
+                device.unrespondedReceivedStanzasCount = 0;
+            } else {
+                ++device.unrespondedReceivedStanzasCount;
+            }
+
+            QXmppE2eeMetadata e2eeMetadata;
+            e2eeMetadata.setSceTimestamp(sceEnvelopeReader.timestamp());
+            e2eeMetadata.setEncryption(QXmpp::Omemo2);
+            const auto &senderDevice = devices.value(senderJid).value(senderDeviceId);
+            e2eeMetadata.setSenderKey(senderDevice.keyId);
+
+            interface.finish(DecryptionResult { sceEnvelopeReader.contentElement(), e2eeMetadata });
         }
-    } else if (sceEnvelopeReader.to() != QXmppUtils::jidToBareJid(stanza.to())) {
-        q->info(u"Recipient of IQ does not match SCE affix element '<to/>'"_s);
-    }
+    });
 
-    auto &device = devices[senderJid][senderDeviceId];
-    device.unrespondedSentStanzasCount = 0;
-
-    // Send a heartbeat message to the sender if too many stanzas were
-    // received responding to none.
-    if (device.unrespondedReceivedStanzasCount == UNRESPONDED_STANZAS_UNTIL_HEARTBEAT_MESSAGE_IS_SENT) {
-        sendEmptyMessage(senderJid, senderDeviceId);
-        device.unrespondedReceivedStanzasCount = 0;
-    } else {
-        ++device.unrespondedReceivedStanzasCount;
-    }
-
-    QXmppE2eeMetadata e2eeMetadata;
-    e2eeMetadata.setSceTimestamp(sceEnvelopeReader.timestamp());
-    e2eeMetadata.setEncryption(QXmpp::Omemo2);
-    const auto &senderDevice = devices.value(senderJid).value(senderDeviceId);
-    e2eeMetadata.setSenderKey(senderDevice.keyId);
-
-    co_return DecryptionResult { sceEnvelopeReader.contentElement(), std::move(e2eeMetadata) };
+    return interface.task();
 }
 
 //
@@ -1518,14 +1554,19 @@ QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanz
 //
 QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, const QByteArray &omemoPayload, bool isMessageStanza)
 {
-    auto payloadDecryptionData =
-        co_await extractPayloadDecryptionData(senderJid, senderDeviceId, omemoEnvelope, isMessageStanza)
-            .withContext(q);
-    if (!payloadDecryptionData) {
-        warning(u"Data for decrypting OMEMO payload could not be extracted"_s);
-        co_return {};
-    }
-    co_return decryptPayload(*payloadDecryptionData, omemoPayload);
+    QXmppPromise<QByteArray> interface;
+
+    auto future = extractPayloadDecryptionData(senderJid, senderDeviceId, omemoEnvelope, isMessageStanza);
+    future.then(q, [=, this](std::optional<QCA::SecureArray> payloadDecryptionData) mutable {
+        if (!payloadDecryptionData) {
+            warning(u"Data for decrypting OMEMO payload could not be extracted"_s);
+            interface.finish(QByteArray());
+        } else {
+            interface.finish(decryptPayload(*payloadDecryptionData, omemoPayload));
+        }
+    });
+
+    return interface.task();
 }
 
 //
@@ -1542,18 +1583,31 @@ QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJi
 //
 QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecryptionData(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, bool isMessageStanza)
 {
+    QXmppPromise<std::optional<QCA::SecureArray>> interface;
+
     SessionCipherPtr sessionCipher;
     const auto address = Address(senderJid, senderDeviceId);
     const auto addressData = address.data();
 
     if (session_cipher_create(sessionCipher.ptrRef(), storeContext.get(), &addressData, globalContext.get()) < 0) {
         warning(u"Session cipher could not be created"_s);
-        co_return {};
+        return makeReadyTask<std::optional<QCA::SecureArray>>(std::nullopt);
     }
 
     session_cipher_set_version(sessionCipher.get(), CIPHERTEXT_OMEMO_VERSION);
 
     BufferSecurePtr payloadDecryptionDataBuffer;
+
+    auto reportResult = [=](const BufferSecurePtr &buffer) mutable {
+        // The buffer is copied into the SecureArray to avoid a QByteArray which is not secure.
+        // However, it would be simpler if SecureArray had an appropriate constructor for that.
+        const auto payloadDecryptionDataPointer = signal_buffer_data(buffer.get());
+        const auto payloadDecryptionDataBufferSize = signal_buffer_len(buffer.get());
+        auto payloadDecryptionData = QCA::SecureArray(payloadDecryptionDataBufferSize);
+        std::copy_n(payloadDecryptionDataPointer, payloadDecryptionDataBufferSize, payloadDecryptionData.data());
+
+        interface.finish(std::move(payloadDecryptionData));
+    };
 
     // There are three cases:
     // 1. If the stanza contains key exchange data, a new session is automatically built by the
@@ -1572,117 +1626,113 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
                                                      senderDeviceId,
                                                      globalContext.get()) < 0) {
             warning(u"OMEMO envelope data could not be deserialized"_s);
-            co_return {};
-        }
-        BufferPtr publicIdentityKeyBuffer(ec_public_key_get_ed(pre_key_signal_message_get_identity_key(omemoEnvelopeData.get())));
+            interface.finish(std::nullopt);
+        } else {
+            BufferPtr publicIdentityKeyBuffer(ec_public_key_get_ed(pre_key_signal_message_get_identity_key(omemoEnvelopeData.get())));
 
-        const auto key = publicIdentityKeyBuffer.toByteArray();
-        if (key.isEmpty()) {
-            warning(u"Public Identity key could not be retrieved"_s);
-            co_return {};
-        }
-        auto &device = devices[senderJid][senderDeviceId];
-        auto &storedKeyId = device.keyId;
+            if (const auto key = publicIdentityKeyBuffer.toByteArray(); key.isEmpty()) {
+                warning(u"Public Identity key could not be retrieved"_s);
+                interface.finish(std::nullopt);
+            } else {
+                auto &device = devices[senderJid][senderDeviceId];
+                auto &storedKeyId = device.keyId;
 
-        // Store the key if its ID has changed.
-        if (storedKeyId != key) {
-            storedKeyId = key;
-            omemoStorage->addDevice(senderJid, senderDeviceId, device);
-            Q_EMIT q->deviceChanged(senderJid, senderDeviceId);
-        }
-
-        // Decrypt the OMEMO envelope data and build a session.
-        switch (session_cipher_decrypt_pre_key_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
-        case SG_ERR_INVALID_MESSAGE:
-            warning(u"OMEMO envelope data for key exchange is not valid"_s);
-            co_return {};
-        case SG_ERR_DUPLICATE_MESSAGE:
-            warning(u"OMEMO envelope data for key exchange is already received"_s);
-            co_return {};
-        case SG_ERR_LEGACY_MESSAGE:
-            warning(u"OMEMO envelope data for key exchange format is deprecated"_s);
-            co_return {};
-        case SG_ERR_INVALID_KEY_ID: {
-            const auto preKeyId = QString::number(pre_key_signal_message_get_pre_key_id(omemoEnvelopeData.get()));
-            warning(u"Pre key with ID '" + preKeyId + u"' of OMEMO envelope data for key exchange could not be found locally");
-            co_return {};
-        }
-        case SG_ERR_INVALID_KEY:
-            warning(u"OMEMO envelope data for key exchange is incorrectly formatted"_s);
-            co_return {};
-        case SG_ERR_UNTRUSTED_IDENTITY:
-            warning(u"Identity key of OMEMO envelope data for key exchange is not trusted by OMEMO library"_s);
-            co_return {};
-        case SG_SUCCESS:
-            // Send an empty message back to the sender in order to notify the sender's
-            // device that the session initiation is completed.
-            // Do not send an empty message if the received stanza is an IQ stanza
-            // because a response is already directly sent.
-            if (isMessageStanza) {
-                sendEmptyMessage(senderJid, senderDeviceId);
-            }
-
-            // Store the key's trust level if it is not stored yet.
-            q->trustLevel(senderJid, storedKeyId).then(q, [=, this](TrustLevel trustLevel) mutable {
-                if (trustLevel == TrustLevel::Undecided) {
-                    storeKeyDependingOnSecurityPolicy(senderJid, key);
+                // Store the key if its ID has changed.
+                if (storedKeyId != key) {
+                    storedKeyId = key;
+                    omemoStorage->addDevice(senderJid, senderDeviceId, device);
+                    Q_EMIT q->deviceChanged(senderJid, senderDeviceId);
                 }
-            });
 
-            // The buffer is copied into the SecureArray to avoid a QByteArray which is not secure.
-            // However, it would be simpler if SecureArray had an appropriate constructor for that.
-            const auto payloadDecryptionDataPointer = signal_buffer_data(payloadDecryptionDataBuffer.get());
-            const auto payloadDecryptionDataBufferSize = signal_buffer_len(payloadDecryptionDataBuffer.get());
-            auto payloadDecryptionData = QCA::SecureArray(payloadDecryptionDataBufferSize);
-            std::copy_n(payloadDecryptionDataPointer, payloadDecryptionDataBufferSize, payloadDecryptionData.data());
+                // Decrypt the OMEMO envelope data and build a session.
+                switch (session_cipher_decrypt_pre_key_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
+                case SG_ERR_INVALID_MESSAGE:
+                    warning(u"OMEMO envelope data for key exchange is not valid"_s);
+                    interface.finish(std::nullopt);
+                    break;
+                case SG_ERR_DUPLICATE_MESSAGE:
+                    warning(u"OMEMO envelope data for key exchange is already received"_s);
+                    interface.finish(std::nullopt);
+                    break;
+                case SG_ERR_LEGACY_MESSAGE:
+                    warning(u"OMEMO envelope data for key exchange format is deprecated"_s);
+                    interface.finish(std::nullopt);
+                    break;
+                case SG_ERR_INVALID_KEY_ID: {
+                    const auto preKeyId = QString::number(pre_key_signal_message_get_pre_key_id(omemoEnvelopeData.get()));
+                    warning(u"Pre key with ID '" + preKeyId + u"' of OMEMO envelope data for key exchange could not be found locally");
+                    interface.finish(std::nullopt);
+                    break;
+                }
+                case SG_ERR_INVALID_KEY:
+                    warning(u"OMEMO envelope data for key exchange is incorrectly formatted"_s);
+                    interface.finish(std::nullopt);
+                    break;
+                case SG_ERR_UNTRUSTED_IDENTITY:
+                    warning(u"Identity key of OMEMO envelope data for key exchange is not trusted by OMEMO library"_s);
+                    interface.finish(std::nullopt);
+                    break;
+                case SG_SUCCESS:
+                    reportResult(payloadDecryptionDataBuffer);
 
-            co_return payloadDecryptionData;
+                    // Send an empty message back to the sender in order to notify the sender's
+                    // device that the session initiation is completed.
+                    // Do not send an empty message if the received stanza is an IQ stanza
+                    // because a response is already directly sent.
+                    if (isMessageStanza) {
+                        sendEmptyMessage(senderJid, senderDeviceId);
+                    }
+
+                    // Store the key's trust level if it is not stored yet.
+                    auto future = q->trustLevel(senderJid, storedKeyId);
+                    future.then(q, [=, this](TrustLevel trustLevel) mutable {
+                        if (trustLevel == TrustLevel::Undecided) {
+                            storeKeyDependingOnSecurityPolicy(senderJid, key);
+                        }
+                    });
+                }
+            }
         }
-        co_return {};
-    }
-
-    if (auto &device = devices[senderJid][senderDeviceId]; device.session.isEmpty()) {
+    } else if (auto &device = devices[senderJid][senderDeviceId]; device.session.isEmpty()) {
         warning(u"Received OMEMO stanza cannot be decrypted because there is no session with "
                 "sending device, new session is being built"_s);
 
-        co_await buildSessionWithDeviceBundle(senderJid, senderDeviceId, device);
-        co_return {};
+        auto future = buildSessionWithDeviceBundle(senderJid, senderDeviceId, device);
+        future.then(q, [=](auto) mutable {
+            interface.finish(std::nullopt);
+        });
+    } else {
+        RefCountedPtr<signal_message> omemoEnvelopeData;
+        const auto serializedOmemoEnvelopeData = omemoEnvelope.data();
+
+        if (signal_message_deserialize_omemo(omemoEnvelopeData.ptrRef(), reinterpret_cast<const uint8_t *>(serializedOmemoEnvelopeData.data()), serializedOmemoEnvelopeData.size(), globalContext.get()) < 0) {
+            warning(u"OMEMO envelope data could not be deserialized"_s);
+            interface.finish(std::nullopt);
+        } else {
+            // Decrypt the OMEMO envelope data.
+            switch (session_cipher_decrypt_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
+            case SG_ERR_INVALID_MESSAGE:
+                warning(u"OMEMO envelope data is not valid"_s);
+                interface.finish(std::nullopt);
+                break;
+            case SG_ERR_DUPLICATE_MESSAGE:
+                warning(u"OMEMO envelope data is already received"_s);
+                interface.finish(std::nullopt);
+                break;
+            case SG_ERR_LEGACY_MESSAGE:
+                warning(u"OMEMO envelope data format is deprecated"_s);
+                interface.finish(std::nullopt);
+                break;
+            case SG_ERR_NO_SESSION:
+                warning(u"Session for OMEMO envelope data could not be found"_s);
+                interface.finish(std::nullopt);
+            case SG_SUCCESS:
+                reportResult(payloadDecryptionDataBuffer);
+            }
+        }
     }
 
-    RefCountedPtr<signal_message> omemoEnvelopeData;
-    const auto serializedOmemoEnvelopeData = omemoEnvelope.data();
-
-    if (signal_message_deserialize_omemo(omemoEnvelopeData.ptrRef(), reinterpret_cast<const uint8_t *>(serializedOmemoEnvelopeData.data()), serializedOmemoEnvelopeData.size(), globalContext.get()) < 0) {
-        warning(u"OMEMO envelope data could not be deserialized"_s);
-        co_return {};
-    }
-
-    // Decrypt the OMEMO envelope data.
-    switch (session_cipher_decrypt_signal_message(sessionCipher.get(), omemoEnvelopeData.get(), nullptr, payloadDecryptionDataBuffer.ptrRef())) {
-    case SG_ERR_INVALID_MESSAGE:
-        warning(u"OMEMO envelope data is not valid"_s);
-        co_return {};
-    case SG_ERR_DUPLICATE_MESSAGE:
-        warning(u"OMEMO envelope data is already received"_s);
-        co_return {};
-    case SG_ERR_LEGACY_MESSAGE:
-        warning(u"OMEMO envelope data format is deprecated"_s);
-        co_return {};
-    case SG_ERR_NO_SESSION:
-        warning(u"Session for OMEMO envelope data could not be found"_s);
-        co_return {};
-    case SG_SUCCESS:
-        // The buffer is copied into the SecureArray to avoid a QByteArray which is not secure.
-        // However, it would be simpler if SecureArray had an appropriate constructor for that.
-        const auto payloadDecryptionDataPointer = signal_buffer_data(payloadDecryptionDataBuffer.get());
-        const auto payloadDecryptionDataBufferSize = signal_buffer_len(payloadDecryptionDataBuffer.get());
-        auto payloadDecryptionData = QCA::SecureArray(payloadDecryptionDataBufferSize);
-        std::copy_n(payloadDecryptionDataPointer, payloadDecryptionDataBufferSize, payloadDecryptionData.data());
-
-        co_return payloadDecryptionData;
-    }
-
-    co_return {};
+    return interface.task();
 }
 
 //
@@ -1749,74 +1799,90 @@ QByteArray ManagerPrivate::decryptPayload(const QCA::SecureArray &payloadDecrypt
 //
 QXmppTask<bool> ManagerPrivate::publishOmemoData()
 {
-    auto result = co_await pubSubManager->requestOwnPepFeatures().withContext(q);
+    QXmppPromise<bool> interface;
 
-    if (const auto error = std::get_if<QXmppError>(&result)) {
-        warning(u"Features of PEP service '" + ownBareJid() + u"' could not be retrieved: " + errorToString(*error));
-        warning(u"Device bundle and device list could not be published"_s);
-        co_return false;
-    }
-
-    const auto &pepServiceFeatures = std::get<QVector<QString>>(result);
-
-    // Check if the PEP service supports publishing items at all and also publishing
-    // multiple items.
-    // The support for publishing multiple items is needed to publish multiple device
-    // bundles to the corresponding node.
-    // It is checked here because if that is not possible, the publication of the device
-    // element must not be published.
-    // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
-    // if (pepServiceFeatures.contains(toString60(ns_pubsub_publish)) && pepServiceFeatures.contains(toString60(ns_pubsub_multi_items))) {
-    if (pepServiceFeatures.contains(toString60(ns_pubsub_publish))) {
-        auto result = co_await pubSubManager->requestOwnPepNodes();
+    auto future = pubSubManager->requestOwnPepFeatures();
+    future.then(q, [=, this](QXmppPubSubManager::FeaturesResult result) mutable {
         if (const auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Nodes of JID '" + ownBareJid() + u"' could not be fetched to check if nodes '" + ns_omemo_2_bundles + u"' and '" + ns_omemo_2_devices + u"' exist: " + errorToString(*error));
+            warning(u"Features of PEP service '" + ownBareJid() + u"' could not be retrieved: " + errorToString(*error));
             warning(u"Device bundle and device list could not be published"_s);
-            co_return false;
+            interface.finish(false);
         } else {
-            const auto &nodes = std::get<QVector<QString>>(result);
+            const auto &pepServiceFeatures = std::get<QVector<QString>>(result);
 
-            const auto deviceListNodeExists = nodes.contains(toString60(ns_omemo_2_devices));
-            const auto arePublishOptionsSupported = pepServiceFeatures.contains(toString60(ns_pubsub_publish_options));
-            const auto isAutomaticCreationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_auto_create));
-            const auto isCreationAndConfigurationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_create_and_configure));
-            const auto isCreationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_create_nodes));
-            const auto isConfigurationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_config_node));
+            // Check if the PEP service supports publishing items at all and also publishing
+            // multiple items.
+            // The support for publishing multiple items is needed to publish multiple device
+            // bundles to the corresponding node.
+            // It is checked here because if that is not possible, the publication of the device
+            // element must not be published.
+            // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
+            // if (pepServiceFeatures.contains(toString60(ns_pubsub_publish)) && pepServiceFeatures.contains(toString60(ns_pubsub_multi_items))) {
+            if (pepServiceFeatures.contains(toString60(ns_pubsub_publish))) {
+                auto future = pubSubManager->requestOwnPepNodes();
+                future.then(q, [=, this](QXmppPubSubManager::NodesResult result) mutable {
+                    if (const auto error = std::get_if<QXmppError>(&result)) {
+                        warning(u"Nodes of JID '" + ownBareJid() + u"' could not be fetched to check if nodes '" + ns_omemo_2_bundles + u"' and '" + ns_omemo_2_devices + u"' exist: " + errorToString(*error));
+                        warning(u"Device bundle and device list could not be published"_s);
+                        interface.finish(false);
+                    } else {
+                        const auto &nodes = std::get<QVector<QString>>(result);
 
-            // The device bundle is published before the device data is published.
-            // That way, it ensures that other devices are notified about this new
-            // device only after the corresponding device bundle is published.
-            bool published = co_await publishDeviceBundle(
-                                 nodes.contains(toString60(ns_omemo_2_bundles)),
-                                 arePublishOptionsSupported,
-                                 isAutomaticCreationSupported,
-                                 isCreationAndConfigurationSupported,
-                                 isCreationSupported,
-                                 isConfigurationSupported,
-                                 pepServiceFeatures.contains(toString60(ns_pubsub_config_node_max)))
-                                 .withContext(q);
+                        const auto deviceListNodeExists = nodes.contains(toString60(ns_omemo_2_devices));
+                        const auto arePublishOptionsSupported = pepServiceFeatures.contains(toString60(ns_pubsub_publish_options));
+                        const auto isAutomaticCreationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_auto_create));
+                        const auto isCreationAndConfigurationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_create_and_configure));
+                        const auto isCreationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_create_nodes));
+                        const auto isConfigurationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_config_node));
 
-            if (!published) {
-                warning(u"Device bundle could not be published"_s);
-                co_return false;
+                        // The device bundle is published before the device data is published.
+                        // That way, it ensures that other devices are notified about this new
+                        // device only after the corresponding device bundle is published.
+                        auto handleResult = [this,
+                                             interface,
+                                             deviceListNodeExists,
+                                             arePublishOptionsSupported,
+                                             isAutomaticCreationSupported,
+                                             isCreationAndConfigurationSupported,
+                                             isCreationSupported,
+                                             isConfigurationSupported](bool isPublished) mutable {
+                            if (isPublished) {
+                                publishDeviceElement(deviceListNodeExists,
+                                                     arePublishOptionsSupported,
+                                                     isAutomaticCreationSupported,
+                                                     isCreationAndConfigurationSupported,
+                                                     isCreationSupported,
+                                                     isConfigurationSupported,
+                                                     [=, this](bool isPublished) mutable {
+                                                         if (!isPublished) {
+                                                             warning(u"Device element could not be published"_s);
+                                                         }
+                                                         interface.finish(std::move(isPublished));
+                                                     });
+                            } else {
+                                warning(u"Device bundle could not be published"_s);
+                                interface.finish(false);
+                            }
+                        };
+                        publishDeviceBundle(nodes.contains(toString60(ns_omemo_2_bundles)),
+                                            arePublishOptionsSupported,
+                                            isAutomaticCreationSupported,
+                                            isCreationAndConfigurationSupported,
+                                            isCreationSupported,
+                                            isConfigurationSupported,
+                                            pepServiceFeatures.contains(toString60(ns_pubsub_config_node_max)),
+                                            handleResult);
+                    }
+                });
+            } else {
+                warning(u"Publishing (multiple) items to PEP node '" + ownBareJid() + u"' is not supported");
+                warning(u"Device bundle and device list could not be published"_s);
+                interface.finish(false);
             }
-            published = co_await publishDeviceElement(deviceListNodeExists,
-                                                      arePublishOptionsSupported,
-                                                      isAutomaticCreationSupported,
-                                                      isCreationAndConfigurationSupported,
-                                                      isCreationSupported,
-                                                      isConfigurationSupported);
-
-            if (!published) {
-                warning(u"Device element could not be published"_s);
-            }
-            co_return published;
         }
-    } else {
-        warning(u"Publishing (multiple) items to PEP node '" + ownBareJid() + u"' is not supported");
-        warning(u"Device bundle and device list could not be published"_s);
-        co_return false;
-    }
+    });
+
+    return interface.task();
 }
 
 //
@@ -1837,13 +1903,15 @@ QXmppTask<bool> ManagerPrivate::publishOmemoData()
 //        of allowed items per node to the maximum it supports
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceBundle(bool isDeviceBundlesNodeExistent,
-                                                    bool arePublishOptionsSupported,
-                                                    bool isAutomaticCreationSupported,
-                                                    bool isCreationAndConfigurationSupported,
-                                                    bool isCreationSupported,
-                                                    bool isConfigurationSupported,
-                                                    bool isConfigNodeMaxSupported)
+template<typename Function>
+void ManagerPrivate::publishDeviceBundle(bool isDeviceBundlesNodeExistent,
+                                         bool arePublishOptionsSupported,
+                                         bool isAutomaticCreationSupported,
+                                         bool isCreationAndConfigurationSupported,
+                                         bool isCreationSupported,
+                                         bool isConfigurationSupported,
+                                         bool isConfigNodeMaxSupported,
+                                         Function continuation)
 {
     // Check if the PEP service supports configuration of nodes during publication of items.
     if (arePublishOptionsSupported) {
@@ -1856,63 +1924,73 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundle(bool isDeviceBundlesNodeExis
             // Thus, it simply tries to publish the item with that publish option.
             // If that fails, it tries to manually create and configure the node and publish the
             // item.
-            auto published = co_await publishDeviceBundleItemWithOptions();
-            if (published) {
-                co_return true;
-            }
-
-            published = co_await publishDeviceBundleWithoutOptions(isDeviceBundlesNodeExistent,
-                                                                   isCreationAndConfigurationSupported,
-                                                                   isCreationSupported,
-                                                                   // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
-                                                                   // isConfigurationSupported,
-                                                                   true,
-                                                                   isConfigNodeMaxSupported);
-            if (!published) {
-                q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options, also not '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
-            }
-            co_return published;
+            publishDeviceBundleItemWithOptions([=, this](bool isPublished) mutable {
+                if (isPublished) {
+                    continuation(true);
+                } else {
+                    auto handleResult = [this, continuation = std::move(continuation)](bool isPublished) mutable {
+                        if (!isPublished) {
+                            q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options, also not '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
+                        }
+                        continuation(isPublished);
+                    };
+                    publishDeviceBundleWithoutOptions(isDeviceBundlesNodeExistent,
+                                                      isCreationAndConfigurationSupported,
+                                                      isCreationSupported,
+                                                      // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
+                                                      // isConfigurationSupported,
+                                                      true,
+                                                      isConfigNodeMaxSupported,
+                                                      handleResult);
+                }
+            });
         } else if (isCreationSupported) {
             // Create a node manually if the PEP service does not support creation of nodes
             // during publication of items and no node already
             // exists.
-            if (!co_await createDeviceBundlesNode().withContext(q)) {
-                co_return false;
-            }
-
-            // The supported publish options cannot be determined because they are not
-            // announced via Service Discovery.
-            // Especially, there is no feature like ns_pubsub_multi_items and no error
-            // case specified for the usage of QXmppPubSubNodeConfig::ItemLimit as a
-            // publish option.
-            // Thus, it simply tries to publish the item with that publish option.
-            // If that fails, it tries to manually configure the node and publish the
-            // item.
-            auto published = co_await publishDeviceBundleItemWithOptions();
-            if (published) {
-                co_return true;
-            } else if (isConfigurationSupported) {
-                co_return co_await configureNodeAndPublishDeviceBundle(isConfigNodeMaxSupported);
-            } else {
-                q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options and also not '" + ns_pubsub_config_node + u"'");
-                co_return false;
-            }
+            createDeviceBundlesNode([=, this](bool isCreated) mutable {
+                if (isCreated) {
+                    // The supported publish options cannot be determined because they are not
+                    // announced via Service Discovery.
+                    // Especially, there is no feature like ns_pubsub_multi_items and no error
+                    // case specified for the usage of QXmppPubSubNodeConfig::ItemLimit as a
+                    // publish option.
+                    // Thus, it simply tries to publish the item with that publish option.
+                    // If that fails, it tries to manually configure the node and publish the
+                    // item.
+                    publishDeviceBundleItemWithOptions([=, this](bool isPublished) mutable {
+                        if (isPublished) {
+                            continuation(true);
+                        } else if (isConfigurationSupported) {
+                            configureNodeAndPublishDeviceBundle(isConfigNodeMaxSupported, continuation);
+                        } else {
+                            q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options and also not '" + ns_pubsub_config_node + u"'");
+                            continuation(false);
+                        }
+                    });
+                } else {
+                    continuation(false);
+                }
+            });
         } else {
             q->debug(u"PEP service '" + ownBareJid() + u"' does not support features '" + ns_pubsub_auto_create + u"', '" + ns_pubsub_create_nodes + u"' and the node does not exist");
-            co_return false;
+            continuation(false);
         }
     } else {
-        auto published = co_await publishDeviceBundleWithoutOptions(isDeviceBundlesNodeExistent,
-                                                                    isCreationAndConfigurationSupported,
-                                                                    isCreationSupported,
-                                                                    // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
-                                                                    // isConfigurationSupported,
-                                                                    true,
-                                                                    isConfigNodeMaxSupported);
-        if (!published) {
-            q->debug(u"PEP service '" + ownBareJid() + u"' does not support features '" + ns_pubsub_publish_options + u"', '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
-        }
-        co_return published;
+        auto handleResult = [this, continuation = std::move(continuation)](bool isPublished) mutable {
+            if (!isPublished) {
+                q->debug(u"PEP service '" + ownBareJid() + u"' does not support features '" + ns_pubsub_publish_options + u"', '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
+            }
+            continuation(isPublished);
+        };
+        publishDeviceBundleWithoutOptions(isDeviceBundlesNodeExistent,
+                                          isCreationAndConfigurationSupported,
+                                          isCreationSupported,
+                                          // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
+                                          // isConfigurationSupported,
+                                          true,
+                                          isConfigNodeMaxSupported,
+                                          handleResult);
     }
 }
 
@@ -1931,31 +2009,34 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundle(bool isDeviceBundlesNodeExis
 //        of allowed items per node to the maximum it supports
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceBundleWithoutOptions(bool isDeviceBundlesNodeExistent,
-                                                                  bool isCreationAndConfigurationSupported,
-                                                                  bool isCreationSupported,
-                                                                  bool isConfigurationSupported,
-                                                                  bool isConfigNodeMaxSupported)
+template<typename Function>
+void ManagerPrivate::publishDeviceBundleWithoutOptions(bool isDeviceBundlesNodeExistent,
+                                                       bool isCreationAndConfigurationSupported,
+                                                       bool isCreationSupported,
+                                                       bool isConfigurationSupported,
+                                                       bool isConfigNodeMaxSupported,
+                                                       Function continuation)
 {
     if (isDeviceBundlesNodeExistent && isConfigurationSupported) {
-        co_return co_await configureNodeAndPublishDeviceBundle(isConfigNodeMaxSupported);
+        configureNodeAndPublishDeviceBundle(isConfigNodeMaxSupported, continuation);
     } else if (isCreationAndConfigurationSupported) {
-        auto createdAndConfigured = co_await createAndConfigureDeviceBundlesNode(isConfigNodeMaxSupported)
-                                        .withContext(q);
-        if (createdAndConfigured) {
-            co_return co_await publishDeviceBundleItem();
-        } else {
-            co_return false;
-        }
+        createAndConfigureDeviceBundlesNode(isConfigNodeMaxSupported, [=, this](bool isCreatedAndConfigured) mutable {
+            if (isCreatedAndConfigured) {
+                publishDeviceBundleItem(continuation);
+            } else {
+                continuation(false);
+            }
+        });
     } else if (isCreationSupported && isConfigurationSupported) {
-        auto created = co_await createDeviceBundlesNode();
-        if (created) {
-            co_return co_await configureNodeAndPublishDeviceBundle(isConfigNodeMaxSupported);
-        } else {
-            co_return false;
-        }
+        createDeviceBundlesNode([=, this](bool isCreated) mutable {
+            if (isCreated) {
+                configureNodeAndPublishDeviceBundle(isConfigNodeMaxSupported, continuation);
+            } else {
+                continuation(false);
+            }
+        });
     } else {
-        co_return false;
+        continuation(false);
     }
 }
 
@@ -1966,13 +2047,16 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundleWithoutOptions(bool isDeviceB
 //        of allowed items per node to the maximum it supports
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceBundle(bool isConfigNodeMaxSupported)
+template<typename Function>
+void ManagerPrivate::configureNodeAndPublishDeviceBundle(bool isConfigNodeMaxSupported, Function continuation)
 {
-    auto configured = co_await configureDeviceBundlesNode(isConfigNodeMaxSupported);
-    if (configured) {
-        co_return co_await publishDeviceBundleItem();
-    }
-    co_return false;
+    configureDeviceBundlesNode(isConfigNodeMaxSupported, [=, this](bool isConfigured) mutable {
+        if (isConfigured) {
+            publishDeviceBundleItem(continuation);
+        } else {
+            continuation(false);
+        }
+    });
 }
 
 //
@@ -1982,18 +2066,26 @@ QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceBundle(bool isConfi
 //        of allowed items per node to the maximum it supports
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::createAndConfigureDeviceBundlesNode(bool isConfigNodeMaxSupported)
+template<typename Function>
+void ManagerPrivate::createAndConfigureDeviceBundlesNode(bool isConfigNodeMaxSupported, Function continuation)
 {
     if (isConfigNodeMaxSupported) {
-        co_return co_await createNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig());
+        createNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(), continuation);
+    } else {
+        createNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(PUBSUB_NODE_MAX_ITEMS_1), [this, continuation = std::move(continuation)](bool isCreated) mutable {
+            if (isCreated) {
+                continuation(true);
+            } else {
+                createNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(PUBSUB_NODE_MAX_ITEMS_2), [this, continuation = std::move(continuation)](bool isCreated) mutable {
+                    if (isCreated) {
+                        continuation(true);
+                    } else {
+                        createNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(PUBSUB_NODE_MAX_ITEMS_3), continuation);
+                    }
+                });
+            }
+        });
     }
-
-    for (auto maxItems : { PUBSUB_NODE_MAX_ITEMS_1, PUBSUB_NODE_MAX_ITEMS_2, PUBSUB_NODE_MAX_ITEMS_3 }) {
-        if (co_await createNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(maxItems)).withContext(q)) {
-            co_return true;
-        }
-    }
-    co_return false;
 }
 
 //
@@ -2001,9 +2093,10 @@ QXmppTask<bool> ManagerPrivate::createAndConfigureDeviceBundlesNode(bool isConfi
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::createDeviceBundlesNode()
+template<typename Function>
+void ManagerPrivate::createDeviceBundlesNode(Function continuation)
 {
-    return createNode(ns_omemo_2_bundles.toString());
+    createNode(ns_omemo_2_bundles.toString(), continuation);
 }
 
 //
@@ -2021,18 +2114,26 @@ QXmppTask<bool> ManagerPrivate::createDeviceBundlesNode()
 //        maximum number of allowed items per node to the maximum it supports
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::configureDeviceBundlesNode(bool isConfigNodeMaxSupported)
+template<typename Function>
+void ManagerPrivate::configureDeviceBundlesNode(bool isConfigNodeMaxSupported, Function continuation)
 {
     if (isConfigNodeMaxSupported) {
-        co_return co_await configureNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig());
+        configureNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(), continuation);
+    } else {
+        configureNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(PUBSUB_NODE_MAX_ITEMS_1), [=, this](bool isConfigured) mutable {
+            if (isConfigured) {
+                continuation(true);
+            } else {
+                configureNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(PUBSUB_NODE_MAX_ITEMS_2), [=, this](bool isConfigured) mutable {
+                    if (isConfigured) {
+                        continuation(true);
+                    } else {
+                        configureNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(PUBSUB_NODE_MAX_ITEMS_3), continuation);
+                    }
+                });
+            }
+        });
     }
-
-    for (auto maxItems : { PUBSUB_NODE_MAX_ITEMS_1, PUBSUB_NODE_MAX_ITEMS_2, PUBSUB_NODE_MAX_ITEMS_3 }) {
-        if (co_await configureNode(ns_omemo_2_bundles.toString(), deviceBundlesNodeConfig(maxItems)).withContext(q)) {
-            co_return true;
-        }
-    }
-    co_return false;
 }
 
 //
@@ -2040,9 +2141,10 @@ QXmppTask<bool> ManagerPrivate::configureDeviceBundlesNode(bool isConfigNodeMaxS
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceBundleItem()
+template<typename Function>
+void ManagerPrivate::publishDeviceBundleItem(Function continuation)
 {
-    return publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem());
+    publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem(), continuation);
 }
 
 //
@@ -2060,18 +2162,28 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundleItem()
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceBundleItemWithOptions()
+template<typename Function>
+void ManagerPrivate::publishDeviceBundleItemWithOptions(Function continuation)
 {
-    if (co_await publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem(), deviceBundlesNodePublishOptions()).withContext(q)) {
-        co_return true;
-    }
-
-    for (auto maxItems : { PUBSUB_NODE_MAX_ITEMS_1, PUBSUB_NODE_MAX_ITEMS_2, PUBSUB_NODE_MAX_ITEMS_3 }) {
-        if (co_await publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem(), deviceBundlesNodePublishOptions(maxItems)).withContext(q)) {
-            co_return true;
+    publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem(), deviceBundlesNodePublishOptions(), [=, this](bool isPublished) mutable {
+        if (isPublished) {
+            continuation(true);
+        } else {
+            publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem(), deviceBundlesNodePublishOptions(PUBSUB_NODE_MAX_ITEMS_1), [=, this](bool isPublished) mutable {
+                if (isPublished) {
+                    continuation(true);
+                } else {
+                    publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem(), deviceBundlesNodePublishOptions(PUBSUB_NODE_MAX_ITEMS_2), [=, this](bool isPublished) mutable {
+                        if (isPublished) {
+                            continuation(true);
+                        } else {
+                            publishItem(ns_omemo_2_bundles.toString(), deviceBundleItem(), deviceBundlesNodePublishOptions(PUBSUB_NODE_MAX_ITEMS_3), continuation);
+                        }
+                    });
+                }
+            });
         }
-    }
-    co_return false;
+    });
 }
 
 //
@@ -2098,15 +2210,20 @@ QXmppOmemoDeviceBundleItem ManagerPrivate::deviceBundleItem() const
 //
 QXmppTask<std::optional<QXmppOmemoDeviceBundle>> ManagerPrivate::requestDeviceBundle(const QString &deviceOwnerJid, uint32_t deviceId) const
 {
-    auto result = co_await pubSubManager->requestItem<QXmppOmemoDeviceBundleItem>(deviceOwnerJid, ns_omemo_2_bundles.toString(), QString::number(deviceId))
-                      .withContext(q);
+    QXmppPromise<std::optional<QXmppOmemoDeviceBundle>> interface;
 
-    if (const auto error = std::get_if<QXmppError>(&result)) {
-        warning(u"Device bundle for JID '" + deviceOwnerJid + u"' and device ID '" + QString::number(deviceId) + u"' could not be retrieved: " + errorToString(*error));
-        co_return {};
-    }
-    const auto &item = std::get<QXmppOmemoDeviceBundleItem>(result);
-    co_return item.deviceBundle();
+    auto future = pubSubManager->requestItem<QXmppOmemoDeviceBundleItem>(deviceOwnerJid, ns_omemo_2_bundles.toString(), QString::number(deviceId));
+    future.then(q, [=, this](QXmppPubSubManager::ItemResult<QXmppOmemoDeviceBundleItem> result) mutable {
+        if (const auto error = std::get_if<QXmppError>(&result)) {
+            warning(u"Device bundle for JID '" + deviceOwnerJid + u"' and device ID '" + QString::number(deviceId) + u"' could not be retrieved: " + errorToString(*error));
+            interface.finish(std::nullopt);
+        } else {
+            const auto &item = std::get<QXmppOmemoDeviceBundleItem>(result);
+            interface.finish(item.deviceBundle());
+        }
+    });
+
+    return interface.task();
 }
 
 //
@@ -2115,12 +2232,13 @@ QXmppTask<std::optional<QXmppOmemoDeviceBundle>> ManagerPrivate::requestDeviceBu
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::deleteDeviceBundle()
+template<typename Function>
+void ManagerPrivate::deleteDeviceBundle(Function continuation)
 {
     if (otherOwnDevices().isEmpty()) {
-        return deleteNode(ns_omemo_2_bundles.toString());
+        deleteNode(ns_omemo_2_bundles.toString(), continuation);
     } else {
-        return retractItem(ns_omemo_2_bundles.toString(), ownDevice.id);
+        retractItem(ns_omemo_2_bundles.toString(), ownDevice.id, continuation);
     }
 }
 
@@ -2140,87 +2258,94 @@ QXmppTask<bool> ManagerPrivate::deleteDeviceBundle()
 //        nodes
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceElement(bool isDeviceListNodeExistent,
-                                                     bool arePublishOptionsSupported,
-                                                     bool isAutomaticCreationSupported,
-                                                     bool isCreationAndConfigurationSupported,
-                                                     bool isCreationSupported,
-                                                     bool isConfigurationSupported)
+template<typename Function>
+void ManagerPrivate::publishDeviceElement(bool isDeviceListNodeExistent,
+                                          bool arePublishOptionsSupported,
+                                          bool isAutomaticCreationSupported,
+                                          bool isCreationAndConfigurationSupported,
+                                          bool isCreationSupported,
+                                          bool isConfigurationSupported,
+                                          Function continuation)
 {
-    auto updated = co_await updateOwnDevicesLocally(isDeviceListNodeExistent).withContext(q);
-
-    if (!updated) {
-        co_return false;
-    }
-
-    // Check if the PEP service supports configuration of nodes during
-    // publication of items.
-    if (arePublishOptionsSupported) {
-        if (isAutomaticCreationSupported || isDeviceListNodeExistent) {
-            // The supported publish options cannot be determined because they
-            // are not announced via Service Discovery.
-            // Thus, it simply tries to publish the item with the specified
-            // publish options.
-            // If that fails, it tries to manually create and configure the node
-            // and publish the item.
-            auto published = co_await publishDeviceListItemWithOptions().withContext(q);
-            if (published) {
-                co_return true;
-            }
-
-            published = co_await publishDeviceElementWithoutOptions(isDeviceListNodeExistent,
-                                                                    isCreationAndConfigurationSupported,
-                                                                    isCreationSupported,
-                                                                    // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
-                                                                    // isConfigurationSupported);
-                                                                    true)
-                            .withContext(q);
-            if (!published) {
-                q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options, also not '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
-            }
-            co_return published;
-        } else if (isCreationSupported) {
-            // Create a node manually if the PEP service does not support creation of
-            // nodes during publication of items and no node already exists.
-            auto created = co_await createDeviceListNode().withContext(q);
-
-            if (!created) {
-                co_return false;
-            }
-
-            // The supported publish options cannot be determined because they
-            // are not announced via Service Discovery.
-            // Thus, it simply tries to publish the item with the specified
-            // publish options.
-            // If that fails, it tries to manually configure the node and
-            // publish the item.
-            auto published = co_await publishDeviceListItemWithOptions();
-            if (published) {
-                co_return true;
-            } else if (isConfigurationSupported) {
-                co_return co_await configureNodeAndPublishDeviceElement();
+    updateOwnDevicesLocally(isDeviceListNodeExistent, [=, this](bool isUpdated) mutable {
+        if (isUpdated) {
+            // Check if the PEP service supports configuration of nodes during
+            // publication of items.
+            if (arePublishOptionsSupported) {
+                if (isAutomaticCreationSupported || isDeviceListNodeExistent) {
+                    // The supported publish options cannot be determined because they
+                    // are not announced via Service Discovery.
+                    // Thus, it simply tries to publish the item with the specified
+                    // publish options.
+                    // If that fails, it tries to manually create and configure the node
+                    // and publish the item.
+                    publishDeviceListItemWithOptions([=, this](bool isPublished) mutable {
+                        if (isPublished) {
+                            continuation(true);
+                        } else {
+                            auto handleResult = [this, continuation = std::move(continuation)](bool isPublished) mutable {
+                                if (!isPublished) {
+                                    q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options, also not '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
+                                }
+                                continuation(isPublished);
+                            };
+                            publishDeviceElementWithoutOptions(isDeviceListNodeExistent,
+                                                               isCreationAndConfigurationSupported,
+                                                               isCreationSupported,
+                                                               // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
+                                                               // isConfigurationSupported);
+                                                               true,
+                                                               handleResult);
+                        }
+                    });
+                } else if (isCreationSupported) {
+                    // Create a node manually if the PEP service does not support creation of
+                    // nodes during publication of items and no node already exists.
+                    createDeviceListNode([=, this](bool isCreated) mutable {
+                        if (isCreated) {
+                            // The supported publish options cannot be determined because they
+                            // are not announced via Service Discovery.
+                            // Thus, it simply tries to publish the item with the specified
+                            // publish options.
+                            // If that fails, it tries to manually configure the node and
+                            // publish the item.
+                            publishDeviceListItemWithOptions([=, this, continuation = std::move(continuation)](bool isPublished) mutable {
+                                if (isPublished) {
+                                    continuation(true);
+                                } else if (isConfigurationSupported) {
+                                    configureNodeAndPublishDeviceElement(continuation);
+                                } else {
+                                    q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options and also not '" + ns_pubsub_config_node + u"'");
+                                    continuation(false);
+                                }
+                            });
+                        } else {
+                            continuation(false);
+                        }
+                    });
+                } else {
+                    q->debug(u"PEP service '" + ownBareJid() + u"' does not support features '" + ns_pubsub_auto_create + u"', '" + ns_pubsub_create_nodes + u"' and the node does not exist");
+                    continuation(false);
+                }
             } else {
-                q->debug(u"PEP service '" + ownBareJid() + u"' does not support feature '" + ns_pubsub_publish_options + u"' for all publish options and also not '" + ns_pubsub_config_node + u"'");
-                co_return false;
+                auto handleResult = [=, this](bool isPublished) mutable {
+                    if (!isPublished) {
+                        q->debug(u"PEP service '" + ownBareJid() + u"' does not support features '" + ns_pubsub_publish_options + u"', '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
+                    }
+                    continuation(isPublished);
+                };
+                publishDeviceElementWithoutOptions(isDeviceListNodeExistent,
+                                                   isCreationAndConfigurationSupported,
+                                                   isCreationSupported,
+                                                   // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
+                                                   // isConfigurationSupported);
+                                                   true,
+                                                   handleResult);
             }
-
         } else {
-            q->debug(u"PEP service '" + ownBareJid() + u"' does not support features '" + ns_pubsub_auto_create + u"', '" + ns_pubsub_create_nodes + u"' and the node does not exist");
-            co_return false;
+            continuation(false);
         }
-    } else {
-        auto published = co_await publishDeviceElementWithoutOptions(isDeviceListNodeExistent,
-                                                                     isCreationAndConfigurationSupported,
-                                                                     isCreationSupported,
-                                                                     // TODO: Uncomment the following line and remove the other one once ejabberd released version > 21.12
-                                                                     // isConfigurationSupported);
-                                                                     true)
-                             .withContext(q);
-        if (!published) {
-            q->debug(u"PEP service '" + ownBareJid() + u"' does not support features '" + ns_pubsub_publish_options + u"', '" + ns_pubsub_create_and_configure + u"', '" + ns_pubsub_create_nodes + u"', '" + ns_pubsub_config_node + u"' and the node does not exist");
-        }
-        co_return published;
-    }
+    });
 }
 
 //
@@ -2236,24 +2361,29 @@ QXmppTask<bool> ManagerPrivate::publishDeviceElement(bool isDeviceListNodeExiste
 //        nodes
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceElementWithoutOptions(bool isDeviceListNodeExistent, bool isCreationAndConfigurationSupported, bool isCreationSupported, bool isConfigurationSupported)
+template<typename Function>
+void ManagerPrivate::publishDeviceElementWithoutOptions(bool isDeviceListNodeExistent, bool isCreationAndConfigurationSupported, bool isCreationSupported, bool isConfigurationSupported, Function continuation)
 {
     if (isDeviceListNodeExistent && isConfigurationSupported) {
-        co_return co_await configureNodeAndPublishDeviceElement();
+        configureNodeAndPublishDeviceElement(continuation);
     } else if (isCreationAndConfigurationSupported) {
-        auto createdAndConfigured = co_await createAndConfigureDeviceListNode();
-        if (createdAndConfigured) {
-            co_return co_await publishDeviceListItem(true);
-        }
-        co_return false;
+        createAndConfigureDeviceListNode([=, this](bool isCreatedAndConfigured) mutable {
+            if (isCreatedAndConfigured) {
+                publishDeviceListItem(true, continuation);
+            } else {
+                continuation(false);
+            }
+        });
     } else if (isCreationSupported && isConfigurationSupported) {
-        auto created = co_await createDeviceListNode();
-        if (!created) {
-            co_return false;
-        }
-        co_return co_await configureNodeAndPublishDeviceElement();
+        createDeviceListNode([=, this](bool isCreated) mutable {
+            if (isCreated) {
+                configureNodeAndPublishDeviceElement(continuation);
+            } else {
+                continuation(false);
+            }
+        });
     } else {
-        co_return false;
+        continuation(false);
     }
 }
 
@@ -2263,13 +2393,16 @@ QXmppTask<bool> ManagerPrivate::publishDeviceElementWithoutOptions(bool isDevice
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceElement()
+template<typename Function>
+void ManagerPrivate::configureNodeAndPublishDeviceElement(Function continuation)
 {
-    auto configured = co_await configureDeviceListNode();
-    if (!configured) {
-        co_return false;
-    }
-    co_return co_await publishDeviceListItem(true);
+    configureDeviceListNode([=, this](bool isConfigured) mutable {
+        if (isConfigured) {
+            publishDeviceListItem(true, continuation);
+        } else {
+            continuation(false);
+        }
+    });
 }
 
 //
@@ -2277,9 +2410,10 @@ QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceElement()
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::createAndConfigureDeviceListNode()
+template<typename Function>
+void ManagerPrivate::createAndConfigureDeviceListNode(Function continuation)
 {
-    return createNode(ns_omemo_2_devices.toString(), deviceListNodeConfig());
+    createNode(ns_omemo_2_devices.toString(), deviceListNodeConfig(), continuation);
 }
 
 //
@@ -2287,9 +2421,10 @@ QXmppTask<bool> ManagerPrivate::createAndConfigureDeviceListNode()
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::createDeviceListNode()
+template<typename Function>
+void ManagerPrivate::createDeviceListNode(Function continuation)
 {
-    return createNode(ns_omemo_2_devices.toString());
+    createNode(ns_omemo_2_devices.toString(), continuation);
 }
 
 //
@@ -2297,9 +2432,10 @@ QXmppTask<bool> ManagerPrivate::createDeviceListNode()
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::configureDeviceListNode()
+template<typename Function>
+void ManagerPrivate::configureDeviceListNode(Function continuation)
 {
-    return configureNode(ns_omemo_2_devices.toString(), deviceListNodeConfig());
+    configureNode(ns_omemo_2_devices.toString(), deviceListNodeConfig(), std::move(continuation));
 }
 
 //
@@ -2308,9 +2444,10 @@ QXmppTask<bool> ManagerPrivate::configureDeviceListNode()
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceListItem(bool addOwnDevice)
+template<typename Function>
+void ManagerPrivate::publishDeviceListItem(bool addOwnDevice, Function continuation)
 {
-    return publishItem(ns_omemo_2_devices.toString(), deviceListItem(addOwnDevice));
+    publishItem(ns_omemo_2_devices.toString(), deviceListItem(addOwnDevice), continuation);
 }
 
 //
@@ -2320,9 +2457,10 @@ QXmppTask<bool> ManagerPrivate::publishDeviceListItem(bool addOwnDevice)
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::publishDeviceListItemWithOptions()
+template<typename Function>
+void ManagerPrivate::publishDeviceListItemWithOptions(Function continuation)
 {
-    return publishItem(ns_omemo_2_devices.toString(), deviceListItem(), deviceListNodePublishOptions());
+    publishItem(ns_omemo_2_devices.toString(), deviceListItem(), deviceListNodePublishOptions(), continuation);
 }
 
 //
@@ -2368,63 +2506,65 @@ QXmppOmemoDeviceListItem ManagerPrivate::deviceListItem(bool addOwnDevice)
 // \param isDeviceListNodeExistent whether the node for the device list exists
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::updateOwnDevicesLocally(bool isDeviceListNodeExistent)
+template<typename Function>
+void ManagerPrivate::updateOwnDevicesLocally(bool isDeviceListNodeExistent, Function continuation)
 {
     if (isDeviceListNodeExistent && otherOwnDevices().isEmpty()) {
-        auto result = co_await pubSubManager->requestOwnPepItem<QXmppOmemoDeviceListItem>(ns_omemo_2_devices.toString(), QXmppPubSubManager::Current).withContext(q);
+        auto future = pubSubManager->requestOwnPepItem<QXmppOmemoDeviceListItem>(ns_omemo_2_devices.toString(), QXmppPubSubManager::Current);
+        future.then(q, [=, this](QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem> result) mutable {
+            if (const auto error = std::get_if<QXmppError>(&result)) {
+                warning(u"Device list for JID '" + ownBareJid() + u"' could not be retrieved and thus not updated: " + errorToString(*error));
+                continuation(false);
+            } else {
+                const auto &deviceListItem = std::get<QXmppOmemoDeviceListItem>(result);
+                QList<QXmppOmemoDeviceElement> deviceList = deviceListItem.deviceList();
 
-        if (const auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Device list for JID '" + ownBareJid() + u"' could not be retrieved and thus not updated: " + errorToString(*error));
-            co_return false;
-        }
-        const auto &deviceListItem = std::get<QXmppOmemoDeviceListItem>(result);
-        QList<QXmppOmemoDeviceElement> deviceList = deviceListItem.deviceList();
+                if (auto devicesCount = deviceList.size()) {
+                    // Do not exceed the maximum of manageable devices.
+                    if (devicesCount > maximumDevicesPerJid) {
+                        warning(u"Received own OMEMO device list could not be stored locally "
+                                "completely because the devices are more than the maximum of "
+                                "manageable devices " +
+                                QString::number(maximumDevicesPerJid) +
+                                u" - Use 'QXmppOmemoManager::setMaximumDevicesPerJid()' to "
+                                "increase the maximum");
+                        deviceList = deviceList.mid(0, maximumDevicesPerJid);
+                        devicesCount = maximumDevicesPerJid;
+                    }
 
-        if (deviceList.empty()) {
-            co_return true;
-        }
+                    auto processedDevicesCount = std::make_shared<int>(0);
 
-        // Do not exceed the maximum of manageable devices.
-        if (deviceList.size() > maximumDevicesPerJid) {
-            warning(u"Received own OMEMO device list could not be stored locally "
-                    "completely because the devices are more than the maximum of "
-                    "manageable devices " +
-                    QString::number(maximumDevicesPerJid) +
-                    u" - Use 'QXmppOmemoManager::setMaximumDevicesPerJid()' to "
-                    "increase the maximum");
-            deviceList = deviceList.mid(0, maximumDevicesPerJid);
-        }
+                    // Store all device elements retrieved from the device list locally as
+                    // devices.
+                    // The own device (i.e., a device element in the device list with the same
+                    // ID as of this device) is skipped.
+                    for (const auto &deviceElement : std::as_const(deviceList)) {
+                        if (const auto deviceId = deviceElement.id(); deviceId != ownDevice.id) {
+                            const auto jid = ownBareJid();
+                            auto &device = devices[jid][deviceId];
+                            device.label = deviceElement.label();
 
-        // Store all device elements retrieved from the device list locally as
-        // devices.
-        // The own device (i.e., a device element in the device list with the same
-        // ID as of this device) is skipped.
+                            auto future = omemoStorage->addDevice(jid, deviceId, device);
+                            future.then(q, [=, this, &device]() mutable {
+                                auto future = buildSessionForNewDevice(jid, deviceId, device);
+                                future.then(q, [=, this](auto) mutable {
+                                    Q_EMIT q->deviceAdded(jid, deviceId);
 
-        removeIf(deviceList, [&](const auto &deviceElement) { return deviceElement.id() == ownDevice.id; });
-
-        struct AddTask {
-            QXmppTask<void> add;
-            QXmppTask<bool> buildSession;
-            uint32_t deviceId;
-        };
-        auto addDeviceTasks = transform<std::vector<AddTask>>(deviceList, [&, this](const auto &deviceElement) {
-            auto &device = devices[ownBareJid()][deviceElement.id()];
-            device.label = deviceElement.label();
-
-            return AddTask {
-                omemoStorage->addDevice(ownBareJid(), deviceElement.id(), device),
-                buildSessionForNewDevice(ownBareJid(), deviceElement.id(), device),
-                deviceElement.id(),
-            };
+                                    if (++(*processedDevicesCount) == devicesCount) {
+                                        continuation(true);
+                                    }
+                                });
+                            });
+                        }
+                    }
+                } else {
+                    continuation(true);
+                }
+            }
         });
-
-        for (auto &[add, buildSession, deviceId] : addDeviceTasks) {
-            co_await add.withContext(q);
-            co_await buildSession.withContext(q);
-            Q_EMIT q->deviceAdded(ownBareJid(), deviceId);
-        }
+    } else {
+        continuation(true);
     }
-    co_return true;
 }
 
 //
@@ -2581,7 +2721,8 @@ void ManagerPrivate::updateDevices(const QString &deviceOwnerJid, const QXmppOme
             device.label = deviceElement.label();
             omemoStorage->addDevice(deviceOwnerJid, deviceId, device);
 
-            buildSessionForNewDevice(deviceOwnerJid, deviceId, device).then(q, [=, this](auto) {
+            auto future = buildSessionForNewDevice(deviceOwnerJid, deviceId, device);
+            future.then(q, [=, this](auto) {
                 Q_EMIT q->deviceAdded(deviceOwnerJid, deviceId);
             });
         }
@@ -2591,7 +2732,7 @@ void ManagerPrivate::updateDevices(const QString &deviceOwnerJid, const QXmppOme
     // and the devices are already set up locally.
     if (isOwnDeviceListIncorrect) {
         if (!devices.isEmpty()) {
-            publishDeviceListItem(true).then(q, [=, this](bool isPublished) {
+            publishDeviceListItem(true, [=, this](bool isPublished) {
                 if (!isPublished) {
                     warning(u"Own device list item could not be published in order to correct the PEP service's one"_s);
                 }
@@ -2637,12 +2778,12 @@ void ManagerPrivate::handleIrregularDeviceListChanges(const QString &deviceOwner
                                              isAutomaticCreationSupported,
                                              isCreationAndConfigurationSupported,
                                              isCreationSupported,
-                                             isConfigurationSupported)
-                            .then(q, [=, this](bool isPublished) {
-                                if (!isPublished) {
-                                    warning(u"Device element could not be published"_s);
-                                }
-                            });
+                                             isConfigurationSupported,
+                                             [=, this](bool isPublished) {
+                                                 if (!isPublished) {
+                                                     warning(u"Device element could not be published"_s);
+                                                 }
+                                             });
                     }
                 });
             }
@@ -2671,12 +2812,13 @@ void ManagerPrivate::handleIrregularDeviceListChanges(const QString &deviceOwner
 //
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::deleteDeviceElement()
+template<typename Function>
+void ManagerPrivate::deleteDeviceElement(Function continuation)
 {
     if (otherOwnDevices().isEmpty()) {
-        return deleteNode(ns_omemo_2_devices.toString());
+        deleteNode(ns_omemo_2_devices.toString(), std::move(continuation));
     } else {
-        return publishDeviceListItem(false);
+        publishDeviceListItem(false, std::move(continuation));
     }
 }
 
@@ -2686,11 +2828,12 @@ QXmppTask<bool> ManagerPrivate::deleteDeviceElement()
 // \param node node to be created
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::createNode(const QString &node)
+template<typename Function>
+void ManagerPrivate::createNode(const QString &node, Function continuation)
 {
-    return runPubSubQueryWithContinuation(
-        pubSubManager->createOwnPepNode(node),
-        u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be created");
+    runPubSubQueryWithContinuation(pubSubManager->createOwnPepNode(node),
+                                   u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be created",
+                                   std::move(continuation));
 }
 
 //
@@ -2700,11 +2843,12 @@ QXmppTask<bool> ManagerPrivate::createNode(const QString &node)
 // \param config configuration to be applied
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::createNode(const QString &node, const QXmppPubSubNodeConfig &config)
+template<typename Function>
+void ManagerPrivate::createNode(const QString &node, const QXmppPubSubNodeConfig &config, Function continuation)
 {
-    return runPubSubQueryWithContinuation(
-        pubSubManager->createOwnPepNode(node, config),
-        u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be created");
+    runPubSubQueryWithContinuation(pubSubManager->createOwnPepNode(node, config),
+                                   u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be created",
+                                   std::move(continuation));
 }
 
 //
@@ -2714,11 +2858,12 @@ QXmppTask<bool> ManagerPrivate::createNode(const QString &node, const QXmppPubSu
 // \param config configuration to be applied
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::configureNode(const QString &node, const QXmppPubSubNodeConfig &config)
+template<typename Function>
+void ManagerPrivate::configureNode(const QString &node, const QXmppPubSubNodeConfig &config, Function continuation)
 {
-    return runPubSubQueryWithContinuation(
-        pubSubManager->configureOwnPepNode(node, config),
-        u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be configured");
+    runPubSubQueryWithContinuation(pubSubManager->configureOwnPepNode(node, config),
+                                   u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be configured",
+                                   std::move(continuation));
 }
 
 //
@@ -2728,12 +2873,13 @@ QXmppTask<bool> ManagerPrivate::configureNode(const QString &node, const QXmppPu
 // \param itemId ID of the item
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::retractItem(const QString &node, uint32_t itemId)
+template<typename Function>
+void ManagerPrivate::retractItem(const QString &node, uint32_t itemId, Function continuation)
 {
     const auto itemIdString = QString::number(itemId);
-    return runPubSubQueryWithContinuation(
-        pubSubManager->retractOwnPepItem(node, itemIdString),
-        u"Item '" + itemIdString + u"' of node '" + node + u"' and JID '" + ownBareJid() + u"' could not be retracted");
+    runPubSubQueryWithContinuation(pubSubManager->retractOwnPepItem(node, itemIdString),
+                                   u"Item '" + itemIdString + u"' of node '" + node + u"' and JID '" + ownBareJid() + u"' could not be retracted",
+                                   std::move(continuation));
 }
 
 //
@@ -2742,24 +2888,27 @@ QXmppTask<bool> ManagerPrivate::retractItem(const QString &node, uint32_t itemId
 // \param node node to be deleted
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::deleteNode(const QString &node)
+template<typename Function>
+void ManagerPrivate::deleteNode(const QString &node, Function continuation)
 {
-    auto result = co_await pubSubManager->deleteOwnPepNode(node).withContext(q);
-    if (auto error = std::get_if<QXmppError>(&result)) {
-        if (auto err = error->value<QXmppStanza::Error>()) {
-            // Skip the error handling if the node is already deleted.
-            if (!(err->type() == Error::Cancel && err->condition() == Error::ItemNotFound)) {
-                warning(u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be deleted: " + errorToString(*error));
-                co_return false;
+    auto future = pubSubManager->deleteOwnPepNode(node);
+    future.then(q, [=, this, continuation = std::move(continuation)](QXmppPubSubManager::Result result) mutable {
+        if (auto error = std::get_if<QXmppError>(&result)) {
+            if (auto err = error->value<QXmppStanza::Error>()) {
+                // Skip the error handling if the node is already deleted.
+                if (!(err->type() == Error::Cancel && err->condition() == Error::ItemNotFound)) {
+                    warning(u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be deleted: " + errorToString(*error));
+                    continuation(false);
+                } else {
+                    continuation(true);
+                }
             } else {
-                co_return true;
+                continuation(false);
             }
         } else {
-            co_return true;
+            continuation(true);
         }
-    } else {
-        co_return true;
-    }
+    });
 }
 
 //
@@ -2769,12 +2918,12 @@ QXmppTask<bool> ManagerPrivate::deleteNode(const QString &node)
 // \param item item to be published
 // \param continuation function to be called with the bool value whether it succeeded
 //
-template<typename T>
-QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item)
+template<typename T, typename Function>
+void ManagerPrivate::publishItem(const QString &node, const T &item, Function continuation)
 {
-    return runPubSubQueryWithContinuation(
-        pubSubManager->publishOwnPepItem(node, item),
-        u"Item with ID '" + item.id() + u"' could not be published to node '" + node + u"' of JID '" + ownBareJid() + u"'");
+    runPubSubQueryWithContinuation(pubSubManager->publishOwnPepItem(node, item),
+                                   u"Item with ID '" + item.id() + u"' could not be published to node '" + node + u"' of JID '" + ownBareJid() + u"'",
+                                   std::move(continuation));
 }
 
 //
@@ -2785,12 +2934,12 @@ QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item)
 // \param publishOptions publish options to be applied
 // \param continuation function to be called with the bool value whether it succeeded
 //
-template<typename T>
-QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item, const QXmppPubSubPublishOptions &publishOptions)
+template<typename T, typename Function>
+void ManagerPrivate::publishItem(const QString &node, const T &item, const QXmppPubSubPublishOptions &publishOptions, Function continuation)
 {
-    return runPubSubQueryWithContinuation(
-        pubSubManager->publishOwnPepItem(node, item, publishOptions),
-        u"Item with ID '" + item.id() + u"' could not be published to node '" + node + u"' of JID '" + ownBareJid() + u"'");
+    runPubSubQueryWithContinuation(pubSubManager->publishOwnPepItem(node, item, publishOptions),
+                                   u"Item with ID '" + item.id() + u"' could not be published to node '" + node + u"' of JID '" + ownBareJid() + u"'",
+                                   std::move(continuation));
 }
 
 //
@@ -2800,16 +2949,17 @@ QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item, 
 // \param errorMessage message to be logged in case of an error
 // \param continuation function to be called after the PubSub query
 //
-template<typename T>
-QXmppTask<bool> QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> future, const QString &errorMessage)
+template<typename T, typename Function>
+void QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> future, const QString &errorMessage, Function continuation)
 {
-    auto result = co_await future;
-    if (auto error = std::get_if<QXmppError>(&result)) {
-        warning(errorMessage + u": " + errorToString(*error));
-        co_return false;
-    } else {
-        co_return true;
-    }
+    future.then(q, [this, errorMessage, continuation = std::move(continuation)](auto result) mutable {
+        if (auto error = std::get_if<QXmppError>(&result)) {
+            warning(errorMessage + u": " + errorToString(*error));
+            continuation(false);
+        } else {
+            continuation(true);
+        }
+    });
 }
 
 // See QXmppOmemoManager for documentation
@@ -2817,15 +2967,21 @@ QXmppTask<bool> ManagerPrivate::changeDeviceLabel(const QString &deviceLabel)
 {
     Q_ASSERT_X(initialized, "Changing device label", "The device label could not be changed because the OMEMO manager must be initialized");
 
+    QXmppPromise<bool> interface;
+
     if (q->client()->isAuthenticated()) {
-        co_await omemoStorage->setOwnDevice(ownDevice).withContext(q);
-        auto published = co_await publishDeviceListItem(true).withContext(q);
-        ownDevice.label = deviceLabel;
-        co_return published;
+        omemoStorage->setOwnDevice(ownDevice).then(q, [=, this]() mutable {
+            publishDeviceListItem(true, [this, interface, deviceLabel](bool isPublished) mutable {
+                ownDevice.label = deviceLabel;
+                interface.finish(std::move(isPublished));
+            });
+        });
     } else {
         warning(QStringLiteral("Device label could not be changed because the user is not logged in"));
-        co_return false;
+        interface.finish(false);
     }
+
+    return interface.task();
 }
 
 //
@@ -2986,9 +3142,9 @@ QXmppTask<bool> ManagerPrivate::resetOwnDevice()
     initialized = false;
 
     resetOwnDeviceLocally().then(q, [this, interface]() mutable {
-        deleteDeviceElement().then(q, [=, this](bool isDeviceElementDeleted) mutable {
+        deleteDeviceElement([=, this](bool isDeviceElementDeleted) mutable {
             if (isDeviceElementDeleted) {
-                deleteDeviceBundle().then(q, [=, this](bool isDeviceBundleDeleted) mutable {
+                deleteDeviceBundle([=, this](bool isDeviceBundleDeleted) mutable {
                     if (isDeviceBundleDeleted) {
                         resetCachedData();
                     }
@@ -3031,9 +3187,9 @@ QXmppTask<bool> ManagerPrivate::resetAll()
     initialized = false;
 
     resetOwnDeviceLocally().then(q, [this, interface]() mutable {
-        deleteNode(ns_omemo_2_devices.toString()).then(q, [this, interface](bool isDevicesNodeDeleted) mutable {
+        deleteNode(ns_omemo_2_devices.toString(), [this, interface](bool isDevicesNodeDeleted) mutable {
             if (isDevicesNodeDeleted) {
-                deleteNode(ns_omemo_2_bundles.toString()).then(q, [this, interface](bool isBundlesNodeDeleted) mutable {
+                deleteNode(ns_omemo_2_bundles.toString(), [this, interface](bool isBundlesNodeDeleted) mutable {
                     if (isBundlesNodeDeleted) {
                         resetCachedData();
                     }
@@ -3095,41 +3251,60 @@ QXmppTask<bool> ManagerPrivate::buildSessionForNewDevice(const QString &jid, uin
 //
 QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(const QString &jid, uint32_t deviceId, QXmppOmemoStorage::Device &device)
 {
-    auto deviceBundle = co_await requestDeviceBundle(jid, deviceId).withContext(q);
-    if (!deviceBundle) {
-        warning(u"Session could not be created because no device bundle could be fetched for JID '" +
-                jid + u"' and device ID '" + QString::number(deviceId) + u"'");
-        co_return false;
-    }
+    QXmppPromise<bool> interface;
 
-    device.keyId = deviceBundle->publicIdentityKey();
+    auto future = requestDeviceBundle(jid, deviceId);
+    future.then(q, [=, this, &device](std::optional<QXmppOmemoDeviceBundle> optionalDeviceBundle) mutable {
+        if (optionalDeviceBundle) {
+            const auto &deviceBundle = *optionalDeviceBundle;
+            device.keyId = deviceBundle.publicIdentityKey();
 
-    auto trustLevel = co_await q->trustLevel(jid, device.keyId).withContext(q);
-    if (trustLevel == TrustLevel::Undecided) {
-        // Store the key's trust level if it is not stored yet.
-        trustLevel = co_await storeKeyDependingOnSecurityPolicy(jid, device.keyId).withContext(q);
-    }
+            auto future = q->trustLevel(jid, device.keyId);
+            future.then(q, [=, this](TrustLevel trustLevel) mutable {
+                auto buildSessionDependingOnTrustLevel = [=, this](TrustLevel trustLevel) mutable {
+                    // Build a session if the device's key has a specific trust
+                    // level and send an empty OMEMO (key exchange) message to
+                    // make the receiving device build a new session too.
+                    if (!acceptedSessionBuildingTrustLevels.testFlag(trustLevel)) {
+                        warning(u"Session could not be created for JID '" + jid + u"' with device ID '" + QString::number(deviceId) + u"' because its key's trust level '" + QString::number(int(trustLevel)) + u"' is not accepted");
+                        interface.finish(false);
+                    } else if (const auto address = Address(jid, deviceId); !buildSession(address.data(), deviceBundle)) {
+                        warning(u"Session could not be created for JID '" + jid + u"' and device ID '" + QString::number(deviceId) + u"'");
+                        interface.finish(false);
+                    } else {
+                        auto future = sendEmptyMessage(jid, deviceId, true);
+                        future.then(q, [=, this](QXmpp::SendResult result) mutable {
+                            if (std::holds_alternative<QXmppError>(result)) {
+                                warning(u"Session could be created but empty message could not be sent to JID '" +
+                                        jid +
+                                        u"' and device ID '" + QString::number(deviceId) + u"'");
+                                interface.finish(false);
+                            } else {
+                                interface.finish(true);
+                            }
+                        });
+                    }
+                };
 
-    // Build a session if the device's key has a specific trust
-    // level and send an empty OMEMO (key exchange) message to
-    // make the receiving device build a new session too.
-    if (!acceptedSessionBuildingTrustLevels.testFlag(trustLevel)) {
-        warning(u"Session could not be created for JID '" + jid + u"' with device ID '" + QString::number(deviceId) + u"' because its key's trust level '" + QString::number(int(trustLevel)) + u"' is not accepted");
-        co_return false;
-    }
+                if (trustLevel == TrustLevel::Undecided) {
+                    // Store the key's trust level if it is not stored yet.
+                    auto future = storeKeyDependingOnSecurityPolicy(jid, device.keyId);
+                    future.then(q, [=](TrustLevel trustLevel) mutable {
+                        buildSessionDependingOnTrustLevel(trustLevel);
+                    });
+                } else {
+                    buildSessionDependingOnTrustLevel(trustLevel);
+                }
+            });
+        } else {
+            warning(u"Session could not be created because no device bundle could be fetched for JID '" +
+                    jid +
+                    u"' and device ID '" + QString::number(deviceId) + u"'");
+            interface.finish(false);
+        }
+    });
 
-    if (const auto address = Address(jid, deviceId); !buildSession(address.data(), *deviceBundle)) {
-        warning(u"Session could not be created for JID '" + jid + u"' and device ID '" + QString::number(deviceId) + u"'");
-        co_return false;
-    }
-
-    auto result = co_await sendEmptyMessage(jid, deviceId, true).withContext(q);
-    if (std::holds_alternative<QXmppError>(result)) {
-        warning(u"Session could be created but empty message could not be sent to JID '" +
-                jid + u"' and device ID '" + QString::number(deviceId) + u"'");
-        co_return false;
-    }
-    co_return true;
+    return interface.task();
 }
 
 //
@@ -3378,17 +3553,20 @@ bool ManagerPrivate::deserializePublicPreKey(ec_public_key **publicPreKey, const
 //
 // \return the result of the sending
 //
-QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId, bool isKeyExchange) const
+QXmppTask<QXmpp::SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId, bool isKeyExchange) const
 {
+    QXmppPromise<QXmpp::SendResult> interface;
+
     const auto address = Address(recipientJid, recipientDeviceId);
     const auto decryptionData = QCA::SecureArray(EMPTY_MESSAGE_DECRYPTION_DATA_SIZE);
 
     if (const auto data = createOmemoEnvelopeData(address.data(), decryptionData); data.isEmpty()) {
         warning(u"OMEMO envelope for recipient JID '" + recipientJid + u"' and device ID '" + QString::number(recipientDeviceId) + u"' could not be created because its data could not be encrypted");
-        return makeReadyTask<SendResult>(QXmppError {
+        QXmppError error {
             u"OMEMO envelope could not be created"_s,
-            SendError::EncryptionError,
-        });
+            SendError::EncryptionError
+        };
+        interface.finish(std::move(error));
     } else {
         QXmppOmemoEnvelope omemoEnvelope;
         omemoEnvelope.setRecipientDeviceId(recipientDeviceId);
@@ -3406,8 +3584,13 @@ QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJ
         message.addHint(QXmppMessage::Store);
         message.setOmemoElement(omemoElement);
 
-        return q->client()->send(std::move(message));
+        auto future = q->client()->send(std::move(message));
+        future.then(q, [=](QXmpp::SendResult result) mutable {
+            interface.finish(std::move(result));
+        });
     }
+
+    return interface.task();
 }
 
 //
@@ -3415,7 +3598,14 @@ QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJ
 //
 QXmppTask<void> ManagerPrivate::storeOwnKey() const
 {
-    return trustManager->setOwnKey(ns_omemo_2.toString(), ownDevice.publicIdentityKey);
+    QXmppPromise<void> interface;
+
+    auto future = trustManager->setOwnKey(ns_omemo_2.toString(), ownDevice.publicIdentityKey);
+    future.then(q, [=]() mutable {
+        interface.finish();
+    });
+
+    return interface.task();
 }
 
 //
@@ -3429,27 +3619,45 @@ QXmppTask<void> ManagerPrivate::storeOwnKey() const
 //
 QXmppTask<TrustLevel> ManagerPrivate::storeKeyDependingOnSecurityPolicy(const QString &keyOwnerJid, const QByteArray &key)
 {
-    auto securityPolicy = co_await q->securityPolicy().withContext(q);
+    QXmppPromise<TrustLevel> interface;
 
-    switch (securityPolicy) {
-    case NoSecurityPolicy:
-        co_return co_await storeKey(keyOwnerJid, key);
-        break;
-    case Toakafa: {
-        if (co_await trustManager->hasKey(ns_omemo_2.toString(), keyOwnerJid, TrustLevel::Authenticated).withContext(q)) {
-            // If there is at least one authenticated key, add the
-            // new key as an automatically distrusted one.
-            co_return co_await storeKey(keyOwnerJid, key);
-        } else {
-            // If no key is authenticated yet, add the new key as an
-            // automatically trusted one.
-            co_return co_await storeKey(keyOwnerJid, key, TrustLevel::AutomaticallyTrusted);
+    auto awaitStoreKey = [=, this](QXmppTask<TrustLevel> &future) mutable {
+        future.then(q, [=](TrustLevel trustLevel) mutable {
+            interface.finish(std::move(trustLevel));
+        });
+    };
+
+    auto future = q->securityPolicy();
+    future.then(q, [=, this](TrustSecurityPolicy securityPolicy) mutable {
+        switch (securityPolicy) {
+        case NoSecurityPolicy: {
+            auto future = storeKey(keyOwnerJid, key);
+            awaitStoreKey(future);
+            break;
         }
-        break;
-    }
-    default:
-        Q_UNREACHABLE();
-    }
+        case Toakafa: {
+            auto future = trustManager->hasKey(ns_omemo_2.toString(), keyOwnerJid, TrustLevel::Authenticated);
+            future.then(q, [=, this](bool hasAuthenticatedKey) mutable {
+                if (hasAuthenticatedKey) {
+                    // If there is at least one authenticated key, add the
+                    // new key as an automatically distrusted one.
+                    auto future = storeKey(keyOwnerJid, key);
+                    awaitStoreKey(future);
+                } else {
+                    // If no key is authenticated yet, add the new key as an
+                    // automatically trusted one.
+                    auto future = storeKey(keyOwnerJid, key, TrustLevel::AutomaticallyTrusted);
+                    awaitStoreKey(future);
+                }
+            });
+            break;
+        }
+        default:
+            Q_UNREACHABLE();
+        }
+    });
+
+    return interface.task();
 }
 
 //
@@ -3463,9 +3671,15 @@ QXmppTask<TrustLevel> ManagerPrivate::storeKeyDependingOnSecurityPolicy(const QS
 //
 QXmppTask<TrustLevel> ManagerPrivate::storeKey(const QString &keyOwnerJid, const QByteArray &key, TrustLevel trustLevel) const
 {
-    co_await trustManager->addKeys(ns_omemo_2.toString(), keyOwnerJid, { key }, trustLevel).withContext(q);
-    Q_EMIT q->trustLevelsChanged({ { keyOwnerJid, key } });
-    co_return trustLevel;
+    QXmppPromise<TrustLevel> interface;
+
+    auto future = trustManager->addKeys(ns_omemo_2.toString(), keyOwnerJid, { key }, trustLevel);
+    future.then(q, [=, this]() mutable {
+        Q_EMIT q->trustLevelsChanged({ { keyOwnerJid, key } });
+        interface.finish(std::move(trustLevel));
+    });
+
+    return interface.task();
 }
 
 //

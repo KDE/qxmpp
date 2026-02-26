@@ -56,37 +56,37 @@ QXmppTask<QXmppOmemoStorage::OmemoData> QXmppOmemoMemoryStorage::allData()
 QXmppTask<void> QXmppOmemoMemoryStorage::setOwnDevice(const std::optional<OwnDevice> &device)
 {
     d->ownDevice = device;
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::addSignedPreKeyPair(const uint32_t keyId, const SignedPreKeyPair &keyPair)
 {
     d->signedPreKeyPairs.insert(keyId, keyPair);
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::removeSignedPreKeyPair(const uint32_t keyId)
 {
     d->signedPreKeyPairs.remove(keyId);
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::addPreKeyPairs(const QHash<uint32_t, QByteArray> &keyPairs)
 {
     d->preKeyPairs.insert(keyPairs);
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::removePreKeyPair(const uint32_t keyId)
 {
     d->preKeyPairs.remove(keyId);
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::addDevice(const QString &jid, const uint32_t deviceId, const QXmppOmemoStorage::Device &device)
 {
     d->devices[jid].insert(deviceId, device);
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::removeDevice(const QString &jid, const uint32_t deviceId)
@@ -100,18 +100,18 @@ QXmppTask<void> QXmppOmemoMemoryStorage::removeDevice(const QString &jid, const 
         d->devices.remove(jid);
     }
 
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::removeDevices(const QString &jid)
 {
     d->devices.remove(jid);
-    co_return;
+    return makeReadyTask();
 }
 
 QXmppTask<void> QXmppOmemoMemoryStorage::resetAll()
 {
     d.reset(new QXmppOmemoMemoryStoragePrivate());
-    co_return;
+    return makeReadyTask();
 }
 /// \endcond
