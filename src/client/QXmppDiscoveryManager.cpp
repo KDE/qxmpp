@@ -14,6 +14,7 @@
 
 #include "Async.h"
 #include "Iq.h"
+#include "IqSending.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
@@ -28,15 +29,6 @@ inline uint qHash(const std::tuple<Ts...> &t, uint seed = 0) noexcept
         return seed;
     },
                       t);
-}
-
-template<typename Response, typename Payload>
-static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, const QString &to, Payload &&payload)
-{
-    return chain<std::variant<Response, QXmppError>>(
-        client->sendIq(CompatIq { GetIq<Payload> { generateSequentialStanzaId(), {}, to, {}, std::move(payload) } }),
-        client,
-        parseIqResponseFlat<Response>);
 }
 
 ///

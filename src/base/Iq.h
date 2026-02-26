@@ -239,7 +239,9 @@ public:
         requires(Type == IqType::Get || Type == IqType::Set || Type == IqType::Result)
     CompatIq(Iq<Type, Payload> &&iq) : QXmppIq(), payload(std::move(iq.payload))
     {
-        setId(iq.id);
+        if (!iq.id.isEmpty()) {
+            setId(iq.id);
+        }
         setFrom(iq.from);
         setTo(iq.to);
         setLang(iq.lang);

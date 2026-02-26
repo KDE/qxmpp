@@ -175,6 +175,7 @@ public:
     void setActor(const QString &actor) { m_actor = actor; }
 
     /// \cond
+    static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_muc_admin };
     static std::optional<Item> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
     /// \endcond

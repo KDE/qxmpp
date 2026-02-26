@@ -5,6 +5,7 @@
 #include "QXmppMucData.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppMucData_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -109,13 +110,13 @@ void Item::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter w(writer);
     w.write(Element {
-        Tag { u"item", ns_muc_admin },
+        u"item",
+        OptionalAttribute { u"affiliation", m_affiliation },
         OptionalAttribute { u"jid", m_jid },
         OptionalAttribute { u"nick", m_nick },
-        OptionalAttribute { u"affiliation", m_affiliation },
         OptionalAttribute { u"role", m_role },
-        OptionalTextElement { u"reason", m_reason },
         OptionalContent { !m_actor.isEmpty(), Element { u"actor", Attribute { u"jid", m_actor } } },
+        OptionalTextElement { u"reason", m_reason },
     });
 }
 /// \endcond
@@ -189,3 +190,56 @@ void UserQuery::toXml(QXmlStreamWriter *writer) const
 /// \endcond
 
 }  // namespace QXmpp::Muc
+
+namespace QXmpp::Private {
+
+/// \cond
+std::optional<MucAdminQuery> MucAdminQuery::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    return MucAdminQuery { parseChildElements<QList<QXmpp::Muc::Item>>(el) };
+}
+
+void MucAdminQuery::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element { Tag { u"query", ns_muc_admin }, items });
+}
+/// \endcond
+
+/// \cond
+std::optional<MucOwnerQuery> MucOwnerQuery::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    MucOwnerQuery q;
+    q.form = parseOptionalChildElement<QXmppDataForm>(el);
+    const auto destroyEl = el.firstChildElement(u"destroy"_s);
+    if (!destroyEl.isNull()) {
+        q.destroyAlternateJid = destroyEl.attribute(u"jid"_s);
+        q.destroyReason = destroyEl.firstChildElement(u"reason"_s).text();
+    }
+    return q;
+}
+
+void MucOwnerQuery::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter w(writer);
+    w.write(Element {
+        Tag { u"query", ns_muc_owner },
+        form,
+        OptionalContent {
+            !destroyAlternateJid.isEmpty() || !destroyReason.isEmpty(),
+            Element {
+                u"destroy",
+                OptionalAttribute { u"jid", destroyAlternateJid },
+                OptionalTextElement { u"reason", destroyReason },
+            },
+        },
+    });
+}
+/// \endcond
+
+}  // namespace QXmpp::Private

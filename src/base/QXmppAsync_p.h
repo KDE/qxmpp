@@ -9,6 +9,7 @@
 #include "QXmppVisitHelper_p.h"
 
 class QDomElement;
+
 class QXmppError;
 
 namespace QXmpp::Private {
