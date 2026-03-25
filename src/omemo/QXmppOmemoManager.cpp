@@ -558,16 +558,12 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(const QLi
     Q_ASSERT_X(!jids.contains(d->ownBareJid()), "Requesting contact's device list", "Own JID passed");
     QVector<Manager::DevicesResult> devicesResults;
 
-    auto tasks = transform<std::vector<std::tuple<QString, QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>>>>>(
-        jids,
-        [this](const auto &jid) {
-            return std::tuple { jid, d->requestDeviceList(jid) };
-        });
-
-    for (auto &[jid, task] : tasks) {
+    // Process each JID sequentially to avoid MSVC coroutine ICE with complex template types
+    for (const auto &jid : jids) {
+        auto result = co_await d->requestDeviceList(jid);
         devicesResults << DevicesResult {
             jid,
-            mapSuccess(co_await task, [](QXmppOmemoDeviceListItem) { return Success(); })
+            mapSuccess(std::move(result), [](QXmppOmemoDeviceListItem) { return Success(); })
         };
     }
 
@@ -590,14 +586,13 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(const QLi
 ///
 QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(const QList<QString> &jids)
 {
-    auto tasks = transform<std::vector<QXmppTask<std::variant<QXmpp::Success, QXmppError>>>>(jids, [this](const auto &jid) {
-        return d->subscribeToDeviceList(jid);
-    });
-
     QVector<DevicesResult> devicesResults;
-    devicesResults.reserve(tasks.size());
-    for (size_t i = 0; i < tasks.size(); i++) {
-        devicesResults.push_back(DevicesResult { jids.at(i), co_await tasks[i] });
+    devicesResults.reserve(jids.size());
+
+    // Process each JID sequentially to avoid MSVC coroutine ICE with complex template types
+    for (const auto &jid : jids) {
+        auto result = co_await d->subscribeToDeviceList(jid);
+        devicesResults.push_back(DevicesResult { jid, std::move(result) });
     }
 
     co_return devicesResults;
@@ -817,8 +812,7 @@ QXmppTask<void> Manager::buildMissingSessions(const QList<QString> &jids)
     }
 
     if (devicesCount) {
-        std::vector<QXmppTask<bool>> buildSessionTasks;
-
+        // Build sessions sequentially to avoid MSVC coroutine ICE
         for (const auto &jid : jids) {
             auto &processedDevices = devices[jid];
 
@@ -827,13 +821,9 @@ QXmppTask<void> Manager::buildMissingSessions(const QList<QString> &jids)
                 auto &device = itr.value();
 
                 if (device.session.isEmpty()) {
-                    buildSessionTasks.push_back(d->buildSessionWithDeviceBundle(jid, deviceId, device));
+                    co_await d->buildSessionWithDeviceBundle(jid, deviceId, device);
                 }
             }
-        }
-
-        for (auto &task : buildSessionTasks) {
-            co_await task;
         }
     }
 }

@@ -2402,26 +2402,14 @@ QXmppTask<bool> ManagerPrivate::updateOwnDevicesLocally(bool isDeviceListNodeExi
 
         removeIf(deviceList, [&](const auto &deviceElement) { return deviceElement.id() == ownDevice.id; });
 
-        struct AddTask {
-            QXmppTask<void> add;
-            QXmppTask<bool> buildSession;
-            uint32_t deviceId;
-        };
-        auto addDeviceTasks = transform<std::vector<AddTask>>(deviceList, [&, this](const auto &deviceElement) {
+        // Process devices sequentially to avoid MSVC coroutine ICE with structured bindings
+        for (const auto &deviceElement : deviceList) {
             auto &device = devices[ownBareJid()][deviceElement.id()];
             device.label = deviceElement.label();
 
-            return AddTask {
-                omemoStorage->addDevice(ownBareJid(), deviceElement.id(), device),
-                buildSessionForNewDevice(ownBareJid(), deviceElement.id(), device),
-                deviceElement.id(),
-            };
-        });
-
-        for (auto &[add, buildSession, deviceId] : addDeviceTasks) {
-            co_await add.withContext(q);
-            co_await buildSession.withContext(q);
-            Q_EMIT q->deviceAdded(ownBareJid(), deviceId);
+            co_await omemoStorage->addDevice(ownBareJid(), deviceElement.id(), device).withContext(q);
+            co_await buildSessionForNewDevice(ownBareJid(), deviceElement.id(), device).withContext(q);
+            Q_EMIT q->deviceAdded(ownBareJid(), deviceElement.id());
         }
     }
     co_return true;
