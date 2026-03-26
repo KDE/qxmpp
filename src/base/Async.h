@@ -101,17 +101,18 @@ QXmppTask<void> joinVoidTasks(QObject *context, std::vector<QXmppTask<T>> &&task
     int taskCount = tasks.size();
     auto finishedTaskCount = std::make_shared<int>();
 
-    QXmppPromise<void> promise;
+    auto promise = std::make_shared<QXmppPromise<void>>();
+    auto result = promise->task();
 
     for (auto &task : tasks) {
         task.then(context, [=]() mutable {
             if (++(*finishedTaskCount) == taskCount) {
-                promise.finish();
+                promise->finish();
             }
         });
     }
 
-    return promise.task();
+    return result;
 }
 
 template<typename Params, typename Response>

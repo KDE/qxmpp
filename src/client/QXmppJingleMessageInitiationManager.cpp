@@ -111,7 +111,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::reject(std::optional<QXmppJi
     jmiElement.setReason(reason);
     jmiElement.setContainsTieBreak(containsTieBreak);
 
-    d->request(std::move(jmiElement)).then(this, [this, promise, containsTieBreak](SendResult &&result) mutable {
+    auto task = promise.task();
+    d->request(std::move(jmiElement)).then(this, [this, promise = std::move(promise), containsTieBreak](SendResult &&result) mutable {
         // Tie-break rejections don't close the local session; only emit closed() for real rejections.
         if (!containsTieBreak) {
             if (hasError(result)) {
@@ -124,7 +125,7 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::reject(std::optional<QXmppJi
         promise.finish(std::move(result));
     });
 
-    return promise.task();
+    return task;
 }
 
 ///
@@ -150,7 +151,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJ
     jmiElement.setReason(reason);
     jmiElement.setContainsTieBreak(containsTieBreak);
 
-    d->request(std::move(jmiElement)).then(this, [this, promise, containsTieBreak](SendResult &&result) mutable {
+    auto task = promise.task();
+    d->request(std::move(jmiElement)).then(this, [this, promise = std::move(promise), containsTieBreak](SendResult &&result) mutable {
         // Tie-break retractions don't close the local session; only emit closed() for real retractions.
         if (!containsTieBreak) {
             if (hasError(result)) {
@@ -163,7 +165,7 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJ
         promise.finish(std::move(result));
     });
 
-    return promise.task();
+    return task;
 }
 
 ///
@@ -191,7 +193,8 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJi
     jmiElement.setReason(reason);
     jmiElement.setMigratedTo(migratedTo);
 
-    d->request(std::move(jmiElement)).then(this, [this, promise](SendResult &&result) mutable {
+    auto task = promise.task();
+    d->request(std::move(jmiElement)).then(this, [this, promise = std::move(promise)](SendResult &&result) mutable {
         if (hasError(result)) {
             Q_EMIT closed(getError(result));
         } else {
@@ -201,7 +204,7 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJi
         promise.finish(std::move(result));
     });
 
-    return promise.task();
+    return task;
 }
 
 ///

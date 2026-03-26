@@ -544,8 +544,9 @@ void QXmppHttpUploadManager::onUnregistered(QXmppClient *client)
 QXmppTask<void> QXmppHttpUploadManager::updateService(const QString &jid)
 {
     QXmppPromise<void> promise;
+    auto task = promise.task();
 
-    d->discoveryManager()->info(jid).then(this, [this, jid, promise](Result<QXmppDiscoInfo> &&result) mutable {
+    d->discoveryManager()->info(jid).then(this, [this, jid, promise = std::move(promise)](Result<QXmppDiscoInfo> &&result) mutable {
         if (hasError(result)) {
             warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, getError(result).description));
             promise.finish();
@@ -592,7 +593,7 @@ QXmppTask<void> QXmppHttpUploadManager::updateService(const QString &jid)
         }
     });
 
-    return promise.task();
+    return task;
 }
 
 void QXmppHttpUploadManager::updateServices()

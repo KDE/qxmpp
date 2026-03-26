@@ -279,7 +279,8 @@ QXmppTask<QXmppAccountMigrationManager::Result<>> QXmppAccountMigrationManager::
         return makeReadyTask<Result<>>({});
     }
 
-    QXmppPromise<Result<>> promise;
+    auto promise = std::make_shared<QXmppPromise<Result<>>>();
+    auto task = promise->task();
 
     auto counter = std::make_shared<int>(account.extensions().size());
 
@@ -289,28 +290,28 @@ QXmppTask<QXmppAccountMigrationManager::Result<>> QXmppAccountMigrationManager::
         // There is no registered extension to import this data type
         if (extensionType == d->extensions.cend()) {
             if (--(*counter) == 0) {
-                promise.finish(Success());
+                promise->finish(Success());
             }
             continue;
         }
 
         auto &[_, extension] = *extensionType;
         extension.importFunction(value).then(this, [promise, counter](auto &&result) mutable {
-            if (promise.task().isFinished()) {
+            if (promise->task().isFinished()) {
                 return;
             }
 
             if (hasError(result)) {
-                return promise.finish(getError(std::move(result)));
+                return promise->finish(getError(std::move(result)));
             }
 
             if ((--(*counter)) == 0) {
-                promise.finish(Success());
+                promise->finish(Success());
             }
         });
     }
 
-    return promise.task();
+    return task;
 }
 
 ///

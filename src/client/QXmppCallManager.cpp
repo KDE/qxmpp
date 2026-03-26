@@ -84,7 +84,8 @@ QXmppTask<ServiceResult> QXmpp::Private::requestCredentials(QXmppClient *client,
 QXmppTask<StunTurnResult> QXmpp::Private::requestStunTurnConfig(QXmppClient *client, QXmppLoggable *q)
 {
     QXmppPromise<StunTurnResult> p;
-    requestExternalServices(client, client->configuration().domain()).then(q, [p, client, q](const auto &result) mutable {
+    auto task = p.task();
+    requestExternalServices(client, client->configuration().domain()).then(q, [p = std::move(p), client, q](const auto &result) mutable {
         if (auto *error = std::get_if<QXmppError>(&result)) {
             qWarning() << u"Could not fetch STUN/TURN external services from server: %1"_s.arg(error->description);
             p.finish(*error);
@@ -161,7 +162,7 @@ QXmppTask<StunTurnResult> QXmpp::Private::requestStunTurnConfig(QXmppClient *cli
             p.finish(StunTurnConfig { std::move(stunServers), std::move(turnServer) });
         }
     });
-    return p.task();
+    return task;
 }
 
 QXmppCallManagerPrivate::QXmppCallManagerPrivate(QXmppCallManager *qq)
