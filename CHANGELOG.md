@@ -4,6 +4,17 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.14.4 (March 26, 2026)
+------------------------------
+
+ - Fix Windows CI test failures (@lnj, !749)
+
+QXmpp 1.14.3 (February 26, 2026)
+--------------------------------
+
+ - JMI: Fix regressions introduced by auto-removal of closed JMIs (@lnj, !747)
+ - OutgoingIqManager: Fix potential double-finish of IQ promises (@lnj, !748)
+
 QXmpp 1.14.2 (February 21, 2026)
 --------------------------------
 

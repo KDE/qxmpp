@@ -111,11 +111,14 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::reject(std::optional<QXmppJi
     jmiElement.setReason(reason);
     jmiElement.setContainsTieBreak(containsTieBreak);
 
-    d->request(std::move(jmiElement)).then(this, [this, promise](SendResult &&result) mutable {
-        if (hasError(result)) {
-            Q_EMIT closed(getError(result));
-        } else {
-            Q_EMIT closed(Rejected {});
+    d->request(std::move(jmiElement)).then(this, [this, promise, containsTieBreak](SendResult &&result) mutable {
+        // Tie-break rejections don't close the local session; only emit closed() for real rejections.
+        if (!containsTieBreak) {
+            if (hasError(result)) {
+                Q_EMIT closed(getError(result));
+            } else {
+                Q_EMIT closed(Rejected {});
+            }
         }
 
         promise.finish(std::move(result));
@@ -147,11 +150,14 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::retract(std::optional<QXmppJ
     jmiElement.setReason(reason);
     jmiElement.setContainsTieBreak(containsTieBreak);
 
-    d->request(std::move(jmiElement)).then(this, [this, promise](SendResult &&result) mutable {
-        if (hasError(result)) {
-            Q_EMIT closed(getError(result));
-        } else {
-            Q_EMIT closed(Retracted {});
+    d->request(std::move(jmiElement)).then(this, [this, promise, containsTieBreak](SendResult &&result) mutable {
+        // Tie-break retractions don't close the local session; only emit closed() for real retractions.
+        if (!containsTieBreak) {
+            if (hasError(result)) {
+                Q_EMIT closed(getError(result));
+            } else {
+                Q_EMIT closed(Retracted {});
+            }
         }
 
         promise.finish(std::move(result));
@@ -473,7 +479,6 @@ bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_pt
         return true;
     case JmiType::Finish:
         if (!existingJmi->isFinished()) {
-            existingJmi->finish(jmiElement.reason(), jmiElement.migratedTo());
             Q_EMIT existingJmi->closed(
                 Jmi::Finished { jmiElement.reason(), jmiElement.migratedTo() });
         }
@@ -587,18 +592,13 @@ bool QXmppJingleMessageInitiationManager::handleNonExistingSession(const std::sh
 
     if (QUuid::fromString(existingJmi->id()) < QUuid::fromString(jmiElementId)) {
         // Jingle message initiator with lower ID rejects the other proposal.
+        // The local session is not closed; the JMI remains active.
         existingJmi->setId(jmiElementId);
-        existingJmi->reject(std::move(reason), true).then(this, [existingJmi](auto result) {
-            if (hasError(result)) {
-                Q_EMIT existingJmi->closed(getError(std::move(result)));
-            }
-        });
+        existingJmi->reject(std::move(reason), true).then(this, [](auto) { });
     } else {
         // Jingle message initiator with higher ID retracts its proposal.
         existingJmi->retract(std::move(reason), true).then(this, [this, existingJmi, jmiElementId, remoteResource](auto result) {
-            if (hasError(result)) {
-                Q_EMIT existingJmi->closed(getError(std::move(result)));
-            } else {
+            if (!hasError(result)) {
                 // Afterwards, JMI ID is changed to lower ID.
                 existingJmi->setId(jmiElementId);
 
@@ -627,7 +627,18 @@ std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManage
 {
     auto jmi = std::shared_ptr<QXmppJingleMessageInitiation>(new QXmppJingleMessageInitiation(this, id, remoteJid));
 
-    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [this, jmi]() {
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [this, jmi](const QXmppJingleMessageInitiation::Result &result) {
+        // Don't remove the JMI on tie-break rejection/retraction since the local session persists.
+        if (const auto *rejected = std::get_if<QXmppJingleMessageInitiation::Rejected>(&result)) {
+            if (rejected->containsTieBreak) {
+                return;
+            }
+        }
+        if (const auto *retracted = std::get_if<QXmppJingleMessageInitiation::Retracted>(&result)) {
+            if (retracted->containsTieBreak) {
+                return;
+            }
+        }
         debug(u"JMI with ID '%1' for remote JID '%2' is closed and thus being removed"_s.arg(jmi->id(), jmi->remoteJid()));
         clear(jmi);
     });

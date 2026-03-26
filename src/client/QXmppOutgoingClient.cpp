@@ -1219,19 +1219,21 @@ QXmppTask<IqResult> OutgoingIqManager::start(const QString &id, const QString &t
 void OutgoingIqManager::finish(const QString &id, IqResult &&result)
 {
     if (auto itr = m_requests.find(id); itr != m_requests.end()) {
-        itr->second.interface.finish(std::move(result));
+        auto promise = std::move(itr->second.interface);
         m_requests.erase(itr);
+        promise.finish(std::move(result));
     }
 }
 
 void OutgoingIqManager::cancelAll()
 {
-    for (auto &[id, state] : m_requests) {
+    auto requests = std::move(m_requests);
+    m_requests = {};
+    for (auto &[id, state] : requests) {
         state.interface.finish(QXmppError {
             u"IQ has been cancelled."_s,
             QXmpp::SendError::Disconnected });
     }
-    m_requests.clear();
 }
 
 void OutgoingIqManager::onSessionOpened(const SessionBegin &session)
@@ -1268,19 +1270,21 @@ bool OutgoingIqManager::handleStanza(const QDomElement &stanza)
         return false;
     }
 
-    auto &promise = itr->second.interface;
-    const auto &expectedFrom = itr->second.jid;
-
     // Check that the sender of the response matches the recipient of the request.
     // Stanzas coming from the server on behalf of the user's account must have no "from"
     // attribute or have it set to the user's bare JID.
     // If 'from' is empty, the IQ has been sent by the server. In this case we don't need to
     // do the check as we trust the server anyways.
-    if (auto from = stanza.attribute(u"from"_s); !from.isEmpty() && from != expectedFrom) {
+    if (auto from = stanza.attribute(u"from"_s); !from.isEmpty() && from != itr->second.jid) {
         warning(u"Ignored received IQ response to request '%1' because of wrong sender '%2' instead of expected sender '%3'"_s
-                    .arg(id, from, expectedFrom));
+                    .arg(id, from, itr->second.jid));
         return false;
     }
+
+    // Extract the promise and erase from the map before calling finish() to prevent
+    // re-entrant double-finish if a continuation triggers cancelAll().
+    auto promise = std::move(itr->second.interface);
+    m_requests.erase(itr);
 
     // report IQ errors as QXmppError (this makes it impossible to parse the full error IQ,
     // but that is okay for now)
@@ -1300,7 +1304,6 @@ bool OutgoingIqManager::handleStanza(const QDomElement &stanza)
         promise.finish(stanza);
     }
 
-    m_requests.erase(itr);
     return true;
 }
 

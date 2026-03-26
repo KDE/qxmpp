@@ -1,2 +1,5 @@
-# Keep test resource files as-is to ensure consistent hashes across platforms
-tests/resources/test.svg -text
+# SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+# SPDX-License-Identifier: CC0-1.0
+
+# Keep SVG files as-is to ensure consistent hashes across platforms
+*.svg eol=lf
