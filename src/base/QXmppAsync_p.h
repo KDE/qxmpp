@@ -8,6 +8,8 @@
 #include "QXmppTask.h"
 #include "QXmppVisitHelper_p.h"
 
+#include <variant>
+
 class QDomElement;
 class QXmppError;
 
