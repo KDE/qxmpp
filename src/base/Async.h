@@ -12,6 +12,7 @@
 
 #include "Algorithms.h"
 
+#include <deque>
 #include <memory>
 #include <variant>
 
@@ -178,7 +179,7 @@ struct AttachableRequests {
 
 template<typename T>
 struct MultiPromise {
-    std::vector<QXmppPromise<T>> promises;
+    std::deque<QXmppPromise<T>> promises;
 
     void finish(T &&response)
     {

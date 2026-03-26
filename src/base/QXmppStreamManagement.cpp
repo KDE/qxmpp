@@ -183,21 +183,21 @@ void StreamAckManager::enableStreamManagement(bool resetSequenceNumber)
         m_lastIncomingSequenceNumber = 0;
 
         // resend unacked stanzas
-        if (!m_unacknowledgedStanzas.isEmpty()) {
-            auto oldUnackedStanzas = m_unacknowledgedStanzas;
-            m_unacknowledgedStanzas.clear();
+        if (!m_unacknowledgedStanzas.empty()) {
+            auto oldUnackedStanzas = std::move(m_unacknowledgedStanzas);
 
-            for (auto &packet : oldUnackedStanzas) {
-                m_unacknowledgedStanzas.insert(++m_lastOutgoingSequenceNumber, packet);
-                socket.sendData(packet.data());
+            for (auto &[_, packet] : oldUnackedStanzas) {
+                auto data = packet.data();
+                m_unacknowledgedStanzas.emplace_back(++m_lastOutgoingSequenceNumber, std::move(packet));
+                socket.sendData(data);
             }
 
             sendAcknowledgementRequest();
         }
     } else {
         // resend unacked stanzas
-        if (!m_unacknowledgedStanzas.isEmpty()) {
-            for (auto &packet : m_unacknowledgedStanzas) {
+        if (!m_unacknowledgedStanzas.empty()) {
+            for (auto &[_, packet] : m_unacknowledgedStanzas) {
                 socket.sendData(packet.data());
             }
 
@@ -208,13 +208,9 @@ void StreamAckManager::enableStreamManagement(bool resetSequenceNumber)
 
 void StreamAckManager::setAcknowledgedSequenceNumber(unsigned int sequenceNumber)
 {
-    for (auto it = m_unacknowledgedStanzas.begin(); it != m_unacknowledgedStanzas.end();) {
-        if (it.key() <= sequenceNumber) {
-            it->reportFinished(QXmpp::SendSuccess { true });
-            it = m_unacknowledgedStanzas.erase(it);
-        } else {
-            break;
-        }
+    while (!m_unacknowledgedStanzas.empty() && m_unacknowledgedStanzas.front().first <= sequenceNumber) {
+        m_unacknowledgedStanzas.front().second.reportFinished(QXmpp::SendSuccess { true });
+        m_unacknowledgedStanzas.pop_front();
     }
 }
 
@@ -236,8 +232,10 @@ std::tuple<bool, QXmppTask<SendResult>> StreamAckManager::internalSend(QXmppPack
 
     // handle stream management
     if (m_enabled && packet.isXmppStanza()) {
-        m_unacknowledgedStanzas.insert(++m_lastOutgoingSequenceNumber, packet);
+        auto task = packet.task();
+        m_unacknowledgedStanzas.emplace_back(++m_lastOutgoingSequenceNumber, std::move(packet));
         sendAcknowledgementRequest();
+        return { writtenToSocket, std::move(task) };
     } else {
         if (writtenToSocket) {
             packet.reportFinished(QXmpp::SendSuccess { false });
@@ -282,7 +280,7 @@ void StreamAckManager::sendAcknowledgementRequest()
 
 void StreamAckManager::resetCache()
 {
-    for (auto &packet : m_unacknowledgedStanzas) {
+    for (auto &[_, packet] : m_unacknowledgedStanzas) {
         packet.reportFinished(QXmppError {
             u"Disconnected"_s,
             QXmpp::SendError::Disconnected });

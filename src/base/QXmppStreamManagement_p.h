@@ -7,14 +7,15 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
+#include "QXmppPacket_p.h"
 #include "QXmppSendResult.h"
 #include "QXmppStanza.h"
 #include "QXmppTask.h"
 
+#include <deque>
+
 #include <QDomDocument>
 #include <QXmlStreamWriter>
-
-class QXmppPacket;
 
 namespace QXmpp::Private {
 class XmlWriter;
@@ -134,7 +135,7 @@ private:
     QXmpp::Private::XmppSocket &socket;
 
     bool m_enabled = false;
-    QMap<unsigned int, QXmppPacket> m_unacknowledgedStanzas;
+    std::deque<std::pair<unsigned int, QXmppPacket>> m_unacknowledgedStanzas;
     unsigned int m_lastOutgoingSequenceNumber = 0;
     unsigned int m_lastIncomingSequenceNumber = 0;
 };
