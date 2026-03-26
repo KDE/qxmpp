@@ -93,13 +93,15 @@ class QXmppPromise
 
 public:
     QXmppPromise() : data(InlineData()) { }
-    // [[deprecated]]
+    /// \deprecated Copying a promise creates shared ownership via heap allocation. Move the promise instead.
+    [[deprecated]]
     QXmppPromise(const QXmppPromise<T> &p)
     {
         p.detachData();
         data = p.data;
         sharedData().promiseCount += 1;
     }
+    /// Move constructor.
     QXmppPromise(QXmppPromise<T> &&p)
     {
         std::swap(data, p.data);
@@ -132,7 +134,8 @@ public:
         }
     }
 
-    // [[deprecated]]
+    /// \deprecated Copying a promise creates shared ownership via heap allocation. Move the promise instead.
+    [[deprecated]]
     QXmppPromise<T> &operator=(const QXmppPromise<T> &p)
     {
         if (shared()) {
@@ -145,6 +148,7 @@ public:
         }
         return *this;
     }
+    /// Move assignment operator.
     QXmppPromise<T> &operator=(QXmppPromise<T> &&p)
     {
         std::swap(data, p.data);
@@ -335,6 +339,7 @@ class QXmppTask
     };
 
 public:
+    /// Move constructor.
     QXmppTask(QXmppTask &&t) : data(InlineData {})
     {
         std::swap(data, t.data);
@@ -354,6 +359,7 @@ public:
         }
     }
 
+    /// Move assignment operator.
     QXmppTask &operator=(QXmppTask &&t) noexcept
     {
         // unregister with old promise
@@ -375,6 +381,7 @@ public:
     }
     QXmppTask &operator=(const QXmppTask &) = delete;
 
+    /// \cond
     bool await_ready() const noexcept { return isFinished(); }
     void await_suspend(std::coroutine_handle<> handle)
     {
@@ -405,6 +412,7 @@ public:
             return takeResult();
         }
     }
+    /// \endcond
 
     ///
     /// Registers a function that will be called with the result as parameter when the asynchronous
