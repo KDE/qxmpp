@@ -2830,28 +2830,28 @@ QXmppTask<bool> ManagerPrivate::changeDeviceLabel(const QString &deviceLabel)
 //
 QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> ManagerPrivate::requestDeviceList(const QString &jid)
 {
-    QXmppPromise<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> interface;
-
     // Since the usage of the item ID \c QXmppPubSubManager::Current is only RECOMMENDED by
     // \xep{0060, Publish-Subscribe} (PubSub) but not obligatory, all items are requested even if
     // the node should contain only one item.
-    auto future = pubSubManager->requestItems<QXmppOmemoDeviceListItem>(jid, ns_omemo_2_devices.toString());
-    auto task = interface.task();
-    future.then(q, [this, interface = std::move(interface), jid](QXmppPubSubManager::ItemsResult<QXmppOmemoDeviceListItem> result) mutable {
-        if (const auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Device list for JID '" + jid + u"' could not be retrieved: " + errorToString(*error));
-            interface.finish(*error);
-        } else if (const auto &items = std::get<QXmppPubSubManager::Items<QXmppOmemoDeviceListItem>>(result).items; items.isEmpty()) {
-            QString errorMessage = u"Device list for JID '" + jid + u"' could not be retrieved because the node does not contain any item";
-            warning(errorMessage);
-            interface.finish(QXmppError { errorMessage, {} });
-        } else if (const auto item = updateContactDevices(jid, items); item) {
-            interface.finish(*item);
-        } else {
-            interface.finish(QXmppError { u"Device list for JID '" + jid + u"' could not be retrieved because the node does not contain an appropriate item", {} });
-        }
-    });
-    return task;
+    auto result = co_await pubSubManager->requestItems<QXmppOmemoDeviceListItem>(jid, ns_omemo_2_devices.toString()).withContext(q);
+
+    if (const auto error = std::get_if<QXmppError>(&result)) {
+        warning(u"Device list for JID '" + jid + u"' could not be retrieved: " + errorToString(*error));
+        co_return *error;
+    }
+
+    const auto &items = std::get<QXmppPubSubManager::Items<QXmppOmemoDeviceListItem>>(result).items;
+    if (items.isEmpty()) {
+        QString errorMessage = u"Device list for JID '" + jid + u"' could not be retrieved because the node does not contain any item";
+        warning(errorMessage);
+        co_return QXmppError { errorMessage, {} };
+    }
+
+    if (const auto item = updateContactDevices(jid, items); item) {
+        co_return *item;
+    }
+
+    co_return QXmppError { u"Device list for JID '" + jid + u"' could not be retrieved because the node does not contain an appropriate item", {} };
 }
 
 //
@@ -2880,25 +2880,15 @@ void ManagerPrivate::subscribeToNewDeviceLists(const QString &jid, uint32_t devi
 //
 QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(const QString &jid)
 {
-    QXmppPromise<QXmppPubSubManager::Result> interface;
+    auto result = co_await pubSubManager->subscribeToNode(jid, ns_omemo_2_devices.toString(), ownFullJid()).withContext(q);
 
-    auto future = pubSubManager->subscribeToNode(jid, ns_omemo_2_devices.toString(), ownFullJid());
-    auto task = interface.task();
-    future.then(q, [=, this, interface = std::move(interface)](QXmppPubSubManager::Result result) mutable {
-        if (const auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Device list for JID '" + jid + u"' could not be subscribed: " + errorToString(*error));
-            interface.finish(std::move(*error));
-        } else {
-            jidsOfManuallySubscribedDevices.append(jid);
+    if (const auto error = std::get_if<QXmppError>(&result)) {
+        warning(u"Device list for JID '" + jid + u"' could not be subscribed: " + errorToString(*error));
+        co_return std::move(*error);
+    }
 
-            auto future = requestDeviceList(jid);
-            future.then(q, [interface = std::move(interface)](auto result) mutable {
-                interface.finish(mapToSuccess(std::move(result)));
-            });
-        }
-    });
-
-    return task;
+    jidsOfManuallySubscribedDevices.append(jid);
+    co_return mapToSuccess(co_await requestDeviceList(jid).withContext(q));
 }
 
 //
@@ -2953,95 +2943,61 @@ QXmppTask<QVector<Manager::DevicesResult>> ManagerPrivate::unsubscribeFromDevice
 //
 QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::unsubscribeFromDeviceList(const QString &jid)
 {
-    QXmppPromise<QXmppPubSubManager::Result> interface;
+    auto result = co_await pubSubManager->unsubscribeFromNode(jid, ns_omemo_2_devices.toString(), ownFullJid()).withContext(q);
 
-    auto future = pubSubManager->unsubscribeFromNode(jid, ns_omemo_2_devices.toString(), ownFullJid());
-    auto task = interface.task();
-    future.then(q, [=, this, interface = std::move(interface)](QXmppPubSubManager::Result result) mutable {
-        if (const auto error = std::get_if<QXmppError>(&result)) {
-            warning(u"Device list for JID '" + jid + u"' could not be unsubscribed: " + errorToString(*error));
-        } else {
-            jidsOfManuallySubscribedDevices.removeAll(jid);
-        }
+    if (std::get_if<QXmppError>(&result)) {
+        warning(u"Device list for JID '" + jid + u"' could not be unsubscribed: " + errorToString(std::get<QXmppError>(result)));
+    } else {
+        jidsOfManuallySubscribedDevices.removeAll(jid);
+    }
 
-        interface.finish(std::move(result));
-    });
-
-    return task;
+    co_return std::move(result);
 }
 
 // See QXmppOmemoManager for documentation
 QXmppTask<bool> ManagerPrivate::resetOwnDevice()
 {
-    QXmppPromise<bool> interface;
-
     initialized = false;
 
-    auto task = interface.task();
-    resetOwnDeviceLocally().then(q, [this, interface = std::move(interface)]() mutable {
-        deleteDeviceElement().then(q, [this, interface = std::move(interface)](bool isDeviceElementDeleted) mutable {
-            if (isDeviceElementDeleted) {
-                deleteDeviceBundle().then(q, [this, interface = std::move(interface)](bool isDeviceBundleDeleted) mutable {
-                    if (isDeviceBundleDeleted) {
-                        resetCachedData();
-                    }
+    co_await resetOwnDeviceLocally().withContext(q);
 
-                    interface.finish(std::move(isDeviceBundleDeleted));
-                });
-            } else {
-                interface.finish(false);
-            }
-        });
-    });
+    if (!co_await deleteDeviceElement().withContext(q)) {
+        co_return false;
+    }
 
-    return task;
+    bool deleted = co_await deleteDeviceBundle().withContext(q);
+    if (deleted) {
+        resetCachedData();
+    }
+    co_return deleted;
 }
 
 // See QXmppOmemoManager for documentation
 QXmppTask<void> QXmppOmemoManagerPrivate::resetOwnDeviceLocally()
 {
-    QXmppPromise<void> interface;
-
     initialized = false;
 
-    auto future = trustManager->resetAll(ns_omemo_2.toString());
-    auto task = interface.task();
-    future.then(q, [this, interface = std::move(interface)]() mutable {
-        auto future = omemoStorage->resetAll();
-        future.then(q, [this, interface = std::move(interface)]() mutable {
-            resetCachedData();
-            interface.finish();
-        });
-    });
-
-    return task;
+    co_await trustManager->resetAll(ns_omemo_2.toString()).withContext(q);
+    co_await omemoStorage->resetAll().withContext(q);
+    resetCachedData();
 }
 
 // See QXmppOmemoManager for documentation
 QXmppTask<bool> ManagerPrivate::resetAll()
 {
-    QXmppPromise<bool> interface;
-
     initialized = false;
 
-    auto task = interface.task();
-    resetOwnDeviceLocally().then(q, [this, interface = std::move(interface)]() mutable {
-        deleteNode(ns_omemo_2_devices.toString()).then(q, [this, interface = std::move(interface)](bool isDevicesNodeDeleted) mutable {
-            if (isDevicesNodeDeleted) {
-                deleteNode(ns_omemo_2_bundles.toString()).then(q, [this, interface = std::move(interface)](bool isBundlesNodeDeleted) mutable {
-                    if (isBundlesNodeDeleted) {
-                        resetCachedData();
-                    }
+    co_await resetOwnDeviceLocally().withContext(q);
 
-                    interface.finish(std::move(isBundlesNodeDeleted));
-                });
-            } else {
-                interface.finish(false);
-            }
-        });
-    });
+    if (!co_await deleteNode(ns_omemo_2_devices.toString()).withContext(q)) {
+        co_return false;
+    }
 
-    return task;
+    bool deleted = co_await deleteNode(ns_omemo_2_bundles.toString()).withContext(q);
+    if (deleted) {
+        resetCachedData();
+    }
+    co_return deleted;
 }
 
 //

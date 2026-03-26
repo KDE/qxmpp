@@ -239,51 +239,36 @@ QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(const QString &ji
 ///
 QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::fetchRoomAvatar(const QString &jid)
 {
-    QXmppPromise<Result<std::optional<Avatar>>> p;
-    auto t = p.task();
+    auto infoResult = co_await d->disco()->info(jid).withContext(this);
+    if (!hasValue(infoResult)) {
+        co_return getError(std::move(infoResult));
+    }
 
-    d->disco()->info(jid).then(this, [this, jid, p = std::move(p)](auto result) mutable {
-        if (!hasValue(result)) {
-            p.finish(getError(std::move(result)));
-            return;
-        }
+    auto &info = getValue(infoResult);
+    if (!contains(info.features(), ns_vcard)) {
+        co_return std::nullopt;
+    }
 
-        auto &info = getValue(result);
-        if (!contains(info.features(), ns_vcard)) {
-            p.finish(std::nullopt);
-            return;
-        }
+    auto roomInfo = info.template dataForm<QXmppMucRoomInfo>();
+    if (!roomInfo.has_value()) {
+        co_return std::nullopt;
+    }
+    auto hashes = roomInfo->avatarHashes();
+    if (hashes.isEmpty()) {
+        co_return std::nullopt;
+    }
 
-        auto roomInfo = info.template dataForm<QXmppMucRoomInfo>();
-        if (!roomInfo.has_value()) {
-            p.finish(std::nullopt);
-            return;
-        }
-        auto hashes = roomInfo->avatarHashes();
-        if (hashes.isEmpty()) {
-            p.finish(std::nullopt);
-            return;
-        }
+    auto iqResponse = parseIq<QXmppVCardIq>(co_await client()->sendIq(QXmppVCardIq(jid)).withContext(this));
+    if (hasError(iqResponse)) {
+        co_return getError(std::move(iqResponse));
+    }
 
-        client()->sendIq(QXmppVCardIq(jid)).then(this, [this, hashes, p = std::move(p)](auto &&result) mutable {
-            auto iqResponse = parseIq<QXmppVCardIq>(std::move(result));
-            if (hasError(iqResponse)) {
-                p.finish(getError(std::move(iqResponse)));
-                return;
-            }
-
-            const auto &vcard = getValue(iqResponse);
-
-            auto hexHash = QString::fromUtf8(QCryptographicHash::hash(vcard.photo(), QCryptographicHash::Sha1).toHex());
-            if (!contains(hashes, hexHash)) {
-                p.finish(QXmppError { u"Avatar hash mismatch"_s });
-            } else {
-                p.finish(Avatar { vcard.photoType(), vcard.photo() });
-            }
-        });
-    });
-
-    return t;
+    const auto &vcard = getValue(iqResponse);
+    auto hexHash = QString::fromUtf8(QCryptographicHash::hash(vcard.photo(), QCryptographicHash::Sha1).toHex());
+    if (!contains(hashes, hexHash)) {
+        co_return QXmppError { u"Avatar hash mismatch"_s };
+    }
+    co_return Avatar { vcard.photoType(), vcard.photo() };
 }
 
 /// Handles incoming PubSub events.

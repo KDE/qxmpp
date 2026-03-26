@@ -543,57 +543,49 @@ void QXmppHttpUploadManager::onUnregistered(QXmppClient *client)
 
 QXmppTask<void> QXmppHttpUploadManager::updateService(const QString &jid)
 {
-    QXmppPromise<void> promise;
-    auto task = promise.task();
+    auto result = co_await d->discoveryManager()->info(jid).withContext(this);
 
-    d->discoveryManager()->info(jid).then(this, [this, jid, promise = std::move(promise)](Result<QXmppDiscoInfo> &&result) mutable {
-        if (hasError(result)) {
-            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, getError(result).description));
-            promise.finish();
-        } else {
-            auto info = getValue(std::move(result));
-            const auto &features = info.features();
+    if (hasError(result)) {
+        warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, getError(result).description));
+        co_return;
+    }
 
-            if (!contains(features, ns_http_upload)) {
-                promise.finish();
-                return;
-            }
+    auto info = getValue(std::move(result));
+    const auto &features = info.features();
 
-            const auto &identities = info.identities();
-            auto oldSupport = d->support;
-            bool servicesAdded = false;
+    if (!contains(features, ns_http_upload)) {
+        co_return;
+    }
 
-            for (const auto &identity : identities) {
-                if (identity.category() == u"store" && identity.type() == u"file") {
-                    QXmppHttpUploadService service;
-                    service.setJid(jid);
+    const auto &identities = info.identities();
+    auto oldSupport = d->support;
+    bool servicesAdded = false;
 
-                    if (auto form = info.dataForm(ns_http_upload)) {
-                        if (auto maxSizeValue = form->fieldValue(u"max-file-size")) {
-                            service.setSizeLimit(parseInt<uint64_t>(maxSizeValue->toString()));
-                        }
-                    }
+    for (const auto &identity : identities) {
+        if (identity.category() == u"store" && identity.type() == u"file") {
+            QXmppHttpUploadService service;
+            service.setJid(jid);
 
-                    d->services.append(service);
-                    servicesAdded = true;
+            if (auto form = info.dataForm(ns_http_upload)) {
+                if (auto maxSizeValue = form->fieldValue(u"max-file-size")) {
+                    service.setSizeLimit(parseInt<uint64_t>(maxSizeValue->toString()));
                 }
             }
 
-            if (servicesAdded) {
-                Q_EMIT servicesChanged();
-
-                d->support = Support::Supported;
-            }
-
-            if (oldSupport != d->support) {
-                Q_EMIT supportChanged();
-            }
-
-            promise.finish();
+            d->services.append(service);
+            servicesAdded = true;
         }
-    });
+    }
 
-    return task;
+    if (servicesAdded) {
+        Q_EMIT servicesChanged();
+
+        d->support = Support::Supported;
+    }
+
+    if (oldSupport != d->support) {
+        Q_EMIT supportChanged();
+    }
 }
 
 void QXmppHttpUploadManager::updateServices()
