@@ -32,8 +32,22 @@ client->connectToServer(config);
 
 \section async Async API
 
-All network operations return a QXmppTask<T>, which represents a pending result. Use
-\c .then() to attach a callback when it completes:
+All network operations return a QXmppTask<T>, which represents a pending result.
+QXmppTask supports \c co_await, making sequential async code straightforward:
+
+\code
+QXmppTask<void> MyManager::doSomething()
+{
+    auto result = co_await muc->joinRoom("room@conference.example.org", "MyNick").withContext(this);
+    if (auto *err = std::get_if<QXmppError>(&result)) {
+        qWarning() << "Join failed:" << err->description;
+        co_return;
+    }
+    // continue ...
+}
+\endcode
+
+Alternatively, use \c .then() to attach a callback:
 
 \code
 muc->joinRoom("room@conference.example.org", "MyNick").then(this, [](auto result) {
@@ -44,6 +58,8 @@ muc->joinRoom("room@conference.example.org", "MyNick").then(this, [](auto result
 \endcode
 
 Results are typically \c QXmpp::Result<T>, a \c std::variant<T, QXmppError>.
+Always pass a context object (\c this) to \c .then() or \c .withContext() to ensure
+the callback is not invoked after the object has been destroyed.
 
 \section managers Managers
 
