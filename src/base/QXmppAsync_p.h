@@ -11,7 +11,7 @@
 #include <variant>
 
 class QDomElement;
-class QXmppError;
+struct QXmppError;
 
 namespace QXmpp::Private {
 
