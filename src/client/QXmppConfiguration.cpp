@@ -14,6 +14,7 @@
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
+#include <QLocale>
 #include <QNetworkProxy>
 #include <QSslSocket>
 
@@ -114,6 +115,8 @@ public:
     QString saslAuthMechanism;
     QList<QString> disabledSaslMechanisms = { u"PLAIN"_s };
     std::optional<QXmppSasl2UserAgent> sasl2UserAgent;
+
+    QString locale;
 
     QNetworkProxy networkProxy;
 
@@ -637,6 +640,46 @@ std::optional<QXmppSasl2UserAgent> QXmppConfiguration::sasl2UserAgent() const
 void QXmppConfiguration::setSasl2UserAgent(const std::optional<QXmppSasl2UserAgent> &userAgent)
 {
     d->sasl2UserAgent = userAgent;
+}
+
+///
+/// Returns the preferred language for the XMPP stream.
+///
+/// If no locale has been explicitly set, this returns the system locale's BCP 47 language tag
+/// (e.g. "en", "de-DE").
+///
+/// The returned value is used as the \c xml:lang attribute on the XMPP stream element, as
+/// specified in RFC 6120 Section 4.7.4.
+///
+/// \since QXmpp 1.15
+///
+QString QXmppConfiguration::locale() const
+{
+    if (d->locale.isEmpty()) {
+        // Check locale environment variables directly because QLocale::system() may
+        // not reflect the user's intended locale if it is not installed on the system.
+        for (auto *var : { "LC_ALL", "LC_MESSAGES", "LANG" }) {
+            auto value = qEnvironmentVariable(var);
+            if (!value.isEmpty() && value != u"C" && value != u"POSIX") {
+                return QLocale(value).bcp47Name();
+            }
+        }
+
+        return QLocale::system().bcp47Name();
+    }
+    return d->locale;
+}
+
+///
+/// Sets the preferred language for the XMPP stream.
+///
+/// Pass an empty string to reset to auto-detection from the system locale.
+///
+/// \since QXmpp 1.15
+///
+void QXmppConfiguration::setLocale(const QString &locale)
+{
+    d->locale = locale;
 }
 
 ///

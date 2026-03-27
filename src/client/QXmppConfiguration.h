@@ -150,6 +150,9 @@ public:
     int keepAliveTimeout() const;
     void setKeepAliveTimeout(int secs);
 
+    QString locale() const;
+    void setLocale(const QString &);
+
     QList<QSslCertificate> caCertificates() const;
     void setCaCertificates(const QList<QSslCertificate> &);
 

@@ -29,6 +29,7 @@ struct StreamOpen {
     QString id;
     QString version;
     QString xmlns;
+    QString xmlLang;
 };
 
 struct StarttlsRequest {

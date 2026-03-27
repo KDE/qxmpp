@@ -626,6 +626,7 @@ void QXmppOutgoingClient::handleStart()
         {},
         u"1.0"_s,
         ns_client.toString(),
+        d->config.locale(),
     }));
 }
 

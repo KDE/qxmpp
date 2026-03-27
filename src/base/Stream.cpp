@@ -46,6 +46,7 @@ StreamOpen StreamOpen::fromXml(QXmlStreamReader &reader)
     out.to = attribute({}, u"to");
     out.id = attribute({}, u"id");
     out.version = attribute({}, u"version");
+    out.xmlLang = attribute(ns_xml, u"lang");
 
     const auto namespaceDeclarations = reader.namespaceDeclarations();
     for (const auto &ns : namespaceDeclarations) {
@@ -65,6 +66,7 @@ void StreamOpen::toXml(XmlWriter &w) const
     w.write(OptionalAttribute { u"to", to });
     w.write(OptionalAttribute { u"id", id });
     w.write(OptionalAttribute { u"version", version });
+    w.write(OptionalAttribute { u"xml:lang", xmlLang });
     w.write(DefaultNamespace { xmlns });
     w.write(Namespace { u"stream", ns_stream });
     w.write(Characters { QString() });
