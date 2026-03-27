@@ -38,8 +38,12 @@ target_sources(${QXMPPOMEMO_TARGET} PRIVATE $<TARGET_OBJECTS:${QXMPPOMEMO_TARGET
 
 target_link_libraries(${QXMPPOMEMO_TARGET}
     PUBLIC ${QXMPP_TARGET}
-    PRIVATE ${QXMPPOMEMO_TARGET}_internal
 )
+if(BUILD_SHARED)
+    target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE ${QXMPPOMEMO_TARGET}_internal)
+else()
+    target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE PkgConfig::OmemoC qca-qt${QT_VERSION_MAJOR})
+endif()
 target_include_directories(${QXMPPOMEMO_TARGET}
     PUBLIC
     $<INSTALL_INTERFACE:include/${QXMPP_TARGET}/Omemo>
