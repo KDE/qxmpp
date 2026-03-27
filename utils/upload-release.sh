@@ -67,3 +67,28 @@ mv $work_dir/$compressed_archive $work_dir/$compressed_archive.sig ./
 # clean up
 rm -rf ${work_dir}
 
+# Update craft blueprint
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+craft_dir="${script_dir}/../../craft-blueprints-kde"
+craft_blueprint="${craft_dir}/qt-libs/qxmpp/qxmpp.py"
+
+if [ -d "$craft_dir" ] && [ -f "$craft_blueprint" ]; then
+    hash=$(sha256sum "$compressed_archive" | cut -d' ' -f1)
+    branch="work/$(whoami)/qxmpp-${version}"
+
+    git -C "$craft_dir" fetch origin
+    git -C "$craft_dir" checkout -b "$branch" origin/master
+
+    sed -i "s/for ver in \[\"[^\"]*\"\]/for ver in [\"${version}\"]/" "$craft_blueprint"
+    sed -i "s/self\.targetDigests\[\"[^\"]*\"\] = (\[\"[^\"]*\"\]/self.targetDigests[\"${version}\"] = ([\"${hash}\"]/" "$craft_blueprint"
+    sed -i "s/self\.defaultTarget = \"[^\"]*\"/self.defaultTarget = \"${version}\"/" "$craft_blueprint"
+
+    git -C "$craft_dir" add "$craft_blueprint"
+    git -C "$craft_dir" commit -m "Update qxmpp to ${version}"
+    git -C "$craft_dir" push -o merge_request.create -o merge_request.remove_source_branch -u origin "$branch"
+
+    echo "Craft blueprint merge request created."
+else
+    echo "Craft blueprints repo not found at ${craft_dir}, skipping blueprint update."
+fi
+
