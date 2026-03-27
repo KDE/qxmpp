@@ -362,8 +362,21 @@ set_target_properties(${QXMPP_TARGET} PROPERTIES
 )
 target_link_libraries(${QXMPP_TARGET}
     PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Xml
-    PRIVATE ${QXMPP_TARGET}_internal
 )
+# For shared builds: link _internal privately to propagate GStreamer/QCA deps.
+# For static builds: this would require _internal to be in the export set; instead we
+# include objects via target_sources above and add the link deps explicitly below.
+if(BUILD_SHARED)
+    target_link_libraries(${QXMPP_TARGET} PRIVATE ${QXMPP_TARGET}_internal)
+endif()
+if(NOT BUILD_SHARED)
+    if(WITH_GSTREAMER)
+        target_link_libraries(${QXMPP_TARGET} PRIVATE PkgConfig::GStreamer)
+    endif()
+    if(WITH_QCA)
+        target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt${QT_VERSION_MAJOR})
+    endif()
+endif()
 target_include_directories(${QXMPP_TARGET}
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/base>
