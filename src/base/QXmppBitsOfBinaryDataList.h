@@ -7,9 +7,9 @@
 
 #include "QXmppBitsOfBinaryData.h"
 
-#include <QVector>
-
 #include <optional>
+
+#include <QVector>
 
 class QDomElement;
 class QXmlStreamWriter;
