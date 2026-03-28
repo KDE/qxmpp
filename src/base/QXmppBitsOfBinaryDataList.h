@@ -9,6 +9,8 @@
 
 #include <QVector>
 
+#include <optional>
+
 class QDomElement;
 class QXmlStreamWriter;
 
@@ -17,6 +19,8 @@ class QXMPP_EXPORT QXmppBitsOfBinaryDataList : public QVector<QXmppBitsOfBinaryD
 public:
     QXmppBitsOfBinaryDataList();
     ~QXmppBitsOfBinaryDataList();
+
+    std::optional<QXmppBitsOfBinaryData> find(const QXmppBitsOfBinaryContentId &cid) const;
 
     /// \cond
     QXmppBitsOfBinaryDataList(const QVector<QXmppBitsOfBinaryData> &data) : QVector<QXmppBitsOfBinaryData>(data) { }

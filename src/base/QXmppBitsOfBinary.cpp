@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "Algorithms.h"
 #include "QXmppBitsOfBinaryContentId.h"
 #include "QXmppBitsOfBinaryDataList.h"
 #include "QXmppBitsOfBinaryIq.h"
@@ -217,6 +218,18 @@ bool QXmppBitsOfBinaryData::operator==(const QXmppBitsOfBinaryData &other) const
 QXmppBitsOfBinaryDataList::QXmppBitsOfBinaryDataList() = default;
 
 QXmppBitsOfBinaryDataList::~QXmppBitsOfBinaryDataList() = default;
+
+///
+/// Searches for a data element matching the given content ID.
+///
+/// \returns the matching data element or std::nullopt if not found
+///
+/// \since QXmpp 1.15
+///
+std::optional<QXmppBitsOfBinaryData> QXmppBitsOfBinaryDataList::find(const QXmppBitsOfBinaryContentId &cid) const
+{
+    return QXmpp::Private::find(*this, cid, &QXmppBitsOfBinaryData::cid);
+}
 
 /// \cond
 void QXmppBitsOfBinaryDataList::parse(const QDomElement &element)

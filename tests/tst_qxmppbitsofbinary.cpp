@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppBitsOfBinaryContentId.h"
+#include "QXmppBitsOfBinaryDataList.h"
 #include "QXmppBitsOfBinaryIq.h"
 
 #include "util.h"
@@ -40,6 +41,8 @@ private:
     Q_SLOT void testIsBobContentId();
 
     Q_SLOT void testUnsupportedAlgorithm();
+
+    Q_SLOT void testDataListFind();
 };
 
 void tst_QXmppBitsOfBinary::testIq()
@@ -399,6 +402,36 @@ void tst_QXmppBitsOfBinary::testUnsupportedAlgorithm()
         QXmppBitsOfBinaryContentId::fromContentId(
             u"blake2s160+8f35fef110ffc5df08d579a50083ff9308fb6242@bob.xmpp.org"_s),
         QXmppBitsOfBinaryContentId());
+}
+
+void tst_QXmppBitsOfBinary::testDataListFind()
+{
+    auto data1 = QXmppBitsOfBinaryData::fromByteArray(QByteArrayLiteral("hello"));
+    auto data2 = QXmppBitsOfBinaryData::fromByteArray(QByteArrayLiteral("world"));
+
+    QXmppBitsOfBinaryDataList list;
+    list.append(data1);
+    list.append(data2);
+
+    // find existing element
+    auto result = list.find(data1.cid());
+    QVERIFY(result.has_value());
+    QCOMPARE(*result, data1);
+
+    // find second element
+    result = list.find(data2.cid());
+    QVERIFY(result.has_value());
+    QCOMPARE(*result, data2);
+
+    // find non-existing element
+    auto data3 = QXmppBitsOfBinaryData::fromByteArray(QByteArrayLiteral("missing"));
+    result = list.find(data3.cid());
+    QVERIFY(!result.has_value());
+
+    // find in empty list
+    QXmppBitsOfBinaryDataList emptyList;
+    result = emptyList.find(data1.cid());
+    QVERIFY(!result.has_value());
 }
 
 QTEST_MAIN(tst_QXmppBitsOfBinary)
