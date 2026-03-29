@@ -92,10 +92,14 @@ enum class LeaveReason {
     Banned,
     /// The participant was removed because their affiliation changed (status 321).
     AffiliationChanged,
-    /// The participant was removed because the room became members-only (status 332).
+    /// The participant was removed because the room became members-only (status 322).
     MembersOnly,
     /// The room was destroyed by its owner (XEP-0045 §10.9).
     RoomDestroyed,
+    /// The participant was removed because the MUC service is being shut down (status 332).
+    ServiceShutdown,
+    /// The participant was removed because of an error (status 333).
+    Error,
 };
 
 ///
