@@ -189,6 +189,46 @@ void UserQuery::toXml(QXmlStreamWriter *writer) const
 }
 /// \endcond
 
+///
+/// Constructs a direct invitation for the room at \a jid.
+///
+DirectInvitation::DirectInvitation(QString jid, QString password, QString reason, bool isContinue, QString thread)
+    : m_jid(std::move(jid)),
+      m_password(std::move(password)),
+      m_reason(std::move(reason)),
+      m_continue(isContinue),
+      m_thread(std::move(thread))
+{
+}
+
+/// \cond
+std::optional<DirectInvitation> DirectInvitation::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    DirectInvitation inv;
+    inv.m_jid = el.attribute(u"jid"_s);
+    inv.m_password = el.attribute(u"password"_s);
+    inv.m_reason = el.attribute(u"reason"_s);
+    inv.m_continue = parseBoolean(el.attribute(u"continue"_s)).value_or(false);
+    inv.m_thread = el.attribute(u"thread"_s);
+    return inv;
+}
+
+void DirectInvitation::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        Tag { u"x", ns_conference },
+        Attribute { u"jid", m_jid },
+        OptionalAttribute { u"password", m_password },
+        OptionalAttribute { u"reason", m_reason },
+        OptionalAttribute { u"continue", DefaultedBool { m_continue, false } },
+        OptionalAttribute { u"thread", m_thread },
+    });
+}
+/// \endcond
+
 }  // namespace QXmpp::Muc
 
 namespace QXmpp::Private {
