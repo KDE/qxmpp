@@ -93,6 +93,8 @@ private:
     Q_SLOT void invitationDeclined();
     Q_SLOT void directInvitationReceived();
     Q_SLOT void sendDirectInvitation();
+    Q_SLOT void requestReservedNickname();
+    Q_SLOT void requestReservedNicknameNone();
 
     // Room creation and configuration
     Q_SLOT void joinRoomNotFound();
@@ -2796,6 +2798,52 @@ void tst_QXmppMuc::sendDirectInvitation()
                 " thread='thread123'/>"
                 "</message>"_s);
     QVERIFY(!task.isFinished());
+}
+
+void tst_QXmppMuc::requestReservedNickname()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    auto task = room.requestReservedNickname();
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info' node='x-roomuser-item'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info' node='x-roomuser-item'>"
+                "<identity category='conference' type='text' name='thirdwitch'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(task.isFinished());
+    QCOMPARE(expectFutureVariant<QString>(task), u"thirdwitch"_s);
+}
+
+void tst_QXmppMuc::requestReservedNicknameNone()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    auto task = room.requestReservedNickname();
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info' node='x-roomuser-item'/>"
+                "</iq>"_s);
+
+    // No identity returned — no reserved nickname
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info' node='x-roomuser-item'/>"
+                "</iq>"_s);
+
+    QVERIFY(task.isFinished());
+    QCOMPARE(expectFutureVariant<QString>(task), QString());
 }
 
 QTEST_MAIN(tst_QXmppMuc)
