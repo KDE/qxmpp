@@ -13,12 +13,11 @@
 #include "QXmppOmemoStorage.h"
 #include "QXmppPubSubManager.h"
 
+#include "Crypto.h"
 #include "OmemoLibWrappers.h"
-#include "QcaInitializer_p.h"
 
 #include <QDomElement>
 #include <QTimer>
-#include <QtCrypto>
 
 #undef max
 
@@ -35,6 +34,7 @@ class QXmppOmemoDeviceBundleItem;
 
 using namespace QXmpp;
 using namespace std::chrono_literals;
+using SecureByteArray = QXmpp::Private::Crypto::SecureByteArray;
 
 namespace QXmpp::Omemo::Private {
 
@@ -81,16 +81,11 @@ constexpr auto DEVICE_REMOVAL_INTERVAL = 24h * 7 * 12;
 // interval to check for devices removed from their servers
 constexpr auto DEVICE_REMOVAL_CHECK_INTERVAL = 24h;
 
-constexpr QStringView PAYLOAD_CIPHER_TYPE = u"aes256";
-constexpr QCA::Cipher::Mode PAYLOAD_CIPHER_MODE = QCA::Cipher::CBC;
-constexpr QCA::Cipher::Padding PAYLOAD_CIPHER_PADDING = QCA::Cipher::PKCS7;
-
 inline constexpr auto HKDF_INFO = "OMEMO Payload";
 constexpr int HKDF_KEY_SIZE = 32;
 constexpr int HKDF_SALT_SIZE = 32;
 constexpr int HKDF_OUTPUT_SIZE = 80;
 
-inline constexpr QStringView PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE = u"hmac(sha256)";
 constexpr uint32_t PAYLOAD_MESSAGE_AUTHENTICATION_CODE_SIZE = 16;
 
 constexpr int PAYLOAD_KEY_SIZE = 32;
@@ -102,7 +97,7 @@ constexpr uint32_t SCE_RPAD_SIZE_MIN = 0;
 constexpr uint32_t SCE_RPAD_SIZE_MAX = 200;
 
 struct PayloadEncryptionResult {
-    QCA::SecureArray decryptionData;
+    SecureByteArray decryptionData;
     QByteArray encryptedPayload;
 };
 
@@ -135,7 +130,6 @@ public:
     QXmppTrustManager *trustManager = nullptr;
     QXmppPubSubManager *pubSubManager = nullptr;
 
-    QcaInitializer cryptoLibInitializer;
     QTimer signedPreKeyPairsRenewalTimer;
     QTimer deviceRemovalTimer;
 
@@ -197,7 +191,7 @@ public:
     std::optional<PayloadEncryptionResult> encryptPayload(const QByteArray &payload) const;
     template<typename T>
     QByteArray createSceEnvelope(const T &stanza);
-    QByteArray createOmemoEnvelopeData(const signal_protocol_address &address, const QCA::SecureArray &payloadDecryptionData) const;
+    QByteArray createOmemoEnvelopeData(const signal_protocol_address &address, const SecureByteArray &payloadDecryptionData) const;
 
     QXmppTask<std::optional<QXmppMessage>> decryptMessage(QXmppMessage stanza);
     QXmppTask<std::optional<IqDecryptionResult>> decryptIq(const QDomElement &iqElement);
@@ -213,11 +207,11 @@ public:
                                              const QXmppOmemoEnvelope &omemoEnvelope,
                                              const QByteArray &omemoPayload,
                                              bool isMessageStanza);
-    QXmppTask<std::optional<QCA::SecureArray>> extractPayloadDecryptionData(const QString &senderJid,
-                                                                            uint32_t senderDeviceId,
-                                                                            const QXmppOmemoEnvelope &omemoEnvelope,
-                                                                            bool isMessageStanza = true);
-    QByteArray decryptPayload(const QCA::SecureArray &payloadDecryptionData, const QByteArray &payload) const;
+    QXmppTask<std::optional<SecureByteArray>> extractPayloadDecryptionData(const QString &senderJid,
+                                                                           uint32_t senderDeviceId,
+                                                                           const QXmppOmemoEnvelope &omemoEnvelope,
+                                                                           bool isMessageStanza = true);
+    QByteArray decryptPayload(const SecureByteArray &payloadDecryptionData, const QByteArray &payload) const;
 
     QXmppTask<bool> publishOmemoData();
 

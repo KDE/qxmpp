@@ -24,8 +24,10 @@ set(CMAKE_AUTORCC ON)
 set(QT_VERSION_MAJOR 6)
 find_package(Qt6 6.4.0 REQUIRED COMPONENTS Core Network Xml)
 
-# QCA (optional)
-find_package(Qca-qt6 QUIET)
+# OpenSSL 3.0+ (optional, for encryption features)
+# OpenSSL 3.0+ uses the Apache-2.0 license which is compatible with LGPL-2.1-or-later
+# only via the "or later" clause. Binaries built with this option are effectively LGPL-3.0+.
+find_package(OpenSSL 3.0 QUIET)
 
 include(GNUInstallDirs)
 
@@ -42,7 +44,7 @@ option(BUILD_EXAMPLES "Build examples." ON)
 option(BUILD_OMEMO "Build the OMEMO module." OFF)
 option(WITH_GSTREAMER "Build with GStreamer support for Jingle." OFF)
 option(WITH_PKGCONFIG "Use PkgConfig when building." ON)
-option(WITH_QCA "Build with QCA for OMEMO or encrypted file sharing." ${Qca-qt6_FOUND})
+option(WITH_ENCRYPTION "Build with OpenSSL for OMEMO or encrypted file sharing. Resulting binaries are LGPL-3.0+." ${OPENSSL_FOUND})
 option(ENABLE_ASAN "Build with address sanitizer." OFF)
 
 if(WITH_PKGCONFIG)
@@ -82,14 +84,14 @@ if(BUILD_OMEMO)
     # libomemo-c
     pkg_check_modules(OmemoC REQUIRED IMPORTED_TARGET libomemo-c)
 
-    # QCA
-    if(NOT WITH_QCA)
-        message(FATAL_ERROR "OMEMO requires QCA (Qt Cryptographic Architecture)")
+    # OpenSSL
+    if(NOT WITH_ENCRYPTION)
+        message(FATAL_ERROR "OMEMO requires OpenSSL (WITH_ENCRYPTION=ON)")
     endif()
 endif()
 
-if(WITH_QCA)
-    add_definitions(-DWITH_QCA)
+if(WITH_ENCRYPTION)
+    add_definitions(-DWITH_ENCRYPTION)
 endif()
 
 if(WITH_GSTREAMER)

@@ -11,19 +11,19 @@
 
 #include <QIODevice>
 
-namespace QCA {
-class Cipher;
-class Initializer;
-}  // namespace QCA
+namespace QXmpp::Private::Crypto {
+class CipherContext;
+}
 
 namespace QXmpp::Private::Encryption {
+
+using CipherContext = Crypto::CipherContext;
 
 enum Direction {
     Encode,
     Decode,
 };
 
-QXMPP_EXPORT bool isSupported(Cipher);
 QXMPP_EXPORT QByteArray process(const QByteArray &data, Cipher cipherConfig, Direction direction, const QByteArray &key, const QByteArray &iv);
 QXMPP_EXPORT QByteArray generateKey(Cipher cipher);
 QXMPP_EXPORT QByteArray generateInitializationVector(Cipher);
@@ -48,7 +48,7 @@ private:
     bool m_finalized = false;
     std::vector<char> m_outputBuffer;
     std::unique_ptr<QIODevice> m_input;
-    std::unique_ptr<QCA::Cipher> m_cipher;
+    std::unique_ptr<CipherContext> m_cipher;
 };
 
 class QXMPP_EXPORT DecryptionDevice : public QIODevice
@@ -69,7 +69,7 @@ private:
     Cipher m_cipherConfig;
     std::vector<char> m_outputBuffer;
     std::unique_ptr<QIODevice> m_output;
-    std::unique_ptr<QCA::Cipher> m_cipher;
+    std::unique_ptr<CipherContext> m_cipher;
 };
 
 }  // namespace QXmpp::Private::Encryption

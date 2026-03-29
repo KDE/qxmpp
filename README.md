@@ -51,6 +51,11 @@ additional features.
 
 QXmpp is released under the terms of the GNU Lesser General Public License, version 2.1 or later.
 
+When built with `WITH_ENCRYPTION=ON` (linking against OpenSSL 3.0+, Apache-2.0), the resulting
+binaries are effectively licensed under **LGPL-3.0-or-later**, since Apache-2.0 is only compatible
+with LGPL-2.1-or-later via the "or later" clause. The OMEMO module additionally links against
+libomemo-c (GPL-3.0), making those binaries **GPL-3.0**.
+
 ## Building
 
 QXmpp requires **Qt 6.4 or higher**.
@@ -72,6 +77,7 @@ Option | Default | Description
 `BUILD_EXAMPLES` | `ON` | Build examples
 `BUILD_TESTING` | `ON` | Build unit tests
 `BUILD_OMEMO` | `OFF` | Build the [OMEMO module][omemo]
+`WITH_ENCRYPTION` | `ON` (if OpenSSL found) | Enable encrypted file sharing (requires OpenSSL 3.0+)
 `WITH_GSTREAMER` | `OFF` | Enable audio/video over Jingle
 
 For example, to build without unit tests you could do:

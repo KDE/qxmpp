@@ -337,11 +337,11 @@ if(BUILD_OMEMO)
     target_sources(${QXMPP_TARGET}_internal PRIVATE base/QXmppOmemoDataBase.cpp)
 endif()
 
-if(WITH_QCA)
+if(WITH_ENCRYPTION)
     target_sources(${QXMPP_TARGET}_internal
-        PRIVATE client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp client/QcaInitializer.cpp)
+        PRIVATE base/Crypto.cpp client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp)
     set(INSTALL_HEADER_FILES ${INSTALL_HEADER_FILES} client/QXmppEncryptedFileSharingProvider.h)
-    target_link_libraries(${QXMPP_TARGET}_internal PUBLIC qca-qt6)
+    target_link_libraries(${QXMPP_TARGET}_internal PUBLIC OpenSSL::Crypto)
 endif()
 
 #
@@ -363,7 +363,7 @@ set_target_properties(${QXMPP_TARGET} PROPERTIES
 target_link_libraries(${QXMPP_TARGET}
     PUBLIC Qt6::Core Qt6::Network Qt6::Xml
 )
-# For shared builds: link _internal privately to propagate GStreamer/QCA deps.
+# For shared builds: link _internal privately to propagate GStreamer/OpenSSL deps.
 # For static builds: this would require _internal to be in the export set; instead we
 # include objects via target_sources above and add the link deps explicitly below.
 if(BUILD_SHARED)
@@ -373,8 +373,8 @@ if(NOT BUILD_SHARED)
     if(WITH_GSTREAMER)
         target_link_libraries(${QXMPP_TARGET} PRIVATE PkgConfig::GStreamer)
     endif()
-    if(WITH_QCA)
-        target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt6)
+    if(WITH_ENCRYPTION)
+        target_link_libraries(${QXMPP_TARGET} PRIVATE OpenSSL::Crypto)
     endif()
 endif()
 target_include_directories(${QXMPP_TARGET}

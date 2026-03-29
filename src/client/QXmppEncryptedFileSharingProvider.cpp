@@ -13,7 +13,6 @@
 
 #include "Algorithms.h"
 #include "Async.h"
-#include "QcaInitializer_p.h"
 #include "StringLiterals.h"
 
 #include <QMimeDatabase>
@@ -34,7 +33,6 @@ constexpr auto ENCRYPTION_DEFAULT_CIPHER = Aes256CbcPkcs7;
 class QXmppEncryptedFileSharingProviderPrivate
 {
 public:
-    QcaInitializer init;
     QXmppFileSharingManager *manager;
     std::shared_ptr<QXmppFileSharingProvider> uploadBaseProvider;
 };

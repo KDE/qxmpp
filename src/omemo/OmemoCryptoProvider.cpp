@@ -8,9 +8,11 @@
 #include "QXmppOmemoManager_p.h"
 #include "QXmppUtils_p.h"
 
+#include "Crypto.h"
 #include "StringLiterals.h"
 
-#include <QtCrypto>
+#include <QCryptographicHash>
+#include <QMessageAuthenticationCode>
 
 using namespace QXmpp::Private;
 
@@ -25,34 +27,28 @@ static int random_func(uint8_t *data, size_t len, void *)
     return 0;
 }
 
-int hmac_sha256_init_func(void **hmac_context, const uint8_t *key, size_t key_len, void *user_data)
+int hmac_sha256_init_func(void **hmac_context, const uint8_t *key, size_t key_len, void *)
 {
-    auto *d = managerPrivate(user_data);
-
-    if (!QCA::MessageAuthenticationCode::supportedTypes().contains(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE)) {
-        d->warning(u"Message authentication code type '" + PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE + u"' is not supported by this system");
-        return -1;
-    }
-
-    QCA::SymmetricKey authenticationKey(QByteArray(reinterpret_cast<const char *>(key), key_len));
-    *hmac_context = new QCA::MessageAuthenticationCode(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE.toString(), authenticationKey);
+    auto *mac = new QMessageAuthenticationCode(QCryptographicHash::Sha256,
+                                               QByteArray(reinterpret_cast<const char *>(key), key_len));
+    *hmac_context = mac;
     return 0;
 }
 
 int hmac_sha256_update_func(void *hmac_context, const uint8_t *data, size_t data_len, void *)
 {
-    auto *messageAuthenticationCodeGenerator = reinterpret_cast<QCA::MessageAuthenticationCode *>(hmac_context);
-    messageAuthenticationCodeGenerator->update(QCA::MemoryRegion(QByteArray(reinterpret_cast<const char *>(data), data_len)));
+    auto *mac = reinterpret_cast<QMessageAuthenticationCode *>(hmac_context);
+    mac->addData(QByteArrayView(reinterpret_cast<const char *>(data), data_len));
     return 0;
 }
 
 int hmac_sha256_final_func(void *hmac_context, signal_buffer **output, void *user_data)
 {
     auto *d = managerPrivate(user_data);
-    auto *messageAuthenticationCodeGenerator = reinterpret_cast<QCA::MessageAuthenticationCode *>(hmac_context);
+    auto *mac = reinterpret_cast<QMessageAuthenticationCode *>(hmac_context);
 
-    auto messageAuthenticationCode = messageAuthenticationCodeGenerator->final();
-    if (!(*output = signal_buffer_create(reinterpret_cast<const uint8_t *>(messageAuthenticationCode.constData()), messageAuthenticationCode.size()))) {
+    auto result = mac->result();
+    if (!(*output = signal_buffer_create(reinterpret_cast<const uint8_t *>(result.constData()), result.size()))) {
         d->warning(u"Message authentication code could not be loaded"_s);
         return -1;
     }
@@ -62,8 +58,8 @@ int hmac_sha256_final_func(void *hmac_context, signal_buffer **output, void *use
 
 void hmac_sha256_cleanup_func(void *hmac_context, void *)
 {
-    auto *messageAuthenticationCodeGenerator = reinterpret_cast<QCA::MessageAuthenticationCode *>(hmac_context);
-    delete messageAuthenticationCodeGenerator;
+    auto *mac = reinterpret_cast<QMessageAuthenticationCode *>(hmac_context);
+    delete mac;
 }
 
 int sha512_digest_init_func(void **digest_context, void *)
@@ -108,43 +104,22 @@ int encrypt_func(signal_buffer **output,
 {
     auto *d = managerPrivate(user_data);
 
-    QString cipherName;
+    const auto keyData = QByteArray(reinterpret_cast<const char *>(key), key_len);
+    const auto ivData = QByteArray(reinterpret_cast<const char *>(iv), iv_len);
+    const auto plaintextData = QByteArray(reinterpret_cast<const char *>(plaintext), plaintext_len);
 
-    switch (key_len) {
-    case 128 / 8:
-        cipherName = u"aes128"_s;
-        break;
-    case 192 / 8:
-        cipherName = u"aes192"_s;
-        break;
-    case 256 / 8:
-        cipherName = u"aes256"_s;
-        break;
-    default:
-        return -1;
-    }
-
-    QCA::Cipher::Mode mode;
-    QCA::Cipher::Padding padding;
+    QByteArray encryptedData;
 
     switch (cipher) {
     case SG_CIPHER_AES_CTR_NOPADDING:
-        mode = QCA::Cipher::CTR;
-        padding = QCA::Cipher::NoPadding;
+        encryptedData = Crypto::aesCtrProcess(plaintextData, keyData, ivData);
         break;
     case SG_CIPHER_AES_CBC_PKCS5:
-        mode = QCA::Cipher::CBC;
-        padding = QCA::Cipher::PKCS7;
+        encryptedData = Crypto::aesCbcEncrypt(plaintextData, keyData, ivData);
         break;
     default:
         return -2;
     }
-
-    const auto encryptionKey = QCA::SymmetricKey(QByteArray(reinterpret_cast<const char *>(key), key_len));
-    const auto initializationVector = QCA::InitializationVector(QByteArray(reinterpret_cast<const char *>(iv), iv_len));
-    QCA::Cipher encryptionCipher(cipherName, mode, padding, QCA::Encode, encryptionKey, initializationVector);
-
-    auto encryptedData = encryptionCipher.process(QCA::MemoryRegion(QByteArray(reinterpret_cast<const char *>(plaintext), plaintext_len)));
 
     if (encryptedData.isEmpty()) {
         return -3;
@@ -167,43 +142,22 @@ int decrypt_func(signal_buffer **output,
 {
     auto *d = managerPrivate(user_data);
 
-    QString cipherName;
+    const auto keyData = QByteArray(reinterpret_cast<const char *>(key), key_len);
+    const auto ivData = QByteArray(reinterpret_cast<const char *>(iv), iv_len);
+    const auto ciphertextData = QByteArray(reinterpret_cast<const char *>(ciphertext), ciphertext_len);
 
-    switch (key_len) {
-    case 128 / 8:
-        cipherName = u"aes128"_s;
-        break;
-    case 192 / 8:
-        cipherName = u"aes192"_s;
-        break;
-    case 256 / 8:
-        cipherName = u"aes256"_s;
-        break;
-    default:
-        return -1;
-    }
-
-    QCA::Cipher::Mode mode;
-    QCA::Cipher::Padding padding;
+    QByteArray decryptedData;
 
     switch (cipher) {
     case SG_CIPHER_AES_CTR_NOPADDING:
-        mode = QCA::Cipher::CTR;
-        padding = QCA::Cipher::NoPadding;
+        decryptedData = Crypto::aesCtrProcess(ciphertextData, keyData, ivData);
         break;
     case SG_CIPHER_AES_CBC_PKCS5:
-        mode = QCA::Cipher::CBC;
-        padding = QCA::Cipher::PKCS7;
+        decryptedData = Crypto::aesCbcDecrypt(ciphertextData, keyData, ivData);
         break;
     default:
         return -2;
     }
-
-    const auto encryptionKey = QCA::SymmetricKey(QByteArray(reinterpret_cast<const char *>(key), key_len));
-    const auto initializationVector = QCA::InitializationVector(QByteArray(reinterpret_cast<const char *>(iv), iv_len));
-    QCA::Cipher decryptionCipher(cipherName, mode, padding, QCA::Decode, encryptionKey, initializationVector);
-
-    auto decryptedData = decryptionCipher.process(QCA::MemoryRegion(QByteArray(reinterpret_cast<const char *>(ciphertext), ciphertext_len)));
 
     if (decryptedData.isEmpty()) {
         return -3;

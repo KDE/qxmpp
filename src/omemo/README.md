@@ -13,7 +13,7 @@ providing the `QXmppOmemoManager`.
 Dependencies
 ------------
 
- * [QCA (Qt Cryptographic Architecture)](https://invent.kde.org/libraries/qca)
+ * [OpenSSL](https://www.openssl.org/) (3.0+)
  * [libomemo-c](https://github.com/dino/libomemo-c) (built with `-DBUILD_SHARED_LIBS=ON`)
 
 Building

@@ -23,7 +23,7 @@ set(OMEMO_SOURCE_FILES
 # internal object library, all symbols
 add_library(${QXMPPOMEMO_TARGET}_internal OBJECT ${OMEMO_SOURCE_FILES})
 target_link_libraries(${QXMPPOMEMO_TARGET}_internal
-    PUBLIC ${QXMPP_TARGET}_internal PkgConfig::OmemoC qca-qt6
+    PUBLIC ${QXMPP_TARGET}_internal PkgConfig::OmemoC OpenSSL::Crypto
 )
 target_include_directories(${QXMPPOMEMO_TARGET}_internal PUBLIC ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(${QXMPPOMEMO_TARGET}_internal PRIVATE ${QXMPPOMEMO_TARGET}_EXPORTS)
@@ -42,7 +42,7 @@ target_link_libraries(${QXMPPOMEMO_TARGET}
 if(BUILD_SHARED)
     target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE ${QXMPPOMEMO_TARGET}_internal)
 else()
-    target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE PkgConfig::OmemoC qca-qt6)
+    target_link_libraries(${QXMPPOMEMO_TARGET} PRIVATE PkgConfig::OmemoC OpenSSL::Crypto)
 endif()
 target_include_directories(${QXMPPOMEMO_TARGET}
     PUBLIC

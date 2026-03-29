@@ -80,7 +80,7 @@ add_simple_test(qxmpputils resources/extended.qrc)
 add_simple_test(qxmppvcardmanager)
 add_simple_test(qxmppversionmanager)
 
-if(WITH_QCA)
+if(WITH_ENCRYPTION)
     add_simple_test(qxmppfileencryption)
 endif()
 

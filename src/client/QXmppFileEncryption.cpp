@@ -4,32 +4,19 @@
 
 #include "QXmppFileEncryption.h"
 
-#include "StringLiterals.h"
+#include "Crypto.h"
 
 #include <QByteArray>
-#include <QtCrypto>
 
 #undef min
 
-using namespace QCA;
+using namespace QXmpp::Private::Crypto;
 
 constexpr std::size_t AES128_BLOCK_SIZE = 128 / 8;
 constexpr std::size_t AES256_BLOCK_SIZE = 256 / 8;
 constexpr int GCM_IV_SIZE = 12;
 
 namespace QXmpp::Private::Encryption {
-
-static QString cipherName(QXmpp::Cipher cipher)
-{
-    switch (cipher) {
-    case Aes128GcmNoPad:
-        return u"aes128"_s;
-    case Aes256GcmNoPad:
-    case Aes256CbcPkcs7:
-        return u"aes256"_s;
-    }
-    Q_UNREACHABLE();
-}
 
 static std::size_t blockSize(QXmpp::Cipher cipher)
 {
@@ -43,81 +30,31 @@ static std::size_t blockSize(QXmpp::Cipher cipher)
     Q_UNREACHABLE();
 }
 
-static QCA::Cipher::Mode cipherMode(QXmpp::Cipher cipher)
-{
-    switch (cipher) {
-    case Aes128GcmNoPad:
-    case Aes256GcmNoPad:
-        return QCA::Cipher::GCM;
-    case Aes256CbcPkcs7:
-        return QCA::Cipher::CBC;
-    }
-    Q_UNREACHABLE();
-}
-
-static QCA::Cipher::Padding padding(QXmpp::Cipher cipher)
-{
-    switch (cipher) {
-    case Aes128GcmNoPad:
-    case Aes256GcmNoPad:
-        return QCA::Cipher::NoPadding;
-    case Aes256CbcPkcs7:
-        return QCA::Cipher::PKCS7;
-    }
-    Q_UNREACHABLE();
-}
-
-QCA::Direction toQcaDirection(Direction direction)
-{
-    switch (direction) {
-    case Encode:
-        return QCA::Encode;
-    case Decode:
-        return QCA::Decode;
-    }
-    Q_UNREACHABLE();
-}
-
 static std::size_t roundUpToBlockSize(qint64 size, std::size_t blockSize)
 {
     Q_ASSERT(size >= 0);
     return (size / blockSize + 1) * blockSize;
 }
 
-bool isSupported(Cipher config)
-{
-    auto cipherString = QCA::Cipher::withAlgorithms(cipherName(config), cipherMode(config), padding(config));
-    return QCA::isSupported({ cipherString });
-}
-
 QByteArray process(const QByteArray &data, QXmpp::Cipher cipherConfig, Direction direction, const QByteArray &key, const QByteArray &iv)
 {
-    auto cipher = QCA::Cipher(cipherName(cipherConfig),
-                              cipherMode(cipherConfig),
-                              padding(cipherConfig),
-                              toQcaDirection(direction),
-                              SymmetricKey(key),
-                              InitializationVector(iv));
-    auto output = cipher.update(MemoryRegion(data)).toByteArray();
-
     switch (cipherConfig) {
     case Aes128GcmNoPad:
     case Aes256GcmNoPad:
-        // For GCM no-padding algorithms QCA / OpenSSL adds a '\0' byte at the end.
-        // We don't want that, it breaks our checksums.
-        // The unit tests verify that the data is still decrypted correctly.
-        break;
+        return direction == Encode
+            ? aesGcmEncrypt(data, key, iv)
+            : aesGcmDecrypt(data, key, iv);
     case Aes256CbcPkcs7:
-        output += cipher.final().toByteArray();
-        break;
+        return direction == Encode
+            ? aesCbcEncrypt(data, key, iv)
+            : aesCbcDecrypt(data, key, iv);
     }
-
-    return output;
+    Q_UNREACHABLE();
 }
 
 QByteArray generateKey(QXmpp::Cipher cipher)
 {
-    return Random::randomArray(int(blockSize(cipher))).toByteArray();
+    return randomBytes(int(blockSize(cipher)));
 }
 
 QByteArray generateInitializationVector(QXmpp::Cipher config)
@@ -125,9 +62,9 @@ QByteArray generateInitializationVector(QXmpp::Cipher config)
     switch (config) {
     case Aes128GcmNoPad:
     case Aes256GcmNoPad:
-        return Random::randomArray(GCM_IV_SIZE).toByteArray();
+        return randomBytes(GCM_IV_SIZE);
     case Aes256CbcPkcs7:
-        return Random::randomArray(int(blockSize(config))).toByteArray();
+        return randomBytes(int(blockSize(config)));
     }
     Q_UNREACHABLE();
 }
@@ -138,13 +75,11 @@ EncryptionDevice::EncryptionDevice(std::unique_ptr<QIODevice> input,
                                    const QByteArray &iv)
     : m_cipherConfig(config),
       m_input(std::move(input)),
-      m_cipher(std::make_unique<QCA::Cipher>(
-          cipherName(config),
-          cipherMode(config),
-          padding(config),
-          QCA::Encode,
-          SymmetricKey(key),
-          InitializationVector(iv)))
+      m_cipher(std::make_unique<CipherContext>(
+          config,
+          Crypto::Encrypt,
+          key,
+          iv))
 {
     // output must not be sequential
     Q_ASSERT(!m_input->isSequential());
@@ -215,10 +150,10 @@ qint64 EncryptionDevice::readData(char *data, qint64 len)
         inputBuffer.resize(m_input->read(inputBuffer.data(), inputBufferSize));
 
         // process input buffer
-        auto processed = m_cipher->update(MemoryRegion(inputBuffer));
+        auto processed = m_cipher->update(inputBuffer);
         if (m_input->atEnd()) {
             m_finalized = true;
-            processed = processed + m_cipher->final();
+            processed += m_cipher->finalize();
         }
 
         // split up into part for user and put rest into output buffer
@@ -253,13 +188,11 @@ DecryptionDevice::DecryptionDevice(std::unique_ptr<QIODevice> input,
                                    const QByteArray &iv)
     : m_cipherConfig(config),
       m_output(std::move(input)),
-      m_cipher(std::make_unique<QCA::Cipher>(
-          cipherName(config),
-          cipherMode(config),
-          padding(config),
-          QCA::Decode,
-          SymmetricKey(key),
-          InitializationVector(iv)))
+      m_cipher(std::make_unique<CipherContext>(
+          config,
+          Crypto::Decrypt,
+          key,
+          iv))
 {
     // output must not be sequential
     Q_ASSERT(!m_output->isSequential());
@@ -308,18 +241,9 @@ qint64 DecryptionDevice::writeData(const char *data, qint64 len)
 
 void DecryptionDevice::finish()
 {
-    switch (m_cipherConfig) {
-    case Aes128GcmNoPad:
-    case Aes256GcmNoPad:
-        // For GCM no-padding algorithms QCA / OpenSSL adds a '\0' byte at the end.
-        // We don't want that, it breaks our checksums.
-        // The unit tests verify that the data is still decrypted correctly.
-        return;
-    case Aes256CbcPkcs7: {
-        auto decrypted = m_cipher->final();
-        m_output->write(decrypted.constData(), decrypted.size());
-        break;
-    }
+    auto finalized = m_cipher->finalize();
+    if (!finalized.isEmpty()) {
+        m_output->write(finalized.constData(), finalized.size());
     }
 }
 

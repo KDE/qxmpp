@@ -1221,45 +1221,40 @@ template QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStan
 //
 std::optional<PayloadEncryptionResult> ManagerPrivate::encryptPayload(const QByteArray &payload) const
 {
-    auto hkdfKey = QCA::SecureArray(QCA::Random::randomArray(HKDF_KEY_SIZE));
-    const auto hkdfSalt = QCA::InitializationVector(QCA::SecureArray(HKDF_SALT_SIZE));
-    const auto hkdfInfo = QCA::InitializationVector(QCA::SecureArray(HKDF_INFO));
-    auto hkdfOutput = QCA::HKDF().makeKey(hkdfKey, hkdfSalt, hkdfInfo, HKDF_OUTPUT_SIZE);
+    using namespace Crypto;
 
-    // first part of hkdfKey
-    auto encryptionKey = QCA::SymmetricKey(hkdfOutput);
-    encryptionKey.resize(PAYLOAD_KEY_SIZE);
+    auto hkdfKey = SecureByteArray(randomBytes(HKDF_KEY_SIZE));
+    const auto hkdfSalt = QByteArray(HKDF_SALT_SIZE, '\0');
+    const auto hkdfInfo = QByteArray(HKDF_INFO);
+    auto hkdfOutput = hkdfSha256(hkdfKey.toByteArray(), hkdfSalt, hkdfInfo, HKDF_OUTPUT_SIZE);
 
-    // middle part of hkdfKey
-    auto authenticationKey = QCA::SymmetricKey(PAYLOAD_AUTHENTICATION_KEY_SIZE);
-    const auto authenticationKeyOffset = hkdfOutput.data() + PAYLOAD_KEY_SIZE;
-    std::copy(authenticationKeyOffset, authenticationKeyOffset + PAYLOAD_AUTHENTICATION_KEY_SIZE, authenticationKey.data());
+    if (hkdfOutput.isEmpty()) {
+        warning(u"HKDF key derivation failed"_s);
+        return {};
+    }
 
-    // last part of hkdfKey
-    auto initializationVector = QCA::InitializationVector(PAYLOAD_INITIALIZATION_VECTOR_SIZE);
-    const auto initializationVectorOffset = hkdfOutput.data() + PAYLOAD_KEY_SIZE + PAYLOAD_AUTHENTICATION_KEY_SIZE;
-    std::copy(initializationVectorOffset, initializationVectorOffset + PAYLOAD_INITIALIZATION_VECTOR_SIZE, initializationVector.data());
+    // first part of hkdfOutput
+    auto encryptionKey = QByteArray(hkdfOutput.constData(), PAYLOAD_KEY_SIZE);
 
-    QCA::Cipher cipher(PAYLOAD_CIPHER_TYPE.toString(), PAYLOAD_CIPHER_MODE, PAYLOAD_CIPHER_PADDING, QCA::Encode, encryptionKey, initializationVector);
-    auto encryptedPayload = cipher.process(QCA::MemoryRegion(payload));
+    // middle part of hkdfOutput
+    auto authenticationKey = QByteArray(hkdfOutput.constData() + PAYLOAD_KEY_SIZE, PAYLOAD_AUTHENTICATION_KEY_SIZE);
+
+    // last part of hkdfOutput
+    auto initializationVector = QByteArray(hkdfOutput.constData() + PAYLOAD_KEY_SIZE + PAYLOAD_AUTHENTICATION_KEY_SIZE, PAYLOAD_INITIALIZATION_VECTOR_SIZE);
+
+    auto encryptedPayload = aesCbcEncrypt(payload, encryptionKey, initializationVector);
 
     if (encryptedPayload.isEmpty()) {
         warning(u"Following payload could not be encrypted: " + QString::fromUtf8(payload));
         return {};
     }
 
-    if (!QCA::MessageAuthenticationCode::supportedTypes().contains(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE)) {
-        warning(u"Message authentication code type '" + PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE.toString() + u"' is not supported by this system");
-        return {};
-    }
-
-    auto messageAuthenticationCodeGenerator = QCA::MessageAuthenticationCode(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE.toString(), authenticationKey);
-    auto messageAuthenticationCode = QCA::SecureArray(messageAuthenticationCodeGenerator.process(encryptedPayload));
+    auto messageAuthenticationCode = hmacSha256(authenticationKey, encryptedPayload);
     messageAuthenticationCode.resize(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_SIZE);
 
     PayloadEncryptionResult payloadEncryptionData;
-    payloadEncryptionData.decryptionData = hkdfKey.append(messageAuthenticationCode);
-    payloadEncryptionData.encryptedPayload = encryptedPayload.toByteArray();
+    payloadEncryptionData.decryptionData = hkdfKey.append(SecureByteArray(messageAuthenticationCode));
+    payloadEncryptionData.encryptedPayload = encryptedPayload;
 
     return payloadEncryptionData;
 }
@@ -1318,7 +1313,7 @@ QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
 // \return the encrypted and serialized OMEMO envelope data or a default-constructed byte array
 //         on failure
 //
-QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address &address, const QCA::SecureArray &payloadDecryptionData) const
+QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address &address, const Crypto::SecureByteArray &payloadDecryptionData) const
 {
     SessionCipherPtr sessionCipher;
 
@@ -1541,7 +1536,7 @@ QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJi
 //
 // \return the serialized payload decryption data if it could be extracted, otherwise std::nullopt
 //
-QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecryptionData(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, bool isMessageStanza)
+QXmppTask<std::optional<Crypto::SecureByteArray>> ManagerPrivate::extractPayloadDecryptionData(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, bool isMessageStanza)
 {
     SessionCipherPtr sessionCipher;
     const auto address = Address(senderJid, senderDeviceId);
@@ -1630,12 +1625,10 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
                 }
             });
 
-            // The buffer is copied into the SecureArray to avoid a QByteArray which is not secure.
-            // However, it would be simpler if SecureArray had an appropriate constructor for that.
             const auto payloadDecryptionDataPointer = signal_buffer_data(payloadDecryptionDataBuffer.get());
             const auto payloadDecryptionDataBufferSize = signal_buffer_len(payloadDecryptionDataBuffer.get());
-            auto payloadDecryptionData = QCA::SecureArray(payloadDecryptionDataBufferSize);
-            std::copy_n(payloadDecryptionDataPointer, payloadDecryptionDataBufferSize, payloadDecryptionData.data());
+            auto payloadDecryptionData = Crypto::SecureByteArray(
+                reinterpret_cast<const char *>(payloadDecryptionDataPointer), payloadDecryptionDataBufferSize);
 
             co_return payloadDecryptionData;
         }
@@ -1673,12 +1666,10 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
         warning(u"Session for OMEMO envelope data could not be found"_s);
         co_return {};
     case SG_SUCCESS:
-        // The buffer is copied into the SecureArray to avoid a QByteArray which is not secure.
-        // However, it would be simpler if SecureArray had an appropriate constructor for that.
         const auto payloadDecryptionDataPointer = signal_buffer_data(payloadDecryptionDataBuffer.get());
         const auto payloadDecryptionDataBufferSize = signal_buffer_len(payloadDecryptionDataBuffer.get());
-        auto payloadDecryptionData = QCA::SecureArray(payloadDecryptionDataBufferSize);
-        std::copy_n(payloadDecryptionDataPointer, payloadDecryptionDataBufferSize, payloadDecryptionData.data());
+        auto payloadDecryptionData = Crypto::SecureByteArray(
+            reinterpret_cast<const char *>(payloadDecryptionDataPointer), payloadDecryptionDataBufferSize);
 
         co_return payloadDecryptionData;
     }
@@ -1694,53 +1685,48 @@ QXmppTask<std::optional<QCA::SecureArray>> ManagerPrivate::extractPayloadDecrypt
 //
 // \return the decrypted payload or a default-constructed byte array on failure
 //
-QByteArray ManagerPrivate::decryptPayload(const QCA::SecureArray &payloadDecryptionData, const QByteArray &payload) const
+QByteArray ManagerPrivate::decryptPayload(const Crypto::SecureByteArray &payloadDecryptionData, const QByteArray &payload) const
 {
-    auto hkdfKey = QCA::SecureArray(payloadDecryptionData);
+    using namespace Crypto;
+
+    auto hkdfKey = SecureByteArray(payloadDecryptionData);
     hkdfKey.resize(HKDF_KEY_SIZE);
-    const auto hkdfSalt = QCA::InitializationVector(QCA::SecureArray(HKDF_SALT_SIZE));
-    const auto hkdfInfo = QCA::InitializationVector(QCA::SecureArray(HKDF_INFO));
-    auto hkdfOutput = QCA::HKDF().makeKey(hkdfKey, hkdfSalt, hkdfInfo, HKDF_OUTPUT_SIZE);
+    const auto hkdfSalt = QByteArray(HKDF_SALT_SIZE, '\0');
+    const auto hkdfInfo = QByteArray(HKDF_INFO);
+    auto hkdfOutput = hkdfSha256(hkdfKey.toByteArray(), hkdfSalt, hkdfInfo, HKDF_OUTPUT_SIZE);
 
-    // first part of hkdfKey
-    auto encryptionKey = QCA::SymmetricKey(hkdfOutput);
-    encryptionKey.resize(PAYLOAD_KEY_SIZE);
-
-    // middle part of hkdfKey
-    auto authenticationKey = QCA::SymmetricKey(PAYLOAD_AUTHENTICATION_KEY_SIZE);
-    const auto authenticationKeyOffset = hkdfOutput.data() + PAYLOAD_KEY_SIZE;
-    std::copy(authenticationKeyOffset, authenticationKeyOffset + PAYLOAD_AUTHENTICATION_KEY_SIZE, authenticationKey.data());
-
-    // last part of hkdfKey
-    auto initializationVector = QCA::InitializationVector(PAYLOAD_INITIALIZATION_VECTOR_SIZE);
-    const auto initializationVectorOffset = hkdfOutput.data() + PAYLOAD_KEY_SIZE + PAYLOAD_AUTHENTICATION_KEY_SIZE;
-    std::copy(initializationVectorOffset, initializationVectorOffset + PAYLOAD_INITIALIZATION_VECTOR_SIZE, initializationVector.data());
-
-    if (!QCA::MessageAuthenticationCode::supportedTypes().contains(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE)) {
-        warning(u"Message authentication code type '" + PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE + u"' is not supported by this system");
+    if (hkdfOutput.isEmpty()) {
+        warning(u"HKDF key derivation failed"_s);
         return {};
     }
 
-    auto messageAuthenticationCodeGenerator = QCA::MessageAuthenticationCode(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_TYPE.toString(), authenticationKey);
-    auto messageAuthenticationCode = QCA::SecureArray(messageAuthenticationCodeGenerator.process(payload));
+    // first part of hkdfOutput
+    auto encryptionKey = QByteArray(hkdfOutput.constData(), PAYLOAD_KEY_SIZE);
+
+    // middle part of hkdfOutput
+    auto authenticationKey = QByteArray(hkdfOutput.constData() + PAYLOAD_KEY_SIZE, PAYLOAD_AUTHENTICATION_KEY_SIZE);
+
+    // last part of hkdfOutput
+    auto initializationVector = QByteArray(hkdfOutput.constData() + PAYLOAD_KEY_SIZE + PAYLOAD_AUTHENTICATION_KEY_SIZE, PAYLOAD_INITIALIZATION_VECTOR_SIZE);
+
+    auto messageAuthenticationCode = hmacSha256(authenticationKey, payload);
     messageAuthenticationCode.resize(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_SIZE);
 
-    auto expectedMessageAuthenticationCode = QCA::SecureArray(payloadDecryptionData.toByteArray().right(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_SIZE));
+    auto expectedMessageAuthenticationCode = payloadDecryptionData.toByteArray().right(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_SIZE);
 
     if (messageAuthenticationCode != expectedMessageAuthenticationCode) {
         warning(u"Message authentication code does not match expected one"_s);
         return {};
     }
 
-    QCA::Cipher cipher(PAYLOAD_CIPHER_TYPE.toString(), PAYLOAD_CIPHER_MODE, PAYLOAD_CIPHER_PADDING, QCA::Decode, encryptionKey, initializationVector);
-    auto decryptedPayload = cipher.process(QCA::MemoryRegion(payload));
+    auto decryptedPayload = aesCbcDecrypt(payload, encryptionKey, initializationVector);
 
     if (decryptedPayload.isEmpty()) {
         warning(u"Following payload could not be decrypted: " + QString::fromUtf8(payload));
         return {};
     }
 
-    return decryptedPayload.toByteArray();
+    return decryptedPayload;
 }
 
 //
@@ -3332,7 +3318,7 @@ bool ManagerPrivate::deserializePublicPreKey(ec_public_key **publicPreKey, const
 QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId, bool isKeyExchange) const
 {
     const auto address = Address(recipientJid, recipientDeviceId);
-    const auto decryptionData = QCA::SecureArray(EMPTY_MESSAGE_DECRYPTION_DATA_SIZE);
+    const auto decryptionData = Crypto::SecureByteArray(EMPTY_MESSAGE_DECRYPTION_DATA_SIZE);
 
     if (const auto data = createOmemoEnvelopeData(address.data(), decryptionData); data.isEmpty()) {
         warning(u"OMEMO envelope for recipient JID '" + recipientJid + u"' and device ID '" + QString::number(recipientDeviceId) + u"' could not be created because its data could not be encrypted");

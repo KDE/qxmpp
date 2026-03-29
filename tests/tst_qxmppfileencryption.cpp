@@ -4,8 +4,6 @@
 
 #include "QXmppFileEncryption.h"
 
-#include "QcaInitializer_p.h"
-
 #include <QtTest>
 
 using namespace QXmpp;
@@ -18,7 +16,6 @@ class tst_QXmppFileEncryption : public QObject
 
 private:
     Q_SLOT void basic();
-    Q_SLOT void qcaFeatures();
     Q_SLOT void deviceEncrypt();
     Q_SLOT void deviceDecrypt_data();
     Q_SLOT void deviceDecrypt();
@@ -27,8 +24,6 @@ private:
 
 void tst_QXmppFileEncryption::basic()
 {
-    QcaInitializer encInit;
-
     QByteArray data =
         "This is an example text message";
     QByteArray key = "12345678901234567890123456789012";
@@ -40,18 +35,8 @@ void tst_QXmppFileEncryption::basic()
     QCOMPARE(decrypted, data);
 }
 
-void tst_QXmppFileEncryption::qcaFeatures()
-{
-    QcaInitializer init;
-    QVERIFY(isSupported(Aes128GcmNoPad));
-    QVERIFY(isSupported(Aes256GcmNoPad));
-    QVERIFY(isSupported(Aes256CbcPkcs7));
-}
-
 void tst_QXmppFileEncryption::deviceEncrypt()
 {
-    QcaInitializer encInit;
-
     QByteArray data =
         "v2qtI8tx5DxM6axUAZ+xsEwrtb0VYafAPlMWqpVMG+5PBE5wbZ7MZhDUEIdFkxchOIJqt";
     QByteArray key = "12345678901234567890123456789012";
@@ -90,8 +75,6 @@ void tst_QXmppFileEncryption::deviceDecrypt()
     QFETCH(QByteArray, key);
     auto cipher = Cipher(cipherId);
 
-    QcaInitializer encInit;
-
     QByteArray data =
         "v2qtI8tx5DxM6axUAZ+xsEwrtb0VYafAPlMWqpVMG+5PBE5wbZ7MZhDUEIdFkxchOIJqt";
     QByteArray iv = "12345678901234567890123456789012";
@@ -127,8 +110,6 @@ void tst_QXmppFileEncryption::deviceDecrypt()
 void tst_QXmppFileEncryption::paddingSize()
 {
     constexpr auto MAX_BYTES_TEST = 1024;
-
-    QcaInitializer encInit;
 
     QByteArray key = "12345678901234567890123456789012";
     QByteArray iv = "12345678901234567890123456789012";
