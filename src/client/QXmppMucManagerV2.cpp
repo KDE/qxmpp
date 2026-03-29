@@ -1887,6 +1887,25 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
 }
 
 ///
+/// Queries the server for the user's reserved nickname in this room (XEP-0045 §7.12).
+///
+/// Returns the reserved nickname, or an empty string if no nickname is reserved.
+///
+QXmppTask<Result<QString>> QXmppMucRoomV2::requestReservedNickname()
+{
+    auto result = co_await m_manager->d->disco()->info(m_jid, u"x-roomuser-item"_s, QXmppDiscoveryManager::CachePolicy::Strict).withContext(m_manager);
+    if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
+        for (const auto &identity : info->identities()) {
+            if (identity.category() == u"conference") {
+                co_return identity.name();
+            }
+        }
+        co_return QString();
+    }
+    co_return std::get<QXmppError>(std::move(result));
+}
+
+///
 /// Requests voice in a moderated room as a visitor.
 ///
 /// Sends a \c muc#request data form to the room. The MUC service forwards an
