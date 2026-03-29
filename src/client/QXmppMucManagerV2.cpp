@@ -1906,6 +1906,34 @@ QXmppTask<Result<QString>> QXmppMucRoomV2::requestReservedNickname()
 }
 
 ///
+/// Requests the registration form for this room (XEP-0045 §7.10).
+///
+/// Returns the data form that needs to be filled in and submitted via submitRegistration().
+///
+QXmppTask<Result<QXmppDataForm>> QXmppMucRoomV2::requestRegistrationForm()
+{
+    auto result = co_await get<MucRegisterQuery>(m_manager->client(), m_jid, MucRegisterQuery {}).withContext(m_manager);
+    if (auto *q = std::get_if<MucRegisterQuery>(&result)) {
+        if (q->form) {
+            co_return std::move(*q->form);
+        }
+        co_return QXmppError { u"Server did not return a registration form."_s };
+    }
+    co_return std::get<QXmppError>(std::move(result));
+}
+
+///
+/// Submits a filled-in registration form to the room (XEP-0045 §7.10).
+///
+/// The \a form should be the form returned by requestRegistrationForm(), filled in by the user,
+/// with its type set to \c QXmppDataForm::Submit.
+///
+QXmppTask<Result<>> QXmppMucRoomV2::submitRegistration(const QXmppDataForm &form)
+{
+    return set(m_manager->client(), m_jid, MucRegisterQuery { .form = form });
+}
+
+///
 /// Requests voice in a moderated room as a visitor.
 ///
 /// Sends a \c muc#request data form to the room. The MUC service forwards an

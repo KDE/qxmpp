@@ -95,6 +95,8 @@ private:
     Q_SLOT void sendDirectInvitation();
     Q_SLOT void requestReservedNickname();
     Q_SLOT void requestReservedNicknameNone();
+    Q_SLOT void requestRegistrationForm();
+    Q_SLOT void submitRegistration();
 
     // Room creation and configuration
     Q_SLOT void joinRoomNotFound();
@@ -2844,6 +2846,73 @@ void tst_QXmppMuc::requestReservedNicknameNone()
 
     QVERIFY(task.isFinished());
     QCOMPARE(expectFutureVariant<QString>(task), QString());
+}
+
+void tst_QXmppMuc::requestRegistrationForm()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    auto task = room.requestRegistrationForm();
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='jabber:iq:register'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='jabber:iq:register'>"
+                "<registered/>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>jabber:iq:register</value>"
+                "</field>"
+                "<field type='text-single' var='muc#register_roomnick'>"
+                "<required/>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    QVERIFY(task.isFinished());
+    auto form = expectFutureVariant<QXmppDataForm>(task);
+    QCOMPARE(form.type(), QXmppDataForm::Form);
+}
+
+void tst_QXmppMuc::submitRegistration()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+
+    QXmppDataForm form;
+    form.setType(QXmppDataForm::Submit);
+    QXmppDataForm::Field formType;
+    formType.setKey(u"FORM_TYPE"_s);
+    formType.setType(QXmppDataForm::Field::HiddenField);
+    formType.setValue(u"jabber:iq:register"_s);
+    QXmppDataForm::Field nick;
+    nick.setKey(u"muc#register_roomnick"_s);
+    nick.setValue(u"thirdwitch"_s);
+    form.setFields({ formType, nick });
+
+    auto task = room.submitRegistration(form);
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='jabber:iq:register'>"
+                "<x xmlns='jabber:x:data' type='submit'>"
+                "<field type='hidden' var='FORM_TYPE'><value>jabber:iq:register</value></field>"
+                "<field type='text-single' var='muc#register_roomnick'><value>thirdwitch</value></field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
 }
 
 QTEST_MAIN(tst_QXmppMuc)
