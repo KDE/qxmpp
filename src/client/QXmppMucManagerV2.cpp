@@ -1829,15 +1829,11 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
     Muc::Item item;
     item.setAffiliation(affiliation);
 
-    return chain<Result<QList<Muc::Item>>>(
-        get<MucAdminQuery>(m_manager->client(), m_jid, MucAdminQuery { .items = { item } }),
-        m_manager,
-        [](Result<MucAdminQuery> &&result) -> Result<QList<Muc::Item>> {
-            if (auto *q = std::get_if<MucAdminQuery>(&result)) {
-                return std::move(q->items);
-            }
-            return std::get<QXmppError>(std::move(result));
-        });
+    auto result = co_await get<MucAdminQuery>(m_manager->client(), m_jid, MucAdminQuery { .items = { item } }).withContext(m_manager);
+    if (auto *q = std::get_if<MucAdminQuery>(&result)) {
+        co_return std::move(q->items);
+    }
+    co_return std::get<QXmppError>(std::move(result));
 }
 
 ///
@@ -1944,7 +1940,7 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
     auto itr = m_manager->d->rooms.find(m_jid);
     if (itr == m_manager->d->rooms.end() ||
         (itr->second.state != Creating && itr->second.state != Joined)) {
-        return makeReadyTask<Result<QXmppMucRoomConfig>>(QXmppError { u"Room is not in Creating or Joined state."_s });
+        co_return QXmppError { u"Room is not in Creating or Joined state."_s };
     }
 
     // Capture wasWatching before potentially enabling watch, so we only use the cache
@@ -1962,30 +1958,26 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
             QXmppPromise<Result<QXmppMucRoomConfig>> p;
             auto task = p.task();
             itr->second.roomConfigWaiters.push_back(std::move(p));
-            return task;
+            co_return co_await std::move(task);
         }
         if (const auto &cached = itr->second.roomConfig.value()) {
-            return makeReadyTask<Result<QXmppMucRoomConfig>>(*cached);
+            co_return *cached;
         }
     }
 
-    return chain<Result<QXmppMucRoomConfig>>(
-        get<MucOwnerQuery>(m_manager->client(), m_jid, MucOwnerQuery {}),
-        m_manager,
-        [this, jid = m_jid](Result<MucOwnerQuery> &&result) -> Result<QXmppMucRoomConfig> {
-            if (auto *e = std::get_if<QXmppError>(&result)) {
-                return std::move(*e);
-            }
-            auto &oq = std::get<MucOwnerQuery>(result);
-            auto config = oq.form ? QXmppMucRoomConfig::fromDataForm(*oq.form) : std::nullopt;
-            if (!config) {
-                return QXmppError { u"Server returned an invalid or missing muc#roomconfig form."_s };
-            }
-            if (auto itr2 = m_manager->d->rooms.find(jid); itr2 != m_manager->d->rooms.end()) {
-                itr2->second.roomConfig = config;
-            }
-            return std::move(*config);
-        });
+    auto result = co_await get<MucOwnerQuery>(m_manager->client(), m_jid, MucOwnerQuery {}).withContext(m_manager);
+    if (auto *e = std::get_if<QXmppError>(&result)) {
+        co_return std::move(*e);
+    }
+    auto &oq = std::get<MucOwnerQuery>(result);
+    auto config = oq.form ? QXmppMucRoomConfig::fromDataForm(*oq.form) : std::nullopt;
+    if (!config) {
+        co_return QXmppError { u"Server returned an invalid or missing muc#roomconfig form."_s };
+    }
+    if (auto itr2 = m_manager->d->rooms.find(m_jid); itr2 != m_manager->d->rooms.end()) {
+        itr2->second.roomConfig = config;
+    }
+    co_return std::move(*config);
 }
 
 ///
@@ -2003,29 +1995,25 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
     auto itr = m_manager->d->rooms.find(m_jid);
     if (itr == m_manager->d->rooms.end() ||
         (itr->second.state != Creating && itr->second.state != Joined)) {
-        return makeReadyTask<Result<>>(QXmppError { u"Room is not in Creating or Joined state."_s });
+        co_return QXmppError { u"Room is not in Creating or Joined state."_s };
     }
 
     auto form = config.toDataForm();
     form.setType(QXmppDataForm::Submit);
 
     const bool wasCreating = (itr->second.state == Creating);
-    return chain<Result<>>(
-        set(m_manager->client(), m_jid, MucOwnerQuery { .form = std::move(form) }),
-        m_manager,
-        [this, wasCreating](Result<> &&result) -> Result<> {
-            if (std::holds_alternative<Success>(result)) {
-                auto itr2 = m_manager->d->rooms.find(m_jid);
-                if (itr2 != m_manager->d->rooms.end() && wasCreating) {
-                    // Unlock the room: transition to Joined state
-                    itr2->second.state = MucRoomState::Joined;
-                    itr2->second.joined = true;
-                    // Fetch room info now that the room is configured
-                    m_manager->d->fetchRoomInfo(m_jid);
-                }
-            }
-            return result;
-        });
+    auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .form = std::move(form) }).withContext(m_manager);
+    if (std::holds_alternative<Success>(result)) {
+        auto itr2 = m_manager->d->rooms.find(m_jid);
+        if (itr2 != m_manager->d->rooms.end() && wasCreating) {
+            // Unlock the room: transition to Joined state
+            itr2->second.state = MucRoomState::Joined;
+            itr2->second.joined = true;
+            // Fetch room info now that the room is configured
+            m_manager->d->fetchRoomInfo(m_jid);
+        }
+    }
+    co_return result;
 }
 
 ///
@@ -2042,21 +2030,17 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     auto itr = m_manager->d->rooms.find(m_jid);
     if (itr == m_manager->d->rooms.end() ||
         itr->second.state != MucRoomState::Creating) {
-        return makeReadyTask<Result<>>(QXmppError { u"Room is not in Creating state."_s });
+        co_return QXmppError { u"Room is not in Creating state."_s };
     }
 
     QXmppDataForm cancelForm;
     cancelForm.setType(QXmppDataForm::Cancel);
 
-    return chain<Result<>>(
-        set(m_manager->client(), m_jid, MucOwnerQuery { .form = std::move(cancelForm) }),
-        m_manager,
-        [this](Result<> &&result) -> Result<> {
-            if (std::holds_alternative<Success>(result)) {
-                m_manager->d->rooms.erase(m_jid);
-            }
-            return result;
-        });
+    auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .form = std::move(cancelForm) }).withContext(m_manager);
+    if (std::holds_alternative<Success>(result)) {
+        m_manager->d->rooms.erase(m_jid);
+    }
+    co_return result;
 }
 
 ///
@@ -2073,18 +2057,14 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
     auto itr = m_manager->d->rooms.find(m_jid);
     if (itr == m_manager->d->rooms.end() ||
         itr->second.state != MucRoomState::Joined) {
-        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+        co_return QXmppError { u"Room is not joined."_s };
     }
 
-    return chain<Result<>>(
-        set(m_manager->client(), m_jid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }),
-        m_manager,
-        [this](Result<> &&result) -> Result<> {
-            if (std::holds_alternative<Success>(result)) {
-                m_manager->d->rooms.erase(m_jid);
-            }
-            return result;
-        });
+    auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_manager);
+    if (std::holds_alternative<Success>(result)) {
+        m_manager->d->rooms.erase(m_jid);
+    }
+    co_return result;
 }
 
 bool QXmppMucParticipant::isValid() const
