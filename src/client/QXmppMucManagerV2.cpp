@@ -1807,6 +1807,17 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participa
 }
 
 ///
+/// Changes the roles of multiple room participants in a single request (XEP-0045 §8.5).
+///
+/// Each item must have its nick and role set. Role changes are transient
+/// and apply only for the current session.
+///
+QXmppTask<Result<>> QXmppMucRoomV2::setRoles(const QList<Muc::Item> &items)
+{
+    return set(m_manager->client(), m_jid, MucAdminQuery { .items = items });
+}
+
+///
 /// Changes the affiliation of a user by bare JID (XEP-0045 §9).
 ///
 /// Affiliation changes are persistent. The \a jid must be a bare JID.
@@ -1820,6 +1831,17 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
     item.setReason(reason);
 
     return set(m_manager->client(), m_jid, MucAdminQuery { .items = { item } });
+}
+
+///
+/// Changes the affiliations of multiple users in a single request (XEP-0045 §9).
+///
+/// Each item must have its jid and affiliation set. Affiliation changes are
+/// persistent and the users do not need to be currently in the room.
+///
+QXmppTask<Result<>> QXmppMucRoomV2::setAffiliations(const QList<Muc::Item> &items)
+{
+    return set(m_manager->client(), m_jid, MucAdminQuery { .items = items });
 }
 
 ///
