@@ -91,6 +91,14 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
 QXmppCarbonManagerV2::QXmppCarbonManagerV2() = default;
 QXmppCarbonManagerV2::~QXmppCarbonManagerV2() = default;
 
+///
+/// Returns whether message carbons are currently enabled on the server.
+///
+QBindable<bool> QXmppCarbonManagerV2::enabled() const
+{
+    return &m_enabled;
+}
+
 bool QXmppCarbonManagerV2::handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &)
 {
     if (element.tagName() != u"message") {
@@ -137,16 +145,25 @@ void QXmppCarbonManagerV2::onUnregistered(QXmppClient *client)
 
 void QXmppCarbonManagerV2::enableCarbons()
 {
-    // skip if stream could be resumed or carbons have been enabled via bind2 already
-    if (client()->streamManagementState() == QXmppClient::ResumedStream ||
-        client()->stream()->carbonManager().enabled()) {
+    // stream resumed: carbons state is preserved from the previous session
+    if (client()->streamManagementState() == QXmppClient::ResumedStream) {
         return;
     }
+
+    // carbons enabled via bind2 already
+    if (client()->stream()->carbonManager().enabled()) {
+        m_enabled = true;
+        return;
+    }
+
+    // new session: reset until IQ succeeds
+    m_enabled = false;
 
     client()->sendIq(CarbonEnableIq()).then(this, [this](QXmppClient::IqResult domResult) {
         if (auto err = parseIq(std::move(domResult))) {
             warning(u"Could not enable message carbons: " + err->description);
         } else {
+            m_enabled = true;
             info(u"Message Carbons enabled."_s);
         }
     });

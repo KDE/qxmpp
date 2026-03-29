@@ -7,12 +7,16 @@
 
 #include "QXmppClientExtension.h"
 
+#include <QProperty>
+
 class QXMPP_EXPORT QXmppCarbonManagerV2 : public QXmppClientExtension
 {
     Q_OBJECT
 public:
     QXmppCarbonManagerV2();
     ~QXmppCarbonManagerV2();
+
+    QBindable<bool> enabled() const;
 
     bool handleStanza(const QDomElement &, const std::optional<QXmppE2eeMetadata> &) override;
 
@@ -23,8 +27,7 @@ protected:
 private:
     void enableCarbons();
 
-    // placeholder (we may need a d-ptr in the future)
-    void *d;
+    QProperty<bool> m_enabled = QProperty<bool> { false };
 };
 
 #endif  // QXMPPCARBONMANAGERV2_H
