@@ -5,6 +5,7 @@
 #include "QXmppAtmManager.h"
 
 #include "QXmppCarbonManager.h"
+#include "QXmppCarbonManagerV2.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
@@ -39,9 +40,7 @@ using namespace QXmpp::Private;
 ///
 /// It is strongly recommended to enable \xep{0280, Message Carbons} with
 /// \code
-/// QXmppCarbonManager *carbonManager = new QXmppCarbonManager;
-/// carbonManager->setCarbonsEnabled(true);
-/// client->addExtension(carbonManager);
+/// client->addNewExtension<QXmppCarbonManagerV2>();
 /// \endcode
 /// and \xep{0313, Message Archive Management} with
 /// \code
@@ -160,9 +159,16 @@ QXmppTask<void> QXmppAtmManager::makeTrustDecisions(const QString &encryption, c
         // It is skipped if a trust message is already delivered via
         // Message Carbons or there are no other own endpoints with
         // authenticated keys.
-        // FIXME: QXmppCarbonManager has been replaced
-        const auto *carbonManager = client()->findExtension<QXmppCarbonManager>();
-        const auto isMessageCarbonsDisabled = !carbonManager || !carbonManager->carbonsEnabled();
+        auto isMessageCarbonsEnabled = [this]() {
+            if (const auto *v2 = client()->findExtension<QXmppCarbonManagerV2>()) {
+                return v2->enabled().value();
+            }
+            if (const auto *v1 = client()->findExtension<QXmppCarbonManager>()) {
+                return v1->carbonsEnabled();
+            }
+            return false;
+        };
+        const auto isMessageCarbonsDisabled = !isMessageCarbonsEnabled();
         if (isMessageCarbonsDisabled || (contactsAuthenticatedKeys.isEmpty() && !ownAuthenticatedKeys.isEmpty())) {
             sendTrustMessage(encryption, { keyOwner }, ownJid);
         }
