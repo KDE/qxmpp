@@ -639,7 +639,7 @@ struct coroutine_traits<QXmppTask<T>, Args...> {
 
         QXmppTask<T> get_return_object() { return p.task(); }
         std::suspend_never initial_suspend() noexcept { return {}; }
-        std::suspend_always final_suspend() noexcept { return {}; }
+        std::suspend_never final_suspend() noexcept { return {}; }
 
         void unhandled_exception()
         {
@@ -658,7 +658,7 @@ struct coroutine_traits<QXmppTask<void>, Args...> {
 
         QXmppTask<void> get_return_object() { return p.task(); }
         std::suspend_never initial_suspend() noexcept { return {}; }
-        std::suspend_always final_suspend() noexcept { return {}; }
+        std::suspend_never final_suspend() noexcept { return {}; }
 
         void unhandled_exception()
         {
