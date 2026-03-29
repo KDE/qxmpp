@@ -200,6 +200,12 @@ HandleElementResult SaslManager::handleElement(const QDomElement &el)
     return Rejected;
 }
 
+bool Sasl2Manager::hasAvailableMechanism(const QXmppConfiguration &config, const QList<QString> &mechanisms)
+{
+    auto [mechanism, disabled] = chooseMechanism(config, mechanisms);
+    return mechanism.has_value();
+}
+
 QXmppTask<Sasl2Manager::AuthResult> Sasl2Manager::authenticate(Sasl2::Authenticate &&auth, const QXmppConfiguration &config, const Sasl2::StreamFeature &feature, QXmppLoggable *loggable)
 {
     Q_ASSERT(!m_state.has_value());
@@ -222,7 +228,8 @@ QXmppTask<Sasl2Manager::AuthResult> Sasl2Manager::authenticate(Sasl2::Authentica
     auth.mechanism = result.saslClient->mechanism().toString();
     auth.initialResponse = result.initialResponse;
     // indicate usage of FAST
-    if (fastAvailable && contains(feature.fast->mechanisms, auth.mechanism)) {
+    m_fastUsed = fastAvailable && contains(feature.fast->mechanisms, auth.mechanism);
+    if (m_fastUsed) {
         auth.fast = FastRequest {};
     }
 
@@ -336,13 +343,21 @@ void FastTokenManager::onSasl2Authenticate(Sasl2::Authenticate &auth, const Sasl
     requestedMechanism.reset();
     m_tokenChanged = false;
 
-    if (feature.fast && isFastEnabled(config) && !hasToken()) {
-        // request token
+    // Request a new token when we don't have a usable one
+    bool requestToken = !hasToken() || m_fastFailed;
+    m_fastFailed = false;
+
+    if (feature.fast && isFastEnabled(config) && requestToken) {
         if (auto mechanism = selectMechanism(feature.fast->mechanisms)) {
             requestedMechanism = mechanism;
             auth.tokenRequest = FastTokenRequest { mechanism->toString() };
         }
     }
+}
+
+void FastTokenManager::onSasl2Failure()
+{
+    m_fastFailed = true;
 }
 
 void FastTokenManager::onSasl2Success(const Sasl2::Success &success)

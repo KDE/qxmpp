@@ -4,6 +4,13 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.14.5 (March 29, 2026)
+------------------------------
+
+ - Fall back to password auth when FAST token is rejected (@lnj)
+ - Fix memory leak in OmemoLibPtr::ptrRef() (@lnj)
+ - CMake: Fix static build failing due to unexported internal OBJECT library (@lnj)
+
 QXmpp 1.14.4 (March 26, 2026)
 ------------------------------
 
