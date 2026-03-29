@@ -24,10 +24,16 @@ set(CMAKE_AUTORCC ON)
 set(QT_VERSION_MAJOR 6)
 find_package(Qt6 6.4.0 REQUIRED COMPONENTS Core Network Xml)
 
+# Dependency discovery (optional)
+find_package(PkgConfig QUIET)
 # OpenSSL 3.0+ (optional, for encryption features)
 # OpenSSL 3.0+ uses the Apache-2.0 license which is compatible with LGPL-2.1-or-later
 # only via the "or later" clause. Binaries built with this option are effectively LGPL-3.0+.
 find_package(OpenSSL 3.0 QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(OmemoC QUIET IMPORTED_TARGET libomemo-c)
+    pkg_check_modules(GStreamer QUIET IMPORTED_TARGET gstreamer-1.0>=1.20)
+endif()
 
 include(GNUInstallDirs)
 
@@ -41,23 +47,10 @@ option(BUILD_TESTING "Build tests." ON)
 option(BUILD_DOCUMENTATION "Build HTML API documentation." OFF)
 option(BUILD_DOCBOOK "Build DOCBOOK documentation." OFF)
 option(BUILD_EXAMPLES "Build examples." ON)
-option(BUILD_OMEMO "Build the OMEMO module." OFF)
-option(WITH_GSTREAMER "Build with GStreamer support for Jingle." OFF)
-option(WITH_PKGCONFIG "Use PkgConfig when building." ON)
+option(BUILD_OMEMO "Build the OMEMO module." ${OmemoC_FOUND})
+option(WITH_GSTREAMER "Build with GStreamer support for Jingle." ${GStreamer_FOUND})
 option(WITH_ENCRYPTION "Build with OpenSSL for OMEMO or encrypted file sharing. Resulting binaries are LGPL-3.0+." ${OPENSSL_FOUND})
 option(ENABLE_ASAN "Build with address sanitizer." OFF)
-
-if(WITH_PKGCONFIG)
-    find_package(PkgConfig REQUIRED)
-else()
-    if(BUILD_OMEMO)
-        message(FATAL_ERROR "BUILD_OMEMO requires WITH_PKGCONFIG=ON (needed for libomemo-c)")
-    endif()
-
-    if(WITH_GSTREAMER)
-        message(FATAL_ERROR "WITH_GSTREAMER requires WITH_PKGCONFIG=ON")
-    endif()
-endif()
 
 set(QXMPP_TARGET QXmppQt${QT_VERSION_MAJOR})
 set(QXMPPOMEMO_TARGET QXmppOmemoQt${QT_VERSION_MAJOR})
@@ -80,13 +73,11 @@ endif()
 
 if(BUILD_OMEMO)
     add_definitions(-DBUILD_OMEMO)
-
-    # libomemo-c
-    pkg_check_modules(OmemoC REQUIRED IMPORTED_TARGET libomemo-c)
-
-    # OpenSSL
+    if(NOT OmemoC_FOUND)
+        message(FATAL_ERROR "BUILD_OMEMO requires libomemo-c (via pkg-config)")
+    endif()
     if(NOT WITH_ENCRYPTION)
-        message(FATAL_ERROR "OMEMO requires OpenSSL (WITH_ENCRYPTION=ON)")
+        message(FATAL_ERROR "BUILD_OMEMO requires OpenSSL (WITH_ENCRYPTION=ON)")
     endif()
 endif()
 
@@ -95,7 +86,9 @@ if(WITH_ENCRYPTION)
 endif()
 
 if(WITH_GSTREAMER)
-    pkg_check_modules(GStreamer REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.20)
+    if(NOT GStreamer_FOUND)
+        message(FATAL_ERROR "WITH_GSTREAMER requires gstreamer-1.0 >= 1.20 (via pkg-config)")
+    endif()
 endif()
 
 add_subdirectory(src)

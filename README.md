@@ -76,9 +76,9 @@ Option | Default | Description
 `BUILD_DOCUMENTATION` | `ON` | Build documentation, requires Doxygen
 `BUILD_EXAMPLES` | `ON` | Build examples
 `BUILD_TESTING` | `ON` | Build unit tests
-`BUILD_OMEMO` | `OFF` | Build the [OMEMO module][omemo]
+`BUILD_OMEMO` | `ON` (if libomemo-c found) | Build the [OMEMO module][omemo]
 `WITH_ENCRYPTION` | `ON` (if OpenSSL found) | Enable encrypted file sharing (requires OpenSSL 3.0+)
-`WITH_GSTREAMER` | `OFF` | Enable audio/video over Jingle
+`WITH_GSTREAMER` | `ON` (if GStreamer found) | Enable audio/video over Jingle
 
 For example, to build without unit tests you could do:
 ```
