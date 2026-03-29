@@ -114,6 +114,8 @@ private:
 
     // SASL 2 + FAST
     Q_SLOT void sasl2Fast();
+    Q_SLOT void sasl2FastTokenRejected();
+    Q_SLOT void sasl2FastTokenRejectedNoPassword();
 };
 
 void tst_QXmppSasl::testParsing()
@@ -985,6 +987,158 @@ void tst_QXmppSasl::sasl2Fast()
     token = unwrap(config.credentialData().htToken);
     QCOMPARE(token.secret, u"t0k3n-rotation-token");
     QCOMPARE(token.mechanism, SaslHtMechanism(IanaHashAlgorithm::Sha3_512, SaslHtMechanism::None));
+}
+
+void tst_QXmppSasl::sasl2FastTokenRejected()
+{
+    Sasl2ManagerTest test;
+    auto &sent = test.socket.sent;
+
+    QXmppConfiguration config;
+    config.setUser("bowman");
+    config.setPassword("1234");
+    config.setDisabledSaslMechanisms({});
+    config.setSasl2UserAgent(QXmppSasl2UserAgent {
+        QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s),
+        "QXmpp",
+        "HAL 9000",
+    });
+
+    // Pre-populate a FAST token (as if from a previous session)
+    config.credentialData().htToken = HtToken {
+        SaslHtMechanism { IanaHashAlgorithm::Sha3_512, SaslHtMechanism::None },
+        u"old-invalid-token"_s,
+        QDateTime::fromString(u"2024-07-11T14:00:00Z"_s, Qt::ISODate),
+    };
+
+    Sasl2::StreamFeature sasl2Feature {
+        { "PLAIN" },
+        {},
+        FastFeature { { "HT-SHA3-512-NONE" }, false },
+        false
+    };
+
+    // First attempt: should use FAST token (HT mechanism)
+    Sasl2::Authenticate auth;
+    FastTokenManager fast(config);
+    QVERIFY(!fast.fastFailed());
+    fast.onSasl2Authenticate(auth, sasl2Feature);
+
+    auto task = test.manager.authenticate(std::move(auth), config, sasl2Feature, test.loggable.get());
+
+    QVERIFY(!task.isFinished());
+    QCOMPARE(sent.size(), 1);
+    // Verify HT mechanism was selected with FAST indication
+    QVERIFY(sent.at(0).contains("mechanism=\"HT-SHA3-512-NONE\""));
+    QVERIFY(sent.at(0).contains("<fast xmlns=\"urn:xmpp:fast:0\"/>"));
+    QVERIFY(test.manager.fastUsed());
+
+    // Server rejects the token
+    test.manager.handleElement(xmlToDom(
+        "<failure xmlns='urn:xmpp:sasl:2'>"
+        "<not-authorized xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>"
+        "</failure>"));
+
+    QVERIFY(task.isFinished());
+    auto [text, err] = expectFutureVariant<Sasl2Manager::AuthError>(task);
+    QCOMPARE(err.type, QXmpp::AuthenticationError::NotAuthorized);
+
+    // Token should still be present (not cleared — server may have been temporarily misconfigured)
+    QVERIFY(config.credentialData().htToken.has_value());
+    QCOMPARE(config.credentialData().htToken->secret, u"old-invalid-token");
+
+    // Mark FAST to be skipped on next attempt
+    fast.onSasl2Failure();
+    QVERIFY(fast.fastFailed());
+
+    // Second attempt: should fall back to PLAIN, skip FAST, but request a new token
+    Sasl2ManagerTest test2;
+    auto &sent2 = test2.socket.sent;
+
+    // Strip FAST mechanisms from feature (as OutgoingClient does when fastFailed())
+    auto effectiveFeature = sasl2Feature;
+    effectiveFeature.fast.reset();
+
+    auth = Sasl2::Authenticate();
+    fast.onSasl2Authenticate(auth, sasl2Feature);
+    QVERIFY(!fast.fastFailed());
+
+    task = test2.manager.authenticate(std::move(auth), config, effectiveFeature, test2.loggable.get());
+
+    QVERIFY(!task.isFinished());
+    QCOMPARE(sent2.size(), 1);
+    // Verify PLAIN mechanism was selected (not HT), no <fast/>, but token request present
+    QVERIFY(sent2.at(0).contains("mechanism=\"PLAIN\""));
+    QVERIFY(!sent2.at(0).contains("<fast xmlns=\"urn:xmpp:fast:0\"/>"));
+    QVERIFY(sent2.at(0).contains("<request-token xmlns=\"urn:xmpp:fast:0\" mechanism=\"HT-SHA3-512-NONE\"/>"));
+
+    // Server accepts password auth and provides a new token
+    test2.manager.handleElement(xmlToDom(
+        "<success xmlns='urn:xmpp:sasl:2'>"
+        "<authorization-identifier>bowman@example.org</authorization-identifier>"
+        "<token xmlns='urn:xmpp:fast:0' token='new-valid-token' expiry='2024-08-01T14:00:00Z'/>"
+        "</success>"));
+
+    QVERIFY(task.isFinished());
+    auto success = expectFutureVariant<Sasl2::Success>(task);
+    fast.onSasl2Success(success);
+    QVERIFY(fast.tokenChanged());
+    QVERIFY(config.credentialData().htToken.has_value());
+    QCOMPARE(config.credentialData().htToken->secret, u"new-valid-token");
+}
+
+void tst_QXmppSasl::sasl2FastTokenRejectedNoPassword()
+{
+    Sasl2ManagerTest test;
+    auto &sent = test.socket.sent;
+
+    QXmppConfiguration config;
+    config.setUser("bowman");
+    // No password set — token-only authentication
+    config.setDisabledSaslMechanisms({});
+    config.setSasl2UserAgent(QXmppSasl2UserAgent {
+        QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s),
+        "QXmpp",
+        "HAL 9000",
+    });
+
+    config.credentialData().htToken = HtToken {
+        SaslHtMechanism { IanaHashAlgorithm::Sha3_512, SaslHtMechanism::None },
+        u"old-invalid-token"_s,
+        QDateTime::fromString(u"2024-07-11T14:00:00Z"_s, Qt::ISODate),
+    };
+
+    Sasl2::StreamFeature sasl2Feature {
+        { "PLAIN" },
+        {},
+        FastFeature { { "HT-SHA3-512-NONE" }, false },
+        false
+    };
+
+    // Authenticate with FAST token
+    Sasl2::Authenticate auth;
+    FastTokenManager fast(config);
+    fast.onSasl2Authenticate(auth, sasl2Feature);
+
+    auto task = test.manager.authenticate(std::move(auth), config, sasl2Feature, test.loggable.get());
+    QVERIFY(test.manager.fastUsed());
+
+    // Server rejects the token
+    test.manager.handleElement(xmlToDom(
+        "<failure xmlns='urn:xmpp:sasl:2'>"
+        "<not-authorized xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>"
+        "</failure>"));
+
+    QVERIFY(task.isFinished());
+    auto [text, err] = expectFutureVariant<Sasl2Manager::AuthError>(task);
+    QCOMPARE(err.type, QXmpp::AuthenticationError::NotAuthorized);
+
+    // No password-based fallback available
+    QVERIFY(!Sasl2Manager::hasAvailableMechanism(config, sasl2Feature.mechanisms));
+
+    // Token should still be present
+    QVERIFY(config.credentialData().htToken.has_value());
+    QCOMPARE(config.credentialData().htToken->secret, u"old-invalid-token");
 }
 
 QTEST_MAIN(tst_QXmppSasl)

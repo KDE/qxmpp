@@ -389,12 +389,19 @@ void QXmppOutgoingClient::startSasl2Auth(const Sasl2::StreamFeature &sasl2Featur
     if (sasl2Feature.bind2Feature) {
         sasl2Request.bindRequest = createBind2Request(sasl2Feature.bind2Feature->features);
     }
+    // Strip FAST mechanisms from feature when retrying after token rejection
+    auto effectiveFeature = sasl2Feature;
+    if (d->fastTokenManager.fastFailed()) {
+        effectiveFeature.fast.reset();
+    }
+
     // other extensions
     d->fastTokenManager.onSasl2Authenticate(sasl2Request, sasl2Feature);
     d->c2sStreamManager.onSasl2Authenticate(sasl2Request, sasl2Feature);
 
     // start authentication
-    d->setListener<Sasl2Manager>(&d->socket).authenticate(std::move(sasl2Request), d->config, sasl2Feature, this).then(this, [this](auto result) {
+    auto &sasl2Manager = d->setListener<Sasl2Manager>(&d->socket);
+    sasl2Manager.authenticate(std::move(sasl2Request), d->config, effectiveFeature, this).then(this, [this, sasl2Feature](auto result) {
         if (auto success = std::get_if<Sasl2::Success>(&result)) {
             debug(u"Authenticated"_s);
             d->isAuthenticated = true;
@@ -418,6 +425,16 @@ void QXmppOutgoingClient::startSasl2Auth(const Sasl2::StreamFeature &sasl2Featur
             }
         } else {
             auto [text, err] = std::get<Sasl2Manager::AuthError>(std::move(result));
+
+            // If FAST token authentication failed, retry with password-based auth (XEP-0484)
+            if (std::get<Sasl2Manager>(d->listener).fastUsed() &&
+                Sasl2Manager::hasAvailableMechanism(d->config, sasl2Feature.mechanisms)) {
+                info(u"FAST token authentication failed, retrying with password"_s);
+                d->fastTokenManager.onSasl2Failure();
+                startSasl2Auth(sasl2Feature);
+                return;
+            }
+
             setError(text, std::move(err));
             disconnectFromHost();
         }

@@ -50,8 +50,11 @@ public:
 
     explicit Sasl2Manager(SendDataInterface *socket) : m_socket(socket) { }
 
+    static bool hasAvailableMechanism(const QXmppConfiguration &config, const QList<QString> &mechanisms);
+
     QXmppTask<AuthResult> authenticate(Sasl2::Authenticate &&authenticate, const QXmppConfiguration &config, const Sasl2::StreamFeature &feature, QXmppLoggable *loggable);
     HandleElementResult handleElement(const QDomElement &);
+    bool fastUsed() const { return m_fastUsed; }
 
 private:
     struct State {
@@ -62,6 +65,7 @@ private:
 
     SendDataInterface *m_socket;
     std::optional<State> m_state;
+    bool m_fastUsed = false;
 };
 
 // Authentication token management
@@ -74,12 +78,15 @@ public:
     bool hasToken() const;
     void onSasl2Authenticate(Sasl2::Authenticate &auth, const Sasl2::StreamFeature &feature);
     void onSasl2Success(const Sasl2::Success &success);
+    void onSasl2Failure();
+    bool fastFailed() const { return m_fastFailed; }
     bool tokenChanged() const { return m_tokenChanged; }
 
 private:
     QXmppConfiguration &config;
     std::optional<SaslHtMechanism> requestedMechanism;
     bool m_tokenChanged = false;
+    bool m_fastFailed = false;
 };
 
 }  // namespace QXmpp::Private
