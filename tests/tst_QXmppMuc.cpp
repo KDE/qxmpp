@@ -71,7 +71,9 @@ private:
     // Role and affiliation management
     Q_SLOT void setRole();
     Q_SLOT void setRoleParticipantGone();
+    Q_SLOT void setRoles();
     Q_SLOT void setAffiliation();
+    Q_SLOT void setAffiliations();
     Q_SLOT void requestAffiliationList();
     Q_SLOT void selfParticipant();
     Q_SLOT void permissions();
@@ -1528,6 +1530,34 @@ void tst_QXmppMuc::setRoleParticipantGone()
     expectVariant<QXmppError>(task.result());
 }
 
+void tst_QXmppMuc::setRoles()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    Muc::Item item1;
+    item1.setNick(u"pistol"_s);
+    item1.setRole(Muc::Role::Moderator);
+    Muc::Item item2;
+    item2.setNick(u"nym"_s);
+    item2.setRole(Muc::Role::Visitor);
+
+    auto task = room.setRoles({ item1, item2 });
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#admin'>"
+                "<item nick='pistol' role='moderator'/>"
+                "<item nick='nym' role='visitor'/>"
+                "</query></iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+}
+
 void tst_QXmppMuc::setAffiliation()
 {
     TestClient test(true);
@@ -1543,6 +1573,34 @@ void tst_QXmppMuc::setAffiliation()
                 "<item affiliation='outcast' jid='macbeth@shakespeare.lit'>"
                 "<reason>Treason</reason>"
                 "</item>"
+                "</query></iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+}
+
+void tst_QXmppMuc::setAffiliations()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    Muc::Item item1;
+    item1.setJid(u"macbeth@shakespeare.lit"_s);
+    item1.setAffiliation(Muc::Affiliation::Outcast);
+    Muc::Item item2;
+    item2.setJid(u"lady_macbeth@shakespeare.lit"_s);
+    item2.setAffiliation(Muc::Affiliation::Member);
+
+    auto task = room.setAffiliations({ item1, item2 });
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#admin'>"
+                "<item affiliation='outcast' jid='macbeth@shakespeare.lit'/>"
+                "<item affiliation='member' jid='lady_macbeth@shakespeare.lit'/>"
                 "</query></iq>"_s);
 
     test.inject(u"<iq id='qx1' type='result'/>"_s);
