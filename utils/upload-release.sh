@@ -74,7 +74,7 @@ craft_blueprint="${craft_dir}/qt-libs/qxmpp/qxmpp.py"
 
 if [ -d "$craft_dir" ] && [ -f "$craft_blueprint" ]; then
     hash=$(sha256sum "$compressed_archive" | cut -d' ' -f1)
-    branch="work/$(whoami)/qxmpp-${version}"
+    branch="work/$(whoami)/qxmpp-${version//./-}"
 
     git -C "$craft_dir" fetch origin
     git -C "$craft_dir" checkout -b "$branch" origin/master
