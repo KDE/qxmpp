@@ -83,6 +83,13 @@ public:
     /// \since QXmpp 1.16
     Q_SIGNAL void invitationDeclined(const QString &roomJid, const QXmpp::Muc::Decline &decline);
 
+    /// Emitted when a direct invitation (XEP-0249) is received.
+    ///
+    /// The \a from is the full JID of the user who sent the invitation.
+    ///
+    /// \since QXmpp 1.16
+    Q_SIGNAL void directInvitationReceived(const QXmpp::Muc::DirectInvitation &invitation, const QString &from, const QXmppMessage &message);
+
     bool handleMessage(const QXmppMessage &) override;
 
     /// Sends a decline for a mediated invitation to \a roomJid.
@@ -91,6 +98,14 @@ public:
     ///
     /// \since QXmpp 1.16
     QXmppTask<QXmpp::SendResult> declineInvitation(const QString &roomJid, QXmpp::Muc::Decline decline);
+
+    /// Sends a direct invitation (XEP-0249) to \a to.
+    ///
+    /// The optional \a message parameter can be used to set custom extensions on the
+    /// message stanza; the \c to, \c type, and invitation fields will be overwritten.
+    ///
+    /// \since QXmpp 1.16
+    QXmppTask<QXmpp::SendResult> sendDirectInvitation(const QString &to, QXmpp::Muc::DirectInvitation invitation, QXmppMessage message = {});
 
 protected:
     void onRegistered(QXmppClient *client) override;
