@@ -56,6 +56,9 @@ private:
     Q_SLOT void participantKicked();
     Q_SLOT void selfBanned();
     Q_SLOT void roomDestroyed();
+    Q_SLOT void selfRemovedMembersOnly();
+    Q_SLOT void selfRemovedServiceShutdown();
+    Q_SLOT void selfRemovedError();
     Q_SLOT void changePresence();
     Q_SLOT void leaveRoom();
     Q_SLOT void leaveRoomTimeout();
@@ -1141,6 +1144,108 @@ void tst_QXmppMuc::roomDestroyed()
     QVERIFY(destroyInfo.has_value());
     QCOMPARE(destroyInfo->alternateRoom(), u"darkcave@chat.shakespeare.lit"_s);
     QCOMPARE(destroyInfo->reason(), u"Moved to a new room"_s);
+    QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::selfRemovedMembersOnly()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+
+    Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
+    bool removedSignalReceived = false;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                     [&](const QString &, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &) {
+                         removedSignalReceived = true;
+                         removedReason = reason;
+                     });
+
+    // Removed because room became members-only (status 322 + 110)
+    QXmppPresence presence;
+    parsePacket(presence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<status code='322'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(presence);
+
+    QVERIFY(removedSignalReceived);
+    QCOMPARE(removedReason, Muc::LeaveReason::MembersOnly);
+    QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::selfRemovedServiceShutdown()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+
+    Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
+    bool removedSignalReceived = false;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                     [&](const QString &, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &) {
+                         removedSignalReceived = true;
+                         removedReason = reason;
+                     });
+
+    // Removed because service is shutting down (status 332 + 110)
+    QXmppPresence presence;
+    parsePacket(presence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<status code='332'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(presence);
+
+    QVERIFY(removedSignalReceived);
+    QCOMPARE(removedReason, Muc::LeaveReason::ServiceShutdown);
+    QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::selfRemovedError()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+
+    Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
+    bool removedSignalReceived = false;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                     [&](const QString &, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &) {
+                         removedSignalReceived = true;
+                         removedReason = reason;
+                     });
+
+    // Removed because of an error (status 333 + 110)
+    QXmppPresence presence;
+    parsePacket(presence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<status code='333'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(presence);
+
+    QVERIFY(removedSignalReceived);
+    QCOMPARE(removedReason, Muc::LeaveReason::Error);
     QVERIFY(!room.isValid());
 }
 

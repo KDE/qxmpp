@@ -41,8 +41,14 @@ static Muc::LeaveReason leaveReasonFromPresence(const QXmppPresence &presence)
     if (codes.contains(321)) {
         return Muc::LeaveReason::AffiliationChanged;
     }
-    if (codes.contains(332)) {
+    if (codes.contains(322)) {
         return Muc::LeaveReason::MembersOnly;
+    }
+    if (codes.contains(332)) {
+        return Muc::LeaveReason::ServiceShutdown;
+    }
+    if (codes.contains(333)) {
+        return Muc::LeaveReason::Error;
     }
     return Muc::LeaveReason::Left;
 }
