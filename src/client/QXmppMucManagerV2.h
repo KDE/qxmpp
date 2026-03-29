@@ -189,7 +189,9 @@ public:
     QXmppTask<QXmpp::Result<>> leave();
 
     QXmppTask<QXmpp::Result<>> setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason = {});
+    QXmppTask<QXmpp::Result<>> setRoles(const QList<QXmpp::Muc::Item> &items);
     QXmppTask<QXmpp::Result<>> setAffiliation(const QString &jid, QXmpp::Muc::Affiliation affiliation, const QString &reason = {});
+    QXmppTask<QXmpp::Result<>> setAffiliations(const QList<QXmpp::Muc::Item> &items);
     QXmppTask<QXmpp::Result<QList<QXmpp::Muc::Item>>> requestAffiliationList(QXmpp::Muc::Affiliation affiliation);
 
     QXmppTask<QXmpp::SendResult> requestVoice();
