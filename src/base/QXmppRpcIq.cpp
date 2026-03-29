@@ -23,11 +23,7 @@
 using namespace QXmpp::Private;
 using std::ranges::transform_view;
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 using MetaType = QMetaType::Type;
-#else
-using MetaType = QVariant::Type;
-#endif
 
 struct RpcValue {
     const QVariant &value;
@@ -95,11 +91,7 @@ void QXmppRpcMarshaller::marshall(QXmlStreamWriter *writer, const QVariant &valu
     XmlWriter w(writer);
 
     writer->writeStartElement(u"value"_s);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     switch (value.typeId()) {
-#else
-    switch (value.type()) {
-#endif
     case MetaType::Int:
     case MetaType::UInt:
     case MetaType::LongLong:
@@ -112,61 +104,32 @@ void QXmppRpcMarshaller::marshall(QXmlStreamWriter *writer, const QVariant &valu
     case MetaType::Bool:
         w.write(TextElement { u"boolean", value.toBool() });
         break;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QDate:
-#else
-    case QVariant::Date:
-#endif
         w.write(TextElement { u"dateTime.iso8601", value.toDate().toString(Qt::ISODate) });
         break;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QDateTime:
-#else
-    case QVariant::DateTime:
-#endif
         w.write(TextElement { u"dateTime.iso8601", value.toDateTime() });
         break;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QTime:
-#else
-    case QVariant::Time:
-#endif
         w.write(TextElement { u"dateTime.iso8601", value.toTime().toString(Qt::ISODate) });
         break;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QStringList:
     case QMetaType::Type::QVariantList: {
-#else
-    case QVariant::StringList:
-    case QVariant::List: {
-#endif
         w.write(RpcList { value.toList() });
         break;
     }
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QVariantMap: {
-#else
-    case QVariant::Map: {
-#endif
         w.write(RpcMap { value.toMap() });
         break;
     }
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QMetaType::Type::QByteArray: {
-#else
-    case QVariant::ByteArray: {
-#endif
         w.write(TextElement { u"base64", Base64 { value.toByteArray() } });
         break;
     }
     default: {
         if (value.isNull()) {
             w.write(Element { u"nil" });
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         } else if (value.canConvert(QMetaType(QMetaType::Type::QString))) {
-#else
-        } else if (value.canConvert(QVariant::String)) {
-#endif
             w.write(Element {
                 u"string",
                 [&] {

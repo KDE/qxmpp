@@ -430,9 +430,7 @@ void tst_QXmppSasl::htAlgorithmParsing()
         { u"HT-SHA3-256-ENDP", { IanaHashAlgorithm::Sha3_256, SaslHtMechanism::TlsServerEndpoint } },
         { u"HT-SHA3-512-EXPR", { IanaHashAlgorithm::Sha3_512, SaslHtMechanism::TlsExporter } },
         { u"HT-SHA-512-UNIQ", { IanaHashAlgorithm::Sha512, SaslHtMechanism::TlsUnique } },
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         { u"HT-BLAKE2B-256-NONE", { IanaHashAlgorithm::Blake2b_256, SaslHtMechanism::None } },
-#endif
     });
 
     for (const auto &[string, htAlg] : testValues) {

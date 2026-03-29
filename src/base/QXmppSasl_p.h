@@ -277,14 +277,10 @@ enum class IanaHashAlgorithm {
     Sha3_256,
     Sha3_384,
     Sha3_512,
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     Blake2s_256,
     Blake2b_256,
     Blake2b_512,
     _End = Blake2b_512,
-#else
-    _End = Sha3_512,
-#endif
 };
 
 QCryptographicHash::Algorithm ianaHashAlgorithmToQt(IanaHashAlgorithm alg);

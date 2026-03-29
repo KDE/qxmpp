@@ -37,14 +37,12 @@ static HashAlgorithm toHashAlgorithm(QCryptographicHash::Algorithm algorithm)
     case QCryptographicHash::Keccak_512:
     case QCryptographicHash::Sha3_224:
     case QCryptographicHash::Sha3_384:
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QCryptographicHash::Blake2b_160:
     case QCryptographicHash::Blake2b_384:
     case QCryptographicHash::Blake2s_128:
     case QCryptographicHash::Blake2s_160:
     case QCryptographicHash::Blake2s_224:
     case QCryptographicHash::Blake2s_256:
-#endif
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
     case QCryptographicHash::NumAlgorithms:
 #endif
@@ -65,12 +63,10 @@ static HashAlgorithm toHashAlgorithm(QCryptographicHash::Algorithm algorithm)
         return HashAlgorithm::Sha3_256;
     case QCryptographicHash::Sha3_512:
         return HashAlgorithm::Sha3_512;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case QCryptographicHash::Blake2b_256:
         return HashAlgorithm::Blake2b_256;
     case QCryptographicHash::Blake2b_512:
         return HashAlgorithm::Blake2b_512;
-#endif
     }
     return HashAlgorithm::Unknown;
 }
@@ -99,16 +95,10 @@ static std::optional<QCryptographicHash::Algorithm> toCryptograhicHashAlgorithm(
         return QCryptographicHash::Sha3_256;
     case HashAlgorithm::Sha3_512:
         return QCryptographicHash::Sha3_512;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     case HashAlgorithm::Blake2b_256:
         return QCryptographicHash::Blake2b_256;
     case HashAlgorithm::Blake2b_512:
         return QCryptographicHash::Blake2b_512;
-#else
-    case HashAlgorithm::Blake2b_256:
-    case HashAlgorithm::Blake2b_512:
-        return {};
-#endif
     }
     return {};
 }
@@ -427,11 +417,7 @@ void BufferReader::run()
 void HashProcessor::run()
 {
     auto &buffer = generator->m_processBuffer;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
     hash->addData(QByteArrayView(buffer.data(), buffer.size()));
-#else
-    hash->addData(buffer.data(), buffer.size());
-#endif
     generator->reportJobFinished();
 }
 

@@ -183,15 +183,6 @@ void QXmppContactAddresses::serializeForm(QXmppDataForm &form) const
 {
     using Type = QXmppDataForm::Field::Type;
 
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    serializeEmptyable(form, Type::ListMultiField, u"abuse-addresses", QStringList(d->abuseAddresses));
-    serializeEmptyable(form, Type::ListMultiField, u"admin-addresses", QStringList(d->adminAddresses));
-    serializeEmptyable(form, Type::ListMultiField, u"feedback-addresses", QStringList(d->feedbackAddresses));
-    serializeEmptyable(form, Type::ListMultiField, u"sales-addresses", QStringList(d->salesAddresses));
-    serializeEmptyable(form, Type::ListMultiField, u"security-addresses", QStringList(d->securityAddresses));
-    serializeEmptyable(form, Type::ListMultiField, u"status-addresses", QStringList(d->statusAddresses));
-    serializeEmptyable(form, Type::ListMultiField, u"support-addresses", QStringList(d->supportAddresses));
-#else
     serializeEmptyable(form, Type::ListMultiField, u"abuse-addresses", d->abuseAddresses);
     serializeEmptyable(form, Type::ListMultiField, u"admin-addresses", d->adminAddresses);
     serializeEmptyable(form, Type::ListMultiField, u"feedback-addresses", d->feedbackAddresses);
@@ -199,5 +190,4 @@ void QXmppContactAddresses::serializeForm(QXmppDataForm &form) const
     serializeEmptyable(form, Type::ListMultiField, u"security-addresses", d->securityAddresses);
     serializeEmptyable(form, Type::ListMultiField, u"status-addresses", d->statusAddresses);
     serializeEmptyable(form, Type::ListMultiField, u"support-addresses", d->supportAddresses);
-#endif
 }

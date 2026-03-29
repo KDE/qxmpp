@@ -43,17 +43,9 @@ protected:
 
     std::optional<bool> parseBool(const QVariant &variant)
     {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         if (variant.typeId() == QMetaType::Type::Bool) {
-#else
-        if (variant.type() == QVariant::Bool) {
-#endif
             return variant.toBool();
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         } else if (variant.typeId() == QMetaType::Type::QString) {
-#else
-        } else if (variant.type() == QVariant::String) {
-#endif
             auto string = variant.toString();
             if (string == u"1" || string == u"true") {
                 return true;

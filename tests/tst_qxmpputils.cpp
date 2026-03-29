@@ -178,12 +178,10 @@ void tst_QXmppUtils::testCalculateHashes_data()
         << u":/test.svg"_s
         << QByteArray::fromHex("4c374d4c52fb57311761877a31a160703e5b67c0d3838758fa3698ae5bce10438145478116e3885cd9a8c30cf30391e7cd579d1c4c5b9c3ea8dba50930417931")
         << HashAlgorithm::Sha3_512;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     QTest::newRow("svg/blake2b-512")
         << u":/test.svg"_s
         << QByteArray::fromHex("a5e86044842e4c8306e9e2ee041fc26d57d172d5cb32346d5ee467c97c5a0b0b2350bc5a4a3dc76b92c48585c2ebbb01cf47fa59a88420fe7bba8f2a18af6f07")
         << HashAlgorithm::Blake2b_512;
-#endif
     QTest::newRow("bmp/sha3-256")
         << u":/test.bmp"_s
         << QByteArray::fromHex("e50ffd13bb279932923ee10ba6847bec7546f77747074d1a7eeeb82228daf257")

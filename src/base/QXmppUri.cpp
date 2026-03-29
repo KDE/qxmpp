@@ -318,12 +318,7 @@ CustomQuery parseCustomQuery(const QUrlQuery &q)
     auto queryItems = q.queryItems();
     auto queryName = queryItems.first().first;
     queryItems.pop_front();
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     return CustomQuery { queryName, queryItems };
-#else
-    auto queryItemsStdPair = transform<QList<std::pair<QString, QString>>>(queryItems, [](const auto &pair) { return std::pair { pair.first, pair.second }; });
-    return CustomQuery { queryName, queryItemsStdPair };
-#endif
 }
 
 struct QXmppUriPrivate : QSharedData {

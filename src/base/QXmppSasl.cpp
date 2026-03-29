@@ -39,11 +39,9 @@ struct Enums::Data<IanaHashAlgorithm> {
         { Sha3_256, u"SHA3-256" },
         { Sha3_384, u"SHA3-384" },
         { Sha3_512, u"SHA3-512" },
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         { Blake2s_256, u"BLAKE2S-256" },
         { Blake2b_256, u"BLAKE2B-256" },
         { Blake2b_512, u"BLAKE2B-512" },
-#endif
     });
 };
 
@@ -578,11 +576,9 @@ QCryptographicHash::Algorithm ianaHashAlgorithmToQt(IanaHashAlgorithm alg)
         CASE(Sha3_256)
         CASE(Sha3_384)
         CASE(Sha3_512)
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         CASE(Blake2s_256)
         CASE(Blake2b_256)
         CASE(Blake2b_512)
-#endif
     }
     Q_UNREACHABLE();
 #undef CASE

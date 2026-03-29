@@ -245,11 +245,7 @@ QXmppTask<QXmppPubSubManager::FeaturesResult> QXmppPubSubManager::requestFeature
     });
 
     if (isPubSubServiceFound) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         co_return info.features();
-#else
-        co_return info.features().toVector();
-#endif
     }
 
     co_return InvalidServiceType();

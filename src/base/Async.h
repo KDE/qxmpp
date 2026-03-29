@@ -26,27 +26,7 @@ auto later(QObject *context, Function function)
     QMetaObject::invokeMethod(context, std::forward<Function>(function), Qt::QueuedConnection);
 }
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
-template<typename T>
-QFuture<T> makeReadyFuture(T &&value) { return QtFuture::makeReadyValueFuture(std::move(value)); }
-#elif QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)
 using QtFuture::makeReadyFuture;
-#else
-template<typename T>
-QFuture<T> makeReadyFuture(T &&value)
-{
-    QFutureInterface<T> interface(QFutureInterfaceBase::Started);
-    interface.reportResult(std::move(value));
-    interface.reportFinished();
-    return interface.future();
-}
-
-inline QFuture<void> makeReadyFuture()
-{
-    using State = QFutureInterfaceBase::State;
-    return QFutureInterface<void>(State(State::Started | State::Finished)).future();
-}
-#endif
 
 template<typename T, typename Handler>
 void await(const QFuture<T> &future, QObject *context, Handler handler)

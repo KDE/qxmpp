@@ -496,12 +496,7 @@ QByteArray QXmpp::Private::serializeQXmlStream(std::function<void(QXmlStreamWrit
 //
 QByteArray QXmpp::Private::generateRandomBytes(size_t minimumByteCount, size_t maximumByteCount)
 {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     const auto byteCount = QRandomGenerator::system()->bounded(quint64(minimumByteCount), quint64(maximumByteCount));
-#else
-    // Qt 5 only supports 32 bit integer!
-    const auto byteCount = QRandomGenerator::system()->bounded(quint32(minimumByteCount), quint32(maximumByteCount));
-#endif
     QByteArray bytes;
     bytes.resize(byteCount);
     generateRandomBytes(reinterpret_cast<uint8_t *>(bytes.data()), byteCount);
