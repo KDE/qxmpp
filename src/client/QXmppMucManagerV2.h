@@ -15,6 +15,7 @@
 #include <optional>
 #include <variant>
 
+class QXmppDataForm;
 class QXmppPresence;
 namespace QXmpp::Private {
 struct MucRoomData;
@@ -209,6 +210,8 @@ public:
     QXmppTask<QXmpp::Result<>> setAffiliations(const QList<QXmpp::Muc::Item> &items);
     QXmppTask<QXmpp::Result<QList<QXmpp::Muc::Item>>> requestAffiliationList(QXmpp::Muc::Affiliation affiliation);
     QXmppTask<QXmpp::Result<QString>> requestReservedNickname();
+    QXmppTask<QXmpp::Result<QXmppDataForm>> requestRegistrationForm();
+    QXmppTask<QXmpp::Result<>> submitRegistration(const QXmppDataForm &form);
 
     QXmppTask<QXmpp::SendResult> requestVoice();
     QXmppTask<QXmpp::SendResult> answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow);
