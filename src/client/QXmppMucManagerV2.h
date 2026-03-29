@@ -208,6 +208,7 @@ public:
     QXmppTask<QXmpp::Result<>> setAffiliation(const QString &jid, QXmpp::Muc::Affiliation affiliation, const QString &reason = {});
     QXmppTask<QXmpp::Result<>> setAffiliations(const QList<QXmpp::Muc::Item> &items);
     QXmppTask<QXmpp::Result<QList<QXmpp::Muc::Item>>> requestAffiliationList(QXmpp::Muc::Affiliation affiliation);
+    QXmppTask<QXmpp::Result<QString>> requestReservedNickname();
 
     QXmppTask<QXmpp::SendResult> requestVoice();
     QXmppTask<QXmpp::SendResult> answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow);
