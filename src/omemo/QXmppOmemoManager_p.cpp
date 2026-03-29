@@ -1714,7 +1714,7 @@ QByteArray ManagerPrivate::decryptPayload(const Crypto::SecureByteArray &payload
 
     auto expectedMessageAuthenticationCode = payloadDecryptionData.toByteArray().right(PAYLOAD_MESSAGE_AUTHENTICATION_CODE_SIZE);
 
-    if (messageAuthenticationCode != expectedMessageAuthenticationCode) {
+    if (!constTimeEqual(messageAuthenticationCode, expectedMessageAuthenticationCode)) {
         warning(u"Message authentication code does not match expected one"_s);
         return {};
     }

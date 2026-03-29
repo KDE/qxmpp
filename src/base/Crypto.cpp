@@ -274,6 +274,14 @@ QByteArray hmacSha256(const QByteArray &key, const QByteArray &data)
     return QMessageAuthenticationCode::hash(data, key, QCryptographicHash::Sha256);
 }
 
+bool constTimeEqual(const QByteArray &a, const QByteArray &b)
+{
+    if (a.size() != b.size()) {
+        return false;
+    }
+    return CRYPTO_memcmp(a.constData(), b.constData(), a.size()) == 0;
+}
+
 QByteArray randomBytes(int count)
 {
     QByteArray output(count, '\0');

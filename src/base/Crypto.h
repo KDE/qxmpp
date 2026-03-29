@@ -69,6 +69,9 @@ QXMPP_EXPORT QByteArray hmacSha256(const QByteArray &key, const QByteArray &data
 // secure random bytes
 QXMPP_EXPORT QByteArray randomBytes(int count);
 
+// constant-time comparison (prevents timing side-channel attacks)
+QXMPP_EXPORT bool constTimeEqual(const QByteArray &a, const QByteArray &b);
+
 // streaming cipher context for QIODevice wrappers
 class QXMPP_EXPORT CipherContext
 {
