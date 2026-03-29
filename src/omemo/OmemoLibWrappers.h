@@ -36,7 +36,11 @@ public:
     operator bool() const { return m_ptr != nullptr; }
     T *operator->() const { return m_ptr; }
     T *get() const { return m_ptr; }
-    T **ptrRef() { return &m_ptr; }
+    T **ptrRef()
+    {
+        reset(nullptr);
+        return &m_ptr;
+    }
     void reset(T *ptr)
     {
         if (m_ptr) {
