@@ -320,7 +320,7 @@ target_include_directories(${QXMPP_TARGET}_internal
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(${QXMPP_TARGET}_internal
-    PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Xml
+    PUBLIC Qt6::Core Qt6::Network Qt6::Xml
 )
 target_compile_definitions(${QXMPP_TARGET}_internal PRIVATE ${QXMPP_TARGET}_EXPORTS)
 
@@ -341,7 +341,7 @@ if(WITH_QCA)
     target_sources(${QXMPP_TARGET}_internal
         PRIVATE client/QXmppEncryptedFileSharingProvider.cpp client/QXmppFileEncryption.cpp client/QcaInitializer.cpp)
     set(INSTALL_HEADER_FILES ${INSTALL_HEADER_FILES} client/QXmppEncryptedFileSharingProvider.h)
-    target_link_libraries(${QXMPP_TARGET}_internal PUBLIC qca-qt${QT_VERSION_MAJOR})
+    target_link_libraries(${QXMPP_TARGET}_internal PUBLIC qca-qt6)
 endif()
 
 #
@@ -361,7 +361,7 @@ set_target_properties(${QXMPP_TARGET} PROPERTIES
     EXPORT_NAME QXmpp
 )
 target_link_libraries(${QXMPP_TARGET}
-    PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Xml
+    PUBLIC Qt6::Core Qt6::Network Qt6::Xml
 )
 # For shared builds: link _internal privately to propagate GStreamer/QCA deps.
 # For static builds: this would require _internal to be in the export set; instead we
@@ -374,7 +374,7 @@ if(NOT BUILD_SHARED)
         target_link_libraries(${QXMPP_TARGET} PRIVATE PkgConfig::GStreamer)
     endif()
     if(WITH_QCA)
-        target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt${QT_VERSION_MAJOR})
+        target_link_libraries(${QXMPP_TARGET} PRIVATE qca-qt6)
     endif()
 endif()
 target_include_directories(${QXMPP_TARGET}

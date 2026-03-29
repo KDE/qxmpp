@@ -8,7 +8,7 @@
 \section intro Introduction
 
 QXmpp is a cross-platform C++ XMPP client and server library built on top of the Qt framework
-(Qt 5.15+ and Qt 6.x). It implements a large number of XMPP Extension Protocols (XEPs) and
+(Qt 6.4+). It implements a large number of XMPP Extension Protocols (XEPs) and
 exposes a modern, reactive API based on C++20 and Qt's property system.
 
 \section getting_started Getting Started

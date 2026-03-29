@@ -53,7 +53,7 @@ QXmpp is released under the terms of the GNU Lesser General Public License, vers
 
 ## Building
 
-QXmpp requires **Qt 5.15** or **Qt 6.0 or higher**.
+QXmpp requires **Qt 6.4 or higher**.
 
 You can build QXmpp with CMake:
 ```
@@ -73,7 +73,6 @@ Option | Default | Description
 `BUILD_TESTING` | `ON` | Build unit tests
 `BUILD_OMEMO` | `OFF` | Build the [OMEMO module][omemo]
 `WITH_GSTREAMER` | `OFF` | Enable audio/video over Jingle
-`QT_VERSION_MAJOR=5/6` | | to build with a specific Qt major version, prefers Qt 6 if undefined
 
 For example, to build without unit tests you could do:
 ```

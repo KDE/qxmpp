@@ -21,20 +21,11 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 # Qt
-if(BUILD_WITH_QT6)
-    set(QT_VERSION_MAJOR 6)
-endif()
-if(NOT DEFINED QT_VERSION_MAJOR)
-    find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network Xml)
-endif()
-message("-- Choosing Qt ${QT_VERSION_MAJOR}")
-find_package(Qt${QT_VERSION_MAJOR} 5.15.0 REQUIRED COMPONENTS Core Network Xml)
+set(QT_VERSION_MAJOR 6)
+find_package(Qt6 6.4.0 REQUIRED COMPONENTS Core Network Xml)
 
 # QCA (optional)
-find_package(Qca-qt${QT_VERSION_MAJOR} QUIET)
-if(${QT_VERSION_MAJOR} EQUAL 6)
-    find_package(Qt6Core5Compat)
-endif()
+find_package(Qca-qt6 QUIET)
 
 include(GNUInstallDirs)
 
@@ -43,7 +34,6 @@ if(DEFINED BUILD_TESTS)
     set(BUILD_TESTING ${BUILD_TESTS})
 endif()
 
-option(BUILD_WITH_QT6 "Force build with Qt 6.")
 option(BUILD_SHARED "Build shared library." ON)
 option(BUILD_TESTING "Build tests." ON)
 option(BUILD_DOCUMENTATION "Build HTML API documentation." OFF)
@@ -52,7 +42,7 @@ option(BUILD_EXAMPLES "Build examples." ON)
 option(BUILD_OMEMO "Build the OMEMO module." OFF)
 option(WITH_GSTREAMER "Build with GStreamer support for Jingle." OFF)
 option(WITH_PKGCONFIG "Use PkgConfig when building." ON)
-option(WITH_QCA "Build with QCA for OMEMO or encrypted file sharing." ${Qca-qt${QT_VERSION_MAJOR}_FOUND})
+option(WITH_QCA "Build with QCA for OMEMO or encrypted file sharing." ${Qca-qt6_FOUND})
 option(ENABLE_ASAN "Build with address sanitizer." OFF)
 
 if(WITH_PKGCONFIG)
@@ -151,32 +141,4 @@ install(
     COMPONENT Devel
 )
 
-if(QT_VERSION_MAJOR EQUAL 5)
-    # "QXmpp" cmake package for backwards-compatibility
-    configure_package_config_file(
-        cmake/QXmppLegacyConfig.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/QXmppConfig.cmake
-        INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/QXmpp"
-    )
-
-    install(
-        FILES ${CMAKE_CURRENT_BINARY_DIR}/QXmppConfig.cmake
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/QXmpp"
-        COMPONENT Devel
-    )
-    install(
-        FILES ${CMAKE_CURRENT_SOURCE_DIR}/cmake/QXmppLegacyConfigVersion.cmake
-        RENAME QXmppConfigVersion.cmake
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/QXmpp"
-        COMPONENT Devel
-    )
-
-    # "qxmpp.pc" for backwards-compatibility
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/qxmpp_legacy.pc.in ${CMAKE_CURRENT_BINARY_DIR}/qxmpp.pc @ONLY)
-    install(
-        FILES ${CMAKE_CURRENT_BINARY_DIR}/qxmpp.pc
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
-        COMPONENT Devel
-    )
-endif()
 

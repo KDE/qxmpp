@@ -4,18 +4,18 @@
 
 include_directories(.)
 
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
+find_package(Qt6 REQUIRED COMPONENTS Test)
 
 # optional QtGui support (for testing header-only usage)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui QUIET)
+find_package(Qt6 COMPONENTS Gui QUIET)
 
 add_library(testutils OBJECT util.h TestClient.h)
-target_link_libraries(testutils PUBLIC Qt${QT_VERSION_MAJOR}::Test ${QXMPP_TARGET}_internal)
+target_link_libraries(testutils PUBLIC Qt6::Test ${QXMPP_TARGET}_internal)
 
 macro(add_simple_test TEST_NAME)
     add_executable(tst_${TEST_NAME} tst_${TEST_NAME}.cpp $<TARGET_OBJECTS:testutils> ${ARGN})
     add_test(tst_${TEST_NAME} tst_${TEST_NAME})
-    target_link_libraries(tst_${TEST_NAME} Qt${QT_VERSION_MAJOR}::Test ${QXMPP_TARGET}_internal)
+    target_link_libraries(tst_${TEST_NAME} Qt6::Test ${QXMPP_TARGET}_internal)
     target_compile_definitions(tst_${TEST_NAME} PRIVATE QXMPP_STATIC_DEFINE)
 
     if(${TEST_NAME} MATCHES "^qxmppomemo")
@@ -31,7 +31,7 @@ add_simple_test(qxmppblockingmanager)
 add_simple_test(qxmppcallinvitemanager)
 add_simple_test(qxmppcarbonmanager)
 add_simple_test(qxmppclient)
-if(Qt${QT_VERSION_MAJOR}Gui_FOUND)
+if(Qt6Gui_FOUND)
     target_link_libraries(tst_qxmppclient Qt::Gui)
 endif()
 add_simple_test(qxmppdataform)

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Gui)
+find_package(Qt6 REQUIRED COMPONENTS Gui)
 
 macro(add_simple_example EXAMPLE_NAME)
     add_executable(${EXAMPLE_NAME} example_${EXAMPLE_NAME}/example_${EXAMPLE_NAME}.cpp)
@@ -18,7 +18,7 @@ add_simple_example(8_server)
 
 # VCard
 add_simple_example(9_vCard)
-target_link_libraries(9_vCard Qt${QT_VERSION_MAJOR}::Gui)
+target_link_libraries(9_vCard Qt6::Gui)
 
 # AV Calls
 if(WITH_GSTREAMER)
