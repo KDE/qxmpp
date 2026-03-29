@@ -282,4 +282,22 @@ void MucOwnerQuery::toXml(QXmlStreamWriter *writer) const
 }
 /// \endcond
 
+/// \cond
+std::optional<MucRegisterQuery> MucRegisterQuery::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    MucRegisterQuery q;
+    q.form = parseOptionalChildElement<QXmppDataForm>(el);
+    q.isRegistered = !el.firstChildElement(u"registered"_s).isNull();
+    return q;
+}
+
+void MucRegisterQuery::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element { Tag { u"query", ns_register }, form });
+}
+/// \endcond
+
 }  // namespace QXmpp::Private

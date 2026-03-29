@@ -49,6 +49,23 @@ struct MucOwnerQuery {
     void toXml(QXmlStreamWriter *writer) const;
 };
 
+///
+/// \brief IQ payload for jabber:iq:register queries to a MUC room (XEP-0045 §7.10).
+///
+/// Used to request and submit a room registration form. Registration typically
+/// reserves a nickname or grants membership in a room.
+///
+struct MucRegisterQuery {
+    /// The registration data form.
+    std::optional<QXmppDataForm> form;
+    /// Whether the user is already registered (\c <registered/> element present).
+    bool isRegistered = false;
+
+    static constexpr std::tuple XmlTag = { u"query", ns_register };
+    static std::optional<MucRegisterQuery> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+};
+
 }  // namespace QXmpp::Private
 
 #endif  // QXMPPMUCDATA_P_H
