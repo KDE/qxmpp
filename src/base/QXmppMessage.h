@@ -206,13 +206,22 @@ public:
     void setMucUserQuery(std::optional<QXmpp::Muc::UserQuery> element);
 
     // XEP-0249: Direct MUC Invitations
+    std::optional<QXmpp::Muc::DirectInvitation> mucDirectInvitation() const;
+    void setMucDirectInvitation(std::optional<QXmpp::Muc::DirectInvitation> invitation);
+
+    [[deprecated("Use mucDirectInvitation()")]]
     QString mucInvitationJid() const;
+    [[deprecated("Use setMucDirectInvitation()")]]
     void setMucInvitationJid(const QString &jid);
 
+    [[deprecated("Use mucDirectInvitation()")]]
     QString mucInvitationPassword() const;
+    [[deprecated("Use setMucDirectInvitation()")]]
     void setMucInvitationPassword(const QString &password);
 
+    [[deprecated("Use mucDirectInvitation()")]]
     QString mucInvitationReason() const;
+    [[deprecated("Use setMucDirectInvitation()")]]
     void setMucInvitationReason(const QString &reason);
 
     // XEP-0280: Message Carbons

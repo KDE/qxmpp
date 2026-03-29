@@ -145,9 +145,11 @@ void QXmppMucManager::_q_messageReceived(const QXmppMessage &msg)
     }
 
     // process room invitations
-    const QString roomJid = msg.mucInvitationJid();
-    if (!roomJid.isEmpty() && (!d->rooms.contains(roomJid) || !d->rooms.value(roomJid)->isJoined())) {
-        Q_EMIT invitationReceived(roomJid, msg.from(), msg.mucInvitationReason());
+    if (const auto inv = msg.mucDirectInvitation(); inv && !inv->jid().isEmpty()) {
+        const auto &roomJid = inv->jid();
+        if (!d->rooms.contains(roomJid) || !d->rooms.value(roomJid)->isJoined()) {
+            Q_EMIT invitationReceived(roomJid, msg.from(), inv->reason());
+        }
     }
 }
 
@@ -309,8 +311,7 @@ bool QXmppMucRoom::sendInvitation(const QString &jid, const QString &reason)
     QXmppMessage message;
     message.setTo(jid);
     message.setType(QXmppMessage::Normal);
-    message.setMucInvitationJid(d->jid);
-    message.setMucInvitationReason(reason);
+    message.setMucDirectInvitation(QXmpp::Muc::DirectInvitation(d->jid, {}, reason));
     return d->client->sendLegacy(message);
 }
 

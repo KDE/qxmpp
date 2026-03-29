@@ -91,6 +91,8 @@ private:
     Q_SLOT void invitationReceivedUnknownRoom();
     Q_SLOT void declineInvitation();
     Q_SLOT void invitationDeclined();
+    Q_SLOT void directInvitationReceived();
+    Q_SLOT void sendDirectInvitation();
 
     // Room creation and configuration
     Q_SLOT void joinRoomNotFound();
@@ -2742,6 +2744,58 @@ void tst_QXmppMuc::invitationDeclined()
     auto decline = spy.at(0).at(1).value<QXmpp::Muc::Decline>();
     QCOMPARE(decline.from(), u"hecate@shakespeare.lit");
     QCOMPARE(decline.reason(), u"Too busy.");
+}
+
+void tst_QXmppMuc::directInvitationReceived()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    QSignalSpy spy(muc, &QXmppMucManagerV2::directInvitationReceived);
+
+    QXmppMessage msg;
+    parsePacket(msg,
+                "<message from='crone1@shakespeare.lit/desktop' to='hecate@shakespeare.lit/broom'>"
+                "<x xmlns='jabber:x:conference'"
+                " continue='true'"
+                " jid='darkcave@macbeth.shakespeare.lit'"
+                " password='cauldronburn'"
+                " reason='Hey Hecate, this is the place for all good witches!'"
+                " thread='e0ffe42b28561960c6b12b944a092794b9683a38'/>"
+                "</message>");
+    muc->handleMessage(msg);
+
+    QCOMPARE(spy.count(), 1);
+    auto invitation = spy.at(0).at(0).value<Muc::DirectInvitation>();
+    QCOMPARE(invitation.jid(), u"darkcave@macbeth.shakespeare.lit");
+    QCOMPARE(invitation.password(), u"cauldronburn");
+    QCOMPARE(invitation.reason(), u"Hey Hecate, this is the place for all good witches!");
+    QVERIFY(invitation.isContinue());
+    QCOMPARE(invitation.thread(), u"e0ffe42b28561960c6b12b944a092794b9683a38");
+    QCOMPARE(spy.at(0).at(1).toString(), u"crone1@shakespeare.lit/desktop");
+}
+
+void tst_QXmppMuc::sendDirectInvitation()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"crone1@shakespeare.lit/desktop"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    Muc::DirectInvitation inv(u"darkcave@macbeth.shakespeare.lit"_s, u"cauldronburn"_s, u"Hey Hecate!"_s, true, u"thread123"_s);
+
+    auto task = muc->sendDirectInvitation(u"hecate@shakespeare.lit"_s, inv);
+    test.expect(u"<message to='hecate@shakespeare.lit' type='normal'>"
+                "<x xmlns='jabber:x:conference'"
+                " jid='darkcave@macbeth.shakespeare.lit'"
+                " password='cauldronburn'"
+                " reason='Hey Hecate!'"
+                " continue='true'"
+                " thread='thread123'/>"
+                "</message>"_s);
+    QVERIFY(!task.isFinished());
 }
 
 QTEST_MAIN(tst_QXmppMuc)

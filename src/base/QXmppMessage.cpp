@@ -155,9 +155,7 @@ public:
     std::optional<Muc::UserQuery> mucUserQuery;
 
     // XEP-0249: Direct MUC Invitations
-    QString mucInvitationJid;
-    QString mucInvitationPassword;
-    QString mucInvitationReason;
+    std::optional<Muc::DirectInvitation> mucDirectInvitation;
 
     // XEP-0280: Message Carbons
     bool privatemsg = false;
@@ -707,69 +705,104 @@ void QXmppMessage::setMucUserQuery(std::optional<QXmpp::Muc::UserQuery> element)
 }
 
 ///
+/// Returns the direct MUC invitation (\xep{0249}) if present.
+///
+/// \since QXmpp 1.16
+///
+std::optional<QXmpp::Muc::DirectInvitation> QXmppMessage::mucDirectInvitation() const
+{
+    return d->mucDirectInvitation;
+}
+
+///
+/// Sets the direct MUC invitation (\xep{0249}).
+///
+/// \since QXmpp 1.16
+///
+void QXmppMessage::setMucDirectInvitation(std::optional<QXmpp::Muc::DirectInvitation> invitation)
+{
+    d->mucDirectInvitation = std::move(invitation);
+}
+
+///
 /// Returns the JID for a multi-user chat direct invitation as defined by
 /// \xep{0249, Direct MUC Invitations}.
 ///
+/// \deprecated Use mucDirectInvitation() instead.
 /// \since QXmpp 0.7.4
 ///
 QString QXmppMessage::mucInvitationJid() const
 {
-    return d->mucInvitationJid;
+    return d->mucDirectInvitation ? d->mucDirectInvitation->jid() : QString();
 }
 
 ///
 /// Sets the JID for a multi-user chat direct invitation as defined by
 /// \xep{0249, Direct MUC Invitations}.
 ///
+/// \deprecated Use setMucDirectInvitation() instead.
 /// \since QXmpp 0.7.4
 ///
 void QXmppMessage::setMucInvitationJid(const QString &jid)
 {
-    d->mucInvitationJid = jid;
+    if (!d->mucDirectInvitation) {
+        d->mucDirectInvitation.emplace();
+    }
+    d->mucDirectInvitation->setJid(jid);
 }
 
 ///
 /// Returns the password for a multi-user chat direct invitation as defined by
 /// \xep{0249, Direct MUC Invitations}.
 ///
+/// \deprecated Use mucDirectInvitation() instead.
 /// \since QXmpp 0.7.4
 ///
 QString QXmppMessage::mucInvitationPassword() const
 {
-    return d->mucInvitationPassword;
+    return d->mucDirectInvitation ? d->mucDirectInvitation->password() : QString();
 }
 
 ///
 /// Sets the \a password for a multi-user chat direct invitation as defined by
 /// \xep{0249, Direct MUC Invitations}.
 ///
+/// \deprecated Use setMucDirectInvitation() instead.
 /// \since QXmpp 0.7.4
 ///
 void QXmppMessage::setMucInvitationPassword(const QString &password)
 {
-    d->mucInvitationPassword = password;
+    if (!d->mucDirectInvitation) {
+        d->mucDirectInvitation.emplace();
+    }
+    d->mucDirectInvitation->setPassword(password);
 }
 
 ///
 /// Returns the reason for a multi-user chat direct invitation as defined by
 /// \xep{0249, Direct MUC Invitations}.
 ///
+/// \deprecated Use mucDirectInvitation() instead.
 /// \since QXmpp 0.7.4
 ///
 QString QXmppMessage::mucInvitationReason() const
 {
-    return d->mucInvitationReason;
+    return d->mucDirectInvitation ? d->mucDirectInvitation->reason() : QString();
 }
 
 ///
 /// Sets the \a reason for a multi-user chat direct invitation as defined by
 /// \xep{0249, Direct MUC Invitations}.
 ///
+/// \deprecated Use setMucDirectInvitation() instead.
 /// \since QXmpp 0.7.4
 ///
 void QXmppMessage::setMucInvitationReason(const QString &reason)
 {
-    d->mucInvitationReason = reason;
+    if (!d->mucDirectInvitation) {
+        d->mucDirectInvitation.emplace();
+    }
+    d->mucDirectInvitation->setReason(reason);
 }
 
 ///
@@ -1845,9 +1878,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             }
             // XEP-0249: Direct MUC Invitations
             if (element.namespaceURI() == ns_conference) {
-                d->mucInvitationJid = element.attribute(u"jid"_s);
-                d->mucInvitationPassword = element.attribute(u"password"_s);
-                d->mucInvitationReason = element.attribute(u"reason"_s);
+                d->mucDirectInvitation = Muc::DirectInvitation::fromDom(element);
                 return true;
             }
             // XEP-0066: Out of Band Data
@@ -2147,13 +2178,8 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
         }
 
         // XEP-0249: Direct MUC Invitations
-        if (!d->mucInvitationJid.isEmpty()) {
-            w.write(Element {
-                { u"x", ns_conference },
-                Attribute { u"jid", d->mucInvitationJid },
-                OptionalAttribute { u"password", d->mucInvitationPassword },
-                OptionalAttribute { u"reason", d->mucInvitationReason },
-            });
+        if (d->mucDirectInvitation) {
+            d->mucDirectInvitation->toXml(writer);
         }
 
         // XEP-0231: Bits of Binary

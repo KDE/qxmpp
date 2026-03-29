@@ -472,9 +472,14 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
 
     auto bareFrom = QXmppUtils::jidToBareJid(message.from());
 
-    // Handle mediated invitations from rooms the user hasn't joined yet (§7.8.2).
-    // These are Normal messages with <invite from=...> inside <x xmlns='muc#user'>.
+    // Handle invitations from users we haven't joined a room with.
     if (type == QXmppMessage::Normal) {
+        // XEP-0249: Direct MUC Invitations
+        if (auto inv = message.mucDirectInvitation(); inv && !inv->jid().isEmpty()) {
+            Q_EMIT directInvitationReceived(*inv, message.from(), message);
+            return true;
+        }
+        // XEP-0045 §7.8.2: Mediated invitations
         if (const auto &ue = message.mucUserQuery(); ue && ue->invite() && !ue->invite()->from().isEmpty()) {
             Q_EMIT invitationReceived(bareFrom, *ue->invite(), ue->password());
             return true;
@@ -577,6 +582,23 @@ QXmppTask<SendResult> QXmppMucManagerV2::declineInvitation(const QString &roomJi
     QXmpp::Muc::UserQuery ue;
     ue.setDecline(std::move(decline));
     message.setMucUserQuery(std::move(ue));
+    return client()->send(std::move(message));
+}
+
+///
+/// Sends a direct invitation (XEP-0249) to \a to.
+///
+/// Direct invitations are sent peer-to-peer and are not routed through the room.
+/// The optional \a message parameter can be used to set custom extensions on the
+/// message stanza; the \c to, \c type, and invitation fields will be overwritten.
+///
+/// \since QXmpp 1.16
+///
+QXmppTask<SendResult> QXmppMucManagerV2::sendDirectInvitation(const QString &to, Muc::DirectInvitation invitation, QXmppMessage message)
+{
+    message.setTo(to);
+    message.setType(QXmppMessage::Normal);
+    message.setMucDirectInvitation(std::move(invitation));
     return client()->send(std::move(message));
 }
 

@@ -388,6 +388,16 @@ void tst_QXmppMessage::testMucInvitation()
 
     QXmppMessage message;
     parsePacket(message, xml);
+
+    // New API
+    QVERIFY(message.mucDirectInvitation().has_value());
+    QCOMPARE(message.mucDirectInvitation()->jid(), u"darkcave@macbeth.shakespeare.lit");
+    QCOMPARE(message.mucDirectInvitation()->password(), u"cauldronburn");
+    QCOMPARE(message.mucDirectInvitation()->reason(), u"Hey Hecate, this is the place for all good witches!");
+
+    // Deprecated API
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QCOMPARE(message.mucInvitationJid(), QLatin1String("darkcave@macbeth.shakespeare.lit"));
     QCOMPARE(message.mucInvitationPassword(), QLatin1String("cauldronburn"));
     QCOMPARE(message.mucInvitationReason(), QLatin1String("Hey Hecate, this is the place for all good witches!"));
@@ -399,6 +409,7 @@ void tst_QXmppMessage::testMucInvitation()
     message.setMucInvitationJid(u"darkcave@macbeth.shakespeare.lit"_s);
     message.setMucInvitationPassword(u"cauldronburn"_s);
     message.setMucInvitationReason(u"Hey Hecate, this is the place for all good witches!"_s);
+    QT_WARNING_POP
     serializePacket(message, xml);
 }
 

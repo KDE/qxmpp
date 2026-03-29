@@ -204,6 +204,61 @@ struct QXMPP_EXPORT Avatar {
 };
 
 ///
+/// \brief A direct MUC invitation as defined by \xep{0249, Direct MUC Invitations}.
+///
+/// Direct invitations are sent peer-to-peer and are not routed through the MUC room.
+/// The \e continue and \e thread attributes are used when converting a 1-to-1 chat
+/// to a group chat (\xep{0045} §7.9).
+///
+/// \since QXmpp 1.16
+///
+class QXMPP_EXPORT DirectInvitation
+{
+public:
+    DirectInvitation() = default;
+    explicit DirectInvitation(QString jid, QString password = {}, QString reason = {},
+                              bool isContinue = false, QString thread = {});
+
+    /// Returns the JID of the MUC room to join (required).
+    QString jid() const { return m_jid; }
+    /// Sets the JID of the MUC room.
+    void setJid(const QString &jid) { m_jid = jid; }
+
+    /// Returns the optional room password.
+    QString password() const { return m_password; }
+    /// Sets the optional room password.
+    void setPassword(const QString &password) { m_password = password; }
+
+    /// Returns the optional human-readable reason for the invitation.
+    QString reason() const { return m_reason; }
+    /// Sets the optional human-readable reason.
+    void setReason(const QString &reason) { m_reason = reason; }
+
+    /// Returns whether this invitation indicates a continuation of a 1-to-1 chat.
+    bool isContinue() const { return m_continue; }
+    /// Sets the continue flag.
+    void setIsContinue(bool isContinue) { m_continue = isContinue; }
+
+    /// Returns the thread ID from the original 1-to-1 conversation.
+    QString thread() const { return m_thread; }
+    /// Sets the thread ID.
+    void setThread(const QString &thread) { m_thread = thread; }
+
+    /// \cond
+    static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_conference };
+    static std::optional<DirectInvitation> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+    /// \endcond
+
+private:
+    QString m_jid;
+    QString m_password;
+    QString m_reason;
+    bool m_continue = false;
+    QString m_thread;
+};
+
+///
 /// \brief A mediated MUC invitation as defined by \xep{0045, Multi-User Chat} §7.8.2.
 ///
 /// When sending an invitation, set \e to to the invitee's JID.
