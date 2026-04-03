@@ -26,7 +26,18 @@ auto later(QObject *context, Function function)
     QMetaObject::invokeMethod(context, std::forward<Function>(function), Qt::QueuedConnection);
 }
 
+// QtFuture::makeReadyFuture() is deprecated since Qt 6.6 in favor of
+// makeReadyValueFuture() (available since Qt 6.6). Wrap it to stay
+// warning-free while keeping Qt 6.4 compatibility.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+template<typename T>
+auto makeReadyFuture(T &&value)
+{
+    return QtFuture::makeReadyValueFuture(std::forward<T>(value));
+}
+#else
 using QtFuture::makeReadyFuture;
+#endif
 
 template<typename T, typename Handler>
 void await(const QFuture<T> &future, QObject *context, Handler handler)
