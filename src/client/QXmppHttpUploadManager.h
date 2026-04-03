@@ -104,7 +104,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    QXmppTask<void> updateService(const QString &jid);
+    QXmppTask<void> updateService(QString jid);
     void updateServices();
     void resetCachedData();
     void updateCachedData();

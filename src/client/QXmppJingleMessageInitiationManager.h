@@ -105,8 +105,8 @@ protected:
 
 private:
     QXmppTask<ProposeResult> propose(
-        const QString &id,
-        const QString &remoteJid,
+        QString id,
+        QString remoteJid,
         const QList<QXmppJingleRtpDescription> &descriptions);
     QXmppTask<QXmpp::SendResult> sendMessage(
         const QXmppJingleMessageInitiationElement &jmiElement,

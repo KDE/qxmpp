@@ -1401,7 +1401,7 @@ QXmppTask<std::optional<QXmppMessage>> ManagerPrivate::decryptMessage(QXmppMessa
 //
 // \return the serialized decrypted stanza if it could be decrypted
 //
-QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(const QDomElement &iqElement)
+QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(QDomElement iqElement)
 {
     using Result = std::optional<IqDecryptionResult>;
 
@@ -1444,7 +1444,7 @@ QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(const QDo
 // \return the result of the decryption if it succeeded
 //
 template<typename T>
-QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanza, const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, const QByteArray &omemoPayload, bool isMessageStanza)
+QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanza, QString senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, const QByteArray &omemoPayload, bool isMessageStanza)
 {
     auto serializedSceEnvelope = co_await extractSceEnvelope(senderJid, senderDeviceId, omemoEnvelope, omemoPayload, isMessageStanza)
                                      .withContext(q);
@@ -1512,7 +1512,7 @@ QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanz
 // \return the serialized SCE envelope if it could be extracted, otherwise a
 //         default-constructed byte array
 //
-QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, const QByteArray &omemoPayload, bool isMessageStanza)
+QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, QByteArray omemoPayload, bool isMessageStanza)
 {
     auto payloadDecryptionData =
         co_await extractPayloadDecryptionData(senderJid, senderDeviceId, omemoEnvelope, isMessageStanza)
@@ -1536,7 +1536,7 @@ QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJi
 //
 // \return the serialized payload decryption data if it could be extracted, otherwise std::nullopt
 //
-QXmppTask<std::optional<Crypto::SecureByteArray>> ManagerPrivate::extractPayloadDecryptionData(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, bool isMessageStanza)
+QXmppTask<std::optional<Crypto::SecureByteArray>> ManagerPrivate::extractPayloadDecryptionData(const QString &senderJid, uint32_t senderDeviceId, QXmppOmemoEnvelope omemoEnvelope, bool isMessageStanza)
 {
     SessionCipherPtr sessionCipher;
     const auto address = Address(senderJid, senderDeviceId);
@@ -2083,7 +2083,7 @@ QXmppOmemoDeviceBundleItem ManagerPrivate::deviceBundleItem() const
 //
 // \return the device bundle on success, otherwise a nullptr
 //
-QXmppTask<std::optional<QXmppOmemoDeviceBundle>> ManagerPrivate::requestDeviceBundle(const QString &deviceOwnerJid, uint32_t deviceId) const
+QXmppTask<std::optional<QXmppOmemoDeviceBundle>> ManagerPrivate::requestDeviceBundle(QString deviceOwnerJid, uint32_t deviceId) const
 {
     auto result = co_await pubSubManager->requestItem<QXmppOmemoDeviceBundleItem>(deviceOwnerJid, ns_omemo_2_bundles.toString(), QString::number(deviceId))
                       .withContext(q);
@@ -2717,7 +2717,7 @@ QXmppTask<bool> ManagerPrivate::retractItem(const QString &node, uint32_t itemId
 // \param node node to be deleted
 // \param continuation function to be called with the bool value whether it succeeded
 //
-QXmppTask<bool> ManagerPrivate::deleteNode(const QString &node)
+QXmppTask<bool> ManagerPrivate::deleteNode(QString node)
 {
     auto result = co_await pubSubManager->deleteOwnPepNode(node).withContext(q);
     if (auto error = std::get_if<QXmppError>(&result)) {
@@ -2776,7 +2776,7 @@ QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item, 
 // \param continuation function to be called after the PubSub query
 //
 template<typename T>
-QXmppTask<bool> QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> future, const QString &errorMessage)
+QXmppTask<bool> QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> future, QString errorMessage)
 {
     auto result = co_await future;
     if (auto error = std::get_if<QXmppError>(&result)) {
@@ -2788,7 +2788,7 @@ QXmppTask<bool> QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTa
 }
 
 // See QXmppOmemoManager for documentation
-QXmppTask<bool> ManagerPrivate::changeDeviceLabel(const QString &deviceLabel)
+QXmppTask<bool> ManagerPrivate::changeDeviceLabel(QString deviceLabel)
 {
     Q_ASSERT_X(initialized, "Changing device label", "The device label could not be changed because the OMEMO manager must be initialized");
 
@@ -2814,7 +2814,7 @@ QXmppTask<bool> ManagerPrivate::changeDeviceLabel(const QString &deviceLabel)
 //
 // \return the result of the request
 //
-QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> ManagerPrivate::requestDeviceList(const QString &jid)
+QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> ManagerPrivate::requestDeviceList(QString jid)
 {
     // Since the usage of the item ID \c QXmppPubSubManager::Current is only RECOMMENDED by
     // \xep{0060, Publish-Subscribe} (PubSub) but not obligatory, all items are requested even if
@@ -2864,7 +2864,7 @@ void ManagerPrivate::subscribeToNewDeviceLists(const QString &jid, uint32_t devi
 //
 // \return the result of the subscription and manual request
 //
-QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(const QString &jid)
+QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(QString jid)
 {
     auto result = co_await pubSubManager->subscribeToNode(jid, ns_omemo_2_devices.toString(), ownFullJid()).withContext(q);
 
@@ -3030,7 +3030,7 @@ QXmppTask<bool> ManagerPrivate::buildSessionForNewDevice(const QString &jid, uin
 //
 // \return whether a session could be built
 //
-QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(const QString &jid, uint32_t deviceId, QXmppOmemoStorage::Device &device)
+QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(QString jid, uint32_t deviceId, QXmppOmemoStorage::Device &device)
 {
     auto deviceBundle = co_await requestDeviceBundle(jid, deviceId).withContext(q);
     if (!deviceBundle) {
@@ -3364,7 +3364,7 @@ QXmppTask<void> ManagerPrivate::storeOwnKey() const
 //
 // \return the trust level of the stored key
 //
-QXmppTask<TrustLevel> ManagerPrivate::storeKeyDependingOnSecurityPolicy(const QString &keyOwnerJid, const QByteArray &key)
+QXmppTask<TrustLevel> ManagerPrivate::storeKeyDependingOnSecurityPolicy(QString keyOwnerJid, QByteArray key)
 {
     auto securityPolicy = co_await q->securityPolicy().withContext(q);
 
@@ -3398,7 +3398,7 @@ QXmppTask<TrustLevel> ManagerPrivate::storeKeyDependingOnSecurityPolicy(const QS
 //
 // \return the trust level of the stored key
 //
-QXmppTask<TrustLevel> ManagerPrivate::storeKey(const QString &keyOwnerJid, const QByteArray &key, TrustLevel trustLevel) const
+QXmppTask<TrustLevel> ManagerPrivate::storeKey(QString keyOwnerJid, QByteArray key, TrustLevel trustLevel) const
 {
     co_await trustManager->addKeys(ns_omemo_2.toString(), keyOwnerJid, { key }, trustLevel).withContext(q);
     Q_EMIT q->trustLevelsChanged({ { keyOwnerJid, key } });

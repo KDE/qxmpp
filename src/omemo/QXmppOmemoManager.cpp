@@ -402,7 +402,7 @@ QXmppTask<bool> Manager::load()
 ///
 /// \return whether everything is set up successfully
 ///
-QXmppTask<bool> Manager::setUp(const QString &deviceLabel)
+QXmppTask<bool> Manager::setUp(QString deviceLabel)
 {
     if (!co_await d->setUpDeviceId()) {
         co_return false;

@@ -239,7 +239,7 @@ QStringList QXmppCallInviteManager::discoveryFeatures() const
 /// Creates a proposal Call Invite element and passes it as a message.
 ///
 QXmppTask<QXmppCallInviteManager::ProposeResult> QXmppCallInviteManager::invite(
-    const QString &callPartnerJid,
+    QString callPartnerJid,
     bool audio,
     bool video,
     std::optional<QXmppCallInviteElement::Jingle> jingle,

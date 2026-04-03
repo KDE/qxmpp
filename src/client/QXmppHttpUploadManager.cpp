@@ -541,7 +541,7 @@ void QXmppHttpUploadManager::onUnregistered(QXmppClient *client)
     resetCachedData();
 }
 
-QXmppTask<void> QXmppHttpUploadManager::updateService(const QString &jid)
+QXmppTask<void> QXmppHttpUploadManager::updateService(QString jid)
 {
     auto result = co_await d->discoveryManager()->info(jid).withContext(this);
 

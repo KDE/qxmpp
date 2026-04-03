@@ -76,7 +76,7 @@ QXmppAtmManager::QXmppAtmManager(QXmppAtmTrustStorage *trustStorage)
 /// \param keyIdsForAuthentication IDs of the keys being authenticated
 /// \param keyIdsForDistrusting IDs of the keys being distrusted
 ///
-QXmppTask<void> QXmppAtmManager::makeTrustDecisions(const QString &encryption, const QString &keyOwnerJid, const QList<QByteArray> &keyIdsForAuthentication, const QList<QByteArray> &keyIdsForDistrusting)
+QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QString keyOwnerJid, QList<QByteArray> keyIdsForAuthentication, QList<QByteArray> keyIdsForDistrusting)
 {
     auto retrievedKeys = co_await keys(encryption, TrustLevel::Authenticated | TrustLevel::ManuallyDistrusted).withContext(this);
 
@@ -369,7 +369,7 @@ QXmppTask<void> QXmppAtmManager::distrustAutomaticallyTrustedKeys(const QString 
 /// \param encryption encryption protocol namespace
 /// \param senderKeyIds IDs of the keys that were used by the senders
 ///
-QXmppTask<void> QXmppAtmManager::makePostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &senderKeyIds)
+QXmppTask<void> QXmppAtmManager::makePostponedTrustDecisions(QString encryption, const QList<QByteArray> &senderKeyIds)
 {
     auto postponedTrustDecisionKeys =
         co_await trustStorage()

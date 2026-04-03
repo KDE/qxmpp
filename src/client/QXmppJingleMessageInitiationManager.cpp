@@ -350,7 +350,7 @@ QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessage
     return propose(QXmppUtils::generateStanzaUuid(), remoteJid, descriptions);
 }
 
-QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(const QString &id, const QString &remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
+QXmppTask<QXmppJingleMessageInitiationManager::ProposeResult> QXmppJingleMessageInitiationManager::propose(QString id, QString remoteJid, const QList<QXmppJingleRtpDescription> &descriptions)
 {
     QXmppJingleMessageInitiationElement jmiElement;
     jmiElement.setType(JmiType::Propose);

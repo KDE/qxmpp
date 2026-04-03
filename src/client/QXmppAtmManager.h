@@ -20,7 +20,7 @@ class QXMPP_EXPORT QXmppAtmManager : public QXmppTrustManager
 
 public:
     QXmppAtmManager(QXmppAtmTrustStorage *trustStorage);
-    QXmppTask<void> makeTrustDecisions(const QString &encryption, const QString &keyOwnerJid, const QList<QByteArray> &keyIdsForAuthentication, const QList<QByteArray> &keyIdsForDistrusting = {});
+    QXmppTask<void> makeTrustDecisions(QString encryption, QString keyOwnerJid, QList<QByteArray> keyIdsForAuthentication, QList<QByteArray> keyIdsForDistrusting = {});
 
 protected:
     /// \cond
@@ -33,7 +33,7 @@ private:
     QXmppTask<void> handleMessage(const QXmppMessage &message);
 
     QXmppTask<void> distrustAutomaticallyTrustedKeys(const QString &encryption, const QList<QString> &keyOwnerJids);
-    QXmppTask<void> makePostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &senderKeyIds);
+    QXmppTask<void> makePostponedTrustDecisions(QString encryption, const QList<QByteArray> &senderKeyIds);
 
     QXmppTask<QXmpp::SendResult> sendTrustMessage(const QString &encryption, const QList<QXmppTrustMessageKeyOwner> &keyOwners, const QString &recipientJid);
 

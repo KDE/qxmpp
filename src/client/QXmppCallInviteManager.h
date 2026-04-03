@@ -72,7 +72,7 @@ public:
     /// \endcond
 
     QXmppTask<ProposeResult> invite(
-        const QString &callPartnerJid,
+        QString callPartnerJid,
         bool audio = true,
         bool video = false,
         std::optional<QXmppCallInviteElement::Jingle> jingle = std::nullopt,
