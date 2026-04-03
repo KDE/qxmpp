@@ -125,6 +125,12 @@ private:
     Q_SLOT void selfPingDisabledWhenZeroThreshold();
     Q_SLOT void selfPingMultipleRoomsSingleTimer();
 
+    // Occupant IDs (XEP-0421)
+    Q_SLOT void occupantIdSupported();
+    Q_SLOT void occupantIdStrippedPresence();
+    Q_SLOT void occupantIdStrippedMessage();
+    Q_SLOT void occupantIdAccessor();
+
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
     // muc#roomconfig form
@@ -3315,6 +3321,229 @@ void tst_QXmppMuc::submitRegistration()
     test.inject(u"<iq id='qx1' type='result'/>"_s);
     QVERIFY(task.isFinished());
     expectVariant<QXmpp::Success>(task.result());
+}
+
+void tst_QXmppMuc::occupantIdSupported()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='self-occupant-id'/>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Before disco#info: occupant IDs are stripped (not supported yet)
+    auto self = room.selfParticipant();
+    QVERIFY(self.has_value());
+    QVERIFY(self->occupantId().isEmpty());
+
+    // Inject disco#info with occupant-id feature
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='urn:xmpp:occupant-id:0'/>"
+                "</query></iq>"_s);
+
+    // After disco#info: new presences with occupant-id should be kept
+    QXmppPresence otherPresence;
+    parsePacket(otherPresence,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='other-occupant-id'/>"
+                "</presence>");
+    test.injectPresence(otherPresence);
+
+    auto participants = room.participants();
+    QXmppMucParticipant firstwitch(muc, u""_s, 0);
+    for (const auto &p : participants) {
+        if (p.nickname().value() == u"firstwitch"_s) {
+            firstwitch = p;
+            break;
+        }
+    }
+    QVERIFY(firstwitch.isValid());
+    QCOMPARE(firstwitch.occupantId(), u"other-occupant-id"_s);
+}
+
+void tst_QXmppMuc::occupantIdStrippedPresence()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Inject disco#info WITHOUT occupant-id feature
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "</query></iq>"_s);
+
+    // New participant with injected occupant-id should have it stripped
+    QXmppPresence otherPresence;
+    parsePacket(otherPresence,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
+                "</presence>");
+    test.injectPresence(otherPresence);
+
+    auto participants = room.participants();
+    QXmppMucParticipant firstwitch(muc, u""_s, 0);
+    for (const auto &p : participants) {
+        if (p.nickname().value() == u"firstwitch"_s) {
+            firstwitch = p;
+            break;
+        }
+    }
+    QVERIFY(firstwitch.isValid());
+    QVERIFY(firstwitch.occupantId().isEmpty());
+}
+
+void tst_QXmppMuc::occupantIdStrippedMessage()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Inject disco#info WITHOUT occupant-id feature
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "</query></iq>"_s);
+
+    // Receive a message with injected occupant-id — should be stripped
+    QXmppMessage receivedMsg;
+    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &msg) {
+        receivedMsg = msg;
+    });
+
+    QXmppMessage liveMsg;
+    parsePacket(liveMsg,
+                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                "<body>Hello</body>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
+                "</message>");
+    QVERIFY(muc->handleMessage(liveMsg));
+    QCOMPARE(receivedMsg.body(), u"Hello"_s);
+    QVERIFY(receivedMsg.mucOccupantId().isEmpty());
+}
+
+void tst_QXmppMuc::occupantIdAccessor()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // presence
+    test.ignore();  // disco#info
+
+    // Inject other participant with occupant-id before self-presence
+    QXmppPresence otherPresence;
+    parsePacket(otherPresence,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='witch-1-id'/>"
+                "</presence>");
+    test.injectPresence(otherPresence);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='self-id'/>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Inject disco#info WITH occupant-id feature so IDs are not stripped
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='urn:xmpp:occupant-id:0'/>"
+                "</query></iq>"_s);
+
+    // Note: the occupant IDs were set during joining before disco#info arrived.
+    // Since supportsOccupantIds was false at that point, they were stripped.
+    auto self = room.selfParticipant();
+    QVERIFY(self.has_value());
+    QVERIFY(self->occupantId().isEmpty());
+
+    // Invalid participant handle should return empty
+    QXmppMucParticipant invalid(muc, u""_s, 999);
+    QVERIFY(invalid.occupantId().isEmpty());
 }
 
 QTEST_MAIN(tst_QXmppMuc)

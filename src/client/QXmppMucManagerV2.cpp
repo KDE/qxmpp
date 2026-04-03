@@ -157,6 +157,7 @@ struct MucRoomData {
     // Avatar — populated when setWatchAvatar(true) is called, re-fetched on status 104
     QProperty<QStringList> avatarHashes;
     QProperty<std::optional<QXmpp::Muc::Avatar>> avatar;
+    bool supportsOccupantIds = false;
     bool supportsVCard = false;
     bool watchingAvatar = false;
     bool fetchingAvatar = false;
@@ -566,24 +567,24 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoomAtJid(const QStri
     return task;
 }
 
-bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
+bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
 {
-    const auto type = message.type();
+    const auto type = uncheckedMessage.type();
     if (type != QXmppMessage::GroupChat && type != QXmppMessage::Error && type != QXmppMessage::Normal) {
         return false;
     }
 
-    auto bareFrom = QXmppUtils::jidToBareJid(message.from());
+    auto bareFrom = QXmppUtils::jidToBareJid(uncheckedMessage.from());
 
     // Handle invitations from users we haven't joined a room with.
     if (type == QXmppMessage::Normal) {
         // XEP-0249: Direct MUC Invitations
-        if (auto inv = message.mucDirectInvitation(); inv && !inv->jid().isEmpty()) {
-            Q_EMIT directInvitationReceived(*inv, message.from(), message);
+        if (auto inv = uncheckedMessage.mucDirectInvitation(); inv && !inv->jid().isEmpty()) {
+            Q_EMIT directInvitationReceived(*inv, uncheckedMessage.from(), uncheckedMessage);
             return true;
         }
         // XEP-0045 §7.8.2: Mediated invitations
-        if (const auto &ue = message.mucUserQuery(); ue && ue->invite() && !ue->invite()->from().isEmpty()) {
+        if (const auto &ue = uncheckedMessage.mucUserQuery(); ue && ue->invite() && !ue->invite()->from().isEmpty()) {
             Q_EMIT invitationReceived(bareFrom, *ue->invite(), ue->password());
             return true;
         }
@@ -595,6 +596,16 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
     }
 
     auto &data = itr->second;
+
+    // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
+    auto message = [&]() {
+        if (!data.supportsOccupantIds && !uncheckedMessage.mucOccupantId().isEmpty()) {
+            auto msg = uncheckedMessage;
+            msg.setMucOccupantId({});
+            return msg;
+        }
+        return uncheckedMessage;
+    }();
 
     // Handle error responses to sent messages
     if (message.type() == QXmppMessage::Error) {
@@ -803,13 +814,16 @@ void QXmppMucManagerV2Private::handlePresence(const QXmppPresence &p)
     }
 }
 
-void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &presence)
+void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, QXmppPresence presence)
 {
     using enum MucRoomState;
 
     auto nickname = QXmppUtils::jidToResource(presence.from());
 
-    // TODO: clear occupant ID in presence at this point if not supported by MUC to prevent occupant ID injection
+    // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
+    if (!data.supportsOccupantIds) {
+        presence.setMucOccupantId({});
+    }
 
     // XEP-0410: any presence on a joined room counts as activity.
     if (data.state == Joined) {
@@ -1246,6 +1260,7 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
         const auto oldHashes = data.avatarHashes.value();
         data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
         const auto &features = info.features();
+        data.supportsOccupantIds = features.contains(ns_muc_occupant_id);
         data.supportsVCard = features.contains(ns_vcard);
         data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
         data.isPublic = features.contains(muc_feat_public);
@@ -2534,6 +2549,14 @@ QBindable<Muc::Affiliation> QXmppMucParticipant::affiliation() const
 {
     if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
         return { &(data->affiliation) };
+    }
+    return {};
+}
+
+QString QXmppMucParticipant::occupantId() const
+{
+    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
+        return data->occupantId;
     }
     return {};
 }
