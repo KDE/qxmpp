@@ -191,11 +191,11 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJi
     jmiElement.setReason(reason);
     jmiElement.setMigratedTo(migratedTo);
 
-    d->request(std::move(jmiElement)).then(this, [this, promise](SendResult &&result) mutable {
+    d->request(std::move(jmiElement)).then(this, [this, promise, reason, migratedTo](SendResult &&result) mutable {
         if (hasError(result)) {
             Q_EMIT closed(getError(result));
         } else {
-            Q_EMIT closed(Finished {});
+            Q_EMIT closed(Finished { reason, migratedTo });
         }
 
         promise.finish(std::move(result));
@@ -553,13 +553,8 @@ bool QXmppJingleMessageInitiationManager::handleExistingSession(const std::share
     reason.setType(QXmppJingleReason::Expired);
     reason.setText(u"Session migrated"_s);
 
-    // Tell the old session to be finished.
-    Q_EMIT existingJmi->closed(Jmi::Finished { reason, jmiElementId });
-
     existingJmi->finish(reason, jmiElementId).then(this, [this, existingJmi, jmiElementId](SendResult result) {
-        if (hasError(result)) {
-            Q_EMIT existingJmi->closed(getError(std::move(result)));
-        } else {
+        if (!hasError(result)) {
             // Then, proceed (accept) the new proposal and set the JMI ID
             // to the ID of the received JMI element.
             existingJmi->setId(jmiElementId);
