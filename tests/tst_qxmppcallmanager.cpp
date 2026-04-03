@@ -11,6 +11,8 @@
 #include "TestClient.h"
 #include "util.h"
 
+#include <gst/gst.h>
+
 #include <QBuffer>
 
 using namespace QXmpp::Private;
@@ -21,11 +23,21 @@ class tst_QXmppCallManager : public QObject
     Q_OBJECT
 
 private:
+    Q_SLOT void initTestCase();
     Q_SLOT void callInvalidJid();
     Q_SLOT void invalidSid();
     Q_SLOT void senderImpersonation();
     Q_SLOT void testCall();
 };
+
+void tst_QXmppCallManager::initTestCase()
+{
+    auto *rtpBin = gst_element_factory_make("rtpbin", nullptr);
+    if (!rtpBin) {
+        QSKIP("GStreamer rtpbin element not available (install gstreamer-good plugins)");
+    }
+    gst_object_unref(rtpBin);
+}
 
 void tst_QXmppCallManager::callInvalidJid()
 {

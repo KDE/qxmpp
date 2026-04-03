@@ -44,24 +44,36 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
 {
     qRegisterMetaType<QXmppCall::State>();
 
+    // Skip GStreamer setup for calls that are already in an error state
+    if (state == QXmppCall::FinishedState) {
+        return;
+    }
+
+    auto initError = [&](const char *msg) {
+        qWarning("QXmppCall: %s", msg);
+        error = QXmppError { QString::fromLatin1(msg), {} };
+        state = QXmppCall::FinishedState;
+    };
+
     removeIf(videoCodecs, std::not_fn(isCodecSupported));
     removeIf(audioCodecs, std::not_fn(isCodecSupported));
 
     pipeline = gst_pipeline_new(nullptr);
     if (!pipeline) {
-        qFatal("Failed to create pipeline");
+        initError("Failed to create GStreamer pipeline");
         return;
     }
     rtpBin = gst_element_factory_make("rtpbin", nullptr);
     if (!rtpBin) {
-        qFatal("Failed to create rtpbin");
+        initError("Failed to create rtpbin element: is the GStreamer 'good' plugins package installed?");
         return;
     }
     // We do not want to build up latency over time
     g_object_set(rtpBin, "drop-on-latency", true, "async-handling", true, "latency", 25, "do-retransmission", true, nullptr);
 
     if (!gst_bin_add(GST_BIN(pipeline.get()), rtpBin)) {
-        qFatal("Could not add rtpbin to the pipeline");
+        initError("Could not add rtpbin to the pipeline");
+        return;
     }
     g_signal_connect_swapped(rtpBin, "pad-added",
                              G_CALLBACK(+[](QXmppCallPrivate *p, GstPad *pad) {
@@ -87,8 +99,10 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
 
 QXmppCallPrivate::~QXmppCallPrivate()
 {
-    if (gst_element_set_state(pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
-        qFatal("Unable to set the pipeline to the null state");
+    if (pipeline) {
+        if (gst_element_set_state(pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
+            qWarning("QXmppCall: Unable to set the pipeline to the null state");
+        }
     }
     // Delete streams before pipeline.
     // Streams still need to be children of QXmppCall for logging to work.
