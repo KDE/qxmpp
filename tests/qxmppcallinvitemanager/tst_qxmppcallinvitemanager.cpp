@@ -229,7 +229,6 @@ void tst_QXmppCallInviteManager::testInvite()
                 QCOMPARE(callInviteElement->jingle().value(), jingle);
                 QVERIFY(callInviteElement->external());
                 QCOMPARE(callInviteElement->external().value(), external);
-
             }
         }
     });

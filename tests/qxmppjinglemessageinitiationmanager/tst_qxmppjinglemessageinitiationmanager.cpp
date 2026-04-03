@@ -286,7 +286,6 @@ void tst_QXmppJingleMessageInitiationManager::testPropose()
                 QVERIFY(jmiElement->description());
                 QCOMPARE(jmiElement->description()->media(), description.media());
                 QCOMPARE(jmiElement->description()->ssrc(), description.ssrc());
-
             }
         }
     });

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 cmake_minimum_required(VERSION 3.16)
-project(qxmpp VERSION 1.14.5)
+project(qxmpp VERSION 1.14.6)
 
 set(SO_VERSION 8)
 
