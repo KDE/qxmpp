@@ -2927,7 +2927,7 @@ QXmppTask<QVector<Manager::DevicesResult>> ManagerPrivate::unsubscribeFromDevice
 //
 // \return the result of the unsubscription
 //
-QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::unsubscribeFromDeviceList(const QString &jid)
+QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::unsubscribeFromDeviceList(QString jid)
 {
     auto result = co_await pubSubManager->unsubscribeFromNode(jid, ns_omemo_2_devices.toString(), ownFullJid()).withContext(q);
 

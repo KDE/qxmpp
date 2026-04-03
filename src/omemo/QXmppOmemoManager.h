@@ -102,7 +102,7 @@ public:
     QXmppOmemoOwnDevice ownDevice();
     QXmppTask<QVector<QXmppOmemoDevice>> devices();
     QXmppTask<QVector<QXmppOmemoDevice>> devices(const QList<QString> &jids);
-    QXmppTask<Result> removeContactDevices(const QString &jid);
+    QXmppTask<Result> removeContactDevices(QString jid);
 
     void setAcceptedSessionBuildingTrustLevels(QXmpp::TrustLevels trustLevels);
     QXmpp::TrustLevels acceptedSessionBuildingTrustLevels();

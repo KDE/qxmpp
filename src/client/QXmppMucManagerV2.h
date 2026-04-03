@@ -77,9 +77,9 @@ public:
     QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
     QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 
-    QXmppTask<QXmpp::Result<>> setRoomAvatar(const QString &jid, const Avatar &avatar);
-    QXmppTask<QXmpp::Result<>> removeRoomAvatar(const QString &jid);
-    QXmppTask<QXmpp::Result<std::optional<Avatar>>> fetchRoomAvatar(const QString &jid);
+    QXmppTask<QXmpp::Result<>> setRoomAvatar(QString jid, const Avatar &avatar);
+    QXmppTask<QXmpp::Result<>> removeRoomAvatar(QString jid);
+    QXmppTask<QXmpp::Result<std::optional<Avatar>>> fetchRoomAvatar(QString jid);
 
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
 

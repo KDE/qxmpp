@@ -255,7 +255,7 @@ void QXmppAtmManager::onUnregistered(QXmppClient *client)
 /// \param keyIdsForDistrusting key owners' bare JIDs mapped to the IDs of their
 ///        keys being distrusted
 ///
-QXmppTask<void> QXmppAtmManager::makeTrustDecisions(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIdsForAuthentication, const QMultiHash<QString, QByteArray> &keyIdsForDistrusting)
+QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QMultiHash<QString, QByteArray> keyIdsForAuthentication, QMultiHash<QString, QByteArray> keyIdsForDistrusting)
 {
     // authenticate
     if (!keyIdsForAuthentication.isEmpty()) {

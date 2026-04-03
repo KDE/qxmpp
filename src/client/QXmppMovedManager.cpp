@@ -165,7 +165,7 @@ bool QXmppMovedManager::supportedByServer() const
 ///
 /// \return the result of the action
 ///
-QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(const QString &newBareJid)
+QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(QString newBareJid)
 {
     co_return mapToSuccess(co_await client()
                                ->findExtension<QXmppPubSubManager>()
@@ -181,7 +181,7 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(const QS
 ///
 /// \return the result of the action
 ///
-QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(const QString &oldBareJid, const QString &newBareJid)
+QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(QString oldBareJid, QString newBareJid)
 {
     co_return std::visit(
         overloaded {

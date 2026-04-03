@@ -699,7 +699,7 @@ QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(const QList<QString> &jids
 ///
 /// \return the result of the contact device removals
 ///
-QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(const QString &jid)
+QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(QString jid)
 {
     Q_ASSERT_X(jid != d->ownBareJid(), "Removing contact device", "Own JID passed");
 

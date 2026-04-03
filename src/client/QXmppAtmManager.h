@@ -29,7 +29,7 @@ protected:
     /// \endcond
 
 private:
-    QXmppTask<void> makeTrustDecisions(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIdsForAuthentication, const QMultiHash<QString, QByteArray> &keyIdsForDistrusting);
+    QXmppTask<void> makeTrustDecisions(QString encryption, QMultiHash<QString, QByteArray> keyIdsForAuthentication, QMultiHash<QString, QByteArray> keyIdsForDistrusting);
     QXmppTask<void> handleMessage(const QXmppMessage &message);
 
     QXmppTask<void> distrustAutomaticallyTrustedKeys(const QString &encryption, const QList<QString> &keyOwnerJids);

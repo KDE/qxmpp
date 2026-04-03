@@ -29,8 +29,8 @@ public:
     bool supportedByServer() const;
     Q_SIGNAL void supportedByServerChanged();
 
-    QXmppTask<Result> publishStatement(const QString &newBareJid);
-    QXmppTask<Result> verifyStatement(const QString &oldBareJid, const QString &newBareJid);
+    QXmppTask<Result> publishStatement(QString newBareJid);
+    QXmppTask<Result> verifyStatement(QString oldBareJid, QString newBareJid);
 
     QXmppTask<QXmpp::SendResult> notifyContact(const QString &contactBareJid, const QString &oldBareJid, bool sensitive = true, const QString &reason = {});
 

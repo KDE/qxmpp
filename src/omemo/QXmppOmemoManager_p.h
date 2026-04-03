@@ -280,7 +280,7 @@ public:
     void subscribeToNewDeviceLists(const QString &jid, uint32_t deviceId);
     QXmppTask<Result> subscribeToDeviceList(QString jid);
     QXmppTask<QVector<QXmppOmemoManager::DevicesResult>> unsubscribeFromDeviceLists(const QList<QString> &jids);
-    QXmppTask<Result> unsubscribeFromDeviceList(const QString &jid);
+    QXmppTask<Result> unsubscribeFromDeviceList(QString jid);
 
     QXmppTask<bool> resetOwnDevice();
     QXmppTask<void> resetOwnDeviceLocally();

@@ -155,7 +155,7 @@ void tst_QXmppMuc::avatarFetch()
         "</iq>"_s);
 
     test.inject(
-        u"<iq type='result' id='qx3' to='juliet@capulet.example.com/balcony' from='garden@chat.shakespeare.example.org'><vCard xmlns='vcard-temp'>"
+        u"<iq type='result' id='qx3' to='juliet@capulet.lit/balcony' from='garden@chat.shakespeare.example.org'><vCard xmlns='vcard-temp'>"
         "<PHOTO>"
         "<TYPE>image/svg+xml</TYPE>"
         "<BINVAL>PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiI+CiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9InJlZCIvPgo8L3N2Zz4K</BINVAL>"

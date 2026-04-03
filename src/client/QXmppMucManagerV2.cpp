@@ -199,7 +199,7 @@ const std::optional<QList<QXmppMucBookmark>> &QXmppMucManagerV2::bookmarks() con
 /// \param jid JID of the MUC room
 /// \param avatar Avatar to be set
 ///
-QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(const QString &jid, const Avatar &avatar)
+QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(QString jid, const Avatar &avatar)
 {
     QXmppVCardIq vCardIq;
     vCardIq.setTo(jid);
@@ -218,7 +218,7 @@ QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(const QString &jid, 
 ///
 /// \param jid JID of the MUC room
 ///
-QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(const QString &jid)
+QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(QString jid)
 {
     QXmppVCardIq vCardIq;
     vCardIq.setTo(jid);
@@ -237,7 +237,7 @@ QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(const QString &ji
 /// \param jid JID of the MUC room
 /// \return nullopt if VCards are not supported in this MUC or no avatar has been published, otherwise the published avatar
 ///
-QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::fetchRoomAvatar(const QString &jid)
+QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::fetchRoomAvatar(QString jid)
 {
     auto infoResult = co_await d->disco()->info(jid).withContext(this);
     if (!hasValue(infoResult)) {
