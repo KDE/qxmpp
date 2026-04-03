@@ -58,8 +58,10 @@ SHA-256:
 $(sha256sum ${release_files})
 \`\`\`"
 
+sysadmin_ticket_link="https://phabricator.kde.org/maniphest/task/edit/form/2/?title=$(jq -sRr @uri <<< "$task_title")&priority=normal&description=$(jq -sRr @uri <<< "$task_description")"
 echo "Now, create a sysadmin ticket to publish on download.kde.org:"
-echo "https://phabricator.kde.org/maniphest/task/edit/form/2/?title=$(jq -sRr @uri <<< "$task_title")&priority=normal&description=$(jq -sRr @uri <<< "$task_description")"
+echo "$sysadmin_ticket_link"
+xdg-open "$sysadmin_ticket_link"
 
 cd - >/dev/null
 mv $work_dir/$compressed_archive $work_dir/$compressed_archive.sig ./
