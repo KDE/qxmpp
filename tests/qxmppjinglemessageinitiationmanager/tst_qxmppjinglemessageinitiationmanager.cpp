@@ -862,9 +862,29 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedFinished()
         QCOMPARE(finishedJmiElement.migratedTo, "989a46a6-f202-4910-a7c3-83c6ba3f3947");
     });
 
+    // XEP-0353 §3.7: both parties SHOULD send <finish/>. Verify that receiving
+    // a <finish/> causes our own <finish/> to be sent back.
+    bool finishEchoed = false;
+    connect(&m_logger, &QXmppLogger::message, this, [&finishEchoed](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            QXmppMessage sent;
+            parsePacket(sent, text.toUtf8());
+
+            if (auto el = sent.jingleMessageInitiationElement()) {
+                if (el->type() == JmiType::Finish) {
+                    QCOMPARE(el->id(), u"ca3cf894-5325-482f-a412-a6e9f832298d");
+                    QVERIFY(el->reason());
+                    QCOMPARE(el->reason()->type(), QXmppJingleReason::Success);
+                    finishEchoed = true;
+                }
+            }
+        }
+    });
+
     message.parse(xmlToDom(xmlFinish));
 
     QVERIFY(m_manager.handleMessage(message));
+    QVERIFY(finishEchoed);
     m_manager.clearAll();
 }
 

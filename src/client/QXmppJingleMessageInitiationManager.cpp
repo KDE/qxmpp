@@ -481,6 +481,17 @@ bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_pt
         if (!existingJmi->isFinished()) {
             Q_EMIT existingJmi->closed(
                 Jmi::Finished { jmiElement.reason(), jmiElement.migratedTo() });
+
+            // XEP-0353 §3.7: both parties SHOULD send <finish/> to synchronize
+            // session state across all devices. Send our own <finish/> back
+            // directly (not via finish() which would re-emit closed()).
+            QXmppJingleMessageInitiationElement finishElement;
+            finishElement.setType(JmiType::Finish);
+            finishElement.setId(existingJmi->id());
+            QXmppJingleReason successReason;
+            successReason.setType(QXmppJingleReason::Success);
+            finishElement.setReason(successReason);
+            sendMessage(finishElement, existingJmi->remoteJid());
         }
         return true;
     default:
