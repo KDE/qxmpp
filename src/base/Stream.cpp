@@ -211,15 +211,15 @@ DomReader::Result DomReader::process(QXmlStreamReader &r)
                 if (ns.prefix().isEmpty()) {
                     child.setAttribute(u"xmlns"_s, ns.namespaceUri().toString());
                 } else {
-                    // namespace declarations are not supported in XMPP
-                    return Error { UnsupportedXmlFeature, u"XML namespace declarations are not allowed in XMPP."_s };
+                    child.setAttribute(u"xmlns:%1"_s.arg(ns.prefix().toString()),
+                                       ns.namespaceUri().toString());
                 }
             }
 
             // other attributes
             const auto attributes = r.attributes();
             for (const auto &a : attributes) {
-                child.setAttribute(a.name().toString(), a.value().toString());
+                child.setAttribute(a.qualifiedName().toString(), a.value().toString());
             }
 
             if (currentElement.isNull()) {
