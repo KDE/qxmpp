@@ -65,10 +65,10 @@ add_definitions(
     -DQT_NO_KEYWORDS
 )
 
-# Address sanitizer
+# Address sanitizer and undefined behavior sanitizer
 if(ENABLE_ASAN)
-    add_compile_options(-fsanitize=address)
-    add_link_options(-fsanitize=address)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
 endif()
 
 if(BUILD_OMEMO)
