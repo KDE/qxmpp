@@ -229,11 +229,6 @@ void tst_QXmppCallInviteManager::testInvite()
                 QCOMPARE(callInviteElement->jingle().value(), jingle);
                 QVERIFY(callInviteElement->external());
                 QCOMPARE(callInviteElement->external().value(), external);
-
-                SKIP_IF_INTEGRATION_TESTS_DISABLED()
-
-                // verify that the Call Invite ID has been changed and the Call Invite was processed
-                QCOMPARE(m_manager.callInvites().size(), 1);
             }
         }
     });

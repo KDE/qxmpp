@@ -194,11 +194,11 @@ QXmppTask<SendResult> QXmppJingleMessageInitiation::finish(std::optional<QXmppJi
     jmiElement.setMigratedTo(migratedTo);
 
     auto task = promise.task();
-    d->request(std::move(jmiElement)).then(this, [this, promise = std::move(promise)](SendResult &&result) mutable {
+    d->request(std::move(jmiElement)).then(this, [this, promise = std::move(promise), reason, migratedTo](SendResult &&result) mutable {
         if (hasError(result)) {
             Q_EMIT closed(getError(result));
         } else {
-            Q_EMIT closed(Finished {});
+            Q_EMIT closed(Finished { reason, migratedTo });
         }
 
         promise.finish(std::move(result));
@@ -479,6 +479,17 @@ bool QXmppJingleMessageInitiationManager::handleExistingJmi(const std::shared_pt
         if (!existingJmi->isFinished()) {
             Q_EMIT existingJmi->closed(
                 Jmi::Finished { jmiElement.reason(), jmiElement.migratedTo() });
+
+            // XEP-0353 §3.7: both parties SHOULD send <finish/> to synchronize
+            // session state across all devices. Send our own <finish/> back
+            // directly (not via finish() which would re-emit closed()).
+            QXmppJingleMessageInitiationElement finishElement;
+            finishElement.setType(JmiType::Finish);
+            finishElement.setId(existingJmi->id());
+            QXmppJingleReason successReason;
+            successReason.setType(QXmppJingleReason::Success);
+            finishElement.setReason(successReason);
+            sendMessage(finishElement, existingJmi->remoteJid());
         }
         return true;
     default:
@@ -551,13 +562,8 @@ bool QXmppJingleMessageInitiationManager::handleExistingSession(const std::share
     reason.setType(QXmppJingleReason::Expired);
     reason.setText(u"Session migrated"_s);
 
-    // Tell the old session to be finished.
-    Q_EMIT existingJmi->closed(Jmi::Finished { reason, jmiElementId });
-
     existingJmi->finish(reason, jmiElementId).then(this, [this, existingJmi, jmiElementId](SendResult result) {
-        if (hasError(result)) {
-            Q_EMIT existingJmi->closed(getError(std::move(result)));
-        } else {
+        if (!hasError(result)) {
             // Then, proceed (accept) the new proposal and set the JMI ID
             // to the ID of the received JMI element.
             existingJmi->setId(jmiElementId);
