@@ -288,6 +288,8 @@ public:
     QBindable<QXmpp::Muc::Role> role() const;
     /// Returns the participant's affiliation with the room.
     QBindable<QXmpp::Muc::Affiliation> affiliation() const;
+    /// Returns the participant's occupant ID (XEP-0421) if the room supports it.
+    QString occupantId() const;
 
 private:
     QXmppMucParticipant(QXmppMucManagerV2 *manager, const QString &roomJid, uint32_t participantId)
