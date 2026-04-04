@@ -304,7 +304,7 @@ void tst_QXmppMuc::avatarFetch()
 
     // Join manually so we can inject the disco#info result before enabling avatar watch.
     auto joinTask = muc->joinRoom(u"garden@chat.shakespeare.example.org"_s, u"juliet"_s);
-    test.ignore();  // disco#info IQ (qx1)
+    test.ignore();  // disco#info IQ
     test.ignore();  // presence
 
     QXmppPresence selfPresence;
@@ -368,6 +368,7 @@ void tst_QXmppMuc::joinRoom()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 
     // Inject self-presence (status 110): transitions JoiningOccupantPresences → JoiningRoomHistory
@@ -402,6 +403,7 @@ void tst_QXmppMuc::joinRoomWithHistory()
     historyOpts.setMaxStanzas(20);
 
     auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, historyOpts);
+    test.ignore();  // disco#info IQ
     test.expect(
         u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'>"
         u"<history maxstanzas=\"20\"/></x></presence>"_s);
@@ -434,6 +436,7 @@ void tst_QXmppMuc::joinRoomWithPassword()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, std::nullopt, u"cauldronburn"_s);
+    test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'><password>cauldronburn</password></x></presence>"_s);
 
     QXmppPresence selfPresence;
@@ -465,6 +468,7 @@ void tst_QXmppMuc::joinRoomTimeout()
     muc->d->timeout = std::chrono::milliseconds(100);
 
     auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 
     // Don't inject any response, let the timer expire
@@ -487,6 +491,7 @@ void tst_QXmppMuc::joinRoomTimerStopped()
     muc->d->timeout = std::chrono::milliseconds(1000);
 
     auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 
     // Inject self-presence (status 110)
@@ -526,6 +531,7 @@ void tst_QXmppMuc::joinRoomAlreadyInProgress()
 
     // First join — not yet completed
     auto task1 = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
     QVERIFY(!task1.isFinished());
 
@@ -563,7 +569,14 @@ static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
                                  const QString &nick = u"thirdwitch"_s)
 {
     auto joinTask = muc->joinRoom(roomJid, nick);
+    test.ignore();  // disco#info IQ (id: qx1)
     test.ignore();  // presence
+    // Inject disco#info response to clear the in-flight IQ
+    test.inject(QStringLiteral("<iq id='qx1' from='%1' type='result'><query xmlns='http://jabber.org/protocol/disco#info'>"
+                               "<identity category='conference' type='text' name='Test Room'/>"
+                               "<feature var='http://jabber.org/protocol/muc'/>"
+                               "</query></iq>")
+                    .arg(roomJid));
 
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
@@ -721,6 +734,7 @@ void tst_QXmppMuc::sendPrivateMessage()
 
     // Join the room — firstwitch is already in the room
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 
     QXmppPresence firstWitchPresence;
@@ -873,6 +887,7 @@ void tst_QXmppMuc::participantNicknameChange()
 
     // Join room with firstwitch already present
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 
     QXmppPresence firstWitchPresence;
@@ -1773,8 +1788,8 @@ void tst_QXmppMuc::roomInfoProperties()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.ignore();  // presence
-    test.ignore();  // disco#info
 
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
@@ -1810,7 +1825,7 @@ void tst_QXmppMuc::roomInfoStatus104()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.ignore();  // disco#info
+    test.ignore();  // disco#info IQ
     test.ignore();  // presence
 
     QXmppPresence selfPresence;
@@ -1845,7 +1860,6 @@ void tst_QXmppMuc::roomInfoStatus104()
     muc->handleMessage(status104);
 
     // A new disco#info IQ should have been sent (also id qx1 since counter was reset)
-    test.ignore();  // consume the new disco#info request
 
     // Inject updated roominfo
     test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
@@ -1868,7 +1882,7 @@ void tst_QXmppMuc::roomInfoBindable()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
-    test.ignore();  // disco#info
+    test.ignore();  // disco#info IQ
     test.ignore();  // presence
 
     QXmppPresence selfPresence;
@@ -1907,7 +1921,7 @@ void tst_QXmppMuc::roomInfoBindable()
 static QXmppMucRoomV2 joinTestRoom(TestClient &test, QXmppMucManagerV2 *muc, const QString &roomJid, const QString &nick)
 {
     auto joinTask = muc->joinRoom(roomJid, nick);
-    test.ignore();  // disco#info or presence
+    test.ignore();  // disco#info IQ
     test.ignore();
 
     QXmppPresence selfPresence;
@@ -2041,8 +2055,8 @@ void tst_QXmppMuc::roomFeatureProperties()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.ignore();  // presence
-    test.ignore();  // disco#info
 
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
@@ -2093,8 +2107,8 @@ void tst_QXmppMuc::roomFeatureStatus172_173()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
     test.ignore();  // presence
-    test.ignore();  // disco#info
 
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
@@ -2148,7 +2162,10 @@ void tst_QXmppMuc::joinRoomNotFound()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto task = muc->joinRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ (id: qx1)
     test.ignore();  // presence sent
+    // Inject disco#info error response to clear in-flight IQ
+    test.inject(u"<iq id='qx1' from='newroom@chat.shakespeare.lit' type='error'><error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
 
     // Server responds with status 201 (new locked room) + 110 (self-presence)
     QXmppPresence selfPresence;
@@ -2488,8 +2505,24 @@ void tst_QXmppMuc::subscribeToRoomConfig()
                 "</x>"
                 "</message>");
     muc->handleMessage(status104);
-    test.expect(roomConfigRequestXml());
-    test.inject(roomConfigResultXml(u"The New Coven"_s));
+    // Status 104 triggers disco#info re-fetch and config re-fetch
+    auto discoId2 = test.expectPacketRandomOrder(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    auto configId = test.expectPacketRandomOrder(roomConfigRequestXml());
+    test.inject(u"<iq id='" + discoId2 + u"' from='coven@chat.shakespeare.lit' type='result'><query xmlns='http://jabber.org/protocol/disco#info'>"
+                                         "<identity category='conference' type='text'/>"
+                                         "<feature var='http://jabber.org/protocol/muc'/>"
+                                         "</query></iq>");
+    test.inject(u"<iq id='" + configId + u"' type='result'>"
+                                         "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                                         "<x xmlns='jabber:x:data' type='form'>"
+                                         "<field type='hidden' var='FORM_TYPE'>"
+                                         "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                                         "</field>"
+                                         "<field type='text-single' var='muc#roomconfig_roomname'>"
+                                         "<value>The New Coven</value>"
+                                         "</field>"
+                                         "</x>"
+                                         "</query></iq>");
     QCOMPARE(room.roomConfig().value()->name(), u"The New Coven"_s);
 
     // setWatchRoomConfig(false) — stop watching, cached value stays
@@ -2601,14 +2634,30 @@ void tst_QXmppMuc::requestRoomConfigJoinsInFlightFetch()
                 "</x>"
                 "</message>");
     muc->handleMessage(status104);
-    test.expect(roomConfigRequestXml());
+    // Status 104 triggers disco#info re-fetch + config re-fetch
+    auto discoId2 = test.expectPacketRandomOrder(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    auto configId = test.expectPacketRandomOrder(roomConfigRequestXml());
+    test.inject(u"<iq id='" + discoId2 + u"' from='coven@chat.shakespeare.lit' type='result'><query xmlns='http://jabber.org/protocol/disco#info'>"
+                                         "<identity category='conference' type='text'/>"
+                                         "<feature var='http://jabber.org/protocol/muc'/>"
+                                         "</query></iq>");
 
     // requestRoomConfig() while fetch is in flight — must wait for the fresh result
     auto task = room.requestRoomConfig();
     QVERIFY(!task.isFinished());
 
     // Now the in-flight IQ response arrives with the updated config
-    test.inject(roomConfigResultXml(u"New Name"_s));
+    test.inject(u"<iq id='" + configId + u"' type='result'>"
+                                         "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                                         "<x xmlns='jabber:x:data' type='form'>"
+                                         "<field type='hidden' var='FORM_TYPE'>"
+                                         "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                                         "</field>"
+                                         "<field type='text-single' var='muc#roomconfig_roomname'>"
+                                         "<value>New Name</value>"
+                                         "</field>"
+                                         "</x>"
+                                         "</query></iq>");
 
     QVERIFY(task.isFinished());
     QCOMPARE(expectFutureVariant<QXmppMucRoomConfig>(task).name(), u"New Name"_s);

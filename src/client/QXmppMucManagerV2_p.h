@@ -6,6 +6,7 @@
 #define QXMPPMUCMANAGERV2_P_H
 
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMucData.h"
 #include "QXmppMucData_p.h"
 #include "QXmppMucManagerV2.h"
@@ -14,8 +15,6 @@
 #include <chrono>
 #include <optional>
 #include <unordered_map>
-
-class QXmppDiscoveryManager;
 
 namespace QXmpp::Private {
 struct MucRoomData;
@@ -28,6 +27,11 @@ struct QXmppMucManagerV2Private {
     std::unordered_map<QString, QXmpp::Private::MucRoomData> rooms;
     uint32_t participantIdCounter = 0;
     std::chrono::milliseconds timeout { QXmpp::Private::MucJoinTimeout };
+
+    // MUC service discovery
+    std::optional<QXmppDiscoServicesWatch> servicesWatch;
+    QProperty<QStringList> mucServices;
+    QProperty<bool> mucServicesLoaded { false };
 
     QXmppDiscoveryManager *disco();
 
