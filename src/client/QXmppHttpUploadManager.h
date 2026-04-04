@@ -104,11 +104,6 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    QXmppTask<void> updateService(QString jid);
-    void updateServices();
-    void resetCachedData();
-    void updateCachedData();
-
     using SlotResult = std::variant<QXmppHttpUploadSlotIq, QXmppError>;
     QXmppTask<SlotResult> requestSlot(const QFileInfo &file,
                                       const QString &uploadService = {});

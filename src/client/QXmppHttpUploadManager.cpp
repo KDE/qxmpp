@@ -307,10 +307,51 @@ struct QXmppHttpUploadManagerPrivate {
         return disco;
     }
 
+    void setupWatch()
+    {
+        servicesWatch = discoveryManager()->discoverServices(
+            QXmpp::Disco::Category::Store,
+            QXmpp::Disco::Type::File,
+            { ns_http_upload.toString() });
+
+        services.setBinding([this]() -> QVector<QXmppHttpUploadService> {
+            QVector<QXmppHttpUploadService> result;
+            for (const auto &s : servicesWatch->services().value()) {
+                QXmppHttpUploadService service;
+                service.setJid(s.jid);
+                if (auto form = s.info.dataForm(ns_http_upload)) {
+                    if (auto maxSizeValue = form->fieldValue(u"max-file-size")) {
+                        service.setSizeLimit(parseInt<uint64_t>(maxSizeValue->toString()));
+                    }
+                }
+                result.append(std::move(service));
+            }
+            return result;
+        });
+
+        support.setBinding([this]() -> QXmppHttpUploadManager::Support {
+            using enum QXmppHttpUploadManager::Support;
+            if (!servicesWatch->loaded().value()) {
+                return Unknown;
+            }
+            return services.value().isEmpty() ? Unsupported : Supported;
+        });
+
+        servicesNotifier = services.addNotifier([this]() {
+            Q_EMIT q->servicesChanged();
+        });
+        supportNotifier = support.addNotifier([this]() {
+            Q_EMIT q->supportChanged();
+        });
+    }
+
     QXmppHttpUploadManager *q;
     QNetworkAccessManager *netManager;
-    QXmppHttpUploadManager::Support support;
-    QVector<QXmppHttpUploadService> services;
+    QProperty<QXmppHttpUploadManager::Support> support { QXmppHttpUploadManager::Support::Unknown };
+    QProperty<QVector<QXmppHttpUploadService>> services;
+    std::optional<QXmppDiscoServicesWatch> servicesWatch;
+    QPropertyNotifier servicesNotifier;
+    QPropertyNotifier supportNotifier;
 };
 
 ///
@@ -524,122 +565,18 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(const QFileI
     return upload;
 }
 
-void QXmppHttpUploadManager::onRegistered(QXmppClient *client)
+void QXmppHttpUploadManager::onRegistered(QXmppClient *)
 {
-    connect(client, &QXmppClient::connected, this, [this, client]() {
-        if (client->streamManagementState() == QXmppClient::NewStream) {
-            resetCachedData();
-            updateCachedData();
-        }
-    });
+    d->setupWatch();
 }
 
-void QXmppHttpUploadManager::onUnregistered(QXmppClient *client)
+void QXmppHttpUploadManager::onUnregistered(QXmppClient *)
 {
-    disconnect(client, &QXmppClient::connected, this, nullptr);
-
-    resetCachedData();
-}
-
-QXmppTask<void> QXmppHttpUploadManager::updateService(QString jid)
-{
-    auto result = co_await d->discoveryManager()->info(jid).withContext(this);
-
-    if (hasError(result)) {
-        warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, getError(result).description));
-        co_return;
-    }
-
-    auto info = getValue(std::move(result));
-    const auto &features = info.features();
-
-    if (!contains(features, ns_http_upload)) {
-        co_return;
-    }
-
-    const auto &identities = info.identities();
-    auto oldSupport = d->support;
-    bool servicesAdded = false;
-
-    for (const auto &identity : identities) {
-        if (identity.category() == u"store" && identity.type() == u"file") {
-            QXmppHttpUploadService service;
-            service.setJid(jid);
-
-            if (auto form = info.dataForm(ns_http_upload)) {
-                if (auto maxSizeValue = form->fieldValue(u"max-file-size")) {
-                    service.setSizeLimit(parseInt<uint64_t>(maxSizeValue->toString()));
-                }
-            }
-
-            d->services.append(service);
-            servicesAdded = true;
-        }
-    }
-
-    if (servicesAdded) {
-        Q_EMIT servicesChanged();
-
-        d->support = Support::Supported;
-    }
-
-    if (oldSupport != d->support) {
-        Q_EMIT supportChanged();
-    }
-}
-
-void QXmppHttpUploadManager::updateServices()
-{
-    const auto serverJid = client()->configuration().domain();
-
-    d->discoveryManager()->items(serverJid).then(this, [this, serverJid](Result<QList<QXmppDiscoItem>> &&result) {
-        const auto maybeReportUnsupported = [this]() {
-            // If no services match or errors happens, report unsupported
-            if (d->support == Support::Unknown) {
-                d->support = Support::Unsupported;
-                Q_EMIT supportChanged();
-            }
-        };
-
-        // We should have no support / services at this stage
-        Q_ASSERT(d->support == Support::Unknown);
-        Q_ASSERT(d->services.isEmpty());
-
-        if (hasError(result)) {
-            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, getError(result).description));
-            maybeReportUnsupported();
-        } else {
-            const auto jids = transform<QList<QString>>(getValue(result), &QXmppDiscoItem::jid);
-            auto tasks = transform<std::vector<QXmppTask<void>>>(jids, [this](const auto &jid) { return updateService(jid); });
-            auto task = joinVoidTasks(this, std::move(tasks));
-
-            task.then(this, maybeReportUnsupported);
-        }
-    });
-}
-
-///
-/// Resets the cached data.
-///
-void QXmppHttpUploadManager::resetCachedData()
-{
-    if (!d->services.isEmpty()) {
-        d->services.clear();
-        Q_EMIT servicesChanged();
-    }
-
-    if (d->support != Support::Unknown) {
-        d->support = Support::Unknown;
-        Q_EMIT supportChanged();
-    }
-}
-
-///
-/// Updates the cached data.
-///
-void QXmppHttpUploadManager::updateCachedData()
-{
-    updateServices();
+    d->servicesNotifier = {};
+    d->supportNotifier = {};
+    d->services = QVector<QXmppHttpUploadService>();
+    d->support = Support::Unknown;
+    d->servicesWatch = {};
 }
 
 ///
@@ -706,7 +643,7 @@ QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlo
 
     QXmppHttpUploadRequestIq iq;
     if (uploadService.isEmpty()) {
-        iq.setTo(d->services.first().jid());
+        iq.setTo(d->services.value().first().jid());
     } else {
         iq.setTo(uploadService);
     }
