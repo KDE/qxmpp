@@ -53,7 +53,7 @@ void tst_QXmppServer::testConnect()
 
     const QString testDomain("localhost");
     const QHostAddress testHost(QHostAddress::LocalHost);
-    const quint16 testPort = 12345;
+    const quint16 testPort = 12001;
 
     QXmppLogger logger;
     // logger.setLoggingType(QXmppLogger::StdoutLogging);

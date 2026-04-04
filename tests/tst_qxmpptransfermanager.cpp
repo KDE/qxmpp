@@ -78,7 +78,7 @@ void tst_QXmppTransferManager::testSendFile()
 
     const QString testDomain("localhost");
     const QHostAddress testHost(QHostAddress::LocalHost);
-    const quint16 testPort = 12345;
+    const quint16 testPort = 12003;
 
     QXmppLogger logger;
     logger.setLoggingType(QXmppLogger::StdoutLogging);
