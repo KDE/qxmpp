@@ -95,13 +95,13 @@ public:
     int maximumDevicesPerStanza() const;
     void setMaximumDevicesPerStanza(int maximum);
 
-    QXmppTask<QVector<DevicesResult>> requestDeviceLists(const QList<QString> &jids);
-    QXmppTask<QVector<DevicesResult>> subscribeToDeviceLists(const QList<QString> &jids);
+    QXmppTask<QVector<DevicesResult>> requestDeviceLists(QList<QString> jids);
+    QXmppTask<QVector<DevicesResult>> subscribeToDeviceLists(QList<QString> jids);
     QXmppTask<QVector<DevicesResult>> unsubscribeFromDeviceLists();
 
     QXmppOmemoOwnDevice ownDevice();
     QXmppTask<QVector<QXmppOmemoDevice>> devices();
-    QXmppTask<QVector<QXmppOmemoDevice>> devices(const QList<QString> &jids);
+    QXmppTask<QVector<QXmppOmemoDevice>> devices(QList<QString> jids);
     QXmppTask<Result> removeContactDevices(QString jid);
 
     void setAcceptedSessionBuildingTrustLevels(QXmpp::TrustLevels trustLevels);
@@ -110,7 +110,7 @@ public:
     void setNewDeviceAutoSessionBuildingEnabled(bool isNewDeviceAutoSessionBuildingEnabled);
     bool isNewDeviceAutoSessionBuildingEnabled();
 
-    QXmppTask<void> buildMissingSessions(const QList<QString> &jids);
+    QXmppTask<void> buildMissingSessions(QList<QString> jids);
 
     QXmppTask<bool> resetOwnDevice();
     QXmppTask<void> resetOwnDeviceLocally();

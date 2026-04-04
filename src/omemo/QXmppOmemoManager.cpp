@@ -553,7 +553,7 @@ void Manager::setMaximumDevicesPerStanza(int maximum)
 ///
 /// \return the results of the requests for each JID
 ///
-QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(const QList<QString> &jids)
+QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QString> jids)
 {
     Q_ASSERT_X(!jids.contains(d->ownBareJid()), "Requesting contact's device list", "Own JID passed");
     QVector<Manager::DevicesResult> devicesResults;
@@ -584,7 +584,7 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(const QLi
 ///
 /// \return the results of the subscription for each JID
 ///
-QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(const QList<QString> &jids)
+QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList<QString> jids)
 {
     QVector<DevicesResult> devicesResults;
     devicesResults.reserve(jids.size());
@@ -658,7 +658,7 @@ QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices()
 ///
 /// \return all devices of the passed JIDs
 ///
-QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(const QList<QString> &jids)
+QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(QList<QString> jids)
 {
     auto keys = co_await this->keys(jids).withContext(this);
 
@@ -793,7 +793,7 @@ bool Manager::isNewDeviceAutoSessionBuildingEnabled()
 ///
 /// \param jids JIDs of the device owners for whom the sessions are built
 ///
-QXmppTask<void> Manager::buildMissingSessions(const QList<QString> &jids)
+QXmppTask<void> Manager::buildMissingSessions(QList<QString> jids)
 {
     auto &devices = d->devices;
     auto devicesCount = 0;
