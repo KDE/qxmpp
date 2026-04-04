@@ -30,6 +30,7 @@ find_package(PkgConfig QUIET)
 # OpenSSL 3.0+ uses the Apache-2.0 license which is compatible with LGPL-2.1-or-later
 # only via the "or later" clause. Binaries built with this option are effectively LGPL-3.0+.
 find_package(OpenSSL 3.0 QUIET)
+find_package(ECM 6.0 QUIET NO_MODULE)
 if(PkgConfig_FOUND)
     pkg_check_modules(OmemoC QUIET IMPORTED_TARGET libomemo-c)
     pkg_check_modules(GStreamer QUIET IMPORTED_TARGET gstreamer-1.0>=1.20)
@@ -105,6 +106,18 @@ endif()
 
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# ECM (optional, for clang-format target and git pre-commit hook)
+if(ECM_FOUND)
+    list(APPEND CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
+
+    include(KDEClangFormat)
+    file(GLOB_RECURSE ALL_CLANG_FORMAT_SOURCE_FILES *.cpp *.h *.hpp *.c)
+    kde_clang_format(${ALL_CLANG_FORMAT_SOURCE_FILES})
+
+    include(KDEGitCommitHooks)
+    kde_configure_git_pre_commit_hook(CHECKS CLANG_FORMAT)
 endif()
 
 include(CMakePackageConfigHelpers)

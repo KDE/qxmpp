@@ -10,13 +10,8 @@ This is a guideline for contributing to QXmpp.
 
 ## Git Hooks Setup
 
-QXmpp currently just provides a hook for code formatting before commiting.
-You can enable it as follows:
-```
-cd qxmpp
-./utils/setup-hooks.sh
-```
-This requires `git-clang-format` to be installed, though.
+QXmpp uses [ECM's KDEGitCommitHooks](https://api.kde.org/ecm/kde-module/KDEGitCommitHooks.html) to set up a pre-commit hook that checks code formatting via `git clang-format`.
+The hook is automatically installed when running CMake, as long as `clang-format` and `extra-cmake-modules` are installed.
 
 ## Merge-requests (MRs)
 
