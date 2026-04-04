@@ -94,6 +94,7 @@ endif()
 add_subdirectory(src)
 
 if(BUILD_TESTING)
+    set(CMAKE_CTEST_ARGUMENTS "-j8;--progress")
     enable_testing()
     add_subdirectory(tests)
 endif()

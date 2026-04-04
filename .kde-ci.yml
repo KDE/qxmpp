@@ -3,4 +3,5 @@
 # SPDX-License-Identifier: CC0-1.0
 Options:
   require-passing-tests-on: ['@all']
+  ctest-arguments: '-j8 --progress'
   clang-format-versions: [19]
