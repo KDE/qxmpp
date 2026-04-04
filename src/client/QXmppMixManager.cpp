@@ -41,7 +41,9 @@ public:
     QXmppDiscoveryManager *discoveryManager = nullptr;
     QXmppMixManager::Support participantSupport;
     QXmppMixManager::Support messageArchivingSupport;
-    QList<QXmppMixManager::Service> services;
+    QProperty<QList<QXmppMixManager::Service>> services;
+    std::optional<QXmppDiscoServicesWatch> servicesWatch;
+    QPropertyNotifier servicesNotifier;
 };
 
 namespace QXmpp::Private {
@@ -1037,15 +1039,38 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::deleteChannel(const QString
 /// \cond
 void QXmppMixManager::onRegistered(QXmppClient *client)
 {
-    connect(client, &QXmppClient::connected, this, [this, client]() {
-        if (client->streamManagementState() == QXmppClient::NewStream) {
-            resetCachedData();
-            updateCachedData();
-        }
-    });
-
     d->discoveryManager = client->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(d->discoveryManager, "QXmppMixManager", "QXmppDiscoveryManager is missing");
+
+    d->servicesWatch = d->discoveryManager->discoverServices(
+        QXmpp::Disco::Category::Conference,
+        QXmpp::Disco::Type::Mix,
+        { ns_mix.toString() });
+
+    d->services.setBinding([this]() -> QList<Service> {
+        QList<Service> result;
+        for (const auto &s : d->servicesWatch->services().value()) {
+            const auto &features = s.info.features();
+            result.append(Service {
+                s.jid,
+                contains(features, ns_mix_searchable),
+                contains(features, ns_mix_create_channel),
+            });
+        }
+        return result;
+    });
+
+    d->servicesNotifier = d->services.addNotifier([this]() {
+        Q_EMIT servicesChanged();
+    });
+
+    connect(client, &QXmppClient::connected, this, [this, client]() {
+        if (client->streamManagementState() == QXmppClient::NewStream) {
+            setParticipantSupport(Unknown);
+            setMessageArchivingSupport(Unknown);
+            updateSupport();
+        }
+    });
 
     d->pubSubManager = client->findExtension<QXmppPubSubManager>();
     Q_ASSERT_X(d->pubSubManager, "QXmppMixManager", "QXmppPubSubManager is missing");
@@ -1115,7 +1140,11 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
 
 void QXmppMixManager::onUnregistered(QXmppClient *client)
 {
-    resetCachedData();
+    d->servicesNotifier = {};
+    d->services = QList<Service>();
+    d->servicesWatch = {};
+    setParticipantSupport(Unknown);
+    setMessageArchivingSupport(Unknown);
     disconnect(client, &QXmppClient::connected, this, nullptr);
 
     if (auto manager = client->findExtension<QXmppAccountMigrationManager>()) {
@@ -1355,15 +1384,6 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::addJidToNode(const QString 
     co_return mapToSuccess(co_await d->pubSubManager->publishItem(channelJid, node, QXmppPubSubBaseItem { jid }).withContext(this));
 }
 
-///
-/// Updates the cached data.
-///
-void QXmppMixManager::updateCachedData()
-{
-    updateSupport();
-    updateServices();
-}
-
 void QXmppMixManager::updateSupport()
 {
     const auto ownJid = client()->configuration().jidBare();
@@ -1376,66 +1396,6 @@ void QXmppMixManager::updateSupport()
 
             setParticipantSupport(contains(features, ns_mix_pam) ? Supported : Unsupported);
             setMessageArchivingSupport(contains(features, ns_mix_pam_archiving) ? Supported : Unsupported);
-        }
-    });
-}
-
-void QXmppMixManager::updateServices()
-{
-    const auto serverJid = client()->configuration().domain();
-
-    d->discoveryManager->items(serverJid).then(this, [this, serverJid](Result<QList<QXmppDiscoItem>> &&result) {
-        if (hasError(result)) {
-            warning(u"Could not retrieve discovery items for %1: %2"_s.arg(serverJid, getError(result).description));
-        } else {
-            const auto jids = transform<QList<QString>>(getValue(result), &QXmppDiscoItem::jid);
-
-            // Remove services from the cache that are not available anymore.
-            for (const auto &service : std::as_const(d->services)) {
-                if (!jids.contains(service.jid)) {
-                    removeService(service.jid);
-                }
-            }
-
-            for (const auto &jid : jids) {
-                updateService(jid);
-            }
-        }
-    });
-}
-
-void QXmppMixManager::updateService(const QString &jid)
-{
-    d->discoveryManager->info(jid).then(this, [this, jid](Result<QXmppDiscoInfo> &&result) {
-        if (hasError(result)) {
-            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(jid, getError(result).description));
-        } else {
-            const auto &info = getValue(result);
-            const auto &features = info.features();
-
-            // If no MIX service is provided by the item, remove it from the cache.
-            if (!contains(features, ns_mix)) {
-                removeService(jid);
-                return;
-            }
-
-            const auto &identities = info.identities();
-
-            // Search for MIX features provided by the determined MIX service.
-            for (const auto &identity : identities) {
-                if (identity.category() == u"conference" && identity.type() == MIX_SERVICE_DISCOVERY_NODE) {
-                    Service service;
-                    service.jid = jid;
-                    service.channelsSearchable = contains(features, ns_mix_searchable);
-                    service.channelCreationAllowed = contains(features, ns_mix_create_channel);
-
-                    addService(service);
-
-                    return;
-                }
-            }
-
-            removeService(jid);
         }
     });
 }
@@ -1467,72 +1427,4 @@ void QXmppMixManager::setMessageArchivingSupport(Support messageArchivingSupport
         d->messageArchivingSupport = messageArchivingSupport;
         Q_EMIT messageArchivingSupportChanged();
     }
-}
-
-///
-/// Adds a MIX service.
-///
-/// \param service MIX service
-///
-void QXmppMixManager::addService(const Service &service)
-{
-    const auto jidsEqual = [&jid = service.jid](const Service &service) {
-        return service.jid == jid;
-    };
-
-    auto itr = std::find_if(d->services.begin(), d->services.end(), jidsEqual);
-
-    if (itr == d->services.end()) {
-        d->services.append(service);
-    } else if (*itr == service) {
-        // Do not emit "servicesChanged()" if the service is already cached with the same
-        // properties.
-        return;
-    } else {
-        *itr = service;
-    }
-
-    Q_EMIT servicesChanged();
-}
-
-///
-/// Removes a MIX service.
-///
-/// \param jid JID of the MIX service
-///
-void QXmppMixManager::removeService(const QString &jid)
-{
-    const auto jidsEqual = [&jid](const Service &service) {
-        return service.jid == jid;
-    };
-
-    auto itr = std::find_if(d->services.begin(), d->services.end(), jidsEqual);
-
-    if (itr == d->services.end()) {
-        return;
-    }
-
-    d->services.erase(itr);
-    Q_EMIT servicesChanged();
-}
-
-///
-/// Removes all MIX services.
-///
-void QXmppMixManager::removeServices()
-{
-    if (!d->services.isEmpty()) {
-        d->services.clear();
-        Q_EMIT servicesChanged();
-    }
-}
-
-///
-/// Resets the cached data.
-///
-void QXmppMixManager::resetCachedData()
-{
-    setParticipantSupport(Unknown);
-    setMessageArchivingSupport(Unknown);
-    removeServices();
 }

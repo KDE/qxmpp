@@ -144,18 +144,9 @@ private:
     QXmppTask<JidResult> requestJids(const QString &channelJid, const QString &node);
     QXmppTask<QXmppClient::EmptyResult> addJidToNode(const QString &channelJid, const QString &node, const QString &jid);
 
-    void updateCachedData();
     void updateSupport();
-    void updateServices();
-    void updateService(const QString &jid);
-
     void setParticipantSupport(Support participantSupport);
     void setMessageArchivingSupport(Support messageArchivingSupport);
-    void addService(const Service &service);
-    void removeService(const QString &jid);
-    void removeServices();
-
-    void resetCachedData();
 
     const std::unique_ptr<QXmppMixManagerPrivate> d;
 

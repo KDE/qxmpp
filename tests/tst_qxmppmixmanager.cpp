@@ -40,21 +40,14 @@ private:
     Q_SLOT void testParticipantSupport();
     Q_SLOT void testMessageArchivingSupport();
     Q_SLOT void testService();
-    Q_SLOT void testServices();
-    Q_SLOT void testResetCachedData();
+    Q_SLOT void testServiceDiscovery();
     Q_SLOT void testUpdateSupport_data();
     Q_SLOT void testUpdateSupport();
-    Q_SLOT void testUpdateService_data();
-    Q_SLOT void testUpdateService();
-    Q_SLOT void testUpdateServices();
-    Q_SLOT void testUpdateCachedData();
     Q_SLOT void testAddJidToNode();
     Q_SLOT void testRequestJids();
     Q_SLOT void testJoinChannelPrivate();
     Q_SLOT void testPrepareJoinIq();
     Q_SLOT void testHandlePubSubEvent();
-    Q_SLOT void testOnRegistered();
-    Q_SLOT void testOnUnregistered();
     Q_SLOT void testCreateChannel();
     Q_SLOT void testCreateChannelWithId();
     Q_SLOT void testRequestChannelJids();
@@ -147,61 +140,63 @@ void tst_QXmppMixManager::testService()
     QVERIFY(!(service1 == service3));
 }
 
-void tst_QXmppMixManager::testServices()
+void tst_QXmppMixManager::testServiceDiscovery()
 {
-    QXmppMixManager manager;
-    QSignalSpy spy(&manager, &QXmppMixManager::servicesChanged);
+    auto tester = Tester(u"hag66@shakespeare.example"_s);
+    auto &client = tester.client;
+    auto manager = tester.manager;
 
-    QXmppMixManager::Service service;
-    service.jid = u"mix.shakespeare.example"_s;
+    QVERIFY(manager->services().isEmpty());
 
-    QVERIFY(manager.services().isEmpty());
+    // Trigger discovery via connect
+    client.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT client.connected();
 
-    manager.addService(service);
-    QCOMPARE(manager.services().size(), 1);
-    QCOMPARE(manager.services().at(0).jid, service.jid);
-    manager.addService(service);
-    QCOMPARE(spy.size(), 1);
+    // updateSupport info query on own JID and items query from disco manager
+    auto supportId = client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
+        "<query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    auto itemsId = client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='shakespeare.example' type='get'>"
+        "<query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
 
-    manager.removeService(u"mix1.shakespeare.example"_s);
-    QCOMPARE(manager.services().size(), 1);
-    QCOMPARE(spy.size(), 1);
+    // Answer support query (not relevant for this test)
+    client.inject(u"<iq id='" + supportId + u"' from='hag66@shakespeare.example' type='result'>"
+                                            "<query xmlns='http://jabber.org/protocol/disco#info'/></iq>");
+    client.inject(
+        u"<iq id='" + itemsId + u"' from='shakespeare.example' type='result'>"
+                                "<query xmlns='http://jabber.org/protocol/disco#items'>"
+                                "<item jid='mix.shakespeare.example' name='MIX Service'/>"
+                                "<item jid='muc.shakespeare.example' name='MUC Service'/>"
+                                "</query></iq>");
 
-    manager.removeService(service.jid);
-    QVERIFY(manager.services().isEmpty());
-    QCOMPARE(spy.size(), 2);
+    auto mixId = client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='mix.shakespeare.example' type='get'>"
+        "<query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    auto mucId = client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='muc.shakespeare.example' type='get'>"
+        "<query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
 
-    manager.addService(service);
-    service.channelsSearchable = true;
-    manager.addService(service);
-    QCOMPARE(manager.services().size(), 1);
-    QCOMPARE(manager.services().at(0).jid, service.jid);
-    QCOMPARE(manager.services().at(0).channelsSearchable, service.channelsSearchable);
-    QCOMPARE(spy.size(), 4);
+    client.inject(
+        u"<iq id='" + mixId + u"' from='mix.shakespeare.example' type='result'>"
+                              "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                              "<identity category='conference' name='MIX Service' type='mix'/>"
+                              "<feature var='urn:xmpp:mix:core:1'/>"
+                              "<feature var='urn:xmpp:mix:core:1#searchable'/>"
+                              "<feature var='urn:xmpp:mix:core:1#create-channel'/>"
+                              "</query></iq>");
 
-    service.jid = u"mix1.shakespeare.example"_s;
-    manager.addService(service);
-    manager.removeServices();
-    QVERIFY(manager.services().isEmpty());
-    QCOMPARE(spy.size(), 6);
-}
+    client.inject(
+        u"<iq id='" + mucId + u"' from='muc.shakespeare.example' type='result'>"
+                              "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                              "<identity category='conference' name='MUC Service' type='text'/>"
+                              "<feature var='http://jabber.org/protocol/muc'/>"
+                              "</query></iq>");
 
-void tst_QXmppMixManager::testResetCachedData()
-{
-    QXmppMixManager manager;
-
-    QXmppMixManager::Service service;
-    service.jid = u"mix.shakespeare.example"_s;
-
-    manager.setParticipantSupport(QXmppMixManager::Support::Supported);
-    manager.setMessageArchivingSupport(QXmppMixManager::Support::Supported);
-    manager.addService(service);
-
-    manager.resetCachedData();
-
-    QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Unknown);
-    QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Unknown);
-    QVERIFY(manager.services().isEmpty());
+    QCOMPARE(manager->services().size(), 1);
+    QCOMPARE(manager->services().at(0).jid, u"mix.shakespeare.example"_s);
+    QVERIFY(manager->services().at(0).channelsSearchable);
+    QVERIFY(manager->services().at(0).channelCreationAllowed);
 }
 
 void tst_QXmppMixManager::testUpdateSupport_data()
@@ -275,222 +270,6 @@ void tst_QXmppMixManager::testUpdateSupport()
 
     QCOMPARE(manager->participantSupport(), participantSupport);
     QCOMPARE(manager->messageArchivingSupport(), messageArchivingSupport);
-}
-
-void tst_QXmppMixManager::testUpdateService_data()
-{
-    QTest::addColumn<QString>("expect");
-    QTest::addColumn<QString>("inject");
-    QTest::addColumn<bool>("mixServiceFound");
-    QTest::addColumn<bool>("channelsSearchable");
-    QTest::addColumn<bool>("channelCreationAllowed");
-
-    QTest::newRow("error")
-        << "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='mix.shakespeare.example' type='error'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "<error type='cancel'>"
-           "<not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
-           "</error>"
-           "</iq>"
-        << false
-        << false
-        << false;
-    QTest::newRow("noMixService")
-        << "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'>"
-           "<identity category='conference' name='MUC Service' type='text'/>"
-           "</query>"
-           "</iq>"
-        << false
-        << false
-        << false;
-    QTest::newRow("channelsSearchable")
-        << "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'>"
-           "<identity category='conference' name='MIX Service' type='mix'/>"
-           "<feature var='urn:xmpp:mix:core:1'/>"
-           "<feature var='urn:xmpp:mix:core:1#searchable'/>"
-           "</query>"
-           "</iq>"
-        << true
-        << true
-        << false;
-    QTest::newRow("channelCreationAllowed")
-        << "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'>"
-           "<identity category='conference' name='MIX Service' type='mix'/>"
-           "<feature var='urn:xmpp:mix:core:1'/>"
-           "<feature var='urn:xmpp:mix:core:1#create-channel'/>"
-           "</query>"
-           "</iq>"
-        << true
-        << false
-        << true;
-    QTest::newRow("bothFeaturesSupported")
-        << "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'>"
-           "<identity category='conference' name='MIX Service' type='mix'/>"
-           "<feature var='urn:xmpp:mix:core:1'/>"
-           "<feature var='urn:xmpp:mix:core:1#searchable'/>"
-           "<feature var='urn:xmpp:mix:core:1#create-channel'/>"
-           "</query>"
-           "</iq>"
-        << true
-        << true
-        << true;
-}
-
-void tst_QXmppMixManager::testUpdateService()
-{
-    QFETCH(QString, expect);
-    QFETCH(QString, inject);
-    QFETCH(bool, mixServiceFound);
-    QFETCH(bool, channelsSearchable);
-    QFETCH(bool, channelCreationAllowed);
-
-    auto tester = Tester(u"hag66@shakespeare.example"_s);
-    auto &client = tester.client;
-    auto manager = tester.manager;
-
-    manager->updateService(u"mix.shakespeare.example"_s);
-
-    client.expect(std::move(expect));
-    client.inject(inject);
-
-    const auto services = manager->services();
-
-    if (mixServiceFound) {
-        QCOMPARE(services.size(), 1);
-
-        const auto service = manager->services().at(0);
-        QCOMPARE(service.jid, u"mix.shakespeare.example"_s);
-        QCOMPARE(service.channelsSearchable, channelsSearchable);
-        QCOMPARE(service.channelCreationAllowed, channelCreationAllowed);
-    } else {
-        QVERIFY(services.isEmpty());
-    }
-}
-
-void tst_QXmppMixManager::testUpdateServices()
-{
-    auto tester = Tester(u"hag66@shakespeare.example"_s);
-    auto &client = tester.client;
-    auto manager = tester.manager;
-
-    manager->client()->findExtension<QXmppDiscoveryManager>()->info(u"mix1.shakespeare.example"_s);
-
-    client.expect(
-        "<iq id='qx1' to='mix1.shakespeare.example' type='get'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-        "</iq>");
-    client.inject(
-        "<iq id='qx1' from='mix1.shakespeare.example' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'>"
-        "<identity category='conference' name='MIX Service' type='mix'/>"
-        "<feature var='urn:xmpp:mix:core:1'/>"
-        "<feature var='urn:xmpp:mix:core:1#searchable'/>"
-        "</query>"
-        "</iq>");
-
-    manager->client()->findExtension<QXmppDiscoveryManager>()->info(u"mix2.shakespeare.example"_s);
-
-    client.expect(
-        "<iq id='qx1' to='mix2.shakespeare.example' type='get'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-        "</iq>");
-    client.inject(
-        "<iq id='qx1' from='mix2.shakespeare.example' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'>"
-        "<identity category='conference' name='MIX Service' type='mix'/>"
-        "<feature var='urn:xmpp:mix:core:1'/>"
-        "<feature var='urn:xmpp:mix:core:1#searchable'/>"
-        "<feature var='urn:xmpp:mix:core:1#create-channel'/>"
-        "</query>"
-        "</iq>");
-
-    manager->updateServices();
-
-    client.expect(
-        "<iq id='qx1' to='shakespeare.example' type='get'>"
-        "<query xmlns='http://jabber.org/protocol/disco#items'/>"
-        "</iq>");
-    client.inject(
-        "<iq id='qx1' from='shakespeare.example' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#items'>"
-        "<item jid='mix1.shakespeare.example' name='MIX Service 1'/>"
-        "<item jid='mix2.shakespeare.example' name='MIX Service 2'/>"
-        "</query>"
-        "</iq>");
-
-    QCOMPARE(manager->services().size(), 2);
-    QCOMPARE(manager->services().at(0).jid, u"mix1.shakespeare.example"_s);
-    QVERIFY(manager->services().at(0).channelsSearchable);
-    QVERIFY(!manager->services().at(0).channelCreationAllowed);
-    QCOMPARE(manager->services().at(1).jid, u"mix2.shakespeare.example"_s);
-    QVERIFY(manager->services().at(1).channelsSearchable);
-    QVERIFY(manager->services().at(1).channelCreationAllowed);
-}
-
-void tst_QXmppMixManager::testUpdateCachedData()
-{
-    auto tester = Tester(u"hag66@shakespeare.example"_s);
-    auto &client = tester.client;
-    auto manager = tester.manager;
-
-    manager->updateCachedData();
-
-    client.expect(
-        "<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-        "</iq>");
-    client.inject(
-        "<iq id='qx1' from='hag66@shakespeare.example' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'>"
-        "<feature var='urn:xmpp:mix:pam:2'/>"
-        "</query>"
-        "</iq>");
-
-    client.expect(
-        "<iq id='qx3' to='shakespeare.example' type='get'>"
-        "<query xmlns='http://jabber.org/protocol/disco#items'/>"
-        "</iq>");
-    client.inject(
-        "<iq id='qx3' from='shakespeare.example' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#items'>"
-        "<item jid='mix.shakespeare.example' name='MIX Service'/>"
-        "</query>"
-        "</iq>");
-
-    client.expect(
-        "<iq id='qx1' to='mix.shakespeare.example' type='get'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-        "</iq>");
-    client.inject(
-        "<iq id='qx1' from='mix.shakespeare.example' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'>"
-        "<identity category='conference' name='MIX Service' type='mix'/>"
-        "<feature var='urn:xmpp:mix:core:1'/>"
-        "<feature var='urn:xmpp:mix:core:1#searchable'/>"
-        "</query>"
-        "</iq>");
-
-    QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Supported);
-    QCOMPARE(manager->services().size(), 1);
 }
 
 void tst_QXmppMixManager::testAddJidToNode()
@@ -757,78 +536,6 @@ void tst_QXmppMixManager::testHandlePubSubEvent()
 
     QCOMPARE(channelConfigurationUpdatedSpy.first().at(1).value<QXmppMixConfigItem>().ownerJids(), jids);
     QCOMPARE(channelInformationUpdatedSpy.first().at(1).value<QXmppMixInfoItem>().name(), channelName);
-}
-
-void tst_QXmppMixManager::testOnRegistered()
-{
-    TestClient client;
-    QXmppMixManager manager;
-
-    client.addNewExtension<QXmppDiscoveryManager>();
-    client.addNewExtension<QXmppPubSubManager>();
-
-    client.configuration().setJid(u"hag66@shakespeare.example"_s);
-    client.addExtension(&manager);
-
-    QXmppMixManager::Service service;
-    service.jid = u"mix.shakespeare.example"_s;
-
-    manager.setParticipantSupport(QXmppMixManager::Support::Supported);
-    manager.setMessageArchivingSupport(QXmppMixManager::Support::Supported);
-    manager.addService(service);
-
-    client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
-    QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Unknown);
-    QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Unknown);
-    QVERIFY(manager.services().isEmpty());
-
-    client.expect(
-        "<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-        "</iq>");
-    client.inject(
-        "<iq id='qx1' from='hag66@shakespeare.example' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'>"
-        "<feature var='urn:xmpp:mix:pam:2'/>"
-        "</query>"
-        "</iq>");
-
-    QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Supported);
-}
-
-void tst_QXmppMixManager::testOnUnregistered()
-{
-    QXmppClient client;
-    QXmppMixManager manager;
-
-    client.addNewExtension<QXmppDiscoveryManager>();
-    client.addNewExtension<QXmppPubSubManager>();
-
-    client.configuration().setJid(u"hag66@shakespeare.example"_s);
-    client.addExtension(&manager);
-
-    QXmppMixManager::Service service;
-    service.jid = u"mix.shakespeare.example"_s;
-
-    manager.setParticipantSupport(QXmppMixManager::Support::Supported);
-    manager.setMessageArchivingSupport(QXmppMixManager::Support::Supported);
-    manager.addService(service);
-
-    manager.onUnregistered(&client);
-
-    QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Unknown);
-    QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Unknown);
-    QVERIFY(manager.services().isEmpty());
-
-    manager.setParticipantSupport(QXmppMixManager::Support::Supported);
-    manager.setMessageArchivingSupport(QXmppMixManager::Support::Supported);
-    manager.addService(service);
-
-    Q_EMIT client.connected();
-    QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Supported);
-    QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Supported);
-    QVERIFY(!manager.services().isEmpty());
 }
 
 void tst_QXmppMixManager::testCreateChannel()
