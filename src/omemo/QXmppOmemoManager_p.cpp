@@ -947,8 +947,12 @@ void ManagerPrivate::removeDevicesRemovedFromServer()
 //
 // \return the result of the encryption
 //
-QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessageForRecipients(QXmppMessage &&message, QVector<QString> recipientJids, TrustLevels acceptedTrustLevels)
+QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessageForRecipients(QXmppMessage &&messageRef, QVector<QString> recipientJids, TrustLevels acceptedTrustLevels)
 {
+    // Move into local to prevent use-after-free: rvalue reference parameters
+    // dangle after co_await because the coroutine frame only stores the reference.
+    auto message = std::move(messageRef);
+
     if (!initialized) {
         co_return QXmppError {
             u"OMEMO manager must be initialized before encrypting"_s,

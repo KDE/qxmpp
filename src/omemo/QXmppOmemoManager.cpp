@@ -961,8 +961,11 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> Manager::encryptMessage(QXmp
     return d->encryptMessageForRecipients(std::move(message), recipientJids, *acceptedTrustLevels);
 }
 
-QXmppTask<QXmppE2eeExtension::MessageDecryptResult> QXmppOmemoManager::decryptMessage(QXmppMessage &&message)
+QXmppTask<QXmppE2eeExtension::MessageDecryptResult> QXmppOmemoManager::decryptMessage(QXmppMessage &&messageRef)
 {
+    // Move into local to prevent use-after-free across co_await.
+    auto message = std::move(messageRef);
+
     if (!d->initialized) {
         co_return QXmppError {
             u"OMEMO manager must be initialized before decrypting"_s,
@@ -980,8 +983,11 @@ QXmppTask<QXmppE2eeExtension::MessageDecryptResult> QXmppOmemoManager::decryptMe
     co_return QXmppError { u"Couldn't decrypt message"_s, {} };
 }
 
-QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &params)
+QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iqRef, const std::optional<QXmppSendStanzaParams> &params)
 {
+    // Move into local to prevent use-after-free across co_await.
+    auto iq = std::move(iqRef);
+
     if (!d->initialized) {
         co_return QXmppError {
             u"OMEMO manager must be initialized before encrypting"_s,
