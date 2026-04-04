@@ -8,6 +8,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
+#include "QXmppDiscoveryIq_p.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
@@ -207,6 +208,83 @@ QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
     return QXmppDiscoInfo { {}, allIdentities, allFeatures, d->dataForms };
 }
 
+// QXmppDiscoServicesWatch
+
+///
+/// Returns whether all discovery queries have completed.
+///
+QBindable<bool> QXmppDiscoServicesWatch::loaded() const
+{
+    return &d->loaded;
+}
+
+///
+/// Returns the list of discovered services matching the filter.
+///
+QBindable<QList<QXmppDiscoService>> QXmppDiscoServicesWatch::services() const
+{
+    return &d->services;
+}
+
+///
+/// \brief Watches for server services matching the given identity category and optional type.
+///
+/// Returns a lightweight handle that provides reactive access to discovered
+/// services via QBindable properties. The watch is automatically started and
+/// will be populated as discovery results arrive.
+///
+/// \param category The identity category to filter by.
+/// \param type Optional identity type to filter by. If not set, matches any type.
+/// \param requiredFeatures Features that discovered services must support.
+/// \return A watch handle. Keep it alive as long as you need updates.
+///
+/// \since QXmpp 1.16
+///
+QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(Disco::Category category, std::optional<Disco::Type> type, QStringList requiredFeatures)
+{
+    std::optional<QString> typeStr;
+    if (type) {
+        typeStr = Enums::toString(*type).toString();
+    }
+    return discoverServices(Enums::toString(category).toString(), std::move(typeStr), std::move(requiredFeatures));
+}
+
+///
+/// \brief Watches for server services matching the given identity category and optional type strings.
+///
+/// This overload accepts raw strings for non-standard or unregistered categories and types.
+///
+/// \since QXmpp 1.16
+///
+QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category, std::optional<QString> type, QStringList requiredFeatures)
+{
+    auto data = std::make_shared<QXmppDiscoServicesWatch::Data>();
+
+    QXmppDiscoveryManagerPrivate::WatchEntry entry;
+    entry.data = data;
+    entry.category = std::move(category);
+    entry.type = std::move(type);
+    entry.requiredFeatures = std::move(requiredFeatures);
+
+    // If discovery already completed, populate from cached results
+    if (d->discoveryComplete) {
+        QList<QXmppDiscoService> matching;
+        for (const auto &service : std::as_const(d->discoveredServices)) {
+            if (d->matchesFilter(entry, service.info)) {
+                matching.append(service);
+            }
+        }
+        data->services = std::move(matching);
+        data->loaded = true;
+    }
+
+    d->watches.append(std::move(entry));
+
+    QXmppDiscoServicesWatch watch;
+    watch.d = std::move(data);
+    return watch;
+}
+
 ///
 /// Returns the capabilities node of the local XMPP client.
 ///
@@ -274,6 +352,7 @@ void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
         if (client->streamManagementState() != QXmppClient::ResumedStream) {
             d->itemsCache.clear();
             d->infoCache.clear();
+            d->discoverServices();
         }
     });
 }
@@ -323,4 +402,114 @@ std::variant<CompatIq<QXmppDiscoItems>, QXmppStanza::Error> QXmppDiscoveryManage
         return CompatIq { QXmppIq::Result, QXmppDiscoItems() };
     }
     return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
+}
+
+void QXmppDiscoveryManagerPrivate::discoverServices()
+{
+    pruneExpiredWatches();
+
+    if (watches.isEmpty()) {
+        return;
+    }
+
+    discoveryComplete = false;
+    discoveredServices.clear();
+
+    // Reset all live watches
+    for (auto &watch : watches) {
+        if (auto data = watch.data.lock()) {
+            data->loaded = false;
+            data->services = QList<QXmppDiscoService>();
+        }
+    }
+
+    auto serverDomain = q->client()->configuration().domain();
+    q->items(serverDomain).then(q, [this](auto &&result) {
+        if (!hasValue(result)) {
+            finalizeDiscovery();
+            return;
+        }
+
+        const auto &itemList = getValue(result);
+        if (itemList.isEmpty()) {
+            finalizeDiscovery();
+            return;
+        }
+
+        auto remaining = std::make_shared<int>(itemList.size());
+
+        for (const auto &item : itemList) {
+            q->info(item.jid()).then(q, [this, jid = item.jid(), remaining](auto &&infoResult) {
+                if (hasValue(infoResult)) {
+                    processServiceInfo(jid, getValue(infoResult));
+                }
+
+                if (--(*remaining) == 0) {
+                    finalizeDiscovery();
+                }
+            });
+        }
+    });
+}
+
+void QXmppDiscoveryManagerPrivate::processServiceInfo(const QString &jid, const QXmppDiscoInfo &info)
+{
+    discoveredServices.append(QXmppDiscoService { jid, info });
+
+    for (auto &watch : watches) {
+        if (auto data = watch.data.lock()) {
+            if (matchesFilter(watch, info)) {
+                auto list = data->services.value();
+                list.append(QXmppDiscoService { jid, info });
+                data->services = std::move(list);
+            }
+        }
+    }
+}
+
+void QXmppDiscoveryManagerPrivate::finalizeDiscovery()
+{
+    discoveryComplete = true;
+    for (auto &watch : watches) {
+        if (auto data = watch.data.lock()) {
+            data->loaded = true;
+        }
+    }
+}
+
+void QXmppDiscoveryManagerPrivate::pruneExpiredWatches()
+{
+    watches.removeIf([](const WatchEntry &entry) {
+        return entry.data.expired();
+    });
+}
+
+bool QXmppDiscoveryManagerPrivate::matchesFilter(const WatchEntry &watch, const QXmppDiscoInfo &info) const
+{
+    // Check that at least one identity matches category (and optionally type)
+    bool identityMatch = false;
+    for (const auto &identity : info.identities()) {
+        if (identity.category() != watch.category) {
+            continue;
+        }
+        if (watch.type && identity.type() != *watch.type) {
+            continue;
+        }
+        identityMatch = true;
+        break;
+    }
+
+    if (!identityMatch) {
+        return false;
+    }
+
+    // Check that all required features are present
+    const auto &features = info.features();
+    for (const auto &required : watch.requiredFeatures) {
+        if (!features.contains(required)) {
+            return false;
+        }
+    }
+
+    return true;
 }

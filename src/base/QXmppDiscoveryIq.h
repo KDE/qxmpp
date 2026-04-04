@@ -7,9 +7,73 @@
 #define QXMPPDISCOVERY_H
 
 #include "QXmppDataFormBase.h"
+#include "QXmppGlobal.h"
 #include "QXmppIq.h"
 
 #include <QSharedDataPointer>
+
+namespace QXmpp::Disco {
+
+///
+/// \brief Service discovery identity category as registered at
+/// https://xmpp.org/registrar/disco-categories.html
+///
+/// \since QXmpp 1.16
+///
+enum class Category {
+    Account,
+    Auth,
+    Automation,
+    Client,
+    Collaboration,
+    Component,
+    Conference,
+    Directory,
+    Gateway,
+    Headline,
+    Hierarchy,
+    Proxy,
+    PubSub,
+    Server,
+    Store,
+};
+
+///
+/// \brief Service discovery identity type as registered at
+/// https://xmpp.org/registrar/disco-categories.html
+///
+/// Note: not all category/type combinations are valid. See the registry for
+/// valid combinations.
+///
+/// \since QXmpp 1.16
+///
+enum class Type {
+    // client
+    Bot,
+    Console,
+    Game,
+    Handheld,
+    Pc,
+    Phone,
+    Sms,
+    Tablet,
+    Web,
+    // conference
+    Irc,
+    Mix,
+    Text,
+    // gateway
+    // (using generic types that overlap with other categories)
+    // pubsub
+    Collection,
+    Leaf,
+    Pep,
+    Service,
+    // store
+    File,
+};
+
+}  // namespace QXmpp::Disco
 
 class QXmppDiscoveryIdentityPrivate;
 class QXmppDiscoveryItemPrivate;
@@ -193,6 +257,20 @@ private:
     QList<QXmppDiscoIdentity> m_identities;
     QList<QString> m_features;
     QList<QXmppDataForm> m_dataForms;
+};
+
+///
+/// \brief A discovered service with its JID and disco info.
+///
+/// Returned by QXmppDiscoServicesWatch when discovering server services.
+///
+/// \since QXmpp 1.16
+///
+struct QXMPP_EXPORT QXmppDiscoService {
+    /// JID of the service.
+    QString jid;
+    /// Service discovery information of the service.
+    QXmppDiscoInfo info;
 };
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)

@@ -7,10 +7,13 @@
 #define QXMPPDISCOVERYMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryIq.h"
 
+#include <memory>
 #include <variant>
 
 #include <QDateTime>
+#include <QProperty>
 
 template<typename T>
 class QXmppTask;
@@ -18,6 +21,36 @@ class QXmppDataForm;
 class QXmppDiscoveryIq;
 class QXmppDiscoveryManagerPrivate;
 struct QXmppError;
+
+///
+/// \brief Lightweight handle to a service discovery watch.
+///
+/// Returned by QXmppDiscoveryManager::discoverServices(). Provides reactive access
+/// to discovered server services matching a filter. Cheap to copy — all copies
+/// share the same underlying state. When the last copy goes out of scope, the
+/// watch is automatically unregistered from the discovery manager.
+///
+/// \since QXmpp 1.16
+///
+class QXMPP_EXPORT QXmppDiscoServicesWatch
+{
+public:
+    /// Whether all discovery queries have completed.
+    QBindable<bool> loaded() const;
+    /// The list of discovered services matching the filter.
+    QBindable<QList<QXmppDiscoService>> services() const;
+
+private:
+    friend class QXmppDiscoveryManager;
+    friend class QXmppDiscoveryManagerPrivate;
+    QXmppDiscoServicesWatch() = default;
+
+    struct Data {
+        QProperty<bool> loaded { false };
+        QProperty<QList<QXmppDiscoService>> services;
+    };
+    std::shared_ptr<Data> d;
+};
 
 class QXMPP_EXPORT QXmppDiscoveryManager : public QXmppClientExtension
 {
@@ -39,6 +72,9 @@ public:
 
     QXmppTask<QXmpp::Result<QXmppDiscoInfo>> info(const QString &jid, const QString &node = {}, CachePolicy fetchPolicy = CachePolicy::Relaxed);
     QXmppTask<QXmpp::Result<QList<QXmppDiscoItem>>> items(const QString &jid, const QString &node = {}, CachePolicy fetchPolicy = CachePolicy::Relaxed);
+
+    QXmppDiscoServicesWatch discoverServices(QXmpp::Disco::Category category, std::optional<QXmpp::Disco::Type> type = {}, QStringList requiredFeatures = {});
+    QXmppDiscoServicesWatch discoverServices(QString category, std::optional<QString> type = {}, QStringList requiredFeatures = {});
 
     const QList<QXmppDiscoIdentity> &identities() const;
     void setIdentities(const QList<QXmppDiscoIdentity> &identities);
