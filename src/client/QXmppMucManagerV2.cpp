@@ -351,6 +351,28 @@ QStringList QXmppMucManagerV2::discoveryFeatures() const
 }
 
 ///
+/// Returns the JIDs of discovered MUC services on the server.
+///
+/// The list is populated automatically after connecting and updated reactively.
+///
+/// \since QXmpp 1.16
+///
+QBindable<QStringList> QXmppMucManagerV2::mucServices() const
+{
+    return &d->mucServices;
+}
+
+///
+/// Returns whether MUC service discovery has completed.
+///
+/// \since QXmpp 1.16
+///
+QBindable<bool> QXmppMucManagerV2::mucServicesLoaded() const
+{
+    return &d->mucServicesLoaded;
+}
+
+///
 ///
 /// Joins the MUC room at \a jid with the given \a nickname.
 ///
@@ -604,6 +626,21 @@ QXmppTask<SendResult> QXmppMucManagerV2::sendDirectInvitation(const QString &to,
 
 void QXmppMucManagerV2::onRegistered(QXmppClient *client)
 {
+    auto *disco = client->findExtension<QXmppDiscoveryManager>();
+    QX_ALWAYS_ASSERT(disco);
+
+    d->servicesWatch = disco->discoverServices(
+        QXmpp::Disco::Category::Conference,
+        QXmpp::Disco::Type::Text,
+        { ns_muc.toString() });
+
+    d->mucServices.setBinding([this]() -> QStringList {
+        return transform<QStringList>(d->servicesWatch->services().value(), &QXmppDiscoService::jid);
+    });
+    d->mucServicesLoaded.setBinding([this]() {
+        return d->servicesWatch->loaded().value();
+    });
+
     connect(client, &QXmppClient::connected, this, &QXmppMucManagerV2::onConnected);
     connect(client, &QXmppClient::disconnected, this, &QXmppMucManagerV2::onDisconnected);
     connect(client, &QXmppClient::presenceReceived, this, [this](const auto &p) { d->handlePresence(p); });
@@ -611,6 +648,9 @@ void QXmppMucManagerV2::onRegistered(QXmppClient *client)
 
 void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 {
+    d->mucServices = QStringList();
+    d->mucServicesLoaded = false;
+    d->servicesWatch = {};
     disconnect(client, nullptr, this, nullptr);
 }
 
