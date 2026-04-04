@@ -38,6 +38,9 @@ public:
 
     QStringList discoveryFeatures() const override;
 
+    QBindable<QStringList> mucServices() const;
+    QBindable<bool> mucServicesLoaded() const;
+
     /// Returns a lightweight handle for the room with the given \a jid.
     QXmppMucRoomV2 room(const QString &jid);
 
