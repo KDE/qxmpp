@@ -1423,8 +1423,7 @@ void QXmppMixManager::updateService(const QString &jid)
 
             // Search for MIX features provided by the determined MIX service.
             for (const auto &identity : identities) {
-                // ' || identity.type() == u"text"' is a workaround for older ejabberd versions.
-                if (identity.category() == u"conference" && (identity.type() == MIX_SERVICE_DISCOVERY_NODE || identity.type() == u"text")) {
+                if (identity.category() == u"conference" && identity.type() == MIX_SERVICE_DISCOVERY_NODE) {
                     Service service;
                     service.jid = jid;
                     service.channelsSearchable = contains(features, ns_mix_searchable);
