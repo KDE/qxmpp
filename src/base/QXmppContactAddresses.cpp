@@ -141,7 +141,7 @@ void QXmppContactAddresses::setSupportAddresses(const QList<QString> &newSupport
 
 QString QXmppContactAddresses::formType() const
 {
-    return ns_contact_addresses.toString();
+    return staticString(ns_contact_addresses);
 }
 
 bool QXmppContactAddresses::parseField(const QXmppDataForm::Field &field)

@@ -591,7 +591,7 @@ std::optional<SaslScramMechanism> SaslScramMechanism::fromString(QStringView str
 
 QString SaslScramMechanism::toString() const
 {
-    return Enums::toString(algorithm).toString();
+    return Enums::toString(algorithm);
 }
 
 QCryptographicHash::Algorithm SaslScramMechanism::qtAlgorithm() const

@@ -326,7 +326,7 @@ QXmppJingleMessageInitiationManager::~QXmppJingleMessageInitiationManager() = de
 /// \cond
 QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
 {
-    return { ns_jingle_message.toString() };
+    return { staticString(ns_jingle_message) };
 }
 /// \endcond
 

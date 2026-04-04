@@ -468,7 +468,7 @@ void QXmppJingleIq::Content::setRtpEncryption(const std::optional<QXmppJingleRtp
 
 void QXmppJingleIq::Content::addTransportCandidate(const QXmppJingleCandidate &candidate)
 {
-    d->transportType = ns_jingle_ice_udp.toString();
+    d->transportType = staticString(ns_jingle_ice_udp);
     d->transportCandidates << candidate;
 }
 
@@ -484,7 +484,7 @@ QList<QXmppJingleCandidate> QXmppJingleIq::Content::transportCandidates() const
 ///
 void QXmppJingleIq::Content::setTransportCandidates(const QList<QXmppJingleCandidate> &candidates)
 {
-    d->transportType = candidates.isEmpty() ? QString() : ns_jingle_ice_udp.toString();
+    d->transportType = candidates.isEmpty() ? QString() : staticString(ns_jingle_ice_udp);
     d->transportCandidates = candidates;
 }
 

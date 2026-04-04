@@ -890,10 +890,10 @@ void QXmppTransferManager::byteStreamSetReceived(const QXmppByteStreamIq &iq)
 QStringList QXmppTransferManager::discoveryFeatures() const
 {
     return {
-        ns_ibb.toString(),                              // XEP-0047: In-Band Bytestreams
-        ns_bytestreams.toString(),                      // XEP-0065: SOCKS5 Bytestreams
-        ns_stream_initiation.toString(),                // XEP-0095: Stream Initiation
-        ns_stream_initiation_file_transfer.toString(),  // XEP-0096: SI File Transfer
+        staticString(ns_ibb),                              // XEP-0047: In-Band Bytestreams
+        staticString(ns_bytestreams),                      // XEP-0065: SOCKS5 Bytestreams
+        staticString(ns_stream_initiation),                // XEP-0095: Stream Initiation
+        staticString(ns_stream_initiation_file_transfer),  // XEP-0096: SI File Transfer
     };
 }
 
@@ -1214,9 +1214,9 @@ void QXmppTransferManager::_q_jobStateChanged(QXmppTransferJob::State state)
     QXmppDataForm::Field methodField(QXmppDataForm::Field::ListSingleField);
     methodField.setKey(u"stream-method"_s);
     if (job->method() == QXmppTransferJob::InBandMethod) {
-        methodField.setValue(ns_ibb.toString());
+        methodField.setValue(staticString(ns_ibb));
     } else if (job->method() == QXmppTransferJob::SocksMethod) {
-        methodField.setValue(ns_bytestreams.toString());
+        methodField.setValue(staticString(ns_bytestreams));
     }
     form.setFields(QList<QXmppDataForm::Field>() << methodField);
 
@@ -1328,10 +1328,10 @@ QXmppTransferJob *QXmppTransferManager::sendFile(const QString &jid, QIODevice *
     QXmppDataForm::Field methodField(QXmppDataForm::Field::ListSingleField);
     methodField.setKey(u"stream-method"_s);
     if (d->supportedMethods & QXmppTransferJob::InBandMethod) {
-        methodField.setOptions(methodField.options() << qMakePair(QString(), ns_ibb.toString()));
+        methodField.setOptions(methodField.options() << qMakePair(QString(), staticString(ns_ibb)));
     }
     if (d->supportedMethods & QXmppTransferJob::SocksMethod) {
-        methodField.setOptions(methodField.options() << qMakePair(QString(), ns_bytestreams.toString()));
+        methodField.setOptions(methodField.options() << qMakePair(QString(), staticString(ns_bytestreams)));
     }
     form.setFields(QList<QXmppDataForm::Field>() << methodField);
 

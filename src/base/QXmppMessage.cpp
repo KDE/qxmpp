@@ -1102,7 +1102,7 @@ QXmpp::EncryptionMethod QXmppMessage::encryptionMethod() const
 ///
 void QXmppMessage::setEncryptionMethod(QXmpp::EncryptionMethod method)
 {
-    d->encryptionMethod = Enums::toString(method).toString();
+    d->encryptionMethod = Enums::toString(method);
 }
 
 ///
@@ -1139,7 +1139,7 @@ QString QXmppMessage::encryptionName() const
     if (!d->encryptionName.isEmpty()) {
         return d->encryptionName;
     }
-    return encryptionToName(encryptionMethod()).toString();
+    return staticString(encryptionToName(encryptionMethod()));
 }
 
 ///
@@ -1552,7 +1552,7 @@ void QXmppMessage::setReply(const std::optional<QXmpp::Reply> &reply)
 ///
 QString QXmppMessage::readReplyQuoteFromBody() const
 {
-    auto replyFallbackBody = readFallbackText(QXmppFallback::Body, ns_reply.toString());
+    auto replyFallbackBody = readFallbackText(QXmppFallback::Body, staticString(ns_reply));
     auto lines = replyFallbackBody.split(u'\n');
     // remove '> ' quotation
     for (auto &line : lines) {

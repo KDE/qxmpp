@@ -49,7 +49,7 @@ QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMucRoomInfo)
 
 QString QXmppMucRoomInfo::formType() const
 {
-    return ns_muc_roominfo.toString();
+    return staticString(ns_muc_roominfo);
 }
 
 bool QXmppMucRoomInfo::parseField(const QXmppDataForm::Field &field)

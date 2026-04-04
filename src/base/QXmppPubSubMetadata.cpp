@@ -190,7 +190,7 @@ void QXmppPubSubMetadata::setMaxItems(ItemLimit maxItems)
 
 QString QXmppPubSubMetadata::formType() const
 {
-    return FORM_TYPE_METADATA.toString();
+    return staticString(FORM_TYPE_METADATA);
 }
 
 bool QXmppPubSubMetadata::parseField(const QXmppDataForm::Field &field)
@@ -252,11 +252,11 @@ void QXmppPubSubMetadata::serializeForm(QXmppDataForm &form) const
         return QString::number(value);
     };
     auto enumToString = [](auto value) {
-        return Enums::toString(value).toString();
+        return Enums::toString(value);
     };
 
     serializeEmptyable(form, Type::JidMultiField, CONTACT_JIDS, d->contactJids);
-    serializeDatetime(form, CREATION_DATE.toString(), d->creationDate);
+    serializeDatetime(form, staticString(CREATION_DATE), d->creationDate);
     serializeNullable(form, Type::JidSingleField, CREATOR_JID, d->creatorJid);
     serializeNullable(form, Type::TextSingleField, DESCRIPTION, d->description);
     serializeNullable(form, Type::TextSingleField, LANGUAGE, d->language);

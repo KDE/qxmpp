@@ -12,6 +12,8 @@
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
+#include "StringLiterals.h"
+
 #include <QDomElement>
 #include <QMap>
 
@@ -80,11 +82,11 @@ QStringList QXmppMucManager::discoveryFeatures() const
 {
     // XEP-0045: Multi-User Chat
     return {
-        ns_muc.toString(),
-        ns_muc_admin.toString(),
-        ns_muc_owner.toString(),
-        ns_muc_user.toString(),
-        ns_conference.toString(),
+        staticString(ns_muc),
+        staticString(ns_muc_admin),
+        staticString(ns_muc_owner),
+        staticString(ns_muc_user),
+        staticString(ns_conference),
     };
 }
 

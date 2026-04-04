@@ -444,7 +444,7 @@ bool serialize(const std::any &query, QUrlQuery &urlQuery)
 QString QXmppUri::toString()
 {
     QUrl url;
-    url.setScheme(SCHEME.toString());
+    url.setScheme(staticString(SCHEME));
     url.setPath(d->jid);
 
     // add URI query

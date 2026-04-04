@@ -56,7 +56,7 @@ void QXmppCarbonManager::setCarbonsEnabled(bool enabled)
         QXmppIq iq(QXmppIq::Set);
         QXmppElement carbonselement;
         carbonselement.setTagName(m_carbonsEnabled ? u"enable"_s : u"disable"_s);
-        carbonselement.setAttribute(u"xmlns"_s, ns_carbons.toString());
+        carbonselement.setAttribute(u"xmlns"_s, staticString(ns_carbons));
 
         iq.setExtensions(QXmppElementList() << carbonselement);
         client()->send(std::move(iq));
@@ -66,7 +66,7 @@ void QXmppCarbonManager::setCarbonsEnabled(bool enabled)
 /// \cond
 QStringList QXmppCarbonManager::discoveryFeatures() const
 {
-    return { ns_carbons.toString() };
+    return { staticString(ns_carbons) };
 }
 
 bool QXmppCarbonManager::handleStanza(const QDomElement &element)

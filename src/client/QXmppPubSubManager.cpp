@@ -967,7 +967,7 @@ QString QXmppPubSubManager::standardItemIdToString(StandardItemId itemId)
 QStringList QXmppPubSubManager::discoveryFeatures() const
 {
     return {
-        ns_pubsub_rsm.toString()
+        staticString(ns_pubsub_rsm)
     };
 }
 

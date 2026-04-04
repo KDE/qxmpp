@@ -421,7 +421,7 @@ QXmppMixManager::~QXmppMixManager() = default;
 
 QStringList QXmppMixManager::discoveryFeatures() const
 {
-    return { ns_mix.toString() };
+    return { staticString(ns_mix) };
 }
 
 ///
@@ -1045,7 +1045,7 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
     d->servicesWatch = d->discoveryManager->discoverServices(
         QXmpp::Disco::Category::Conference,
         QXmpp::Disco::Type::Mix,
-        { ns_mix.toString() });
+        { staticString(ns_mix) });
 
     d->services.setBinding([this]() -> QList<Service> {
         QList<Service> result;

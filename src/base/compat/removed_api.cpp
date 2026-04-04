@@ -603,7 +603,7 @@ bool QXmppSessionIq::isSessionIq(const QDomElement &element)
 void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(u"session"_s);
-    writer->writeDefaultNamespace(ns_session.toString());
+    writer->writeDefaultNamespace(staticString(ns_session));
     writer->writeEndElement();
 }
 /// \endcond
@@ -780,7 +780,7 @@ void QXmppPubSubIq::parseElementFromChild(const QDomElement &element)
 void QXmppPubSubIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     writer->writeStartElement(u"pubsub"_s);
-    writer->writeDefaultNamespace(ns_pubsub.toString());
+    writer->writeDefaultNamespace(staticString(ns_pubsub));
 
     // write query type
     writer->writeStartElement(PUBSUB_QUERIES.at(d->queryType));
@@ -921,8 +921,8 @@ void QXmppStartTlsPacket::parse(const QDomElement &element)
 void QXmppStartTlsPacket::toXml(QXmlStreamWriter *writer) const
 {
     if (m_type != Invalid) {
-        writer->writeStartElement(STARTTLS_TYPES.at(size_t(m_type)).toString());
-        writer->writeDefaultNamespace(ns_tls.toString());
+        writer->writeStartElement(staticString(STARTTLS_TYPES.at(size_t(m_type))));
+        writer->writeDefaultNamespace(staticString(ns_tls));
         writer->writeEndElement();
     }
 }

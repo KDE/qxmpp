@@ -47,7 +47,7 @@ template<BlockingAction Action>
 struct Blocking {
     QVector<QString> jids;
 
-    static constexpr std::tuple XmlTag = { Enums::toString(Action), ns_blocking };
+    static constexpr std::tuple XmlTag = { Enums::toStringView(Action), ns_blocking };
 
     bool parse(const QDomElement &el)
     {
@@ -302,7 +302,7 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QVector<QS
 /// \cond
 QStringList QXmppBlockingManager::discoveryFeatures() const
 {
-    return { ns_blocking.toString() };
+    return { staticString(ns_blocking) };
 }
 
 void QXmppBlockingManager::onRegistered(QXmppClient *client)

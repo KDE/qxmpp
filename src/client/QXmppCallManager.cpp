@@ -335,14 +335,14 @@ void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &se
 QStringList QXmppCallManager::discoveryFeatures() const
 {
     QStringList features = {
-        ns_jingle.toString(),      // XEP-0166: Jingle
-        ns_jingle_rtp.toString(),  // XEP-0167: Jingle RTP Sessions
-        ns_jingle_rtp_audio.toString(),
-        ns_jingle_rtp_video.toString(),
-        ns_jingle_ice_udp.toString(),  // XEP-0176: Jingle ICE-UDP Transport Method
+        staticString(ns_jingle),      // XEP-0166: Jingle
+        staticString(ns_jingle_rtp),  // XEP-0167: Jingle RTP Sessions
+        staticString(ns_jingle_rtp_audio),
+        staticString(ns_jingle_rtp_video),
+        staticString(ns_jingle_ice_udp),  // XEP-0176: Jingle ICE-UDP Transport Method
     };
     if (d->supportsDtls) {
-        features.append(ns_jingle_dtls.toString());  // XEP-0320: Use of DTLS-SRTP in Jingle Sessions
+        features.append(staticString(ns_jingle_dtls));  // XEP-0320: Use of DTLS-SRTP in Jingle Sessions
     }
     return features;
 }

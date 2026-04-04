@@ -95,37 +95,37 @@ QStringList QXmppClientPrivate::discoveryFeatures()
 {
     return {
         // XEP-0004: Data Forms
-        ns_data.toString(),
+        staticString(ns_data),
         // XEP-0059: Result Set Management
-        ns_rsm.toString(),
+        staticString(ns_rsm),
         // XEP-0066: Out of Band Data
-        ns_oob.toString(),
+        staticString(ns_oob),
         // XEP-0071: XHTML-IM
-        ns_xhtml_im.toString(),
+        staticString(ns_xhtml_im),
         // XEP-0085: Chat State Notifications
-        ns_chat_states.toString(),
+        staticString(ns_chat_states),
         // XEP-0115: Entity Capabilities
-        ns_capabilities.toString(),
+        staticString(ns_capabilities),
         // XEP-0249: Direct MUC Invitations
-        ns_conference.toString(),
+        staticString(ns_conference),
         // XEP-0308: Last Message Correction
-        ns_message_correct.toString(),
+        staticString(ns_message_correct),
         // XEP-0333: Chat Markers
-        ns_chat_markers.toString(),
+        staticString(ns_chat_markers),
         // XEP-0334: Message Processing Hints
-        ns_message_processing_hints.toString(),
+        staticString(ns_message_processing_hints),
         // XEP-0359: Unique and Stable Stanza IDs
-        ns_sid.toString(),
+        staticString(ns_sid),
         // XEP-0367: Message Attaching
-        ns_message_attaching.toString(),
+        staticString(ns_message_attaching),
         // XEP-0380: Explicit Message Encryption
-        ns_eme.toString(),
+        staticString(ns_eme),
         // XEP-0382: Spoiler messages
-        ns_spoiler.toString(),
+        staticString(ns_spoiler),
         // XEP-0428: Fallback Indication
-        ns_fallback_indication.toString(),
+        staticString(ns_fallback_indication),
         // XEP-0444: Message Reactions
-        ns_reactions.toString(),
+        staticString(ns_reactions),
     };
 }
 

@@ -200,7 +200,7 @@ void QXmppIncomingClient::handleStream(const StreamOpen &stream)
         d->domain,
         QString::fromUtf8(sessionId),
         u"1.0"_s,
-        ns_client.toString(),
+        staticString(ns_client),
     }));
 
     // check requested domain

@@ -10,6 +10,7 @@
 #include "QXmppStanza.h"
 #include "QXmppVisitHelper_p.h"
 
+#include "StringLiterals.h"
 #include "XmlWriter.h"
 
 #include <optional>
@@ -142,7 +143,7 @@ auto iqFromDomImpl(const QDomElement &el) -> std::optional<Iq<Type, Payload>>
         auto id = el.attribute(u"id"_s);
         auto from = el.attribute(u"from"_s);
         auto to = el.attribute(u"to"_s);
-        auto lang = el.attributeNS(ns_xml.toString(), u"lang"_s);
+        auto lang = el.attributeNS(staticString(ns_xml), u"lang"_s);
 
         if constexpr (Type == IqType::Get || Type == IqType::Set) {
             if (auto payload = parseOptionalElement<Payload>(el.firstChildElement())) {

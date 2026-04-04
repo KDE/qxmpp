@@ -312,7 +312,7 @@ struct QXmppHttpUploadManagerPrivate {
         servicesWatch = discoveryManager()->discoverServices(
             QXmpp::Disco::Category::Store,
             QXmpp::Disco::Type::File,
-            { ns_http_upload.toString() });
+            { staticString(ns_http_upload) });
 
         services.setBinding([this]() -> QVector<QXmppHttpUploadService> {
             QVector<QXmppHttpUploadService> result;

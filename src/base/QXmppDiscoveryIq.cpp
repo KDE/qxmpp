@@ -90,7 +90,7 @@ std::optional<QXmppDiscoIdentity> QXmppDiscoIdentity::fromDom(const QDomElement 
         el.attribute(u"category"_s),
         el.attribute(u"type"_s),
         el.attribute(u"name"_s),
-        el.attributeNS(ns_xml.toString(), u"lang"_s),
+        el.attributeNS(staticString(ns_xml), u"lang"_s),
     };
     if (identity.category().isEmpty() || identity.type().isEmpty()) {
         return {};

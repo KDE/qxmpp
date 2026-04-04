@@ -123,7 +123,7 @@ public:
 
     QString formType() const override
     {
-        return ns_mix_admin.toString();
+        return staticString(ns_mix_admin);
     }
 
     void parseForm(const QXmppDataForm &form) override
@@ -188,27 +188,27 @@ public:
 
         using Type = QXmppDataForm::Field::Type;
 
-        serializeNullable(form, Type::JidSingleField, LAST_EDITOR_JID_KEY.toString(), lastEditorJid);
-        serializeEmptyable(form, Type::JidMultiField, OWNER_JIDS_KEY.toString(), ownerJids);
-        serializeEmptyable(form, Type::JidMultiField, ADMINISTRATOR_JIDS_KEY.toString(), administratorJids);
-        serializeDatetime(form, CHANNEL_DELETION_KEY.toString(), channelDeletion);
-        serializeEmptyable(form, Type::ListMultiField, NODES_KEY.toString(), nodesToList(nodes));
-        serializeRole(form, MESSAGES_SUBSCRIBE_ROLE_KEY.toString(), messagesSubscribeRole);
-        serializeRole(form, MESSAGES_RETRACT_ROLE_KEY.toString(), messagesRetractRole);
-        serializeRole(form, PRESENCE_SUBSCRIBE_ROLE_KEY.toString(), presenceSubscribeRole);
-        serializeRole(form, PARTICIPANTS_SUBSCRIBE_ROLE_KEY.toString(), participantsSubscribeRole);
-        serializeRole(form, INFORMATION_SUBSCRIBE_ROLE_KEY.toString(), informationSubscribeRole);
-        serializeRole(form, INFORMATION_UPDATE_ROLE_KEY.toString(), informationUpdateRole);
-        serializeRole(form, ALLOWED_JIDS_SUBSCRIBE_ROLE_KEY.toString(), allowedJidsSubscribeRole);
-        serializeRole(form, BANNED_JIDS_SUBSCRIBE_ROLE_KEY.toString(), bannedJidsSubscribeRole);
-        serializeRole(form, CONFIGURATION_READ_ROLE_KEY.toString(), configurationReadRole);
-        serializeRole(form, AVATARS_UPDATE_ROLE_KEY.toString(), avatarUpdateRole);
-        serializeOptional(form, Type::ListSingleField, NICKNAME_REQUIRED_KEY.toString(), nicknameRequired);
-        serializeOptional(form, Type::ListSingleField, PRESENCE_REQUIRED_KEY.toString(), presenceRequired);
-        serializeOptional(form, Type::ListSingleField, ONLY_PARTICIPANTS_PERMITTED_TO_SUBMIT_PRESENCE_KEY.toString(), onlyParticipantsPermittedToSubmitPresence);
-        serializeOptional(form, Type::ListSingleField, OWN_MESSAGE_RETRACTION_PERMITTED_KEY.toString(), ownMessageRetractionPermitted);
-        serializeOptional(form, Type::ListSingleField, INVITATIONS_PERMITTED_KEY.toString(), invitationsPermitted);
-        serializeOptional(form, Type::ListSingleField, PRIVATE_MESSAGES_PERMITTED_KEY.toString(), privateMessagesPermitted);
+        serializeNullable(form, Type::JidSingleField, staticString(LAST_EDITOR_JID_KEY), lastEditorJid);
+        serializeEmptyable(form, Type::JidMultiField, staticString(OWNER_JIDS_KEY), ownerJids);
+        serializeEmptyable(form, Type::JidMultiField, staticString(ADMINISTRATOR_JIDS_KEY), administratorJids);
+        serializeDatetime(form, staticString(CHANNEL_DELETION_KEY), channelDeletion);
+        serializeEmptyable(form, Type::ListMultiField, staticString(NODES_KEY), nodesToList(nodes));
+        serializeRole(form, staticString(MESSAGES_SUBSCRIBE_ROLE_KEY), messagesSubscribeRole);
+        serializeRole(form, staticString(MESSAGES_RETRACT_ROLE_KEY), messagesRetractRole);
+        serializeRole(form, staticString(PRESENCE_SUBSCRIBE_ROLE_KEY), presenceSubscribeRole);
+        serializeRole(form, staticString(PARTICIPANTS_SUBSCRIBE_ROLE_KEY), participantsSubscribeRole);
+        serializeRole(form, staticString(INFORMATION_SUBSCRIBE_ROLE_KEY), informationSubscribeRole);
+        serializeRole(form, staticString(INFORMATION_UPDATE_ROLE_KEY), informationUpdateRole);
+        serializeRole(form, staticString(ALLOWED_JIDS_SUBSCRIBE_ROLE_KEY), allowedJidsSubscribeRole);
+        serializeRole(form, staticString(BANNED_JIDS_SUBSCRIBE_ROLE_KEY), bannedJidsSubscribeRole);
+        serializeRole(form, staticString(CONFIGURATION_READ_ROLE_KEY), configurationReadRole);
+        serializeRole(form, staticString(AVATARS_UPDATE_ROLE_KEY), avatarUpdateRole);
+        serializeOptional(form, Type::ListSingleField, staticString(NICKNAME_REQUIRED_KEY), nicknameRequired);
+        serializeOptional(form, Type::ListSingleField, staticString(PRESENCE_REQUIRED_KEY), presenceRequired);
+        serializeOptional(form, Type::ListSingleField, staticString(ONLY_PARTICIPANTS_PERMITTED_TO_SUBMIT_PRESENCE_KEY), onlyParticipantsPermittedToSubmitPresence);
+        serializeOptional(form, Type::ListSingleField, staticString(OWN_MESSAGE_RETRACTION_PERMITTED_KEY), ownMessageRetractionPermitted);
+        serializeOptional(form, Type::ListSingleField, staticString(INVITATIONS_PERMITTED_KEY), invitationsPermitted);
+        serializeOptional(form, Type::ListSingleField, staticString(PRIVATE_MESSAGES_PERMITTED_KEY), privateMessagesPermitted);
     }
 
     ///
@@ -221,7 +221,7 @@ public:
     static void serializeRole(QXmppDataForm &form, const QString &name, std::optional<QXmppMixConfigItem::Role> role)
     {
         if (role) {
-            serializeValue(form, QXmppDataForm::Field::Type::ListSingleField, name, Enums::toString(*role).toString());
+            serializeValue(form, QXmppDataForm::Field::Type::ListSingleField, name, Enums::toString(*role));
         }
     }
 
@@ -946,7 +946,7 @@ public:
 
     QString formType() const override
     {
-        return ns_mix.toString();
+        return staticString(ns_mix);
     }
 
     void parseForm(const QXmppDataForm &form) override
@@ -973,9 +973,9 @@ public:
         form.setType(dataFormType);
 
         using Type = QXmppDataForm::Field::Type;
-        serializeNullable(form, Type::TextSingleField, NAME.toString(), name);
-        serializeNullable(form, Type::TextSingleField, DESCRIPTION.toString(), description);
-        serializeEmptyable(form, Type::JidMultiField, CONTACT_JIDS.toString(), contactJids);
+        serializeNullable(form, Type::TextSingleField, staticString(NAME), name);
+        serializeNullable(form, Type::TextSingleField, staticString(DESCRIPTION), description);
+        serializeEmptyable(form, Type::JidMultiField, staticString(CONTACT_JIDS), contactJids);
     }
 };
 

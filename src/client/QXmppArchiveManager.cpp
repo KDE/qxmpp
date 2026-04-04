@@ -10,6 +10,8 @@
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
+#include "StringLiterals.h"
+
 #include <QDomElement>
 
 using namespace QXmpp::Private;
@@ -18,7 +20,7 @@ using namespace QXmpp::Private;
 QStringList QXmppArchiveManager::discoveryFeatures() const
 {
     // XEP-0036: Message Archiving
-    return { ns_archive.toString() };
+    return { staticString(ns_archive) };
 }
 
 bool QXmppArchiveManager::handleStanza(const QDomElement &element)

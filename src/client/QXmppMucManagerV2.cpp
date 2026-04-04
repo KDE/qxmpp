@@ -369,7 +369,7 @@ void QXmppMucManagerV2::onConnected()
     using PubSub = QXmppPubSubManager;
 
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->pubsub()->requestItems<Bookmarks2ConferenceItem>({}, ns_bookmarks2.toString()).then(this, [this](auto &&result) {
+        d->pubsub()->requestItems<Bookmarks2ConferenceItem>({}, staticString(ns_bookmarks2)).then(this, [this](auto &&result) {
             if (hasError(result)) {
                 warning(u"Could not fetch MUC Bookmarks: " + getError(result).description);
                 d->resetBookmarks();
@@ -394,7 +394,7 @@ auto QXmppMucManagerV2Private::setBookmark(QXmppMucBookmark &&bookmark) -> QXmpp
     item.payload = bookmark.d->payload;
 
     return chain<EmptyResult>(
-        pubsub()->publishItem({}, ns_bookmarks2.toString(), item, opts),
+        pubsub()->publishItem({}, staticString(ns_bookmarks2), item, opts),
         q,
         [this, bookmark](auto &&result) mutable -> EmptyResult {
             if (hasError(result)) {
@@ -409,7 +409,7 @@ auto QXmppMucManagerV2Private::setBookmark(QXmppMucBookmark &&bookmark) -> QXmpp
 
 QXmppTask<EmptyResult> QXmppMucManagerV2Private::removeBookmark(const QString &jid)
 {
-    return chain<EmptyResult>(pubsub()->retractOwnPepItem(ns_bookmarks2.toString(), jid, true), q, [this, jid](auto &&result) -> EmptyResult {
+    return chain<EmptyResult>(pubsub()->retractOwnPepItem(staticString(ns_bookmarks2), jid, true), q, [this, jid](auto &&result) -> EmptyResult {
         if (hasError(result)) {
             return getError(std::move(result));
         }

@@ -5,6 +5,8 @@
 #ifndef ENUMS_H
 #define ENUMS_H
 
+#include "StringLiterals.h"
+
 #include <array>
 #include <optional>
 #include <ranges>
@@ -95,14 +97,20 @@ constexpr std::optional<Enum> fromString(QStringView str)
 }
 
 template<SerializableEnum Enum>
-constexpr QStringView toString(Enum value)
+constexpr QStringView toStringView(Enum value)
 {
     // offset for enums that do not start at 0
     constexpr auto offset = size_t(std::get<0>(Data<Enum>::Values[0]));
 
     auto &[enumerator, string] = Data<Enum>::Values.at(size_t(value) - offset);
     return string;
-};
+}
+
+template<SerializableEnum Enum>
+inline QString toString(Enum value)
+{
+    return staticString(toStringView(value));
+}
 
 template<SerializableFlags Enum, typename Container>
 constexpr QFlags<Enum> fromStrings(const Container &container)
@@ -131,7 +139,7 @@ constexpr auto toStrings(QFlags<Enum> value)
 template<SerializableFlags Enum>
 QList<QString> toStringList(QFlags<Enum> value)
 {
-    auto strings = toStrings(value) | std::views::transform(&QStringView::toString);
+    auto strings = toStrings(value) | std::views::transform([](QStringView sv) { return staticString(sv); });
     return QList<QString>(strings.begin(), strings.end());
 }
 
@@ -140,9 +148,9 @@ QList<QString> toStringList(QFlags<Enum> value)
 // operators
 
 template<QXmpp::Private::Enums::SerializableEnum Enum>
-bool operator==(QStringView s, Enum e) { return s == QXmpp::Private::Enums::toString(e); }
+bool operator==(QStringView s, Enum e) { return s == QXmpp::Private::Enums::toStringView(e); }
 template<QXmpp::Private::Enums::SerializableEnum Enum>
-bool operator!=(QStringView s, Enum e) { return s != QXmpp::Private::Enums::toString(e); }
+bool operator!=(QStringView s, Enum e) { return s != QXmpp::Private::Enums::toStringView(e); }
 
 template<QXmpp::Private::Enums::SerializableEnum Enum>
 struct QConcatenable<Enum> {
@@ -152,18 +160,18 @@ struct QConcatenable<Enum> {
 
     static int size(Enum e)
     {
-        return QXmpp::Private::Enums::toString(e).size();
+        return QXmpp::Private::Enums::toStringView(e).size();
     }
     static void appendTo(Enum m, QChar *&out)
     {
-        QConcatenable<QStringView>::appendTo(QXmpp::Private::Enums::toString(m), out);
+        QConcatenable<QStringView>::appendTo(QXmpp::Private::Enums::toStringView(m), out);
     }
 };
 
 template<QXmpp::Private::Enums::SerializableEnum Enum>
 QDebug operator<<(QDebug debug, Enum e)
 {
-    return debug << QXmpp::Private::Enums::toString(e);
+    return debug << QXmpp::Private::Enums::toStringView(e);
 }
 
 #endif  // ENUMS_H

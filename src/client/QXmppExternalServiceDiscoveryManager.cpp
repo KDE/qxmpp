@@ -10,6 +10,7 @@
 #include "QXmppIqHandling.h"
 
 #include "Async.h"
+#include "StringLiterals.h"
 
 using namespace QXmpp::Private;
 
@@ -57,6 +58,6 @@ QXmppTask<QXmppExternalServiceDiscoveryManager::ServicesResult> QXmppExternalSer
 /// \cond
 QStringList QXmppExternalServiceDiscoveryManager::discoveryFeatures() const
 {
-    return { ns_external_service_discovery.toString() };
+    return { staticString(ns_external_service_discovery) };
 }
 /// \endcond

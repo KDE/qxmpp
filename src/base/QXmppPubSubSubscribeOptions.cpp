@@ -215,7 +215,7 @@ void QXmppPubSubSubscribeOptions::serializeForm(QXmppDataForm &form) const
         return QString::number(value);
     };
     auto enumToString = [](auto value) {
-        return Enums::toString(value).toString();
+        return Enums::toString(value);
     };
 
     serializeOptional(form, Type::BooleanField, NOTIFICATIONS_ENABLED, d->notificationsEnabled);

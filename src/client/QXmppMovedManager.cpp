@@ -133,7 +133,7 @@ QXmppMovedManager::~QXmppMovedManager() = default;
 
 QStringList QXmppMovedManager::discoveryFeatures() const
 {
-    return { ns_moved.toString() };
+    return { staticString(ns_moved) };
 }
 
 ///
@@ -169,7 +169,7 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(QString 
 {
     co_return mapToSuccess(co_await client()
                                ->findExtension<QXmppPubSubManager>()
-                               ->publishOwnPepItem(ns_moved.toString(), QXmppMovedItem { newBareJid })
+                               ->publishOwnPepItem(staticString(ns_moved), QXmppMovedItem { newBareJid })
                                .withContext(this));
 }
 
@@ -218,7 +218,7 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(QString 
         },
         co_await client()
             ->findExtension<QXmppPubSubManager>()
-            ->requestItem<QXmppMovedItem>(oldBareJid, ns_moved.toString(), u"current"_s)
+            ->requestItem<QXmppMovedItem>(oldBareJid, staticString(ns_moved), u"current"_s)
             .withContext(this));
 }
 

@@ -540,7 +540,7 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
     using Type = QXmppDataForm::Field::Type;
 
     auto enumToString = [](auto value) {
-        return Enums::toString(value).toString();
+        return Enums::toString(value);
     };
 
     serializeOptional(form,

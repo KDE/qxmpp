@@ -13,6 +13,8 @@
 #include "QXmppRosterManager.h"
 #include "QXmppUtils.h"
 
+#include "StringLiterals.h"
+
 using namespace QXmpp::Private;
 
 ///
@@ -98,7 +100,7 @@ QXmppAttentionManager::~QXmppAttentionManager() = default;
 QStringList QXmppAttentionManager::discoveryFeatures() const
 {
     return {
-        ns_attention.toString(),
+        staticString(ns_attention),
     };
 }
 

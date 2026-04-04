@@ -244,9 +244,9 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(Disco::Category 
 {
     std::optional<QString> typeStr;
     if (type) {
-        typeStr = Enums::toString(*type).toString();
+        typeStr = Enums::toString(*type);
     }
-    return discoverServices(Enums::toString(category).toString(), std::move(typeStr), std::move(requiredFeatures));
+    return discoverServices(Enums::toString(category), std::move(typeStr), std::move(requiredFeatures));
 }
 
 ///

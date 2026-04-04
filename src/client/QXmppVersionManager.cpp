@@ -109,7 +109,7 @@ QStringList QXmppVersionManager::discoveryFeatures() const
 {
     return {
         // XEP-0092: Software Version
-        ns_version.toString(),
+        staticString(ns_version),
     };
 }
 

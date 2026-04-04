@@ -142,7 +142,7 @@ QXmppMamManager::~QXmppMamManager() = default;
 QStringList QXmppMamManager::discoveryFeatures() const
 {
     // XEP-0313: Message Archive Management
-    return { ns_mam.toString() };
+    return { staticString(ns_mam) };
 }
 
 bool QXmppMamManager::handleStanza(const QDomElement &element)
@@ -183,7 +183,7 @@ static QXmppMamQueryIq buildRequest(const QString &to,
 
     QXmppDataForm::Field hiddenField(QXmppDataForm::Field::HiddenField);
     hiddenField.setKey(u"FORM_TYPE"_s);
-    hiddenField.setValue(ns_mam.toString());
+    hiddenField.setValue(staticString(ns_mam));
     fields << hiddenField;
 
     if (!jid.isEmpty()) {

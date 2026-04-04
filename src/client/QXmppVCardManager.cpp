@@ -142,7 +142,7 @@ QStringList QXmppVCardManager::discoveryFeatures() const
 {
     return {
         // XEP-0054: vcard-temp
-        ns_vcard.toString(),
+        staticString(ns_vcard),
     };
 }
 
