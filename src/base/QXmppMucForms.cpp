@@ -5,6 +5,7 @@
 #include "QXmppMucForms.h"
 
 #include "QXmppMucForms_p.h"
+#include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
 
@@ -31,6 +32,7 @@ struct QXmppMucRoomInfoPrivate : QSharedData {
     QString subject;
     std::optional<bool> subjectChangeable;
     QStringList avatarHashes;
+    std::optional<double> messageActivity;
 };
 
 /*! Tries to parse \a form into QXmppMucRoomInfo. */
@@ -82,6 +84,8 @@ bool QXmppMucRoomInfo::parseField(const QXmppDataForm::Field &field)
         d->subjectChangeable = parseBool(value);
     } else if (key == u"muc#roominfo_avatarhash") {
         d->avatarHashes = value.toStringList();
+    } else if (key == u"{urn:xmpp:muc-activity}message-activity") {
+        d->messageActivity = parseDouble(value.toString());
     } else {
         return false;
     }
@@ -99,6 +103,7 @@ void QXmppMucRoomInfo::serializeForm(QXmppDataForm &f) const
     serializeEmptyable(f, Type::TextSingleField, u"muc#roominfo_subject", d->subject);
     serializeOptional(f, Type::BooleanField, u"muc#roominfo_subjectmod", d->subjectChangeable);
     serializeEmptyable(f, Type::TextMultiField, u"muc#roominfo_avatarhash", d->avatarHashes);
+    serializeOptionalNumber(f, Type::TextSingleField, u"{urn:xmpp:muc-activity}message-activity", d->messageActivity);
 }
 
 /*! Returns Maximum Number of History Messages Returned by Room */
@@ -225,6 +230,28 @@ void QXmppMucRoomInfo::setAvatarHashes(const QStringList &hashes)
     d->avatarHashes = hashes;
 }
 
+///
+/// Returns an approximate measure of messages per hour in the room, as defined
+/// in \xep{0502, MUC Activity Indicator}.
+///
+/// \since QXmpp 1.16
+///
+std::optional<double> QXmppMucRoomInfo::messageActivity() const
+{
+    return d->messageActivity;
+}
+
+///
+/// Sets an approximate measure of messages per hour in the room, as defined
+/// in \xep{0502, MUC Activity Indicator}.
+///
+/// \since QXmpp 1.16
+///
+void QXmppMucRoomInfo::setMessageActivity(std::optional<double> messagesPerHour)
+{
+    d->messageActivity = messagesPerHour;
+}
+
 /// Equality operator
 bool QXmppMucRoomInfo::operator==(const QXmppMucRoomInfo &other) const
 {
@@ -235,7 +262,8 @@ bool QXmppMucRoomInfo::operator==(const QXmppMucRoomInfo &other) const
         d->occupants == other.d->occupants &&
         d->subject == other.d->subject &&
         d->subjectChangeable == other.d->subjectChangeable &&
-        d->avatarHashes == other.d->avatarHashes;
+        d->avatarHashes == other.d->avatarHashes &&
+        d->messageActivity == other.d->messageActivity;
 }
 
 ///
