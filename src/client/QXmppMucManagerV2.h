@@ -52,9 +52,10 @@ public:
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname,
                                                       std::optional<QXmpp::Muc::HistoryOptions> history,
                                                       const QString &password = {});
-    /// Creates a new reserved MUC room at \a jid with the given \a nickname.
-    /// \since QXmpp 1.15
-    QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoom(const QString &jid, const QString &nickname);
+    QXmppTask<QXmpp::Result<QString>> requestUniqueRoomName(QString serviceJid);
+    QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoom(QString serviceJid,
+                                                        QString nickname,
+                                                        std::optional<QString> roomName = std::nullopt);
     /// Emitted when a participant joins a room.
     Q_SIGNAL void participantJoined(const QString &roomJid, const QXmppMucParticipant &participant);
     /// Emitted when a participant leaves a room.
@@ -118,6 +119,8 @@ protected:
 private:
     void onConnected();
     void onDisconnected();
+
+    QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoomAtJid(const QString &roomJid, const QString &nickname);
 
     const QXmpp::Private::MucRoomData *roomData(const QString &jid) const;
     const QXmpp::Private::MucParticipantData *participantData(const QString &roomJid, uint32_t participantId) const;

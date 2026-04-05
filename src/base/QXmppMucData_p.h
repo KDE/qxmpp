@@ -66,6 +66,14 @@ struct MucRegisterQuery {
     void toXml(QXmlStreamWriter *writer) const;
 };
 
+struct MucUniqueQuery {
+    QString name;
+
+    static constexpr std::tuple XmlTag = { u"unique", ns_muc_unique };
+    static std::optional<MucUniqueQuery> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+};
+
 }  // namespace QXmpp::Private
 
 #endif  // QXMPPMUCDATA_P_H
