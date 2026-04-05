@@ -131,6 +131,14 @@ private:
     Q_SLOT void occupantIdStrippedMessage();
     Q_SLOT void occupantIdAccessor();
 
+    // Shared-ownership lifetime safety
+    Q_SLOT void handleSurvivesLeave();
+    Q_SLOT void rejoinRevivesHandle();
+    Q_SLOT void participantSnapshotAfterLeave();
+    Q_SLOT void findRoomNulloptForUnknown();
+    Q_SLOT void findRoomRevivesInactive();
+    Q_SLOT void inactiveRoomsPruned();
+
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
     // muc#roomconfig form
@@ -408,7 +416,6 @@ void tst_QXmppMuc::joinRoom()
     muc->handleMessage(subjectMsg);
 
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
-    QVERIFY(room.isValid());
     QCOMPARE(room.subject().value(), u"Cauldron"_s);
 }
 
@@ -445,7 +452,6 @@ void tst_QXmppMuc::joinRoomWithHistory()
     muc->handleMessage(subjectMsg);
 
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::joinRoomWithPassword()
@@ -474,7 +480,6 @@ void tst_QXmppMuc::joinRoomWithPassword()
     muc->handleMessage(subjectMsg);
 
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::joinRoomTimeout()
@@ -531,7 +536,6 @@ void tst_QXmppMuc::joinRoomTimerStopped()
     muc->handleMessage(subjectMsg);
 
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
-    QVERIFY(room.isValid());
 
     // Wait to ensure timer doesn't fire after join completion
     QTest::qWait(1500);
@@ -539,7 +543,6 @@ void tst_QXmppMuc::joinRoomTimerStopped()
     // Task should still be completed successfully (not timed out)
     QVERIFY(task.isFinished());
     auto result = expectVariant<QXmppMucRoomV2>(task.result());
-    QVERIFY(result.isValid());
 }
 
 void tst_QXmppMuc::joinRoomAlreadyInProgress()
@@ -576,12 +579,11 @@ void tst_QXmppMuc::joinRoomAlreadyInProgress()
     muc->handleMessage(subjectMsg);
 
     auto room = expectFutureVariant<QXmppMucRoomV2>(task1);
-    QVERIFY(room.isValid());
 
     // Third join after fully joined must succeed idempotently
     auto task3 = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
     QVERIFY(task3.isFinished());
-    QVERIFY(expectVariant<QXmppMucRoomV2>(task3.result()).isValid());
+    expectVariant<QXmppMucRoomV2>(task3.result());
 }
 
 static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
@@ -781,15 +783,20 @@ void tst_QXmppMuc::sendPrivateMessage()
     muc->handleMessage(subjectMsg);
     auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
-    // firstwitch was the first participant injected, so has ID 0
-    auto participant = QXmppMucParticipant(muc, u"coven@chat.shakespeare.lit"_s, 0);
-    QVERIFY(participant.isValid());
-    QCOMPARE(participant.nickname().value(), u"firstwitch"_s);
+    // Find firstwitch in participants
+    std::optional<QXmppMucParticipant> participant;
+    for (const auto &p : room.participants()) {
+        if (p.nickname().value() == u"firstwitch"_s) {
+            participant = p;
+            break;
+        }
+    }
+    QVERIFY(participant.has_value());
 
     // Send a private message
     QXmppMessage pm;
     pm.setBody(u"I'll give thee a wind."_s);
-    room.sendPrivateMessage(participant, std::move(pm));
+    room.sendPrivateMessage(*participant, std::move(pm));
 
     // Verify the sent XML
     auto sent = test.takePacket();
@@ -895,7 +902,6 @@ void tst_QXmppMuc::changeNicknameTimeout()
     auto error = expectVariant<QXmppError>(nickTask.result());
     QVERIFY(error.description.contains(u"timed out"_s));
     // Room should still be valid after a nick-change timeout
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::participantNicknameChange()
@@ -934,10 +940,15 @@ void tst_QXmppMuc::participantNicknameChange()
     muc->handleMessage(subjectMsg);
     auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
-    // Get firstwitch participant handle (ID 0)
-    auto participant = QXmppMucParticipant(muc, u"coven@chat.shakespeare.lit"_s, 0);
-    QVERIFY(participant.isValid());
-    QCOMPARE(participant.nickname().value(), u"firstwitch"_s);
+    // Find firstwitch participant handle
+    std::optional<QXmppMucParticipant> participant;
+    for (const auto &p : room.participants()) {
+        if (p.nickname().value() == u"firstwitch"_s) {
+            participant = p;
+            break;
+        }
+    }
+    QVERIFY(participant.has_value());
 
     // firstwitch changes nickname: unavailable with 303
     QXmppPresence nickUnavailable;
@@ -961,8 +972,7 @@ void tst_QXmppMuc::participantNicknameChange()
     test.injectPresence(nickAvailable);
 
     // Same participant handle, new nickname
-    QVERIFY(participant.isValid());
-    QCOMPARE(participant.nickname().value(), u"witch1"_s);
+    QCOMPARE(participant->nickname().value(), u"witch1"_s);
 }
 
 void tst_QXmppMuc::participantJoinLeave()
@@ -975,7 +985,7 @@ void tst_QXmppMuc::participantJoinLeave()
     auto room = joinedRoom(test, muc);
 
     // Track participantJoined signal
-    QXmppMucParticipant joinedParticipant(muc, u""_s, 0);
+    std::optional<QXmppMucParticipant> joinedParticipant;
     bool joinSignalReceived = false;
     QObject::connect(muc, &QXmppMucManagerV2::participantJoined, muc,
                      [&](const QString &roomJid, const QXmppMucParticipant &p) {
@@ -994,11 +1004,11 @@ void tst_QXmppMuc::participantJoinLeave()
     test.injectPresence(firstWitchJoin);
 
     QVERIFY(joinSignalReceived);
-    QVERIFY(joinedParticipant.isValid());
-    QCOMPARE(joinedParticipant.nickname().value(), u"firstwitch"_s);
+    QVERIFY(joinedParticipant.has_value());
+    QCOMPARE(joinedParticipant->nickname().value(), u"firstwitch"_s);
 
     // Track participantLeft signal
-    QXmppMucParticipant leftParticipant(muc, u""_s, 0);
+    std::optional<QXmppMucParticipant> leftParticipant;
     bool leftSignalReceived = false;
     Muc::LeaveReason leftReason = Muc::LeaveReason::Left;
     QObject::connect(muc, &QXmppMucManagerV2::participantLeft, muc,
@@ -1021,7 +1031,6 @@ void tst_QXmppMuc::participantJoinLeave()
     QVERIFY(leftSignalReceived);
     QCOMPARE(leftReason, Muc::LeaveReason::Left);
     // After the signal, participant data is cleaned up
-    QVERIFY(!joinedParticipant.isValid());
 }
 
 void tst_QXmppMuc::participantsList()
@@ -1121,12 +1130,12 @@ void tst_QXmppMuc::selfBanned()
     // Track removedFromRoom signal
     Muc::LeaveReason removedReason = Muc::LeaveReason::Left;
     bool removedSignalReceived = false;
-    bool roomValidDuringSignal = false;
+    bool roomStillJoinedDuringSignal = false;
     QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
                      [&](const QString &, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &) {
                          removedSignalReceived = true;
                          removedReason = reason;
-                         roomValidDuringSignal = room.isValid();
+                         roomStillJoinedDuringSignal = room.joined().value();
                      });
 
     // We are banned (status 301 + 110)
@@ -1143,9 +1152,8 @@ void tst_QXmppMuc::selfBanned()
 
     QVERIFY(removedSignalReceived);
     QCOMPARE(removedReason, Muc::LeaveReason::Banned);
-    QVERIFY(roomValidDuringSignal);
+    QVERIFY(roomStillJoinedDuringSignal);
     // After signal handlers, room is cleaned up
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::roomDestroyed()
@@ -1187,7 +1195,6 @@ void tst_QXmppMuc::roomDestroyed()
     QVERIFY(destroyInfo.has_value());
     QCOMPARE(destroyInfo->alternateRoom(), u"darkcave@chat.shakespeare.lit"_s);
     QCOMPARE(destroyInfo->reason(), u"Moved to a new room"_s);
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::selfRemovedMembersOnly()
@@ -1221,7 +1228,6 @@ void tst_QXmppMuc::selfRemovedMembersOnly()
 
     QVERIFY(removedSignalReceived);
     QCOMPARE(removedReason, Muc::LeaveReason::MembersOnly);
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::selfRemovedServiceShutdown()
@@ -1255,7 +1261,6 @@ void tst_QXmppMuc::selfRemovedServiceShutdown()
 
     QVERIFY(removedSignalReceived);
     QCOMPARE(removedReason, Muc::LeaveReason::ServiceShutdown);
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::selfRemovedError()
@@ -1289,7 +1294,6 @@ void tst_QXmppMuc::selfRemovedError()
 
     QVERIFY(removedSignalReceived);
     QCOMPARE(removedReason, Muc::LeaveReason::Error);
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::changePresence()
@@ -1324,8 +1328,6 @@ void tst_QXmppMuc::leaveRoom()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto room = joinedRoom(test, muc);
-
-    QVERIFY(room.isValid());
     QCOMPARE(room.joined().value(), true);
 
     // Leave the room
@@ -1347,7 +1349,6 @@ void tst_QXmppMuc::leaveRoom()
 
     QVERIFY(leaveTask.isFinished());
     expectVariant<QXmpp::Success>(leaveTask.result());
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::leaveRoomTimeout()
@@ -1371,7 +1372,6 @@ void tst_QXmppMuc::leaveRoomTimeout()
     QVERIFY(leaveTask.isFinished());
     auto error = expectVariant<QXmppError>(leaveTask.result());
     QVERIFY(error.description.contains(u"timed out"_s));
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::roomInfoForm()
@@ -1434,7 +1434,6 @@ void tst_QXmppMuc::disconnectNoStreamManagement()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto room = joinedRoom(test, muc);
-    QVERIFY(room.isValid());
     QVERIFY(room.joined().value());
 
     // Simulate disconnect without stream management (intentional disconnect)
@@ -1442,7 +1441,6 @@ void tst_QXmppMuc::disconnectNoStreamManagement()
     test.simulateDisconnected();
 
     // Room state must be cleared immediately
-    QVERIFY(!room.isValid());
     QVERIFY(!room.joined().value());
 }
 
@@ -1453,14 +1451,12 @@ void tst_QXmppMuc::disconnectResumedStream()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto room = joinedRoom(test, muc);
-    QVERIFY(room.isValid());
 
     // Simulate network drop (SM enabled, disconnect without clearing SM)
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateDisconnected();
 
     // Room state must be preserved (stream can potentially be resumed)
-    QVERIFY(room.isValid());
     QVERIFY(room.joined().value());
 
     // Simulate successful stream resumption
@@ -1468,7 +1464,6 @@ void tst_QXmppMuc::disconnectResumedStream()
     test.simulateConnected();
 
     // Room state must still be intact after resume
-    QVERIFY(room.isValid());
     QVERIFY(room.joined().value());
 }
 
@@ -1480,20 +1475,17 @@ void tst_QXmppMuc::disconnectNewStream()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto room = joinedRoom(test, muc);
-    QVERIFY(room.isValid());
 
     // Simulate network drop (SM enabled)
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateDisconnected();
 
     // Room preserved while resumption is possible
-    QVERIFY(room.isValid());
 
     // Simulate reconnect where stream resumption failed (NewStream)
     test.simulateConnected();
 
     // Room must be cleared now — server no longer knows about our presence
-    QVERIFY(!room.isValid());
     QVERIFY(!room.joined().value());
 }
 
@@ -1568,8 +1560,16 @@ void tst_QXmppMuc::setRoleParticipantGone()
                 "</presence>");
     test.injectPresence(leavePresence);
 
-    QVERIFY(!pistol.isValid());
+    // In the shared_ptr model, participant handles survive leave as frozen snapshots.
+    // setRole sends the IQ using the snapshot nickname — the server decides whether it's valid.
     auto task = room.setRole(pistol, QXmpp::Muc::Role::Moderator);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#admin'>"
+                "<item nick='pistol' role='moderator'/>"
+                "</query></iq>"_s);
+    test.inject(u"<iq id='qx1' type='error'>"
+                "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
     QVERIFY(task.isFinished());
     expectVariant<QXmppError>(task.result());
 }
@@ -1689,10 +1689,6 @@ void tst_QXmppMuc::selfParticipant()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Not yet joined: no self participant
-    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
-    QVERIFY(!room.selfParticipant().has_value());
-
     // Joined room with admin affiliation and moderator role
     auto room2 = joinedRoom(test, muc);
     auto self = room2.selfParticipant();
@@ -1709,13 +1705,8 @@ void tst_QXmppMuc::permissions()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    // Not joined: all false, QBindable is empty (default-constructed bool = false)
-    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
-    QVERIFY(!room.canSendMessages().value());
-    QVERIFY(!room.canChangeSubject().value());
-    QVERIFY(!room.canSetRoles().value());
-    QVERIFY(!room.canSetAffiliations().value());
-    QVERIFY(!room.canConfigureRoom().value());
+    // Not joined: findRoom returns nullopt for unknown rooms
+    QVERIFY(!muc->findRoom(u"coven@chat.shakespeare.lit"_s).has_value());
 
     // Joined as moderator + admin (from joinedRoom() fixture)
     auto room2 = joinedRoom(test, muc);
@@ -2259,7 +2250,6 @@ void tst_QXmppMuc::createRoom()
     // createRoom task must now resolve
     QVERIFY(task.isFinished());
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
-    QVERIFY(room.isValid());
     QVERIFY(!room.joined().value());  // still locked
     QVERIFY(room.canConfigureRoom().value());
 }
@@ -2379,7 +2369,6 @@ void tst_QXmppMuc::createRoomUnique()
 
     QVERIFY(task.isFinished());
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::setRoomConfigCreation()
@@ -2433,7 +2422,6 @@ void tst_QXmppMuc::cancelRoomCreation()
     test.inject(u"<iq id='qx1' type='result'/>"_s);
     QVERIFY(task.isFinished());
     expectVariant<QXmpp::Success>(task.result());
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::reconfigureRoom()
@@ -2509,7 +2497,6 @@ void tst_QXmppMuc::destroyRoom()
     test.inject(u"<iq id='qx1' type='result'/>"_s);
     QVERIFY(task.isFinished());
     expectVariant<QXmpp::Success>(task.result());
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::selfPingJoined()
@@ -2534,7 +2521,6 @@ void tst_QXmppMuc::selfPingJoined()
     // Room still tracked, ping no longer in flight, retry count reset.
     QVERIFY(!muc->d->testSelfPingInFlight(roomJid));
     QCOMPARE(muc->d->testSelfPingRetryCount(roomJid), 0);
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::selfPingStillJoinedServiceUnavailable()
@@ -2559,7 +2545,6 @@ void tst_QXmppMuc::selfPingStillJoinedServiceUnavailable()
 
     // service-unavailable → still joined.
     QVERIFY(muc->d->testHasRoom(roomJid));
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::selfPingStillJoinedItemNotFound()
@@ -2583,7 +2568,6 @@ void tst_QXmppMuc::selfPingStillJoinedItemNotFound()
                 "</iq>"_s);
 
     QVERIFY(muc->d->testHasRoom(roomJid));
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::selfPingGhosted()
@@ -2618,7 +2602,6 @@ void tst_QXmppMuc::selfPingGhosted()
     QCOMPARE(seenRoomJid, roomJid);
     QCOMPARE(seenReason, Muc::LeaveReason::ConnectionLost);
     QVERIFY(!muc->d->testHasRoom(roomJid));
-    QVERIFY(!room.isValid());
 }
 
 void tst_QXmppMuc::selfPingInconclusiveRetry()
@@ -2650,7 +2633,6 @@ void tst_QXmppMuc::selfPingInconclusiveRetry()
     auto now = std::chrono::steady_clock::now();
     auto sinceActivity = std::chrono::duration_cast<std::chrono::milliseconds>(now - muc->d->testLastActivity(roomJid));
     QVERIFY(sinceActivity > std::chrono::seconds(0));
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::selfPingSkippedDuringNickChange()
@@ -2724,7 +2706,6 @@ void tst_QXmppMuc::selfPingDisabledWhenZeroThreshold()
 
     // onSelfPingTick is a no-op when threshold is zero — no ping sent.
     muc->d->onSelfPingTick();
-    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::selfPingMultipleRoomsSingleTimer()
@@ -3220,7 +3201,7 @@ void tst_QXmppMuc::requestReservedNickname()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    auto room = joinedRoom(test, muc);
     auto task = room.requestReservedNickname();
     QVERIFY(!task.isFinished());
     test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
@@ -3243,7 +3224,7 @@ void tst_QXmppMuc::requestReservedNicknameNone()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    auto room = joinedRoom(test, muc);
     auto task = room.requestReservedNickname();
     QVERIFY(!task.isFinished());
     test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
@@ -3266,7 +3247,7 @@ void tst_QXmppMuc::requestRegistrationForm()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    auto room = joinedRoom(test, muc);
     auto task = room.requestRegistrationForm();
     QVERIFY(!task.isFinished());
     test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'>"
@@ -3298,7 +3279,7 @@ void tst_QXmppMuc::submitRegistration()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto room = muc->room(u"coven@chat.shakespeare.lit"_s);
+    auto room = joinedRoom(test, muc);
 
     QXmppDataForm form;
     form.setType(QXmppDataForm::Submit);
@@ -3377,15 +3358,15 @@ void tst_QXmppMuc::occupantIdSupported()
     test.injectPresence(otherPresence);
 
     auto participants = room.participants();
-    QXmppMucParticipant firstwitch(muc, u""_s, 0);
+    std::optional<QXmppMucParticipant> firstwitch;
     for (const auto &p : participants) {
         if (p.nickname().value() == u"firstwitch"_s) {
             firstwitch = p;
             break;
         }
     }
-    QVERIFY(firstwitch.isValid());
-    QCOMPARE(firstwitch.occupantId(), u"other-occupant-id"_s);
+    QVERIFY(firstwitch.has_value());
+    QCOMPARE(firstwitch->occupantId(), u"other-occupant-id"_s);
 }
 
 void tst_QXmppMuc::occupantIdStrippedPresence()
@@ -3433,15 +3414,15 @@ void tst_QXmppMuc::occupantIdStrippedPresence()
     test.injectPresence(otherPresence);
 
     auto participants = room.participants();
-    QXmppMucParticipant firstwitch(muc, u""_s, 0);
+    std::optional<QXmppMucParticipant> firstwitch;
     for (const auto &p : participants) {
         if (p.nickname().value() == u"firstwitch"_s) {
             firstwitch = p;
             break;
         }
     }
-    QVERIFY(firstwitch.isValid());
-    QVERIFY(firstwitch.occupantId().isEmpty());
+    QVERIFY(firstwitch.has_value());
+    QVERIFY(firstwitch->occupantId().isEmpty());
 }
 
 void tst_QXmppMuc::occupantIdStrippedMessage()
@@ -3543,10 +3524,176 @@ void tst_QXmppMuc::occupantIdAccessor()
     auto self = room.selfParticipant();
     QVERIFY(self.has_value());
     QVERIFY(self->occupantId().isEmpty());
+}
 
-    // Invalid participant handle should return empty
-    QXmppMucParticipant invalid(muc, u""_s, 999);
-    QVERIFY(invalid.occupantId().isEmpty());
+//
+// Shared-ownership lifetime safety tests
+//
+
+// Helper to simulate leave with server confirmation.
+static void simulateLeave(TestClient &test, QXmppMucRoomV2 &room, const QString &roomJid, const QString &nick)
+{
+    room.leave();
+    test.ignore();  // unavailable presence
+    QXmppPresence leavePresence;
+    parsePacket(leavePresence,
+                QStringLiteral("<presence from='%1/%2' type='unavailable'>"
+                               "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                               "<item affiliation='none' role='none'/>"
+                               "<status code='110'/>"
+                               "</x>"
+                               "</presence>")
+                    .arg(roomJid, nick)
+                    .toUtf8());
+    test.injectPresence(leavePresence);
+}
+
+void tst_QXmppMuc::handleSurvivesLeave()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto subj = room.subject();
+    auto nick = room.nickname();
+    auto joined = room.joined();
+
+    QCOMPARE(joined.value(), true);
+    QCOMPARE(nick.value(), u"thirdwitch"_s);
+    QCOMPARE(subj.value(), u"Test"_s);
+
+    // Leave the room — manager drops its strong ref, handle survives.
+    simulateLeave(test, room, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+
+    // All bindables still readable — no UAF.
+    QCOMPARE(joined.value(), false);
+    // Nickname and subject kept as last known values.
+    QCOMPARE(nick.value(), u"thirdwitch"_s);
+    QCOMPARE(subj.value(), u"Test"_s);
+}
+
+void tst_QXmppMuc::rejoinRevivesHandle()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto joined = room.joined();
+    auto subj = room.subject();
+
+    QCOMPARE(joined.value(), true);
+    QCOMPARE(subj.value(), u"Test"_s);
+
+    // Leave
+    simulateLeave(test, room, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    QCOMPARE(joined.value(), false);
+
+    // Rejoin — should revive the same MucRoomData.
+    auto room2 = joinedRoom(test, muc);
+
+    // Existing handle sees the state transition.
+    QCOMPARE(joined.value(), true);
+
+    // Both handles point to the same underlying data.
+    QCOMPARE(room.jid(), room2.jid());
+    QCOMPARE(room.joined().value(), room2.joined().value());
+}
+
+void tst_QXmppMuc::participantSnapshotAfterLeave()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+
+    // Inject another participant.
+    QXmppPresence other;
+    parsePacket(other,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(other);
+
+    // Grab a handle to firstwitch.
+    std::optional<QXmppMucParticipant> fw;
+    for (const auto &p : room.participants()) {
+        if (p.nickname().value() == u"firstwitch"_s) {
+            fw = p;
+            break;
+        }
+    }
+    QVERIFY(fw.has_value());
+    QCOMPARE(fw->nickname().value(), u"firstwitch"_s);
+    QCOMPARE(fw->role().value(), QXmpp::Muc::Role::Participant);
+
+    // firstwitch leaves.
+    QXmppPresence leave;
+    parsePacket(leave,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='none'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(leave);
+
+    // The held handle is a frozen snapshot — still readable, no crash.
+    QCOMPARE(fw->nickname().value(), u"firstwitch"_s);
+    QCOMPARE(fw->role().value(), QXmpp::Muc::Role::Participant);
+}
+
+void tst_QXmppMuc::findRoomNulloptForUnknown()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    QVERIFY(!muc->findRoom(u"unknown@chat.shakespeare.lit"_s).has_value());
+}
+
+void tst_QXmppMuc::findRoomRevivesInactive()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+
+    // Leave — room becomes inactive.
+    simulateLeave(test, room, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+
+    // While the handle is still alive, findRoom() should return a handle to the same data.
+    auto found = muc->findRoom(u"coven@chat.shakespeare.lit"_s);
+    QVERIFY(found.has_value());
+    QCOMPARE(found->jid(), u"coven@chat.shakespeare.lit"_s);
+    QCOMPARE(found->nickname().value(), u"thirdwitch"_s);  // cached last known nick
+}
+
+void tst_QXmppMuc::inactiveRoomsPruned()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // Join and leave 40 rooms without holding any handles.
+    for (int i = 0; i < 40; ++i) {
+        auto jid = u"room%1@chat.shakespeare.lit"_s.arg(i);
+        auto room = joinedRoom(test, muc, jid, u"nick"_s);
+        simulateLeave(test, room, jid, u"nick"_s);
+    }
+    // room handles from the loop went out of scope → weak_ptrs expired.
+    // After pruning at threshold 32, all expired entries should be cleaned up.
+    QVERIFY(muc->d->inactiveRooms.size() <= 32);
 }
 
 QTEST_MAIN(tst_QXmppMuc)

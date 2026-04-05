@@ -120,12 +120,14 @@ struct PendingMessage {
 };
 
 struct MucRoomData {
+    QXmppMucManagerV2 *manager = nullptr;
+    QString roomJid;
     MucRoomState state = MucRoomState::NotJoined;
     QProperty<QString> subject;
     QProperty<QString> nickname;
     QProperty<bool> joined = QProperty<bool> { false };
-    std::optional<uint32_t> selfParticipantId;
-    std::unordered_map<uint32_t, MucParticipantData> participants;
+    QProperty<std::shared_ptr<MucParticipantData>> selfParticipant;
+    std::unordered_map<QString, std::shared_ptr<MucParticipantData>> participants;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> createPromise;
     QList<QXmppMessage> historyMessages;
@@ -167,9 +169,7 @@ struct MucRoomData {
     QProperty<QString> description;
     QProperty<QString> language;
     QProperty<QStringList> contactJids;
-    // Permission properties — bindings set up in setupPermissionBindings()
-    // after selfParticipantId is known. Declared after `participants` so that
-    // `participants` outlives these bindings during destruction.
+    // Permission properties — bindings installed once in the ctor, reactive to selfParticipant changes.
     QProperty<bool> canSendMessages;
     QProperty<bool> canChangeSubject;
     QProperty<bool> canSetRoles;
@@ -198,32 +198,51 @@ struct MucRoomData {
             const auto &info = roomInfo.value();
             return info ? info->avatarHashes() : QStringList {};
         });
+
+        auto selfRole = [this]() { auto sp = selfParticipant.value(); return sp ? sp->role.value() : Muc::Role::None; };
+        auto selfAffil = [this]() { auto sp = selfParticipant.value(); return sp ? sp->affiliation.value() : Muc::Affiliation::None; };
+
+        canSendMessages.setBinding([selfRole]() {
+            auto r = selfRole();
+            return r == Muc::Role::Participant || r == Muc::Role::Moderator;
+        });
+        canChangeSubject.setBinding([this, selfRole]() {
+            auto r = selfRole();
+            return r == Muc::Role::Moderator ||
+                (r == Muc::Role::Participant && subjectChangeable.value());
+        });
+        canSetRoles.setBinding([selfRole]() {
+            return selfRole() == Muc::Role::Moderator;
+        });
+        canSetAffiliations.setBinding([selfAffil]() {
+            auto a = selfAffil();
+            return a == Muc::Affiliation::Admin || a == Muc::Affiliation::Owner;
+        });
+        canConfigureRoom.setBinding([selfAffil]() {
+            return selfAffil() == Muc::Affiliation::Owner;
+        });
     }
 
-    void setupPermissionBindings()
+    // Reset per-session state on leave. The participants map is intentionally kept
+    // as a frozen snapshot for caller handles; selfParticipant (the "who am I"
+    // pointer) is reset to null so permission bindings evaluate to false.
+    void resetSessionState()
     {
-        Q_ASSERT(selfParticipantId.has_value());
-        auto &pData = participants.at(*selfParticipantId);
-
-        canSendMessages.setBinding([&pData]() {
-            auto role = pData.role.value();
-            return role == Muc::Role::Participant || role == Muc::Role::Moderator;
-        });
-        canChangeSubject.setBinding([this, &pData]() {
-            auto role = pData.role.value();
-            return role == Muc::Role::Moderator ||
-                (role == Muc::Role::Participant && subjectChangeable.value());
-        });
-        canSetRoles.setBinding([&pData]() {
-            return pData.role.value() == Muc::Role::Moderator;
-        });
-        canSetAffiliations.setBinding([&pData]() {
-            auto affil = pData.affiliation.value();
-            return affil == Muc::Affiliation::Admin || affil == Muc::Affiliation::Owner;
-        });
-        canConfigureRoom.setBinding([&pData]() {
-            return pData.affiliation.value() == Muc::Affiliation::Owner;
-        });
+        state = MucRoomState::NotJoined;
+        joined = false;
+        selfParticipant = nullptr;
+        historyMessages.clear();
+        joinPromise.reset();
+        createPromise.reset();
+        leavePromise.reset();
+        nickChangePromise.reset();
+        joinTimer.reset();
+        leaveTimer.reset();
+        nickChangeTimer.reset();
+        pendingMessages.clear();
+        selfPingInFlight = false;
+        selfPingRetryCount = 0;
+        lastActivity = {};
     }
 };
 
@@ -262,17 +281,18 @@ struct MucRoomData {
 /// });
 /// \endcode
 ///
-/// After joining, retrieve the room handle at any time via room():
+/// After joining, retrieve the room handle at any time via findRoom():
 ///
 /// \code
-/// auto r = muc->room(u"room@conference.example.org"_s);
-/// if (r.isValid()) { /* use r */ }
+/// if (auto r = muc->findRoom(u"room@conference.example.org"_s)) {
+///     /* use *r */
+/// }
 /// \endcode
 ///
 /// \section sending Sending messages
 ///
 /// \code
-/// auto r = muc->room(u"room@conference.example.org"_s);
+/// auto r = muc->findRoom(u"room@conference.example.org"_s).value();
 /// QXmppMessage msg;
 /// msg.setBody(u"Hello, room!"_s);
 /// r.sendMessage(std::move(msg)).then(this, [](auto result) { /* ... */ });
@@ -459,24 +479,24 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     if (nickname.isEmpty()) {
         return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Nickname must not be empty."_s });
     }
-    if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
-        if (itr->second.state == MucRoomState::Joined) {
-            return makeReadyTask<Result<QXmppMucRoomV2>>(room(jid));
+    if (auto itr = d->activeRooms.find(jid); itr != d->activeRooms.end()) {
+        if (itr->second->state == MucRoomState::Joined) {
+            return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppMucRoomV2(itr->second));
         }
         return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Room join already in progress."_s });
     }
 
-    // create MUC room state
-    auto &roomData = d->rooms[jid];
-    roomData.state = MucRoomState::JoiningOccupantPresences;
-    roomData.nickname = nickname;
+    // Create or revive the room (cached server state carries over a leave/rejoin cycle).
+    auto roomData = d->createOrReviveRoom(jid);
+    roomData->state = MucRoomState::JoiningOccupantPresences;
+    roomData->nickname = nickname;
 
     // Fetch room features in parallel; updates roominfo properties when it arrives.
     d->fetchRoomInfo(jid);
 
     QXmppPromise<Result<QXmppMucRoomV2>> promise;
     auto task = promise.task();
-    roomData.joinPromise = std::move(promise);
+    roomData->joinPromise = std::move(promise);
 
     QXmppPresence p;
     p.setTo(jid + u'/' + nickname);
@@ -491,7 +511,7 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     QObject::connect(timer, &QTimer::timeout, this, [this, roomJid = jid]() {
         d->handleJoinTimeout(roomJid);
     });
-    roomData.joinTimer.reset(timer);
+    roomData->joinTimer.reset(timer);
     timer->start(d->timeout);
 
     return task;
@@ -538,17 +558,17 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoomAtJid(const QStri
     if (nickname.isEmpty()) {
         return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Nickname must not be empty."_s });
     }
-    if (d->rooms.count(jid)) {
+    if (d->activeRooms.count(jid)) {
         return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Room is already tracked (join or create already in progress)."_s });
     }
 
-    auto &roomData = d->rooms[jid];
-    roomData.state = MucRoomState::JoiningOccupantPresences;
-    roomData.nickname = nickname;
+    auto roomData = d->createOrReviveRoom(jid);
+    roomData->state = MucRoomState::JoiningOccupantPresences;
+    roomData->nickname = nickname;
 
     QXmppPromise<Result<QXmppMucRoomV2>> promise;
     auto task = promise.task();
-    roomData.createPromise = std::move(promise);
+    roomData->createPromise = std::move(promise);
 
     QXmppPresence p;
     p.setTo(jid + u'/' + nickname);
@@ -561,7 +581,7 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoomAtJid(const QStri
     QObject::connect(timer, &QTimer::timeout, this, [this, roomJid = jid]() {
         d->handleJoinTimeout(roomJid);
     });
-    roomData.joinTimer.reset(timer);
+    roomData->joinTimer.reset(timer);
     timer->start(d->timeout);
 
     return task;
@@ -590,12 +610,12 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         }
     }
 
-    auto itr = d->rooms.find(bareFrom);
-    if (itr == d->rooms.end()) {
+    auto itr = d->activeRooms.find(bareFrom);
+    if (itr == d->activeRooms.end()) {
         return false;
     }
 
-    auto &data = itr->second;
+    auto &data = *itr->second;
 
     // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
     auto message = [&]() {
@@ -656,7 +676,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
             if (!history.isEmpty()) {
                 Q_EMIT roomHistoryReceived(bareFrom, history);
             }
-            promise.finish(room(bareFrom));
+            promise.finish(QXmppMucRoomV2(d->activeRooms[bareFrom]));
         }
         return true;
     case MucRoomState::Joined:
@@ -754,33 +774,23 @@ void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 void QXmppMucManagerV2::onConnected()
 {
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->clearAllRooms();
+        d->deactivateAllRooms();
     }
 }
 
 void QXmppMucManagerV2::onDisconnected()
 {
     if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
-        d->clearAllRooms();
+        d->deactivateAllRooms();
     }
 }
 
-const MucRoomData *QXmppMucManagerV2::roomData(const QString &jid) const
+std::optional<QXmppMucRoomV2> QXmppMucManagerV2::findRoom(const QString &jid)
 {
-    if (auto itr = d->rooms.find(jid); itr != d->rooms.end()) {
-        return &itr->second;
+    if (auto data = d->lookupRoom(jid)) {
+        return QXmppMucRoomV2(std::move(data));
     }
-    return nullptr;
-}
-
-const MucParticipantData *QXmppMucManagerV2::participantData(const QString &roomJid, uint32_t participantId) const
-{
-    if (auto roomItr = d->rooms.find(roomJid); roomItr != d->rooms.end()) {
-        if (auto pItr = roomItr->second.participants.find(participantId); pItr != roomItr->second.participants.end()) {
-            return &pItr->second;
-        }
-    }
-    return nullptr;
+    return std::nullopt;
 }
 
 QXmppMucManagerV2Private::QXmppMucManagerV2Private(QXmppMucManagerV2 *manager)
@@ -809,8 +819,8 @@ QXmppDiscoveryManager *QXmppMucManagerV2Private::disco()
 void QXmppMucManagerV2Private::handlePresence(const QXmppPresence &p)
 {
     auto bareFrom = QXmppUtils::jidToBareJid(p.from());
-    if (auto itr = rooms.find(bareFrom); itr != rooms.end()) {
-        handleRoomPresence(bareFrom, itr->second, p);
+    if (auto itr = activeRooms.find(bareFrom); itr != activeRooms.end()) {
+        handleRoomPresence(bareFrom, *itr->second, p);
     }
 }
 
@@ -837,25 +847,25 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
     case JoiningOccupantPresences:
         if (presence.type() == QXmppPresence::Available) {
             for (const auto &[pId, participant] : data.participants) {
-                if (participant.nickname.value() == nickname) {
+                if (participant->nickname.value() == nickname) {
                     // room sent two presences for the same nickname
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same nickname"_s });
                     return;
-                } else if (!participant.occupantId.isEmpty() && participant.occupantId == presence.mucOccupantId()) {
+                } else if (!participant->occupantId.isEmpty() && participant->occupantId == presence.mucOccupantId()) {
                     // sent two presences with the same occupant ID
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same occupant ID"_s });
                     return;
                 }
             }
 
-            // store new presence
-            auto [itr, inserted] = data.participants.emplace(generateParticipantId(), presence);
+            // store new presence (keyed by nickname, unique per XEP-0045)
+            auto newParticipant = std::make_shared<MucParticipantData>(presence);
+            auto [itr, inserted] = data.participants.emplace(nickname, newParticipant);
             QX_ALWAYS_ASSERT(inserted);
 
             // this is our presence (must be last)
             if (presence.mucStatusCodes().contains(110)) {
-                data.selfParticipantId = itr->first;
-                data.setupPermissionBindings();
+                data.selfParticipant = newParticipant;
                 if (nickname != data.nickname) {
                     if (presence.mucStatusCodes().contains(210)) {
                         // service modified nickname
@@ -917,16 +927,14 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 }
             }
 
-            // Update participant's presence with new nickname so the
-            // following available presence matches by nickname.
+            // Re-key the participant under the new nickname.
             if (!newNick.isEmpty()) {
-                for (auto &[pId, pData] : data.participants) {
-                    if (pData.nickname.value() == nickname) {
-                        auto updated = presence;
-                        updated.setFrom(roomJid + u'/' + newNick);
-                        pData.setPresence(updated);
-                        break;
-                    }
+                if (auto node = data.participants.extract(nickname); !node.empty()) {
+                    auto updated = presence;
+                    updated.setFrom(roomJid + u'/' + newNick);
+                    node.mapped()->setPresence(updated);
+                    node.key() = newNick;
+                    data.participants.insert(std::move(node));
                 }
             }
         } else if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
@@ -941,7 +949,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 Q_EMIT q->removedFromRoom(roomJid, reason, presence.mucDestroy());
             }
 
-            rooms.erase(roomJid);
+            deactivateRoom(roomJid);
             rescheduleSelfPing();
 
             if (promise) {
@@ -950,29 +958,19 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
         } else if (presence.type() == QXmppPresence::Unavailable && !presence.mucStatusCodes().contains(110)) {
             // Another participant left the room
             auto reason = leaveReasonFromPresence(presence);
-            for (auto pItr = data.participants.begin(); pItr != data.participants.end(); ++pItr) {
-                if (pItr->second.nickname.value() == nickname) {
-                    auto participantId = pItr->first;
-                    Q_EMIT q->participantLeft(roomJid, QXmppMucParticipant(q, roomJid, participantId), reason);
-                    data.participants.erase(pItr);
-                    break;
-                }
+            if (auto pItr = data.participants.find(nickname); pItr != data.participants.end()) {
+                Q_EMIT q->participantLeft(roomJid, QXmppMucParticipant(pItr->second), reason);
+                data.participants.erase(pItr);
             }
         } else if (presence.type() == QXmppPresence::Available) {
-            // Check if participant already exists
-            bool found = false;
-            for (auto &[pId, pData] : data.participants) {
-                if (pData.nickname.value() == nickname) {
-                    pData.setPresence(presence);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
+            if (auto pItr = data.participants.find(nickname); pItr != data.participants.end()) {
+                // Existing participant — update presence
+                pItr->second->setPresence(presence);
+            } else {
                 // New participant joined
-                auto id = generateParticipantId();
-                data.participants.emplace(id, presence);
-                Q_EMIT q->participantJoined(roomJid, QXmppMucParticipant(q, roomJid, id));
+                auto newParticipant = std::make_shared<MucParticipantData>(presence);
+                data.participants.emplace(nickname, newParticipant);
+                Q_EMIT q->participantJoined(roomJid, QXmppMucParticipant(newParticipant));
             }
         } else if (presence.type() == QXmppPresence::Error) {
             if (data.leavePromise) {
@@ -1015,14 +1013,14 @@ void QXmppMucManagerV2Private::rescheduleSelfPing()
     }
     auto now = steady_clock::now();
     auto earliest = steady_clock::time_point::max();
-    for (const auto &[jid, data] : rooms) {
-        if (data.state != MucRoomState::Joined) {
+    for (const auto &[jid, data] : activeRooms) {
+        if (data->state != MucRoomState::Joined) {
             continue;
         }
-        if (data.selfPingInFlight || data.nickChangePromise) {
+        if (data->selfPingInFlight || data->nickChangePromise) {
             continue;
         }
-        auto deadline = data.lastActivity + selfPingSilenceThreshold;
+        auto deadline = data->lastActivity + selfPingSilenceThreshold;
         if (deadline < earliest) {
             earliest = deadline;
         }
@@ -1048,14 +1046,14 @@ void QXmppMucManagerV2Private::onSelfPingTick()
     // Collect room JIDs first — runSelfPing() may mutate rooms via async callbacks,
     // but for the synchronous iteration we only trigger the send, not the response path.
     std::vector<QString> due;
-    for (const auto &[jid, data] : rooms) {
-        if (data.state != MucRoomState::Joined) {
+    for (const auto &[jid, data] : activeRooms) {
+        if (data->state != MucRoomState::Joined) {
             continue;
         }
-        if (data.selfPingInFlight || data.nickChangePromise) {
+        if (data->selfPingInFlight || data->nickChangePromise) {
             continue;
         }
-        if (now - data.lastActivity >= selfPingSilenceThreshold) {
+        if (now - data->lastActivity >= selfPingSilenceThreshold) {
             due.push_back(jid);
         }
     }
@@ -1073,11 +1071,11 @@ void QXmppMucManagerV2Private::runSelfPing(const QString &roomJid)
         Inconclusive,
     };
 
-    auto it = rooms.find(roomJid);
-    if (it == rooms.end() || it->second.state != MucRoomState::Joined) {
+    auto it = activeRooms.find(roomJid);
+    if (it == activeRooms.end() || it->second->state != MucRoomState::Joined) {
         return;
     }
-    auto &data = it->second;
+    auto &data = *it->second;
     if (data.selfPingInFlight || data.nickChangePromise) {
         return;
     }
@@ -1085,11 +1083,11 @@ void QXmppMucManagerV2Private::runSelfPing(const QString &roomJid)
     const QString occupantJid = roomJid + u'/' + data.nickname.value();
 
     getEmpty(q->client(), occupantJid, Ping {}).then(q, [this, roomJid](Result<> &&result) {
-        auto it = rooms.find(roomJid);
-        if (it == rooms.end()) {
+        auto it = activeRooms.find(roomJid);
+        if (it == activeRooms.end()) {
             return;
         }
-        auto &data = it->second;
+        auto &data = *it->second;
         data.selfPingInFlight = false;
 
         using Cond = QXmppStanza::Error::Condition;
@@ -1145,7 +1143,7 @@ void QXmppMucManagerV2Private::runSelfPing(const QString &roomJid)
         case SelfPingOutcome::NotJoined:
             // Synthesize a forcible removal — reuses the standard removedFromRoom cleanup path.
             Q_EMIT q->removedFromRoom(roomJid, Muc::LeaveReason::ConnectionLost, std::nullopt);
-            rooms.erase(it);
+            deactivateRoom(roomJid);
             rescheduleSelfPing();
             break;
         }
@@ -1154,51 +1152,51 @@ void QXmppMucManagerV2Private::runSelfPing(const QString &roomJid)
 
 bool QXmppMucManagerV2Private::testSelfPingInFlight(const QString &roomJid) const
 {
-    auto it = rooms.find(roomJid);
-    return it != rooms.end() && it->second.selfPingInFlight;
+    auto it = activeRooms.find(roomJid);
+    return it != activeRooms.end() && it->second->selfPingInFlight;
 }
 
 int QXmppMucManagerV2Private::testSelfPingRetryCount(const QString &roomJid) const
 {
-    auto it = rooms.find(roomJid);
-    return it != rooms.end() ? it->second.selfPingRetryCount : 0;
+    auto it = activeRooms.find(roomJid);
+    return it != activeRooms.end() ? it->second->selfPingRetryCount : 0;
 }
 
 bool QXmppMucManagerV2Private::testHasRoom(const QString &roomJid) const
 {
-    return rooms.contains(roomJid);
+    return activeRooms.contains(roomJid);
 }
 
 void QXmppMucManagerV2Private::testForceDueForSelfPing(const QString &roomJid)
 {
-    auto it = rooms.find(roomJid);
-    if (it != rooms.end()) {
-        it->second.lastActivity = std::chrono::steady_clock::now() - std::chrono::hours(1);
+    auto it = activeRooms.find(roomJid);
+    if (it != activeRooms.end()) {
+        it->second->lastActivity = std::chrono::steady_clock::now() - std::chrono::hours(1);
     }
 }
 
 std::chrono::steady_clock::time_point QXmppMucManagerV2Private::testLastActivity(const QString &roomJid) const
 {
-    auto it = rooms.find(roomJid);
-    return it != rooms.end() ? it->second.lastActivity : std::chrono::steady_clock::time_point {};
+    auto it = activeRooms.find(roomJid);
+    return it != activeRooms.end() ? it->second->lastActivity : std::chrono::steady_clock::time_point {};
 }
 
 void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError &&error)
 {
-    auto itr = rooms.find(roomJid);
-    if (itr == rooms.end()) {
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end()) {
         return;
     }
 
-    // Move promise out before erasing so we can finish it cleanly
+    // Move promise out before deactivating so we can finish it cleanly after the
+    // session state (including the promise slots) is reset.
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> promise;
-    if (itr->second.joinPromise) {
-        promise = std::move(itr->second.joinPromise);
-    } else if (itr->second.createPromise) {
-        promise = std::move(itr->second.createPromise);
+    if (itr->second->joinPromise) {
+        promise = std::move(itr->second->joinPromise);
+    } else if (itr->second->createPromise) {
+        promise = std::move(itr->second->createPromise);
     }
-    itr->second.joinTimer.reset();
-    rooms.erase(itr);
+    deactivateRoom(roomJid);
     rescheduleSelfPing();
 
     if (promise) {
@@ -1206,33 +1204,118 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
     }
 }
 
-void QXmppMucManagerV2Private::clearAllRooms()
+//
+// Room lifetime management
+//
+// activeRooms holds strong shared_ptr references while the user is joined or joining.
+// On leave/kick/disconnect, rooms are moved to inactiveRooms as weak_ptrs. If any
+// caller still holds a QXmppMucRoomV2 handle (which also owns a shared_ptr), the
+// MucRoomData lives on as a frozen snapshot. Rejoining via createOrReviveRoom()
+// upgrades the weak_ptr back to strong ownership, reusing the cached state.
+//
+
+std::shared_ptr<MucRoomData> QXmppMucManagerV2Private::lookupRoom(const QString &jid)
 {
-    // Collect pending promises before clearing so their callbacks see a clean (empty) room state.
+    if (auto itr = activeRooms.find(jid); itr != activeRooms.end()) {
+        return itr->second;
+    }
+    if (auto itr = inactiveRooms.find(jid); itr != inactiveRooms.end()) {
+        if (auto locked = itr->second.lock()) {
+            return locked;
+        }
+        inactiveRooms.erase(itr);  // expired — prune inline
+    }
+    return nullptr;
+}
+
+std::shared_ptr<MucRoomData> QXmppMucManagerV2Private::createOrReviveRoom(const QString &jid)
+{
+    if (auto itr = activeRooms.find(jid); itr != activeRooms.end()) {
+        return itr->second;  // caller is responsible for detecting duplicate join
+    }
+    // Try to revive from inactive so cached state (roomInfo, roomConfig, avatar, feature
+    // flags, last known subject/nickname) carries over a leave/rejoin cycle.
+    if (auto itr = inactiveRooms.find(jid); itr != inactiveRooms.end()) {
+        if (auto locked = itr->second.lock()) {
+            inactiveRooms.erase(itr);
+            // Clear stale participants from the previous session. Permission bindings
+            // react to selfParticipant being null — no manual unwiring needed.
+            locked->participants.clear();
+            locked->selfParticipant = nullptr;
+            activeRooms[jid] = locked;
+            return locked;
+        }
+        inactiveRooms.erase(itr);
+    }
+    auto data = std::make_shared<MucRoomData>();
+    data->manager = q;
+    data->roomJid = jid;
+    activeRooms[jid] = data;
+    return data;
+}
+
+void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
+{
+    auto itr = activeRooms.find(jid);
+    if (itr == activeRooms.end()) {
+        return;  // already inactive (or never tracked) — idempotent
+    }
+    auto data = std::move(itr->second);
+    activeRooms.erase(itr);
+
+    // Reset per-session state (promises, timers, state flags). Participants and
+    // permission bindings are intentionally preserved — they serve as a frozen
+    // snapshot for caller handles and are cleared on the next join instead.
+    data->resetSessionState();
+
+    // Register a weak_ptr so subsequent joinRoom()/findRoom() calls can revive the
+    // same MucRoomData instance as long as any caller handle is still holding it.
+    inactiveRooms[jid] = data;
+
+    // data shared_ptr goes out of scope here. If no caller holds a handle, the data
+    // is freed and the weak_ptr expires (pruned lazily on next lookup or threshold sweep).
+
+    if (inactiveRooms.size() > 32) {
+        pruneInactiveRooms();
+    }
+}
+
+void QXmppMucManagerV2Private::deactivateAllRooms()
+{
+    // Collect pending promises before resetting so their error callbacks observe a
+    // clean (empty) room state.
     std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
     std::vector<QXmppPromise<Result<>>> otherPromises;
 
-    for (auto &[jid, data] : rooms) {
-        // Notify QBindable observers while the room data is still valid
-        data.joined = false;
-
-        if (data.joinPromise) {
-            joinPromises.push_back(std::move(*data.joinPromise));
+    for (auto &[jid, data] : activeRooms) {
+        if (data->joinPromise) {
+            joinPromises.push_back(std::move(*data->joinPromise));
         }
-        if (data.createPromise) {
-            joinPromises.push_back(std::move(*data.createPromise));
+        if (data->createPromise) {
+            joinPromises.push_back(std::move(*data->createPromise));
         }
-        if (data.leavePromise) {
-            otherPromises.push_back(std::move(*data.leavePromise));
+        if (data->leavePromise) {
+            otherPromises.push_back(std::move(*data->leavePromise));
         }
-        if (data.nickChangePromise) {
-            otherPromises.push_back(std::move(*data.nickChangePromise));
+        if (data->nickChangePromise) {
+            otherPromises.push_back(std::move(*data->nickChangePromise));
         }
-        for (auto &[msgId, pending] : data.pendingMessages) {
+        for (auto &[msgId, pending] : data->pendingMessages) {
             otherPromises.push_back(std::move(pending.promise));
         }
     }
-    rooms.clear();
+
+    // Deactivate every room (demote to inactive, reset session state, keep cache).
+    // Copy jids first since deactivateRoom() mutates activeRooms.
+    std::vector<QString> jids;
+    jids.reserve(activeRooms.size());
+    for (const auto &[jid, _] : activeRooms) {
+        jids.push_back(jid);
+    }
+    for (const auto &jid : jids) {
+        deactivateRoom(jid);
+    }
+
     selfPingTimer.stop();
 
     const auto error = QXmppError { u"Disconnected from server."_s };
@@ -1244,6 +1327,17 @@ void QXmppMucManagerV2Private::clearAllRooms()
     }
 }
 
+void QXmppMucManagerV2Private::pruneInactiveRooms()
+{
+    for (auto itr = inactiveRooms.begin(); itr != inactiveRooms.end();) {
+        if (itr->second.expired()) {
+            itr = inactiveRooms.erase(itr);
+        } else {
+            ++itr;
+        }
+    }
+}
+
 void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
 {
     auto *disco = q->client()->findExtension<QXmppDiscoveryManager>();
@@ -1251,12 +1345,12 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
         return;
     }
     disco->info(roomJid, {}, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [this, roomJid](auto &&result) {
-        auto itr = rooms.find(roomJid);
-        if (itr == rooms.end() || hasError(result)) {
+        auto itr = activeRooms.find(roomJid);
+        if (itr == activeRooms.end() || hasError(result)) {
             return;
         }
         auto &info = getValue(result);
-        auto &data = itr->second;
+        auto &data = *itr->second;
         const auto oldHashes = data.avatarHashes.value();
         data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
         const auto &features = info.features();
@@ -1279,11 +1373,11 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
 
 void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
 {
-    auto itr = rooms.find(roomJid);
-    if (itr == rooms.end()) {
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end()) {
         return;
     }
-    auto &data = itr->second;
+    auto &data = *itr->second;
     const auto hashes = data.avatarHashes.value();
     data.avatarOutdated = false;
 
@@ -1294,11 +1388,11 @@ void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
 
     data.fetchingAvatar = true;
     q->client()->sendIq(QXmppVCardIq(roomJid)).then(q, [this, roomJid, hashes](auto &&result) mutable {
-        auto itr = rooms.find(roomJid);
-        if (itr == rooms.end()) {
+        auto itr = activeRooms.find(roomJid);
+        if (itr == activeRooms.end()) {
             return;
         }
-        auto &data = itr->second;
+        auto &data = *itr->second;
         data.fetchingAvatar = false;
 
         auto iqResponse = parseIq<QXmppVCardIq>(std::move(result));
@@ -1327,11 +1421,11 @@ QXmppTask<Result<MucOwnerQuery>> QXmppMucManagerV2Private::sendOwnerFormRequest(
 void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
 {
     sendOwnerFormRequest(roomJid).then(q, [this, roomJid](Result<MucOwnerQuery> &&result) {
-        auto itr = rooms.find(roomJid);
-        if (itr == rooms.end() || itr->second.state != MucRoomState::Creating) {
+        auto itr = activeRooms.find(roomJid);
+        if (itr == activeRooms.end() || itr->second->state != MucRoomState::Creating) {
             return;
         }
-        auto &data = itr->second;
+        auto &data = *itr->second;
 
         if (auto *error = std::get_if<QXmppError>(&result)) {
             throwRoomError(roomJid, std::move(*error));
@@ -1341,24 +1435,24 @@ void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
         // Resolve the createPromise — room is locked, owner can now configure it
         auto promise = std::move(*data.createPromise);
         data.createPromise.reset();
-        promise.finish(q->room(roomJid));
+        promise.finish(QXmppMucRoomV2(activeRooms[roomJid]));
     });
 }
 
 void QXmppMucManagerV2Private::fetchRoomConfigSubscribed(const QString &roomJid)
 {
-    auto itr = rooms.find(roomJid);
-    if (itr == rooms.end()) {
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end()) {
         return;
     }
-    itr->second.fetchingRoomConfig = true;
+    itr->second->fetchingRoomConfig = true;
 
     sendOwnerFormRequest(roomJid).then(q, [this, roomJid](Result<MucOwnerQuery> &&result) {
-        auto itr = rooms.find(roomJid);
-        if (itr == rooms.end()) {
+        auto itr = activeRooms.find(roomJid);
+        if (itr == activeRooms.end()) {
             return;
         }
-        auto &data = itr->second;
+        auto &data = *itr->second;
         data.fetchingRoomConfig = false;
         auto waiters = std::move(data.roomConfigWaiters);
 
@@ -1393,16 +1487,16 @@ void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
 
 void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
 {
-    auto itr = rooms.find(roomJid);
-    if (itr == rooms.end()) {
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end()) {
         return;
     }
 
     std::optional<QXmppPromise<Result<>>> promise;
-    if (itr->second.leavePromise) {
-        promise = std::move(itr->second.leavePromise);
+    if (itr->second->leavePromise) {
+        promise = std::move(itr->second->leavePromise);
     }
-    rooms.erase(itr);
+    deactivateRoom(roomJid);
     rescheduleSelfPing();
 
     if (promise) {
@@ -1412,12 +1506,12 @@ void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
 
 void QXmppMucManagerV2Private::handleNickChangeTimeout(const QString &roomJid)
 {
-    auto itr = rooms.find(roomJid);
-    if (itr == rooms.end()) {
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end()) {
         return;
     }
 
-    auto &data = itr->second;
+    auto &data = *itr->second;
     if (!data.nickChangePromise) {
         return;
     }
@@ -1432,18 +1526,18 @@ void QXmppMucManagerV2Private::handleNickChangeTimeout(const QString &roomJid)
 
 void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, const QString &originId)
 {
-    auto itr = rooms.find(roomJid);
-    if (itr == rooms.end()) {
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end()) {
         return;
     }
 
-    auto pendingItr = itr->second.pendingMessages.find(originId);
-    if (pendingItr == itr->second.pendingMessages.end()) {
+    auto pendingItr = itr->second->pendingMessages.find(originId);
+    if (pendingItr == itr->second->pendingMessages.end()) {
         return;
     }
 
     pendingItr->second.promise.finish(QXmppError { u"Sending message timed out."_s });
-    itr->second.pendingMessages.erase(pendingItr);
+    itr->second->pendingMessages.erase(pendingItr);
 }
 
 //
@@ -1452,41 +1546,38 @@ void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, cons
 
 static bool isRoomJoined(QXmppMucManagerV2Private *d, const QString &jid)
 {
-    auto itr = d->rooms.find(jid);
-    return itr != d->rooms.end() && itr->second.state == MucRoomState::Joined;
+    auto itr = d->activeRooms.find(jid);
+    return itr != d->activeRooms.end() && itr->second->state == MucRoomState::Joined;
 }
 
-/// Returns whether the room handle refers to a valid, active room.
-bool QXmppMucRoomV2::isValid() const
+/// Returns the room JID this handle refers to.
+QString QXmppMucRoomV2::jid() const
 {
-    return m_manager->roomData(m_jid) != nullptr;
+    return m_data->roomJid;
+}
+
+/// Returns the manager that owns this room's state.
+QXmppMucManagerV2 *QXmppMucRoomV2::manager() const
+{
+    return m_data->manager;
 }
 
 /// Returns the room subject as a bindable property.
 QBindable<QString> QXmppMucRoomV2::subject() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->subject) };
-    }
-    return {};
+    return &m_data->subject;
 }
 
 /// Returns the user's nickname in the room as a bindable property.
 QBindable<QString> QXmppMucRoomV2::nickname() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->nickname) };
-    }
-    return {};
+    return &m_data->nickname;
 }
 
 /// Returns whether the room is currently joined as a bindable property.
 QBindable<bool> QXmppMucRoomV2::joined() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->joined) };
-    }
-    return {};
+    return &m_data->joined;
 }
 
 ///
@@ -1497,11 +1588,9 @@ QBindable<bool> QXmppMucRoomV2::joined() const
 QList<QXmppMucParticipant> QXmppMucRoomV2::participants() const
 {
     QList<QXmppMucParticipant> result;
-    if (auto *data = m_manager->roomData(m_jid)) {
-        result.reserve(data->participants.size());
-        for (const auto &[id, _] : data->participants) {
-            result.append(QXmppMucParticipant(m_manager, m_jid, id));
-        }
+    result.reserve(m_data->participants.size());
+    for (const auto &[id, pData] : m_data->participants) {
+        result.append(QXmppMucParticipant(pData));
     }
     return result;
 }
@@ -1519,10 +1608,8 @@ QList<QXmppMucParticipant> QXmppMucRoomV2::participants() const
 ///
 std::optional<QXmppMucParticipant> QXmppMucRoomV2::selfParticipant() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        if (data->selfParticipantId.has_value()) {
-            return QXmppMucParticipant(m_manager, m_jid, *data->selfParticipantId);
-        }
+    if (auto sp = m_data->selfParticipant.value()) {
+        return QXmppMucParticipant(std::move(sp));
     }
     return std::nullopt;
 }
@@ -1533,10 +1620,7 @@ std::optional<QXmppMucParticipant> QXmppMucRoomV2::selfParticipant() const
 /// In unmoderated rooms the server assigns Participant by default.
 QBindable<bool> QXmppMucRoomV2::canSendMessages() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->canSendMessages) };
-    }
-    return {};
+    return &m_data->canSendMessages;
 }
 
 /// Returns whether the local user can change the room subject.
@@ -1545,10 +1629,7 @@ QBindable<bool> QXmppMucRoomV2::canSendMessages() const
 /// (\c muc#roominfo_subjectmod). Defaults to false until disco\#info arrives.
 QBindable<bool> QXmppMucRoomV2::canChangeSubject() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->canChangeSubject) };
-    }
-    return {};
+    return &m_data->canChangeSubject;
 }
 
 /// Returns whether the local user can change other participants' roles (XEP-0045 §8.4–8.6).
@@ -1557,10 +1638,7 @@ QBindable<bool> QXmppMucRoomV2::canChangeSubject() const
 /// (setting role to None) and granting/revoking voice.
 QBindable<bool> QXmppMucRoomV2::canSetRoles() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->canSetRoles) };
-    }
-    return {};
+    return &m_data->canSetRoles;
 }
 
 /// Returns whether the local user can change affiliations (XEP-0045 §9).
@@ -1569,10 +1647,7 @@ QBindable<bool> QXmppMucRoomV2::canSetRoles() const
 /// granting and revoking membership, and querying affiliation lists.
 QBindable<bool> QXmppMucRoomV2::canSetAffiliations() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->canSetAffiliations) };
-    }
-    return {};
+    return &m_data->canSetAffiliations;
 }
 
 /// Returns whether the local user can configure the room (XEP-0045 §10).
@@ -1580,10 +1655,7 @@ QBindable<bool> QXmppMucRoomV2::canSetAffiliations() const
 /// True when the user's affiliation is Owner.
 QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->canConfigureRoom) };
-    }
-    return {};
+    return &m_data->canConfigureRoom;
 }
 
 ///
@@ -1602,10 +1674,7 @@ QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
 ///
 QBindable<bool> QXmppMucRoomV2::isNonAnonymous() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->isNonAnonymous) };
-    }
-    return {};
+    return &m_data->isNonAnonymous;
 }
 
 ///
@@ -1623,10 +1692,7 @@ QBindable<bool> QXmppMucRoomV2::isNonAnonymous() const
 ///
 QBindable<bool> QXmppMucRoomV2::isPublic() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->isPublic) };
-    }
-    return {};
+    return &m_data->isPublic;
 }
 
 ///
@@ -1644,10 +1710,7 @@ QBindable<bool> QXmppMucRoomV2::isPublic() const
 ///
 QBindable<bool> QXmppMucRoomV2::isMembersOnly() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->isMembersOnly) };
-    }
-    return {};
+    return &m_data->isMembersOnly;
 }
 
 ///
@@ -1665,10 +1728,7 @@ QBindable<bool> QXmppMucRoomV2::isMembersOnly() const
 ///
 QBindable<bool> QXmppMucRoomV2::isModerated() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->isModerated) };
-    }
-    return {};
+    return &m_data->isModerated;
 }
 
 ///
@@ -1686,10 +1746,7 @@ QBindable<bool> QXmppMucRoomV2::isModerated() const
 ///
 QBindable<bool> QXmppMucRoomV2::isPersistent() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->isPersistent) };
-    }
-    return {};
+    return &m_data->isPersistent;
 }
 
 ///
@@ -1707,10 +1764,7 @@ QBindable<bool> QXmppMucRoomV2::isPersistent() const
 ///
 QBindable<bool> QXmppMucRoomV2::isPasswordProtected() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->isPasswordProtected) };
-    }
-    return {};
+    return &m_data->isPasswordProtected;
 }
 
 /// Returns the full \c muc#roominfo data form from \xep{0045, Multi-User Chat}.
@@ -1729,10 +1783,7 @@ QBindable<bool> QXmppMucRoomV2::isPasswordProtected() const
 ///
 QBindable<std::optional<QXmppMucRoomInfo>> QXmppMucRoomV2::roomInfo() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->roomInfo) };
-    }
-    return {};
+    return &m_data->roomInfo;
 }
 
 ///
@@ -1749,10 +1800,7 @@ QBindable<std::optional<QXmppMucRoomInfo>> QXmppMucRoomV2::roomInfo() const
 ///
 QBindable<std::optional<QXmppMucRoomConfig>> QXmppMucRoomV2::roomConfig() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->roomConfig) };
-    }
-    return {};
+    return &m_data->roomConfig;
 }
 
 ///
@@ -1771,15 +1819,10 @@ QBindable<std::optional<QXmppMucRoomConfig>> QXmppMucRoomV2::roomConfig() const
 ///
 void QXmppMucRoomV2::setWatchRoomConfig(bool watch)
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end()) {
-        return;
-    }
-    auto &data = itr->second;
-    const bool needsFetch = watch && !data.watchingRoomConfig;
-    data.watchingRoomConfig = watch;
+    const bool needsFetch = watch && !m_data->watchingRoomConfig;
+    m_data->watchingRoomConfig = watch;
     if (needsFetch) {
-        m_manager->d->fetchRoomConfigSubscribed(m_jid);
+        m_data->manager->d->fetchRoomConfigSubscribed(m_data->roomJid);
     }
 }
 
@@ -1791,10 +1834,7 @@ void QXmppMucRoomV2::setWatchRoomConfig(bool watch)
 ///
 bool QXmppMucRoomV2::isWatchingRoomConfig() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return data->watchingRoomConfig;
-    }
-    return false;
+    return m_data->watchingRoomConfig;
 }
 
 ///
@@ -1812,10 +1852,7 @@ bool QXmppMucRoomV2::isWatchingRoomConfig() const
 ///
 QBindable<QStringList> QXmppMucRoomV2::avatarHashes() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->avatarHashes) };
-    }
-    return {};
+    return &m_data->avatarHashes;
 }
 
 ///
@@ -1833,10 +1870,7 @@ QBindable<QStringList> QXmppMucRoomV2::avatarHashes() const
 ///
 QBindable<std::optional<QXmpp::Muc::Avatar>> QXmppMucRoomV2::avatar() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->avatar) };
-    }
-    return {};
+    return &m_data->avatar;
 }
 
 ///
@@ -1854,15 +1888,10 @@ QBindable<std::optional<QXmpp::Muc::Avatar>> QXmppMucRoomV2::avatar() const
 ///
 void QXmppMucRoomV2::setWatchAvatar(bool watch)
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end()) {
-        return;
-    }
-    auto &data = itr->second;
-    const bool needsFetch = watch && !data.watchingAvatar && data.roomInfo.value().has_value() && !data.fetchingAvatar && data.avatarOutdated;
-    data.watchingAvatar = watch;
+    const bool needsFetch = watch && !m_data->watchingAvatar && m_data->roomInfo.value().has_value() && !m_data->fetchingAvatar && m_data->avatarOutdated;
+    m_data->watchingAvatar = watch;
     if (needsFetch) {
-        m_manager->d->fetchAvatar(m_jid);
+        m_data->manager->d->fetchAvatar(m_data->roomJid);
     }
 }
 
@@ -1874,10 +1903,7 @@ void QXmppMucRoomV2::setWatchAvatar(bool watch)
 ///
 bool QXmppMucRoomV2::isWatchingAvatar() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return data->watchingAvatar;
-    }
-    return false;
+    return m_data->watchingAvatar;
 }
 
 ///
@@ -1893,14 +1919,14 @@ bool QXmppMucRoomV2::isWatchingAvatar() const
 QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmpp::Muc::Avatar> newAvatar)
 {
     QXmppVCardIq vCardIq;
-    vCardIq.setTo(m_jid);
+    vCardIq.setTo(m_data->roomJid);
     vCardIq.setFrom({});
     vCardIq.setType(QXmppIq::Set);
     if (newAvatar) {
         vCardIq.setPhotoType(newAvatar->contentType);
         vCardIq.setPhoto(newAvatar->data);
     }
-    return m_manager->client()->sendGenericIq(std::move(vCardIq));
+    return m_data->manager->client()->sendGenericIq(std::move(vCardIq));
 }
 
 ///
@@ -1914,10 +1940,7 @@ QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmpp::Muc::A
 ///
 QBindable<QString> QXmppMucRoomV2::description() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->description) };
-    }
-    return {};
+    return &m_data->description;
 }
 
 ///
@@ -1933,10 +1956,7 @@ QBindable<QString> QXmppMucRoomV2::description() const
 ///
 QBindable<QString> QXmppMucRoomV2::language() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->language) };
-    }
-    return {};
+    return &m_data->language;
 }
 
 ///
@@ -1954,10 +1974,7 @@ QBindable<QString> QXmppMucRoomV2::language() const
 ///
 QBindable<QStringList> QXmppMucRoomV2::contactJids() const
 {
-    if (auto *data = m_manager->roomData(m_jid)) {
-        return { &(data->contactJids) };
-    }
-    return {};
+    return &m_data->contactJids;
 }
 
 ///
@@ -1973,14 +1990,11 @@ QBindable<QStringList> QXmppMucRoomV2::contactJids() const
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() || itr->second.state != MucRoomState::Joined) {
+    if (m_data->state != MucRoomState::Joined) {
         return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
     }
 
-    auto &data = itr->second;
-
-    message.setTo(m_jid);
+    message.setTo(m_data->roomJid);
     message.setType(QXmppMessage::GroupChat);
     if (message.originId().isEmpty()) {
         message.setOriginId(QXmppUtils::generateStanzaUuid());
@@ -1992,14 +2006,14 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
 
     auto *timer = new QTimer();
     timer->setSingleShot(true);
-    QObject::connect(timer, &QTimer::timeout, m_manager, [d = m_manager->d.get(), roomJid = m_jid, originId]() {
+    QObject::connect(timer, &QTimer::timeout, m_data->manager, [d = m_data->manager->d.get(), roomJid = m_data->roomJid, originId]() {
         d->handleMessageTimeout(roomJid, originId);
     });
 
-    data.pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
-    timer->start(m_manager->d->timeout);
+    m_data->pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
+    timer->start(m_data->manager->d->timeout);
 
-    m_manager->client()->send(std::move(message));
+    m_data->manager->client()->send(std::move(message));
     return task;
 }
 
@@ -2011,19 +2025,14 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message)
 {
-    if (!isValid()) {
+    if (m_data->state != MucRoomState::Joined) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
-    auto *pData = m_manager->participantData(m_jid, participant.m_participantId);
-    if (!pData) {
-        return makeReadyTask<SendResult>(QXmppError { u"Participant is no longer in the room."_s });
-    }
-
-    message.setTo(m_jid + u'/' + pData->nickname.value());
+    message.setTo(m_data->roomJid + u'/' + participant.m_data->nickname.value());
     message.setType(QXmppMessage::Chat);
 
-    return m_manager->client()->send(std::move(message));
+    return m_data->manager->client()->send(std::move(message));
 }
 
 ///
@@ -2053,12 +2062,11 @@ QXmppTask<Result<>> QXmppMucRoomV2::setSubject(const QString &subject)
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() || itr->second.state != MucRoomState::Joined) {
+    if (m_data->state != MucRoomState::Joined) {
         return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
     }
 
-    auto &data = itr->second;
+    auto &data = *m_data;
 
     // Cancel any pending nickname change
     if (data.nickChangePromise) {
@@ -2073,19 +2081,19 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
     data.nickChangePromise = std::move(promise);
 
     QXmppPresence p;
-    p.setTo(m_jid + u'/' + newNick);
-    m_manager->client()->send(std::move(p));
+    p.setTo(m_data->roomJid + u'/' + newNick);
+    m_data->manager->client()->send(std::move(p));
 
     auto *timer = new QTimer();
     timer->setSingleShot(true);
-    QObject::connect(timer, &QTimer::timeout, m_manager, [d = m_manager->d.get(), roomJid = m_jid]() {
+    QObject::connect(timer, &QTimer::timeout, m_data->manager, [d = m_data->manager->d.get(), roomJid = m_data->roomJid]() {
         d->handleNickChangeTimeout(roomJid);
     });
     data.nickChangeTimer.reset(timer);
-    timer->start(m_manager->d->timeout);
+    timer->start(m_data->manager->d->timeout);
 
     // XEP-0410 §4.1: suppress self-ping on this room until the nick change completes.
-    m_manager->d->rescheduleSelfPing();
+    m_data->manager->d->rescheduleSelfPing();
 
     return task;
 }
@@ -2098,13 +2106,12 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::setPresence(QXmppPresence presence)
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() || itr->second.state != MucRoomState::Joined) {
+    if (m_data->state != MucRoomState::Joined) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
-    presence.setTo(m_jid + u'/' + itr->second.nickname.value());
-    return m_manager->client()->send(std::move(presence));
+    presence.setTo(m_data->roomJid + u'/' + m_data->nickname.value());
+    return m_data->manager->client()->send(std::move(presence));
 }
 
 ///
@@ -2115,21 +2122,21 @@ QXmppTask<SendResult> QXmppMucRoomV2::setPresence(QXmppPresence presence)
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::leave()
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end()) {
+    auto itr = m_data->manager->d->activeRooms.find(m_data->roomJid);
+    if (itr == m_data->manager->d->activeRooms.end()) {
         return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
     }
 
-    auto &data = itr->second;
+    auto &data = *m_data;
     if (data.leavePromise) {
         return makeReadyTask<Result<>>(QXmppError { u"Already leaving the room."_s });
     }
 
     QXmppPresence p;
-    p.setTo(m_jid + u'/' + data.nickname.value());
+    p.setTo(m_data->roomJid + u'/' + data.nickname.value());
     p.setType(QXmppPresence::Unavailable);
 
-    auto sendResult = m_manager->client()->send(std::move(p));
+    auto sendResult = m_data->manager->client()->send(std::move(p));
     // Check if send failed immediately
     if (sendResult.isFinished()) {
         if (std::holds_alternative<QXmppError>(sendResult.result())) {
@@ -2144,11 +2151,11 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
     // Start timeout timer
     auto *timer = new QTimer();
     timer->setSingleShot(true);
-    QObject::connect(timer, &QTimer::timeout, m_manager, [d = m_manager->d.get(), roomJid = m_jid]() {
+    QObject::connect(timer, &QTimer::timeout, m_data->manager, [d = m_data->manager->d.get(), roomJid = m_data->roomJid]() {
         d->handleLeaveTimeout(roomJid);
     });
     data.leaveTimer.reset(timer);
-    timer->start(m_manager->d->timeout);
+    timer->start(m_data->manager->d->timeout);
 
     return task;
 }
@@ -2162,17 +2169,12 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason)
 {
-    auto *pData = m_manager->participantData(m_jid, participant.m_participantId);
-    if (!pData) {
-        return makeReadyTask<Result<>>(QXmppError { u"Participant is no longer in the room."_s });
-    }
-
     Muc::Item item;
-    item.setNick(pData->nickname.value());
+    item.setNick(participant.m_data->nickname.value());
     item.setRole(role);
     item.setReason(reason);
 
-    return set(m_manager->client(), m_jid, MucAdminQuery { .items = { item } });
+    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } });
 }
 
 ///
@@ -2183,7 +2185,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participa
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::setRoles(const QList<Muc::Item> &items)
 {
-    return set(m_manager->client(), m_jid, MucAdminQuery { .items = items });
+    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = items });
 }
 
 ///
@@ -2199,7 +2201,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
     item.setAffiliation(affiliation);
     item.setReason(reason);
 
-    return set(m_manager->client(), m_jid, MucAdminQuery { .items = { item } });
+    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } });
 }
 
 ///
@@ -2210,7 +2212,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::setAffiliations(const QList<Muc::Item> &items)
 {
-    return set(m_manager->client(), m_jid, MucAdminQuery { .items = items });
+    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = items });
 }
 
 ///
@@ -2226,7 +2228,7 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
     Muc::Item item;
     item.setAffiliation(affiliation);
 
-    auto result = co_await get<MucAdminQuery>(m_manager->client(), m_jid, MucAdminQuery { .items = { item } }).withContext(m_manager);
+    auto result = co_await get<MucAdminQuery>(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } }).withContext(m_data->manager);
     if (auto *q = std::get_if<MucAdminQuery>(&result)) {
         co_return std::move(q->items);
     }
@@ -2240,7 +2242,7 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
 ///
 QXmppTask<Result<QString>> QXmppMucRoomV2::requestReservedNickname()
 {
-    auto result = co_await m_manager->d->disco()->info(m_jid, u"x-roomuser-item"_s, QXmppDiscoveryManager::CachePolicy::Strict).withContext(m_manager);
+    auto result = co_await m_data->manager->d->disco()->info(m_data->roomJid, u"x-roomuser-item"_s, QXmppDiscoveryManager::CachePolicy::Strict).withContext(m_data->manager);
     if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
         for (const auto &identity : info->identities()) {
             if (identity.category() == u"conference") {
@@ -2259,7 +2261,7 @@ QXmppTask<Result<QString>> QXmppMucRoomV2::requestReservedNickname()
 ///
 QXmppTask<Result<QXmppDataForm>> QXmppMucRoomV2::requestRegistrationForm()
 {
-    auto result = co_await get<MucRegisterQuery>(m_manager->client(), m_jid, MucRegisterQuery {}).withContext(m_manager);
+    auto result = co_await get<MucRegisterQuery>(m_data->manager->client(), m_data->roomJid, MucRegisterQuery {}).withContext(m_data->manager);
     if (auto *q = std::get_if<MucRegisterQuery>(&result)) {
         if (q->form) {
             co_return std::move(*q->form);
@@ -2277,7 +2279,7 @@ QXmppTask<Result<QXmppDataForm>> QXmppMucRoomV2::requestRegistrationForm()
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::submitRegistration(const QXmppDataForm &form)
 {
-    return set(m_manager->client(), m_jid, MucRegisterQuery { .form = form });
+    return set(m_data->manager->client(), m_data->roomJid, MucRegisterQuery { .form = form });
 }
 
 ///
@@ -2295,15 +2297,15 @@ QXmppTask<Result<>> QXmppMucRoomV2::submitRegistration(const QXmppDataForm &form
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::requestVoice()
 {
-    if (!isRoomJoined(m_manager->d.get(), m_jid)) {
+    if (!isRoomJoined(m_data->manager->d.get(), m_data->roomJid)) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
     QXmppMessage message;
-    message.setTo(m_jid);
+    message.setTo(m_data->roomJid);
     message.setType(QXmppMessage::Normal);
     message.setMucVoiceRequest(QXmppMucVoiceRequest {});
-    return m_manager->client()->send(std::move(message));
+    return m_data->manager->client()->send(std::move(message));
 }
 
 ///
@@ -2322,7 +2324,7 @@ QXmppTask<SendResult> QXmppMucRoomV2::requestVoice()
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow)
 {
-    if (!isRoomJoined(m_manager->d.get(), m_jid)) {
+    if (!isRoomJoined(m_data->manager->d.get(), m_data->roomJid)) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
@@ -2330,10 +2332,10 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
     response.setRequestAllow(allow);
 
     QXmppMessage message;
-    message.setTo(m_jid);
+    message.setTo(m_data->roomJid);
     message.setType(QXmppMessage::Normal);
     message.setMucVoiceRequest(std::move(response));
-    return m_manager->client()->send(std::move(message));
+    return m_data->manager->client()->send(std::move(message));
 }
 
 ///
@@ -2346,17 +2348,17 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
 ///
 QXmppTask<SendResult> QXmppMucRoomV2::inviteUser(QXmpp::Muc::Invite invite)
 {
-    if (!isRoomJoined(m_manager->d.get(), m_jid)) {
+    if (!isRoomJoined(m_data->manager->d.get(), m_data->roomJid)) {
         return makeReadyTask<SendResult>(QXmppError { u"Room is not joined."_s });
     }
 
     QXmppMessage message;
-    message.setTo(m_jid);
+    message.setTo(m_data->roomJid);
     message.setType(QXmppMessage::Normal);
     QXmpp::Muc::UserQuery ue;
     ue.setInvite(std::move(invite));
     message.setMucUserQuery(std::move(ue));
-    return m_manager->client()->send(std::move(message));
+    return m_data->manager->client()->send(std::move(message));
 }
 
 ///
@@ -2381,35 +2383,33 @@ QXmppTask<SendResult> QXmppMucRoomV2::inviteUser(QXmpp::Muc::Invite invite)
 QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool watch)
 {
     using enum MucRoomState;
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() ||
-        (itr->second.state != Creating && itr->second.state != Joined)) {
+    if (m_data->state != Creating && m_data->state != Joined) {
         co_return QXmppError { u"Room is not in Creating or Joined state."_s };
     }
 
     // Capture wasWatching before potentially enabling watch, so we only use the cache
     // when watching was already active (status 104 was keeping it current).
     // If we're just (re-)enabling watch now, the cache may be stale — always re-fetch.
-    const bool wasWatching = itr->second.watchingRoomConfig;
+    const bool wasWatching = m_data->watchingRoomConfig;
     if (watch) {
-        itr->second.watchingRoomConfig = true;
+        m_data->watchingRoomConfig = true;
     }
 
     if (wasWatching) {
         // If a status-104 re-fetch is in progress, join it — its result will be fresher
         // than the current cache. Otherwise return the cache directly.
-        if (itr->second.fetchingRoomConfig) {
+        if (m_data->fetchingRoomConfig) {
             QXmppPromise<Result<QXmppMucRoomConfig>> p;
             auto task = p.task();
-            itr->second.roomConfigWaiters.push_back(std::move(p));
+            m_data->roomConfigWaiters.push_back(std::move(p));
             co_return co_await std::move(task);
         }
-        if (const auto &cached = itr->second.roomConfig.value()) {
+        if (const auto &cached = m_data->roomConfig.value()) {
             co_return *cached;
         }
     }
 
-    auto result = co_await get<MucOwnerQuery>(m_manager->client(), m_jid, MucOwnerQuery {}).withContext(m_manager);
+    auto result = co_await get<MucOwnerQuery>(m_data->manager->client(), m_data->roomJid, MucOwnerQuery {}).withContext(m_data->manager);
     if (auto *e = std::get_if<QXmppError>(&result)) {
         co_return std::move(*e);
     }
@@ -2418,9 +2418,7 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
     if (!config) {
         co_return QXmppError { u"Server returned an invalid or missing muc#roomconfig form."_s };
     }
-    if (auto itr2 = m_manager->d->rooms.find(m_jid); itr2 != m_manager->d->rooms.end()) {
-        itr2->second.roomConfig = config;
-    }
+    m_data->roomConfig = config;
     co_return std::move(*config);
 }
 
@@ -2436,29 +2434,24 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
 QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &config)
 {
     using enum MucRoomState;
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() ||
-        (itr->second.state != Creating && itr->second.state != Joined)) {
+    if (m_data->state != Creating && m_data->state != Joined) {
         co_return QXmppError { u"Room is not in Creating or Joined state."_s };
     }
 
     auto form = config.toDataForm();
     form.setType(QXmppDataForm::Submit);
 
-    const bool wasCreating = (itr->second.state == Creating);
-    auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .form = std::move(form) }).withContext(m_manager);
-    if (std::holds_alternative<Success>(result)) {
-        auto itr2 = m_manager->d->rooms.find(m_jid);
-        if (itr2 != m_manager->d->rooms.end() && wasCreating) {
-            // Unlock the room: transition to Joined state
-            itr2->second.state = MucRoomState::Joined;
-            itr2->second.joined = true;
-            // XEP-0410: start self-ping silence tracking.
-            itr2->second.lastActivity = std::chrono::steady_clock::now();
-            m_manager->d->rescheduleSelfPing();
-            // Fetch room info now that the room is configured
-            m_manager->d->fetchRoomInfo(m_jid);
-        }
+    const bool wasCreating = (m_data->state == Creating);
+    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .form = std::move(form) }).withContext(m_data->manager);
+    if (std::holds_alternative<Success>(result) && wasCreating) {
+        // Unlock the room: transition to Joined state
+        m_data->state = MucRoomState::Joined;
+        m_data->joined = true;
+        // XEP-0410: start self-ping silence tracking.
+        m_data->lastActivity = std::chrono::steady_clock::now();
+        m_data->manager->d->rescheduleSelfPing();
+        // Fetch room info now that the room is configured
+        m_data->manager->d->fetchRoomInfo(m_data->roomJid);
     }
     co_return result;
 }
@@ -2474,19 +2467,17 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() ||
-        itr->second.state != MucRoomState::Creating) {
+    if (m_data->state != MucRoomState::Creating) {
         co_return QXmppError { u"Room is not in Creating state."_s };
     }
 
     QXmppDataForm cancelForm;
     cancelForm.setType(QXmppDataForm::Cancel);
 
-    auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .form = std::move(cancelForm) }).withContext(m_manager);
+    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .form = std::move(cancelForm) }).withContext(m_data->manager);
     if (std::holds_alternative<Success>(result)) {
-        m_manager->d->rooms.erase(m_jid);
-        m_manager->d->rescheduleSelfPing();
+        m_data->manager->d->deactivateRoom(m_data->roomJid);
+        m_data->manager->d->rescheduleSelfPing();
     }
     co_return result;
 }
@@ -2502,61 +2493,39 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
 ///
 QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QString &alternateJid)
 {
-    auto itr = m_manager->d->rooms.find(m_jid);
-    if (itr == m_manager->d->rooms.end() ||
-        itr->second.state != MucRoomState::Joined) {
+    if (m_data->state != MucRoomState::Joined) {
         co_return QXmppError { u"Room is not joined."_s };
     }
 
-    auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_manager);
+    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_data->manager);
     if (std::holds_alternative<Success>(result)) {
-        m_manager->d->rooms.erase(m_jid);
-        m_manager->d->rescheduleSelfPing();
+        m_data->manager->d->deactivateRoom(m_data->roomJid);
+        m_data->manager->d->rescheduleSelfPing();
     }
     co_return result;
 }
 
-bool QXmppMucParticipant::isValid() const
-{
-    return m_manager->participantData(m_roomJid, m_participantId) != nullptr;
-}
-
 QBindable<QString> QXmppMucParticipant::nickname() const
 {
-    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
-        return { &(data->nickname) };
-    }
-    return {};
+    return &m_data->nickname;
 }
 
 QBindable<QString> QXmppMucParticipant::jid() const
 {
-    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
-        return { &(data->jid) };
-    }
-    return {};
+    return &m_data->jid;
 }
 
 QBindable<Muc::Role> QXmppMucParticipant::role() const
 {
-    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
-        return { &(data->role) };
-    }
-    return {};
+    return &m_data->role;
 }
 
 QBindable<Muc::Affiliation> QXmppMucParticipant::affiliation() const
 {
-    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
-        return { &(data->affiliation) };
-    }
-    return {};
+    return &m_data->affiliation;
 }
 
 QString QXmppMucParticipant::occupantId() const
 {
-    if (auto *data = m_manager->participantData(m_roomJid, m_participantId)) {
-        return data->occupantId;
-    }
-    return {};
+    return m_data->occupantId;
 }

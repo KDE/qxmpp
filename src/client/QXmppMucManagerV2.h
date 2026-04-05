@@ -13,6 +13,7 @@
 #include "QXmppTask.h"
 
 #include <chrono>
+#include <memory>
 #include <optional>
 #include <variant>
 
@@ -45,8 +46,10 @@ public:
     std::chrono::milliseconds selfPingSilenceThreshold() const;
     void setSelfPingSilenceThreshold(std::chrono::milliseconds threshold);
 
-    /// Returns a lightweight handle for the room with the given \a jid.
-    QXmppMucRoomV2 room(const QString &jid);
+    /// Returns a handle for a tracked room, or std::nullopt if the manager has no state
+    /// for this jid. Inactive rooms (left but still held by a caller handle) are revived
+    /// transparently so that leave → findRoom observes the same underlying state.
+    std::optional<QXmppMucRoomV2> findRoom(const QString &jid);
 
     /// Joins the MUC room at \a jid with the given \a nickname.
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname);
@@ -126,9 +129,6 @@ private:
 
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoomAtJid(const QString &roomJid, const QString &nickname);
 
-    const QXmpp::Private::MucRoomData *roomData(const QString &jid) const;
-    const QXmpp::Private::MucParticipantData *participantData(const QString &roomJid, uint32_t participantId) const;
-
     friend class QXmppMucManagerV2Private;
     friend class QXmppMucRoomV2;
     friend class QXmppMucParticipant;
@@ -139,16 +139,17 @@ private:
 ///
 /// \class QXmppMucRoomV2
 ///
-/// \brief Lightweight handle to a joined MUC room, backed by state in QXmppMucManagerV2.
+/// \brief Handle to a MUC room. Copyable value type backed by a shared_ptr.
 ///
 /// A handle is obtained from QXmppMucManagerV2::joinRoom(), QXmppMucManagerV2::createRoom(), or
-/// QXmppMucManagerV2::room(). It is cheap to copy and does not own any data — all state lives in
-/// the manager.
+/// QXmppMucManagerV2::findRoom(). It owns a strong reference to the underlying room state so its
+/// QBindable getters are always safe to read — the state lives as long as any handle does.
 ///
-/// \par Validity
-/// Always check isValid() before accessing properties. A handle becomes invalid when the room is
-/// left or the manager is destroyed. Accessing an invalid handle is safe (properties return default
-/// QBindables / empty lists / errors) but carries no data.
+/// \par Lifetime
+/// When you leave a room or are kicked, the manager drops its own reference but keeps a weak_ptr
+/// so that caller handles can continue to observe the final state as a frozen snapshot. Rejoining
+/// the same room while a handle is still held revives the existing state in place, preserving
+/// cached roomInfo, roomConfig, avatars, etc. When the last handle is dropped, memory is freed.
 ///
 /// \par Bindable properties
 /// Most observable state (subject(), nickname(), joined(), canSendMessages(), …) is exposed as
@@ -161,21 +162,27 @@ private:
 /// \endcode
 ///
 /// \par Participants
-/// participants() returns a snapshot list of lightweight QXmppMucParticipant handles. Connect to
-/// QXmppMucManagerV2::participantJoined() and participantLeft() (or the convenience helpers
-/// onParticipantJoined() / onParticipantLeft()) to be notified of changes.
+/// participants() returns a snapshot list of QXmppMucParticipant handles. Each participant handle
+/// likewise owns a strong reference to its participant data, so it is safe to hold across
+/// participants coming and going. Connect to QXmppMucManagerV2::participantJoined() and
+/// participantLeft() (or the convenience helpers onParticipantJoined() / onParticipantLeft()) to
+/// be notified of changes.
 ///
-/// \note QXmppMucRoomV2 and QXmppMucParticipant are lightweight handles and do not own any data.
-/// They access state stored in the QXmppMucManager. The manager must remain alive for the lifetime
-/// of any room or participant handle.
-/// Accessing a handle after the manager is destroyed is undefined behavior.
+/// \note The QXmppMucManagerV2 itself must remain alive while handles are in use — the handles
+/// own the data but the manager owns the signal infrastructure. Accessing a handle after the
+/// manager is destroyed is undefined behavior.
 ///
 /// \since QXmpp 1.15
 ///
 class QXMPP_EXPORT QXmppMucRoomV2
 {
 public:
-    bool isValid() const;
+    QXmppMucRoomV2() = delete;
+    QXmppMucRoomV2(const QXmppMucRoomV2 &) = default;
+    QXmppMucRoomV2(QXmppMucRoomV2 &&) = default;
+    QXmppMucRoomV2 &operator=(const QXmppMucRoomV2 &) = default;
+    QXmppMucRoomV2 &operator=(QXmppMucRoomV2 &&) = default;
+
     QBindable<QString> subject() const;
     QBindable<QString> nickname() const;
     QBindable<bool> joined() const;
@@ -236,7 +243,8 @@ public:
     template<typename Func>
     QMetaObject::Connection onParticipantJoined(QObject *context, Func &&f) const
     {
-        return QObject::connect(m_manager, &QXmppMucManagerV2::participantJoined, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant) {
+        auto *manager = this->manager();
+        return QObject::connect(manager, &QXmppMucManagerV2::participantJoined, context, [jid = jid(), f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant) {
             if (roomJid == jid) {
                 f(participant);
             }
@@ -247,22 +255,27 @@ public:
     template<typename Func>
     QMetaObject::Connection onParticipantLeft(QObject *context, Func &&f) const
     {
-        return QObject::connect(m_manager, &QXmppMucManagerV2::participantLeft, context, [jid = m_jid, f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant, QXmpp::Muc::LeaveReason reason) {
+        auto *manager = this->manager();
+        return QObject::connect(manager, &QXmppMucManagerV2::participantLeft, context, [jid = jid(), f = std::forward<Func>(f)](const QString &roomJid, const QXmppMucParticipant &participant, QXmpp::Muc::LeaveReason reason) {
             if (roomJid == jid) {
                 f(participant, reason);
             }
         });
     }
 
+    QString jid() const;
+    QXmppMucManagerV2 *manager() const;
+
 private:
-    QXmppMucRoomV2(QXmppMucManagerV2 *manager, const QString &jid)
-        : m_manager(manager), m_jid(jid)
+    explicit QXmppMucRoomV2(std::shared_ptr<QXmpp::Private::MucRoomData> data)
+        : m_data(std::move(data))
     {
     }
 
     friend class QXmppMucManagerV2;
-    QXmppMucManagerV2 *m_manager;
-    QString m_jid;
+    friend struct QXmppMucManagerV2Private;
+    friend class tst_QXmppMuc;
+    std::shared_ptr<QXmpp::Private::MucRoomData> m_data;
 };
 
 ///
@@ -278,8 +291,12 @@ private:
 class QXMPP_EXPORT QXmppMucParticipant
 {
 public:
-    /// Returns whether the participant handle refers to a valid participant.
-    bool isValid() const;
+    QXmppMucParticipant() = delete;
+    QXmppMucParticipant(const QXmppMucParticipant &) = default;
+    QXmppMucParticipant(QXmppMucParticipant &&) = default;
+    QXmppMucParticipant &operator=(const QXmppMucParticipant &) = default;
+    QXmppMucParticipant &operator=(QXmppMucParticipant &&) = default;
+
     /// Returns the participant's nickname in the room.
     QBindable<QString> nickname() const;
     /// Returns the participant's real JID if known.
@@ -292,23 +309,16 @@ public:
     QString occupantId() const;
 
 private:
-    QXmppMucParticipant(QXmppMucManagerV2 *manager, const QString &roomJid, uint32_t participantId)
-        : m_manager(manager), m_roomJid(roomJid), m_participantId(participantId)
+    explicit QXmppMucParticipant(std::shared_ptr<QXmpp::Private::MucParticipantData> data)
+        : m_data(std::move(data))
     {
     }
 
     friend class QXmppMucManagerV2;
-    friend class QXmppMucManagerV2Private;
+    friend struct QXmppMucManagerV2Private;
     friend class QXmppMucRoomV2;
     friend class tst_QXmppMuc;
-    QXmppMucManagerV2 *m_manager;
-    QString m_roomJid;
-    uint32_t m_participantId;
+    std::shared_ptr<QXmpp::Private::MucParticipantData> m_data;
 };
-
-inline QXmppMucRoomV2 QXmppMucManagerV2::room(const QString &jid)
-{
-    return QXmppMucRoomV2(this, jid);
-}
 
 #endif  // QXMPPMUCMANAGERV2_H
