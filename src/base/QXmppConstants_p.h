@@ -201,6 +201,8 @@ inline constexpr QStringView ns_jingle_rtp_hdrext = u"urn:xmpp:jingle:apps:rtp:r
 inline constexpr QStringView ns_forwarding = u"urn:xmpp:forward:0";
 // XEP-0300: Use of Cryptographic Hash Functions in XMPP
 inline constexpr QStringView ns_hashes = u"urn:xmpp:hashes:2";
+// XEP-0307: Unique Room Names for Multi-User Chat
+inline constexpr QStringView ns_muc_unique = u"http://jabber.org/protocol/muc#unique";
 // XEP-0308: Last Message Correction
 inline constexpr QStringView ns_message_correct = u"urn:xmpp:message-correct:0";
 // XEP-0313: Message Archive Management

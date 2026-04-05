@@ -300,4 +300,19 @@ void MucRegisterQuery::toXml(QXmlStreamWriter *writer) const
 }
 /// \endcond
 
+/// \cond
+std::optional<MucUniqueQuery> MucUniqueQuery::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    return MucUniqueQuery { el.text() };
+}
+
+void MucUniqueQuery::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element { XmlTag, OptionalCharacters { name } });
+}
+/// \endcond
+
 }  // namespace QXmpp::Private

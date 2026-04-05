@@ -22,6 +22,7 @@
 
 #include <QProperty>
 #include <QTimer>
+#include <QUuid>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -277,7 +278,7 @@ struct MucRoomData {
 /// setRoomConfig() to unlock it, or cancel with cancelRoomCreation().
 ///
 /// \code
-/// muc->createRoom(u"newroom@conference.example.org"_s, u"alice"_s).then(this, [](auto result) {
+/// muc->createRoom(u"conference.example.org"_s, u"alice"_s, u"newroom"_s).then(this, [](auto result) {
 ///     if (auto *room = std::get_if<QXmppMucRoomV2>(&result)) {
 ///         auto config = room->roomConfig().value().value_or(QXmppMucRoomConfig{});
 ///         config.setName(u"My New Room"_s);
@@ -373,6 +374,27 @@ QBindable<bool> QXmppMucManagerV2::mucServicesLoaded() const
 }
 
 ///
+/// Requests a unique room localpart from the MUC \a serviceJid (XEP-0307).
+///
+/// Returns the full room JID (\c localpart@serviceJid) which can be passed to createRoom().
+/// Fails if the service does not support XEP-0307 or returns an empty name. Use createRoom()
+/// without an explicit \c roomName if you want an automatic client-side fallback.
+///
+/// \since QXmpp 1.16
+///
+QXmppTask<Result<QString>> QXmppMucManagerV2::requestUniqueRoomName(QString serviceJid)
+{
+    auto result = co_await get<MucUniqueQuery>(client(), serviceJid, MucUniqueQuery {}).withContext(this);
+    if (auto *q = std::get_if<MucUniqueQuery>(&result)) {
+        if (q->name.isEmpty()) {
+            co_return QXmppError { u"MUC service did not return a unique room name."_s };
+        }
+        co_return q->name + u'@' + serviceJid;
+    }
+    co_return std::get<QXmppError>(std::move(result));
+}
+
+///
 ///
 /// Joins the MUC room at \a jid with the given \a nickname.
 ///
@@ -438,20 +460,42 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
 }
 
 ///
-/// Creates a new reserved MUC room at \a jid with the given \a nickname.
+/// Creates a new reserved (locked) MUC room on \a serviceJid with the given \a nickname.
 ///
-/// The room is created in a locked state; no other users can join until the
-/// owner submits the configuration form via QXmppMucRoomV2::setRoomConfig().
+/// If \a roomName is set, the room is created at \c roomName@serviceJid. If \a roomName is
+/// unset, createRoom() asks the service for a unique localpart via XEP-0307 (muc\#unique);
+/// if that query fails for any reason (service does not support XEP-0307, IQ error, …), it
+/// falls back to a client-generated UUID localpart so creation still succeeds against any
+/// compliant MUC service.
 ///
-/// The returned task resolves once the server has confirmed room creation
-/// (XEP-0045 status code 201) and the configuration form has been fetched.
-/// If the room already exists the join will succeed normally and the task
-/// will fail with an error. If the local state machine detects that the room
-/// already exists (already tracked) the task fails immediately.
+/// The room is created in a locked state; no other users can join until the owner submits
+/// the configuration form via QXmppMucRoomV2::setRoomConfig(). The task resolves once the
+/// server has confirmed room creation (XEP-0045 status code 201) and the configuration form
+/// has been fetched. If the local state machine detects that the room is already tracked,
+/// the task fails immediately.
 ///
 /// \since QXmpp 1.16
 ///
-QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoom(const QString &jid, const QString &nickname)
+QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoom(QString serviceJid,
+                                                                QString nickname,
+                                                                std::optional<QString> roomName)
+{
+    QString roomJid;
+    if (roomName) {
+        roomJid = *roomName + u'@' + serviceJid;
+    } else {
+        auto unique = co_await requestUniqueRoomName(serviceJid).withContext(this);
+        if (auto *jid = std::get_if<QString>(&unique)) {
+            roomJid = *jid;
+        } else {
+            // XEP-0307 not supported / IQ failed — fall back to a locally generated name.
+            roomJid = QUuid::createUuid().toString(QUuid::WithoutBraces) + u'@' + serviceJid;
+        }
+    }
+    co_return co_await createRoomAtJid(roomJid, nickname).withContext(this);
+}
+
+QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoomAtJid(const QString &jid, const QString &nickname)
 {
     if (nickname.isEmpty()) {
         return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Nickname must not be empty."_s });
