@@ -14,6 +14,7 @@
 #include "QXmppPubSubManager.h"
 #include "QXmppPubSubSubAuthorization.h"
 #include "QXmppSendResult.h"
+#include "QXmppUtils.h"
 
 #include "TestClient.h"
 
@@ -102,6 +103,9 @@ private:
     Q_SLOT void joinRoomNotFound();
     Q_SLOT void createRoom();
     Q_SLOT void createRoomAlreadyExists();
+    Q_SLOT void requestUniqueRoomName();
+    Q_SLOT void requestUniqueRoomNameEmpty();
+    Q_SLOT void createRoomUnique();
     Q_SLOT void setRoomConfigCreation();
     Q_SLOT void cancelRoomCreation();
     Q_SLOT void reconfigureRoom();
@@ -605,7 +609,7 @@ static QXmppMucRoomV2 createdRoom(TestClient &test, QXmppMucManagerV2 *muc,
                                   const QString &roomJid = u"newroom@chat.shakespeare.lit"_s,
                                   const QString &nick = u"thirdwitch"_s)
 {
-    auto createTask = muc->createRoom(roomJid, nick);
+    auto createTask = muc->createRoom(QXmppUtils::jidToDomain(roomJid), nick, QXmppUtils::jidToUser(roomJid));
     test.ignore();  // presence
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
@@ -2197,7 +2201,7 @@ void tst_QXmppMuc::createRoom()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto task = muc->createRoom(u"newroom@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    auto task = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s, u"newroom"_s);
     test.expect(u"<presence to='newroom@chat.shakespeare.lit/thirdwitch'>"
                 "<x xmlns='http://jabber.org/protocol/muc'/>"
                 "</presence>"_s);
@@ -2248,7 +2252,7 @@ void tst_QXmppMuc::createRoomAlreadyExists()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto task = muc->createRoom(u"existing@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    auto task = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s, u"existing"_s);
     test.ignore();  // presence
 
     // Server grants entry without status 201: room already existed
@@ -2264,6 +2268,99 @@ void tst_QXmppMuc::createRoomAlreadyExists()
 
     QVERIFY(task.isFinished());
     expectFutureVariant<QXmppError>(task);
+}
+
+void tst_QXmppMuc::requestUniqueRoomName()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->requestUniqueRoomName(u"chat.shakespeare.lit"_s);
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='chat.shakespeare.lit' type='get'>"
+                "<unique xmlns='http://jabber.org/protocol/muc#unique'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result' from='chat.shakespeare.lit'>"
+                "<unique xmlns='http://jabber.org/protocol/muc#unique'>"
+                "6d9423a55f4d9db8b0a2bf3acdf6fe47f48a66a4"
+                "</unique></iq>"_s);
+
+    QVERIFY(task.isFinished());
+    QCOMPARE(expectFutureVariant<QString>(task),
+             u"6d9423a55f4d9db8b0a2bf3acdf6fe47f48a66a4@chat.shakespeare.lit"_s);
+}
+
+void tst_QXmppMuc::requestUniqueRoomNameEmpty()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->requestUniqueRoomName(u"chat.shakespeare.lit"_s);
+    test.expect(u"<iq id='qx1' to='chat.shakespeare.lit' type='get'>"
+                "<unique xmlns='http://jabber.org/protocol/muc#unique'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result' from='chat.shakespeare.lit'>"
+                "<unique xmlns='http://jabber.org/protocol/muc#unique'/>"
+                "</iq>"_s);
+
+    QVERIFY(task.isFinished());
+    expectFutureVariant<QXmppError>(task);
+}
+
+void tst_QXmppMuc::createRoomUnique()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // No roomName provided → muc#unique query first.
+    auto task = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.expect(u"<iq id='qx1' to='chat.shakespeare.lit' type='get'>"
+                "<unique xmlns='http://jabber.org/protocol/muc#unique'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result' from='chat.shakespeare.lit'>"
+                "<unique xmlns='http://jabber.org/protocol/muc#unique'>"
+                "newroom"
+                "</unique></iq>"_s);
+
+    // From here on, the regular createRoom flow kicks in at newroom@chat.shakespeare.lit.
+    test.expect(u"<presence to='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc'/>"
+                "</presence>"_s);
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='owner' role='moderator'/>"
+                "<status code='110'/>"
+                "<status code='201'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    test.expect(u"<iq id='qx1' to='newroom@chat.shakespeare.lit' type='get'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'>"
+                "<value>http://jabber.org/protocol/muc#roomconfig</value>"
+                "</field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    QVERIFY(task.isFinished());
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task);
+    QVERIFY(room.isValid());
 }
 
 void tst_QXmppMuc::setRoomConfigCreation()
