@@ -16,10 +16,14 @@
 #include <optional>
 #include <unordered_map>
 
+#include <QTimer>
+
 namespace QXmpp::Private {
 struct MucRoomData;
 
 constexpr auto MucJoinTimeout = std::chrono::seconds(30);
+constexpr auto MucSelfPingDefaultThreshold = std::chrono::minutes(5);
+constexpr int MucSelfPingMaxRetries = 4;
 }  // namespace QXmpp::Private
 
 struct QXmppMucManagerV2Private {
@@ -32,6 +36,12 @@ struct QXmppMucManagerV2Private {
     std::optional<QXmppDiscoServicesWatch> servicesWatch;
     QProperty<QStringList> mucServices;
     QProperty<bool> mucServicesLoaded { false };
+
+    // XEP-0410: MUC Self-Ping — manager-wide scheduler state
+    QTimer selfPingTimer;
+    std::chrono::milliseconds selfPingSilenceThreshold { QXmpp::Private::MucSelfPingDefaultThreshold };
+
+    QXmppMucManagerV2Private(QXmppMucManagerV2 *manager);
 
     QXmppDiscoveryManager *disco();
 
@@ -50,6 +60,20 @@ struct QXmppMucManagerV2Private {
     void handleNickChangeTimeout(const QString &roomJid);
     void handleMessageTimeout(const QString &roomJid, const QString &originId);
     uint32_t generateParticipantId() { return participantIdCounter++; }
+
+    // XEP-0410: MUC Self-Ping
+    void rescheduleSelfPing();
+    void onSelfPingTick();
+    void runSelfPing(const QString &roomJid);
+
+    // XEP-0410 test accessors — MucRoomData is defined in the .cpp, so tests can't
+    // reach it directly. These helpers let tst_QXmppMuc inspect/manipulate per-room
+    // self-ping state without exposing the full struct.
+    bool testSelfPingInFlight(const QString &roomJid) const;
+    int testSelfPingRetryCount(const QString &roomJid) const;
+    bool testHasRoom(const QString &roomJid) const;
+    void testForceDueForSelfPing(const QString &roomJid);
+    std::chrono::steady_clock::time_point testLastActivity(const QString &roomJid) const;
 };
 
 #endif  // QXMPPMUCMANAGERV2_P_H
