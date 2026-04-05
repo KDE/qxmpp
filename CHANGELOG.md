@@ -4,8 +4,23 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.15.0 (UNRELEASED)
+-------------------------
+
+ - Make QXmppTask `co_await`-able and migrate all async code to C++20 coroutines (@lnj, !711)
+ - Replace QCA dependency with direct OpenSSL 3.0+ usage (@lnj, !756)
+ - Use constant-time comparison for OMEMO HMAC verification fixing timing attacks on OMEMO (@lnj, !756)
+ - Send client locale in XMPP stream open to server (@lnj, !754)
+ - CarbonManagerV2: Add bindable enabled() property (@lnj)
+ - Add QXmppBitsOfBinaryDataList::find() convenience method (@lnj, !755)
+ - Docs: Add option to generate docbook (@kbkmde, !743)
+ - CMake: Auto-enable OMEMO and GStreamer support when dependencies are found (@lnj, !760)
+ - CMake: Make PkgConfig usage optional (@skunkoss @lnj, !751)
+ - CMake: Rename `BUILD_TESTS` option to `BUILD_TESTING` (@lnj, !738)
+ - Drop Qt 5 support, require Qt 6.4 (@lnj, !759)
+
 QXmpp 1.14.6 (April 3, 2026)
-------------------------------
+----------------------------
 
  - Fix parsing of XML namespace prefixes in extension elements (@lnj, !762)
  - JMI: Fix finish() emitting closed() with empty reason/migratedTo (@lnj)
@@ -13,7 +28,7 @@ QXmpp 1.14.6 (April 3, 2026)
  - JMI: Echo `<finish/>` back when receiving one per XEP-0353 §3.7 (@lnj)
 
 QXmpp 1.14.5 (March 29, 2026)
-------------------------------
+-----------------------------
 
  - Fall back to password auth when FAST token is rejected (@lnj)
  - Fix memory leak in OmemoLibPtr::ptrRef() (@lnj)
