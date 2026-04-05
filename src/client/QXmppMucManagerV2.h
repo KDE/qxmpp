@@ -12,6 +12,7 @@
 #include "QXmppSendResult.h"
 #include "QXmppTask.h"
 
+#include <chrono>
 #include <optional>
 #include <variant>
 
@@ -40,6 +41,9 @@ public:
 
     QBindable<QStringList> mucServices() const;
     QBindable<bool> mucServicesLoaded() const;
+
+    std::chrono::milliseconds selfPingSilenceThreshold() const;
+    void setSelfPingSilenceThreshold(std::chrono::milliseconds threshold);
 
     /// Returns a lightweight handle for the room with the given \a jid.
     QXmppMucRoomV2 room(const QString &jid);

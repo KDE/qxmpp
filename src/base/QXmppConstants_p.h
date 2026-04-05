@@ -270,6 +270,8 @@ inline constexpr QStringView ns_mix_node_banned = u"urn:xmpp:mix:nodes:banned";
 inline constexpr QStringView ns_mix_node_config = u"urn:xmpp:mix:nodes:config";
 // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
 inline constexpr QStringView ns_mix_misc = u"urn:xmpp:mix:misc:0";
+// XEP-0410: MUC Self-Ping (Schrödinger's Chat)
+inline constexpr QStringView muc_feat_self_ping_optimization = u"http://jabber.org/protocol/muc#self-ping-optimization";
 // XEP-0421: Occupant identifiers for semi-anonymous MUCs
 inline constexpr QStringView ns_muc_occupant_id = u"urn:xmpp:occupant-id:0";
 // XEP-0428: Fallback Indication
