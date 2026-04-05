@@ -38,6 +38,7 @@ private:
     Q_SLOT void testE2eeExtension();
     Q_SLOT void testTaskDirect();
     Q_SLOT void testTaskStore();
+    Q_SLOT void testTaskOptionalNullopt();
     Q_SLOT void testChainIq();
     Q_SLOT void colorGeneration();
 #if QT_GUI_LIB
@@ -232,6 +233,21 @@ void tst_QXmppClient::testTaskStore()
 
     QVERIFY(p.task().isFinished());
     QVERIFY(!p.task().hasResult());
+}
+
+void tst_QXmppClient::testTaskOptionalNullopt()
+{
+    // Regression test: finishing a promise whose T is std::optional<X>
+    // with std::nullopt must produce an engaged result holding an empty
+    // inner optional, not disengage the internal storage. takeResult()
+    // previously dereferenced an empty optional and crashed.
+    QXmppPromise<std::optional<int>> p;
+    auto task = p.task();
+    p.finish(std::nullopt);
+
+    QVERIFY(task.isFinished());
+    QVERIFY(task.hasResult());
+    QVERIFY(!task.takeResult().has_value());
 }
 
 using DiscoResult = std::variant<QXmppDiscoveryIq, QXmppError>;

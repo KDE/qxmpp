@@ -209,16 +209,16 @@ public:
     {
         if (shared()) {
             sharedData().finished = true;
-            sharedData().result = std::forward<U>(value);
+            sharedData().result.emplace(std::forward<U>(value));
         } else {
             if (auto *task = inlineData().task) {
                 inlineData().task->inlineData().finished = true;
-                inlineData().task->inlineData().result = std::forward<U>(value);
+                inlineData().task->inlineData().result.emplace(std::forward<U>(value));
             } else {
                 // finish called without generating task
                 detachData();
                 sharedData().finished = true;
-                sharedData().result = std::forward<U>(value);
+                sharedData().result.emplace(std::forward<U>(value));
             }
         }
         invokeHandle();
