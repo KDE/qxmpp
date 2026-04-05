@@ -9,12 +9,14 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMucForms.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppStanza.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 #include <QXmppUtils.h>
 
 #include "Global.h"
 #include "IqSending.h"
+#include "Ping.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -133,6 +135,10 @@ struct MucRoomData {
     std::unique_ptr<QTimer, DeleteLaterDeleter> nickChangeTimer;
     std::optional<QXmppPromise<Result<>>> leavePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
+    // XEP-0410: MUC Self-Ping
+    std::chrono::steady_clock::time_point lastActivity;
+    bool selfPingInFlight = false;
+    int selfPingRetryCount = 0;
     // Room feature flags populated from disco#info after joining (re-fetched on status code 104).
     // isNonAnonymous is additionally updated on status codes 172/173.
     QProperty<bool> isNonAnonymous;
@@ -374,6 +380,37 @@ QBindable<bool> QXmppMucManagerV2::mucServicesLoaded() const
 }
 
 ///
+/// Returns the current XEP-0410 self-ping silence threshold.
+///
+/// After a room has been silent for this duration, the manager sends a self-ping to verify
+/// that the client is still joined. A zero value disables self-pinging entirely.
+///
+/// \since QXmpp 1.16
+///
+std::chrono::milliseconds QXmppMucManagerV2::selfPingSilenceThreshold() const
+{
+    return d->selfPingSilenceThreshold;
+}
+
+///
+/// Sets the XEP-0410 self-ping silence threshold.
+///
+/// After \a threshold of silence on a joined room, the manager sends an XEP-0199 ping to
+/// the user's own occupant JID and interprets the response to detect silent server-side
+/// eviction ("ghosting"). Defaults to 5 minutes. Pass a zero duration to disable
+/// self-pinging entirely.
+///
+/// Ghosted rooms are surfaced via removedFromRoom() with \c LeaveReason::ConnectionLost.
+///
+/// \since QXmpp 1.16
+///
+void QXmppMucManagerV2::setSelfPingSilenceThreshold(std::chrono::milliseconds threshold)
+{
+    d->selfPingSilenceThreshold = threshold;
+    d->rescheduleSelfPing();
+}
+
+///
 /// Requests a unique room localpart from the MUC \a serviceJid (XEP-0307).
 ///
 /// Returns the full room JID (\c localpart@serviceJid) which can be passed to createRoom().
@@ -597,6 +634,9 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
             data.state = MucRoomState::Joined;
             data.joined = true;
             data.joinTimer.reset();
+            // XEP-0410: start self-ping silence tracking.
+            data.lastActivity = std::chrono::steady_clock::now();
+            d->rescheduleSelfPing();
 
             auto history = std::move(data.historyMessages);
             auto promise = std::move(*data.joinPromise);
@@ -609,6 +649,8 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &message)
         }
         return true;
     case MucRoomState::Joined:
+        // XEP-0410: any incoming stanza on a joined room counts as activity.
+        data.lastActivity = std::chrono::steady_clock::now();
         // Check for reflected message (match by origin-id)
         if (auto originId = message.originId(); !originId.isEmpty()) {
             if (auto pendingItr = data.pendingMessages.find(originId); pendingItr != data.pendingMessages.end()) {
@@ -730,6 +772,13 @@ const MucParticipantData *QXmppMucManagerV2::participantData(const QString &room
     return nullptr;
 }
 
+QXmppMucManagerV2Private::QXmppMucManagerV2Private(QXmppMucManagerV2 *manager)
+    : q(manager)
+{
+    selfPingTimer.setSingleShot(true);
+    QObject::connect(&selfPingTimer, &QTimer::timeout, q, [this]() { onSelfPingTick(); });
+}
+
 QXmppDiscoveryManager *QXmppMucManagerV2Private::disco()
 {
     if (!q->client()) {
@@ -761,6 +810,11 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
     auto nickname = QXmppUtils::jidToResource(presence.from());
 
     // TODO: clear occupant ID in presence at this point if not supported by MUC to prevent occupant ID injection
+
+    // XEP-0410: any presence on a joined room counts as activity.
+    if (data.state == Joined) {
+        data.lastActivity = std::chrono::steady_clock::now();
+    }
 
     switch (data.state) {
     case NotJoined:
@@ -843,6 +897,8 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     auto promise = std::move(*data.nickChangePromise);
                     data.nickChangePromise.reset();
                     data.nickChangeTimer.reset();
+                    // XEP-0410 §4.1: nick change complete — the room can be self-pinged again.
+                    rescheduleSelfPing();
                     promise.finish(Success());
                 }
             }
@@ -872,6 +928,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             }
 
             rooms.erase(roomJid);
+            rescheduleSelfPing();
 
             if (promise) {
                 promise->finish(Success());
@@ -915,6 +972,8 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 auto promise = std::move(*data.nickChangePromise);
                 data.nickChangePromise.reset();
                 data.nickChangeTimer.reset();
+                // XEP-0410 §4.1: nick change ended (with error) — room can be self-pinged again.
+                rescheduleSelfPing();
                 promise.finish(QXmppError { error.text(), std::move(error) });
             }
         }
@@ -927,6 +986,187 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
         }
         break;
     }
+}
+
+//
+// XEP-0410: MUC Self-Ping
+//
+
+void QXmppMucManagerV2Private::rescheduleSelfPing()
+{
+    using namespace std::chrono;
+    if (selfPingSilenceThreshold == milliseconds::zero()) {
+        selfPingTimer.stop();
+        return;
+    }
+    auto now = steady_clock::now();
+    auto earliest = steady_clock::time_point::max();
+    for (const auto &[jid, data] : rooms) {
+        if (data.state != MucRoomState::Joined) {
+            continue;
+        }
+        if (data.selfPingInFlight || data.nickChangePromise) {
+            continue;
+        }
+        auto deadline = data.lastActivity + selfPingSilenceThreshold;
+        if (deadline < earliest) {
+            earliest = deadline;
+        }
+    }
+    if (earliest == steady_clock::time_point::max()) {
+        selfPingTimer.stop();
+        return;
+    }
+    auto delta = duration_cast<milliseconds>(earliest - now);
+    if (delta < milliseconds::zero()) {
+        delta = milliseconds::zero();
+    }
+    selfPingTimer.start(delta);
+}
+
+void QXmppMucManagerV2Private::onSelfPingTick()
+{
+    using namespace std::chrono;
+    if (selfPingSilenceThreshold == milliseconds::zero()) {
+        return;
+    }
+    auto now = steady_clock::now();
+    // Collect room JIDs first — runSelfPing() may mutate rooms via async callbacks,
+    // but for the synchronous iteration we only trigger the send, not the response path.
+    std::vector<QString> due;
+    for (const auto &[jid, data] : rooms) {
+        if (data.state != MucRoomState::Joined) {
+            continue;
+        }
+        if (data.selfPingInFlight || data.nickChangePromise) {
+            continue;
+        }
+        if (now - data.lastActivity >= selfPingSilenceThreshold) {
+            due.push_back(jid);
+        }
+    }
+    for (const auto &jid : due) {
+        runSelfPing(jid);
+    }
+    rescheduleSelfPing();
+}
+
+void QXmppMucManagerV2Private::runSelfPing(const QString &roomJid)
+{
+    enum class SelfPingOutcome {
+        Joined,
+        NotJoined,
+        Inconclusive,
+    };
+
+    auto it = rooms.find(roomJid);
+    if (it == rooms.end() || it->second.state != MucRoomState::Joined) {
+        return;
+    }
+    auto &data = it->second;
+    if (data.selfPingInFlight || data.nickChangePromise) {
+        return;
+    }
+    data.selfPingInFlight = true;
+    const QString occupantJid = roomJid + u'/' + data.nickname.value();
+
+    getEmpty(q->client(), occupantJid, Ping {}).then(q, [this, roomJid](Result<> &&result) {
+        auto it = rooms.find(roomJid);
+        if (it == rooms.end()) {
+            return;
+        }
+        auto &data = it->second;
+        data.selfPingInFlight = false;
+
+        using Cond = QXmppStanza::Error::Condition;
+        auto outcome = SelfPingOutcome::Inconclusive;
+        if (std::holds_alternative<Success>(result)) {
+            outcome = SelfPingOutcome::Joined;
+        } else {
+            auto &err = std::get<QXmppError>(result);
+            if (auto stanzaErr = err.value<QXmppStanza::Error>()) {
+                switch (stanzaErr->condition()) {
+                case Cond::ServiceUnavailable:
+                case Cond::FeatureNotImplemented:
+                case Cond::ItemNotFound:
+                    outcome = SelfPingOutcome::Joined;
+                    break;
+                case Cond::NotAcceptable:
+                case Cond::NotAllowed:
+                case Cond::BadRequest:
+                    outcome = SelfPingOutcome::NotJoined;
+                    break;
+                case Cond::RemoteServerNotFound:
+                case Cond::RemoteServerTimeout:
+                    outcome = SelfPingOutcome::Inconclusive;
+                    break;
+                default:
+                    outcome = SelfPingOutcome::NotJoined;
+                    break;
+                }
+            }
+            // else: transport-level error / task timeout → inconclusive (already default)
+        }
+
+        using namespace std::chrono;
+        switch (outcome) {
+        case SelfPingOutcome::Joined:
+            data.selfPingRetryCount = 0;
+            data.lastActivity = steady_clock::now();
+            rescheduleSelfPing();
+            break;
+        case SelfPingOutcome::Inconclusive:
+            if (++data.selfPingRetryCount < MucSelfPingMaxRetries) {
+                // Backoff: 30s, 1m, 2m, 4m. Encode as an earlier lastActivity so
+                // the scheduler naturally fires at the right time — keeps the
+                // single-timer design free of retry-specific paths.
+                auto backoff = seconds(30) * (1u << (data.selfPingRetryCount - 1));
+                data.lastActivity = steady_clock::now() - selfPingSilenceThreshold + backoff;
+            } else {
+                data.selfPingRetryCount = 0;
+                data.lastActivity = steady_clock::now();
+            }
+            rescheduleSelfPing();
+            break;
+        case SelfPingOutcome::NotJoined:
+            // Synthesize a forcible removal — reuses the standard removedFromRoom cleanup path.
+            Q_EMIT q->removedFromRoom(roomJid, Muc::LeaveReason::ConnectionLost, std::nullopt);
+            rooms.erase(it);
+            rescheduleSelfPing();
+            break;
+        }
+    });
+}
+
+bool QXmppMucManagerV2Private::testSelfPingInFlight(const QString &roomJid) const
+{
+    auto it = rooms.find(roomJid);
+    return it != rooms.end() && it->second.selfPingInFlight;
+}
+
+int QXmppMucManagerV2Private::testSelfPingRetryCount(const QString &roomJid) const
+{
+    auto it = rooms.find(roomJid);
+    return it != rooms.end() ? it->second.selfPingRetryCount : 0;
+}
+
+bool QXmppMucManagerV2Private::testHasRoom(const QString &roomJid) const
+{
+    return rooms.contains(roomJid);
+}
+
+void QXmppMucManagerV2Private::testForceDueForSelfPing(const QString &roomJid)
+{
+    auto it = rooms.find(roomJid);
+    if (it != rooms.end()) {
+        it->second.lastActivity = std::chrono::steady_clock::now() - std::chrono::hours(1);
+    }
+}
+
+std::chrono::steady_clock::time_point QXmppMucManagerV2Private::testLastActivity(const QString &roomJid) const
+{
+    auto it = rooms.find(roomJid);
+    return it != rooms.end() ? it->second.lastActivity : std::chrono::steady_clock::time_point {};
 }
 
 void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError &&error)
@@ -945,6 +1185,7 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
     }
     itr->second.joinTimer.reset();
     rooms.erase(itr);
+    rescheduleSelfPing();
 
     if (promise) {
         promise->finish(std::move(error));
@@ -978,6 +1219,7 @@ void QXmppMucManagerV2Private::clearAllRooms()
         }
     }
     rooms.clear();
+    selfPingTimer.stop();
 
     const auto error = QXmppError { u"Disconnected from server."_s };
     for (auto &promise : joinPromises) {
@@ -1146,6 +1388,7 @@ void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
         promise = std::move(itr->second.leavePromise);
     }
     rooms.erase(itr);
+    rescheduleSelfPing();
 
     if (promise) {
         promise->finish(QXmppError { u"Leaving room timed out."_s });
@@ -1167,6 +1410,8 @@ void QXmppMucManagerV2Private::handleNickChangeTimeout(const QString &roomJid)
     auto promise = std::move(*data.nickChangePromise);
     data.nickChangePromise.reset();
     data.nickChangeTimer.reset();
+    // XEP-0410 §4.1: nick change ended (with timeout) — room can be self-pinged again.
+    rescheduleSelfPing();
     promise.finish(QXmppError { u"Changing nickname timed out."_s });
 }
 
@@ -1824,6 +2069,9 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
     data.nickChangeTimer.reset(timer);
     timer->start(m_manager->d->timeout);
 
+    // XEP-0410 §4.1: suppress self-ping on this room until the nick change completes.
+    m_manager->d->rescheduleSelfPing();
+
     return task;
 }
 
@@ -2190,6 +2438,9 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
             // Unlock the room: transition to Joined state
             itr2->second.state = MucRoomState::Joined;
             itr2->second.joined = true;
+            // XEP-0410: start self-ping silence tracking.
+            itr2->second.lastActivity = std::chrono::steady_clock::now();
+            m_manager->d->rescheduleSelfPing();
             // Fetch room info now that the room is configured
             m_manager->d->fetchRoomInfo(m_jid);
         }
@@ -2220,6 +2471,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .form = std::move(cancelForm) }).withContext(m_manager);
     if (std::holds_alternative<Success>(result)) {
         m_manager->d->rooms.erase(m_jid);
+        m_manager->d->rescheduleSelfPing();
     }
     co_return result;
 }
@@ -2244,6 +2496,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
     auto result = co_await set(m_manager->client(), m_jid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_manager);
     if (std::holds_alternative<Success>(result)) {
         m_manager->d->rooms.erase(m_jid);
+        m_manager->d->rescheduleSelfPing();
     }
     co_return result;
 }

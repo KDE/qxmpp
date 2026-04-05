@@ -115,6 +115,16 @@ private:
     Q_SLOT void rewatchRoomConfigStaleCache();
     Q_SLOT void requestRoomConfigJoinsInFlightFetch();
 
+    // XEP-0410: MUC Self-Ping
+    Q_SLOT void selfPingJoined();
+    Q_SLOT void selfPingStillJoinedServiceUnavailable();
+    Q_SLOT void selfPingStillJoinedItemNotFound();
+    Q_SLOT void selfPingGhosted();
+    Q_SLOT void selfPingInconclusiveRetry();
+    Q_SLOT void selfPingSkippedDuringNickChange();
+    Q_SLOT void selfPingDisabledWhenZeroThreshold();
+    Q_SLOT void selfPingMultipleRoomsSingleTimer();
+
     // muc#roominfo form
     Q_SLOT void roomInfoForm();
     // muc#roomconfig form
@@ -2491,6 +2501,252 @@ void tst_QXmppMuc::destroyRoom()
     QVERIFY(task.isFinished());
     expectVariant<QXmpp::Success>(task.result());
     QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::selfPingJoined()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit/thirdwitch'/>"_s);
+
+    // Room still tracked, ping no longer in flight, retry count reset.
+    QVERIFY(!muc->d->testSelfPingInFlight(roomJid));
+    QCOMPARE(muc->d->testSelfPingRetryCount(roomJid), 0);
+    QVERIFY(room.isValid());
+}
+
+void tst_QXmppMuc::selfPingStillJoinedServiceUnavailable()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='error' from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    // service-unavailable → still joined.
+    QVERIFY(muc->d->testHasRoom(roomJid));
+    QVERIFY(room.isValid());
+}
+
+void tst_QXmppMuc::selfPingStillJoinedItemNotFound()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='error' from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    QVERIFY(muc->d->testHasRoom(roomJid));
+    QVERIFY(room.isValid());
+}
+
+void tst_QXmppMuc::selfPingGhosted()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    Muc::LeaveReason seenReason = Muc::LeaveReason::Left;
+    QString seenRoomJid;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                     [&](const QString &jid, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &) {
+                         seenRoomJid = jid;
+                         seenReason = reason;
+                     });
+
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='error' from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<error type='cancel'><not-acceptable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    // Ghost detected: room erased and signal fired with ConnectionLost.
+    QCOMPARE(seenRoomJid, roomJid);
+    QCOMPARE(seenReason, Muc::LeaveReason::ConnectionLost);
+    QVERIFY(!muc->d->testHasRoom(roomJid));
+    QVERIFY(!room.isValid());
+}
+
+void tst_QXmppMuc::selfPingInconclusiveRetry()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='error' from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<error type='wait'><remote-server-timeout xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    // Inconclusive: room still tracked, retry counter bumped.
+    QVERIFY(muc->d->testHasRoom(roomJid));
+    QCOMPARE(muc->d->testSelfPingRetryCount(roomJid), 1);
+    QVERIFY(!muc->d->testSelfPingInFlight(roomJid));
+    // lastActivity was pushed backwards so the next scheduler tick is earlier
+    // than silenceThreshold from now.
+    auto now = std::chrono::steady_clock::now();
+    auto sinceActivity = std::chrono::duration_cast<std::chrono::milliseconds>(now - muc->d->testLastActivity(roomJid));
+    QVERIFY(sinceActivity > std::chrono::seconds(0));
+    QVERIFY(room.isValid());
+}
+
+void tst_QXmppMuc::selfPingSkippedDuringNickChange()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    // Begin a nickname change — this sets nickChangePromise on the room.
+    auto nickTask = room.setNickname(u"newnick"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/newnick'/>"_s);
+
+    // Trigger scheduler — self-ping must NOT be sent for this room.
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    // If a ping had been sent, TestClient::expect() on the next call would
+    // consume it and break the test. Instead, inject the 303/self-presence
+    // that completes the nick change — no pending outgoing stanzas expected.
+
+    // Complete the nick change: self-unavailable with status 303 + new nick,
+    // followed by self-presence on the new nick.
+    QXmppPresence unavailable;
+    parsePacket(unavailable,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='admin' role='moderator' nick='newnick'/>"
+                "<status code='110'/>"
+                "<status code='303'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(unavailable);
+
+    QXmppPresence newPresence;
+    parsePacket(newPresence,
+                "<presence from='coven@chat.shakespeare.lit/newnick'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='admin' role='moderator'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(newPresence);
+
+    QVERIFY(nickTask.isFinished());
+
+    // Now self-ping can fire again for the room.
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/newnick' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit/newnick'/>"_s);
+}
+
+void tst_QXmppMuc::selfPingDisabledWhenZeroThreshold()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    muc->setSelfPingSilenceThreshold(std::chrono::milliseconds::zero());
+    QCOMPARE(muc->selfPingSilenceThreshold(), std::chrono::milliseconds::zero());
+
+    auto room = joinedRoom(test, muc);
+    // Scheduler must be stopped even though a room is joined.
+    QVERIFY(!muc->d->selfPingTimer.isActive());
+
+    // onSelfPingTick is a no-op when threshold is zero — no ping sent.
+    muc->d->onSelfPingTick();
+    QVERIFY(room.isValid());
+}
+
+void tst_QXmppMuc::selfPingMultipleRoomsSingleTimer()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    joinedRoom(test, muc, u"forest@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+
+    QVERIFY(muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+    QVERIFY(muc->d->testHasRoom(u"forest@chat.shakespeare.lit"_s));
+
+    // A single manager-wide timer serves multiple rooms. Trigger ping for each
+    // room individually (avoids depending on unordered_map iteration order when
+    // matching outgoing stanzas) — what matters is that both can be pinged
+    // through the same scheduler.
+    muc->d->testForceDueForSelfPing(u"coven@chat.shakespeare.lit"_s);
+    muc->d->onSelfPingTick();
+    QVERIFY(muc->d->testSelfPingInFlight(u"coven@chat.shakespeare.lit"_s));
+    QVERIFY(!muc->d->testSelfPingInFlight(u"forest@chat.shakespeare.lit"_s));
+    test.ignore();  // coven ping IQ
+
+    muc->d->testForceDueForSelfPing(u"forest@chat.shakespeare.lit"_s);
+    muc->d->onSelfPingTick();
+    // coven's ping is still in flight (no response injected yet); forest's is now too.
+    QVERIFY(muc->d->testSelfPingInFlight(u"coven@chat.shakespeare.lit"_s));
+    QVERIFY(muc->d->testSelfPingInFlight(u"forest@chat.shakespeare.lit"_s));
+    test.ignore();  // forest ping IQ
 }
 
 void tst_QXmppMuc::roomConfigForm()

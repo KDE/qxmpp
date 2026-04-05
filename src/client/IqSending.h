@@ -39,6 +39,15 @@ static QXmppTask<QXmpp::Result<>> set(QXmppClient *client, const QString &to, Pa
     return client->sendGenericIq(CompatIq { SetIq<std::decay_t<Payload>> { generateSequentialStanzaId(), {}, to, {}, std::forward<Payload>(payload) } });
 }
 
+// Get IQ without response payload
+// Use this for expected results to be an empty <iq type='result'/>.
+// A separate name from the general-purpose get<Response, Payload>() helper avoids overload ambiguity.
+template<typename Payload>
+static QXmppTask<QXmpp::Result<>> getEmpty(QXmppClient *client, const QString &to, Payload &&payload)
+{
+    return client->sendGenericIq(CompatIq { GetIq<std::decay_t<Payload>> { generateSequentialStanzaId(), {}, to, {}, std::forward<Payload>(payload) } });
+}
+
 }  // namespace QXmpp::Private
 
 #endif  // IQSENDING_H

@@ -100,6 +100,8 @@ enum class LeaveReason {
     ServiceShutdown,
     /// The participant was removed because of an error (status 333).
     Error,
+    /// The client detected via \xep{0410} self-ping that it had been silently removed from the room.
+    ConnectionLost,
 };
 
 ///
