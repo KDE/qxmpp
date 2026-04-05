@@ -13,6 +13,7 @@
 #include "QXmppTask.h"
 
 #include <chrono>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 
@@ -28,8 +29,8 @@ constexpr int MucSelfPingMaxRetries = 4;
 
 struct QXmppMucManagerV2Private {
     QXmppMucManagerV2 *q = nullptr;
-    std::unordered_map<QString, QXmpp::Private::MucRoomData> rooms;
-    uint32_t participantIdCounter = 0;
+    std::unordered_map<QString, std::shared_ptr<QXmpp::Private::MucRoomData>> activeRooms;
+    std::unordered_map<QString, std::weak_ptr<QXmpp::Private::MucRoomData>> inactiveRooms;
     std::chrono::milliseconds timeout { QXmpp::Private::MucJoinTimeout };
 
     // MUC service discovery
@@ -45,8 +46,14 @@ struct QXmppMucManagerV2Private {
 
     QXmppDiscoveryManager *disco();
 
+    // Room lifetime — see the big header comment on activeRooms/inactiveRooms above.
+    std::shared_ptr<QXmpp::Private::MucRoomData> lookupRoom(const QString &jid);
+    std::shared_ptr<QXmpp::Private::MucRoomData> createOrReviveRoom(const QString &jid);
+    void deactivateRoom(const QString &jid);
+    void deactivateAllRooms();
+    void pruneInactiveRooms();
+
     // MUC Core
-    void clearAllRooms();
     void fetchRoomInfo(const QString &roomJid);
     void fetchAvatar(const QString &roomJid);
     QXmppTask<QXmpp::Result<QXmpp::Private::MucOwnerQuery>> sendOwnerFormRequest(const QString &roomJid);
@@ -59,7 +66,6 @@ struct QXmppMucManagerV2Private {
     void handleLeaveTimeout(const QString &roomJid);
     void handleNickChangeTimeout(const QString &roomJid);
     void handleMessageTimeout(const QString &roomJid, const QString &originId);
-    uint32_t generateParticipantId() { return participantIdCounter++; }
 
     // XEP-0410: MUC Self-Ping
     void rescheduleSelfPing();
