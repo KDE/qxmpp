@@ -43,6 +43,9 @@ public:
     QStringList avatarHashes() const;
     void setAvatarHashes(const QStringList &hashes);
 
+    std::optional<double> messageActivity() const;
+    void setMessageActivity(std::optional<double> messagesPerHour);
+
     bool operator==(const QXmppMucRoomInfo &other) const;
 
 protected:

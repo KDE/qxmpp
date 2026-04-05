@@ -1390,6 +1390,7 @@ void tst_QXmppMuc::roomInfoForm()
 <field var='muc#maxhistoryfetch' label='Maximum Number of History Messages Returned by Room'><value>50</value></field>
 <field var='muc#roominfo_pubsub' label='Associated pubsub node'><value>xmpp:pubsub.shakespeare.lit?;node=the-coven-node</value></field>
 <field var='muc#roominfo_avatarhash' type='text-multi' label='Avatar hash'><value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value><value>b9b256f999ded52c2fa14fb007c2e5b979450cbb</value></field>
+<field var='{urn:xmpp:muc-activity}message-activity' label='Messages per hour'><value>23.42</value></field>
 </x>)");
 
     QXmppDataForm form;
@@ -1406,6 +1407,7 @@ void tst_QXmppMuc::roomInfoForm()
     QCOMPARE(roomInfo->maxHistoryFetch(), 50);
     auto hashes = QStringList { u"a31c4bd04de69663cfd7f424a8453f4674da37ff"_s, u"b9b256f999ded52c2fa14fb007c2e5b979450cbb"_s };
     QCOMPARE(roomInfo->avatarHashes(), hashes);
+    QCOMPARE(roomInfo->messageActivity(), std::optional { 23.42 });
 
     form = roomInfo->toDataForm();
     QVERIFY(!form.isNull());
@@ -1420,6 +1422,7 @@ void tst_QXmppMuc::roomInfoForm()
         "<field type=\"text-single\" var=\"muc#roominfo_subject\"><value>Spells</value></field>"
         "<field type=\"boolean\" var=\"muc#roominfo_subjectmod\"><value>true</value></field>"
         "<field type='text-multi' var='muc#roominfo_avatarhash'><value>a31c4bd04de69663cfd7f424a8453f4674da37ff</value><value>b9b256f999ded52c2fa14fb007c2e5b979450cbb</value></field>"
+        "<field type=\"text-single\" var=\"{urn:xmpp:muc-activity}message-activity\"><value>23.42</value></field>"
         "</x>");
     serializePacket(form, xml2);
 }
