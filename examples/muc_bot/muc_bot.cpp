@@ -72,12 +72,12 @@ private:
 
             // Observe subject changes reactively via QBindable
             m_subjectNotifier = room.subject().addNotifier([this]() {
-                qDebug() << "Subject:" << m_muc->room(m_roomJid).subject().value();
+                qDebug() << "Subject:" << m_muc->findRoom(m_roomJid).value().subject().value();
             });
 
             // Observe joined state – e.g. to detect kicks or bans
             m_joinedNotifier = room.joined().addNotifier([this]() {
-                qDebug() << "Joined state changed:" << m_muc->room(m_roomJid).joined().value();
+                qDebug() << "Joined state changed:" << m_muc->findRoom(m_roomJid).value().joined().value();
             });
 
             // Save a bookmark with autojoin enabled
@@ -102,7 +102,7 @@ private:
 
             // Leave after 60 seconds
             QTimer::singleShot(60000, this, [this]() {
-                m_muc->room(m_roomJid).leave().then(this, [this](Result<> result) {
+                m_muc->findRoom(m_roomJid).value().leave().then(this, [this](Result<> result) {
                     if (const auto *error = std::get_if<QXmppError>(&result)) {
                         qWarning() << "Failed to leave room:" << error->description;
                         return;
@@ -128,7 +128,7 @@ private:
         // Echo the message back to the room
         QXmppMessage reply;
         reply.setBody(QStringLiteral("Echo: ") + message.body());
-        m_muc->room(roomJid).sendMessage(std::move(reply)).then(this, [](Result<> result) {
+        m_muc->findRoom(roomJid).value().sendMessage(std::move(reply)).then(this, [](Result<> result) {
             if (const auto *error = std::get_if<QXmppError>(&result)) {
                 qWarning() << "Failed to send message:" << error->description;
             }
