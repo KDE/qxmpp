@@ -4,8 +4,8 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.15.0 (UNRELEASED)
--------------------------
+QXmpp 1.15.0 (April 5, 2026)
+----------------------------
 
  - Make QXmppTask `co_await`-able and migrate all async code to C++20 coroutines (@lnj, !711)
  - Replace QCA dependency with direct OpenSSL 3.0+ usage (@lnj, !756)
