@@ -200,6 +200,8 @@ public:
     std::optional<Bind2Bound> bind2Bound;
 
     std::variant<QXmppOutgoingClient *, StarttlsManager, NonSaslAuthManager, SaslManager, Sasl2Manager, C2sStreamManager *, BindManager> listener;
+    // Incremented every time setListener() installs a new listener to detect a replacements.
+    uint listenerGeneration = 0;
     FastTokenManager fastTokenManager;
     C2sStreamManager c2sStreamManager;
     CarbonManager carbonManager;
@@ -210,6 +212,7 @@ public:
     T &setListener(Args... args)
     {
         listener = T { args... };
+        ++listenerGeneration;
         return std::get<T>(listener);
     }
 
