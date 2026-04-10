@@ -4,6 +4,14 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.15.1 (April 10, 2026)
+-----------------------------
+
+ - Fix use-after-free in sendSensitive() coroutine lambdas causing encryption results to be silently lost (@lnj)
+ - Move sendSensitive() coroutine lambdas to QXmppClientPrivate methods to avoid closure lifetime issues (@lnj)
+ - QXmppTask::then(): co_return continuation result so chaining with non-void continuations compiles (@lnj)
+ - Fix QXmppPromise::finish() to construct T instead of assigning (@lnj)
+
 QXmpp 1.15.0 (April 5, 2026)
 ----------------------------
 
