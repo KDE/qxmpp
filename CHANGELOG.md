@@ -4,8 +4,13 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.14.7 (April 10, 2026)
+-----------------------------
+
+ - Fix `Sasl2Manager` listener being replaced after FAST→password fallback retry (@lnj)
+
 QXmpp 1.14.6 (April 3, 2026)
-------------------------------
+----------------------------
 
  - Fix parsing of XML namespace prefixes in extension elements (@lnj, !762)
  - JMI: Fix finish() emitting closed() with empty reason/migratedTo (@lnj)
