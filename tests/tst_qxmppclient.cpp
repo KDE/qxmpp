@@ -39,6 +39,7 @@ private:
     Q_SLOT void testTaskDirect();
     Q_SLOT void testTaskStore();
     Q_SLOT void testTaskOptionalNullopt();
+    Q_SLOT void testTaskThenChainSuspended();
     Q_SLOT void testChainIq();
     Q_SLOT void colorGeneration();
 #if QT_GUI_LIB
@@ -248,6 +249,33 @@ void tst_QXmppClient::testTaskOptionalNullopt()
     QVERIFY(task.isFinished());
     QVERIFY(task.hasResult());
     QVERIFY(!task.takeResult().has_value());
+}
+
+void tst_QXmppClient::testTaskThenChainSuspended()
+{
+    // Regression test: QXmppTask::then() with a non-void-returning continuation
+    // must co_return the continuation's value, so the chained task carries it
+    // through. This also exercises the suspension path: the source task is not
+    // yet finished when then() is called, so the then() coroutine actually
+    // suspends and is resumed later by promise.finish().
+    QXmppPromise<int> sourcePromise;
+    auto sourceTask = sourcePromise.task();
+
+    auto chainedTask = sourceTask.then(this, [](int &&value) -> QString {
+        return QString::number(value * 2);
+    });
+
+    // The source has not been finished yet, so the chained task must still be
+    // suspended on the inner co_await.
+    QVERIFY(!chainedTask.isFinished());
+
+    sourcePromise.finish(21);
+
+    // After finishing the source, then() resumes, runs the continuation and
+    // co_returns its result into the chained task.
+    QVERIFY(chainedTask.isFinished());
+    QVERIFY(chainedTask.hasResult());
+    QCOMPARE(chainedTask.takeResult(), u"42"_s);
 }
 
 using DiscoResult = std::variant<QXmppDiscoveryIq, QXmppError>;

@@ -229,7 +229,7 @@ public:
     ///
     /// If a task is cancelled, no call to `finish()` is needed and no continuation is resumed.
     ///
-    /// \since QXmpp 1.11
+    /// \since QXmpp 1.15
     ///
     bool cancelled() const
     {
@@ -445,16 +445,29 @@ public:
     /// deleted. This way your lambda will never be executed after your object has been deleted.
     /// \param continuation A function accepting a result in the form of `T &&`.
     ///
+    /// \returns A new QXmppTask that finishes with the value returned by \p continuation, allowing
+    /// further chaining via another `.then()` or `co_await`. If \p continuation returns `void`,
+    /// the returned task is `QXmppTask<void>` which finishes once the continuation has run.
+    ///
     template<typename Continuation>
     auto then(const QObject *context, Continuation continuation)
         -> QXmppTask<QXmpp::Private::InvokeContinuationResult<Continuation, T>>
     {
+        using Result = QXmpp::Private::InvokeContinuationResult<Continuation, T>;
         QXmppTask<T> task = std::move(*this);
         if constexpr (std::is_void_v<T>) {
             co_await task.withContext(context);
-            continuation();
+            if constexpr (std::is_void_v<Result>) {
+                continuation();
+            } else {
+                co_return continuation();
+            }
         } else {
-            continuation(co_await task.withContext(context));
+            if constexpr (std::is_void_v<Result>) {
+                continuation(co_await task.withContext(context));
+            } else {
+                co_return continuation(co_await task.withContext(context));
+            }
         }
     }
 
@@ -467,7 +480,7 @@ public:
     ///
     /// \returns reference to this task
     ///
-    /// \since QXmpp 1.11
+    /// \since QXmpp 1.15
     ///
     QXmppTask<T> &withContext(const QObject *c)
     {
@@ -491,7 +504,7 @@ public:
     /// If there is a waiting coroutine, it is cancelled immediately. Any continuation set in the
     /// future also won't be executed.
     ///
-    /// \since QXmpp 1.11
+    /// \since QXmpp 1.15
     ///
     void cancel()
     {
