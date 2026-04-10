@@ -19,6 +19,11 @@ QXmpp 1.15.0 (April 5, 2026)
  - CMake: Rename `BUILD_TESTS` option to `BUILD_TESTING` (@lnj, !738)
  - Drop Qt 5 support, require Qt 6.4 (@lnj, !759)
 
+QXmpp 1.14.7 (April 10, 2026)
+-----------------------------
+
+ - Fix `Sasl2Manager` listener being replaced after FAST→password fallback retry (@lnj)
+
 QXmpp 1.14.6 (April 3, 2026)
 ----------------------------
 

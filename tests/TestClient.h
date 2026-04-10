@@ -9,6 +9,7 @@
 #include "QXmppClientExtension.h"  // needed for qDeleteAll(d->extensions)
 #include "QXmppClient_p.h"
 #include "QXmppOutgoingClient.h"
+#include "QXmppSasl_p.h"
 
 #include "util.h"
 
@@ -37,6 +38,17 @@ public:
 
     QXmppOutgoingClient *stream() const { return d->stream; }
     QXmppOutgoingClientPrivate *streamPrivate() const { return d->stream->d.get(); }
+
+    // Test wrappers for the private outgoing-client entry points exercised by the SASL2 + FAST
+    // listener-replacement regression test.
+    void startSasl2Auth(const QXmpp::Private::Sasl2::StreamFeature &feature)
+    {
+        d->stream->startSasl2Auth(feature);
+    }
+    void handlePacketReceived(const QDomElement &el)
+    {
+        d->stream->handlePacketReceived(el);
+    }
 
     template<typename String>
     void inject(const String &xml) { inject(xmlToDom(xml)); }
