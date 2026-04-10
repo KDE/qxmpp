@@ -499,7 +499,7 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
 ///
 QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
-    auto sendEncryptedMessage = [this](auto &&task) -> QXmppTask<QXmpp::SendResult> {
+    auto sendEncryptedMessage = [this](auto task) -> QXmppTask<QXmpp::SendResult> {
         auto result = co_await task.withContext(this);
         if (std::holds_alternative<QXmppError>(result)) {
             co_return std::get<QXmppError>(std::move(result));
@@ -511,7 +511,7 @@ QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, co
         co_return co_await d->stream->streamAckManager().send(QXmppPacket(xml, true));
     };
 
-    auto sendEncryptedIq = [this](auto &&task) -> QXmppTask<QXmpp::SendResult> {
+    auto sendEncryptedIq = [this](auto task) -> QXmppTask<QXmpp::SendResult> {
         auto result = co_await task.withContext(this);
         if (std::holds_alternative<QXmppError>(result)) {
             co_return std::get<QXmppError>(std::move(result));
