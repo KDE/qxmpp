@@ -15,6 +15,8 @@
 #include "QXmppPromise.h"
 #include "QXmppRegisterIq.h"
 #include "QXmppRosterManager.h"
+#include "QXmppSasl2UserAgent.h"
+#include "QXmppSaslManager_p.h"
 #include "QXmppSasl_p.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppVCardManager.h"
@@ -39,6 +41,7 @@ private:
     Q_SLOT void testTaskDirect();
     Q_SLOT void testTaskStore();
     Q_SLOT void testTaskOptionalNullopt();
+    Q_SLOT void testTaskThenChainSuspended();
     Q_SLOT void testChainIq();
     Q_SLOT void colorGeneration();
 #if QT_GUI_LIB
@@ -47,6 +50,7 @@ private:
 
     // outgoing client
     Q_SLOT void csiManager();
+    Q_SLOT void sasl2FastFallbackKeepsListener();
 
     Q_SLOT void credentialsSerialization();
 };
@@ -250,6 +254,33 @@ void tst_QXmppClient::testTaskOptionalNullopt()
     QVERIFY(!task.takeResult().has_value());
 }
 
+void tst_QXmppClient::testTaskThenChainSuspended()
+{
+    // Regression test: QXmppTask::then() with a non-void-returning continuation
+    // must co_return the continuation's value, so the chained task carries it
+    // through. This also exercises the suspension path: the source task is not
+    // yet finished when then() is called, so the then() coroutine actually
+    // suspends and is resumed later by promise.finish().
+    QXmppPromise<int> sourcePromise;
+    auto sourceTask = sourcePromise.task();
+
+    auto chainedTask = sourceTask.then(this, [](int &&value) -> QString {
+        return QString::number(value * 2);
+    });
+
+    // The source has not been finished yet, so the chained task must still be
+    // suspended on the inner co_await.
+    QVERIFY(!chainedTask.isFinished());
+
+    sourcePromise.finish(21);
+
+    // After finishing the source, then() resumes, runs the continuation and
+    // co_returns its result into the chained task.
+    QVERIFY(chainedTask.isFinished());
+    QVERIFY(chainedTask.hasResult());
+    QCOMPARE(chainedTask.takeResult(), u"42"_s);
+}
+
 using DiscoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
 
 static QXmppTask<DiscoResult> parseIqResult(QXmppTask<QXmppClient::IqResult> &&sendTask, QObject *context)
@@ -334,6 +365,93 @@ void tst_QXmppClient::csiManager()
     };
     csi.onSessionOpened(session);
     client.expectNoPacket();
+}
+
+// Regression test for the SASL2 + FAST listener-replacement bug.
+//
+// When a stored FAST token (XEP-0484) is rejected by the server, QXmppOutgoingClient retries
+// SASL2 authentication with a password-based mechanism. The retry happens from inside the
+// failed task's .then() continuation, which calls startSasl2Auth() recursively, which calls
+// setListener<Sasl2Manager>() — installing a NEW Sasl2Manager into d->listener while the OLD
+// Sasl2Manager's handleElement() call is still on the stack.
+//
+// Before the fix, handlePacketReceived() compared d->listener.index() before/after the call to
+// decide whether to fall back to OutgoingClient as the active listener. Both old and new
+// listeners were Sasl2Manager — same variant index — so the check failed to notice the
+// replacement and overwrote the new Sasl2Manager with OutgoingClient. The next stanza (the
+// SCRAM challenge) then landed on the wrong handler and produced
+// "Unexpected element received while handling client session." A monotonic listener generation
+// counter, captured before the call and re-checked after, fixes this.
+void tst_QXmppClient::sasl2FastFallbackKeepsListener()
+{
+    TestClient client;
+    auto &config = client.stream()->configuration();
+    config.setUser(u"bowman"_s);
+    config.setPassword(u"1234"_s);
+    config.setDomain(u"example.org"_s);
+    config.setDisabledSaslMechanisms({});
+    config.setSasl2UserAgent(QXmppSasl2UserAgent {
+        QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s),
+        u"QXmpp"_s,
+        u"HAL 9000"_s,
+    });
+
+    // Pre-populate a (stale) FAST token, as if from a previous session.
+    config.credentialData().htToken = HtToken {
+        SaslHtMechanism { IanaHashAlgorithm::Sha3_512, SaslHtMechanism::None },
+        u"old-invalid-token"_s,
+        QDateTime::fromString(u"2024-07-11T14:00:00Z"_s, Qt::ISODate),
+    };
+
+    Sasl2::StreamFeature sasl2Feature {
+        { u"PLAIN"_s },
+        {},
+        FastFeature { { u"HT-SHA3-512-NONE"_s }, false },
+        false,
+    };
+
+    // Kick off SASL2 auth. The first attempt picks the FAST HT mechanism.
+    client.startSasl2Auth(sasl2Feature);
+
+    QVERIFY(std::holds_alternative<Sasl2Manager>(client.streamPrivate()->listener));
+    auto firstAuth = client.takePacket();
+    QVERIFY(firstAuth.contains(u"mechanism=\"HT-SHA3-512-NONE\""_s));
+    QVERIFY(firstAuth.contains(u"<fast xmlns=\"urn:xmpp:fast:0\"/>"_s));
+
+    // Server rejects the token. This synchronously runs the failed task's .then() continuation,
+    // which retries by calling startSasl2Auth() → setListener<Sasl2Manager>(). With the fix in
+    // place, handlePacketReceived() must NOT overwrite the new Sasl2Manager with OutgoingClient.
+    client.handlePacketReceived(xmlToDom(
+        "<failure xmlns='urn:xmpp:sasl:2'>"
+        "<not-authorized xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>"
+        "</failure>"));
+
+    // Critical assertion: the listener is still a Sasl2Manager (the second one). Without the
+    // generation-counter fix this would be QXmppOutgoingClient* and the next stanza would be
+    // rejected as "Unexpected element received while handling client session."
+    QVERIFY(std::holds_alternative<Sasl2Manager>(client.streamPrivate()->listener));
+
+    // The retry should have sent a second <authenticate>, this time with PLAIN, no <fast/>,
+    // and a fresh FAST token request.
+    auto secondAuth = client.takePacket();
+    QVERIFY(secondAuth.contains(u"mechanism=\"PLAIN\""_s));
+    QVERIFY(!secondAuth.contains(u"<fast xmlns=\"urn:xmpp:fast:0\"/>"_s));
+    QVERIFY(secondAuth.contains(u"<request-token xmlns=\"urn:xmpp:fast:0\" mechanism=\"HT-SHA3-512-NONE\"/>"_s));
+    // Stale token must still be present — server may have been temporarily misconfigured.
+    QVERIFY(config.credentialData().htToken.has_value());
+    QCOMPARE(config.credentialData().htToken->secret, u"old-invalid-token"_s);
+
+    // Server now accepts the password attempt and provides a fresh token. The same Sasl2Manager
+    // instance handles this success element.
+    client.handlePacketReceived(xmlToDom(
+        "<success xmlns='urn:xmpp:sasl:2'>"
+        "<authorization-identifier>bowman@example.org</authorization-identifier>"
+        "<token xmlns='urn:xmpp:fast:0' token='new-valid-token' expiry='2024-08-01T14:00:00Z'/>"
+        "</success>"));
+
+    QVERIFY(client.streamPrivate()->isAuthenticated);
+    QVERIFY(config.credentialData().htToken.has_value());
+    QCOMPARE(config.credentialData().htToken->secret, u"new-valid-token"_s);
 }
 
 void tst_QXmppClient::credentialsSerialization()

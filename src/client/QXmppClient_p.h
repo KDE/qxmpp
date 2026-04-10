@@ -19,14 +19,15 @@
 #ifndef QXMPPCLIENT_P_H
 #define QXMPPCLIENT_P_H
 
+#include "QXmppE2eeExtension.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppPresence.h"
+#include "QXmppSendResult.h"
 
 #include <chrono>
 
 class QXmppClient;
 class QXmppClientExtension;
-class QXmppE2eeExtension;
 class QXmppLogger;
 class QTimer;
 
@@ -36,6 +37,10 @@ public:
     QXmppClientPrivate(QXmppClient *qq);
 
     void resendPresence();
+
+    QXmppTask<QXmpp::SendResult> sendEncryptedMessage(QXmppTask<QXmppE2eeExtension::MessageEncryptResult> task);
+    QXmppTask<QXmpp::SendResult> sendEncryptedIq(QXmppTask<QXmppE2eeExtension::IqEncryptResult> task);
+    QXmppTask<QXmppClient::IqResult> sendSensitiveIq(QXmppIq iq, std::optional<QXmppSendStanzaParams> params);
 
     /// Current presence of the client
     QXmppPresence clientPresence;

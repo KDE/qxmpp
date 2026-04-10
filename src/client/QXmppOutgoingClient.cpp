@@ -685,7 +685,11 @@ void QXmppOutgoingClient::handlePacketReceived(const QDomElement &nodeRecv)
     // if we receive any kind of data, stop the timeout timer
     d->pingManager.onDataReceived();
 
-    auto index = d->listener.index();
+    // Remember the listener generation so we can tell whether a synchronous task continuation
+    // inside handleElement() installed a replacement listener. std::variant::index() is not
+    // sufficient here because the replacement may be of the same type (e.g. Sasl2Manager retrying
+    // with password auth after a FAST token rejection, which re-runs setListener<Sasl2Manager>).
+    const uint generation = d->listenerGeneration;
 
     switch (visit(overloaded {
                       [&](auto *manager) { return manager->handleElement(nodeRecv); },
@@ -706,8 +710,9 @@ void QXmppOutgoingClient::handlePacketReceived(const QDomElement &nodeRecv)
         return;
     }
     case Finished:
-        // if the job is done, set OutgoingClient, but do not override a continuation job
-        if (d->listener.index() == index) {
+        // if the job is done, fall back to OutgoingClient — but not if a continuation already
+        // installed a new listener during the handleElement() call above.
+        if (d->listenerGeneration == generation) {
             d->listener = this;
         }
         return;
