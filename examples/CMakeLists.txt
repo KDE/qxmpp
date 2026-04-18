@@ -25,3 +25,8 @@ if(WITH_GSTREAMER)
     add_executable(audio_call audio_call/AudioCall.cpp)
     target_link_libraries(audio_call PUBLIC ${QXMPP_TARGET} PkgConfig::GStreamer)
 endif()
+
+if(BUILD_OMEMO)
+    add_simple_example(1a_echoClientOmemo)
+    target_link_libraries(1a_echoClientOmemo ${QXMPPOMEMO_TARGET})
+endif()

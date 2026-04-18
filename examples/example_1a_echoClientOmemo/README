@@ -1,0 +1,26 @@
+<!--
+SPDX-FileCopyrightText: 2026 J SHIVA SHANKAR <jangamshiva2005@gmail.com>
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
+This is a minimal echo bot that demonstrates wiring up OMEMO encryption in
+QXmpp. It replies to any incoming message with "Your message: " followed by
+the body; if the incoming message was OMEMO-encrypted, the reply is
+OMEMO-encrypted as well (via QXmppClient::reply()).
+
+**Important limitation:** this example uses the in-memory storage classes
+`QXmppOmemoMemoryStorage` and `QXmppAtmTrustMemoryStorage`. Nothing is
+persisted across runs — the bot gets a new OMEMO device identity every time
+it starts, and all trust decisions are lost on exit. This is only
+appropriate for demos and testing.
+
+A real application must provide persistent implementations of
+`QXmppOmemoStorage` and `QXmppTrustStorage` so that the device, identity
+keys, pre-keys, sessions, and trust decisions survive across restarts. See
+the class documentation of `QXmppOmemoManager` for the recommended
+load()/setUp() flow in that case.
+
+How to run: edit the JID and password in `main()` to a test account on an
+XMPP server that supports OMEMO 2 (XEP-0384), then send it a message from a
+second account. OMEMO-encrypted messages will be echoed back OMEMO-encrypted.
