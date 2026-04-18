@@ -81,7 +81,7 @@ SPDX-License-Identifier: CC0-1.0
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0045.html'/>
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>1.25</xmpp:version>
+        <xmpp:version>1.35.3</xmpp:version>
         <xmpp:since>0.2</xmpp:since>
       </xmpp:SupportedXep>
     </implements>
@@ -476,6 +476,14 @@ SPDX-License-Identifier: CC0-1.0
     </implements>
     <implements>
       <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0307.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>0.1</xmpp:version>
+        <xmpp:since>1.16</xmpp:since>
+      </xmpp:SupportedXep>
+    </implements>
+    <implements>
+      <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0308.html'/>
         <xmpp:status>complete</xmpp:status>
         <xmpp:version>1.2.1</xmpp:version>
@@ -667,6 +675,14 @@ SPDX-License-Identifier: CC0-1.0
         <xmpp:version>0.1.2</xmpp:version>
         <xmpp:since>1.4</xmpp:since>
         <xmpp:note>Only invitations implemented; Manager since 1.7</xmpp:note>
+      </xmpp:SupportedXep>
+    </implements>
+    <implements>
+      <xmpp:SupportedXep>
+        <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0410.html'/>
+        <xmpp:status>complete</xmpp:status>
+        <xmpp:version>1.1.0</xmpp:version>
+        <xmpp:since>1.16</xmpp:since>
       </xmpp:SupportedXep>
     </implements>
     <implements>
