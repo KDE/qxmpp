@@ -11,15 +11,15 @@
 #include <QtGlobal>
 
 #define ENV_ENABLED "QXMPP_TESTS_INTEGRATION_ENABLED"
-#define ENV_JID "QXMPP_TESTS_JID"
-#define ENV_PASSWORD "QXMPP_TESTS_PASSWORD"
+#define ENV_JID "QXMPP_JID"
+#define ENV_PASSWORD "QXMPP_PASSWORD"
 
 #define SKIP_IF_INTEGRATION_TESTS_DISABLED()                            \
     if (!IntegrationTests::enabled()) {                                 \
         QSKIP("Export 'QXMPP_TESTS_INTEGRATION_ENABLED=1' to enable."); \
     } else if (!IntegrationTests::credentialsAvailable()) {             \
         QFAIL("No credentials for integration tests provided! "         \
-              "Export 'QXMPP_TESTS_JID' and 'QXMPP_TESTS_PASSWORD'.");  \
+              "Export 'QXMPP_JID' and 'QXMPP_PASSWORD'.");              \
     }
 
 class IntegrationTests

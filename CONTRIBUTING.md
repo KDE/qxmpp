@@ -40,7 +40,7 @@ make test
 ### Internal Tests
 
 There are some additional internal tests that only work with debug builds because they are using unexported symbols from the QXmpp library.
-You can enable those using `-DBUILD_INTERNAL_TESTS=ON`.
+You can enable them using `-DBUILD_INTERNAL_TESTS=ON`.
 They are also run using `make test`, along with the regular tests.
 
 ### Integration Tests
@@ -51,8 +51,8 @@ The code of those test cases is always built, but the cases are skipped when run
 You can enable them by exporting the following environment variables:
 
 * `QXMPP_TESTS_INTEGRATION_ENABLED=1`
-* `QXMPP_TESTS_JID=<jid>`
-* `QXMPP_TESTS_PASSWORD=<password>`
+* `QXMPP_JID=<jid>`
+* `QXMPP_PASSWORD=<password>`
 
 Replace `<jid>` and `<password>` with the credentials of the account for connecting to the server.
 
