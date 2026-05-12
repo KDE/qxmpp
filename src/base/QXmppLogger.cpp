@@ -45,9 +45,56 @@ static QStringView typeName(QXmppLogger::MessageType type)
     }
 }
 
-static QString formatted(QXmppLogger::MessageType type, const QString &text)
+static QStringView typeColor(QXmppLogger::MessageType type)
 {
-    return QDateTime::currentDateTime().toString() + u' ' + typeName(type) + u' ' + text;
+    switch (type) {
+    case QXmppLogger::DebugMessage:
+        return u"\x1b[90m";  // bright black (dim)
+    case QXmppLogger::InformationMessage:
+        return u"\x1b[32m";  // green
+    case QXmppLogger::WarningMessage:
+        return u"\x1b[33m";  // yellow
+    case QXmppLogger::ReceivedMessage:
+        return u"\x1b[94m";  // bright blue
+    case QXmppLogger::SentMessage:
+        return u"\x1b[95m";  // bright magenta
+    default:
+        return {};
+    }
+}
+
+static QString formatted(QXmppLogger::MessageType type, const QString &text, bool colorize)
+{
+    QString date = QDateTime::currentDateTime().toString(u"yyyy-MM-dd HH:mm:ss"_s);
+    QString name = typeName(type).toString();
+    QString typeStr;
+    if (colorize) {
+        date = u"\x1b[90m"_s + date + u"\x1b[0m"_s;  // bright black / grey
+        // Content-sized chip; alignment padding lives *outside* the colored block
+        // so the right edge of every chip falls at the same column.
+        QString inner = u' ' + name + u' ';
+        QString outerLeftPad(10 - inner.size(), u' ');
+        typeStr = outerLeftPad + u"\x1b[7m"_s + typeColor(type).toString() + inner + u"\x1b[0m"_s;
+    } else {
+        typeStr = name.rightJustified(8);
+    }
+    // Direction marker on the header line: <<< outgoing, >>> incoming.
+    QString arrows;
+    if (type == QXmppLogger::SentMessage || type == QXmppLogger::ReceivedMessage) {
+        arrows = (type == QXmppLogger::SentMessage)
+            ? u">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"_s
+            : u"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"_s;
+        if (colorize) {
+            arrows = typeColor(type).toString() + arrows + u"\x1b[0m"_s;
+        }
+        arrows = u' ' + arrows;
+    }
+    // XML stanzas start on their own line so the structure is readable;
+    // text-only messages stay inline.
+    QChar separator = (type == QXmppLogger::SentMessage || type == QXmppLogger::ReceivedMessage)
+        ? u'\n'
+        : u' ';
+    return date + u' ' + typeStr + arrows + separator + text;
 }
 
 static void relaySignals(QXmppLoggable *from, QXmppLoggable *to)
@@ -195,9 +242,8 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
         return;
     }
 
-    QString payload = text;
-    if (d->prettyXml && (type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
-        bool colorize = false;
+    bool colorize = false;
+    if (d->prettyXml) {
         switch (d->colorMode) {
         case ColorOn:
             colorize = true;
@@ -209,7 +255,14 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
             colorize = (d->loggingType == StdoutLogging) && qxmpp_isatty_stdout();
             break;
         }
+    }
+
+    QString payload = text;
+    if (d->prettyXml && (type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
         payload = QXmpp::formatXmlForDebug(text, true, 2, colorize);
+        // Nest the XML block under the log header.
+        QString indent(2, u' ');
+        payload = indent + payload.replace(u'\n', u'\n' + indent);
     }
 
     switch (d->loggingType) {
@@ -218,10 +271,11 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
             d->logFile = new QFile(d->logFilePath);
             d->logFile->open(QIODevice::WriteOnly | QIODevice::Append);
         }
-        QTextStream(d->logFile) << formatted(type, payload) << "\n";
+        // Never write ANSI escapes to log files.
+        QTextStream(d->logFile) << formatted(type, payload, false) << "\n";
         break;
     case QXmppLogger::StdoutLogging:
-        std::cout << qPrintable(formatted(type, payload)) << std::endl;
+        std::cout << qPrintable(formatted(type, payload, colorize)) << std::endl;
         break;
     case QXmppLogger::SignalLogging:
         Q_EMIT message(type, payload);
