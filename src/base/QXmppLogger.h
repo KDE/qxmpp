@@ -36,6 +36,10 @@ class QXMPP_EXPORT QXmppLogger : public QObject
     Q_PROPERTY(LoggingType loggingType READ loggingType WRITE setLoggingType NOTIFY loggingTypeChanged)
     /// The types of messages to log
     Q_PROPERTY(MessageTypes messageTypes READ messageTypes WRITE setMessageTypes NOTIFY messageTypesChanged)
+    /// Whether to pretty-print Sent/Received XML stanzas with indentation
+    Q_PROPERTY(bool prettyXml READ prettyXml WRITE setPrettyXml NOTIFY prettyXmlChanged)
+    /// How to decide whether to use ANSI color escapes for pretty XML
+    Q_PROPERTY(ColorMode colorMode READ colorMode WRITE setColorMode NOTIFY colorModeChanged)
 
 public:
     /// This enum describes how log message are handled.
@@ -58,6 +62,14 @@ public:
         AnyMessage = 31          ///< Any message type
     };
     Q_DECLARE_FLAGS(MessageTypes, MessageType)
+
+    /// Controls ANSI color output for pretty-printed XML.
+    enum ColorMode {
+        ColorOff,   ///< Never emit color escapes
+        ColorOn,    ///< Always emit color escapes
+        ColorAuto,  ///< Emit colors when loggingType is StdoutLogging and stdout is a TTY
+    };
+    Q_ENUM(ColorMode)
 
     QXmppLogger(QObject *parent = nullptr);
     ~QXmppLogger() override;
@@ -85,6 +97,22 @@ public:
     QXmppLogger::MessageTypes messageTypes();
     void setMessageTypes(QXmppLogger::MessageTypes types);
     Q_SIGNAL void messageTypesChanged();
+
+    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
+    /// Returns whether Sent/Received XML stanzas should be pretty-printed.
+    bool prettyXml() const;
+    void setPrettyXml(bool enable);
+    Q_SIGNAL void prettyXmlChanged();
+
+    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
+    /// Returns the current ANSI color mode for pretty-printed XML.
+    QXmppLogger::ColorMode colorMode() const;
+    void setColorMode(QXmppLogger::ColorMode mode);
+    Q_SIGNAL void colorModeChanged();
+
+    /// Enables pretty-printing of Sent/Received XML stanzas and sets the color
+    /// mode to ColorAuto so ANSI escapes appear when logging to a TTY.
+    void enablePrettyXml(bool enable = true);
 
     Q_SLOT virtual void setGauge(const QString &gauge, double value);
     Q_SLOT virtual void updateCounter(const QString &counter, qint64 amount);

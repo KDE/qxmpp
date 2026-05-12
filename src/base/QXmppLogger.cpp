@@ -5,6 +5,8 @@
 
 #include "QXmppLogger.h"
 
+#include "QXmppXmlFormatter.h"
+
 #include "StringLiterals.h"
 
 #include <iostream>
@@ -14,6 +16,14 @@
 #include <QFile>
 #include <QMetaType>
 #include <QTextStream>
+
+#ifdef Q_OS_WIN
+#include <io.h>
+#define qxmpp_isatty_stdout() (::_isatty(::_fileno(stdout)) != 0)
+#else
+#include <unistd.h>
+#define qxmpp_isatty_stdout() (::isatty(STDOUT_FILENO) != 0)
+#endif
 
 QXmppLogger *QXmppLogger::m_logger = nullptr;
 
@@ -93,6 +103,8 @@ public:
     QFile *logFile;
     QString logFilePath;
     QXmppLogger::MessageTypes messageTypes;
+    bool prettyXml = false;
+    QXmppLogger::ColorMode colorMode = QXmppLogger::ColorAuto;
 };
 
 QXmppLoggerPrivate::QXmppLoggerPrivate()
@@ -183,22 +195,102 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
         return;
     }
 
+    QString payload = text;
+    if (d->prettyXml && (type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
+        bool colorize = false;
+        switch (d->colorMode) {
+        case ColorOn:
+            colorize = true;
+            break;
+        case ColorOff:
+            colorize = false;
+            break;
+        case ColorAuto:
+            colorize = (d->loggingType == StdoutLogging) && qxmpp_isatty_stdout();
+            break;
+        }
+        payload = QXmpp::formatXmlForDebug(text, true, 2, colorize);
+    }
+
     switch (d->loggingType) {
     case QXmppLogger::FileLogging:
         if (!d->logFile) {
             d->logFile = new QFile(d->logFilePath);
             d->logFile->open(QIODevice::WriteOnly | QIODevice::Append);
         }
-        QTextStream(d->logFile) << formatted(type, text) << "\n";
+        QTextStream(d->logFile) << formatted(type, payload) << "\n";
         break;
     case QXmppLogger::StdoutLogging:
-        std::cout << qPrintable(formatted(type, text)) << std::endl;
+        std::cout << qPrintable(formatted(type, payload)) << std::endl;
         break;
     case QXmppLogger::SignalLogging:
-        Q_EMIT message(type, text);
+        Q_EMIT message(type, payload);
         break;
     default:
         break;
+    }
+}
+
+///
+/// Returns whether Sent/Received XML stanzas are pretty-printed.
+///
+/// \since QXmpp 1.16
+///
+bool QXmppLogger::prettyXml() const
+{
+    return d->prettyXml;
+}
+
+///
+/// Sets whether Sent/Received XML stanzas should be pretty-printed.
+///
+/// \since QXmpp 1.16
+///
+void QXmppLogger::setPrettyXml(bool enable)
+{
+    if (d->prettyXml != enable) {
+        d->prettyXml = enable;
+        Q_EMIT prettyXmlChanged();
+    }
+}
+
+///
+/// Returns the current ANSI color mode used for pretty-printed XML.
+///
+/// \since QXmpp 1.16
+///
+QXmppLogger::ColorMode QXmppLogger::colorMode() const
+{
+    return d->colorMode;
+}
+
+///
+/// Sets the ANSI color mode for pretty-printed XML. See ColorMode.
+///
+/// \since QXmpp 1.16
+///
+void QXmppLogger::setColorMode(QXmppLogger::ColorMode mode)
+{
+    if (d->colorMode != mode) {
+        d->colorMode = mode;
+        Q_EMIT colorModeChanged();
+    }
+}
+
+///
+/// Enables pretty-printing of Sent/Received XML stanzas and sets ColorAuto so
+/// ANSI escapes appear on a TTY.
+///
+/// Equivalent to calling setPrettyXml(enable) and, if enabling,
+/// setColorMode(ColorAuto).
+///
+/// \since QXmpp 1.16
+///
+void QXmppLogger::enablePrettyXml(bool enable)
+{
+    setPrettyXml(enable);
+    if (enable) {
+        setColorMode(ColorAuto);
     }
 }
 
