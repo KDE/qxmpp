@@ -149,6 +149,8 @@ set(INSTALL_HEADER_FILES
     client/QXmppPubSubManager.h
     client/QXmppRemoteMethod.h
     client/QXmppRosterManager.h
+    client/QXmppRosterMemoryStorage.h
+    client/QXmppRosterStorage.h
     client/QXmppRpcManager.h
     client/QXmppSendStanzaParams.h
     client/QXmppTransferManager.h

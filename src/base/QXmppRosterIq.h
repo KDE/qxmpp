@@ -9,6 +9,8 @@
 #include "QXmppConstants_p.h"
 #include "QXmppIq.h"
 
+#include <optional>
+
 #include <QList>
 #include <QSet>
 #include <QSharedDataPointer>
@@ -102,8 +104,15 @@ public:
     QXmppRosterIq &operator=(const QXmppRosterIq &);
     QXmppRosterIq &operator=(QXmppRosterIq &&);
 
+#if QXMPP_DEPRECATED_SINCE(1, 16)
+    [[deprecated("Use versionOpt() instead.")]]
     QString version() const;
-    void setVersion(const QString &);
+#endif
+    std::optional<QString> versionOpt() const;
+    void setVersion(std::optional<QString>);
+
+    bool hasQuery() const;
+    void setHasQuery(bool);
 
     QList<Item> items() const;
     void setItems(const QList<Item> &);

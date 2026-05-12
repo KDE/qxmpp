@@ -21,8 +21,12 @@ class QXmppRosterIqPrivate : public QSharedData
 {
 public:
     QList<QXmppRosterIq::Item> items;
-    // XEP-0237 Roster Versioning
-    QString version;
+    // RFC 6121 §2.6 Roster Versioning: nullopt means no `ver` attribute; an empty string means
+    // `ver=""` (how clients advertise versioning support to the server).
+    std::optional<QString> version;
+    // Whether the <query> element was present (vs. an <iq type='result'/> with no payload,
+    // which servers use to indicate the cached roster is still up-to-date).
+    bool hasQuery = false;
     // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
     bool mixAnnotate = false;
 };
@@ -71,27 +75,65 @@ void QXmppRosterIq::setItems(const QList<Item> &items)
 }
 
 ///
-/// Returns the roster version of IQ.
+/// Returns the roster version of the IQ.
 ///
-/// \return version as a QString
+/// \deprecated Use versionOpt() instead, which distinguishes "no \c ver attribute" from
+/// \c ver="". This getter conflates both cases as an empty string.
 ///
 /// \since QXmpp 1.0
 ///
 QString QXmppRosterIq::version() const
 {
+    return d->version.value_or(QString());
+}
+
+///
+/// Returns the roster version of the IQ.
+///
+/// \c std::nullopt means no \c ver attribute was set. An empty string means \c ver="", which
+/// is how clients advertise RFC 6121 §2.6 roster versioning support to the server.
+///
+/// \since QXmpp 1.16
+///
+std::optional<QString> QXmppRosterIq::versionOpt() const
+{
     return d->version;
 }
 
 ///
-/// Sets the roster version of IQ.
+/// Sets the roster version of the IQ.
 ///
-/// \param version as a QString
+/// Pass \c std::nullopt to omit the \c ver attribute. Pass an empty string to emit \c ver="".
 ///
-/// \since QXmpp 1.0
+/// \since QXmpp 1.0 (parameter type changed to \c std::optional<QString> in QXmpp 1.16)
 ///
-void QXmppRosterIq::setVersion(const QString &version)
+void QXmppRosterIq::setVersion(std::optional<QString> version)
 {
-    d->version = version;
+    d->version = std::move(version);
+}
+
+///
+/// Returns whether the IQ contains a \c <query> element.
+///
+/// Roster get/set IQs always have one. An \c <iq type='result'/> from the server in reply to a
+/// versioned roster get with no \c <query> child means "the cached roster is still up to date";
+/// this getter is how the roster manager distinguishes that case from an actually empty roster.
+///
+/// \since QXmpp 1.16
+///
+bool QXmppRosterIq::hasQuery() const
+{
+    return d->hasQuery;
+}
+
+///
+/// Sets whether the IQ contains a \c <query> element.
+///
+/// \since QXmpp 1.16
+///
+void QXmppRosterIq::setHasQuery(bool hasQuery)
+{
+    d->hasQuery = hasQuery;
 }
 
 ///
@@ -119,7 +161,10 @@ void QXmppRosterIq::setMixAnnotate(bool mixAnnotate)
 void QXmppRosterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
-    setVersion(queryElement.attribute(u"ver"_s));
+    d->hasQuery = !queryElement.isNull();
+    if (queryElement.hasAttribute(u"ver"_s)) {
+        d->version = queryElement.attribute(u"ver"_s);
+    }
     d->items = parseChildElements<QList<Item>>(queryElement);
     setMixAnnotate(!firstChildElement(queryElement, u"annotate", ns_mix_roster).isNull());
 }
@@ -128,7 +173,8 @@ void QXmppRosterIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
         PayloadXmlTag,
-        // XEP-0237: Roster Versioning
+        // RFC 6121 §2.6: Roster Versioning — emit `ver` whenever explicitly set, including
+        // `ver=""` which is how clients advertise versioning support to the server.
         OptionalAttribute { u"ver", d->version },
         // XEP-0405: Mediated Information eXchange (MIX): Participant Server Requirements
         OptionalContent { d->mixAnnotate, Element { { u"annotate", ns_mix_roster } } },

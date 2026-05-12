@@ -13,6 +13,8 @@
 #include "QXmppMovedManager.h"
 #include "QXmppPresence.h"
 #include "QXmppRosterIq.h"
+#include "QXmppRosterMemoryStorage.h"
+#include "QXmppRosterStorage.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -65,6 +67,70 @@ static void serializeRosterData(const RosterData &d, QXmlStreamWriter &writer)
 }  // namespace QXmpp::Private
 
 ///
+/// \class QXmppRosterStorage
+///
+/// Out-of-line virtual destructor anchors the vtable in this translation unit.
+///
+QXmppRosterStorage::~QXmppRosterStorage() = default;
+
+///
+/// \class QXmppRosterMemoryStorage
+///
+/// In-memory backing for QXmppRosterStorage. Used as the default by
+/// QXmppRosterManager when no external storage is configured.
+///
+
+class QXmppRosterMemoryStoragePrivate
+{
+public:
+    QString version;
+    std::vector<QXmppRosterIq::Item> items;
+};
+
+QXmppRosterMemoryStorage::QXmppRosterMemoryStorage()
+    : d(std::make_unique<QXmppRosterMemoryStoragePrivate>())
+{
+}
+
+QXmppRosterMemoryStorage::~QXmppRosterMemoryStorage() = default;
+
+/// \cond
+QXmppTask<QXmppRosterStorage::RosterCache> QXmppRosterMemoryStorage::load()
+{
+    co_return RosterCache { d->version, d->items };
+}
+
+QXmppTask<void> QXmppRosterMemoryStorage::replaceAll(const QString &version, const std::vector<QXmppRosterIq::Item> &items)
+{
+    d->version = version;
+    d->items = items;
+    co_return;
+}
+
+QXmppTask<void> QXmppRosterMemoryStorage::upsertItem(const QString &version, const QXmppRosterIq::Item &item)
+{
+    d->version = version;
+    removeIf(d->items, [&](const auto &i) { return i.bareJid() == item.bareJid(); });
+    d->items.push_back(item);
+    co_return;
+}
+
+QXmppTask<void> QXmppRosterMemoryStorage::removeItem(const QString &version, const QString &bareJid)
+{
+    d->version = version;
+    removeIf(d->items, [&](const auto &i) { return i.bareJid() == bareJid; });
+    co_return;
+}
+
+QXmppTask<void> QXmppRosterMemoryStorage::clear()
+{
+    d->version.clear();
+    d->items.clear();
+    co_return;
+}
+/// \endcond
+
+///
 /// \fn QXmppRosterManager::subscriptionRequestReceived
 ///
 /// This signal is emitted when a JID asks to subscribe to the user's presence.
@@ -101,6 +167,21 @@ public:
 
     // flag to store that the roster has been populated
     bool isRosterReceived;
+
+    // RFC 6121 §2.6: Roster Versioning
+    QString cachedVersion;
+
+    // Storage backend owned by the manager. Lazily created by storage() so a caller that injects
+    // their own backend via setStorage() before any operation pays for one allocation, not two.
+    mutable std::unique_ptr<QXmppRosterStorage> storageImpl;
+
+    QXmppRosterStorage *storage() const
+    {
+        if (!storageImpl) {
+            storageImpl = std::make_unique<QXmppRosterMemoryStorage>();
+        }
+        return storageImpl.get();
+    }
 };
 
 QXmppRosterManagerPrivate::QXmppRosterManagerPrivate()
@@ -113,6 +194,7 @@ void QXmppRosterManagerPrivate::clear()
     entries.clear();
     presences.clear();
     isRosterReceived = false;
+    cachedVersion.clear();
 }
 
 ///
@@ -134,6 +216,50 @@ QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
 }
 
 QXmppRosterManager::~QXmppRosterManager() = default;
+
+///
+/// Returns the storage backend used to persist the roster between sessions.
+///
+/// By default this is an internally owned QXmppRosterMemoryStorage. Call setStorage() to plug in
+/// a persistent backend. The returned pointer is owned by the manager and stays valid for the
+/// manager's lifetime (or until setStorage() is called again).
+///
+/// \since QXmpp 1.16
+///
+QXmppRosterStorage *QXmppRosterManager::storage() const
+{
+    return d->storage();
+}
+
+///
+/// Sets the storage backend used to persist the roster between sessions and transfers ownership.
+///
+/// Pass an empty unique_ptr to fall back to the default in-memory storage. Any previously
+/// configured storage is destroyed.
+///
+/// Must be called before the QXmppClient connects to the server; switching storage mid-session
+/// is unsupported and will leave the cache inconsistent.
+///
+/// \since QXmpp 1.16
+///
+void QXmppRosterManager::setStorage(std::unique_ptr<QXmppRosterStorage> storage)
+{
+    d->storageImpl = std::move(storage);
+}
+
+///
+/// Wipes the cached roster (in-memory and storage) and resets the version.
+///
+/// Use this on account switch or explicit logout where the previous roster must not leak into the
+/// next session.
+///
+/// \since QXmpp 1.16
+///
+QXmppTask<void> QXmppRosterManager::clearCache()
+{
+    d->clear();
+    co_await d->storage()->clear().withContext(this);
+}
 
 ///
 /// Accepts an existing subscription request or pre-approves future subscription
@@ -158,39 +284,69 @@ bool QXmppRosterManager::acceptSubscription(const QString &bareJid, const QStrin
 }
 
 ///
-/// Upon XMPP connection, request the roster.
+/// Upon XMPP connection, load the cached roster and request the latest version from the server.
 ///
 void QXmppRosterManager::_q_connected()
 {
-    // clear cache if stream has not been resumed
-    if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->clear();
+    // On stream resumption the in-memory state is already in sync (pushes that
+    // occurred during the disconnect window are replayed on resume).
+    if (client()->streamManagementState() == QXmppClient::ResumedStream) {
+        return;
     }
 
-    if (!d->isRosterReceived && client()->isAuthenticated()) {
-        requestRoster().then(this, [this](auto &&result) {
-            if (hasValue(result)) {
-                // reset entries
-                d->entries.clear();
-                const auto items = getValue(result).items();
-                for (const auto &item : items) {
-                    d->entries.insert(item.bareJid(), item);
-                }
+    initRosterFromCacheAndSync();
+}
 
-                // notify
-                d->isRosterReceived = true;
-                Q_EMIT rosterReceived();
-            }
-        });
+QXmppTask<void> QXmppRosterManager::initRosterFromCacheAndSync()
+{
+    // Load cached roster first so we can send the versioned request with the right `ver`.
+    auto cache = co_await d->storage()->load().withContext(this);
+
+    d->entries.clear();
+    for (const auto &item : cache.items) {
+        d->entries.insert(item.bareJid(), item);
     }
+    d->cachedVersion = cache.version;
+    d->isRosterReceived = false;
+
+    if (!client()->isAuthenticated()) {
+        co_return;
+    }
+
+    auto result = co_await requestRoster().withContext(this);
+    if (!hasValue(result)) {
+        co_return;
+    }
+    const auto &iq = getValue(result);
+
+    if (!iq.hasQuery()) {
+        // Server confirms the cached roster is still up to date (RFC 6121 §2.6.3). Any subsequent
+        // changes arrive as roster pushes carrying the new `ver`; nothing to persist here.
+    } else {
+        // Server sent a full roster snapshot — replace our cache wholesale.
+        d->entries.clear();
+        const auto items = iq.items();
+        for (const auto &item : items) {
+            d->entries.insert(item.bareJid(), item);
+        }
+        const auto newVersion = iq.versionOpt().value_or(QString());
+        co_await d->storage()->replaceAll(
+                                 newVersion,
+                                 std::vector<QXmppRosterIq::Item>(items.cbegin(), items.cend()))
+            .withContext(this);
+        d->cachedVersion = newVersion;
+    }
+
+    d->isRosterReceived = true;
+    Q_EMIT rosterReceived();
 }
 
 void QXmppRosterManager::_q_disconnected()
 {
-    // clear cache if stream cannot be resumed
-    if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
-        d->clear();
-    }
+    // The cache must survive disconnects — that is the whole point of roster versioning.
+    // In-memory state is kept; the next connect re-syncs via initRosterFromCacheAndSync().
+    // Presence data is per-session, so drop it.
+    d->presences.clear();
 }
 
 /// \cond
@@ -219,25 +375,26 @@ bool QXmppRosterManager::handleStanza(const QDomElement &element)
 
         // store updated entries and notify changes
         const auto items = rosterIq.items();
+        const auto newVersion = rosterIq.versionOpt().value_or(QString());
         for (const auto &item : items) {
             const QString bareJid = item.bareJid();
             if (item.subscriptionType() == QXmppRosterIq::Item::Remove) {
                 if (d->entries.remove(bareJid)) {
-                    // notify the user that the item was removed
+                    d->storage()->removeItem(newVersion, bareJid).then(this, []() { });
                     Q_EMIT itemRemoved(bareJid);
                 }
             } else {
                 const bool added = !d->entries.contains(bareJid);
                 d->entries.insert(bareJid, item);
+                d->storage()->upsertItem(newVersion, item).then(this, []() { });
                 if (added) {
-                    // notify the user that the item was added
                     Q_EMIT itemAdded(bareJid);
                 } else {
-                    // notify the user that the item changed
                     Q_EMIT itemChanged(bareJid);
                 }
             }
         }
+        d->cachedVersion = newVersion;
         break;
     }
     default:
@@ -308,6 +465,10 @@ QXmppTask<QXmppRosterManager::RosterResult> QXmppRosterManager::requestRoster()
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Get);
     iq.setFrom(client()->configuration().jid());
+
+    // RFC 6121 §2.6: Roster Versioning. Sending the `ver` attribute (even empty) signals support
+    // to versioning-aware servers; servers that don't support it ignore the attribute.
+    iq.setVersion(d->cachedVersion);
 
     // TODO: Request MIX annotations only when the server supports MIX-PAM.
     iq.setMixAnnotate(true);

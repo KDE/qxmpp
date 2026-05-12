@@ -8,8 +8,13 @@
 #include "QXmppMovedManager.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
+#include "QXmppRosterMemoryStorage.h"
+#include "QXmppRosterStorage.h"
 
+#include "Algorithms.h"
 #include "TestClient.h"
+
+using namespace QXmpp::Private;
 
 class tst_QXmppRosterManager : public QObject
 {
@@ -25,6 +30,12 @@ private:
     Q_SLOT void testMovedSubscriptionRequestReceived();
     Q_SLOT void testAddItem();
     Q_SLOT void testRemoveItem();
+    Q_SLOT void testDefaultStorage();
+    Q_SLOT void testSetStorage();
+    Q_SLOT void testPushPersistsAdd();
+    Q_SLOT void testPushPersistsRemove();
+    Q_SLOT void testClearCache();
+    Q_SLOT void testRosterIqVerSerialization();
 
 private:
     QXmppClient client;
@@ -270,6 +281,165 @@ void tst_QXmppRosterManager::testRemoveItem()
     auto error = err.value<QXmppStanza::Error>().value();
     QCOMPARE(error.type(), QXmppStanza::Error::Cancel);
     QCOMPARE(error.text(), u"Not found"_s);
+}
+
+void tst_QXmppRosterManager::testDefaultStorage()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
+
+    // The manager wires up a default in-memory storage automatically.
+    QVERIFY(rosterManager->storage() != nullptr);
+}
+
+void tst_QXmppRosterManager::testSetStorage()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
+
+    auto external = std::make_unique<QXmppRosterMemoryStorage>();
+    auto *externalPtr = external.get();
+    rosterManager->setStorage(std::move(external));
+    QCOMPARE(rosterManager->storage(), externalPtr);
+
+    // Passing an empty unique_ptr restores the internal default.
+    rosterManager->setStorage(nullptr);
+    QVERIFY(rosterManager->storage() != nullptr);
+}
+
+void tst_QXmppRosterManager::testPushPersistsAdd()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
+
+    rosterManager->setStorage(std::make_unique<QXmppRosterMemoryStorage>());
+
+    // Inject a roster-set push carrying a new version.
+    QXmppRosterIq::Item item;
+    item.setBareJid(u"alice@example.org"_s);
+    item.setName(u"Alice"_s);
+    QXmppRosterIq push;
+    push.setType(QXmppIq::Set);
+    push.setVersion(u"v42"_s);
+    push.addItem(item);
+
+    QVERIFY(rosterManager->handleStanza(writePacketToDom(push)));
+
+    auto cache = rosterManager->storage()->load().takeResult();
+    QCOMPARE(cache.version, u"v42"_s);
+    QCOMPARE(cache.items.size(), 1u);
+    QCOMPARE(find(cache.items, u"alice@example.org"_s, &QXmppRosterIq::Item::bareJid)->name(), u"Alice"_s);
+}
+
+void tst_QXmppRosterManager::testPushPersistsRemove()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
+
+    rosterManager->setStorage(std::make_unique<QXmppRosterMemoryStorage>());
+
+    // First push: add Alice.
+    QXmppRosterIq::Item item;
+    item.setBareJid(u"alice@example.org"_s);
+    QXmppRosterIq add;
+    add.setType(QXmppIq::Set);
+    add.setVersion(u"v1"_s);
+    add.addItem(item);
+    QVERIFY(rosterManager->handleStanza(writePacketToDom(add)));
+
+    // Second push: remove Alice with a new version.
+    QXmppRosterIq::Item removed;
+    removed.setBareJid(u"alice@example.org"_s);
+    removed.setSubscriptionType(QXmppRosterIq::Item::Remove);
+    QXmppRosterIq remove;
+    remove.setType(QXmppIq::Set);
+    remove.setVersion(u"v2"_s);
+    remove.addItem(removed);
+    QVERIFY(rosterManager->handleStanza(writePacketToDom(remove)));
+
+    auto cache = rosterManager->storage()->load().takeResult();
+    QCOMPARE(cache.version, u"v2"_s);
+    QVERIFY(cache.items.empty());
+}
+
+void tst_QXmppRosterManager::testClearCache()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
+
+    rosterManager->setStorage(std::make_unique<QXmppRosterMemoryStorage>());
+
+    QXmppRosterIq::Item item;
+    item.setBareJid(u"alice@example.org"_s);
+    QXmppRosterIq push;
+    push.setType(QXmppIq::Set);
+    push.setVersion(u"v1"_s);
+    push.addItem(item);
+    QVERIFY(rosterManager->handleStanza(writePacketToDom(push)));
+
+    auto task = rosterManager->clearCache();
+    QVERIFY(task.isFinished());
+
+    QVERIFY(rosterManager->getRosterBareJids().isEmpty());
+    auto cache = rosterManager->storage()->load().takeResult();
+    QVERIFY(cache.version.isEmpty());
+    QVERIFY(cache.items.empty());
+}
+
+void tst_QXmppRosterManager::testRosterIqVerSerialization()
+{
+    // No version set: ver attribute is omitted entirely.
+    {
+        QXmppRosterIq iq;
+        iq.setType(QXmppIq::Get);
+        QByteArray xml;
+        QXmlStreamWriter writer(&xml);
+        iq.toXml(&writer);
+        QVERIFY(!xml.contains("ver="));
+    }
+
+    // Explicit empty ver (RFC 6121 §2.6 support advertisement): emit ver="".
+    {
+        QXmppRosterIq iq;
+        iq.setType(QXmppIq::Get);
+        iq.setVersion(QString());
+        QByteArray xml;
+        QXmlStreamWriter writer(&xml);
+        iq.toXml(&writer);
+        QVERIFY(xml.contains("ver=\"\""));
+    }
+
+    // Explicit non-empty ver: emit ver="abc".
+    {
+        QXmppRosterIq iq;
+        iq.setType(QXmppIq::Get);
+        iq.setVersion(u"abc"_s);
+        QByteArray xml;
+        QXmlStreamWriter writer(&xml);
+        iq.toXml(&writer);
+        QVERIFY(xml.contains("ver=\"abc\""));
+    }
+
+    // Parse: an empty IQ result without <query> sets hasQuery() == false.
+    {
+        QXmppRosterIq iq;
+        parsePacket(iq, "<iq id='qx1' type='result'/>");
+        QVERIFY(!iq.hasQuery());
+        QVERIFY(!iq.versionOpt().has_value());
+    }
+
+    // Parse: an IQ result with <query/> sets hasQuery() == true.
+    {
+        QXmppRosterIq iq;
+        parsePacket(iq, "<iq id='qx1' type='result'><query xmlns='jabber:iq:roster' ver='abc'/></iq>");
+        QVERIFY(iq.hasQuery());
+        QCOMPARE(iq.versionOpt(), std::optional { u"abc"_s });
+    }
 }
 
 QTEST_MAIN(tst_QXmppRosterManager)

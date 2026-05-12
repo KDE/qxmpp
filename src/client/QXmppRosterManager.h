@@ -13,6 +13,7 @@
 #include "QXmppRosterIq.h"
 #include "QXmppSendResult.h"
 
+#include <memory>
 #include <variant>
 
 #include <QMap>
@@ -22,6 +23,7 @@
 template<typename T>
 class QXmppTask;
 class QXmppRosterManagerPrivate;
+class QXmppRosterStorage;
 
 ///
 /// \brief The QXmppRosterManager class provides access to a connected client's
@@ -90,6 +92,10 @@ public:
 
     explicit QXmppRosterManager(QXmppClient *stream);
     ~QXmppRosterManager() override;
+
+    QXmppRosterStorage *storage() const;
+    void setStorage(std::unique_ptr<QXmppRosterStorage> storage);
+    QXmppTask<void> clearCache();
 
     bool isRosterReceived() const;
     QStringList getRosterBareJids() const;
@@ -169,6 +175,7 @@ private:
     Q_SLOT void _q_presenceReceived(const QXmppPresence &);
 
     void handleSubscriptionRequest(const QString &bareJid, const QXmppPresence &presence);
+    QXmppTask<void> initRosterFromCacheAndSync();
     QXmppTask<RosterResult> requestRoster();
 
     const std::unique_ptr<QXmppRosterManagerPrivate> d;
