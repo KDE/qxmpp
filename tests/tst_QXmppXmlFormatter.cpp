@@ -134,9 +134,9 @@ void tst_QXmppXmlFormatter::loggerPrettyXmlAppliesToSentReceivedOnly()
     logger.log(QXmppLogger::InformationMessage, u"<iq><foo/></iq>"_s);
 
     QCOMPARE(spy.count(), 2);
-    // Sent: pretty-printed and nested under the log header.
+    // Sent: pretty-printed.
     QCOMPARE(spy.at(0).at(1).toString(),
-             u"  <iq>\n    <foo/>\n  </iq>"_s);
+             u"<iq>\n  <foo/>\n</iq>"_s);
     // Info: untouched
     QCOMPARE(spy.at(1).at(1).toString(), u"<iq><foo/></iq>"_s);
 }

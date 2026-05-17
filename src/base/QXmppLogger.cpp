@@ -260,9 +260,6 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
     QString payload = text;
     if (d->prettyXml && (type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
         payload = QXmpp::formatXmlForDebug(text, true, 2, colorize);
-        // Nest the XML block under the log header.
-        QString indent(2, u' ');
-        payload = indent + payload.replace(u'\n', u'\n' + indent);
     }
 
     switch (d->loggingType) {
