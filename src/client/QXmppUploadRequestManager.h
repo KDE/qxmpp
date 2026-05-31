@@ -21,11 +21,13 @@ class QXmppHttpUploadSlotIq;
 class QXmppUploadServicePrivate;
 class QXmppUploadRequestManagerPrivate;
 
-///
-/// \brief QXmppUploadService represents an HTTP File Upload service.
-///
-/// It is used to store the JID and maximum file size for uploads.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief QXmppUploadService represents an HTTP File Upload service.
+
+    It is used to store the JID and maximum file size for uploads.
+*/
 class QXMPP_EXPORT QXmppUploadService
 {
 public:
@@ -45,41 +47,43 @@ private:
     QSharedDataPointer<QXmppUploadServicePrivate> d;
 };
 
-///
-/// \brief The QXmppUploadRequestManager implements the core of \xep{0363, HTTP File Upload}.
-///
-/// It handles the discovery of QXmppUploadServices and can send upload
-/// requests and outputs the upload slots. It doesn't do the actual upload via.
-/// HTTP.
-///
-/// To make use of this manager, you need to instantiate it and load it into
-/// the QXmppClient instance as follows:
-///
-/// \code
-/// auto *manager = new QXmppUploadRequestManager;
-/// client->addExtension(manager);
-/// \endcode
-///
-/// Apart from that, you also need to discover HTTP File Upload service(s) by
-/// requesting the Service Discovery info for each Service Discovery item of
-/// the server. The QXmppUploadManager will then automatically recognize upload
-/// services and add them to the list of discovered services
-/// \c uploadServices().
-///
-/// Keep in mind that theoretically any XMPP entity could promote to be an
-/// upload service and so is recognized by this manager. A potential attacker
-/// could exploit this vulnerability, so the client could be uploading files to
-/// the attacker (e.g. a normal user JID) instead of the own server.
-///
-/// As soon as at least one upload service has been discovered, you can start
-/// to request upload slots by using \c requestUploadSlot(). Alternatively you
-/// can provide the JID of the upload service which should be used for
-/// uploading.
-///
-/// \since QXmpp 1.1
-///
-/// \ingroup Managers
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppUploadRequestManager implements the core of \xep{0363}{HTTP File Upload}.
+
+    It handles the discovery of QXmppUploadServices and can send upload
+    requests and outputs the upload slots. It doesn't do the actual upload via.
+    HTTP.
+
+    To make use of this manager, you need to instantiate it and load it into
+    the QXmppClient instance as follows:
+
+    \code
+    auto *manager = new QXmppUploadRequestManager;
+    client->addExtension(manager);
+    \endcode
+
+    Apart from that, you also need to discover HTTP File Upload service(s) by
+    requesting the Service Discovery info for each Service Discovery item of
+    the server. The QXmppUploadManager will then automatically recognize upload
+    services and add them to the list of discovered services
+    \c uploadServices().
+
+    Keep in mind that theoretically any XMPP entity could promote to be an
+    upload service and so is recognized by this manager. A potential attacker
+    could exploit this vulnerability, so the client could be uploading files to
+    the attacker (e.g. a normal user JID) instead of the own server.
+
+    As soon as at least one upload service has been discovered, you can start
+    to request upload slots by using \c requestUploadSlot(). Alternatively you
+    can provide the JID of the upload service which should be used for
+    uploading.
+
+    \since QXmpp 1.1
+
+    \ingroup Managers
+*/
 class QXMPP_EXPORT QXmppUploadRequestManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -109,15 +113,17 @@ public:
 
     bool handleStanza(const QDomElement &stanza) override;
 
-    /// Emitted when an upload slot was received.
+    /*! Emitted when an upload \a slot was received. */
     Q_SIGNAL void slotReceived(const QXmppHttpUploadSlotIq &slot);
 
-    /// Emitted when the slot request failed.
-    ///
-    /// \param request The sent IQ with an QXmppStanza::Error from the server.
+    /*!
+        Emitted when the slot request failed.
+
+        \a request is the sent IQ with a QXmppStanza::Error from the server.
+    */
     Q_SIGNAL void requestFailed(const QXmppHttpUploadRequestIq &request);
 
-    /// Emitted when the first upload service has been found.
+    /*! Emitted when the first upload service has been found. */
     Q_SIGNAL void serviceFoundChanged();
 
 protected:

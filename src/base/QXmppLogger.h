@@ -20,42 +20,73 @@
 
 class QXmppLoggerPrivate;
 
-///
-/// \brief The QXmppLogger class represents a sink for logging messages.
-///
-/// \ingroup Core
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppLogger class represents a sink for logging messages.
+
+    \ingroup Core
+*/
 class QXMPP_EXPORT QXmppLogger : public QObject
 {
     Q_OBJECT
     Q_FLAGS(MessageType MessageTypes)
 
-    /// The path to which logging messages should be written
+    /*!
+        \property QXmppLogger::logFilePath
+
+        The path to which logging messages should be written
+    */
     Q_PROPERTY(QString logFilePath READ logFilePath WRITE setLogFilePath NOTIFY logFilePathChanged)
-    /// The handler for logging messages
+    /*!
+        \property QXmppLogger::loggingType
+
+        The handler for logging messages
+    */
     Q_PROPERTY(LoggingType loggingType READ loggingType WRITE setLoggingType NOTIFY loggingTypeChanged)
-    /// The types of messages to log
+    /*!
+        \property QXmppLogger::messageTypes
+
+        The types of messages to log
+    */
     Q_PROPERTY(MessageTypes messageTypes READ messageTypes WRITE setMessageTypes NOTIFY messageTypesChanged)
 
 public:
-    /// This enum describes how log message are handled.
+    /*!
+        This enum describes how log message are handled.
+
+        \value NoLogging Log messages are discarded.
+        \value FileLogging Log messages are written to a file.
+        \value StdoutLogging Log messages are written to the standard output.
+        \value SignalLogging Log messages are emitted as a signal.
+    */
     enum LoggingType {
-        NoLogging = 0,      ///< Log messages are discarded
-        FileLogging = 1,    ///< Log messages are written to a file
-        StdoutLogging = 2,  ///< Log messages are written to the standard output
-        SignalLogging = 4   ///< Log messages are emitted as a signal
+        NoLogging = 0,
+        FileLogging = 1,
+        StdoutLogging = 2,
+        SignalLogging = 4
     };
     Q_ENUM(LoggingType)
 
-    /// This enum describes a type of log message.
+    /*!
+        This enum describes a type of log message.
+
+        \value NoMessage No message type.
+        \value DebugMessage Debugging message.
+        \value InformationMessage Informational message.
+        \value WarningMessage Warning message.
+        \value ReceivedMessage Message received from server.
+        \value SentMessage Message sent to server.
+        \value AnyMessage Any message type.
+    */
     enum MessageType {
-        NoMessage = 0,           ///< No message type
-        DebugMessage = 1,        ///< Debugging message
-        InformationMessage = 2,  ///< Informational message
-        WarningMessage = 4,      ///< Warning message
-        ReceivedMessage = 8,     ///< Message received from server
-        SentMessage = 16,        ///< Message sent to server
-        AnyMessage = 31          ///< Any message type
+        NoMessage = 0,
+        DebugMessage = 1,
+        InformationMessage = 2,
+        WarningMessage = 4,
+        ReceivedMessage = 8,
+        SentMessage = 16,
+        AnyMessage = 31
     };
     Q_DECLARE_FLAGS(MessageTypes, MessageType)
 
@@ -65,23 +96,23 @@ public:
     static QXmppLogger *getLogger();
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Returns the handler for logging messages.
+    /*! Returns the handler for logging messages. */
     QXmppLogger::LoggingType loggingType();
     void setLoggingType(QXmppLogger::LoggingType type);
     Q_SIGNAL void loggingTypeChanged();
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    ///
-    /// Returns the path to which logging messages should be written.
-    ///
-    /// \sa loggingType()
-    ///
+    /*!
+        Returns the path to which logging messages should be written.
+
+        \sa loggingType()
+    */
     QString logFilePath();
     void setLogFilePath(const QString &path);
     Q_SIGNAL void logFilePathChanged();
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Returns the types of messages to log.
+    /*! Returns the types of messages to log. */
     QXmppLogger::MessageTypes messageTypes();
     void setMessageTypes(QXmppLogger::MessageTypes types);
     Q_SIGNAL void messageTypesChanged();
@@ -92,7 +123,11 @@ public:
     Q_SLOT void log(QXmppLogger::MessageType type, const QString &text);
     Q_SLOT void reopen();
 
-    /// This signal is emitted whenever a log message is received.
+    /*!
+        This signal is emitted whenever a log message is received.
+
+        \a type and \a text.
+    */
     Q_SIGNAL void message(QXmppLogger::MessageType type, const QString &text);
 
 private:
@@ -100,11 +135,13 @@ private:
     const std::unique_ptr<QXmppLoggerPrivate> d;
 };
 
-///
-/// \brief The QXmppLoggable class represents a source of logging messages.
-///
-/// \ingroup Core
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppLoggable class represents a source of logging messages.
+
+    \ingroup Core
+*/
 class QXMPP_EXPORT QXmppLoggable : public QObject
 {
     Q_OBJECT
@@ -113,48 +150,58 @@ public:
     QXmppLoggable(QObject *parent = nullptr);
 
 protected:
-    /// \cond
     void childEvent(QChildEvent *event) override;
-    /// \endcond
 
-    /// Logs a debugging message.
+    /*! Logs a debugging \a message. */
     void debug(const QString &message)
     {
         Q_EMIT logMessage(QXmppLogger::DebugMessage, qxmpp_loggable_trace(message));
     }
 
-    /// Logs an informational message.
+    /*! Logs an informational \a message. */
     void info(const QString &message)
     {
         Q_EMIT logMessage(QXmppLogger::InformationMessage, qxmpp_loggable_trace(message));
     }
 
-    /// Logs a warning message.
+    /*! Logs a warning \a message. */
     void warning(const QString &message)
     {
         Q_EMIT logMessage(QXmppLogger::WarningMessage, qxmpp_loggable_trace(message));
     }
 
-    /// Logs a received packet.
+    /*!
+        Logs a received packet.
+
+        \a message.
+    */
     void logReceived(const QString &message)
     {
         Q_EMIT logMessage(QXmppLogger::ReceivedMessage, qxmpp_loggable_trace(message));
     }
 
-    /// Logs a sent packet.
+    /*!
+        Logs a sent packet.
+
+        \a message.
+    */
     void logSent(const QString &message)
     {
         Q_EMIT logMessage(QXmppLogger::SentMessage, qxmpp_loggable_trace(message));
     }
 
 public:
-    /// Sets the given \a gauge to \a value.
+    /*! Sets the given \a gauge to \a value. */
     Q_SIGNAL void setGauge(const QString &gauge, double value);
 
-    /// This signal is emitted to send logging messages.
+    /*!
+        This signal is emitted to send logging messages.
+
+        \a msg and \a type.
+    */
     Q_SIGNAL void logMessage(QXmppLogger::MessageType type, const QString &msg);
 
-    /// Updates the given \a counter by \a amount.
+    /*! Updates the given \a counter by \a amount. */
     Q_SIGNAL void updateCounter(const QString &counter, qint64 amount = 1);
 };
 

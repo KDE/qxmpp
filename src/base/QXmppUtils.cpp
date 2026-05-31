@@ -98,20 +98,20 @@ static quint32 crctable[256] = {
 
 QAtomicInt QXmpp::Private::globalStanzaIdCounter = 0;
 
-///
-/// Parses a date-time from a string according to \xep{0082, XMPP Date and Time Profiles}.
-///
-/// Takes QStringView since QXmpp 1.8.
-///
+/*! Parses a date-time from a string according to \xep{0082}{XMPP Date and Time Profiles}.
+
+    Takes QStringView since QXmpp 1.8. Returns true on success. */
 QDateTime QXmppUtils::datetimeFromString(QStringView str)
 {
     // Qt::ISODate parses milliseconds, but doesn't output them
     return QDateTime::fromString(toString60(str), Qt::ISODate).toUTC();
 }
 
-///
-/// Serializes a date-time to a string according to \xep{0082, XMPP Date and Time Profiles}.
-///
+/*!
+    Serializes a date-time to a string according to \xep{0082}{XMPP Date and Time Profiles}.
+
+    \a dt.
+*/
 QString QXmppUtils::datetimeToString(const QDateTime &dt)
 {
     if (!dt.isValid()) {
@@ -123,10 +123,8 @@ QString QXmppUtils::datetimeToString(const QDateTime &dt)
     return dt.toUTC().toString(Qt::ISODate);
 }
 
-///
-/// Parses a timezone offset (in seconds) from a string according to
-/// \xep{0082, XMPP Date and Time Profiles}.
-///
+/*! Parses a timezone offset (in seconds) from a string according to
+    \xep{0082}{XMPP Date and Time Profiles}. Returns true on success. */
 int QXmppUtils::timezoneOffsetFromString(const QString &str)
 {
     static const QRegularExpression timezoneRegex(u"(Z|([+-])([0-9]{2}):([0-9]{2}))"_s);
@@ -151,10 +149,12 @@ int QXmppUtils::timezoneOffsetFromString(const QString &str)
     return offset;
 }
 
-///
-/// Serializes a timezone offset (in seconds) to a string according to
-/// \xep{0082, XMPP Date and Time Profiles}.
-///
+/*!
+    Serializes a timezone offset (in seconds) to a string according to
+    \xep{0082}{XMPP Date and Time Profiles}.
+
+    \a secs.
+*/
 QString QXmppUtils::timezoneOffsetToString(int secs)
 {
     if (!secs) {
@@ -165,13 +165,13 @@ QString QXmppUtils::timezoneOffsetToString(int secs)
     return (secs < 0 ? u"-"_s : u"+"_s) + tzoTime.toString(u"hh:mm"_s);
 }
 
-/// Returns the domain for the given \a jid.
+/*! Returns the domain for the given \a jid. */
 QString QXmppUtils::jidToDomain(const QString &jid)
 {
     return jidToBareJid(jid).split(u"@"_s).last();
 }
 
-/// Returns the resource for the given \a jid.
+/*! Returns the resource for the given \a jid. */
 QString QXmppUtils::jidToResource(const QString &jid)
 {
     const int pos = jid.indexOf(u'/');
@@ -181,7 +181,7 @@ QString QXmppUtils::jidToResource(const QString &jid)
     return jid.mid(pos + 1);
 }
 
-/// Returns the user for the given \a jid.
+/*! Returns the user for the given \a jid. */
 QString QXmppUtils::jidToUser(const QString &jid)
 {
     const int pos = jid.indexOf(u'@');
@@ -191,7 +191,7 @@ QString QXmppUtils::jidToUser(const QString &jid)
     return jid.left(pos);
 }
 
-/// Returns the bare jid (i.e. without resource) for the given \a jid.
+/*! Returns the bare jid (i.e. without resource) for the given \a jid. */
 QString QXmppUtils::jidToBareJid(const QString &jid)
 {
     const int pos = jid.indexOf(u'/');
@@ -201,7 +201,11 @@ QString QXmppUtils::jidToBareJid(const QString &jid)
     return jid.left(pos);
 }
 
-/// Calculates the CRC32 checksum for the given input.
+/*!
+    Calculates the CRC32 checksum for the given input.
+
+    \a in.
+*/
 quint32 QXmppUtils::generateCrc32(const QByteArray &in)
 {
     quint32 result = 0xffffffff;
@@ -236,23 +240,23 @@ static QByteArray generateHmac(QCryptographicHash::Algorithm algorithm, const QB
     return hasher.result();
 }
 
-/// Generates the MD5 HMAC for the given \a key and \a text.
+/*! Generates the MD5 HMAC for the given \a key and \a text. */
 
 QByteArray QXmppUtils::generateHmacMd5(const QByteArray &key, const QByteArray &text)
 {
     return generateHmac(QCryptographicHash::Md5, key, text);
 }
 
-/// Generates the SHA1 HMAC for the given \a key and \a text.
+/*! Generates the SHA1 HMAC for the given \a key and \a text. */
 
 QByteArray QXmppUtils::generateHmacSha1(const QByteArray &key, const QByteArray &text)
 {
     return generateHmac(QCryptographicHash::Sha1, key, text);
 }
 
-/// Generates a random integer x between 0 and N-1.
-///
-/// \param N
+/*!
+    Generates a random integer x between 0 and \a N - 1.
+*/
 
 int QXmppUtils::generateRandomInteger(int N)
 {
@@ -263,9 +267,9 @@ int QXmppUtils::generateRandomInteger(int N)
     return val;
 }
 
-/// Returns a random byte array of the specified size.
-///
-/// \param length
+/*!
+    Returns a random byte array of the size specified by \a length.
+*/
 
 QByteArray QXmppUtils::generateRandomBytes(int length)
 {
@@ -276,31 +280,29 @@ QByteArray QXmppUtils::generateRandomBytes(int length)
     return bytes;
 }
 
-///
-/// Creates a new stanza id in the UUID format.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Creates a new stanza id in the UUID format.
+
+    \since QXmpp 1.3
+*/
 QString QXmppUtils::generateStanzaUuid()
 {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
 }
 
-///
-/// Returns a random alphanumerical string of the specified size.
-///
-/// Since QXmpp 1.3 this will generate a UUID, if the specified \p length is 36
-/// which is also the new default value. The returned string is still 36
-/// characters long, but will contain dashes (as specified in the UUID format).
-///
-/// \note It is recommended to use UUIDs for cases where IDs must be unique and
-/// are possibly stored permanently. This can be done using
-/// QXmppUtils::generateStanzaUuid(). However, since that function is only
-/// available since QXmpp 1.3, you may also want to continue to use this
-/// function because of compatibility reasons.
-///
-/// \param length
-///
+/*!
+    Returns a random alphanumerical string of the specified size.
+
+    Since QXmpp 1.3 this will generate a UUID, if the specified \a length is 36
+    which is also the new default value. The returned string is still 36
+    characters long, but will contain dashes (as specified in the UUID format).
+
+    \note It is recommended to use UUIDs for cases where IDs must be unique and
+    are possibly stored permanently. This can be done using
+    QXmppUtils::generateStanzaUuid(). However, since that function is only
+    available since QXmpp 1.3, you may also want to continue to use this
+    function because of compatibility reasons.
+*/
 QString QXmppUtils::generateStanzaHash(int length)
 {
     if (length == 36) {
@@ -329,21 +331,20 @@ std::tuple<QString, QString> QXmpp::Private::iqPayloadXmlTag(const QDomElement &
     return { {}, {} };
 }
 
-///
-/// Generates a new sequential stanza id. The ID is locally unique, not globally unique (see
-/// QXmppUtils::generateStanzaUuid()).
-///
-/// This is used for all QXmppStanzas automatically.
-///
-/// \since QXmpp 1.11
-///
+/*!
+    Generates a new sequential stanza id. The ID is locally unique, not globally unique (see
+    QXmppUtils::generateStanzaUuid()).
+
+    This is used for all QXmppStanzas automatically.
+
+    \since QXmpp 1.11
+*/
 QString QXmpp::generateSequentialStanzaId()
 {
     ++globalStanzaIdCounter;
     return u"qx" + QString::number(globalStanzaIdCounter);
 }
 
-/// \cond
 std::optional<QByteArray> QXmpp::Private::parseBase64(const QString &text)
 {
     if (auto result = QByteArray::fromBase64Encoding(text.toUtf8())) {
@@ -487,12 +488,10 @@ QByteArray QXmpp::Private::serializeQXmlStream(std::function<void(QXmlStreamWrit
 }
 
 //
-// Generates a random count of random bytes.
+// Generates a random count of random bytes between \a minimumByteCount and
+// \a maximumByteCount.
 //
-// \param minimumByteCount minimum count of bytes to generate
-// \param maximumByteCount maximum count of bytes to generate
-//
-// \return the generated bytes
+// Returns the generated bytes.
 //
 QByteArray QXmpp::Private::generateRandomBytes(size_t minimumByteCount, size_t maximumByteCount)
 {
@@ -505,10 +504,7 @@ QByteArray QXmpp::Private::generateRandomBytes(size_t minimumByteCount, size_t m
 }
 
 //
-// Generates random bytes.
-//
-// \param bytes generated bytes
-// \param byteCount count of bytes to generate
+// Generates \a byteCount random bytes into \a bytes.
 //
 void QXmpp::Private::generateRandomBytes(uint8_t *bytes, size_t byteCount)
 {
@@ -551,4 +547,3 @@ std::pair<QString, int> QXmpp::Private::parseHostAddress(const QString &address)
     }
     return { {}, -1 };
 }
-/// \endcond

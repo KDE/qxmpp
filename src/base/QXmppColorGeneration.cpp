@@ -10,19 +10,22 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppColorGeneration
-///
-/// \brief Generates colors from strings as defined in \xep{0392, Consistent Color Generation}.
-///
-/// This way the colors are unique between different clients.
-///
-/// \since QXmpp 1.10
-///
+/*!
+    \class QXmppColorGeneration
+    \inmodule QXmpp
 
-///
-/// Generates an RGB color triple for a string.
-///
+    \brief Generates colors from strings as defined in \xep{0392}{Consistent Color Generation}.
+
+    This way the colors are unique between different clients.
+
+    \since QXmpp 1.10
+*/
+
+/*!
+    Generates an RGB color triple for a string.
+
+    \a str.
+*/
 QXmppColorGeneration::Rgb QXmppColorGeneration::generateRgb(QStringView str)
 {
     double hue = generateColorAngle(str);
@@ -36,14 +39,14 @@ QXmppColorGeneration::Rgb QXmppColorGeneration::generateRgb(QStringView str)
     return Rgb { quint8(red * 255.0), quint8(green * 255.0), quint8(blue * 255.0) };
 }
 
-///
-/// \fn QXmppColorGeneration::generateColor
-///
-/// Generates a QColor for a string.
-///
-/// \note This is a header-only function and it is only available when building the application
-/// using QXmpp with the Qt GUI module.
-///
+/*!
+    \fn QColor QXmppColorGeneration::generateColor(QStringView str)
+
+    Generates a QColor for a string.
+
+    \note This is a header-only function and it is only available when building the application
+    using QXmpp with the Qt GUI module.
+*/
 
 double QXmpp::Private::generateColorAngle(QStringView str)
 {

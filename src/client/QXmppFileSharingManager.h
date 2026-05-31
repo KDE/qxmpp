@@ -31,7 +31,11 @@ class QXmppFileUploadPrivate;
 class QXMPP_EXPORT QXmppFileUpload : public QObject
 {
     Q_OBJECT
-    /// Progress of the file upload between 0.0 and 1.0.
+    /*!
+        \property QXmppFileUpload::progress
+
+        Progress of the file upload between 0.0 and 1.0.
+    */
     Q_PROPERTY(float progress READ progress NOTIFY progressChanged)
 public:
     struct FileResult {
@@ -68,19 +72,27 @@ Q_DECLARE_METATYPE(QXmppFileUpload::Result);
 class QXMPP_EXPORT QXmppFileDownload : public QObject
 {
     Q_OBJECT
-    /// Progress of the file download between 0.0 and 1.0.
+    /*!
+        \property QXmppFileDownload::progress
+
+        Progress of the file download between 0.0 and 1.0.
+    */
     Q_PROPERTY(float progress READ progress NOTIFY progressChanged)
 public:
+    /*!
+        \enum QXmppFileDownload::HashVerificationResult
+
+        Result of hash verification after a file download.
+
+        \value NoStrongHashes File did not contain strong hashes (or no hashes
+        at all) and no verification was done. This value is not used when a
+        hash value did not match — in that case the whole file download
+        returns an error.
+        \value HashVerified The file integrity could be proved using a strong
+        hash algorithm.
+    */
     enum HashVerificationResult {
-        ///
-        /// \brief File did not contain strong hashes (or no hashes at all) and no verification
-        /// was done.
-        ///
-        /// This value is not used when a hash value did not match. In that case the whole file
-        /// download returns an error.
-        ///
         NoStrongHashes,
-        /// \brief The file integrity could be proved using a strong hash algorithm.
         HashVerified,
     };
 
@@ -139,11 +151,12 @@ public:
 
     void setMetadataGenerator(MetadataGenerator &&generator);
 
-    ///
-    /// \brief Register a provider for automatic downloads
-    /// \param manager A shared_ptr to a QXmppFileSharingProvider subclass
-    /// The provider must define SourceType to the type of the accepted file source.
-    ///
+    /*!
+        \brief Register a provider for automatic downloads.
+
+        \a manager is a shared_ptr to a QXmppFileSharingProvider subclass.
+        The provider must define SourceType to the type of the accepted file source.
+    */
     template<typename ProviderType>
     void registerProvider(std::shared_ptr<ProviderType> manager)
     {

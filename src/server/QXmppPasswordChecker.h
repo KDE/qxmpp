@@ -9,12 +9,19 @@
 
 #include <QObject>
 
-/// \brief The QXmppPasswordRequest class represents a password request.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppPasswordRequest class represents a password request.
+*/
 class QXMPP_EXPORT QXmppPasswordRequest
 {
 public:
-    /// This enum is used to describe request types.
+    /*!
+        This enum is used to describe request types.
+
+        \value CheckPassword
+    */
     enum Type {
         CheckPassword = 0
     };
@@ -34,14 +41,23 @@ private:
     QString m_username;
 };
 
-/// \brief The QXmppPasswordReply class represents a password reply.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppPasswordReply class represents a password reply.
+*/
 class QXMPP_EXPORT QXmppPasswordReply : public QObject
 {
     Q_OBJECT
 
 public:
-    /// This enum is used to describe authentication errors.
+    /*!
+        This enum is used to describe authentication errors.
+
+        \value NoError
+        \value AuthorizationError
+        \value TemporaryError
+    */
     enum Error {
         NoError = 0,
         AuthorizationError,
@@ -64,7 +80,7 @@ public:
     Q_SLOT void finish();
     Q_SLOT void finishLater();
 
-    /// This signal is emitted when the reply has finished.
+    /*! This signal is emitted when the reply has finished. */
     Q_SIGNAL void finished();
 
 private:
@@ -74,8 +90,11 @@ private:
     bool m_isFinished;
 };
 
-/// \brief The QXmppPasswordChecker class represents an abstract password checker.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppPasswordChecker class represents an abstract password checker.
+*/
 
 class QXMPP_EXPORT QXmppPasswordChecker
 {

@@ -102,13 +102,14 @@ static bool checkElement(const QDomElement &element, QStringView tagName, QStrin
     return element.tagName() == tagName && element.namespaceURI() == xmlns;
 }
 
-///
-/// \struct QXmppStanzaId
-///
-/// \brief Stanza ID element as defined in \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    \struct QXmppStanzaId
+    \inmodule QXmpp
+
+    \brief Stanza ID element as defined in \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \since QXmpp 1.8
+*/
 
 enum StampType {
     LegacyDelayedDelivery,  // XEP-0091: Legacy Delayed Delivery
@@ -221,14 +222,10 @@ public:
     std::optional<QXmppCallInviteElement> callInviteElement;
 };
 
-///
-/// Constructs a QXmppMessage.
-///
-/// \param from
-/// \param to
-/// \param body
-/// \param thread
-///
+/*!
+    Constructs a QXmppMessage with sender \a from, recipient \a to, message
+    \a body and \a thread.
+*/
 QXmppMessage::QXmppMessage(const QString &from, const QString &to, const QString &body, const QString &thread)
     : QXmppStanza(from, to), d(new QXmppMessagePrivate)
 {
@@ -236,134 +233,133 @@ QXmppMessage::QXmppMessage(const QString &from, const QString &to, const QString
     d->thread = thread;
 }
 
-/// Constructs a copy of \a other.
+/*! Constructs a copy of \a other. */
 QXmppMessage::QXmppMessage(const QXmppMessage &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppMessage::QXmppMessage(QXmppMessage &&) = default;
 QXmppMessage::~QXmppMessage() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppMessage &QXmppMessage::operator=(const QXmppMessage &other) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppMessage &QXmppMessage::operator=(QXmppMessage &&) = default;
 
-///
-/// Indicates if the QXmppStanza is a stanza in the XMPP sense (i. e. a message,
-/// iq or presence)
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns whether the QXmppStanza is a stanza in the XMPP sense (i. e. a message,
+    iq or presence)
+
+    \since QXmpp 1.0
+*/
 bool QXmppMessage::isXmppStanza() const
 {
     return true;
 }
 
-/// Returns the message's body.
+/*! Returns the message's body. */
 QString QXmppMessage::body() const
 {
     return d->body;
 }
 
-/// Sets the message's body.
+/*! Sets the message's \a body. */
 void QXmppMessage::setBody(const QString &body)
 {
     d->body = body;
 }
 
-///
-/// Returns a body that is unlike the normal body not encrypted.
-///
-/// It can be presented to users if the message could not be decrypted (e.g.,
-/// because their clients do not support the used end-to-end encryption).
-///
-/// \return the end-to-end encryption fallback body
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns a body that is unlike the normal body not encrypted.
+
+    It can be presented to users if the message could not be decrypted (e.g.,
+    because their clients do not support the used end-to-end encryption).
+
+    \since QXmpp 1.5
+*/
 QString QXmppMessage::e2eeFallbackBody() const
 {
     return d->e2eeFallbackBody;
 }
 
-///
-/// Sets a body that is unlike the normal body not encrypted.
-///
-/// It can be presented to users if the message could not be decrypted (e.g.,
-/// because their clients do not support the used end-to-end encryption).
-///
-/// \param fallbackBody end-to-end encryption fallback body
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the end-to-end encryption \a fallbackBody that is unlike the normal
+    body not encrypted.
+
+    It can be presented to users if the message could not be decrypted (e.g.,
+    because their clients do not support the used end-to-end encryption).
+
+    \since QXmpp 1.5
+*/
 void QXmppMessage::setE2eeFallbackBody(const QString &fallbackBody)
 {
     d->e2eeFallbackBody = fallbackBody;
 }
 
-/// Returns the message's type.
+/*! Returns the message's type. */
 QXmppMessage::Type QXmppMessage::type() const
 {
     return d->type;
 }
 
-/// Sets the message's type.
+/*! Sets the message's \a type. */
 void QXmppMessage::setType(QXmppMessage::Type type)
 {
     d->type = type;
 }
 
-/// Returns the message's subject.
+/*! Returns the message's subject. */
 QString QXmppMessage::subject() const
 {
     return d->subject;
 }
 
-/// Sets the message's subject.
+/*! Sets the message's \a subject. */
 void QXmppMessage::setSubject(const QString &subject)
 {
     d->subject = subject;
 }
 
-/// Returns the message's thread.
+/*! Returns the message's thread. */
 QString QXmppMessage::thread() const
 {
     return d->thread;
 }
 
-/// Sets the message's thread.
+/*! Sets the message's \a thread. */
 void QXmppMessage::setThread(const QString &thread)
 {
     d->thread = thread;
 }
 
-///
-/// Returns the optional parent thread of this message.
-///
-/// The possibility to create child threads was added in RFC6121.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the optional parent thread of this message.
+
+    The possibility to create child threads was added in RFC6121.
+
+    \since QXmpp 1.3
+*/
 QString QXmppMessage::parentThread() const
 {
     return d->parentThread;
 }
 
-///
-/// Sets the optional parent thread of this message.
-///
-/// The possibility to create child threads was added in RFC6121.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets the optional parent thread of this message.
+
+    The possibility to create child threads was added in RFC6121.
+
+    \since QXmpp 1.3
+
+    \a parent.
+*/
 void QXmppMessage::setParentThread(const QString &parent)
 {
     d->parentThread = parent;
 }
 
-///
-/// Returns a possibly attached URL from \xep{0066, Out of Band Data}
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns a possibly attached URL from \xep{0066}{Out of Band Data}
+
+    \since QXmpp 1.0
+*/
 QString QXmppMessage::outOfBandUrl() const
 {
     if (d->outOfBandUrls.empty()) {
@@ -373,13 +369,15 @@ QString QXmppMessage::outOfBandUrl() const
     return d->outOfBandUrls.front().url();
 }
 
-///
-/// Sets the attached URL for \xep{0066, Out of Band Data}
-///
-/// This overrides all other urls that may be contained in the list of out of band urls.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Sets the attached URL for \xep{0066}{Out of Band Data}
+
+    This overrides all other urls that may be contained in the list of out of band urls.
+
+    \since QXmpp 1.0
+
+    \a url.
+*/
 void QXmppMessage::setOutOfBandUrl(const QString &url)
 {
     QXmppOutOfBandUrl data;
@@ -387,106 +385,116 @@ void QXmppMessage::setOutOfBandUrl(const QString &url)
     d->outOfBandUrls = { std::move(data) };
 }
 
-///
-/// Returns possibly attached URLs from \xep{0066, Out of Band Data}
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns possibly attached URLs from \xep{0066}{Out of Band Data}
+
+    \since QXmpp 1.5
+*/
 QVector<QXmppOutOfBandUrl> QXmppMessage::outOfBandUrls() const
 {
     return d->outOfBandUrls;
 }
 
-///
-/// Sets the attached URLs for \xep{0066, Out of Band Data}
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the attached URLs for \xep{0066}{Out of Band Data}
+
+    \since QXmpp 1.5
+
+    \a urls.
+*/
 void QXmppMessage::setOutOfBandUrls(const QVector<QXmppOutOfBandUrl> &urls)
 {
     d->outOfBandUrls = urls;
 }
 
-///
-/// Returns the message's XHTML body as defined by \xep{0071, XHTML-IM}.
-///
-/// \since QXmpp 0.6.2
-///
+/*!
+    Returns the message's XHTML body as defined by \xep{0071}{XHTML-IM}.
+
+    \since QXmpp 0.6.2
+*/
 QString QXmppMessage::xhtml() const
 {
     return d->xhtml;
 }
 
-///
-/// Sets the message's XHTML body as defined by \xep{0071, XHTML-IM}.
-///
-/// \since QXmpp 0.6.2
-///
+/*!
+    Sets the message's XHTML body as defined by \xep{0071}{XHTML-IM}.
+
+    \since QXmpp 0.6.2
+
+    \a xhtml.
+*/
 void QXmppMessage::setXhtml(const QString &xhtml)
 {
     d->xhtml = xhtml;
 }
 
-///
-/// Returns the the chat state notification according to \xep{0085, Chat State Notifications}.
-///
-/// \since QXmpp 0.2
-///
+/*!
+    Returns the the chat state notification according to \xep{0085}{Chat State Notifications}.
+
+    \since QXmpp 0.2
+*/
 QXmppMessage::State QXmppMessage::state() const
 {
     return d->state;
 }
 
-///
-/// Sets the the chat state notification according to \xep{0085, Chat State Notifications}.
-///
-/// \since QXmpp 0.2
-///
+/*!
+    Sets the the chat state notification according to \xep{0085}{Chat State Notifications}.
+
+    \since QXmpp 0.2
+
+    \a state.
+*/
 void QXmppMessage::setState(QXmppMessage::State state)
 {
     d->state = state;
 }
 
-///
-/// Returns the optional timestamp of the message specified using \xep{0093, Legacy Delayed Delivery}
-/// or using \xep{0203, Delayed Delivery} (preferred).
-///
-/// \since QXmpp 0.2
-///
+/*!
+    Returns the optional timestamp of the message specified using \xep{0093}{Legacy Delayed Delivery}
+    or using \xep{0203}{Delayed Delivery} (preferred).
+
+    \since QXmpp 0.2
+*/
 QDateTime QXmppMessage::stamp() const
 {
     return d->stamp;
 }
 
-///
-/// Sets the message's timestamp without modifying the type of the stamp
-/// (\xep{0093, Legacy Delayed Delivery} or \xep{0203, Delayed Delivery}).
-///
-/// By default messages are constructed with the new delayed delivery XEP, but
-/// parsed messages keep their type.
-///
-/// \since QXmpp 0.2
-///
+/*!
+    Sets the message's timestamp without modifying the type of the stamp
+    (\xep{0093}{Legacy Delayed Delivery} or \xep{0203}{Delayed Delivery}).
+
+    By default messages are constructed with the new delayed delivery XEP, but
+    parsed messages keep their type.
+
+    \since QXmpp 0.2
+
+    \a stamp.
+*/
 void QXmppMessage::setStamp(const QDateTime &stamp)
 {
     d->stamp = stamp;
 }
 
-///
-/// Returns true if a delivery receipt is requested, as defined by \xep{0184, Message Delivery Receipts}.
-///
-/// \since QXmpp 0.4
-///
+/*!
+    Returns true if a delivery receipt is requested, as defined by \xep{0184}{Message Delivery Receipts}.
+
+    \since QXmpp 0.4
+*/
 bool QXmppMessage::isReceiptRequested() const
 {
     return d->receiptRequested;
 }
 
-///
-/// Sets whether a delivery receipt is requested, as defined by \xep{0184, Message Delivery Receipts}.
-///
-/// \since QXmpp 0.4
-///
+/*!
+    Sets whether a delivery receipt is requested, as defined by \xep{0184}{Message Delivery Receipts}.
+
+    \since QXmpp 0.4
+
+    \a requested.
+*/
 void QXmppMessage::setReceiptRequested(bool requested)
 {
     d->receiptRequested = requested;
@@ -495,119 +503,120 @@ void QXmppMessage::setReceiptRequested(bool requested)
     }
 }
 
-///
-/// If this message is a delivery receipt, returns the ID of the original
-/// message.
-///
-/// \since QXmpp 0.4
-///
+/*!
+    If this message is a delivery receipt, returns the ID of the original
+    message.
+
+    \since QXmpp 0.4
+*/
 QString QXmppMessage::receiptId() const
 {
     return d->receiptId;
 }
 
-///
-/// Make this message a delivery receipt for the message with the given \a id.
-///
-/// \since QXmpp 0.4
-///
+/*!
+    Make this message a delivery receipt for the message with the given \a id.
+
+    \since QXmpp 0.4
+*/
 void QXmppMessage::setReceiptId(const QString &id)
 {
     d->receiptId = id;
 }
 
-///
-/// Returns true if the user's attention is requested, as defined by \xep{0224, Attention}.
-///
-/// \since QXmpp 0.4
-///
+/*!
+    Returns true if the user's attention is requested, as defined by \xep{0224}{Attention}.
+
+    \since QXmpp 0.4
+*/
 bool QXmppMessage::isAttentionRequested() const
 {
     return d->attentionRequested;
 }
 
-///
-/// Sets whether the user's attention is requested, as defined by \xep{0224, Attention}.
-///
-/// \param requested Whether to request attention (true) or not (false)
-///
-/// \since QXmpp 0.4
-///
+/*!
+    Sets whether the user's attention is \a requested (true) or not (false), as
+    defined by \xep{0224}{Attention}.
+
+    \since QXmpp 0.4
+*/
 void QXmppMessage::setAttentionRequested(bool requested)
 {
     d->attentionRequested = requested;
 }
 
-///
-/// Returns a list of data packages attached using \xep{0231, Bits of Binary}.
-///
-/// This could be used to resolve \c cid: URIs found in the X-HTML body.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Returns a list of data packages attached using \xep{0231}{Bits of Binary}.
+
+    This could be used to resolve \c cid: URIs found in the X-HTML body.
+
+    \since QXmpp 1.2
+*/
 QXmppBitsOfBinaryDataList QXmppMessage::bitsOfBinaryData() const
 {
     return d->bitsOfBinaryData;
 }
 
-///
-/// Returns a list of data attached using \xep{0231, Bits of Binary}.
-///
-/// This could be used to resolve \c cid: URIs found in the X-HTML body.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Returns a list of data attached using \xep{0231}{Bits of Binary}.
+
+    This could be used to resolve \c cid: URIs found in the X-HTML body.
+
+    \since QXmpp 1.2
+*/
 QXmppBitsOfBinaryDataList &QXmppMessage::bitsOfBinaryData()
 {
     return d->bitsOfBinaryData;
 }
 
-///
-/// Sets a list of \xep{0231, Bits of Binary} attachments to be included.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Sets a list of \xep{0231}{Bits of Binary} attachments to be included.
+
+    \since QXmpp 1.2
+
+    \a bitsOfBinaryData.
+*/
 void QXmppMessage::setBitsOfBinaryData(const QXmppBitsOfBinaryDataList &bitsOfBinaryData)
 {
     d->bitsOfBinaryData = bitsOfBinaryData;
 }
 
-///
-/// Returns whether the given text is a '/me command' as defined in \xep{0245, The /me Command}.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns whether the given text is a '/me command' as defined in \xep{0245}{The /me Command}.
+
+    \since QXmpp 1.3
+*/
 bool QXmppMessage::isSlashMeCommand(const QString &body)
 {
     return body.startsWith(u"/me "_s);
 }
 
-///
-/// Returns whether the body of the message is a '/me command' as defined in
-/// \xep{0245, The /me Command}.
-///
-/// \note If you want to check a custom string for the /me command, you can use
-/// the static version of this method. This can be helpful when checking user
-/// input before a message was sent.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns whether the body of the message is a '/me command' as defined in
+    \xep{0245}{The /me Command}.
+
+    \note If you want to check a custom string for the /me command, you can use
+    the static version of this method. This can be helpful when checking user
+    input before a message was sent.
+
+    \since QXmpp 1.3
+*/
 bool QXmppMessage::isSlashMeCommand() const
 {
     return isSlashMeCommand(d->body);
 }
 
-///
-/// Returns the part of the body after the /me command.
-///
-/// This cuts off '/me ' (with the space) from the body, in case the body
-/// starts with that. In case the body does not contain a /me command as
-/// defined in \xep{0245, The /me Command}, a null string is returned.
-///
-/// This is useful when displaying the /me command correctly to the user.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the part of the body after the /me command.
+
+    This cuts off '/me ' (with the space) from the body, in case the body
+    starts with that. In case the body does not contain a /me command as
+    defined in \xep{0245}{The /me Command}, a null string is returned.
+
+    This is useful when displaying the /me command correctly to the user.
+
+    \since QXmpp 1.3
+*/
 QString QXmppMessage::slashMeCommandText(const QString &body)
 {
     if (isSlashMeCommand(body)) {
@@ -616,310 +625,328 @@ QString QXmppMessage::slashMeCommandText(const QString &body)
     return {};
 }
 
-///
-/// Returns the part of the body after the /me command.
-///
-/// This cuts off '/me ' (with the space) from the body, in case the body
-/// starts with that. In case the body does not contain a /me command as
-/// defined in \xep{0245, The /me Command}, a null string is returned.
-///
-/// This is useful when displaying the /me command correctly to the user.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the part of the body after the /me command.
+
+    This cuts off '/me ' (with the space) from the body, in case the body
+    starts with that. In case the body does not contain a /me command as
+    defined in \xep{0245}{The /me Command}, a null string is returned.
+
+    This is useful when displaying the /me command correctly to the user.
+
+    \since QXmpp 1.3
+*/
 QString QXmppMessage::slashMeCommandText() const
 {
     return slashMeCommandText(d->body);
 }
 
-///
-/// Returns the JID for a multi-user chat direct invitation as defined by
-/// \xep{0249, Direct MUC Invitations}.
-///
-/// \since QXmpp 0.7.4
-///
+/*!
+    Returns the JID for a multi-user chat direct invitation as defined by
+    \xep{0249}{Direct MUC Invitations}.
+
+    \since QXmpp 0.7.4
+*/
 QString QXmppMessage::mucInvitationJid() const
 {
     return d->mucInvitationJid;
 }
 
-///
-/// Sets the JID for a multi-user chat direct invitation as defined by
-/// \xep{0249, Direct MUC Invitations}.
-///
-/// \since QXmpp 0.7.4
-///
+/*!
+    Sets the JID for a multi-user chat direct invitation as defined by
+    \xep{0249}{Direct MUC Invitations}.
+
+    \since QXmpp 0.7.4
+
+    \a jid.
+*/
 void QXmppMessage::setMucInvitationJid(const QString &jid)
 {
     d->mucInvitationJid = jid;
 }
 
-///
-/// Returns the password for a multi-user chat direct invitation as defined by
-/// \xep{0249, Direct MUC Invitations}.
-///
-/// \since QXmpp 0.7.4
-///
+/*!
+    Returns the password for a multi-user chat direct invitation as defined by
+    \xep{0249}{Direct MUC Invitations}.
+
+    \since QXmpp 0.7.4
+*/
 QString QXmppMessage::mucInvitationPassword() const
 {
     return d->mucInvitationPassword;
 }
 
-///
-/// Sets the \a password for a multi-user chat direct invitation as defined by
-/// \xep{0249, Direct MUC Invitations}.
-///
-/// \since QXmpp 0.7.4
-///
+/*!
+    Sets the \a password for a multi-user chat direct invitation as defined by
+    \xep{0249}{Direct MUC Invitations}.
+
+    \since QXmpp 0.7.4
+*/
 void QXmppMessage::setMucInvitationPassword(const QString &password)
 {
     d->mucInvitationPassword = password;
 }
 
-///
-/// Returns the reason for a multi-user chat direct invitation as defined by
-/// \xep{0249, Direct MUC Invitations}.
-///
-/// \since QXmpp 0.7.4
-///
+/*!
+    Returns the reason for a multi-user chat direct invitation as defined by
+    \xep{0249}{Direct MUC Invitations}.
+
+    \since QXmpp 0.7.4
+*/
 QString QXmppMessage::mucInvitationReason() const
 {
     return d->mucInvitationReason;
 }
 
-///
-/// Sets the \a reason for a multi-user chat direct invitation as defined by
-/// \xep{0249, Direct MUC Invitations}.
-///
-/// \since QXmpp 0.7.4
-///
+/*!
+    Sets the \a reason for a multi-user chat direct invitation as defined by
+    \xep{0249}{Direct MUC Invitations}.
+
+    \since QXmpp 0.7.4
+*/
 void QXmppMessage::setMucInvitationReason(const QString &reason)
 {
     d->mucInvitationReason = reason;
 }
 
-///
-/// Returns if the message is marked with a &lt;private/&gt; tag, in which case
-/// it will not be forwarded to other resources according to \xep{0280, Message Carbons}.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns if the message is marked with a &lt;private/&gt; tag, in which case
+    it will not be forwarded to other resources according to \xep{0280}{Message Carbons}.
+
+    \since QXmpp 1.0
+*/
 bool QXmppMessage::isPrivate() const
 {
     return d->privatemsg;
 }
 
-///
-/// If true is passed, the message is marked with a &lt;private/&gt; tag, in
-/// which case it will not be forwarded to other resources according to
-/// \xep{0280, Message Carbons}.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    If true is passed, the message is marked with a &lt;private/&gt; tag, in
+    which case it will not be forwarded to other resources according to
+    \xep{0280}{Message Carbons}.
+
+    \since QXmpp 1.0
+
+    \a priv.
+*/
 void QXmppMessage::setPrivate(const bool priv)
 {
     d->privatemsg = priv;
 }
 
-///
-/// Returns whether this message has been forwarded using carbons.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns whether this message has been forwarded using carbons.
+
+    \since QXmpp 1.5
+*/
 bool QXmppMessage::isCarbonForwarded() const
 {
     return d->isCarbonForwarded;
 }
 
-///
-/// Sets whether this message has been forwarded using carbons.
-///
-/// Setting this to true has no effect, this is purely informational.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets whether this message has been forwarded using carbons.
+
+    Setting this to true has no effect, this is purely informational.
+
+    \since QXmpp 1.5
+
+    \a forwarded.
+*/
 void QXmppMessage::setCarbonForwarded(bool forwarded)
 {
     d->isCarbonForwarded = forwarded;
 }
 
-///
-/// Returns the message id to replace with this message as used in \xep{0308, Last Message Correction}.
-/// If the returned string is empty, this message is not replacing another.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns the message id to replace with this message as used in \xep{0308}{Last Message Correction}.
+    If the returned string is empty, this message is not replacing another.
+
+    \since QXmpp 1.0
+*/
 QString QXmppMessage::replaceId() const
 {
     return d->replaceId;
 }
 
-///
-/// Sets the message id to replace with this message as in \xep{0308, Last Message Correction}.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Sets the message id to replace with this message as in \xep{0308}{Last Message Correction}.
+
+    \since QXmpp 1.0
+
+    \a replaceId.
+*/
 void QXmppMessage::setReplaceId(const QString &replaceId)
 {
     d->replaceId = replaceId;
 }
 
-///
-/// Returns true if a message is markable, as defined by \xep{0333, Chat Markers}.
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Returns true if a message is markable, as defined by \xep{0333}{Chat Markers}.
+
+    \since QXmpp 0.8.1
+*/
 bool QXmppMessage::isMarkable() const
 {
     return d->markable;
 }
 
-///
-/// Sets if the message is markable, as defined by \xep{0333, Chat Markers}.
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Sets if the message is markable, as defined by \xep{0333}{Chat Markers}.
+
+    \since QXmpp 0.8.1
+
+    \a markable.
+*/
 void QXmppMessage::setMarkable(const bool markable)
 {
     d->markable = markable;
 }
 
-///
-/// Returns the message's marker id, as defined by \xep{0333, Chat Markers}.
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Returns the message's marker id, as defined by \xep{0333}{Chat Markers}.
+
+    \since QXmpp 0.8.1
+*/
 QString QXmppMessage::markedId() const
 {
     return d->markedId;
 }
 
-///
-/// Sets the message's marker id, as defined by \xep{0333, Chat Markers}.
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Sets the message's marker id, as defined by \xep{0333}{Chat Markers}.
+
+    \since QXmpp 0.8.1
+
+    \a markerId.
+*/
 void QXmppMessage::setMarkerId(const QString &markerId)
 {
     d->markedId = markerId;
 }
 
-///
-/// Returns the message's marker thread, as defined by \xep{0333, Chat Markers}.
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Returns the message's marker thread, as defined by \xep{0333}{Chat Markers}.
+
+    \since QXmpp 0.8.1
+*/
 QString QXmppMessage::markedThread() const
 {
     return d->markedThread;
 }
 
-///
-/// Sets the message's marked thread, as defined by \xep{0333, Chat Markers}.
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Sets the message's marked thread, as defined by \xep{0333}{Chat Markers}.
+
+    \since QXmpp 0.8.1
+
+    \a markedThread.
+*/
 void QXmppMessage::setMarkedThread(const QString &markedThread)
 {
     d->markedThread = markedThread;
 }
 
-///
-/// Returns the message's marker, as defined by \xep{0333, Chat Markers}.
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Returns the message's marker, as defined by \xep{0333}{Chat Markers}.
+
+    \since QXmpp 0.8.1
+*/
 QXmppMessage::Marker QXmppMessage::marker() const
 {
     return d->marker;
 }
 
-///
-/// Sets the message's marker, as defined by \xep{0333, Chat Markers}
-///
-/// \since QXmpp 0.8.1
-///
+/*!
+    Sets the message's marker, as defined by \xep{0333}{Chat Markers}
+
+    \since QXmpp 0.8.1
+
+    \a marker.
+*/
 void QXmppMessage::setMarker(const Marker marker)
 {
     d->marker = marker;
 }
 
-///
-/// Returns true if the message contains the hint passed, as defined in
-/// \xep{0334, Message Processing Hints}
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns true if the message contains the \a hint passed, as defined in
+    \xep{0334}{Message Processing Hints}
+
+    \since QXmpp 1.1
+*/
 bool QXmppMessage::hasHint(const Hint hint) const
 {
     return d->hints & hint;
 }
 
-///
-/// Adds a hint to the message, as defined in \xep{0334, Message Processing Hints}
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Adds a \a hint to the message, as defined in \xep{0334}{Message Processing Hints}
+
+    \since QXmpp 1.1
+*/
 void QXmppMessage::addHint(const Hint hint)
 {
     d->hints |= hint;
 }
 
-///
-/// Removes a hint from the message, as defined in \xep{0334, Message Processing Hints}
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Removes a hint from the message, as defined in \xep{0334}{Message Processing Hints}
+
+    \since QXmpp 1.1
+
+    \a hint.
+*/
 void QXmppMessage::removeHint(const Hint hint)
 {
     d->hints &= ~hint;
 }
 
-///
-/// Removes all hints from the message, as defined in \xep{0334, Message Processing Hints}
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Removes all hints from the message, as defined in \xep{0334}{Message Processing Hints}
+
+    \since QXmpp 1.1
+*/
 void QXmppMessage::removeAllHints()
 {
     d->hints = {};
 }
 
-///
-/// Returns a Jingle Message Initiation element as defined in \xep{0353, Jingle Message Initiation}.
-///
+/*! Returns a Jingle Message Initiation element as defined in \xep{0353}{Jingle Message Initiation}. */
 std::optional<QXmppJingleMessageInitiationElement> QXmppMessage::jingleMessageInitiationElement() const
 {
     return d->jingleMessageInitiationElement;
 }
 
-///
-/// Sets a Jingle Message Initiation element as defined in \xep{0353, Jingle Message Initiation}.
-///
+/*!
+    Sets a Jingle Message Initiation element as defined in \xep{0353}{Jingle Message Initiation}.
+
+    \a jingleMessageInitiationElement.
+*/
 void QXmppMessage::setJingleMessageInitiationElement(const std::optional<QXmppJingleMessageInitiationElement> &jingleMessageInitiationElement)
 {
     d->jingleMessageInitiationElement = jingleMessageInitiationElement;
 }
 
-///
-/// Returns the stanza ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \deprecated Use stanzaIds() instead.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the stanza ID of the message according to \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \deprecated Use stanzaIds() instead.
+
+    \since QXmpp 1.3
+*/
 QString QXmppMessage::stanzaId() const
 {
     return d->stanzaIds.empty() ? QString() : d->stanzaIds.last().id;
 }
 
-///
-/// Sets the stanza ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \deprecated Use setStanzaIds() instead.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets the stanza ID of the message according to \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \deprecated Use setStanzaIds() instead.
+
+    \since QXmpp 1.3
+*/
 void QXmppMessage::setStanzaId(const QString &id)
 {
     if (d->stanzaIds.size() == 1) {
@@ -929,25 +956,25 @@ void QXmppMessage::setStanzaId(const QString &id)
     }
 }
 
-///
-/// Returns the creator of the stanza ID according to \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \deprecated Use stanzaIds() instead.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the creator of the stanza ID according to \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \deprecated Use stanzaIds() instead.
+
+    \since QXmpp 1.3
+*/
 QString QXmppMessage::stanzaIdBy() const
 {
     return d->stanzaIds.empty() ? QString() : d->stanzaIds.last().by;
 }
 
-///
-/// Sets the creator of the stanza ID according to \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \deprecated Use setStanzaIds() instead.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets the creator of the stanza ID according to \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \deprecated Use setStanzaIds() instead.
+
+    \since QXmpp 1.3
+*/
 void QXmppMessage::setStanzaIdBy(const QString &by)
 {
     if (d->stanzaIds.size() == 1) {
@@ -957,135 +984,145 @@ void QXmppMessage::setStanzaIdBy(const QString &by)
     }
 }
 
-///
-/// Returns the stanza IDs of the message as defined in \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    Returns the stanza IDs of the message as defined in \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \since QXmpp 1.8
+*/
 QVector<QXmppStanzaId> QXmppMessage::stanzaIds() const
 {
     return d->stanzaIds;
 }
 
-///
-/// Sets the stanza IDs of the message as defined in \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    Sets the stanza IDs of the message as defined in \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \since QXmpp 1.8
+
+    \a ids.
+*/
 void QXmppMessage::setStanzaIds(const QVector<QXmppStanzaId> &ids)
 {
     d->stanzaIds = ids;
 }
 
-///
-/// Returns the origin ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the origin ID of the message according to \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \since QXmpp 1.3
+*/
 QString QXmppMessage::originId() const
 {
     return d->originId;
 }
 
-///
-/// Sets the origin ID of the message according to \xep{0359, Unique and Stable Stanza IDs}.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets the origin ID of the message according to \xep{0359}{Unique and Stable Stanza IDs}.
+
+    \since QXmpp 1.3
+
+    \a id.
+*/
 void QXmppMessage::setOriginId(const QString &id)
 {
     d->originId = id;
 }
 
-///
-/// Returns the message id this message is linked/attached to. See \xep{0367, Message Attaching} for details.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the message id this message is linked/attached to. See \xep{0367}{Message Attaching} for details.
+
+    \since QXmpp 1.1
+*/
 QString QXmppMessage::attachId() const
 {
     return d->attachId;
 }
 
-///
-/// Sets the id of the attached message as in \xep{0367, Message Attaching}.
-/// This can be used for a "reply to" or "reaction" function.
-///
-/// The used message id depends on the message context, see the Business rules
-/// section of the XEP for details about when to use which id.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the id of the attached message as in \xep{0367}{Message Attaching}.
+    This can be used for a "reply to" or "reaction" function.
+
+    The used message id depends on the message context, see the Business rules
+    section of the XEP for details about when to use which id.
+
+    \since QXmpp 1.1
+
+    \a attachId.
+*/
 void QXmppMessage::setAttachId(const QString &attachId)
 {
     d->attachId = attachId;
 }
 
-///
-/// Returns the participant ID of the sender if the message is received from a MIX channel as
-/// specified in \xep{0369, Mediated Information eXchange (MIX)}.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the participant ID of the sender if the message is received from a MIX channel as
+    specified in \xep{0369}{Mediated Information eXchange (MIX)}.
+
+    \since QXmpp 1.7
+*/
 QString QXmppMessage::mixParticipantId() const
 {
     return mixUserJid().isEmpty() && mixUserNick().isEmpty() ? QString() : QXmppUtils::jidToResource(from());
 }
 
-///
-/// Returns the actual JID of a MIX channel participant.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the actual JID of a MIX channel participant.
+
+    \since QXmpp 1.1
+*/
 QString QXmppMessage::mixUserJid() const
 {
     return d->mixUserJid;
 }
 
-///
-/// Sets the actual JID of a MIX channel participant.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the actual JID of a MIX channel participant.
+
+    \since QXmpp 1.1
+
+    \a mixUserJid.
+*/
 void QXmppMessage::setMixUserJid(const QString &mixUserJid)
 {
     d->mixUserJid = mixUserJid;
 }
 
-///
-/// Returns the MIX participant's nickname.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the MIX participant's nickname.
+
+    \since QXmpp 1.1
+*/
 QString QXmppMessage::mixUserNick() const
 {
     return d->mixUserNick;
 }
 
-///
-/// Sets the MIX participant's nickname.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the MIX participant's nickname.
+
+    \since QXmpp 1.1
+
+    \a mixUserNick.
+*/
 void QXmppMessage::setMixUserNick(const QString &mixUserNick)
 {
     d->mixUserNick = mixUserNick;
 }
 
-///
-/// Returns the encryption method this message is advertised to be encrypted
-/// with.
-///
-/// \note QXmppMessage::NoEncryption does not necesserily mean that the message
-/// is not encrypted; it may also be that the author of the message does not
-/// support \xep{0380, Explicit Message Encryption}.
-///
-/// \note If this returns QXmppMessage::UnknownEncryption, you can still get
-/// the namespace of the encryption with \c encryptionMethodNs() and possibly
-/// also a name with \c encryptionName().
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the encryption method this message is advertised to be encrypted
+    with.
+
+    \note QXmppMessage::NoEncryption does not necesserily mean that the message
+    is not encrypted; it may also be that the author of the message does not
+    support \xep{0380}{Explicit Message Encryption}.
+
+    \note If this returns QXmppMessage::UnknownEncryption, you can still get
+    the namespace of the encryption with \c encryptionMethodNs() and possibly
+    also a name with \c encryptionName().
+
+    \since QXmpp 1.1
+*/
 QXmpp::EncryptionMethod QXmppMessage::encryptionMethod() const
 {
     if (d->encryptionMethod.isEmpty()) {
@@ -1094,46 +1131,49 @@ QXmpp::EncryptionMethod QXmppMessage::encryptionMethod() const
     return Enums::fromString<EncryptionMethod>(d->encryptionMethod).value_or(QXmpp::UnknownEncryption);
 }
 
-///
-/// Advertises that this message is encrypted with the given encryption method.
-/// See \xep{0380, Explicit Message Encryption} for details.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Advertises that this message is encrypted with the given encryption method.
+    See \xep{0380}{Explicit Message Encryption} for details.
+
+    \since QXmpp 1.1
+
+    \a method.
+*/
 void QXmppMessage::setEncryptionMethod(QXmpp::EncryptionMethod method)
 {
     d->encryptionMethod = Enums::toString(method);
 }
 
-///
-/// Returns the namespace of the advertised encryption method via. \xep{0380,
-/// Explicit Message Encryption}.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the namespace of the advertised encryption method via. \xep{0380}{Explicit Message Encryption}.
+
+    \since QXmpp 1.1
+*/
 QString QXmppMessage::encryptionMethodNs() const
 {
     return d->encryptionMethod;
 }
 
-///
-/// Sets the namespace of the encryption method this message advertises to be
-/// encrypted with. See \xep{0380, Explicit Message Encryption} for details.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the namespace of the encryption method this message advertises to be
+    encrypted with. See \xep{0380}{Explicit Message Encryption} for details.
+
+    \since QXmpp 1.1
+
+    \a encryptionMethod.
+*/
 void QXmppMessage::setEncryptionMethodNs(const QString &encryptionMethod)
 {
     d->encryptionMethod = encryptionMethod;
 }
 
-///
-/// Returns the associated name of the encryption method this message
-/// advertises to be encrypted with. See \xep{0380, Explicit Message Encryption}
-/// for details.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the associated name of the encryption method this message
+    advertises to be encrypted with. See \xep{0380}{Explicit Message Encryption}
+    for details.
+
+    \since QXmpp 1.1
+*/
 QString QXmppMessage::encryptionName() const
 {
     if (!d->encryptionName.isEmpty()) {
@@ -1142,69 +1182,75 @@ QString QXmppMessage::encryptionName() const
     return staticString(encryptionToName(encryptionMethod()));
 }
 
-///
-/// Sets the name of the encryption method for \xep{0380, Explicit Message Encryption}.
-///
-/// \note This should only be used, if the encryption method is custom and is
-/// not one of the methods listed in the XEP.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the name of the encryption method for \xep{0380}{Explicit Message Encryption}.
+
+    \note This should only be used, if the encryption method is custom and is
+    not one of the methods listed in the XEP.
+
+    \since QXmpp 1.1
+
+    \a encryptionName.
+*/
 void QXmppMessage::setEncryptionName(const QString &encryptionName)
 {
     d->encryptionName = encryptionName;
 }
 
-///
-/// Returns true, if this is a spoiler message according to \xep{0382, Spoiler Messages}.
-/// The spoiler hint however can still be empty.
-///
-/// A spoiler message's content should not be visible to the user by default.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns true, if this is a spoiler message according to \xep{0382}{Spoiler Messages}.
+    The spoiler hint however can still be empty.
+
+    A spoiler message's content should not be visible to the user by default.
+
+    \since QXmpp 1.1
+*/
 bool QXmppMessage::isSpoiler() const
 {
     return d->isSpoiler;
 }
 
-///
-/// Sets whether this is a spoiler message as specified in \xep{0382, Spoiler Messages}.
-///
-/// The content of spoiler messages will not be displayed by default to the
-/// user. However, clients not supporting spoiler messages will still display
-/// the content as usual.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets whether this is a spoiler message as specified in \xep{0382}{Spoiler Messages}.
+
+    The content of spoiler messages will not be displayed by default to the
+    user. However, clients not supporting spoiler messages will still display
+    the content as usual.
+
+    \since QXmpp 1.1
+
+    \a isSpoiler.
+*/
 void QXmppMessage::setIsSpoiler(bool isSpoiler)
 {
     d->isSpoiler = isSpoiler;
 }
 
-///
-/// Returns the spoiler hint as specified in \xep{0382, Spoiler Messages}.
-///
-/// The hint may be empty, even if isSpoiler is true.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the spoiler hint as specified in \xep{0382}{Spoiler Messages}.
+
+    The hint may be empty, even if isSpoiler is true.
+
+    \since QXmpp 1.1
+*/
 QString QXmppMessage::spoilerHint() const
 {
     return d->spoilerHint;
 }
 
-///
-/// Sets a spoiler hint for \xep{0382, Spoiler Messages}. If the spoiler hint
-/// is not empty, isSpoiler will be set to true.
-///
-/// A spoiler hint is optional for spoiler messages.
-///
-/// Keep in mind that the spoiler hint is not displayed at all by clients not
-/// supporting spoiler messages.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets a spoiler hint for \xep{0382}{Spoiler Messages}. If the spoiler hint
+    is not empty, isSpoiler will be set to true.
+
+    A spoiler hint is optional for spoiler messages.
+
+    Keep in mind that the spoiler hint is not displayed at all by clients not
+    supporting spoiler messages.
+
+    \since QXmpp 1.1
+
+    \a spoilerHint.
+*/
 void QXmppMessage::setSpoilerHint(const QString &spoilerHint)
 {
     d->spoilerHint = spoilerHint;
@@ -1214,99 +1260,103 @@ void QXmppMessage::setSpoilerHint(const QString &spoilerHint)
 }
 
 #ifdef BUILD_OMEMO
-/// \cond
-///
-/// Returns an included OMEMO element as defined by \xep{0384, OMEMO Encryption}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns an included OMEMO element as defined by \xep{0384}{OMEMO Encryption}.
+
+    \since QXmpp 1.5
+*/
 std::optional<QXmppOmemoElement> QXmppMessage::omemoElement() const
 {
     return d->omemoElement;
 }
 
-///
-/// Sets an OMEMO element as defined by \xep{0384, OMEMO Encryption}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets an OMEMO element as defined by \xep{0384}{OMEMO Encryption}.
+
+    \since QXmpp 1.5
+
+    \a omemoElement.
+*/
 void QXmppMessage::setOmemoElement(const std::optional<QXmppOmemoElement> &omemoElement)
 {
     d->omemoElement = omemoElement;
 }
-/// \endcond
 #endif
 
-///
-/// Returns an included \xep{0369, Mediated Information eXchange (MIX)}
-/// invitation as defined by
-/// \xep{0407, Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
-///
-/// \since QXmpp 1.4
-///
+/*!
+    Returns an included \xep{0369}{Mediated Information eXchange (MIX)}
+    invitation as defined by
+    \xep{0407}{Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
+
+    \since QXmpp 1.4
+*/
 std::optional<QXmppMixInvitation> QXmppMessage::mixInvitation() const
 {
     return d->mixInvitation;
 }
 
-///
-/// Sets a \xep{0369, Mediated Information eXchange (MIX)} invitation as defined
-/// by \xep{0407, Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
-///
-/// \since QXmpp 1.4
-///
+/*!
+    Sets a \xep{0369}{Mediated Information eXchange (MIX)} invitation as defined
+    by \xep{0407}{Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
+
+    \since QXmpp 1.4
+
+    \a mixInvitation.
+*/
 void QXmppMessage::setMixInvitation(const std::optional<QXmppMixInvitation> &mixInvitation)
 {
     d->mixInvitation = mixInvitation;
 }
 
-///
-/// Returns the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
-/// MUCs}.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Returns the MUC Occupant ID as defined in \xep{0421}{Occupant identifiers for semi-anonymous
+    MUCs}.
+
+    \since QXmpp 1.13
+*/
 QString QXmppMessage::mucOccupantId() const
 {
     return d->mucOccupantId;
 }
 
-///
-/// Sets the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
-/// MUCs}.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Sets the MUC Occupant ID as defined in \xep{0421}{Occupant identifiers for semi-anonymous
+    MUCs}.
+
+    \since QXmpp 1.13
+
+    \a id.
+*/
 void QXmppMessage::setMucOccupantId(const QString &id)
 {
     d->mucOccupantId = id;
 }
 
-///
-/// Sets whether this message is only a fallback according to \xep{0428, Fallback Indication}.
-///
-/// This is useful for clients not supporting end-to-end encryption to indicate
-/// that the message body does not contain the intended text of the author.
-///
-/// \deprecated Use fallbackMarkers() instead, it provides full access to the fallback elements.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets whether this message is only a fallback according to \xep{0428}{Fallback Indication}.
+
+    This is useful for clients not supporting end-to-end encryption to indicate
+    that the message body does not contain the intended text of the author.
+
+    \deprecated Use fallbackMarkers() instead, it provides full access to the fallback elements.
+
+    \since QXmpp 1.3
+*/
 bool QXmppMessage::isFallback() const
 {
     return !d->fallbackMarkers.empty();
 }
 
-///
-/// Sets whether this message is only a fallback according to \xep{0428, Fallback Indication}.
-///
-/// This is useful for clients not supporting end-to-end encryption to indicate
-/// that the message body does not contain the intended text of the author.
-///
-/// \deprecated Use setFallbackMarkers() instead, it provides full access to the fallback elements.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets whether this message is only a fallback according to \xep{0428}{Fallback Indication}.
+
+    This is useful for clients not supporting end-to-end encryption to indicate
+    that the message body does not contain the intended text of the author.
+
+    \deprecated Use setFallbackMarkers() instead, it provides full access to the fallback elements.
+
+    \since QXmpp 1.3
+*/
 void QXmppMessage::setIsFallback(bool isFallback)
 {
     if (isFallback) {
@@ -1316,35 +1366,38 @@ void QXmppMessage::setIsFallback(bool isFallback)
     }
 }
 
-///
-/// Returns the fallback elements defined in \xep{0428, Fallback Indication}.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the fallback elements defined in \xep{0428}{Fallback Indication}.
+
+    \since QXmpp 1.7
+*/
 const QVector<QXmppFallback> &QXmppMessage::fallbackMarkers() const
 {
     return d->fallbackMarkers;
 }
 
-///
-/// Sets the fallback elements defined in \xep{0428, Fallback Indication}.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets the fallback elements defined in \xep{0428}{Fallback Indication}.
+
+    \since QXmpp 1.7
+
+    \a fallbackMarkers.
+*/
 void QXmppMessage::setFallbackMarkers(const QVector<QXmppFallback> &fallbackMarkers)
 {
     d->fallbackMarkers = fallbackMarkers;
 }
 
-///
-/// Returns the body or subject text of the message without parts that have a fallback marker
-/// with a supported namespace.
-///
-/// \param element whether to use the body or the subject text
-/// \param supportedNamespaces
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Returns the body or subject text of the message without parts that have a fallback marker
+    with a supported namespace.
+
+    \a element decides whether to use the body or the subject text.
+    \a supportedNamespaces is the list of namespaces for which fallback markers
+    should be filtered out.
+
+    \since QXmpp 1.9
+*/
 QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, const QVector<QString> &supportedNamespaces) const
 {
     // filter out all QXmppFallback::Reference s
@@ -1394,14 +1447,14 @@ QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, co
     return output;
 }
 
-///
-/// Returns the parts of the body or subject that are marked as fallback for this namespace.
-///
-/// \param element whether to use the body or the subject text
-/// \param forNamespace
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Returns the parts of the body or subject that are marked as fallback for
+    \a forNamespace.
+
+    \a element decides whether to use the body or the subject text.
+
+    \since QXmpp 1.9
+*/
 QString QXmppMessage::readFallbackText(QXmppFallback::Element element, QStringView forNamespace) const
 {
     const auto &fullText = element == QXmppFallback::Subject ? d->subject : d->body;
@@ -1435,121 +1488,131 @@ QString QXmppMessage::readFallbackText(QXmppFallback::Element element, QStringVi
     return output;
 }
 
-///
-/// Returns an included trust message element as defined by
-/// \xep{0434, Trust Messages (TM)}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns an included trust message element as defined by
+    \xep{0434}{Trust Messages (TM)}.
+
+    \since QXmpp 1.5
+*/
 std::optional<QXmppTrustMessageElement> QXmppMessage::trustMessageElement() const
 {
     return d->trustMessageElement;
 }
 
-///
-/// Sets a trust message element as defined by \xep{0434, Trust Messages (TM)}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets a trust message element as defined by \xep{0434}{Trust Messages (TM)}.
+
+    \since QXmpp 1.5
+
+    \a trustMessageElement.
+*/
 void QXmppMessage::setTrustMessageElement(const std::optional<QXmppTrustMessageElement> &trustMessageElement)
 {
     d->trustMessageElement = trustMessageElement;
 }
 
-///
-/// Returns a reaction to a message as defined by \xep{0444, Message Reactions}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns a reaction to a message as defined by \xep{0444}{Message Reactions}.
+
+    \since QXmpp 1.5
+*/
 std::optional<QXmppMessageReaction> QXmppMessage::reaction() const
 {
     return d->reaction;
 }
 
-///
-/// Sets a reaction to a message as defined by \xep{0444, Message Reactions}.
-///
-/// The corresponding hint must be set manually:
-/// \code
-/// QXmppMessage message;
-/// message.addHint(QXmppMessage::Store);
-/// \endcode
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets a reaction to a message as defined by \xep{0444}{Message Reactions}.
+
+    The corresponding hint must be set manually:
+    \code
+    QXmppMessage message;
+    message.addHint(QXmppMessage::Store);
+    \endcode
+
+    \since QXmpp 1.5
+
+    \a reaction.
+*/
 void QXmppMessage::setReaction(const std::optional<QXmppMessageReaction> &reaction)
 {
     d->reaction = reaction;
 }
 
-///
-/// Returns the via \xep{0447, Stateless file sharing} shared files attached to this message.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the via \xep{0447}{Stateless file sharing} shared files attached to this message.
+
+    \since QXmpp 1.5
+*/
 const QVector<QXmppFileShare> &QXmppMessage::sharedFiles() const
 {
     return d->sharedFiles;
 }
 
-///
-/// Sets the via \xep{0447, Stateless file sharing} shared files attached to this message.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the via \xep{0447}{Stateless file sharing} shared files attached to this message.
+
+    \since QXmpp 1.5
+
+    \a sharedFiles.
+*/
 void QXmppMessage::setSharedFiles(const QVector<QXmppFileShare> &sharedFiles)
 {
     d->sharedFiles = sharedFiles;
 }
 
-///
-/// Returns additional sources to be attached to a file share as defined by \xep{0447, Stateless
-/// file sharing}.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns additional sources to be attached to a file share as defined by \xep{0447}{Stateless
+    file sharing}.
+
+    \since QXmpp 1.7
+*/
 QVector<QXmppFileSourcesAttachment> QXmppMessage::fileSourcesAttachments() const
 {
     return d->fileSourcesAttachments;
 }
 
-///
-/// Sets additional sources to be attached to a file share as defined by \xep{0447, Stateless
-/// file sharing}.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets additional sources to be attached to a file share as defined by \xep{0447}{Stateless
+    file sharing}.
+
+    \since QXmpp 1.7
+
+    \a fileSourcesAttachments.
+*/
 void QXmppMessage::setFileSourcesAttachments(const QVector<QXmppFileSourcesAttachment> &fileSourcesAttachments)
 {
     d->fileSourcesAttachments = fileSourcesAttachments;
 }
 
-///
-/// Returns the message reply extension as defined in \xep{0461, Message Replies}.
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Returns the message reply extension as defined in \xep{0461}{Message Replies}.
+
+    \since QXmpp 1.9
+*/
 std::optional<QXmpp::Reply> QXmppMessage::reply() const
 {
     return d->reply;
 }
 
-///
-/// Sets the message reply extension as defined in \xep{0461, Message Replies}.
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Sets the message reply extension as defined in \xep{0461}{Message Replies}.
+
+    \since QXmpp 1.9
+
+    \a reply.
+*/
 void QXmppMessage::setReply(const std::optional<QXmpp::Reply> &reply)
 {
     d->reply = reply;
 }
 
-///
-/// Returns the part of the body that is marked as fallback for \xep{0461, Message Replies},
-/// without any quotation marks ('> ').
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Returns the part of the body that is marked as fallback for \xep{0461}{Message Replies},
+    without any quotation marks ('> ').
+
+    \since QXmpp 1.9
+*/
 QString QXmppMessage::readReplyQuoteFromBody() const
 {
     auto replyFallbackBody = readFallbackText(QXmppFallback::Body, staticString(ns_reply));
@@ -1565,23 +1628,22 @@ QString QXmppMessage::readReplyQuoteFromBody() const
     return lines.join(u'\n');
 }
 
-///
-/// Returns a Call Invite element as defined in \xep{0482, Call Invites}.
-///
+/*! Returns a Call Invite element as defined in \xep{0482}{Call Invites}. */
 std::optional<QXmppCallInviteElement> QXmppMessage::callInviteElement() const
 {
     return d->callInviteElement;
 }
 
-///
-/// Sets a Call Invite element as defined in \xep{0482, Call Invites}.
-///
+/*!
+    Sets a Call Invite element as defined in \xep{0482}{Call Invites}.
+
+    \a callInviteElement.
+*/
 void QXmppMessage::setCallInviteElement(std::optional<QXmppCallInviteElement> callInviteElement)
 {
     d->callInviteElement = callInviteElement;
 }
 
-/// \cond
 void QXmppMessage::parse(const QDomElement &element)
 {
     parse(element, QXmpp::SceAll);
@@ -1618,14 +1680,11 @@ void QXmppMessage::toXml(QXmlStreamWriter *writer, QXmpp::SceMode sceMode) const
         },
     });
 }
-/// \endcond
 
-///
-/// Parses all child elements of a message stanza.
-///
-/// \param element message element or SCE content element
-/// \param sceMode mode to decide which child elements of the message to parse
-///
+// Parses all child elements of a message stanza.
+//
+// element is the message element or SCE content element. sceMode is the mode
+// to decide which child elements of the message to parse.
 void QXmppMessage::parseExtensions(const QDomElement &element, const QXmpp::SceMode sceMode)
 {
     QXmppElementList unknownExtensions;
@@ -1642,20 +1701,20 @@ void QXmppMessage::parseExtensions(const QDomElement &element, const QXmpp::SceM
     setExtensions(unknownExtensions);
 }
 
-///
-/// Parses a child element of the message stanza.
-///
-/// Allows inherited classes to parse additional extension elements. This
-/// function may be executed multiple times with different elements.
-///
-/// \param element child element of the message to be parsed
-/// \param sceMode Which elements to be parsed from the DOM (all known / only
-/// public / only sensitive)
-///
-/// \return True, if the element was successfully parsed.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Parses a child element of the message stanza.
+
+    Allows inherited classes to parse additional extension elements. This
+    function may be executed multiple times with different elements.
+
+    \a element is the child element of the message to be parsed.
+    \a sceMode decides which elements to be parsed from the DOM (all known /
+    only public / only sensitive).
+
+    Returns true, if the element was successfully parsed.
+
+    \since QXmpp 1.5
+*/
 bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sceMode)
 {
     if (sceMode & QXmpp::ScePublic) {
@@ -1904,17 +1963,17 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
     return false;
 }
 
-///
-/// Serializes all additional child elements.
-///
-/// \param writer The XML stream writer to output the XML
-/// \param sceMode The mode which decides which elements to output (only useful
-/// for encryption)
-/// \param baseNamespace Custom namespace added to basic XMPP-Core elements like
-/// &lt;body/&gt; (needed when encrypting elements outside of the stream).
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Serializes all additional child elements.
+
+    \a writer is the XML stream writer to output the XML.
+    \a sceMode is the mode which decides which elements to output (only useful
+    for encryption).
+    \a baseNamespace is a custom namespace added to basic XMPP-Core elements
+    like &lt;body/&gt; (needed when encrypting elements outside of the stream).
+
+    \since QXmpp 1.5
+*/
 void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode sceMode, const QString &baseNamespace) const
 {
     XmlWriter w(writer);
@@ -2134,78 +2193,80 @@ struct QXmppFallbackPrivate : QSharedData {
     QVector<QXmppFallback::Reference> references;
 };
 
-///
-/// \class QXmppFallback
-///
-/// Fallback marker for message stanzas as defined in \xep{0428, Fallback Indication}.
-///
-/// \sa QXmppFallback
-/// \since QXmpp 1.7
-///
+/*!
+    \class QXmppFallback
+    \inmodule QXmpp
 
-///
-/// \enum QXmppFallback::Element
-///
-/// Describes the element of the message stanza this refers to.
-///
+    Fallback marker for message stanzas as defined in \xep{0428}{Fallback Indication}.
 
-///
-/// \struct QXmppFallback::Range
-///
-/// A character range of a string, see \xep{0426, Character counting in message bodies} for details.
-///
+    \sa QXmppFallback
+    \since QXmpp 1.7
+*/
 
-///
-/// \struct QXmppFallback::Reference
-///
-/// A reference to a text in the message stanza.
-///
+/*!
+    \enum QXmppFallback::Element
+
+    Describes the element of the message stanza this refers to.
+
+    \value Body
+    \value Subject
+*/
+
+/*!
+    \struct QXmppFallback::Range
+    \inmodule QXmpp
+
+    A character range of a string, see \xep{0426}{Character counting in message bodies} for details.
+*/
+
+/*!
+    \struct QXmppFallback::Reference
+    \inmodule QXmpp
+
+    A reference to a text in the message stanza.
+*/
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFallback)
 
-/// Creates a fallback marker.
+/*! Creates a fallback marker. */
 QXmppFallback::QXmppFallback(const QString &forNamespace, const QVector<Reference> &references)
     : d(new QXmppFallbackPrivate { {}, forNamespace, references })
 {
 }
 
-///
-/// Returns the namespace of the XEP that this fallback marker is referring to.
-///
+/*! Returns the namespace of the XEP that this fallback marker is referring to. */
 const QString &QXmppFallback::forNamespace() const
 {
     return d->forNamespace;
 }
 
-///
-/// Sets the namespace of the XEP that this fallback marker is referring to.
-///
+/*!
+    Sets the namespace of the XEP that this fallback marker is referring to.
+
+    \a ns.
+*/
 void QXmppFallback::setForNamespace(const QString &ns)
 {
     d->forNamespace = ns;
 }
 
-///
-/// Returns the text references of this fallback marker.
-///
+/*! Returns the text references of this fallback marker. */
 const QVector<QXmppFallback::Reference> &QXmppFallback::references() const
 {
     return d->references;
 }
 
-///
-/// Sets the text references of this fallback marker.
-///
+/*! Sets the text \a references of this fallback marker. */
 void QXmppFallback::setReferences(const QVector<Reference> &references)
 {
     d->references = references;
 }
 
-///
-/// Tries to parse \a el into a QXmppFallback object.
-///
-/// \return Empty optional on failure, parsed object otherwise.
-///
+/*!
+    Tries to parse \a el into a QXmppFallback object.
+
+    Returns an empty optional on failure, the parsed object otherwise.
+*/
 std::optional<QXmppFallback> QXmppFallback::fromDom(const QDomElement &el)
 {
     if (el.tagName() != u"fallback" || el.namespaceURI() != ns_fallback_indication) {
@@ -2234,9 +2295,11 @@ std::optional<QXmppFallback> QXmppFallback::fromDom(const QDomElement &el)
     };
 }
 
-///
-/// Serializes the object to XML.
-///
+/*!
+    Serializes the object to XML.
+
+    \a writer.
+*/
 void QXmppFallback::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter w(writer);

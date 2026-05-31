@@ -7,12 +7,14 @@
 
 #include "QXmppIq.h"
 
-///
-/// \brief The QXmppVersionIq class represents an IQ for conveying a software
-/// version as defined by \xep{0092, Software Version}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppVersionIq class represents an IQ for conveying a software
+    version as defined by \xep{0092}{Software Version}.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppVersionIq : public QXmppIq
 {
 public:
@@ -25,19 +27,15 @@ public:
     QString version() const;
     void setVersion(const QString &version);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_version };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isVersionIq(const QDomElement &element);
     [[deprecated]]
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QString m_name;

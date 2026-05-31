@@ -37,10 +37,8 @@ public:
     static bool isItem(const QDomElement &itemElement);
 
 protected:
-    /// \cond
     void parsePayload(const QDomElement &payloadElement) override;
     void serializePayload(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppMixInfoItemPrivate> d;

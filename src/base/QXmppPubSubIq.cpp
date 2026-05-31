@@ -18,51 +18,36 @@
 
 using namespace QXmpp::Private;
 
-/// \cond
+/*!
+    \class QXmppPubSubIq
+    \inmodule QXmpp
 
-///
-/// \class QXmppPubSubIqBase
-///
-/// \brief The QXmppPubSubIqBase class is an abstract class used for parsing of
-/// generic PubSub IQs as defined by \xep{0060, Publish-Subscribe}.
-///
-/// This class does not handle queries working with items. For a full-featured
-/// PubSub-IQ, please use QXmppPubSubIq<T> with your needed item class.
-///
-/// \since QXmpp 1.5
-///
+    The QXmppPubSubIq class represents an IQ used for the publish-subscribe
+    mechanisms defined by \xep{0060}{Publish-Subscribe}.
 
-///
-/// \class QXmppPubSubIq
-///
-/// The QXmppPubSubIq class represents an IQ used for the publish-subscribe
-/// mechanisms defined by \xep{0060, Publish-Subscribe}.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.5
-///
+    \ingroup Stanzas
 
-///
-/// \fn QXmppPubSubIq<T>::items()
-///
-/// Returns the IQ's items.
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \fn QXmppPubSubIq<T>::setItems()
-///
-/// Sets the IQ's items.
-///
-/// \param items
-///
+/*!
+    \fn QList<QXmppPubSubItem> QXmppPubSubIq::items() const
 
-///
-/// \fn QXmppPubSubIq<T>::isPubSubIq()
-///
-/// Returns true, if the element is a valid PubSub IQ stanza. The payload of the
-/// &lt;item/&gt; is also checked.
-///
+    Returns the IQ's items.
+*/
+
+/*!
+    \fn void QXmppPubSubIq::setItems(const QList<QXmppPubSubItem> &items)
+
+    Sets the IQ's \a items.
+*/
+
+/*!
+    \fn bool QXmppPubSubIq::isPubSubIq(const QDomElement &element)
+
+    Returns true, if the element is a valid PubSub IQ stanza. The payload of the
+    &lt;item/&gt; is also checked.
+*/
 
 template<>
 struct Enums::Data<PubSubIqBase::QueryType> {
@@ -107,119 +92,89 @@ public:
 
 }  // namespace QXmpp::Private
 
-///
-/// Constructs a PubSub IQ.
-///
-PubSubIqBase::PubSubIqBase()
-    : d(new PubSubIqPrivate)
-{
-}
-
-/// Default copy-constructor
+// Constructs a PubSub IQ. */
+// PubSubIqBase::PubSubIqBase()
+// : d(new PubSubIqPrivate)
+// {
+// }
+//
+// /*! Default copy-constructor
 PubSubIqBase::PubSubIqBase(const PubSubIqBase &iq) = default;
 
 PubSubIqBase::~PubSubIqBase() = default;
 
-/// Default assignment operator
+// Default assignment operator
 PubSubIqBase &PubSubIqBase::operator=(const PubSubIqBase &iq) = default;
 
-///
-/// Returns the PubSub query type for this IQ.
-///
+// Returns the PubSub query type for this IQ.
 PubSubIqBase::QueryType PubSubIqBase::queryType() const
 {
     return d->queryType;
 }
 
-///
-/// Sets the PubSub query type for this IQ.
-///
-/// \param queryType
-///
+// Sets the PubSub \a queryType for this IQ.
 void PubSubIqBase::setQueryType(PubSubIqBase::QueryType queryType)
 {
     d->queryType = queryType;
 }
 
-///
-/// Returns the JID being queried.
-///
+// Returns the JID being queried.
 QString PubSubIqBase::queryJid() const
 {
     return d->queryJid;
 }
 
-///
-/// Sets the JID being queried.
-///
-/// \param queryJid
-///
+// Sets the JID being queried to \a queryJid.
 void PubSubIqBase::setQueryJid(const QString &queryJid)
 {
     d->queryJid = queryJid;
 }
 
-///
-/// Returns the name of the node being queried.
-///
+// Returns the name of the node being queried.
 QString PubSubIqBase::queryNode() const
 {
     return d->queryNode;
 }
 
-///
-/// Sets the name of the node being queried.
-///
-/// \param queryNodeName
-///
+// Sets the name of the node being queried to \a queryNodeName.
 void PubSubIqBase::setQueryNode(const QString &queryNodeName)
 {
     d->queryNode = queryNodeName;
 }
 
-///
-/// Returns the subscription ID for the request.
-///
-/// This does not work for SubscriptionQuery IQs, use subscription() instead.
-///
+// Returns the subscription ID for the request.
+//
+// This does not work for SubscriptionQuery IQs, use subscription() instead.
 QString PubSubIqBase::subscriptionId() const
 {
     return d->subscriptionId;
 }
 
-///
-/// Sets the subscription ID for the request.
-///
-/// This does not work for SubscriptionQuery IQs, use setSubscription() instead.
-///
+// Sets the subscription ID for the request.
+//
+// This does not work for SubscriptionQuery IQs, use setSubscription() instead.
 void PubSubIqBase::setSubscriptionId(const QString &subscriptionId)
 {
     d->subscriptionId = subscriptionId;
 }
 
-///
-/// Returns the included subscriptions.
-///
+// Returns the included subscriptions.
 QVector<QXmppPubSubSubscription> PubSubIqBase::subscriptions() const
 {
     return d->subscriptions;
 }
 
-///
-/// Sets the included subscriptions.
-///
+// Sets the included subscriptions.
 void PubSubIqBase::setSubscriptions(const QVector<QXmppPubSubSubscription> &subscriptions)
 {
     d->subscriptions = subscriptions;
 }
 
-///
-/// Returns the subscription.
-///
-/// This is a utility function for subscriptions(). It returns the first
-/// subscription if existant. This can be used for both query types,
-/// Subscription and Subscriptions.
-///
+// Returns the subscription.
+//
+// This is a utility function for subscriptions(). It returns the first
+// subscription if existant. This can be used for both query types,
+// Subscription and Subscriptions.
 std::optional<QXmppPubSubSubscription> PubSubIqBase::subscription() const
 {
     if (d->subscriptions.isEmpty()) {
@@ -228,12 +183,10 @@ std::optional<QXmppPubSubSubscription> PubSubIqBase::subscription() const
     return d->subscriptions.first();
 }
 
-///
-/// Sets the subscription.
-///
-/// This is a utility function for setSubscriptions(). It can be used for both
-/// query types, Subscription and Subscriptions.
-///
+// Sets the subscription.
+//
+// This is a utility function for setSubscriptions(). It can be used for both
+// query types, Subscription and Subscriptions.
 void PubSubIqBase::setSubscription(const std::optional<QXmppPubSubSubscription> &subscription)
 {
     if (subscription) {
@@ -243,27 +196,21 @@ void PubSubIqBase::setSubscription(const std::optional<QXmppPubSubSubscription> 
     }
 }
 
-///
-/// Returns the included affiliations.
-///
+// Returns the included affiliations.
 QVector<QXmppPubSubAffiliation> PubSubIqBase::affiliations() const
 {
     return d->affiliations;
 }
 
-///
-/// Sets the included affiliations.
-///
+// Sets the included affiliations.
 void PubSubIqBase::setAffiliations(const QVector<QXmppPubSubAffiliation> &affiliations)
 {
     d->affiliations = affiliations;
 }
 
-///
-/// Returns the maximum of items that are requested.
-///
-/// This is only used for queries with type ItemsQuery.
-///
+// Returns the maximum of items that are requested.
+//
+// This is only used for queries with type ItemsQuery.
 std::optional<uint32_t> PubSubIqBase::maxItems() const
 {
     if (d->maxItems) {
@@ -272,61 +219,47 @@ std::optional<uint32_t> PubSubIqBase::maxItems() const
     return std::nullopt;
 }
 
-///
-/// Sets the maximum of items that are requested.
-///
-/// This is only used for queries with type ItemsQuery.
-///
+// Sets the maximum of items that are requested.
+//
+// This is only used for queries with type ItemsQuery.
 void PubSubIqBase::setMaxItems(std::optional<uint32_t> maxItems)
 {
     d->maxItems = maxItems.value_or(0);
 }
 
-///
-/// Returns whether to send notifications on retraction (default: false).
-///
-/// \since QXmpp 1.11
-///
+// Returns whether to send notifications on retraction (default: false).
+//
+// \since QXmpp 1.11
 bool PubSubIqBase::retractNotify() const { return d->retractNotify; }
 
-///
-/// Sets whether to send notifications on retraction.
-///
-///  \since QXmpp 1.11
-///
+// Sets whether to send notifications on retraction.
+//
+// \since QXmpp 1.11
 void PubSubIqBase::setRetractNotify(bool notify) { d->retractNotify = notify; }
 
-///
-/// Returns a data form if the IQ contains one.
-///
+// Returns a data form if the IQ contains one.
 std::optional<QXmppDataForm> PubSubIqBase::dataForm() const
 {
     return d->dataForm;
 }
 
-///
-/// Sets a data form (or clears it by setting std::nullopt).
-///
+// Sets a data form (or clears it by setting std::nullopt).
 void PubSubIqBase::setDataForm(const std::optional<QXmppDataForm> &dataForm)
 {
     d->dataForm = dataForm;
 }
 
-///
-/// Returns a description of which items have been returned.
-///
-/// If this value is set the results are incomplete.
-///
+// Returns a description of which items have been returned.
+//
+// If this value is set the results are incomplete.
 std::optional<QXmppResultSetReply> PubSubIqBase::itemsContinuation() const
 {
     return d->itemsContinuation;
 }
 
-///
-/// Returns a description of which items have been returned.
-///
-/// If this value is set the results are incomplete.
-///
+// Returns a description of which items have been returned.
+//
+// If this value is set the results are incomplete.
 void PubSubIqBase::setItemsContinuation(const std::optional<QXmppResultSetReply> &itemsContinuation)
 {
     d->itemsContinuation = itemsContinuation;
@@ -703,5 +636,3 @@ bool PubSubIqBase::queryTypeIsOwnerIq(QueryType type)
     }
     return false;
 }
-
-/// \endcond

@@ -23,27 +23,51 @@ class QXmppError;
 class QXMPP_EXPORT QXmppCall : public QXmppLoggable
 {
     Q_OBJECT
-    /// The call's direction
+    /*!
+        \property QXmppCall::direction
+
+        The call's direction
+    */
     Q_PROPERTY(Direction direction READ direction CONSTANT)
-    /// The remote party's JID
+    /*!
+        \property QXmppCall::jid
+
+        The remote party's JID
+    */
     Q_PROPERTY(QString jid READ jid CONSTANT)
-    /// The call's state
+    /*!
+        \property QXmppCall::state
+
+        The call's state
+    */
     Q_PROPERTY(State state READ state NOTIFY stateChanged)
 
 public:
-    /// This enum is used to describe the direction of a call.
+    /*!
+        This enum is used to describe the direction of a call.
+
+        \value IncomingDirection The call is incoming.
+        \value OutgoingDirection The call is outgoing.
+    */
     enum Direction {
-        IncomingDirection,  ///< The call is incoming.
-        OutgoingDirection   ///< The call is outgoing.
+        IncomingDirection,
+        OutgoingDirection
     };
     Q_ENUM(Direction)
 
-    /// This enum is used to describe the state of a call.
+    /*!
+        This enum is used to describe the state of a call.
+
+        \value ConnectingState The call is being connected.
+        \value ActiveState The call is active.
+        \value DisconnectingState The call is being disconnected.
+        \value FinishedState The call is finished.
+    */
     enum State {
-        ConnectingState = 0,     ///< The call is being connected.
-        ActiveState = 1,         ///< The call is active.
-        DisconnectingState = 2,  ///< The call is being disconnected.
-        FinishedState = 3        ///< The call is finished.
+        ConnectingState = 0,
+        ActiveState = 1,
+        DisconnectingState = 2,
+        FinishedState = 3
     };
     Q_ENUM(State)
 
@@ -67,19 +91,19 @@ public:
     void hangUp();
     void addVideo();
 
-    /// \brief This signal is emitted when a call is connected.
+    /*! \brief This signal is emitted when a call is connected. */
     Q_SIGNAL void connected();
 
-    /// \brief This signal is emitted when a call is finished.
+    /*! \brief This signal is emitted when a call is finished. */
     Q_SIGNAL void finished();
 
-    /// \brief This signal is emitted when the remote party is ringing.
+    /*! \brief This signal is emitted when the remote party is ringing. */
     Q_SIGNAL void ringing();
 
-    /// \brief This signal is emitted when the call state changes.
+    /*! \brief This signal is emitted when the call \a state changes. */
     Q_SIGNAL void stateChanged(QXmppCall::State state);
 
-    /// \brief This signal is emitted when a stream is created.
+    /*! \brief This signal is emitted when a \a stream is created. */
     Q_SIGNAL void streamCreated(QXmppCallStream *stream);
 
 private:

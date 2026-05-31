@@ -67,9 +67,7 @@ public:
     QXmppCallInviteManager();
     ~QXmppCallInviteManager();
 
-    /// \cond
     QStringList discoveryFeatures() const override;
-    /// \endcond
 
     QXmppTask<ProposeResult> invite(
         QString callPartnerJid,
@@ -81,9 +79,7 @@ public:
     Q_SIGNAL void invited(const std::shared_ptr<QXmppCallInvite> &callInvite, const QString &id);
 
 protected:
-    /// \cond
     bool handleMessage(const QXmppMessage &) override;
-    /// \endcond
 
 private:
     QXmppTask<QXmpp::SendResult> sendMessage(

@@ -16,7 +16,6 @@ class QXmppClient;
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 
-/// \cond
 struct [[deprecated("Removed from public API (unmaintained)")]] QXmppRemoteMethodResult {
     QXmppRemoteMethodResult() : hasError(false), code(0) { }
     bool hasError;
@@ -42,7 +41,6 @@ private:
     QXmppClient *m_client;
     QXmppRemoteMethodResult m_result;
 };
-/// \endcond
 
 QT_WARNING_POP
 #endif

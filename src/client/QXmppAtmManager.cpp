@@ -20,62 +20,60 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppAtmManager
-///
-/// \brief The QXmppAtmManager class represents a manager for
-/// \xep{0450, Automatic Trust Management (ATM)}.
-///
-/// For interacting with the storage, a corresponding implementation of the
-/// storage interface must be added.
-/// That implementation has to be adapted to your storage such as a database.
-/// In case you only need memory and no peristent storage, you can use the
-/// existing implementation and add the storage with it:
-///
-///\code
-/// QXmppAtmTrustStorage *trustStorage = new QXmppAtmTrustMemoryStorage;
-/// QXmppAtmManager *manager = new QXmppAtmManager(trustStorage);
-/// client->addExtension(manager);
-/// \endcode
-///
-/// It is strongly recommended to enable \xep{0280, Message Carbons} with
-/// \code
-/// client->addNewExtension<QXmppCarbonManagerV2>();
-/// \endcode
-/// and \xep{0313, Message Archive Management} with
-/// \code
-/// QXmppMamManager *mamManager = new QXmppMamManager;
-/// client->addExtension(mamManager);
-/// \endcode
-/// for delivering trust messages to all online and offline endpoints.
-///
-/// In addition, archiving via MAM must be enabled on the server.
-///
-/// \ingroup Managers
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppAtmManager
+    \inmodule QXmpp
 
-///
-/// Constructs an ATM manager.
-///
-/// \param trustStorage trust storage implementation
-///
+    \brief The QXmppAtmManager class represents a manager for
+    \xep{0450}{Automatic Trust Management (ATM)}.
+
+    For interacting with the storage, a corresponding implementation of the
+    storage interface must be added.
+    That implementation has to be adapted to your storage such as a database.
+    In case you only need memory and no peristent storage, you can use the
+    existing implementation and add the storage with it:
+
+    \code
+    QXmppAtmTrustStorage *trustStorage = new QXmppAtmTrustMemoryStorage;
+    QXmppAtmManager *manager = new QXmppAtmManager(trustStorage);
+    client->addExtension(manager);
+    \endcode
+
+    It is strongly recommended to enable \xep{0280}{Message Carbons} with
+    \code
+    client->addNewExtension<QXmppCarbonManagerV2>();
+    \endcode
+    and \xep{0313}{Message Archive Management} with
+    \code
+    QXmppMamManager *mamManager = new QXmppMamManager;
+    client->addExtension(mamManager);
+    \endcode
+    for delivering trust messages to all online and offline endpoints.
+
+    In addition, archiving via MAM must be enabled on the server.
+
+    \ingroup Managers
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    Constructs an ATM manager with the given \a trustStorage trust storage implementation.
+*/
 QXmppAtmManager::QXmppAtmManager(QXmppAtmTrustStorage *trustStorage)
     : QXmppTrustManager(trustStorage)
 {
 }
 
-///
-/// Authenticates or distrusts keys manually (e.g., by the Trust Message URI of
-/// a scanned QR code or after entering key IDs by hand) and sends corresponding
-/// trust messages.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJid JID of the key owner
-/// \param keyIdsForAuthentication IDs of the keys being authenticated
-/// \param keyIdsForDistrusting IDs of the keys being distrusted
-///
+/*!
+    Authenticates or distrusts keys manually (e.g., by the Trust Message URI of
+    a scanned QR code or after entering key IDs by hand) and sends corresponding
+    trust messages.
+
+    \a encryption is the encryption protocol namespace. \a keyOwnerJid is the JID of the key
+    owner. \a keyIdsForAuthentication contains the IDs of the keys being authenticated and
+    \a keyIdsForDistrusting contains the IDs of the keys being distrusted.
+*/
 QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QString keyOwnerJid, QList<QByteArray> keyIdsForAuthentication, QList<QByteArray> keyIdsForDistrusting)
 {
     auto retrievedKeys = co_await keys(encryption, TrustLevel::Authenticated | TrustLevel::ManuallyDistrusted).withContext(this);
@@ -234,7 +232,6 @@ QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QString 
     }
 }
 
-/// \cond
 void QXmppAtmManager::onRegistered(QXmppClient *client)
 {
     connect(client, &QXmppClient::messageReceived, this, &QXmppAtmManager::handleMessage);
@@ -244,17 +241,14 @@ void QXmppAtmManager::onUnregistered(QXmppClient *client)
 {
     disconnect(client, &QXmppClient::messageReceived, this, &QXmppAtmManager::handleMessage);
 }
-/// \endcond
 
-///
-/// Authenticates or distrusts keys.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyIdsForAuthentication key owners' bare JIDs mapped to the IDs of
-///        their keys being authenticated
-/// \param keyIdsForDistrusting key owners' bare JIDs mapped to the IDs of their
-///        keys being distrusted
-///
+/*!
+    Authenticates or distrusts keys.
+
+    \a encryption is the encryption protocol namespace. \a keyIdsForAuthentication maps key
+    owners' bare JIDs to the IDs of their keys being authenticated.
+    \a keyIdsForDistrusting maps key owners' bare JIDs to the IDs of their keys being distrusted.
+*/
 QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QMultiHash<QString, QByteArray> keyIdsForAuthentication, QMultiHash<QString, QByteArray> keyIdsForDistrusting)
 {
     // authenticate
@@ -272,12 +266,11 @@ QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QMultiHa
     }
 }
 
-///
-/// Handles incoming messages and uses included trust message elements for
-/// making automatic trust decisions.
-///
-/// \param message message that can contain a trust message element
-///
+/*!
+    Handles incoming messages and uses included trust message elements for
+    making automatic trust decisions. \a message is a message that can contain a trust message
+    element.
+*/
 QXmppTask<void> QXmppAtmManager::handleMessage(const QXmppMessage &message)
 {
     const auto trustMessageElement = message.trustMessageElement();
@@ -347,28 +340,28 @@ QXmppTask<void> QXmppAtmManager::handleMessage(const QXmppMessage &message)
     co_await trustDecisionTask;
 }
 
-///
-/// Distrusts all formerly automatically trusted keys (as specifed by the
-/// security policy TOAKAFA).
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJids bare JIDs of the key owners
-///
+/*!
+    Distrusts all formerly automatically trusted keys (as specifed by the
+    security policy TOAKAFA).
+
+    \a encryption is the encryption protocol namespace. \a keyOwnerJids contains the bare JIDs
+    of the key owners.
+*/
 QXmppTask<void> QXmppAtmManager::distrustAutomaticallyTrustedKeys(const QString &encryption, const QList<QString> &keyOwnerJids)
 {
     return setTrustLevel(encryption, keyOwnerJids, TrustLevel::AutomaticallyTrusted, TrustLevel::AutomaticallyDistrusted);
 }
 
-///
-/// Authenticates or distrusts keys for whom earlier trust messages were
-/// received but not used for authenticating or distrusting at that time.
-///
-/// As soon as the senders' keys have been authenticated, all postponed trust
-/// decisions can be performed by this method.
-///
-/// \param encryption encryption protocol namespace
-/// \param senderKeyIds IDs of the keys that were used by the senders
-///
+/*!
+    Authenticates or distrusts keys for whom earlier trust messages were
+    received but not used for authenticating or distrusting at that time.
+
+    As soon as the senders' keys have been authenticated, all postponed trust
+    decisions can be performed by this method.
+
+    \a encryption is the encryption protocol namespace. \a senderKeyIds contains the IDs of the
+    keys that were used by the senders.
+*/
 QXmppTask<void> QXmppAtmManager::makePostponedTrustDecisions(QString encryption, const QList<QByteArray> &senderKeyIds)
 {
     auto postponedTrustDecisionKeys =
@@ -386,13 +379,12 @@ QXmppTask<void> QXmppAtmManager::makePostponedTrustDecisions(QString encryption,
     co_await trustDecisionTask;
 }
 
-///
-/// Sends a trust message.
-///
-/// \param encryption namespace of the encryption
-/// \param keyOwners key owners containing the data for authentication or distrusting
-/// \param recipientJid JID of the recipient
-///
+/*!
+    Sends a trust message.
+
+    \a encryption is the namespace of the encryption. \a keyOwners contains the key owners with
+    the data for authentication or distrusting. \a recipientJid is the JID of the recipient.
+*/
 QXmppTask<QXmpp::SendResult> QXmppAtmManager::sendTrustMessage(const QString &encryption, const QList<QXmppTrustMessageKeyOwner> &keyOwners, const QString &recipientJid)
 {
     QXmppTrustMessageElement trustMessageElement;

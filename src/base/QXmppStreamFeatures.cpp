@@ -51,236 +51,205 @@ QXmppStreamFeatures::QXmppStreamFeatures()
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppStreamFeatures::QXmppStreamFeatures(const QXmppStreamFeatures &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppStreamFeatures::QXmppStreamFeatures(QXmppStreamFeatures &&) = default;
 QXmppStreamFeatures::~QXmppStreamFeatures() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppStreamFeatures &QXmppStreamFeatures::operator=(const QXmppStreamFeatures &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppStreamFeatures &QXmppStreamFeatures::operator=(QXmppStreamFeatures &&) = default;
 
-///
-/// Returns the resource binding mode
-///
+/*! Returns the resource binding mode */
 QXmppStreamFeatures::Mode QXmppStreamFeatures::bindMode() const
 {
     return d->bindMode;
 }
 
-///
-/// Sets the resource binding mode
-///
+/*! Sets the resource binding \a mode */
 void QXmppStreamFeatures::setBindMode(QXmppStreamFeatures::Mode mode)
 {
     d->bindMode = mode;
 }
 
-///
-/// Returns session mode
-///
+/*! Returns session mode */
 QXmppStreamFeatures::Mode QXmppStreamFeatures::sessionMode() const
 {
     return d->sessionMode;
 }
 
-///
-/// Sets session mode
-///
+/*! Sets session \a mode */
 void QXmppStreamFeatures::setSessionMode(Mode mode)
 {
     d->sessionMode = mode;
 }
 
-///
-/// Returns Non-SASL Authentication mode
-///
+/*! Returns Non-SASL Authentication mode */
 QXmppStreamFeatures::Mode QXmppStreamFeatures::nonSaslAuthMode() const
 {
     return d->nonSaslAuthMode;
 }
 
-///
-/// Sets Non-SASL Authentication mode
-///
+/*! Sets Non-SASL Authentication \a mode */
 void QXmppStreamFeatures::setNonSaslAuthMode(QXmppStreamFeatures::Mode mode)
 {
     d->nonSaslAuthMode = mode;
 }
 
-///
-/// Returns the available authentication mechanisms
-///
+/*! Returns the available authentication mechanisms */
 QStringList QXmppStreamFeatures::authMechanisms() const
 {
     return d->authMechanisms;
 }
 
-///
-/// Sets the available authentication mechanisms
-///
+/*! Sets the available authentication \a mechanisms */
 void QXmppStreamFeatures::setAuthMechanisms(const QStringList &mechanisms)
 {
     d->authMechanisms = mechanisms;
 }
 
-///
-/// Returns the \xep{0388, Extensible SASL Profile} stream feature.
-///
+/*! Returns the \xep{0388}{Extensible SASL Profile} stream feature. */
 const std::optional<Sasl2::StreamFeature> &QXmppStreamFeatures::sasl2Feature() const
 {
     return d->sasl2Feature;
 }
 
-///
-/// Sets the \xep{0388, Extensible SASL Profile} stream feature.
-///
+/*! Sets the \xep{0388}{Extensible SASL Profile} stream \a feature. */
 void QXmppStreamFeatures::setSasl2Feature(const std::optional<Sasl2::StreamFeature> &feature)
 {
     d->sasl2Feature = feature;
 }
 
-///
-/// Returns the available compression methods
-///
+/*! Returns the available compression methods */
 QStringList QXmppStreamFeatures::compressionMethods() const
 {
     return d->compressionMethods;
 }
 
-///
-/// Sets the available compression methods
-///
+/*! Sets the available compression \a methods */
 void QXmppStreamFeatures::setCompressionMethods(const QStringList &methods)
 {
     d->compressionMethods = methods;
 }
 
-///
-/// Returns the mode for STARTTLS
-///
+/*! Returns the mode for STARTTLS */
 QXmppStreamFeatures::Mode QXmppStreamFeatures::tlsMode() const
 {
     return d->tlsMode;
 }
 
-///
-/// Sets the mode for STARTTLS
-///
+/*! Sets the \a mode for STARTTLS */
 void QXmppStreamFeatures::setTlsMode(QXmppStreamFeatures::Mode mode)
 {
     d->tlsMode = mode;
 }
 
-///
-/// Returns the mode (disabled, enabled or required) for \xep{0198, Stream
-/// Management}
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns the mode (disabled, enabled or required) for \xep{0198}{Stream
+    Management}
+
+    \since QXmpp 1.0
+*/
 QXmppStreamFeatures::Mode QXmppStreamFeatures::streamManagementMode() const
 {
     return d->streamManagementMode;
 }
 
-///
-/// Sets the mode for \xep{0198, Stream Management}
-///
-/// \param mode The mode to set.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Sets the mode for \xep{0198}{Stream Management} to \a mode.
+
+    \since QXmpp 1.0
+*/
 void QXmppStreamFeatures::setStreamManagementMode(QXmppStreamFeatures::Mode mode)
 {
     d->streamManagementMode = mode;
 }
 
-///
-/// Returns the mode for \xep{0352, Client State Indication}
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns the mode for \xep{0352}{Client State Indication}
+
+    \since QXmpp 1.0
+*/
 QXmppStreamFeatures::Mode QXmppStreamFeatures::clientStateIndicationMode() const
 {
     return d->csiMode;
 }
 
-///
-/// Sets the mode for \xep{0352, Client State Indication}
-///
-/// \param mode The mode to set.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Sets the mode for \xep{0352}{Client State Indication} to \a mode.
+
+    \since QXmpp 1.0
+*/
 void QXmppStreamFeatures::setClientStateIndicationMode(QXmppStreamFeatures::Mode mode)
 {
     d->csiMode = mode;
 }
 
-///
-/// Returns the mode for \xep{0077, In-Band Registration}
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the mode for \xep{0077}{In-Band Registration}
+
+    \since QXmpp 1.1
+*/
 QXmppStreamFeatures::Mode QXmppStreamFeatures::registerMode() const
 {
     return d->registerMode;
 }
 
-///
-/// Sets the mode for \xep{0077, In-Band Registration}
-///
-/// \param mode The mode to set.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the mode for \xep{0077}{In-Band Registration} to \a mode.
+
+    \since QXmpp 1.1
+*/
 void QXmppStreamFeatures::setRegisterMode(const QXmppStreamFeatures::Mode &mode)
 {
     d->registerMode = mode;
 }
 
-///
-/// Returns whether usage of Pre-Approved roster subscriptions is supported.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns whether usage of Pre-Approved roster subscriptions is supported.
+
+    \since QXmpp 1.3
+*/
 bool QXmppStreamFeatures::preApprovedSubscriptionsSupported() const
 {
     return d->preApprovedSubscriptionsSupported;
 }
 
-///
-/// Sets whether usage of Pre-Approved roster subscriptions is supported.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets whether usage of Pre-Approved roster subscriptions is supported.
+
+    \since QXmpp 1.3
+
+    \a supported.
+*/
 void QXmppStreamFeatures::setPreApprovedSubscriptionsSupported(bool supported)
 {
     d->preApprovedSubscriptionsSupported = supported;
 }
 
-///
-/// Returns whether roster versioning from RFC6121 is supported.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns whether roster versioning from RFC6121 is supported.
+
+    \since QXmpp 1.3
+*/
 bool QXmppStreamFeatures::rosterVersioningSupported() const
 {
     return d->rosterVersioningSupported;
 }
 
-///
-/// Sets whether roster versioning from RFC6121 is supported.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets whether roster versioning from RFC6121 is supported.
+
+    \since QXmpp 1.3
+
+    \a supported.
+*/
 void QXmppStreamFeatures::setRosterVersioningSupported(bool supported)
 {
     d->rosterVersioningSupported = supported;
 }
 
-/// \cond
 bool QXmppStreamFeatures::isStreamFeatures(const QDomElement &element)
 {
     return element.namespaceURI() == ns_stream &&
@@ -377,4 +346,3 @@ void QXmppStreamFeatures::toXml(QXmlStreamWriter *writer) const
         d->sasl2Feature,
     });
 }
-/// \endcond

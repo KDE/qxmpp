@@ -26,7 +26,7 @@ class PubSubIqPrivate;
 class QXMPP_EXPORT PubSubIqBase : public QXmppIq
 {
 public:
-    /// This enum is used to describe a publish-subscribe query type.
+    // This enum is used to describe a publish-subscribe query type.
     enum QueryType : uint8_t {
         Affiliations,
         OwnerAffiliations,
@@ -86,7 +86,6 @@ public:
     std::optional<QXmppResultSetReply> itemsContinuation() const;
     void setItemsContinuation(const std::optional<QXmppResultSetReply> &itemsContinuation);
 
-    /// \cond
     static bool isPubSubIq(const QDomElement &element);
 
 protected:
@@ -98,7 +97,6 @@ protected:
 
     virtual void parseItems(const QDomElement &queryElement) = 0;
     virtual void serializeItems(QXmlStreamWriter *writer) const = 0;
-    /// \endcond
 
 private:
     static std::optional<QueryType> queryTypeFromDomElement(const QDomElement &element);
@@ -117,10 +115,8 @@ public:
     static bool isPubSubIq(const QDomElement &element);
 
 protected:
-    /// \cond
     void parseItems(const QDomElement &queryElement) override;
     void serializeItems(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QVector<T> m_items;
@@ -146,7 +142,6 @@ bool PubSubIq<T>::isPubSubIq(const QDomElement &element)
     });
 }
 
-/// \cond
 template<typename T>
 void PubSubIq<T>::parseItems(const QDomElement &queryElement)
 {
@@ -166,7 +161,6 @@ void PubSubIq<T>::serializeItems(QXmlStreamWriter *writer) const
         item.toXml(writer);
     }
 }
-/// \endcond
 
 }  // namespace QXmpp::Private
 

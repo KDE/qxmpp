@@ -27,78 +27,94 @@ public:
     std::optional<uint32_t> height;
 };
 
-///
-/// \class QXmppThumbnail
-///
-/// Thumbnail from \xep{0264, Jingle Content Thumbnails}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppThumbnail
+    \inmodule QXmpp
 
-/// Default constructor
+    Thumbnail from \xep{0264}{Jingle Content Thumbnails}.
+
+    \since QXmpp 1.5
+*/
+
+/*! Default constructor */
 QXmppThumbnail::QXmppThumbnail()
     : d(new QXmppThumbnailPrivate)
 {
 }
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppThumbnail::QXmppThumbnail(const QXmppThumbnail &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppThumbnail::QXmppThumbnail(QXmppThumbnail &&) noexcept = default;
 QXmppThumbnail::~QXmppThumbnail() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppThumbnail &QXmppThumbnail::operator=(const QXmppThumbnail &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppThumbnail &QXmppThumbnail::operator=(QXmppThumbnail &&) noexcept = default;
 
-/// Returns the URI with the location for the data (usually a \xep{0231, Bits of Binary} content ID)
+/*! Returns the URI with the location for the data (usually a \xep{0231}{Bits of Binary} content ID) */
 const QString &QXmppThumbnail::uri() const
 {
     return d->uri;
 }
 
-/// Sets the URI with the location for the data (usually a \xep{0231, Bits of Binary} content ID)
+/*!
+    Sets the URI with the location for the data (usually a \xep{0231}{Bits of Binary} content ID)
+
+    \a newUri.
+*/
 void QXmppThumbnail::setUri(const QString &newUri)
 {
     d->uri = newUri;
 }
 
-/// Returns the MIME type of the thumbnail data.
+/*! Returns the MIME type of the thumbnail data. */
 const QMimeType &QXmppThumbnail::mediaType() const
 {
     return d->mediaType;
 }
 
-/// Sets the MIME type of the thumbnail data.
+/*!
+    Sets the MIME type of the thumbnail data.
+
+    \a newMediaType.
+*/
 void QXmppThumbnail::setMediaType(const QMimeType &newMediaType)
 {
     d->mediaType = newMediaType;
 }
 
-/// Returns the width of the thumbnail image.
+/*! Returns the width of the thumbnail image. */
 std::optional<uint32_t> QXmppThumbnail::width() const
 {
     return d->width;
 }
 
-/// Sets the width of the thumbnail image.
+/*!
+    Sets the width of the thumbnail image.
+
+    \a newWidth.
+*/
 void QXmppThumbnail::setWidth(std::optional<uint32_t> newWidth)
 {
     d->width = newWidth;
 }
 
-/// Returns the height of the thumbnail image.
+/*! Returns the height of the thumbnail image. */
 std::optional<uint32_t> QXmppThumbnail::height() const
 {
     return d->height;
 }
 
-/// Sets the height of the thumbnail image.
+/*!
+    Sets the height of the thumbnail image.
+
+    \a newHeight.
+*/
 void QXmppThumbnail::setHeight(std::optional<uint32_t> newHeight)
 {
     d->height = newHeight;
 }
 
-/// \cond
 bool QXmppThumbnail::parse(const QDomElement &el)
 {
     if (el.tagName() == u"thumbnail" && el.namespaceURI() == ns_thumbs) {
@@ -141,4 +157,3 @@ void QXmppThumbnail::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"height", d->height },
     });
 }
-/// \endcond

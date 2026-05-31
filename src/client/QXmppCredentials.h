@@ -24,9 +24,9 @@ public:
     static std::optional<QXmppCredentials> fromXml(QXmlStreamReader &);
     void toXml(QXmlStreamWriter &) const;
 
-    /// Comparison operator
+    /*! Returns true if both objects are equal. */
     bool operator==(const QXmppCredentials &other) const;
-    /// Comparison operator
+    /*! Returns true if both objects are equal. */
     bool operator!=(const QXmppCredentials &other) const = default;
 
 private:

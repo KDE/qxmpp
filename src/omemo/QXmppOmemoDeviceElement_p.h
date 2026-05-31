@@ -23,11 +23,9 @@ public:
     QString label() const;
     void setLabel(const QString &label);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"device", QXmpp::Private::ns_omemo_2 };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isOmemoDeviceElement(const QDomElement &element);
 

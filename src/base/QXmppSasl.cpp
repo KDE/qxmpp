@@ -723,24 +723,25 @@ void HtToken::toXml(XmlWriter &w) const
 
 }  // namespace QXmpp::Private
 
-///
-/// \class QXmppSasl2UserAgent
-///
-/// \brief User-agent for identifying devices across reconnects, defined in \xep{0388, Extensible
-/// SASL Profile}.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \class QXmppSasl2UserAgent
+    \inmodule QXmpp
+
+    \brief User-agent for identifying devices across reconnects, defined in \xep{0388}{Extensible
+    SASL Profile}.
+
+    \since QXmpp 1.7
+*/
 
 struct QXmppSasl2UserAgentPrivate : QSharedData, Sasl2::UserAgent { };
 
-/// Default-constructor
+/*! Default-constructor */
 QXmppSasl2UserAgent::QXmppSasl2UserAgent()
     : d(new QXmppSasl2UserAgentPrivate())
 {
 }
 
-/// Constructs a new user-agent with given values.
+/*! Constructs a new user-agent with given values. */
 QXmppSasl2UserAgent::QXmppSasl2UserAgent(QUuid deviceId, const QString &softwareName, const QString &deviceName)
     : d(new QXmppSasl2UserAgentPrivate { QSharedData(), Sasl2::UserAgent { deviceId, softwareName, deviceName } })
 {
@@ -748,53 +749,45 @@ QXmppSasl2UserAgent::QXmppSasl2UserAgent(QUuid deviceId, const QString &software
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppSasl2UserAgent)
 
-///
-/// Returns the unique and stable ID of this device.
-///
-/// This ID is intended to be persistent across reconnects and reboots of the used device.
-///
+/*!
+    Returns the unique and stable ID of this device.
+
+    This ID is intended to be persistent across reconnects and reboots of the used device.
+*/
 QUuid QXmppSasl2UserAgent::deviceId() const
 {
     return d->id;
 }
 
-///
-/// Sets the unique and stable ID of this device.
-///
-/// This ID is intended to be persistent across reconnects and reboots of the used device.
-///
+/*!
+    Sets the unique and stable ID of this device.
+
+    This ID is intended to be persistent across reconnects and reboots of the used device.
+*/
 void QXmppSasl2UserAgent::setDeviceId(QUuid id)
 {
     d->id = id;
 }
 
-///
-/// Returns the name of the used software (e.g. *AwesomeXMPP*).
-///
+/*! Returns the name of the used software (e.g. *AwesomeXMPP*). */
 const QString &QXmppSasl2UserAgent::softwareName() const
 {
     return d->software;
 }
 
-///
-/// Sets the name of the used software (e.g. *AwesomeXMPP*).
-///
+/*! Sets the name of the used software (e.g. *AwesomeXMPP*). */
 void QXmppSasl2UserAgent::setSoftwareName(const QString &software)
 {
     d->software = software;
 }
 
-///
-/// Returns the name of this device (e.g. *Kiva's Phone*).
-///
+/*! Returns the name of this device (e.g. *Kiva's Phone*). */
 const QString &QXmppSasl2UserAgent::deviceName() const
 {
     return d->device;
 }
 
-///
-/// Sets the name of this device (e.g. *Kiva's Phone*).
-///
+/*! Sets the name of this device (e.g. *Kiva's Phone*). */
 void QXmppSasl2UserAgent::setDeviceName(const QString &device)
 {
     d->device = device;
@@ -865,9 +858,7 @@ bool QXmppSaslClient::isMechanismAvailable(SaslMechanism mechanism, const Creden
         mechanism);
 }
 
-///
-/// Creates an SASL client for the given mechanism.
-///
+/*! Creates an SASL client for the given mechanism. */
 std::unique_ptr<QXmppSaslClient> QXmppSaslClient::create(const QString &string, QObject *parent)
 {
     if (auto mechanism = SaslMechanism::fromString(string)) {
@@ -1182,7 +1173,7 @@ QXmppSaslServer::QXmppSaslServer(QObject *parent)
 
 QXmppSaslServer::~QXmppSaslServer() = default;
 
-/// Creates an SASL server for the given mechanism.
+/*! Creates an SASL server for the given mechanism. */
 std::unique_ptr<QXmppSaslServer> QXmppSaslServer::create(const QString &mechanism, QObject *parent)
 {
     if (mechanism == u"PLAIN") {
@@ -1196,49 +1187,49 @@ std::unique_ptr<QXmppSaslServer> QXmppSaslServer::create(const QString &mechanis
     }
 }
 
-/// Returns the username.
+/*! Returns the username. */
 QString QXmppSaslServer::username() const
 {
     return d->username;
 }
 
-/// Sets the username.
+/*! Sets the username. */
 void QXmppSaslServer::setUsername(const QString &username)
 {
     d->username = username;
 }
 
-/// Returns the password.
+/*! Returns the password. */
 QString QXmppSaslServer::password() const
 {
     return d->password;
 }
 
-/// Sets the password.
+/*! Sets the password. */
 void QXmppSaslServer::setPassword(const QString &password)
 {
     d->password = password;
 }
 
-/// Returns the password digest.
+/*! Returns the password digest. */
 QByteArray QXmppSaslServer::passwordDigest() const
 {
     return d->passwordDigest;
 }
 
-/// Sets the password digest.
+/*! Sets the password digest. */
 void QXmppSaslServer::setPasswordDigest(const QByteArray &digest)
 {
     d->passwordDigest = digest;
 }
 
-/// Returns the realm.
+/*! Returns the realm. */
 QString QXmppSaslServer::realm() const
 {
     return d->realm;
 }
 
-/// Sets the realm.
+/*! Sets the realm. */
 void QXmppSaslServer::setRealm(const QString &realm)
 {
     d->realm = realm;

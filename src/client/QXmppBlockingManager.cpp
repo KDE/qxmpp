@@ -69,114 +69,119 @@ struct QXmppBlockingManagerPrivate {
     std::vector<QXmppPromise<QXmppBlockingManager::BlocklistResult>> openFetchBlocklistPromises;
 };
 
-///
-/// \class QXmppBlockingManager
-///
-/// \brief Uses \xep{0191, Blocking Command} to manage blocked accounts and services.
-///
-/// ## Use Cases
-///
-///  * listing blocked devices, accounts and servers
-///  * blocking and unblocking JIDs
-///  * getting notified when a new JID has been blocked or unblocked
-///
-/// ### Listing blocked devices
-///
-/// You can receive a list of blocked JIDs by using fetchBlocklist().
-/// ```
-/// manager->fetchBlocklist().then(this, [](auto result) {
-///     if (auto *blocklist = std::get_if<QXmppBlocklist>(&result)) {
-///         qDebug() << "Blocked JIDs:" << blocklist->entries();
-///     } else if (auto *err = std::get_if<QXmppError>(&result)) {
-///         qDebug() << "Error fetching blocklist:" << err->description;
-///     }
-/// });
-/// ```
-///
-/// The server will send updates to us for the rest of the stream. You can listen to the updates by
-/// connecting to blocked() and unblocked().
-///
-/// \note The manager caches the blocklist, so after the first time the task will finish instantly.
-///
-/// ### Blocking and Unblocking
-///
-/// You can use block() and unblock() for this purpose.
-/// ```
-/// manager->block("baduser@spam.im").then(this, [](auto result) {
-///     if (QXmpp::hasValue(result)) {
-///         qDebug() << "Blocked baduser@spam.im!";
-///     } else if (auto *err = std::get_if<QXmppError>(&result)) {
-///         qDebug() << "Error:" << err->description;
-///     }
-/// });
-/// ```
-/// unblock() works likewise.
-///
-/// \note This will also trigger blocked() or unblocked() if you are subscribed to the blocklist.
-///
-/// ### Blocklist Subscription
-///
-/// You will automatically receive blocklist updates after you requested the blocklist. You can
-/// connect to the blocked() and unblocked() signals.
-///
-/// ## Format
-///
-/// It is important to notice that the blocked JIDs are not limited to accounts, allowed are the
-/// following formats:
-///  * `user@domain/resource`
-///  * `user@domain`
-///  * `domain/resource`
-///  * `domain`
-///
-/// It is not possible to block a domain without blocking a specific account though (or another
-/// combination).
-///
-/// ## Setup
-///
-/// The blocking manager is not enabled by default and needs to be registered with your
-/// QXmppClient.
-/// ```
-/// auto *blockingManager = client->addNewExtension<QXmppBlockingManager>();
-/// ```
-///
-/// \ingroup Managers
-/// \sa QXmppBlocklist
-/// \since QXmpp 1.6
-///
+/*!
+    \class QXmppBlockingManager
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppBlockingManager::BlocklistResult
-///
-/// Contains a QXmppBlocklist or an error.
-///
+    \brief Uses \xep{0191}{Blocking Command} to manage blocked accounts and services.
 
-///
-/// \typedef QXmppBlockingManager::Result
-///
-/// Contains QXmpp::Success or an error.
-///
+    \section1 Use Cases
 
-///
-/// \fn QXmppBlockingManager::subscribedChanged()
-///
-/// Called whenever the state of the subscription to blocklist updates has changed.
-///
+    \list
+        \li listing blocked devices, accounts and servers
+        \li blocking and unblocking JIDs
+        \li getting notified when a new JID has been blocked or unblocked
+    \endlist
 
-///
-/// \fn QXmppBlockingManager::blocked
-///
-/// Emitted when a blocklist update with new blocked JIDs has been received.
-///
-/// This is also emitted when you call block().
-///
+    \section2 Listing blocked devices
 
-///
-/// \fn QXmppBlockingManager::unblocked
-///
-/// Emitted when a blocklist update with new unblocked JIDs has been received.
-///
-/// This is also emitted when you call unblock().
-///
+    You can receive a list of blocked JIDs by using fetchBlocklist().
+    ```
+    manager->fetchBlocklist().then(this, [](auto result) {
+    if (auto *blocklist = std::get_if<QXmppBlocklist>(&result)) {
+    qDebug() << "Blocked JIDs:" << blocklist->entries();
+    } else if (auto *err = std::get_if<QXmppError>(&result)) {
+    qDebug() << "Error fetching blocklist:" << err->description;
+    }
+    });
+    ```
+
+    The server will send updates to us for the rest of the stream. You can listen to the updates by
+    connecting to blocked() and unblocked().
+
+    \note The manager caches the blocklist, so after the first time the task will finish instantly.
+
+    \section2 Blocking and Unblocking
+
+    You can use block() and unblock() for this purpose.
+    ```
+    manager->block("baduser@spam.im").then(this, [](auto result) {
+    if (QXmpp::hasValue(result)) {
+    qDebug() << "Blocked baduser@spam.im!";
+    } else if (auto *err = std::get_if<QXmppError>(&result)) {
+    qDebug() << "Error:" << err->description;
+    }
+    });
+    ```
+    unblock() works likewise.
+
+    \note This will also trigger blocked() or unblocked() if you are subscribed to the blocklist.
+
+    \section2 Blocklist Subscription
+
+    You will automatically receive blocklist updates after you requested the blocklist. You can
+    connect to the blocked() and unblocked() signals.
+
+    \section1 Format
+
+    It is important to notice that the blocked JIDs are not limited to accounts, allowed are the
+    following formats:
+    \list
+        \li \c {user@domain/resource}
+        \li \c {user@domain}
+        \li \c {domain/resource}
+        \li \c {domain}
+    \endlist
+
+    It is not possible to block a domain without blocking a specific account though (or another
+    combination).
+
+    \section1 Setup
+
+    The blocking manager is not enabled by default and needs to be registered with your
+    QXmppClient.
+    ```
+    auto *blockingManager = client->addNewExtension<QXmppBlockingManager>();
+    ```
+
+    \ingroup Managers
+    \sa QXmppBlocklist
+    \since QXmpp 1.6
+*/
+
+/*!
+    \typedef QXmppBlockingManager::BlocklistResult
+
+    Contains a QXmppBlocklist or an error.
+*/
+
+/*!
+    \typedef QXmppBlockingManager::Result
+
+    Contains QXmpp::Success or an error.
+*/
+
+/*!
+    \fn QXmppBlockingManager::subscribedChanged()
+
+    Called whenever the state of the subscription to blocklist updates has changed.
+*/
+
+/*!
+    \fn void QXmppBlockingManager::blocked(const QVector<QString> &jids)
+
+    Emitted when a blocklist update with new blocked JIDs has been received.
+
+    This is also emitted when you call block().
+*/
+
+/*!
+    \fn void QXmppBlockingManager::unblocked(const QVector<QString> &jids)
+
+    Emitted when a blocklist update with new unblocked JIDs has been received.
+
+    This is also emitted when you call unblock().
+*/
 
 // Manager
 QXmppBlockingManager::QXmppBlockingManager()
@@ -186,24 +191,24 @@ QXmppBlockingManager::QXmppBlockingManager()
 
 QXmppBlockingManager::~QXmppBlockingManager() = default;
 
-///
-/// \brief Returns whether the blocking manager currently receives updates of the blocklist.
-///
-/// The subscription is enabled automatically after fetching the blocklist using fetchBlocklist().
-///
+/*!
+    \brief Returns whether the blocking manager currently receives updates of the blocklist.
+
+    The subscription is enabled automatically after fetching the blocklist using fetchBlocklist().
+*/
 bool QXmppBlockingManager::isSubscribed() const
 {
     return d->blocklist.has_value();
 }
 
-///
-/// \brief Fetches the list of blocked JIDs and subscribes to blocklist updates.
-///
-/// The manager will cache the blocklist and keep track of updates for the rest of the session.
-/// Later calls of this function will report the cached result immediately. Even calling this
-/// function multiple times before the first request has finished, will not trigger more than one
-/// IQ request being sent.
-///
+/*!
+    \brief Fetches the list of blocked JIDs and subscribes to blocklist updates.
+
+    The manager will cache the blocklist and keep track of updates for the rest of the session.
+    Later calls of this function will report the cached result immediately. Even calling this
+    function multiple times before the first request has finished, will not trigger more than one
+    IQ request being sent.
+*/
 QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBlocklist()
 {
     // use cached blocklist if possible
@@ -257,19 +262,19 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
     return task;
 }
 
-///
-/// \fn QXmppBlockingManager::block(QString jid)
-///
-/// Blocks a JID.
-///
-/// \sa unblock()
-///
+/*!
+    \fn QXmppBlockingManager::block(QString jid)
 
-///
-/// Blocks a list of JIDs.
-///
-/// \sa unblock()
-///
+    Blocks a JID.
+
+    \sa unblock()
+*/
+
+/*!
+    Blocks a list of JIDs.
+
+    \sa unblock()
+*/
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QVector<QString> jids)
 {
     return client()->sendGenericIq(CompatIq {
@@ -278,19 +283,19 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QVector<QStr
     });
 }
 
-///
-/// \fn QXmppBlockingManager::unblock(QString jid)
-///
-/// Unblocks a JID.
-///
-/// \sa block()
-///
+/*!
+    \fn QXmppBlockingManager::unblock(QString jid)
 
-///
-/// Unblocks a list of JIDs.
-///
-/// \sa block()
-///
+    Unblocks a JID.
+
+    \sa block()
+*/
+
+/*!
+    Unblocks a list of JIDs.
+
+    \sa block()
+*/
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QVector<QString> jids)
 {
     return client()->sendGenericIq(CompatIq {
@@ -299,7 +304,6 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QVector<QS
     });
 }
 
-/// \cond
 QStringList QXmppBlockingManager::discoveryFeatures() const
 {
     return { staticString(ns_blocking) };
@@ -371,7 +375,6 @@ bool QXmppBlockingManager::handleStanza(const QDomElement &stanza, const std::op
     // e2ee is not supported (not needed with local server)
     return handleIqRequests<SetIq<Blocking<Block>>, SetIq<Blocking<Unblock>>>(stanza, client(), overloaded { handleBlock, handleUnblock });
 }
-/// \endcond
 
 void QXmppBlockingManager::onConnected()
 {
@@ -381,26 +384,27 @@ void QXmppBlockingManager::onConnected()
     }
 }
 
-///
-/// \class QXmppBlocklist
-///
-/// \brief List of blocked entries according to \xep{0191, Blocking Command} with helper functions
-/// to check the blocking state of JIDs.
-///
-/// \sa QXmppBlockingManager
-/// \since QXmpp 1.6
-///
+/*!
+    \class QXmppBlocklist
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppBlocklist::BlockingState
-///
-/// Whether a JID is completely blocked (Blocked), partially blocked (PartiallyBlocked) or not
-/// blocked (NotBlocked).
-///
+    \brief List of blocked entries according to \xep{0191}{Blocking Command} with helper functions
+    to check the blocking state of JIDs.
+
+    \sa QXmppBlockingManager
+    \since QXmpp 1.6
+*/
+
+/*!
+    \typedef QXmppBlocklist::BlockingState
+
+    Whether a JID is completely blocked (Blocked), partially blocked (PartiallyBlocked) or not
+    blocked (NotBlocked).
+*/
 
 QXmppBlocklist::QXmppBlocklist() = default;
 
-/// Constructs with given entries.
+/*! Constructs with given entries. */
 QXmppBlocklist::QXmppBlocklist(QVector<QString> entries)
     : m_blocklist(std::move(entries))
 {
@@ -408,38 +412,40 @@ QXmppBlocklist::QXmppBlocklist(QVector<QString> entries)
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppBlocklist)
 
-///
-/// Returns a list of blocked entires.
-///
-/// Entries may be full JIDs, bare JIDs, domains or domains with resource, as in
-/// \xep{0191, Blocking Command}.
-///
+/*!
+    Returns a list of blocked entires.
+
+    Entries may be full JIDs, bare JIDs, domains or domains with resource, as in
+    \xep{0191}{Blocking Command}.
+*/
 QVector<QString> QXmppBlocklist::entries() const
 {
     return m_blocklist;
 }
 
-///
-/// Checks whether the blocklist contains an entry.
-///
-/// \note This does not check whether a JID may be blocked or blocked partially by other entries.
-/// E.g. `containsEntry("user@domain.tld")` will return false even if `domain.tld` is blocked
-/// completely.
-///
+/*!
+    Returns true if the blocklist contains an entry.
+
+    \note This does not check whether a JID may be blocked or blocked partially by other entries.
+    E.g. `containsEntry("user@domain.tld")` will return false even if `domain.tld` is blocked
+    completely.
+*/
 bool QXmppBlocklist::containsEntry(QStringView entry) const
 {
     // Can be replaced with .contains() with Qt 6
     return std::find(m_blocklist.begin(), m_blocklist.end(), entry) != m_blocklist.end();
 }
 
-///
-/// Checks the blocking state of a JID.
-///
-/// A JID can be a full JID, a bare JID, a domain or a domain with a resource, as in
-/// \xep{0191, Blocking Command}.
-///
-/// \returns BlockingState of the JID.
-///
+/*!
+    Checks the blocking state of a JID.
+
+    A JID can be a full JID, a bare JID, a domain or a domain with a resource, as in
+    \xep{0191}{Blocking Command}.
+
+    Returns the BlockingState of the JID.
+
+    \a jid.
+*/
 QXmppBlocklist::BlockingState QXmppBlocklist::blockingState(const QString &jid) const
 {
     auto user = QXmppUtils::jidToUser(jid);

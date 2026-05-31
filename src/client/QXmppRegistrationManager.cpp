@@ -47,7 +47,7 @@ QXmppRegistrationManagerPrivate::QXmppRegistrationManagerPrivate()
 {
 }
 
-/// Default constructor.
+/*! Default constructor. */
 QXmppRegistrationManager::QXmppRegistrationManager()
     : d(std::make_unique<QXmppRegistrationManagerPrivate>())
 {
@@ -55,9 +55,7 @@ QXmppRegistrationManager::QXmppRegistrationManager()
 
 QXmppRegistrationManager::~QXmppRegistrationManager() = default;
 
-///
-/// This adds the \c jabber:iq:register namespace to the features.
-///
+/*! This adds the \c jabber:iq:register namespace to the features. */
 QStringList QXmppRegistrationManager::discoveryFeatures() const
 {
     return QStringList {
@@ -65,13 +63,12 @@ QStringList QXmppRegistrationManager::discoveryFeatures() const
     };
 }
 
-///
-/// Changes the password of the user's account.
-///
-/// \note Be sure to only call this when any previous requests have finished.
-///
-/// \param newPassword The new password to be set. This must not be empty.
-///
+/*!
+    Changes the password of the user's account to \a newPassword. \a newPassword must not be
+    empty.
+
+    \note Be sure to only call this when any previous requests have finished.
+*/
 void QXmppRegistrationManager::changePassword(const QString &newPassword)
 {
     auto iq = QXmppRegisterIq::createChangePasswordRequest(client()->configuration().user(), newPassword);
@@ -82,12 +79,12 @@ void QXmppRegistrationManager::changePassword(const QString &newPassword)
     client()->send(std::move(iq));
 }
 
-///
-/// Cancels an existing registration on the server.
-///
-/// \sa accountDeleted()
-/// \sa accountDeletionFailed()
-///
+/*!
+    Cancels an existing registration on the server.
+
+    \sa accountDeleted()
+    \sa accountDeletionFailed()
+*/
 void QXmppRegistrationManager::deleteAccount()
 {
     auto iq = QXmppRegisterIq::createUnregistrationRequest();
@@ -102,12 +99,12 @@ bool QXmppRegistrationManager::supportedByServer() const
     return d->supportedByServer;
 }
 
-///
-/// Requests the registration form for registering.
-///
-/// \param service The service which the registration form should be requested
-/// from. If left empty, this will default to the local server.
-///
+/*!
+    Requests the registration form for registering.
+
+    \a service is the service from which the registration form should be requested. If left
+    empty, this will default to the local server.
+*/
 void QXmppRegistrationManager::requestRegistrationForm(const QString &service)
 {
     QXmppRegisterIq iq;
@@ -116,33 +113,32 @@ void QXmppRegistrationManager::requestRegistrationForm(const QString &service)
     client()->send(std::move(iq));
 }
 
-///
-/// Sets a registration form to be sent on the next connect with the server.
-/// \param iq The completed registration form.
-///
+/*!
+    Sets the completed registration form \a iq to be sent on the next connect with the server.
+*/
 void QXmppRegistrationManager::setRegistrationFormToSend(const QXmppRegisterIq &iq)
 {
     d->registrationFormToSend = iq;
 }
 
-///
-/// Sets a registration form to be sent on the next connect with the server.
-/// \param dataForm The completed data form for registration.
-///
+/*!
+    Sets the completed data form \a dataForm for registration to be sent on the next connect
+    with the server.
+*/
 void QXmppRegistrationManager::setRegistrationFormToSend(const QXmppDataForm &dataForm)
 {
     d->registrationFormToSend = QXmppRegisterIq();
     d->registrationFormToSend.setForm(dataForm);
 }
 
-///
-/// Sends a completed registration form that was previously set using
-/// setRegistrationFormToSend().
-///
-/// You usually only need to set the form and the manager will automatically
-/// send it when connected. More details can be found in the documentation of
-/// the QXmppRegistrationManager.
-///
+/*!
+    Sends a completed registration form that was previously set using
+    setRegistrationFormToSend().
+
+    You usually only need to set the form and the manager will automatically
+    send it when connected. More details can be found in the documentation of
+    the QXmppRegistrationManager.
+*/
 void QXmppRegistrationManager::sendCachedRegistrationForm()
 {
     if (auto form = d->registrationFormToSend.form(); !form.isNull()) {
@@ -159,21 +155,19 @@ void QXmppRegistrationManager::sendCachedRegistrationForm()
     d->registrationFormToSend = QXmppRegisterIq();
 }
 
-///
-/// Returns whether to only request the registration form and not to connect
-/// with username/password.
-///
+/*!
+    Returns whether to only request the registration form and not to connect
+    with username/password.
+*/
 bool QXmppRegistrationManager::registerOnConnectEnabled() const
 {
     return d->registerOnConnectEnabled;
 }
 
-///
-/// Sets whether to only request the registration form and not to connect with
-/// username/password.
-///
-/// \param enabled true to register, false to connect normally.
-///
+/*!
+    Sets whether to only request the registration form and not to connect with
+    username/password. Set \a enabled to true to register, false to connect normally.
+*/
 void QXmppRegistrationManager::setRegisterOnConnectEnabled(bool enabled)
 {
     d->registerOnConnectEnabled = enabled;
@@ -185,7 +179,6 @@ void QXmppRegistrationManager::setRegisterOnConnectEnabled(bool enabled)
     }
 }
 
-/// \cond
 bool QXmppRegistrationManager::handleStanza(const QDomElement &stanza)
 {
     if (d->registerOnConnectEnabled && QXmppStreamFeatures::isStreamFeatures(stanza)) {
@@ -302,7 +295,6 @@ bool QXmppRegistrationManager::handleStanza(const QDomElement &stanza)
     }
     return false;
 }
-/// \endcond
 
 void QXmppRegistrationManager::onRegistered(QXmppClient *client)
 {

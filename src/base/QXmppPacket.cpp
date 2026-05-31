@@ -10,7 +10,6 @@
 
 using namespace QXmpp::Private;
 
-/// \cond
 QXmppPacket::QXmppPacket(const QXmppNonza &nonza, QXmppPromise<QXmpp::SendResult> interface)
     : QXmppPacket(serializeXml(nonza), nonza.isXmppStanza(), std::move(interface))
 {
@@ -42,4 +41,3 @@ void QXmppPacket::reportFinished(QXmpp::SendResult &&result)
 {
     m_promise.finish(std::move(result));
 }
-/// \endcond

@@ -24,7 +24,6 @@ public:
     QString resource() const;
     void setResource(const QString &resource);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_auth };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isNonSASLAuthIq(const QDomElement &element);
@@ -32,7 +31,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QString m_username;

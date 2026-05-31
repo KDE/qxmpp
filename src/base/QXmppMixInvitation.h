@@ -35,11 +35,9 @@ public:
     QString token() const;
     void setToken(const QString &token);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"invitation", QXmpp::Private::ns_mix_misc };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isMixInvitation(const QDomElement &element);
 

@@ -20,22 +20,29 @@ class QXmppExternalServicePrivate;
 class QXMPP_EXPORT QXmppExternalService
 {
 public:
-    ///
-    /// Describes the action type of an external service IQ.
-    ///
-    /// \since QXmpp 1.6
-    ///
+    /*!
+        Describes the action type of an external service IQ.
+
+        \since QXmpp 1.6
+
+        \value Add
+        \value Delete
+        \value Modify
+    */
     enum class Action {
         Add,
         Delete,
         Modify
     };
 
-    ///
-    /// Describes the packet type of an external service IQ.
-    ///
-    /// \since QXmpp 1.6
-    ///
+    /*!
+        Describes the packet type of an external service IQ.
+
+        \since QXmpp 1.6
+
+        \value Tcp
+        \value Udp
+    */
     enum class Transport {
         Tcp,
         Udp
@@ -77,9 +84,7 @@ public:
 
     static bool isExternalService(const QDomElement &);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"service", QXmpp::Private::ns_external_service_discovery };
-    /// \endcond
     void parse(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
 

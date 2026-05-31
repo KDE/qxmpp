@@ -19,7 +19,6 @@ public:
     QXmppOmemoMemoryStorage();
     ~QXmppOmemoMemoryStorage() override;
 
-    /// \cond
     QXmppTask<OmemoData> allData() override;
 
     QXmppTask<void> setOwnDevice(const std::optional<OwnDevice> &device) override;
@@ -35,7 +34,6 @@ public:
     QXmppTask<void> removeDevices(const QString &jid) override;
 
     QXmppTask<void> resetAll() override;
-    /// \endcond
 
 private:
     std::unique_ptr<QXmppOmemoMemoryStoragePrivate> d;

@@ -14,17 +14,19 @@ class QDomElement;
 class QXmppServer;
 class QXmppServerExtensionPrivate;
 
-///
-/// \brief The QXmppServerExtension class is the base class for QXmppServer
-/// extensions.
-///
-/// If you want to extend QXmppServer, for instance to support an IQ type
-/// which is not natively supported, you can subclass QXmppServerExtension
-/// and implement handleStanza(). You can then add your extension to the
-/// client instance using QXmppServer::addExtension().
-///
-/// \ingroup Core
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppServerExtension class is the base class for QXmppServer
+    extensions.
+
+    If you want to extend QXmppServer, for instance to support an IQ type
+    which is not natively supported, you can subclass QXmppServerExtension
+    and implement handleStanza(). You can then add your extension to the
+    client instance using QXmppServer::addExtension().
+
+    \ingroup Core
+*/
 class QXMPP_EXPORT QXmppServerExtension : public QXmppLoggable
 {
     Q_OBJECT

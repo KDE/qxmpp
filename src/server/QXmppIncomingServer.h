@@ -19,10 +19,12 @@ namespace QXmpp::Private {
 struct StreamOpen;
 }
 
-///
-/// \brief The QXmppIncomingServer class represents an incoming XMPP stream
-/// from an XMPP server.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppIncomingServer class represents an incoming XMPP stream
+    from an XMPP server.
+*/
 class QXMPP_EXPORT QXmppIncomingServer : public QXmppLoggable
 {
     Q_OBJECT
@@ -39,13 +41,17 @@ public:
     bool sendPacket(const QXmppNonza &);
     Q_SLOT bool sendData(const QByteArray &);
 
-    /// This signal is emitted when the stream is connected.
+    /*! This signal is emitted when the stream is connected. */
     Q_SIGNAL void connected();
-    /// This signal is emitted when the stream is disconnected.
+    /*! This signal is emitted when the stream is disconnected. */
     Q_SIGNAL void disconnected();
-    /// This signal is emitted when a dialback verify request is received.
+    /*!
+        This signal is emitted when a dialback verify request is received.
+
+        \a result.
+    */
     Q_SIGNAL void dialbackRequestReceived(const QXmppDialback &result);
-    /// This signal is emitted when an element is received.
+    /*! This signal is emitted when an \a element is received. */
     Q_SIGNAL void elementReceived(const QDomElement &element);
 
 private:

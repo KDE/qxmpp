@@ -71,7 +71,7 @@ public:
     bool bookmarksReceived;
 };
 
-/// Constructs a new bookmark manager.
+/*! Constructs a new bookmark manager. */
 QXmppBookmarkManager::QXmppBookmarkManager()
     : d(new QXmppBookmarkManagerPrivate)
 {
@@ -80,27 +80,27 @@ QXmppBookmarkManager::QXmppBookmarkManager()
 
 QXmppBookmarkManager::~QXmppBookmarkManager() = default;
 
-///
-/// Returns true if the bookmarks have been received from the server,
-/// false otherwise.
-///
+/*!
+    Returns true if the bookmarks have been received from the server,
+    false otherwise.
+*/
 bool QXmppBookmarkManager::areBookmarksReceived() const
 {
     return d->bookmarksReceived;
 }
 
-///
-/// Returns the bookmarks stored on the server.
-///
-/// Before calling this method, check that the bookmarks
-/// have indeed been received by calling areBookmarksReceived().
-///
+/*!
+    Returns the bookmarks stored on the server.
+
+    Before calling this method, check that the bookmarks
+    have indeed been received by calling areBookmarksReceived().
+*/
 QXmppBookmarkSet QXmppBookmarkManager::bookmarks() const
 {
     return d->bookmarks;
 }
 
-/// Stores the bookmarks on the server.
+/*! Stores the \a bookmarks on the server and returns true on success. */
 bool QXmppBookmarkManager::setBookmarks(const QXmppBookmarkSet &bookmarks)
 {
     QXmppPrivateStorageIq iq;
@@ -116,7 +116,6 @@ bool QXmppBookmarkManager::setBookmarks(const QXmppBookmarkSet &bookmarks)
     return true;
 }
 
-/// \cond
 bool QXmppBookmarkManager::handleStanza(const QDomElement &stanza)
 {
     if (stanza.tagName() == u"iq") {
@@ -161,7 +160,6 @@ void QXmppBookmarkManager::onUnregistered(QXmppClient *client)
     disconnect(client, &QXmppClient::disconnected,
                this, &QXmppBookmarkManager::slotDisconnected);
 }
-/// \endcond
 
 void QXmppBookmarkManager::slotConnected()
 {

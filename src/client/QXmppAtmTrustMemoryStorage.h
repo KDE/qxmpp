@@ -16,7 +16,6 @@ public:
     QXmppAtmTrustMemoryStorage();
     ~QXmppAtmTrustMemoryStorage();
 
-    /// \cond
     QXmppTask<void> addKeysForPostponedTrustDecisions(const QString &encryption, const QByteArray &senderKeyId, const QList<QXmppTrustMessageKeyOwner> &keyOwners) override;
     QXmppTask<void> removeKeysForPostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &keyIdsForAuthentication, const QList<QByteArray> &keyIdsForDistrusting) override;
     QXmppTask<void> removeKeysForPostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &senderKeyIds) override;
@@ -24,7 +23,6 @@ public:
     QXmppTask<QHash<bool, QMultiHash<QString, QByteArray>>> keysForPostponedTrustDecisions(const QString &encryption, const QList<QByteArray> &senderKeyIds = {}) override;
 
     QXmppTask<void> resetAll(const QString &encryption) override;
-    /// \endcond
 
 private:
     const std::unique_ptr<QXmppAtmTrustMemoryStoragePrivate> d;

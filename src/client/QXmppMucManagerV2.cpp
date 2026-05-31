@@ -64,57 +64,66 @@ public:
     Bookmarks2Conference payload;
 };
 
-///
-/// \class QXmppMucBookmark
-///
-/// Bookmark data for a MUC room, retrieved via \xep{0402, PEP Native Bookmarks}.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    \class QXmppMucBookmark
+    \inmodule QXmpp
+
+    Bookmark data for a MUC room, retrieved via \xep{0402}{PEP Native Bookmarks}.
+
+    \since QXmpp 1.13
+*/
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMucBookmark)
 
-/// Empty constructor.
+/*! Empty constructor. */
 QXmppMucBookmark::QXmppMucBookmark()
     : d(new QXmppMucBookmarkPrivate)
 {
 }
 
-/// Constructs with values.
+/*! Constructs with values. */
 QXmppMucBookmark::QXmppMucBookmark(const QString &jid, const QString &name, bool autojoin, const QString &nick, const QString &password)
     : d(new QXmppMucBookmarkPrivate { {}, jid, Bookmarks2Conference { autojoin, name, nick, password } })
 {
 }
 
-/// Constructs with values.
+/*! Constructs with values. */
 QXmppMucBookmark::QXmppMucBookmark(const QString &jid, QXmpp::Private::Bookmarks2Conference conference)
     : d(new QXmppMucBookmarkPrivate { {}, jid, std::move(conference) })
 {
 }
 
-/// Returns the (bare) JID of the MUC.
+/*! Returns the (bare) JID of the MUC. */
 const QString &QXmppMucBookmark::jid() const { return d->jid; }
-/// Sets the (bare) JID of the MUC.
+/*!
+    Sets the (bare) JID of the MUC.
+
+    \a jid.
+*/
 void QXmppMucBookmark::setJid(const QString &jid) { d->jid = jid; }
 
-/// Returns the user-defined display name of the MUC.
+/*! Returns the user-defined display name of the MUC. */
 const QString &QXmppMucBookmark::name() const { return d->payload.name; }
-/// Sets the user-defined display name of the MUC.
+/*! Sets the user-defined display \a name of the MUC. */
 void QXmppMucBookmark::setName(const QString &name) { d->payload.name = name; }
 
-/// Returns the user's preferred nick for this MUC.
+/*! Returns the user's preferred nick for this MUC. */
 const QString &QXmppMucBookmark::nick() const { return d->payload.nick; }
-/// Sets the user's preferred nick for this MUC.
+/*! Sets the user's preferred \a nick for this MUC. */
 void QXmppMucBookmark::setNick(const QString &nick) { d->payload.nick = nick; }
 
-/// Returns the required password for the MUC.
+/*! Returns the required password for the MUC. */
 const QString &QXmppMucBookmark::password() const { return d->payload.password; }
-/// Sets the required password for the MUC.
+/*! Sets the required \a password for the MUC. */
 void QXmppMucBookmark::setPassword(const QString &password) { d->payload.password = password; }
 
-/// Returns whether to automatically join this MUC on connection.
+/*! Returns whether to automatically join this MUC on connection. */
 bool QXmppMucBookmark::autojoin() const { return d->payload.autojoin; }
-/// Sets whether to automatically join this MUC on connection.
+/*!
+    Sets whether to automatically join this MUC on connection.
+
+    \a autojoin.
+*/
 void QXmppMucBookmark::setAutojoin(bool autojoin) { d->payload.autojoin = autojoin; }
 
 //
@@ -135,48 +144,49 @@ struct QXmppMucManagerV2Private {
     QXmppTask<EmptyResult> removeBookmark(const QString &jid);
 };
 
-///
-/// \class QXmppMucManagerV2
-///
-/// \brief \xep{0045, Multi-User Chat} Manager with support for \xep{0402, PEP Native Bookmarks}.
-///
-/// The manager automatically fetches bookmarks on session establishment and afterwards emits
-/// bookmarksReset(), bookmarksAdded(), bookmarksRemoved() and bookmarksChanged().
-///
-/// The QXmppPubSubManager must be registered with the client.
-///
-/// \note This manager is work-in-progress and joining MUCs is not yet implemented.
-///
-/// \ingroup Managers
-/// \since QXmpp 1.13
-///
+/*!
+    \class QXmppMucManagerV2
+    \inmodule QXmpp
 
-///
-/// \fn QXmppMucManagerV2::bookmarksReset()
-///
-/// Emitted when the total set of bookmarks is reset, e.g. when receiving the initial bookmarks
-/// items query.
-///
+    \brief \xep{0045}{Multi-User Chat} Manager with support for \xep{0402}{PEP Native Bookmarks}.
 
-///
-/// \fn QXmppMucManagerV2::bookmarksAdded()
-///
-/// Emitted when bookmarks have been added. This is triggered by PubSub event notifications.
-///
+    The manager automatically fetches bookmarks on session establishment and afterwards emits
+    bookmarksReset(), bookmarksAdded(), bookmarksRemoved() and bookmarksChanged().
 
-///
-/// \fn QXmppMucManagerV2::bookmarksChanged()
-///
-/// Emitted when bookmarks have been changed.
-///
+    The QXmppPubSubManager must be registered with the client.
 
-///
-/// \fn QXmppMucManagerV2::bookmarksRemoved()
-///
-/// Emitted when bookmarks are retracted.
-///
+    \note This manager is work-in-progress and joining MUCs is not yet implemented.
 
-/// Default constructor.
+    \ingroup Managers
+    \since QXmpp 1.13
+*/
+
+/*!
+    \fn QXmppMucManagerV2::bookmarksReset()
+
+    Emitted when the total set of bookmarks is reset, e.g. when receiving the initial bookmarks
+    items query.
+*/
+
+/*!
+    \fn QXmppMucManagerV2::bookmarksAdded()
+
+    Emitted when bookmarks have been added. This is triggered by PubSub event notifications.
+*/
+
+/*!
+    \fn QXmppMucManagerV2::bookmarksChanged()
+
+    Emitted when bookmarks have been changed.
+*/
+
+/*!
+    \fn QXmppMucManagerV2::bookmarksRemoved()
+
+    Emitted when bookmarks are retracted.
+*/
+
+/*! Default constructor. */
 QXmppMucManagerV2::QXmppMucManagerV2()
     : d(std::make_unique<QXmppMucManagerV2Private>(this))
 {
@@ -184,21 +194,20 @@ QXmppMucManagerV2::QXmppMucManagerV2()
 
 QXmppMucManagerV2::~QXmppMucManagerV2() = default;
 
-/// Supported service discovery features.
+/*! Supported service discovery features. */
 QStringList QXmppMucManagerV2::discoveryFeatures() const { return { ns_bookmarks2 + u"+notify" }; }
 
-/// Retrieved bookmarks.
+/*! Retrieved bookmarks. */
 const std::optional<QList<QXmppMucBookmark>> &QXmppMucManagerV2::bookmarks() const { return d->bookmarks; }
 
-///
-/// Sets the avatar of a MUC room.
-///
-/// Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
-/// entity" of the MUC.
-///
-/// \param jid JID of the MUC room
-/// \param avatar Avatar to be set
-///
+/*!
+    Sets the avatar of a MUC room.
+
+    Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
+    entity" of the MUC.
+
+    \a jid is the JID of the MUC room. \a avatar is the avatar to be set.
+*/
 QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(QString jid, const Avatar &avatar)
 {
     QXmppVCardIq vCardIq;
@@ -210,14 +219,12 @@ QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::setRoomAvatar(QString jid, const A
     return client()->sendGenericIq(std::move(vCardIq));
 }
 
-///
-/// Removes the avatar of a MUC room.
-///
-/// Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
-/// entity" of the MUC.
-///
-/// \param jid JID of the MUC room
-///
+/*!
+    Removes the avatar of the MUC room with JID \a jid.
+
+    Requires the MUC service to support "vcard-temp" and to be "an owner or some other priviledged
+    entity" of the MUC.
+*/
 QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(QString jid)
 {
     QXmppVCardIq vCardIq;
@@ -227,16 +234,17 @@ QXmppTask<QXmpp::Result<>> QXmppMucManagerV2::removeRoomAvatar(QString jid)
     return client()->sendGenericIq(std::move(vCardIq));
 }
 
-///
-/// Fetches the Avatar of a MUC room
-///
-/// First fetches the avatar hashes via the `muc#roominfo` form from service discovery information
-/// and then fetches the avatar itself via vcard-temp.
-///
-/// \note This currently does not do any caching and does not listen for avatar changes.
-/// \param jid JID of the MUC room
-/// \return nullopt if VCards are not supported in this MUC or no avatar has been published, otherwise the published avatar
-///
+/*!
+    Fetches the avatar of the MUC room with JID \a jid.
+
+    First fetches the avatar hashes via the `muc#roominfo` form from service discovery information
+    and then fetches the avatar itself via vcard-temp.
+
+    \note This currently does not do any caching and does not listen for avatar changes.
+
+    Returns nullopt if VCards are not supported in this MUC or no avatar has been published,
+    otherwise the published avatar.
+*/
 QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::fetchRoomAvatar(QString jid)
 {
     auto infoResult = co_await d->disco()->info(jid).withContext(this);
@@ -271,7 +279,11 @@ QXmppTask<Result<std::optional<QXmppMucManagerV2::Avatar>>> QXmppMucManagerV2::f
     co_return Avatar { vcard.photoType(), vcard.photo() };
 }
 
-/// Handles incoming PubSub events.
+/*!
+    Returns true if the event was handled (\xep{0060} (Publish-Subscribe)).
+
+    \a pubSubService, \a nodeName, and \a element.
+*/
 bool QXmppMucManagerV2::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
     if (d->bookmarks && pubSubService == client()->configuration().jidBare() && nodeName == ns_bookmarks2) {
@@ -342,13 +354,17 @@ bool QXmppMucManagerV2::handlePubSubEvent(const QDomElement &element, const QStr
     return false;
 }
 
-/// Adds or updates the bookmark for a MUC.
+/*! Adds or updates the \a bookmark for a MUC. */
 QXmppTask<Result<>> QXmppMucManagerV2::setBookmark(QXmppMucBookmark &&bookmark)
 {
     return d->setBookmark(std::move(bookmark));
 }
 
-/// Removes a bookmark.
+/*!
+    Removes a bookmark.
+
+    \a jid.
+*/
 QXmppTask<Result<>> QXmppMucManagerV2::removeBookmark(const QString &jid)
 {
     return d->removeBookmark(jid);

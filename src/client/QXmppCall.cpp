@@ -599,9 +599,7 @@ void QXmppCallPrivate::setState(QXmppCall::State newState)
     }
 }
 
-///
-/// Request graceful call termination
-///
+/*! Request graceful call termination */
 void QXmppCallPrivate::terminate(QXmppJingleReason reason, bool delay)
 {
     q->debug(u"Call(sid=%1): Terminating: %2"_s.arg(sid, reason.text()));
@@ -644,13 +642,14 @@ bool QXmppCallPrivate::isOwn(QXmppCallStream *stream) const
     return outgoingCall && initiatorsStream || !outgoingCall && !initiatorsStream;
 }
 
-///
-/// \class QXmppCall
-///
-/// The QXmppCall class represents a Voice-Over-IP call to a remote party.
-///
-/// \note THIS API IS NOT FINALIZED YET
-///
+/*!
+    \class QXmppCall
+    \inmodule QXmpp
+
+    The QXmppCall class represents a Voice-Over-IP call to a remote party.
+
+    \note THIS API IS NOT FINALIZED YET
+*/
 
 QXmppCall::QXmppCall(const QString &jid, const QString &sid, Direction direction, QXmppCallManager *manager)
     : QXmppCall(jid, sid, direction, ConnectingState, {}, manager)
@@ -667,11 +666,11 @@ QXmppCall::QXmppCall(const QString &jid, const QString &sid, Direction direction
 
 QXmppCall::~QXmppCall() = default;
 
-///
-/// Call this method if you wish to accept an incoming call.
-///
-/// \sa decline()
-///
+/*!
+    Call this method if you wish to accept an incoming call.
+
+    \sa decline()
+*/
 void QXmppCall::accept()
 {
     if (d->direction == IncomingDirection && d->state == ConnectingState) {
@@ -690,43 +689,43 @@ void QXmppCall::accept()
     }
 }
 
-///
-/// Rejects the call.
-///
-/// This will terminate the call with reason *decline*.
-///
-/// \sa accept()
-///
+/*!
+    Rejects the call.
+
+    This will terminate the call with reason *decline*.
+
+    \sa accept()
+*/
 void QXmppCall::decline()
 {
     d->terminate({ QXmppJingleReason::Decline, {}, {} });
 }
 
-///
-/// Returns the GStreamer pipeline.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the GStreamer pipeline.
+
+    \since QXmpp 1.3
+*/
 GstElement *QXmppCall::pipeline() const
 {
     return d->pipeline;
 }
 
-///
-/// Returns the RTP stream for the audio data.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the RTP stream for the audio data.
+
+    \since QXmpp 1.3
+*/
 QXmppCallStream *QXmppCall::audioStream() const
 {
     return find(d->streams, AUDIO_MEDIA, &QXmppCallStream::media).value_or(nullptr);
 }
 
-///
-/// Returns the RTP stream for the video data.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the RTP stream for the video data.
+
+    \since QXmpp 1.3
+*/
 QXmppCallStream *QXmppCall::videoStream() const
 {
     return find(d->streams, VIDEO_MEDIA, &QXmppCallStream::media).value_or(nullptr);
@@ -743,27 +742,23 @@ void QXmppCall::terminated()
     d->setState(QXmppCall::FinishedState);
 }
 
-///
-/// Returns the call's direction.
-///
+/*! Returns the call's direction. */
 QXmppCall::Direction QXmppCall::direction() const
 {
     return d->direction;
 }
 
-///
-/// Hangs up the call.
-///
-/// Terminates with the reason *success*.
-///
+/*!
+    Hangs up the call.
+
+    Terminates with the reason *success*.
+*/
 void QXmppCall::hangUp()
 {
     d->terminate({ QXmppJingleReason::Success, {}, {} });
 }
 
-///
-/// Sends a transport-info to inform the remote party of new local candidates.
-///
+/*! Sends a transport-info to inform the remote party of new local candidates. */
 void QXmppCall::onLocalCandidatesChanged(QXmppCallStream *stream)
 {
     auto iq = d->createIq(QXmppJingleIq::TransportInfo);
@@ -771,37 +766,33 @@ void QXmppCall::onLocalCandidatesChanged(QXmppCallStream *stream)
     d->manager->client()->sendIq(std::move(iq));
 }
 
-///
-/// Returns the remote party's JID.
-///
+/*! Returns the remote party's JID. */
 QString QXmppCall::jid() const
 {
     return d->jid;
 }
 
-///
-/// Returns the call's session identifier.
-///
+/*! Returns the call's session identifier. */
 QString QXmppCall::sid() const
 {
     return d->sid;
 }
 
-///
-/// Returns the call's state.
-///
-/// \sa stateChanged()
-///
+/*!
+    Returns the call's state.
+
+    \sa stateChanged()
+*/
 QXmppCall::State QXmppCall::state() const
 {
     return d->state;
 }
 
-///
-/// Returns the error of the call if any occurred.
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Returns the error of the call if any occurred.
+
+    \since QXmpp 1.14
+*/
 std::optional<QXmppError> QXmppCall::error() const
 {
     if (!d->error.description.isEmpty()) {
@@ -810,9 +801,7 @@ std::optional<QXmppError> QXmppCall::error() const
     return {};
 }
 
-///
-/// Starts sending video to the remote party.
-///
+/*! Starts sending video to the remote party. */
 void QXmppCall::addVideo()
 {
     if (d->state != QXmppCall::ActiveState) {
@@ -840,21 +829,21 @@ void QXmppCall::addVideo()
     d->manager->client()->sendIq(std::move(iq));
 }
 
-///
-/// Returns if the call is encrypted
-///
-/// \since QXmpp 1.11
-///
+/*!
+    Returns if the call is encrypted
+
+    \since QXmpp 1.11
+*/
 bool QXmppCall::isEncrypted() const
 {
     return d->useDtls;
 }
 
-///
-/// Returns whether the remote also supports video calls.
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Returns whether the remote also supports video calls.
+
+    \since QXmpp 1.14
+*/
 bool QXmppCall::videoSupported() const
 {
     return d->videoSupported;

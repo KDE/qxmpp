@@ -10,10 +10,12 @@
 
 #include <QDateTime>
 
-///
-/// \brief The QXmppResultSetQuery class represents a set element in a query
-/// as defined by \xep{0059, Result Set Management}.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppResultSetQuery class represents a set element in a query
+    as defined by \xep{0059}{Result Set Management}.
+*/
 class QXMPP_EXPORT QXmppResultSetQuery
 {
 public:
@@ -33,10 +35,8 @@ public:
 
     bool isNull() const;
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     int m_index;
@@ -45,10 +45,12 @@ private:
     QString m_before;
 };
 
-///
-/// \brief The QXmppResultSetReply class represents a set element in a reply
-/// as defined by \xep{0059, Result Set Management}.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppResultSetReply class represents a set element in a reply
+    as defined by \xep{0059}{Result Set Management}.
+*/
 class QXMPP_EXPORT QXmppResultSetReply
 {
 public:
@@ -68,11 +70,9 @@ public:
 
     bool isNull() const;
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"set", QXmpp::Private::ns_rsm };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     int m_count;

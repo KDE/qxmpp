@@ -41,13 +41,11 @@ public:
     void setLongitude(std::optional<double> lon);
 
     static bool isItem(const QDomElement &itemElement);
-    /// \cond
     static constexpr std::tuple XmlTag = { u"geoloc", QXmpp::Private::ns_geoloc };
 
 protected:
     void parsePayload(const QDomElement &payloadElement) override;
     void serializePayload(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppGeolocItemPrivate> d;

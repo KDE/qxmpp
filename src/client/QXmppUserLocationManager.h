@@ -35,9 +35,7 @@ public:
     Q_SIGNAL void itemReceived(const QString &jid, const QXmppGeolocItem &);
 
 protected:
-    /// \cond
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
-    /// \endcond
 };
 
 #endif  // QXMPPUSERLOCATIONMANAGER_H

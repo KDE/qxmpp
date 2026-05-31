@@ -19,10 +19,12 @@ namespace QXmpp::Private {
 struct StreamOpen;
 }
 
-///
-/// \brief The QXmppIncomingClient class represents an incoming XMPP stream
-/// from an XMPP client.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppIncomingClient class represents an incoming XMPP stream
+    from an XMPP client.
+*/
 class QXMPP_EXPORT QXmppIncomingClient : public QXmppLoggable
 {
     Q_OBJECT
@@ -40,21 +42,19 @@ public:
     void setInactivityTimeout(int secs);
     void setPasswordChecker(QXmppPasswordChecker *checker);
 
-    /// This signal is emitted when an element is received.
+    /*! This signal is emitted when an \a element is received. */
     Q_SIGNAL void elementReceived(const QDomElement &element);
 
-    /// This signal is emitted when the stream is connected.
+    /*! This signal is emitted when the stream is connected. */
     Q_SIGNAL void connected();
 
-    /// This signal is emitted when the stream is disconnected.
+    /*! This signal is emitted when the stream is disconnected. */
     Q_SIGNAL void disconnected();
 
 protected:
-    /// \cond
     void handleStart();
     void handleStream(const QXmpp::Private::StreamOpen &);
     void handleStanza(const QDomElement &element);
-    /// \endcond
 
 private:
     Q_SLOT void onDigestReply();

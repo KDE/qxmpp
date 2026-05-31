@@ -17,17 +17,24 @@ class QXmlStreamWriter;
 class QXMPP_EXPORT QXmppPubSubAffiliation
 {
 public:
-    ///
-    /// This enum describes the type of the affiliation of the user with the
-    /// node.
-    ///
+    /*!
+        This enum describes the type of the affiliation of the user with the
+        node.
+
+        \value None No affiliation, but may subscribe.
+        \value Member Active member, is subscribed, can read.
+        \value Outcast Cannot subscribe, cannot read, 'banned'.
+        \value Owner Highest privileges, can read, publish & configure.
+        \value Publisher May read and publish, but cannot configure node.
+        \value PublishOnly Can only publish, cannot subscribe.
+    */
     enum Affiliation {
-        None,         ///< No affiliation, but may subscribe.
-        Member,       ///< Active member, is subscribed, can read.
-        Outcast,      ///< Cannot subscribe, cannot read, 'banned'.
-        Owner,        ///< Highest privileges, can read, publish & configure.
-        Publisher,    ///< May read and publish, but cannot configure node.
-        PublishOnly,  ///< Can only publish, cannot subscribe.
+        None,
+        Member,
+        Outcast,
+        Owner,
+        Publisher,
+        PublishOnly,
     };
 
     QXmppPubSubAffiliation(Affiliation = None,
@@ -51,10 +58,8 @@ public:
 
     static bool isAffiliation(const QDomElement &);
 
-    /// \cond
     void parse(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppPubSubAffiliationPrivate> d;

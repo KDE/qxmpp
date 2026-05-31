@@ -10,10 +10,12 @@
 
 #include <QDateTime>
 
-///
-/// \brief The QXmppArchiveMessage class represents an archived message
-/// as defined by \xep{0136, Message Archiving}.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppArchiveMessage class represents an archived message
+    as defined by \xep{0136}{Message Archiving}.
+*/
 class QXMPP_EXPORT QXmppArchiveMessage
 {
 public:
@@ -34,10 +36,12 @@ private:
     bool m_received;
 };
 
-///
-/// \brief The QXmppArchiveChat class represents an archived conversation
-/// as defined by \xep{0136, Message Archiving}.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppArchiveChat class represents an archived conversation
+    as defined by \xep{0136}{Message Archiving}.
+*/
 class QXMPP_EXPORT QXmppArchiveChat
 {
 public:
@@ -61,12 +65,10 @@ public:
     QString with() const;
     void setWith(const QString &with);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"chat", QXmpp::Private::ns_archive };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const { toXml(writer, {}); }
     void toXml(QXmlStreamWriter *writer, const QXmppResultSetReply &rsm) const;
-    /// \endcond
 
 private:
     QList<QXmppArchiveMessage> m_messages;
@@ -77,13 +79,15 @@ private:
     QString m_with;
 };
 
-///
-/// \brief Represents an archive chat as defined by \xep{0136, Message Archiving}.
-///
-/// It is used to get chat as a QXmppArchiveChat.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an archive chat as defined by \xep{0136}{Message Archiving}.
+
+    It is used to get chat as a QXmppArchiveChat.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppArchiveChatIq : public QXmppIq
 {
 public:
@@ -93,7 +97,6 @@ public:
     QXmppResultSetReply resultSetReply() const;
     void setResultSetReply(const QXmppResultSetReply &rsm);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"chat", QXmpp::Private::ns_archive };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveChatIq(const QDomElement &element);
@@ -101,18 +104,19 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QXmppArchiveChat m_chat;
     QXmppResultSetReply m_rsmReply;
 };
 
-///
-/// \brief Represents an archive list as defined by \xep{0136, Message Archiving}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an archive list as defined by \xep{0136}{Message Archiving}.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppArchiveListIq : public QXmppIq
 {
 public:
@@ -136,17 +140,13 @@ public:
     QXmppResultSetReply resultSetReply() const;
     void setResultSetReply(const QXmppResultSetReply &rsm);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"list", QXmpp::Private::ns_archive };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveListIq(const QDomElement &element);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QString m_with;
@@ -157,11 +157,13 @@ private:
     QXmppResultSetReply m_rsmReply;
 };
 
-///
-/// \brief Represents an archive remove IQ as defined by \xep{0136, Message Archiving}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an archive remove IQ as defined by \xep{0136}{Message Archiving}.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppArchiveRemoveIq : public QXmppIq
 {
 public:
@@ -174,7 +176,6 @@ public:
     QDateTime end() const;
     void setEnd(const QDateTime &end);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"remove", QXmpp::Private::ns_archive };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveRemoveIq(const QDomElement &element);
@@ -182,7 +183,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QString m_with;
@@ -190,11 +190,13 @@ private:
     QDateTime m_end;
 };
 
-///
-/// \brief Represents an archive retrieve IQ as defined by \xep{0136, Message Archiving}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an archive retrieve IQ as defined by \xep{0136}{Message Archiving}.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppArchiveRetrieveIq : public QXmppIq
 {
 public:
@@ -209,7 +211,6 @@ public:
     QXmppResultSetQuery resultSetQuery() const;
     void setResultSetQuery(const QXmppResultSetQuery &rsm);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"retrieve", QXmpp::Private::ns_archive };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchiveRetrieveIq(const QDomElement &element);
@@ -217,7 +218,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QString m_with;
@@ -225,15 +225,16 @@ private:
     QXmppResultSetQuery m_rsmQuery;
 };
 
-///
-/// \brief Represents an archive preference IQ as defined by \xep{0136, Message Archiving}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an archive preference IQ as defined by \xep{0136}{Message Archiving}.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppArchivePrefIq : public QXmppIq
 {
 public:
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"pref", QXmpp::Private::ns_archive };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isArchivePrefIq(const QDomElement &element);
@@ -241,7 +242,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 };
 
 #endif  // QXMPPARCHIVEIQ_H

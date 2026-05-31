@@ -15,22 +15,21 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppPingIq
-///
-/// QXmppPingIq represents a Ping IQ as defined by \xep{0199, XMPP Ping}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \class QXmppPingIq
+    \inmodule QXmpp
+
+    QXmppPingIq represents a Ping IQ as defined by \xep{0199}{XMPP Ping}.
+
+    \ingroup Stanzas
+*/
 
 QXmppPingIq::QXmppPingIq()
     : QXmppIq(QXmppIq::Get)
 {
 }
 
-/// \cond
 void QXmppPingIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { PayloadXmlTag });
 }
-/// \endcond

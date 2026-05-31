@@ -31,11 +31,9 @@ public:
     QXmppIq::Type type;
 };
 
-///
-/// Constructs a QXmppIq with the specified \a type.
-///
-/// \param type
-///
+/*!
+    Constructs a QXmppIq with the specified \a type.
+*/
 QXmppIq::QXmppIq(QXmppIq::Type type)
     : QXmppStanza(), d(new QXmppIqPrivate)
 {
@@ -43,47 +41,42 @@ QXmppIq::QXmppIq(QXmppIq::Type type)
     generateAndSetNextId();
 }
 
-/// Constructs a copy of \a other.
+/*! Constructs a copy of \a other. */
 QXmppIq::QXmppIq(const QXmppIq &other) = default;
-/// Default move-constructor.
+/*! Default move-constructor. */
 QXmppIq::QXmppIq(QXmppIq &&) = default;
 QXmppIq::~QXmppIq() = default;
 
-/// Assigns \a other to this IQ.
+/*! Assigns \a other to this IQ. */
 QXmppIq &QXmppIq::operator=(const QXmppIq &other) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppIq &QXmppIq::operator=(QXmppIq &&) = default;
 
-///
-/// Returns the IQ's type.
-///
+/*! Returns the IQ's type. */
 QXmppIq::Type QXmppIq::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the IQ's type.
-///
-/// \param type
-///
+/*!
+    Sets the IQ's type to \a type.
+*/
 void QXmppIq::setType(QXmppIq::Type type)
 {
     d->type = type;
 }
 
-///
-/// Indicates if the QXmppStanza is a stanza in the XMPP sense (i. e. a message,
-/// iq or presence)
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns whether the QXmppStanza is a stanza in the XMPP sense (i. e. a message,
+    iq or presence)
+
+    \since QXmpp 1.0
+*/
 bool QXmppIq::isXmppStanza() const
 {
     return true;
 }
 
-/// \cond
 void QXmppIq::parse(const QDomElement &element)
 {
     QXmppStanza::parse(element);
@@ -120,4 +113,3 @@ void QXmppIq::toXmlElementFromChild(QXmlStreamWriter *w) const
 {
     XmlWriter(w).write(extensions());
 }
-/// \endcond

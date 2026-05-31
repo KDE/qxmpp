@@ -103,33 +103,34 @@ public:
     std::unordered_map<std::string, RetrieveRequestState> ongoingRequests;
 };
 
-///
-/// \struct QXmppMamManager::RetrievedMessages
-///
-/// \brief Contains all retrieved messages and the result IQ that can be used for pagination.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \struct QXmppMamManager::RetrievedMessages
+    \inmodule QXmpp
 
-///
-/// \var QXmppMamManager::RetrievedMessages::result
-///
-/// The returned result IQ from the MAM server.
-///
+    \brief Contains all retrieved messages and the result IQ that can be used for pagination.
 
-///
-/// \var QXmppMamManager::RetrievedMessages::messages
-///
-/// A vector of retrieved QXmppMessages.
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \typedef QXmppMamManager::RetrieveResult
-///
-/// Contains RetrievedMessages or an QXmppError.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \variable QXmppMamManager::RetrievedMessages::result
+
+    The returned result IQ from the MAM server.
+*/
+
+/*!
+    \variable QXmppMamManager::RetrievedMessages::messages
+
+    A vector of retrieved QXmppMessages.
+*/
+
+/*!
+    \typedef QXmppMamManager::RetrieveResult
+
+    Contains RetrievedMessages or an QXmppError.
+
+    \since QXmpp 1.5
+*/
 
 QXmppMamManager::QXmppMamManager()
     : d(std::make_unique<QXmppMamManagerPrivate>())
@@ -138,7 +139,6 @@ QXmppMamManager::QXmppMamManager()
 
 QXmppMamManager::~QXmppMamManager() = default;
 
-/// \cond
 QStringList QXmppMamManager::discoveryFeatures() const
 {
     // XEP-0313: Message Archive Management
@@ -170,7 +170,6 @@ bool QXmppMamManager::handleStanza(const QDomElement &element)
 
     return false;
 }
-/// \endcond
 
 static QXmppMamQueryIq buildRequest(const QString &to,
                                     const QString &node,
@@ -221,29 +220,26 @@ static QXmppMamQueryIq buildRequest(const QString &to,
     return queryIq;
 }
 
-///
-/// Retrieves archived messages. For each received message, the
-/// archiveMessageReceived() signal is emitted. Once all messages are received,
-/// the resultsRecieved() signal is emitted. It returns a result set that can
-/// be used to page through the results.
-/// The number of results may be limited by the server.
-///
-/// \warning This API does not work with end-to-end encrypted messages. You can
-/// use the new QFuture-based API (retrieveMessages()) for that.
-///
-/// \param to Optional entity that should be queried. Leave this empty to query
-///           the local archive.
-/// \param node Optional node that should be queried. This is used when querying
-///             a pubsub node.
-/// \param jid Optional JID to filter the results.
-/// \param start Optional start time to filter the results.
-/// \param end Optional end time to filter the results.
-/// \param resultSetQuery Optional Result Set Management query. This can be used
-///                       to limit the number of results and to page through the
-///                       archive.
-/// \return query id of the request. This can be used to associate the
-///         corresponding resultsRecieved signal.
-///
+/*!
+    Retrieves archived messages. For each received message, the
+    archiveMessageReceived() signal is emitted. Once all messages are received,
+    the resultsRecieved() signal is emitted. It returns a result set that can
+    be used to page through the results.
+    The number of results may be limited by the server.
+
+    \warning This API does not work with end-to-end encrypted messages. You can
+    use the new QFuture-based API (retrieveMessages()) for that.
+
+    \a to is an optional entity that should be queried. Leave this empty to query the local
+    archive. \a node is an optional node that should be queried. This is used when querying a
+    pubsub node. \a jid is an optional JID to filter the results. \a start is an optional start
+    time to filter the results, \a end an optional end time to filter the results.
+    \a resultSetQuery is an optional Result Set Management query. This can be used to limit the
+    number of results and to page through the archive.
+
+    Returns the query id of the request. This can be used to associate the corresponding
+    resultsRecieved signal.
+*/
 QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
                                                   const QString &node,
                                                   const QString &jid,
@@ -257,27 +253,24 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
     return id;
 }
 
-///
-/// Retrieves archived messages and reports all messages at once via a QFuture.
-///
-/// This function tries to decrypt encrypted messages.
-///
-/// The number of results may be limited by the server.
-///
-/// \param to Optional entity that should be queried. Leave this empty to query
-///           the local archive.
-/// \param node Optional node that should be queried. This is used when querying
-///             a pubsub node.
-/// \param jid Optional JID to filter the results.
-/// \param start Optional start time to filter the results.
-/// \param end Optional end time to filter the results.
-/// \param resultSetQuery Optional Result Set Management query. This can be used
-///                       to limit the number of results and to page through the
-///                       archive.
-/// \return result of the query
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Retrieves archived messages and reports all messages at once via a QFuture.
+
+    This function tries to decrypt encrypted messages.
+
+    The number of results may be limited by the server.
+
+    \a to is an optional entity that should be queried. Leave this empty to query the local
+    archive. \a node is an optional node that should be queried. This is used when querying a
+    pubsub node. \a jid is an optional JID to filter the results. \a start is an optional start
+    time to filter the results, \a end an optional end time to filter the results.
+    \a resultSetQuery is an optional Result Set Management query. This can be used to limit the
+    number of results and to page through the archive.
+
+    Returns the result of the query.
+
+    \since QXmpp 1.5
+*/
 QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(const QString &to, const QString &node, const QString &jid, const QDateTime &start, const QDateTime &end, const QXmppResultSetQuery &resultSetQuery)
 {
     auto queryIq = buildRequest(to, node, jid, start, end, resultSetQuery);

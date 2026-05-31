@@ -20,9 +20,16 @@ class QXmppPubSubBaseItem;
 class QXMPP_EXPORT QXmppPubSubEventBase : public QXmppMessage
 {
 public:
-    ///
-    /// Enumeration of different event types
-    ///
+    /*!
+        Enumeration of different event types
+
+        \value Configuration
+        \value Delete
+        \value Items
+        \value Retract
+        \value Purge
+        \value Subscription
+    */
     enum EventType : uint8_t {
         Configuration,
         Delete,
@@ -59,7 +66,6 @@ public:
     void setConfigurationForm(const std::optional<QXmppDataForm> &configurationForm);
 
 protected:
-    /// \cond
     static bool isPubSubEvent(const QDomElement &element, std::function<bool(const QDomElement &)> isItemValid);
 
     bool parseExtension(const QDomElement &element, QXmpp::SceMode) override;
@@ -67,7 +73,6 @@ protected:
 
     virtual void parseItems(const QDomElement &) = 0;
     virtual void serializeItems(QXmlStreamWriter *writer) const = 0;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppPubSubEventPrivate> d;
@@ -83,37 +88,41 @@ public:
     static bool isPubSubEvent(const QDomElement &element);
 
 protected:
-    /// \cond
     void parseItems(const QDomElement &) override;
     void serializeItems(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QVector<T> m_items;
 };
 
-///
-/// Returns the PubSub items of the event.
-///
+/*!
+    \fn template <typename T> QVector<T> QXmppPubSubEvent<T>::items() const
+
+    Returns the PubSub items of the event.
+*/
 template<typename T>
 QVector<T> QXmppPubSubEvent<T>::items() const
 {
     return m_items;
 }
 
-///
-/// Sets the PubSub items of the event.
-///
+/*!
+    \fn template <typename T> void QXmppPubSubEvent<T>::setItems(const QVector<T> &items)
+
+    Sets the PubSub items of the event.
+*/
 template<typename T>
 void QXmppPubSubEvent<T>::setItems(const QVector<T> &items)
 {
     m_items = items;
 }
 
-///
-/// Returns whether the element is a valid QXmppPubSubEvent and contains only
-/// valid items of type T.
-///
+/*!
+    \fn template <typename T> bool QXmppPubSubEvent<T>::isPubSubEvent(const QDomElement &element)
+
+    Returns whether the element is a valid QXmppPubSubEvent and contains only
+    valid items of type T.
+*/
 template<typename T>
 bool QXmppPubSubEvent<T>::isPubSubEvent(const QDomElement &element)
 {
@@ -122,7 +131,6 @@ bool QXmppPubSubEvent<T>::isPubSubEvent(const QDomElement &element)
     });
 }
 
-/// \cond
 template<typename T>
 void QXmppPubSubEvent<T>::parseItems(const QDomElement &parent)
 {
@@ -143,7 +151,6 @@ void QXmppPubSubEvent<T>::serializeItems(QXmlStreamWriter *writer) const
         item.toXml(writer);
     }
 }
-/// \endcond
 
 Q_DECLARE_METATYPE(QXmppPubSubEventBase::EventType)
 

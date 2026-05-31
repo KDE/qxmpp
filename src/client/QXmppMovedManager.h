@@ -35,10 +35,8 @@ public:
     QXmppTask<QXmpp::SendResult> notifyContact(const QString &contactBareJid, const QString &oldBareJid, bool sensitive = true, const QString &reason = {});
 
 protected:
-    /// \cond
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
-    /// \endcond
 
 private:
     QXmppTask<QXmppPresence> processSubscriptionRequest(QXmppPresence presence);

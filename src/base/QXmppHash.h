@@ -41,11 +41,9 @@ class QXMPP_EXPORT QXmppHash
 public:
     QXmppHash();
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"hash", QXmpp::Private::ns_hashes };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     QXmpp::HashAlgorithm algorithm() const;
     void setAlgorithm(QXmpp::HashAlgorithm algorithm);
@@ -64,11 +62,9 @@ public:
     QXmppHashUsed();
     QXmppHashUsed(QXmpp::HashAlgorithm algorithm);
 
-    /// \cond
     static constexpr auto XmlTag = std::tuple { u"hash-used", QXmpp::Private::ns_hashes };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     QXmpp::HashAlgorithm algorithm() const;
     void setAlgorithm(QXmpp::HashAlgorithm algorithm);

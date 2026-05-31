@@ -2,94 +2,80 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-///
-/// \class QXmppOmemoStorage
-///
-/// \brief The QXmppOmemoStorage class stores data used by
-/// \xep{0384, OMEMO Encryption}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppOmemoStorage
+    \inmodule QXmpp
 
-///
-/// \fn QXmppOmemoStorage::allData()
-///
-/// Returns all data used by OMEMO.
-///
-/// \return the OMEMO data
-///
+    \brief The QXmppOmemoStorage class stores data used by
+    \xep{0384}{OMEMO Encryption}.
 
-///
-/// \fn QXmppOmemoStorage::setOwnDevice(const std::optional<OwnDevice> &device)
-///
-/// Sets the own device (i.e., the device used by this client instance).
-///
-/// \param device own device
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \fn QXmppOmemoStorage::addSignedPreKeyPair(uint32_t keyId, const SignedPreKeyPair &keyPair)
-///
-/// Adds a signed pre key pair.
-///
-/// \param keyId ID of the signed pre key pair
-/// \param keyPair signed pre key pair
-///
+/*!
+    \fn QXmppOmemoStorage::allData()
 
-///
-/// \fn QXmppOmemoStorage::removeSignedPreKeyPair(uint32_t keyId)
-///
-/// Removes a signed pre key pair.
-///
-/// \param keyId ID of the signed pre key pair
-///
+    Returns all OMEMO data.
+*/
 
-///
-/// \fn QXmppOmemoStorage::addPreKeyPairs(const QHash<uint32_t, QByteArray> &keyPairs)
-///
-/// Adds pre key pairs.
-///
-/// \param keyPairs key IDs mapped to the pre key pairs
-///
+/*!
+    \fn QXmppOmemoStorage::setOwnDevice(const std::optional<OwnDevice> &device)
 
-///
-/// \fn QXmppOmemoStorage::removePreKeyPair(uint32_t keyId)
-///
-/// Removes a pre key pair.
-///
-/// \param keyId ID of the pre key pair
-///
+    Sets the own \a device (i.e., the device used by this client instance).
+*/
 
-///
-/// \fn QXmppOmemoStorage::addDevice(const QString &jid, uint32_t deviceId, const Device &device)
-///
-/// Adds other devices (i.e., all devices but the own one).
-///
-/// \param jid JID of the device owner
-/// \param deviceId ID of the device
-/// \param device device being added
-///
+/*!
+    \fn QXmppOmemoStorage::addSignedPreKeyPair(uint32_t keyId, const SignedPreKeyPair &keyPair)
 
-///
-/// \fn QXmppOmemoStorage::removeDevice(const QString &jid, uint32_t deviceId)
-///
-/// Removes a device of the other devices (i.e., all devices but the own one).
-///
-/// \param jid JID of the device owner
-/// \param deviceId ID of the device being removed
-///
+    Adds a signed pre key pair \a keyPair with ID \a keyId.
+*/
 
-///
-/// \fn QXmppOmemoStorage::removeDevices(const QString &jid)
-///
-/// Removes all devices of a passed JID from the other devices (i.e., all
-/// devices but the own one).
-///
-/// \param jid JID of the device owner
-///
+/*!
+    \fn QXmppOmemoStorage::removeSignedPreKeyPair(uint32_t keyId)
 
-///
-/// \fn QXmppOmemoStorage::resetAll()
-///
-/// Resets all data.
-///
+    Removes the signed pre key pair with ID \a keyId.
+*/
+
+/*!
+    \fn QXmppOmemoStorage::addPreKeyPairs(const QHash<uint32_t, QByteArray> &keyPairs)
+
+    Adds pre key pairs from \a keyPairs, which maps key IDs to the pre key
+    pairs.
+*/
+
+/*!
+    \fn QXmppOmemoStorage::removePreKeyPair(uint32_t keyId)
+
+    Removes the pre key pair with ID \a keyId.
+*/
+
+/*!
+    \fn QXmppOmemoStorage::addDevice(const QString &jid, uint32_t deviceId, const Device &device)
+
+    Adds other devices (i.e., all devices but the own one).
+
+    \a jid is the JID of the device owner, \a deviceId is the ID of the device
+    and \a device is the device being added.
+*/
+
+/*!
+    \fn QXmppOmemoStorage::removeDevice(const QString &jid, uint32_t deviceId)
+
+    Removes a device of the other devices (i.e., all devices but the own one).
+
+    \a jid is the JID of the device owner and \a deviceId is the ID of the
+    device being removed.
+*/
+
+/*!
+    \fn QXmppOmemoStorage::removeDevices(const QString &jid)
+
+    Removes all devices belonging to \a jid from the other devices (i.e., all
+    devices but the own one).
+*/
+
+/*!
+    \fn QXmppOmemoStorage::resetAll()
+
+    Resets all data.
+*/

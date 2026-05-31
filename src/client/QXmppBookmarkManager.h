@@ -12,9 +12,12 @@
 class QXmppBookmarkManagerPrivate;
 class QXmppBookmarkSet;
 
-/// \brief The QXmppBookmarkManager class allows you to store and retrieve
-/// bookmarks as defined by \xep{0048, Bookmarks}.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppBookmarkManager class allows you to store and retrieve
+    bookmarks as defined by \xep{0048}{Bookmarks}.
+*/
 
 class QXMPP_EXPORT QXmppBookmarkManager : public QXmppClientExtension
 {
@@ -28,18 +31,14 @@ public:
     QXmppBookmarkSet bookmarks() const;
     bool setBookmarks(const QXmppBookmarkSet &bookmarks);
 
-    /// \cond
     bool handleStanza(const QDomElement &stanza) override;
-    /// \endcond
 
-    /// This signal is emitted when bookmarks are received.
+    /*! This signal is emitted when \a bookmarks are received. */
     Q_SIGNAL void bookmarksReceived(const QXmppBookmarkSet &bookmarks);
 
 protected:
-    /// \cond
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
-    /// \endcond
 
 private:
     Q_SLOT void slotConnected();

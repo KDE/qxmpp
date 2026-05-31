@@ -23,15 +23,15 @@ static bool entityCapabilities1Compare(const QXmppDiscoIdentity &i1, const QXmpp
         std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
 }
 
-///
-/// \class QXmppDiscoItem
-///
-/// Related entity that can be queried using \xep{0030, Service Discovery}.
-///
-/// \note In QXmpp 1.11 and earlier, this class was called QXmppDiscoveryIq::Item.
-///
+/*!
+    \class QXmppDiscoItem
+    \inmodule QXmpp
 
-/// \cond
+    Related entity that can be queried using \xep{0030}{Service Discovery}.
+
+    \note In QXmpp 1.11 and earlier, this class was called QXmppDiscoveryIq::Item.
+*/
+
 std::optional<QXmppDiscoItem> QXmppDiscoItem::fromDom(const QDomElement &el)
 {
     QXmppDiscoItem item;
@@ -53,17 +53,16 @@ void QXmppDiscoItem::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"node", m_node },
     });
 }
-/// \endcond
 
-///
-/// \class QXmppDiscoItems
-///
-/// Items query request or result as defined in \xep{0030, Service Discovery}.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    \class QXmppDiscoItems
+    \inmodule QXmpp
 
-/// \cond
+    Items query request or result as defined in \xep{0030}{Service Discovery}.
+
+    \since QXmpp 1.12
+*/
+
 std::optional<QXmppDiscoItems> QXmppDiscoItems::fromDom(const QDomElement &el)
 {
     return QXmppDiscoItems { el.attribute(u"node"_s), parseChildElements<QList<QXmppDiscoItem>>(el) };
@@ -73,17 +72,16 @@ void QXmppDiscoItems::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { XmlTag, OptionalAttribute { u"node", m_node }, m_items });
 }
-/// \endcond
 
-///
-/// \class QXmppDiscoIdentity
-///
-/// Identity of an XMPP entity as defined in \xep{0030, Service Discovery}.
-///
-/// \note In QXmpp 1.11 and earlier, this class was called QXmppDiscoveryIq::Item.
-///
+/*!
+    \class QXmppDiscoIdentity
+    \inmodule QXmpp
 
-/// \cond
+    Identity of an XMPP entity as defined in \xep{0030}{Service Discovery}.
+
+    \note In QXmpp 1.11 and earlier, this class was called QXmppDiscoveryIq::Item.
+*/
+
 std::optional<QXmppDiscoIdentity> QXmppDiscoIdentity::fromDom(const QDomElement &el)
 {
     QXmppDiscoIdentity identity {
@@ -108,29 +106,27 @@ void QXmppDiscoIdentity::toXml(QXmlStreamWriter *writer) const
         Attribute { u"type", m_type },
     });
 }
-/// \endcond
 
-///
-/// \class QXmppDiscoInfo
-///
-/// Info query request or result as defined in \xep{0030, Service Discovery}.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    \class QXmppDiscoInfo
+    \inmodule QXmpp
 
-///
-/// Looks for a data form with the given form type and returns it if found.
-///
-/// Data forms in service discovery info are defined in \xep{0128, Service Discovery Extensions}.
-///
+    Info query request or result as defined in \xep{0030}{Service Discovery}.
+
+    \since QXmpp 1.12
+*/
+
+/*!
+    Looks for a data form with the given form type and returns it if found.
+
+    Data forms in service discovery info are defined in \xep{0128}{Service Discovery Extensions}.
+*/
 std::optional<QXmppDataForm> QXmppDiscoInfo::dataForm(QStringView formType) const
 {
     return find(m_dataForms, formType, &QXmppDataForm::formType);
 }
 
-///
-/// Calculates an \xep{0115, Entity Capabilities} hash value of this service discovery data object.
-///
+/*! Calculates an \xep{0115}{Entity Capabilities} hash value of this service discovery data object. */
 QByteArray QXmppDiscoInfo::calculateEntityCapabilitiesHash() const
 {
     QString S;
@@ -185,7 +181,6 @@ QByteArray QXmppDiscoInfo::calculateEntityCapabilitiesHash() const
     return QCryptographicHash::hash(S.toUtf8(), QCryptographicHash::Sha1);
 }
 
-/// \cond
 std::optional<QXmppDiscoInfo> QXmppDiscoInfo::fromDom(const QDomElement &el)
 {
     return QXmppDiscoInfo {
@@ -206,4 +201,3 @@ void QXmppDiscoInfo::toXml(QXmlStreamWriter *writer) const
         m_dataForms,
     });
 }
-/// \endcond

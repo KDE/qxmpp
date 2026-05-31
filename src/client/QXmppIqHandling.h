@@ -113,82 +113,83 @@ bool handleIqType(Handler handler,
 
 }  // namespace Private
 
-///
-/// Parses IQ requests, calls a handler and sends an IQ result or error.
-///
-/// It is the easiest to explain this function with a few examples.
-///
-/// ```
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq>(element, e2eeMetadata, client, [](QXmppVersionIq iq) -> std::variant<QXmppVersionIq, QXmppStanza::Error> {
-///     if (iq.type() == QXmppIq::Get) {
-///         QXmppVersionIq response;
-///         response.setName("MyApp");
-///         response.setVersion("1.0");
-///         // id, to and type of the IQ are set automatically.
-///         return response;
-///     } else if (iq.type() == QXmppIq::Set) {
-///         return QXmppStanza::Error(QXmppStanza::Error::Cancel, QXmppStanza::Error::BadRequest, "IQ must be of type 'get'.");
-///     }
-/// });
-/// ```
-///
-/// It is also possible to handle multiple IQ types.
-/// ```
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
-///     element, e2eeMetadata, client, [](std::variant<QXmppVersionIq, QXmppVCardIq> iqVariant) {
-///     // ...
-/// });
-/// ```
-/// It doesn't need to be a std::variant, it's only important that the object is callable with all
-/// the IQ types. You can for example use different lambdas per type using this 'overloaded' helper.
-/// ```
-/// template<class... Ts>
-/// struct overloaded : Ts... {
-///     using Ts::operator()...;
-/// };
-/// // explicit deduction guide (not needed as of C++20)
-/// template<class... Ts>
-/// overloaded(Ts...) -> overloaded<Ts...>;
-///
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
-///     element, e2eeMetadata, client, overloaded {
-///         [](QXmppVersionIq iq) {
-///             // ...
-///         },
-///         [](QXmppVCardIq iq) {
-///             // ...
-///         }
-///     });
-/// ```
-///
-/// And another option is to an object with `handleIq()` functions.
-/// ```
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(element, e2eeMetadata, client, this);
-/// // will call this->handleIq(QXmppVersionIq) or this->handleIq(QXmppVCardIq)
-/// ```
-///
-/// The return type of the handler function can be:
-///  1. an QXmppIq based type
-///  2. a std::variant of QXmppIq based types (multiple are possible) and optionally also QXmppStanza::Error
-///  3. a QXmppTask of 1. or 2.
-///
-/// You don't need to set the values for id or the to address on the IQ result because that's done
-/// automatically. Unless you want to return an error IQ you also don't need to set the IQ type.
-///
-/// If you return an QXmppStanza::Error, a normal QXmppIq with the error will be sent.
-///
-/// The provided optional QXmppE2eeMetadata is set on the parsed IQ and used to correctly encrypt
-/// the IQ response using QXmppClient::reply().
-///
-/// \param element The DOM element that might contain an IQ.
-/// \param e2eeMetadata The end-to-end encryption metadata that is used to encrypt the response
-/// correctly and to be set on the parsed IQ.
-/// \param client The client that should be used to send the response.
-/// \param handler Function that can handle the IQ types from the template parameter or an object
-/// that has handleIq() functions for each of the IQ types.
-/// \return Whether the IQ could be parsed, handled and a response was or will be sent.
-/// \since QXmpp 1.5
-///
+/*!
+    Parses IQ requests, calls a handler and sends an IQ result or error.
+
+    It is the easiest to explain this function with a few examples.
+
+    ```
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq>(element, e2eeMetadata, client, [](QXmppVersionIq iq) -> std::variant<QXmppVersionIq, QXmppStanza::Error> {
+    if (iq.type() == QXmppIq::Get) {
+    QXmppVersionIq response;
+    response.setName("MyApp");
+    response.setVersion("1.0");
+    // id, to and type of the IQ are set automatically.
+    return response;
+    } else if (iq.type() == QXmppIq::Set) {
+    return QXmppStanza::Error(QXmppStanza::Error::Cancel, QXmppStanza::Error::BadRequest, "IQ must be of type 'get'.");
+    }
+    });
+    ```
+
+    It is also possible to handle multiple IQ types.
+    ```
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
+    element, e2eeMetadata, client, [](std::variant<QXmppVersionIq, QXmppVCardIq> iqVariant) {
+    // ...
+    });
+    ```
+    It doesn't need to be a std::variant, it's only important that the object is callable with all
+    the IQ types. You can for example use different lambdas per type using this 'overloaded' helper.
+    ```
+    template<class... Ts>
+    struct overloaded : Ts... {
+    using Ts::operator()...;
+    };
+    // explicit deduction guide (not needed as of C++20)
+    template<class... Ts>
+    overloaded(Ts...) -> overloaded<Ts...>;
+
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
+    element, e2eeMetadata, client, overloaded {
+    [](QXmppVersionIq iq) {
+    // ...
+    },
+    [](QXmppVCardIq iq) {
+    // ...
+    }
+    });
+    ```
+
+    And another option is to an object with `handleIq()` functions.
+    ```
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(element, e2eeMetadata, client, this);
+    // will call this->handleIq(QXmppVersionIq) or this->handleIq(QXmppVCardIq)
+    ```
+
+    The return type of the handler function can be:
+    1. an QXmppIq based type
+    2. a std::variant of QXmppIq based types (multiple are possible) and optionally also QXmppStanza::Error
+    3. a QXmppTask of 1. or 2.
+
+    You don't need to set the values for id or the to address on the IQ result because that's done
+    automatically. Unless you want to return an error IQ you also don't need to set the IQ type.
+
+    If you return an QXmppStanza::Error, a normal QXmppIq with the error will be sent.
+
+    The provided optional QXmppE2eeMetadata is set on the parsed IQ and used to correctly encrypt
+    the IQ response using QXmppClient::reply().
+
+    \a element is the DOM element that might contain an IQ. \a e2eeMetadata is the end-to-end
+    encryption metadata that is used to encrypt the response correctly and to be set on the
+    parsed IQ. \a client is the client that should be used to send the response. \a handler is
+    a function that can handle the IQ types from the template parameter or an object that has
+    handleIq() functions for each of the IQ types.
+
+    Returns whether the IQ could be parsed, handled and a response was or will be sent.
+
+    \since QXmpp 1.5
+*/
 template<typename... IqTypes, typename Handler>
 bool handleIqRequests(const QDomElement &element,
                       const std::optional<QXmppE2eeMetadata> &e2eeMetadata,
@@ -201,77 +202,79 @@ bool handleIqRequests(const QDomElement &element,
     return false;
 }
 
-///
-/// Parses IQ requests, calls a handler and sends an IQ result or error.
-///
-/// It is the easiest to explain this function with a few examples.
-///
-/// ```
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq>(element, client, [](QXmppVersionIq iq) -> std::variant<QXmppVersionIq, QXmppStanza::Error> {
-///     if (iq.type() == QXmppIq::Get) {
-///         QXmppVersionIq response;
-///         response.setName("MyApp");
-///         response.setVersion("1.0");
-///         // id, to and type of the IQ are set automatically.
-///         return response;
-///     } else if (iq.type() == QXmppIq::Set) {
-///         return QXmppStanza::Error(QXmppStanza::Error::Cancel, QXmppStanza::Error::BadRequest, "IQ must be of type 'get'.");
-///     }
-/// });
-/// ```
-///
-/// It is also possible to handle multiple IQ types.
-/// ```
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
-///     element, client, [](std::variant<QXmppVersionIq, QXmppVCardIq> iqVariant) {
-///     // ...
-/// });
-/// ```
-/// It doesn't need to be a std::variant, it's only important that the object is callable with all
-/// the IQ types. You can for example use different lambdas per type using this 'overloaded' helper.
-/// ```
-/// template<class... Ts>
-/// struct overloaded : Ts... {
-///     using Ts::operator()...;
-/// };
-/// // explicit deduction guide (not needed as of C++20)
-/// template<class... Ts>
-/// overloaded(Ts...) -> overloaded<Ts...>;
-///
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
-///     element, client, overloaded {
-///         [](QXmppVersionIq iq) {
-///             // ...
-///         },
-///         [](QXmppVCardIq iq) {
-///             // ...
-///         }
-///     });
-/// ```
-///
-/// And another option is to an object with `handleIq()` functions.
-/// ```
-/// auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(element, client, this);
-/// // will call this->handleIq(QXmppVersionIq) or this->handleIq(QXmppVCardIq)
-/// ```
-///
-/// The return type of the handler function can be:
-///  1. an QXmppIq based type
-///  2. a std::variant of QXmppIq based types (multiple are possible) and optionally also QXmppStanza::Error
-///  3. a QXmppTask of 1. or 2.
-///
-/// You don't need to set the values for id or the to address on the IQ result because that's done
-/// automatically. Unless you want to return an error IQ you also don't need to set the IQ type.
-///
-/// If you return an QXmppStanza::Error, a normal QXmppIq with the error will be sent.
-///
-/// \param element The DOM element that might contain an IQ.
-/// \param client The client that should be used to send the response.
-/// \param handler Function that can handle the IQ types from the template parameter or an object
-/// that has handleIq() functions for each of the IQ types.
-/// \return Whether the IQ could be parsed, handled and a response was or will be sent.
-/// \since QXmpp 1.5
-///
+/*!
+    Parses IQ requests, calls a handler and sends an IQ result or error.
+
+    It is the easiest to explain this function with a few examples.
+
+    ```
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq>(element, client, [](QXmppVersionIq iq) -> std::variant<QXmppVersionIq, QXmppStanza::Error> {
+    if (iq.type() == QXmppIq::Get) {
+    QXmppVersionIq response;
+    response.setName("MyApp");
+    response.setVersion("1.0");
+    // id, to and type of the IQ are set automatically.
+    return response;
+    } else if (iq.type() == QXmppIq::Set) {
+    return QXmppStanza::Error(QXmppStanza::Error::Cancel, QXmppStanza::Error::BadRequest, "IQ must be of type 'get'.");
+    }
+    });
+    ```
+
+    It is also possible to handle multiple IQ types.
+    ```
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
+    element, client, [](std::variant<QXmppVersionIq, QXmppVCardIq> iqVariant) {
+    // ...
+    });
+    ```
+    It doesn't need to be a std::variant, it's only important that the object is callable with all
+    the IQ types. You can for example use different lambdas per type using this 'overloaded' helper.
+    ```
+    template<class... Ts>
+    struct overloaded : Ts... {
+    using Ts::operator()...;
+    };
+    // explicit deduction guide (not needed as of C++20)
+    template<class... Ts>
+    overloaded(Ts...) -> overloaded<Ts...>;
+
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
+    element, client, overloaded {
+    [](QXmppVersionIq iq) {
+    // ...
+    },
+    [](QXmppVCardIq iq) {
+    // ...
+    }
+    });
+    ```
+
+    And another option is to an object with `handleIq()` functions.
+    ```
+    auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(element, client, this);
+    // will call this->handleIq(QXmppVersionIq) or this->handleIq(QXmppVCardIq)
+    ```
+
+    The return type of the handler function can be:
+    1. an QXmppIq based type
+    2. a std::variant of QXmppIq based types (multiple are possible) and optionally also QXmppStanza::Error
+    3. a QXmppTask of 1. or 2.
+
+    You don't need to set the values for id or the to address on the IQ result because that's done
+    automatically. Unless you want to return an error IQ you also don't need to set the IQ type.
+
+    If you return an QXmppStanza::Error, a normal QXmppIq with the error will be sent.
+
+    \a element is the DOM element that might contain an IQ. \a client is the client that
+    should be used to send the response. \a handler is a function that can handle the IQ types
+    from the template parameter or an object that has handleIq() functions for each of the IQ
+    types.
+
+    Returns whether the IQ could be parsed, handled and a response was or will be sent.
+
+    \since QXmpp 1.5
+*/
 template<typename... IqTypes, typename Handler>
 bool handleIqRequests(const QDomElement &element, QXmppClient *client, Handler handler)
 {

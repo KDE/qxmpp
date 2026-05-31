@@ -22,25 +22,33 @@ class QXMPP_EXPORT QXmppPubSubManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
-    ///
-    /// Type of PubSub service
-    ///
+    /*!
+        Type of PubSub service
+
+        \value PubSubOrPep PubSub service or PEP service.
+        \value PubSub PubSub service only.
+        \value Pep PEP service only.
+    */
     enum ServiceType {
-        PubSubOrPep,  ///< PubSub service or PEP service
-        PubSub,       ///< PubSub service only
-        Pep           ///< PEP service only
+        PubSubOrPep,
+        PubSub,
+        Pep
     };
 
-    ///
-    /// Pre-defined ID of a PubSub item
-    ///
+    /*!
+        Pre-defined ID of a PubSub item
+
+        \value Current Item of a singleton node (i.e., the node's single item).
+    */
     enum StandardItemId {
-        Current  ///< Item of a singleton node (i.e., the node's single item)
+        Current
     };
 
-    ///
-    /// Used to indicate a service type mismatch.
-    ///
+    /*!
+        \inmodule QXmpp
+
+        Used to indicate a service type mismatch.
+    */
     struct InvalidServiceType { };
 
     template<typename T>
@@ -139,10 +147,8 @@ public:
 
     static QString standardItemIdToString(StandardItemId itemId);
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
-    /// \endcond
 
 private:
     // for private requestFeatures() API
@@ -157,15 +163,11 @@ private:
     static QXmpp::Private::PubSubIq<> requestItemsIq(const QString &jid, const QString &nodeName, const QStringList &itemIds);
 };
 
-///
-/// Requests a specific item of an entity's node.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service. For PEP this
-/// should be an account's bare JID
-/// \param nodeName the name of the node to query
-/// \param itemId the ID of the item to retrieve
-/// \return
-///
+/*!
+    Requests the item with ID \a itemId from the node \a nodeName of the
+    entity with JID \a jid. \a jid is the Jabber ID of the entity hosting the
+    pubsub service. For PEP this should be an account's bare JID.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::ItemResult<T>> QXmppPubSubManager::requestItem(const QString &jid,
                                                                              const QString &nodeName,
@@ -180,15 +182,11 @@ QXmppTask<QXmppPubSubManager::ItemResult<T>> QXmppPubSubManager::requestItem(con
     });
 }
 
-///
-/// Requests a specific item of an entity's node.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service. For PEP this
-/// should be an account's bare JID
-/// \param nodeName the name of the node to query
-/// \param itemId the ID of the item to retrieve
-/// \return
-///
+/*!
+    Requests the item with standard ID \a itemId from the node \a nodeName of
+    the entity with JID \a jid. \a jid is the Jabber ID of the entity hosting
+    the pubsub service. For PEP this should be an account's bare JID.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::ItemResult<T>> QXmppPubSubManager::requestItem(const QString &jid,
                                                                              const QString &nodeName,
@@ -197,14 +195,11 @@ QXmppTask<QXmppPubSubManager::ItemResult<T>> QXmppPubSubManager::requestItem(con
     return requestItem<T>(jid, nodeName, standardItemIdToString(itemId));
 }
 
-///
-/// Requests all items of an entity's node.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service. For PEP this
-/// should be an account's bare JID
-/// \param nodeName the name of the node to query
-/// \return
-///
+/*!
+    Requests all items of the node \a nodeName of the entity with JID \a jid.
+    \a jid is the Jabber ID of the entity hosting the pubsub service. For PEP
+    this should be an account's bare JID.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::ItemsResult<T>> QXmppPubSubManager::requestItems(const QString &jid,
                                                                                const QString &nodeName)
@@ -212,16 +207,12 @@ QXmppTask<QXmppPubSubManager::ItemsResult<T>> QXmppPubSubManager::requestItems(c
     return requestItems<T>(jid, nodeName, {});
 }
 
-///
-/// Requests items of an entity's node.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service. For PEP this
-/// should be an account's bare JID
-/// \param nodeName the name of the node to query
-/// \param itemIds the IDs of the items to retrieve. If empty, retrieves all
-/// items
-/// \return
-///
+/*!
+    Requests the items with IDs \a itemIds from the node \a nodeName of the
+    entity with JID \a jid. \a jid is the Jabber ID of the entity hosting the
+    pubsub service. For PEP this should be an account's bare JID. If
+    \a itemIds is empty, all items are retrieved.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::ItemsResult<T>> QXmppPubSubManager::requestItems(const QString &jid,
                                                                                const QString &nodeName,
@@ -235,17 +226,13 @@ QXmppTask<QXmppPubSubManager::ItemsResult<T>> QXmppPubSubManager::requestItems(c
         });
 }
 
-///
-/// Publishs one item to a pubsub node.
-///
-/// This is a convenience method equivalent to calling
-/// QXmppPubSubManager::publishItem with no publish options.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service
-/// \param nodeName the name of the node to publish the item to
-/// \param item the item to publish
-/// \return
-///
+/*!
+    Publishes the item \a item to the node \a nodeName of the pubsub service
+    with JID \a jid.
+
+    This is a convenience method equivalent to calling
+    QXmppPubSubManager::publishItem with no publish options.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishItem(const QString &jid,
                                                                                  const QString &nodeName,
@@ -258,18 +245,10 @@ QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishItem
     return publishItem(std::move(request));
 }
 
-///
-/// Publishs one item to a pubsub node.
-///
-/// This is a convenience method equivalent to calling
-/// QXmppPubSubManager::publishItem with no publish options.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service
-/// \param nodeName the name of the node to publish the item to
-/// \param item the item to publish
-/// \param publishOptions publish-options for the items
-/// \return
-///
+/*!
+    Publishes the item \a item with publish options \a publishOptions to the
+    node \a nodeName of the pubsub service with JID \a jid.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishItem(const QString &jid,
                                                                                  const QString &nodeName,
@@ -284,14 +263,10 @@ QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishItem
     return publishItem(std::move(request));
 }
 
-///
-/// Publishs items to a pubsub node.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service
-/// \param nodeName the name of the node to publish the items to
-/// \param items the items to publish
-/// \return
-///
+/*!
+    Publishes the items \a items to the node \a nodeName of the pubsub service
+    with JID \a jid.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishItems(const QString &jid,
                                                                                    const QString &nodeName,
@@ -304,15 +279,10 @@ QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishIte
     return publishItems(std::move(request));
 }
 
-///
-/// Publishs items to a pubsub node.
-///
-/// \param jid Jabber ID of the entity hosting the pubsub service
-/// \param nodeName the name of the node to publish the items to
-/// \param items the items to publish
-/// \param publishOptions publish-options for the items
-/// \return
-///
+/*!
+    Publishes the items \a items with publish options \a publishOptions to the
+    node \a nodeName of the pubsub service with JID \a jid.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishItems(const QString &jid,
                                                                                    const QString &nodeName,
@@ -327,55 +297,39 @@ QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishIte
     return publishItems(std::move(request));
 }
 
-///
-/// Publishs one item to a PEP node.
-///
-/// \param nodeName the name of the PEP node to publish the item to
-/// \param item the item to publish
-/// \param publishOptions publish-options for fine tuning
-/// \return
-///
+/*!
+    Publishes the item \a item with publish options \a publishOptions to the
+    PEP node \a nodeName. \a publishOptions allows fine tuning.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishOwnPepItem(const QString &nodeName, const T &item, const QXmppPubSubPublishOptions &publishOptions)
 {
     return publishItem(client()->configuration().jidBare(), nodeName, item, publishOptions);
 }
 
-///
-/// Publishs one item to a PEP node.
-///
-/// \param nodeName the name of the PEP node to publish the item to
-/// \param item the item to publish
-/// \return
-///
+/*!
+    Publishes the item \a item to the PEP node \a nodeName.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishOwnPepItem(const QString &nodeName, const T &item)
 {
     return publishItem(client()->configuration().jidBare(), nodeName, item);
 }
 
-///
-/// Publishs items to a PEP node.
-///
-/// \param nodeName the name  of the PEP node to publish the items to
-/// \param items the items to publish
-/// \param publishOptions publish-options for fine tuning (optional). Pass
-/// an empty form to honor the default options of the PEP node
-/// \return
-///
+/*!
+    Publishes the items \a items with publish options \a publishOptions to the
+    PEP node \a nodeName. \a publishOptions allows fine tuning (optional);
+    pass an empty form to honor the default options of the PEP node.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishOwnPepItems(const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions)
 {
     return publishItems(client()->configuration().jidBare(), nodeName, items, publishOptions);
 }
 
-///
-/// Publishs items to a PEP node.
-///
-/// \param nodeName the name of the PEP node to publish the items to
-/// \param items the items to publish
-/// \return
-///
+/*!
+    Publishes the items \a items to the PEP node \a nodeName.
+*/
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishOwnPepItems(const QString &nodeName, const QVector<T> &items)
 {

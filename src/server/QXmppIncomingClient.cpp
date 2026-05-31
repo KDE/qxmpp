@@ -94,13 +94,12 @@ QString QXmppIncomingClientPrivate::origin() const
     }
 }
 
-///
-/// Constructs a new incoming client stream.
-///
-/// \param socket The socket for the XMPP stream.
-/// \param domain The local domain.
-/// \param parent The parent QObject for the stream (optional).
-///
+/*!
+    Constructs a new incoming client stream.
+
+    \a socket is the socket for the XMPP stream, \a domain is the local domain
+    and \a parent is the optional parent QObject for the stream.
+*/
 QXmppIncomingClient::QXmppIncomingClient(QSslSocket *socket, const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppIncomingClientPrivate>(socket, this))
@@ -124,10 +123,10 @@ QXmppIncomingClient::QXmppIncomingClient(QSslSocket *socket, const QString &doma
 
 QXmppIncomingClient::~QXmppIncomingClient() = default;
 
-///
-/// Returns true if the socket is connected, the client is authenticated
-/// and a resource is bound.
-///
+/*!
+    Returns true if the socket is connected, the client is authenticated
+    and a resource is bound.
+*/
 bool QXmppIncomingClient::isConnected() const
 {
     return d->socket.isConnected() &&
@@ -135,33 +134,39 @@ bool QXmppIncomingClient::isConnected() const
         !d->resource.isEmpty();
 }
 
-/// Returns the client's JID.
-/// Sends an XMPP packet to the peer.
+/*!
+    Returns the client's JID.
+    Sends an XMPP packet to the peer.
+*/
 QString QXmppIncomingClient::jid() const
 {
     return d->jid;
 }
 
-/// Sends an XMPP packet to the peer.
+/*! Sends an XMPP \a packet to the peer; returns true on success. */
 bool QXmppIncomingClient::sendPacket(const QXmppNonza &packet)
 {
     return d->socket.sendData(serializeXml(packet));
 }
 
-/// Sends raw data to the peer.
+/*! Sends raw \a data to the peer; returns true on success. */
 bool QXmppIncomingClient::sendData(const QByteArray &data)
 {
     return d->socket.sendData(data);
 }
 
-/// Disconnects from the remote host.
+/*! Disconnects from the remote host. */
 void QXmppIncomingClient::disconnectFromHost()
 {
     d->socket.disconnectFromHost();
 }
 
-/// Sets the number of seconds after which a client will be disconnected
-/// for inactivity.
+/*!
+    Sets the number of seconds after which a client will be disconnected
+    for inactivity.
+
+    \a secs.
+*/
 void QXmppIncomingClient::setInactivityTimeout(int secs)
 {
     d->idleTimer->stop();
@@ -171,17 +176,14 @@ void QXmppIncomingClient::setInactivityTimeout(int secs)
     }
 }
 
-///
-/// Sets the password checker used to verify client credentials.
-///
-/// \param checker
-///
+/*!
+    Sets the password \a checker used to verify client credentials.
+*/
 void QXmppIncomingClient::setPasswordChecker(QXmppPasswordChecker *checker)
 {
     d->passwordChecker = checker;
 }
 
-/// \cond
 void QXmppIncomingClient::handleStart()
 {
 }
@@ -452,7 +454,6 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
         }
     }
 }
-/// \endcond
 
 void QXmppIncomingClient::onDigestReply()
 {

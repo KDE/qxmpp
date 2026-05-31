@@ -17,86 +17,78 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppNonSASLAuthIq
-///
-/// QXmppNonSASLAuthIq represents a Non-SASL authentication IQ as defined by
-/// \xep{0078, Non-SASL Authentication}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \class QXmppNonSASLAuthIq
+    \inmodule QXmpp
+
+    QXmppNonSASLAuthIq represents a Non-SASL authentication IQ as defined by
+    \xep{0078}{Non-SASL Authentication}.
+
+    \ingroup Stanzas
+*/
 
 QXmppNonSASLAuthIq::QXmppNonSASLAuthIq()
     : QXmppIq(QXmppIq::Set)
 {
 }
 
-///
-/// Returns the username of the account
-///
+/*! Returns the username of the account */
 QString QXmppNonSASLAuthIq::username() const
 {
     return m_username;
 }
 
-///
-/// Sets the username of the account
-///
+/*! Sets the \a username of the account */
 void QXmppNonSASLAuthIq::setUsername(const QString &username)
 {
     m_username = username;
 }
 
-///
-/// Returns the SHA1 hash of the concatenated string
-///
+/*! Returns the SHA1 hash of the concatenated string */
 QByteArray QXmppNonSASLAuthIq::digest() const
 {
     return m_digest;
 }
 
-///
-/// Sets the digest by creating a hash of the concatenation of streamId and
-/// password.
-///
+/*!
+    Sets the digest by creating a hash of the concatenation of streamId and
+    password.
+
+    \a password and \a streamId.
+*/
 void QXmppNonSASLAuthIq::setDigest(const QString &streamId, const QString &password)
 {
     m_digest = QCryptographicHash::hash(QByteArray(streamId.toUtf8() + password.toUtf8()), QCryptographicHash::Sha1);
 }
 
-///
-/// Returns the username of the account in plaintext
-///
+/*! Returns the username of the account in plaintext */
 QString QXmppNonSASLAuthIq::password() const
 {
     return m_password;
 }
 
-///
-/// Sets the username of the account in plaintext
-///
+/*!
+    Sets the username of the account in plaintext
+
+    \a password.
+*/
 void QXmppNonSASLAuthIq::setPassword(const QString &password)
 {
     m_password = password;
 }
 
-///
-/// Returns the resource to bind to
-///
+/*! Returns the resource to bind to */
 QString QXmppNonSASLAuthIq::resource() const
 {
     return m_resource;
 }
 
-///
-/// Sets the resource to bind to
-///
+/*! Sets the \a resource to bind to */
 void QXmppNonSASLAuthIq::setResource(const QString &resource)
 {
     m_resource = resource;
 }
 
-/// \cond
 void QXmppNonSASLAuthIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -116,4 +108,3 @@ void QXmppNonSASLAuthIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         OptionalTextElement { u"resource", m_resource },
     });
 }
-/// \endcond

@@ -17,9 +17,7 @@ class QXmppHttpFileSharingProviderPrivate;
 class QXMPP_EXPORT QXmppHttpFileSharingProvider : public QXmppFileSharingProvider
 {
 public:
-    /// \cond
     using SourceType = QXmppHttpFileSource;
-    /// \endcond
 
     QXmppHttpFileSharingProvider(QXmppHttpUploadManager *manager, QNetworkAccessManager *netManager);
     ~QXmppHttpFileSharingProvider() override;

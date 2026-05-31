@@ -46,9 +46,7 @@ public:
         void setContentType(const QMimeType &contentType);
 
         bool operator==(const MediaSource &other) const;
-        /// \cond
         static constexpr std::tuple XmlTag = { u"uri", QXmpp::Private::ns_media_element };
-        /// \endcond
 
     private:
         QSharedDataPointer<QXmppDataFormMediaSourcePrivate> d;
@@ -92,7 +90,20 @@ public:
     class QXMPP_EXPORT Field
     {
     public:
-        /// This enum is used to describe a field's type.
+        /*!
+            This enum is used to describe a field's type.
+
+            \value BooleanField
+            \value FixedField
+            \value HiddenField
+            \value JidMultiField
+            \value JidSingleField
+            \value ListMultiField
+            \value ListSingleField
+            \value TextMultiField
+            \value TextPrivateField
+            \value TextSingleField
+        */
         enum Type {
             BooleanField,
             FixedField,
@@ -149,7 +160,6 @@ public:
 
         bool operator==(const Field &other) const;
 
-        /// \cond
         static constexpr std::tuple XmlTag = { u"field", QXmpp::Private::ns_data };
         static std::optional<Field> fromDom(const QDomElement &el);
         void toXml(QXmlStreamWriter *writer) const;
@@ -166,24 +176,26 @@ public:
         [[deprecated("Use const-getter or setter")]]
         QSize &mediaSize();
 #endif
-        /// \endcond
 
     private:
         QSharedDataPointer<QXmppDataFormFieldPrivate> d;
     };
 
-    /// This enum is used to describe a form's type.
+    /*!
+        This enum is used to describe a form's type.
+
+        \value None Unknown form type.
+        \value Form The form-processing entity is asking the form-submitting entity to complete a form.
+        \value Submit The form-submitting entity is submitting data to the form-processing entity.
+        \value Cancel The form-submitting entity has cancelled submission of data to the form-processing entity.
+        \value Result The form-processing entity is returning data (e.g., search results) to the form-submitting entity, or the data is a generic data set.
+    */
     enum Type {
-        None,    ///< Unknown form type
-        Form,    ///< The form-processing entity is asking the form-submitting
-                 ///< entity to complete a form.
-        Submit,  ///< The form-submitting entity is submitting data to the
-                 ///< form-processing entity.
-        Cancel,  ///< The form-submitting entity has cancelled submission
-                 ///< of data to the form-processing entity.
-        Result   ///< The form-processing entity is returning data
-                 ///< (e.g., search results) to the form-submitting entity,
-                 ///< or the data is a generic data set.
+        None,
+        Form,
+        Submit,
+        Cancel,
+        Result
     };
 
     QXmppDataForm(Type type = None,
@@ -220,7 +232,6 @@ public:
 
     bool isNull() const;
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_data };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
@@ -229,7 +240,6 @@ public:
     [[deprecated("Use const-getter or setter")]]
     QList<Field> &fields();
 #endif
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppDataFormPrivate> d;

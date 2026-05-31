@@ -26,24 +26,24 @@ QXmppCarbonManager::~QXmppCarbonManager()
 {
 }
 
-///
-/// Returns whether message carbons are currently enabled
-///
+/*! Returns whether message carbons are currently enabled */
 bool QXmppCarbonManager::carbonsEnabled() const
 {
     return m_carbonsEnabled;
 }
 
-///
-/// Enables or disables message carbons for this connection.
-///
-/// This function does not check whether the server supports
-/// message carbons, but just sends the corresponding stanza
-/// to the server, so one must check in advance by using the
-/// discovery manager.
-///
-/// By default, carbon copies are disabled.
-///
+/*!
+    Enables or disables message carbons for this connection.
+
+    This function does not check whether the server supports
+    message carbons, but just sends the corresponding stanza
+    to the server, so one must check in advance by using the
+    discovery manager.
+
+    By default, carbon copies are disabled.
+
+    \a enabled.
+*/
 void QXmppCarbonManager::setCarbonsEnabled(bool enabled)
 {
     if (m_carbonsEnabled == enabled) {
@@ -63,7 +63,6 @@ void QXmppCarbonManager::setCarbonsEnabled(bool enabled)
     }
 }
 
-/// \cond
 QStringList QXmppCarbonManager::discoveryFeatures() const
 {
     return { staticString(ns_carbons) };
@@ -110,20 +109,19 @@ bool QXmppCarbonManager::handleStanza(const QDomElement &element)
 
     return true;
 }
-/// \endcond
 
-///
-/// \fn QXmppCarbonManager::messageReceived()
-///
-/// Emitted when a message was received from someone else and directed to
-/// another resource.
-///
-/// If you connect this signal to the QXmppClient::messageReceived signal, they
-/// will appear as normal messages.
-///
+/*!
+    \fn void QXmppCarbonManager::messageReceived(const QXmppMessage &message)
 
-///
-/// \fn QXmppCarbonManager::messageSent()
-///
-/// Emitted when another resource sent a message to someone else.
-///
+    Emitted when a message was received from someone else and directed to
+    another resource.
+
+    If you connect this signal to the QXmppClient::messageReceived signal, they
+    will appear as normal messages.
+*/
+
+/*!
+    \fn void QXmppCarbonManager::messageSent(const QXmppMessage &message)
+
+    Emitted when another resource sent a message to someone else.
+*/

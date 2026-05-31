@@ -19,33 +19,43 @@ struct RosterData;
 
 class QXmppRosterIqPrivate;
 
-///
-/// \brief The QXmppRosterIq class represents a roster IQ.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppRosterIq class represents a roster IQ.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppRosterIq : public QXmppIq
 {
 public:
     class ItemPrivate;
 
-    /// \brief The QXmppRosterIq::Item class represents a roster entry.
+    /*!
+        \inmodule QXmpp
+
+        \brief The QXmppRosterIq::Item class represents a roster entry.
+    */
     class QXMPP_EXPORT Item
     {
     public:
-        /// An enumeration for type of subscription with the bareJid in the roster.
+        /*!
+            An enumeration for type of subscription with the bareJid in the roster.
+
+            \value None the user does not have a subscription to the contact's presence information, and the contact does not have a subscription to the user's presence information.
+            \value From the contact has a subscription to the user's presence information, but the user does not have a subscription to the contact's presence information.
+            \value To the user has a subscription to the contact's presence information, but the contact does not have a subscription to the user's presence information.
+            \value Both both the user and the contact have subscriptions to each other's presence information.
+            \value Remove to delete a roster item.
+            \value NotSet the subscription state was not specified.
+        */
         enum SubscriptionType {
-            None = 0,    ///< the user does not have a subscription to the
-                         ///< contact's presence information, and the contact does
-                         ///< not have a subscription to the user's presence information
-            From = 1,    ///< the contact has a subscription to the user's presence information,
-                         ///< but the user does not have a subscription to the contact's presence information
-            To = 2,      ///< the user has a subscription to the contact's presence information,
-                         ///< but the contact does not have a subscription to the user's presence information
-            Both = 3,    ///< both the user and the contact have subscriptions to each
-                         ///< other's presence information
-            Remove = 4,  ///< to delete a roster item
-            NotSet = 8   ///< the subscription state was not specified
+            None = 0,
+            From = 1,
+            To = 2,
+            Both = 3,
+            Remove = 4,
+            NotSet = 8
         };
 
         Item();
@@ -77,11 +87,9 @@ public:
         QString mixParticipantId() const;
         void setMixParticipantId(const QString &);
 
-        /// \cond
         static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_roster };
         void parse(const QDomElement &element);
         void toXml(QXmlStreamWriter *writer) const;
-        /// \endcond
 
     private:
         friend struct QXmpp::Private::RosterData;
@@ -113,17 +121,13 @@ public:
     bool mixAnnotate() const;
     void setMixAnnotate(bool);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_roster };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isRosterIq(const QDomElement &element);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppRosterIqPrivate> d;

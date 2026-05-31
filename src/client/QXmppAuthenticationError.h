@@ -11,35 +11,39 @@
 
 namespace QXmpp {
 
-///
-/// Indicates an authentication error
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \inmodule QXmpp
+
+    Indicates an authentication error
+
+    \since QXmpp 1.7
+*/
 struct AuthenticationError {
-    /// Describes the type of the authentication error.
+    /*!
+        Describes the type of the authentication error.
+
+        \value NotAuthorized The provided credentials have been rejected by the server.
+        \value AccountDisabled The server did not allow authentication because the account is currently disabled.
+        \value CredentialsExpired Used credentials are not valid anymore.
+        \value EncryptionRequired Authentication is only allowed with an encrypted connection.
+        \value MechanismMismatch Authenticated could not be completed because the server did not offer a compatible authentication mechanism.
+        \value ProcessingError Local error while processing authentication challenges.
+        \value RequiredTasks The server requested for tasks that are not supported.
+    */
     enum Type {
-        /// The provided credentials have been rejected by the server.
         NotAuthorized,
-        /// The server did not allow authentication because the account is currently disabled.
         AccountDisabled,
-        /// Used credentials are not valid anymore.
         CredentialsExpired,
-        /// Authentication is only allowed with an encrypted connection.
         EncryptionRequired,
-        /// Authenticated could not be completed because the server did not offer a compatible
-        /// authentication mechanism.
         MechanismMismatch,
-        /// Local error while processing authentication challenges
         ProcessingError,
-        /// The server requested for tasks that are not supported
         RequiredTasks,
     };
-    /// Type of the authentication error
+    /*! Type of the authentication error */
     Type type;
-    /// Error message from the server
+    /*! Error message from the server */
     QString text;
-    /// Protocol-specific details provided to the error
+    /*! Protocol-specific details provided to the error */
     std::any details;
 };
 

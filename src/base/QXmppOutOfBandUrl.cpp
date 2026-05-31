@@ -22,13 +22,14 @@ public:
     std::optional<QString> description;
 };
 
-///
-/// \class QXmppOutOfBandUrl
-///
-/// A URL and a description of its contents, from \xep{0066, Out of Band Data}
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppOutOfBandUrl
+    \inmodule QXmpp
+
+    A URL and a description of its contents, from \xep{0066}{Out of Band Data}
+
+    \since QXmpp 1.5
+*/
 
 QXmppOutOfBandUrl::QXmppOutOfBandUrl()
     : d(new QXmppOutOfBandUrlPrivate())
@@ -37,39 +38,34 @@ QXmppOutOfBandUrl::QXmppOutOfBandUrl()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppOutOfBandUrl);
 
-///
-/// Returns the attached URL
-///
+/*! Returns the attached URL */
 const QString &QXmppOutOfBandUrl::url() const
 {
     return d->url;
 }
 
-///
-/// Sets the attached URL
-///
+/*!
+    Sets the attached URL
+
+    \a url.
+*/
 void QXmppOutOfBandUrl::setUrl(const QString &url)
 {
     d->url = url;
 }
 
-///
-/// Returns the description of the URL
-///
+/*! Returns the description of the URL */
 const std::optional<QString> &QXmppOutOfBandUrl::description() const
 {
     return d->description;
 }
 
-///
-/// Set the description of the URL
-///
+/*! Set the \a description of the URL */
 void QXmppOutOfBandUrl::setDescription(const std::optional<QString> &description)
 {
     d->description = description;
 }
 
-/// \cond
 bool QXmppOutOfBandUrl::parse(const QDomElement &el)
 {
     d->url = el.firstChildElement(u"url"_s).text();
@@ -89,4 +85,3 @@ void QXmppOutOfBandUrl::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"desc", d->description },
     });
 }
-/// \endcond

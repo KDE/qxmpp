@@ -15,9 +15,7 @@ class QXmppEncryptedFileSharingProviderPrivate;
 class QXMPP_EXPORT QXmppEncryptedFileSharingProvider : public QXmppFileSharingProvider
 {
 public:
-    /// \cond
     using SourceType = QXmppEncryptedFileSource;
-    /// \endcond
 
     QXmppEncryptedFileSharingProvider(QXmppFileSharingManager *manager, std::shared_ptr<QXmppFileSharingProvider> uploadBaseProvider);
     ~QXmppEncryptedFileSharingProvider() override;

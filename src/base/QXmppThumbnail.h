@@ -40,11 +40,9 @@ public:
     std::optional<uint32_t> height() const;
     void setHeight(std::optional<uint32_t>);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"thumbnail", QXmpp::Private::ns_thumbs };
     bool parse(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppThumbnailPrivate> d;

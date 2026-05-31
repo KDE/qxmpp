@@ -28,10 +28,8 @@ public:
     std::optional<QXmppOmemoEnvelope> searchEnvelope(const QString &recipientJid, uint32_t recipientDeviceId) const;
     void addEnvelope(const QString &recipientJid, const QXmppOmemoEnvelope &envelope);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isOmemoElement(const QDomElement &element);
 

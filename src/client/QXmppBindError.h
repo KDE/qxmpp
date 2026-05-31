@@ -9,13 +9,15 @@
 
 namespace QXmpp {
 
-///
-/// Indicates a resource binding error
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \inmodule QXmpp
+
+    Indicates a resource binding error
+
+    \since QXmpp 1.7
+*/
 struct BindError {
-    /// Stanza error returned by the server
+    /*! Stanza error returned by the server */
     QXmppStanza::Error stanzaError;
 };
 

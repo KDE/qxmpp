@@ -460,15 +460,16 @@ void QXmppCallStreamPrivate::onPeerCertificateReceived(GCharPtr pem)
     Q_EMIT peerCertificateReceived(expectedPeerCertificateDigest == peerCertificateDigest);
 }
 
-///
-/// \class QXmppCallStream
-///
-/// The QXmppCallStream class represents an RTP stream in a VoIP call.
-///
-/// \note THIS API IS NOT FINALIZED YET
-///
-/// \since QXmpp 1.3
-///
+/*!
+    \class QXmppCallStream
+    \inmodule QXmpp
+
+    The QXmppCallStream class represents an RTP stream in a VoIP call.
+
+    \note THIS API IS NOT FINALIZED YET
+
+    \since QXmpp 1.3
+*/
 
 QXmppCallStream::QXmppCallStream(GstElement *pipeline, GstElement *rtpbin, QString media, QString creator, QString name, int id, bool useDtls, QObject *parent)
     : QXmppLoggable(parent),
@@ -476,45 +477,41 @@ QXmppCallStream::QXmppCallStream(GstElement *pipeline, GstElement *rtpbin, QStri
 {
 }
 
-///
-/// Returns the JID of the creator of the call stream.
-///
+/*! Returns the JID of the creator of the call stream. */
 QString QXmppCallStream::creator() const
 {
     return d->creator;
 }
 
-///
-/// Returns the media type of the stream, "audio" or "video".
-///
+/*! Returns the media type of the stream, "audio" or "video". */
 QString QXmppCallStream::media() const
 {
     return d->media;
 }
 
-///
-/// Returns the name of the stream (e.g. "webcam" or "voice").
-///
-/// There is no defined format and there are no predefined values for this.
-///
+/*!
+    Returns the name of the stream (e.g. "webcam" or "voice").
+
+    There is no defined format and there are no predefined values for this.
+*/
 QString QXmppCallStream::name() const
 {
     return d->name;
 }
 
-///
-/// Returns the local ID of the stream.
-///
+/*! Returns the local ID of the stream. */
 int QXmppCallStream::id() const
 {
     return d->id;
 }
 
-///
-/// Sets a gstreamer receive pad callback.
-///
-/// Can be used to process or display the received data.
-///
+/*!
+    Sets a gstreamer receive pad callback.
+
+    Can be used to process or display the received data.
+
+    \a cb.
+*/
 void QXmppCallStream::setReceivePadCallback(std::function<void(GstPad *)> cb)
 {
     d->receivePadCB = std::move(cb);
@@ -523,11 +520,13 @@ void QXmppCallStream::setReceivePadCallback(std::function<void(GstPad *)> cb)
     }
 }
 
-///
-/// Sets a gstreamer send pad callback.
-///
-/// Can be used to send the stream input.
-///
+/*!
+    Sets a gstreamer send pad callback.
+
+    Can be used to send the stream input.
+
+    \a cb.
+*/
 void QXmppCallStream::setSendPadCallback(std::function<void(GstPad *)> cb)
 {
     d->sendPadCB = std::move(cb);

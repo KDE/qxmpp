@@ -18,35 +18,35 @@ class QDomElement;
 class QXMPP_EXPORT QXmppPubSubSubscription
 {
 public:
-    ///
-    /// The State enum describes the state of a subscription.
-    ///
+    /*!
+        The State enum describes the state of a subscription.
+
+        \value Invalid No state information is included.
+        \value None There is no subscription with the node.
+        \value Pending A subscription is pending.
+        \value Subscribed The user is subscribed to the node.
+        \value Unconfigured The subscription requires configuration before it becomes active.
+    */
     enum State : uint8_t {
-        /// No state information is included.
         Invalid,
-        /// There is no subscription with the node.
         None,
-        /// A subscription is pending.
         Pending,
-        /// The user is subscribed to the node.
         Subscribed,
-        /// The subscription requires configuration before it becomes active.
         Unconfigured,
     };
 
-    ///
-    /// The SubscribeOptionsSupport enum describes whether the availability of a
-    /// subscription configuration. This is also known as
-    /// &lt;subscribe-options/&gt;.
-    ///
+    /*!
+        The SubscribeOptionsSupport enum describes whether the availability of a
+        subscription configuration. This is also known as
+        &lt;subscribe-options/&gt;.
+
+        \value Unavailable A subscription configuration is not advertised.
+        \value Available Configuration of the subscription is possible, but not required.
+        \value Required Configuration of the subscription is required. No event notifications are going to be sent until the subscription has been configured.
+    */
     enum ConfigurationSupport : uint8_t {
-        /// A subscription configuration is not advertised.
         Unavailable,
-        /// Configuration of the subscription is possible, but not required.
         Available,
-        /// Configuration of the subscription is required. No event
-        /// notifications are going to be sent until the subscription has been
-        /// configured.
         Required,
     };
 
@@ -85,10 +85,8 @@ public:
 
     static bool isSubscription(const QDomElement &);
 
-    /// \cond
     void parse(const QDomElement &);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppPubSubSubscriptionPrivate> d;

@@ -11,15 +11,17 @@
 
 namespace QXmpp {
 
-///
-/// \brief STUN server address
-///
-/// \since QXmpp 1.14
-///
+/*!
+    \inmodule QXmpp
+
+    \brief STUN server address
+
+    \since QXmpp 1.14
+*/
 struct StunServer {
-    /// host address of the STUN server
+    /*! host address of the STUN server */
     QHostAddress host;
-    /// port of the STUN server (default: 3478)
+    /*! port of the STUN server (default: 3478) */
     quint16 port;
 };
 

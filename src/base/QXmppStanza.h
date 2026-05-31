@@ -29,11 +29,16 @@ class QXmppExtendedAddressPrivate;
 
 namespace QXmpp {
 
-///
-/// \xep{0166, Jingle}-specific error condition, used in QXmppStanza::Error.
-///
-/// \since QXmpp 1.14
-///
+/*!
+    \xep{0166}{Jingle}-specific error condition, used in QXmppStanza::Error.
+
+    \since QXmpp 1.14
+
+    \value OutOfOrder
+    \value TieBreak
+    \value UnknownSession
+    \value UnsupportedInfo
+*/
 enum class JingleErrorCondition {
     OutOfOrder,
     TieBreak,
@@ -43,15 +48,17 @@ enum class JingleErrorCondition {
 
 }  // namespace QXmpp
 
-///
-/// \brief Represents an extended address as defined by \xep{0033, Extended
-/// Stanza Addressing}.
-///
-/// Extended addresses maybe of different types: some are defined by \xep{0033, Extended Stanza Addressing},
-/// others are defined in separate XEPs (for instance \xep{0146, Remote
-/// Controlling Clients}). That is why the "type" property is a string rather
-/// than an enumerated type.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an extended address as defined by \xep{0033}{Extended
+    Stanza Addressing}.
+
+    Extended addresses maybe of different types: some are defined by \xep{0033}{Extended Stanza Addressing},
+    others are defined in separate XEPs (for instance \xep{0146}{Remote
+    Controlling Clients}). That is why the "type" property is a string rather
+    than an enumerated type.
+*/
 class QXMPP_EXPORT QXmppExtendedAddress
 {
 public:
@@ -77,11 +84,9 @@ public:
 
     bool isValid() const;
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"address", QXmpp::Private::ns_extended_addressing };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppExtendedAddressPrivate> d;
@@ -90,70 +95,102 @@ private:
 class QXmppStanzaPrivate;
 class QXmppStanzaErrorPrivate;
 
-///
-/// \defgroup Stanzas Stanzas
-///
-/// All packets that are sent and received are serialized in Stanzas, so this
-/// includes IQ stanzas, message stanzas, presence stanzas and other stanzas.
-///
+/*!
+    \inmodule QXmpp
 
-///
-/// \brief The QXmppStanza class is the base class for all XMPP stanzas.
-///
-/// \ingroup Stanzas
-///
+    \brief The QXmppStanza class is the base class for all XMPP stanzas.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppStanza : public QXmppNonza
 {
 public:
-    ///
-    /// \brief The Error class represents a stanza error.
-    ///
+    /*!
+        \inmodule QXmpp
+
+        \brief The Error class represents a stanza error.
+    */
     class QXMPP_EXPORT Error
     {
     public:
-        /// The type represents the error type of stanza errors.
-        ///
-        /// The error descriptions are not detailed in here. The exact meaning
-        /// can be found in the particular protocols using them.
+        /*!
+            The type represents the error type of stanza errors.
+
+            The error descriptions are not detailed in here. The exact meaning
+            can be found in the particular protocols using them.
+
+            \value Cancel The error is not temporary.
+            \value Continue The error was only a warning.
+            \value Modify The request needs to be changed and resent.
+            \value Auth The request needs to be resent after authentication.
+            \value Wait The error is temporary, you should wait and resend.
+
+            \value NoType
+        */
         enum Type {
             NoType = -1,
-            Cancel,    ///< The error is not temporary.
-            Continue,  ///< The error was only a warning.
-            Modify,    ///< The request needs to be changed and resent.
-            Auth,      ///< The request needs to be resent after authentication.
-            Wait       ///< The error is temporary, you should wait and resend.
+            Cancel,
+            Continue,
+            Modify,
+            Auth,
+            Wait
         };
 
-        /// A detailed condition of the error
+        /*!
+            A detailed condition of the error
+
+            \value BadRequest The request does not contain a valid schema.
+            \value Conflict The request conflicts with another.
+            \value FeatureNotImplemented The feature is not implemented.
+            \value Forbidden The requesting entity does not posses the necessary privileges to perform the request.
+            \value Gone The user or server can not be contacted at the address. This is used in combination with a redirection URI.
+            \value InternalServerError The server has expierienced an internal error and can not process the request.
+            \value ItemNotFound The requested item could not be found.
+            \value JidMalformed The given JID is not valid.
+            \value NotAcceptable The request does not meet the defined critera.
+            \value NotAllowed No entity is allowed to perform the request.
+            \value NotAuthorized The request should be resent after authentication.
+            \value RecipientUnavailable The recipient is unavailable.
+            \value Redirect The requested resource is available elsewhere. This is used in combination with a redirection URI.
+            \value RegistrationRequired The requesting entity needs to register first.
+            \value RemoteServerNotFound The remote server could not be found.
+            \value RemoteServerTimeout The connection to the server could not be established or timed out.
+            \value ResourceConstraint The recipient lacks system resources to perform the request.
+            \value ServiceUnavailable The service is currently not available.
+            \value SubscriptionRequired The requester needs to subscribe first.
+            \value UndefinedCondition An undefined condition was hit.
+            \value UnexpectedRequest The request was unexpected.
+            \value PolicyViolation The entity has violated a local server policy. \since QXmpp 1.3.
+        */
         enum Condition {
             NoCondition = -1,
-            BadRequest,             ///< The request does not contain a valid schema.
-            Conflict,               ///< The request conflicts with another.
-            FeatureNotImplemented,  ///< The feature is not implemented.
-            Forbidden,              ///< The requesting entity does not posses the necessary privileges to perform the request.
-            Gone,                   ///< The user or server can not be contacted at the address. This is used in combination with a redirection URI.
-            InternalServerError,    ///< The server has expierienced an internal error and can not process the request.
-            ItemNotFound,           ///< The requested item could not be found.
-            JidMalformed,           ///< The given JID is not valid.
-            NotAcceptable,          ///< The request does not meet the defined critera.
-            NotAllowed,             ///< No entity is allowed to perform the request.
-            NotAuthorized,          ///< The request should be resent after authentication.
+            BadRequest,
+            Conflict,
+            FeatureNotImplemented,
+            Forbidden,
+            Gone,
+            InternalServerError,
+            ItemNotFound,
+            JidMalformed,
+            NotAcceptable,
+            NotAllowed,
+            NotAuthorized,
 #if QXMPP_DEPRECATED_SINCE(1, 3)
-            /// Payment is required to perform the request.
-            /// \deprecated This error condition is deprecated since QXmpp 1.3 as it was not adopted in RFC6120.
+            // PaymentRequired: payment is required to perform the request.
+            // Deprecated since QXmpp 1.3 as it was not adopted in RFC6120.
             PaymentRequired Q_DECL_ENUMERATOR_DEPRECATED_X("The <payment-required/> error was removed in RFC6120"),
 #endif
-            RecipientUnavailable = 12,  ///< The recipient is unavailable.
-            Redirect,                   ///< The requested resource is available elsewhere. This is used in combination with a redirection URI.
-            RegistrationRequired,       ///< The requesting entity needs to register first.
-            RemoteServerNotFound,       ///< The remote server could not be found.
-            RemoteServerTimeout,        ///< The connection to the server could not be established or timed out.
-            ResourceConstraint,         ///< The recipient lacks system resources to perform the request.
-            ServiceUnavailable,         ///< The service is currently not available.
-            SubscriptionRequired,       ///< The requester needs to subscribe first.
-            UndefinedCondition,         ///< An undefined condition was hit.
-            UnexpectedRequest,          ///< The request was unexpected.
-            PolicyViolation             ///< The entity has violated a local server policy. \since QXmpp 1.3
+            RecipientUnavailable = 12,
+            Redirect,
+            RegistrationRequired,
+            RemoteServerNotFound,
+            RemoteServerTimeout,
+            ResourceConstraint,
+            ServiceUnavailable,
+            SubscriptionRequired,
+            UndefinedCondition,
+            UnexpectedRequest,
+            PolicyViolation
         };
 
         Error();
@@ -161,9 +198,7 @@ public:
         Error(Error &&);
         Error(Type type, Condition cond, const QString &text = QString());
         Error(const QString &type, const QString &cond, const QString &text = QString());
-        /// \cond
         Error(QSharedDataPointer<QXmppStanzaErrorPrivate> d);
-        /// \endcond
         ~Error();
 
         Error &operator=(const Error &);
@@ -201,10 +236,8 @@ public:
         QDateTime retryDate() const;
         void setRetryDate(const QDateTime &);
 
-        /// \cond
         void parse(const QDomElement &element);
         void toXml(QXmlStreamWriter *writer) const;
-        /// \endcond
 
     private:
         friend class QXmppStanza;
@@ -246,13 +279,11 @@ public:
     std::optional<QXmppE2eeMetadata> e2eeMetadata() const;
     void setE2eeMetadata(const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
 
-    /// \cond
     void parse(const QDomElement &element) override;
 
 protected:
     void extensionsToXml(QXmlStreamWriter *writer, QXmpp::SceMode = QXmpp::SceAll) const;
     void generateAndSetNextId();
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppStanzaPrivate> d;

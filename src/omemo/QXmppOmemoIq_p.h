@@ -14,10 +14,8 @@ public:
     QXmppOmemoElement omemoElement();
     void setOmemoElement(const QXmppOmemoElement &omemoElement);
 
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
     static bool isOmemoIq(const QDomElement &element);
 

@@ -23,10 +23,8 @@ public:
     QXmppTask<void> makeTrustDecisions(QString encryption, QString keyOwnerJid, QList<QByteArray> keyIdsForAuthentication, QList<QByteArray> keyIdsForDistrusting = {});
 
 protected:
-    /// \cond
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
-    /// \endcond
 
 private:
     QXmppTask<void> makeTrustDecisions(QString encryption, QMultiHash<QString, QByteArray> keyIdsForAuthentication, QMultiHash<QString, QByteArray> keyIdsForDistrusting);
@@ -37,12 +35,10 @@ private:
 
     QXmppTask<QXmpp::SendResult> sendTrustMessage(const QString &encryption, const QList<QXmppTrustMessageKeyOwner> &keyOwners, const QString &recipientJid);
 
-    /// \cond
     inline QXmppAtmTrustStorage *trustStorage() const
     {
         return dynamic_cast<QXmppAtmTrustStorage *>(QXmppTrustManager::trustStorage());
     }
-    /// \endcond
 
     friend class tst_QXmppTrustManager;
 };

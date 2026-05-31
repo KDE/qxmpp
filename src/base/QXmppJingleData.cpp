@@ -238,77 +238,85 @@ QXmppJingleIqContentPrivate::QXmppJingleIqContentPrivate()
     description.setSsrc(0);
 }
 
-///
-/// \enum QXmppJingleIq::Creator
-///
-/// Party that originially generated the content type
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \enum QXmppJingleIq::Creator
 
-///
-/// \struct QXmppJingleIq::RtpSessionStateActive
-///
-/// Actively participating in the session after having been on mute or having put the other party on
-/// hold
-///
-/// \since QXmpp 1.5
-///
+    Party that originally generated the content type.
 
-///
-/// \struct QXmppJingleIq::RtpSessionStateHold
-///
-/// Temporarily not listening for media from the other party
-///
-/// \since QXmpp 1.5
-///
+    \value Initiator The initiator generated the content type.
+    \value Responder The responder generated the content type.
 
-///
-/// \struct QXmppJingleIq::RtpSessionStateUnhold
-///
-/// Ending hold state
-///
-/// \since QXmpp 1.5
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \struct QXmppJingleIq::RtpSessionStateMuting
-///
-/// State for muting or unmuting
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \struct QXmppJingleIq::RtpSessionStateActive
+    \inmodule QXmpp
 
-///
-/// \struct QXmppJingleIq::RtpSessionStateRinging
-///
-/// State after the callee acknowledged the call but did not yet interacted with it
-///
-/// \since QXmpp 1.5
-///
+    Actively participating in the session after having been on mute or having put the other party on
+    hold
 
-///
-/// \typedef QXmppJingleIq::RtpSessionState
-///
-/// Contains the state of an RTP session as specified by \xep{0167, Jingle RTP Sessions}
-/// Informational Messages.
-///
-/// \since QXmpp 1.5
-///
+    \since QXmpp 1.5
+*/
 
-/// Constructs an empty content.
+/*!
+    \struct QXmppJingleIq::RtpSessionStateHold
+    \inmodule QXmpp
+
+    Temporarily not listening for media from the other party
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \struct QXmppJingleIq::RtpSessionStateUnhold
+    \inmodule QXmpp
+
+    Ending hold state
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \struct QXmppJingleIq::RtpSessionStateMuting
+    \inmodule QXmpp
+
+    State for muting or unmuting
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \struct QXmppJingleIq::RtpSessionStateRinging
+    \inmodule QXmpp
+
+    State after the callee acknowledged the call but did not yet interacted with it
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \typedef QXmppJingleIq::RtpSessionState
+
+    Contains the state of an RTP session as specified by \xep{0167}{Jingle RTP Sessions}
+    Informational Messages.
+
+    \since QXmpp 1.5
+*/
+
+/*! Constructs an empty content. */
 QXmppJingleIq::Content::Content()
     : d(new QXmppJingleIqContentPrivate())
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppJingleIq::Content::Content(const QXmppJingleIq::Content &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppJingleIq::Content::Content(QXmppJingleIq::Content &&) = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppJingleIq::Content &QXmppJingleIq::Content::operator=(const QXmppJingleIq::Content &) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppJingleIq::Content &QXmppJingleIq::Content::operator=(QXmppJingleIq::Content &&) = default;
 
 QXmppJingleIq::Content::~Content() = default;
@@ -343,12 +351,12 @@ void QXmppJingleIq::Content::setSenders(const QString &senders)
     d->senders = senders;
 }
 
-///
-/// Returns the description as specified by
-/// \xep{0167, Jingle RTP Sessions} and RFC 3550.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Returns the description as specified by
+    \xep{0167}{Jingle RTP Sessions} and RFC 3550.
+
+    \since QXmpp 0.9
+*/
 QXmppJingleRtpDescription QXmppJingleIq::Content::description() const
 {
     return d->description;
@@ -359,108 +367,113 @@ void QXmppJingleIq::Content::setDescription(const QXmppJingleRtpDescription &des
     d->description = description;
 }
 
-/// \deprecated This method is deprecated since QXmpp 1.6. Use
-/// \c QXmppJingleIq::Conent::description().media() instead.
+/*!
+    \deprecated This method is deprecated since QXmpp 1.6. Use
+    \c QXmppJingleIq::Conent::description().media() instead.
+*/
 QString QXmppJingleIq::Content::descriptionMedia() const
 {
     return d->description.media();
 }
 
-/// \deprecated This method is deprecated since QXmpp 1.6. Use
-/// \c QXmppJingleIq::Conent::description().setMedia() instead.
+/*!
+    \deprecated This method is deprecated since QXmpp 1.6. Use
+    \c QXmppJingleIq::Conent::description().setMedia() instead.
+*/
 void QXmppJingleIq::Content::setDescriptionMedia(const QString &media)
 {
     d->description.setMedia(media);
 }
 
-///
-/// Returns the description's 32-bit synchronization source for the media stream as specified by
-/// \xep{0167, Jingle RTP Sessions} and RFC 3550.
-///
-/// \since QXmpp 0.9
-/// \deprecated This method is deprecated since QXmpp 1.6. Use
-/// \c QXmppJingleIq::Content::description().setSsrc() instead.
-///
+/*!
+    Returns the description's 32-bit synchronization source for the media stream as specified by
+    \xep{0167}{Jingle RTP Sessions} and RFC 3550.
+
+    \since QXmpp 0.9
+    \deprecated This method is deprecated since QXmpp 1.6. Use
+    \c QXmppJingleIq::Content::description().setSsrc() instead.
+*/
 quint32 QXmppJingleIq::Content::descriptionSsrc() const
 {
     return d->description.ssrc();
 }
 
-/// \deprecated This method is deprecated since QXmpp 1.6. Use
-/// \c QXmppJingleIq::Conent::description().setSsrc() instead.
+/*!
+    \deprecated This method is deprecated since QXmpp 1.6. Use
+    \c QXmppJingleIq::Conent::description().setSsrc() instead.
+*/
 void QXmppJingleIq::Content::setDescriptionSsrc(quint32 ssrc)
 {
     d->description.setSsrc(ssrc);
 }
 
-/// \deprecated This method is deprecated since QXmpp 1.6. Use
-/// \c QXmppJingleIq::Conent::description().addPayloadType() instead.
+/*!
+    \deprecated This method is deprecated since QXmpp 1.6. Use
+    \c QXmppJingleIq::Conent::description().addPayloadType() instead.
+*/
 void QXmppJingleIq::Content::addPayloadType(const QXmppJinglePayloadType &payload)
 {
     d->description.addPayloadType(payload);
 }
 
-/// \deprecated This method is deprecated since QXmpp 1.6. Use
-/// \c QXmppJingleIq::Conent::description().payloadTypes() instead.
+/*!
+    \deprecated This method is deprecated since QXmpp 1.6. Use
+    \c QXmppJingleIq::Conent::description().payloadTypes() instead.
+*/
 QList<QXmppJinglePayloadType> QXmppJingleIq::Content::payloadTypes() const
 {
     return d->description.payloadTypes();
 }
 
-/// \deprecated This method is deprecated since QXmpp 1.6. Use
-/// \c QXmppJingleIq::Conent::description().setPayloadTypes() instead.
+/*!
+    \deprecated This method is deprecated since QXmpp 1.6. Use
+    \c QXmppJingleIq::Conent::description().setPayloadTypes() instead.
+*/
 void QXmppJingleIq::Content::setPayloadTypes(const QList<QXmppJinglePayloadType> &payloadTypes)
 {
     d->description.setPayloadTypes(payloadTypes);
 }
 
-///
-/// Returns whether multiplexing of RTP data and control packets on a single port is supported as
-/// specified by \xep{0167, Jingle RTP Sessions} and  RFC 5761.
-///
-/// \return whether multiplexing of RTP data and control packets is supported
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns whether multiplexing of RTP data and control packets on a single port is supported as
+    specified by \xep{0167}{Jingle RTP Sessions} and  RFC 5761.
+
+    \since QXmpp 1.5
+*/
 bool QXmppJingleIq::Content::isRtpMultiplexingSupported() const
 {
     return d->isRtpMultiplexingSupported;
 }
 
-///
-/// Sets whether multiplexing of RTP data and control packets on a single port is supported as
-/// specified by \xep{0167, Jingle RTP Sessions} and  RFC 5761.
-///
-/// \param isRtpMultiplexingSupported whether multiplexing of RTP data and control packets is
-///        supported
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets via \a isRtpMultiplexingSupported whether multiplexing of RTP data and
+    control packets on a single port is supported as specified by \xepn{0167}
+    (Jingle RTP Sessions) and RFC 5761.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::Content::setRtpMultiplexingSupported(bool isRtpMultiplexingSupported)
 {
     d->isRtpMultiplexingSupported = isRtpMultiplexingSupported;
 }
 
-///
-/// Returns the encryption used for SRTP negotiation as specified by
-/// \xep{0167, Jingle RTP Sessions}.
-///
-/// \return the RTP encryption via SRTP
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the RTP encryption via SRTP used for SRTP negotiation as specified
+    by \xep{0167}{Jingle RTP Sessions}.
+
+    \since QXmpp 1.5
+*/
 std::optional<QXmppJingleRtpEncryption> QXmppJingleIq::Content::rtpEncryption() const
 {
     return d->rtpEncryption;
 }
 
-///
-/// Sets the encryption used for SRTP negotiation as specified by \xep{0167, Jingle RTP Sessions}.
-///
-/// \param rtpEncryption RTP encryption via SRTP
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a rtpEncryption (RTP encryption via SRTP) used for SRTP
+    negotiation as specified by \xep{0167}{Jingle RTP Sessions}.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::Content::setRtpEncryption(const std::optional<QXmppJingleRtpEncryption> &rtpEncryption)
 {
     d->rtpEncryption = rtpEncryption;
@@ -477,11 +490,11 @@ QList<QXmppJingleCandidate> QXmppJingleIq::Content::transportCandidates() const
     return d->transportCandidates;
 }
 
-///
-/// Sets a list of transport candidates.
-///
-/// \since QXmpp 0.9.2
-///
+/*!
+    Sets a list of transport candidates.
+
+    \since QXmpp 0.9.2
+*/
 void QXmppJingleIq::Content::setTransportCandidates(const QList<QXmppJingleCandidate> &candidates)
 {
     d->transportType = candidates.isEmpty() ? QString() : staticString(ns_jingle_ice_udp);
@@ -508,179 +521,162 @@ void QXmppJingleIq::Content::setTransportPassword(const QString &password)
     d->transportPassword = password;
 }
 
-///
-/// Returns the properties of RTP feedback.
-///
-/// \return the RTP feedback properties
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the RTP feedback properties.
+
+    \since QXmpp 1.5
+*/
 QVector<QXmppJingleRtpFeedbackProperty> QXmppJingleIq::Content::rtpFeedbackProperties() const
 {
     return d->rtpFeedbackProperties;
 }
 
-///
-/// Sets the properties of RTP feedback.
-///
-/// \param rtpFeedbackProperties RTP feedback properties
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a rtpFeedbackProperties of RTP feedback.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::Content::setRtpFeedbackProperties(const QVector<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties)
 {
     d->rtpFeedbackProperties = rtpFeedbackProperties;
 }
 
-///
-/// Returns the intervals of RTP feedback.
-///
-/// \return the RTP feedback intervals
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the RTP feedback intervals.
+
+    \since QXmpp 1.5
+*/
 QVector<QXmppJingleRtpFeedbackInterval> QXmppJingleIq::Content::rtpFeedbackIntervals() const
 {
     return d->rtpFeedbackIntervals;
 }
 
-///
-/// Sets the intervals of RTP feedback.
-///
-/// \param rtpFeedbackIntervals RTP feedback intervals
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a rtpFeedbackIntervals of RTP feedback.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::Content::setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals)
 {
     d->rtpFeedbackIntervals = rtpFeedbackIntervals;
 }
 
-///
-/// Returns the RTP header extension properties.
-///
-/// \return the RTP header extension properties
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the RTP header extension properties.
+
+    \since QXmpp 1.5
+*/
 QVector<QXmppJingleRtpHeaderExtensionProperty> QXmppJingleIq::Content::rtpHeaderExtensionProperties() const
 {
     return d->rtpHeaderExtensionProperties;
 }
 
-///
-/// Sets the RTP header extension properties.
-///
-/// \param rtpHeaderExtensionProperties RTP header extension properties
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a rtpHeaderExtensionProperties.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::Content::setRtpHeaderExtensionProperties(const QVector<QXmppJingleRtpHeaderExtensionProperty> &rtpHeaderExtensionProperties)
 {
     d->rtpHeaderExtensionProperties = rtpHeaderExtensionProperties;
 }
 
-///
-/// Returns whether mixing of RTP header extensions is allowed corresponding to the
-/// "extmap-allow-mixed" element as specified by
-/// \xep{0293, Jingle RTP Header Extensions Negotiation}.
-///
-/// \return whether mixing of RTP header extensions is allowed
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns whether mixing of RTP header extensions is allowed corresponding to the
+    "extmap-allow-mixed" element as specified by
+    \xep{0293}{Jingle RTP Header Extensions Negotiation}.
+
+    \since QXmpp 1.5
+*/
 bool QXmppJingleIq::Content::isRtpHeaderExtensionMixingAllowed() const
 {
     return d->isRtpHeaderExtensionMixingAllowed;
 }
 
-///
-/// Sets whether mixing of RTP header extensions is allowed corresponding to the
-/// "extmap-allow-mixed" element as specified by
-/// \xep{0293, Jingle RTP Header Extensions Negotiation}.
-///
-/// \param isAllowed whether mixing of RTP header extensions is allowed
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets via \a isRtpHeaderExtensionMixingAllowed whether mixing of RTP header
+    extensions is allowed corresponding to the "extmap-allow-mixed" element as
+    specified by \xep{0293}{Jingle RTP Header Extensions Negotiation}.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::Content::setRtpHeaderExtensionMixingAllowed(bool isRtpHeaderExtensionMixingAllowed)
 {
     d->isRtpHeaderExtensionMixingAllowed = isRtpHeaderExtensionMixingAllowed;
 }
 
-///
-/// Returns the fingerprint hash value for the transport key.
-///
-/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Returns the fingerprint hash value for the transport key.
+
+    This is used for DTLS-SRTP as defined in \xep{0320}{Use of DTLS-SRTP in Jingle Sessions}.
+
+    \since QXmpp 0.9
+*/
 QByteArray QXmppJingleIq::Content::transportFingerprint() const
 {
     return d->transportFingerprint;
 }
 
-///
-/// Sets the fingerprint hash value for the transport key.
-///
-/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Sets the fingerprint hash value for the transport key.
+
+    This is used for DTLS-SRTP as defined in \xep{0320}{Use of DTLS-SRTP in Jingle Sessions}.
+
+    \since QXmpp 0.9
+*/
 void QXmppJingleIq::Content::setTransportFingerprint(const QByteArray &fingerprint)
 {
     d->transportFingerprint = fingerprint;
 }
 
-///
-/// Returns the fingerprint hash algorithm for the transport key.
-///
-/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Returns the fingerprint hash algorithm for the transport key.
+
+    This is used for DTLS-SRTP as defined in \xep{0320}{Use of DTLS-SRTP in Jingle Sessions}.
+
+    \since QXmpp 0.9
+*/
 QString QXmppJingleIq::Content::transportFingerprintHash() const
 {
     return d->transportFingerprintHash;
 }
 
-///
-/// Sets the fingerprint hash algorithm for the transport key.
-///
-/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Sets the fingerprint hash algorithm for the transport key.
+
+    This is used for DTLS-SRTP as defined in \xep{0320}{Use of DTLS-SRTP in Jingle Sessions}.
+
+    \since QXmpp 0.9
+*/
 void QXmppJingleIq::Content::setTransportFingerprintHash(const QString &hash)
 {
     d->transportFingerprintHash = hash;
 }
 
-///
-/// Returns the setup role for the encrypted transport.
-///
-/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Returns the setup role for the encrypted transport.
+
+    This is used for DTLS-SRTP as defined in \xep{0320}{Use of DTLS-SRTP in Jingle Sessions}.
+
+    \since QXmpp 0.9
+*/
 QString QXmppJingleIq::Content::transportFingerprintSetup() const
 {
     return d->transportFingerprintSetup;
 }
 
-///
-/// Sets the setup role for the encrypted transport.
-///
-/// This is used for DTLS-SRTP as defined in \xep{0320, Use of DTLS-SRTP in Jingle Sessions}.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Sets the setup role for the encrypted transport.
+
+    This is used for DTLS-SRTP as defined in \xep{0320}{Use of DTLS-SRTP in Jingle Sessions}.
+
+    \since QXmpp 0.9
+*/
 void QXmppJingleIq::Content::setTransportFingerprintSetup(const QString &setup)
 {
     d->transportFingerprintSetup = setup;
 }
 
-/// \cond
 void QXmppJingleIq::Content::parse(const QDomElement &element)
 {
     d->creator = element.attribute(u"creator"_s);
@@ -964,8 +960,6 @@ QString QXmppJingleIq::Content::toSdp() const
     return sdp.join(u"\r\n") + u"\r\n";
 }
 
-/// \endcond
-
 class QXmppJingleIqReasonPrivate : public QSharedData
 {
 public:
@@ -974,78 +968,78 @@ public:
     QXmppJingleReason::RtpErrorCondition m_rtpErrorCondition = QXmppJingleReason::NoErrorCondition;
 };
 
-///
-/// \class QXmppJingleReason
-///
-/// The QXmppJingleReason class represents the "reason" element of a
-/// QXmppJingle element.
-///
+/*!
+    \class QXmppJingleReason
+    \inmodule QXmpp
 
-/// Constructs an empty QXmppJingleReason.
+    The QXmppJingleReason class represents the "reason" element of a
+    QXmppJingle element.
+*/
+
+/*! Constructs an empty QXmppJingleReason. */
 QXmppJingleReason::QXmppJingleReason()
     : d(new QXmppJingleIqReasonPrivate())
 {
 }
 
-///
-/// Constructs a QXmppJingleReason with specific type, error text and RTP error condition.
-///
-/// \since QXmpp 1.11
-///
+/*!
+    Constructs a QXmppJingleReason with specific type, error text and RTP error condition.
+
+    \since QXmpp 1.11
+*/
 QXmppJingleReason::QXmppJingleReason(Type type, const QString &text, std::optional<RtpErrorCondition> rtpError)
     : d(new QXmppJingleIqReasonPrivate { {}, text, type, rtpError.value_or(NoErrorCondition) })
 {
 }
 
-/// Returns the reason's textual description.
+/*! Returns the reason's textual description. */
 QString QXmppJingleReason::text() const
 {
     return d->m_text;
 }
 
-/// Sets the reason's textual description.
+/*!
+    Sets the reason's textual description.
+
+    \a text.
+*/
 void QXmppJingleReason::setText(const QString &text)
 {
     d->m_text = text;
 }
 
-/// Gets the reason's type.
+/*! Gets the reason's type. */
 QXmppJingleReason::Type QXmppJingleReason::type() const
 {
     return d->m_type;
 }
 
-/// Sets the reason's type.
+/*! Sets the reason's \a type. */
 void QXmppJingleReason::setType(QXmppJingleReason::Type type)
 {
     d->m_type = type;
 }
 
-///
-/// Returns the RTP error condition as specified by \xep{0167, Jingle RTP Sessions}.
-///
-/// \return the RTP error condition
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the RTP error condition as specified by \xep{0167}{Jingle RTP Sessions}.
+
+    \since QXmpp 1.5
+*/
 QXmppJingleReason::RtpErrorCondition QXmppJingleReason::rtpErrorCondition() const
 {
     return d->m_rtpErrorCondition;
 }
 
-///
-/// Sets the RTP error condition as specified by \xep{0167, Jingle RTP Sessions}.
-///
-/// \param rtpErrorCondition RTP error condition
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a rtpErrorCondition as specified by \xep{0167}{Jingle RTP Sessions}.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleReason::setRtpErrorCondition(RtpErrorCondition rtpErrorCondition)
 {
     d->m_rtpErrorCondition = rtpErrorCondition;
 }
 
-/// \cond
 void QXmppJingleReason::parse(const QDomElement &element)
 {
     // the reason type element must be the first child element
@@ -1074,7 +1068,6 @@ void QXmppJingleReason::toXml(QXmlStreamWriter *writer) const
         OptionalEnumElement { d->m_rtpErrorCondition, ns_jingle_rtp_errors },
     });
 }
-/// \endcond
 
 class QXmppJingleIqPrivate : public QSharedData
 {
@@ -1102,88 +1095,90 @@ QXmppJingleIqPrivate::QXmppJingleIqPrivate()
 {
 }
 
-/// Constructs a QXmppJingleIq.
+/*! Constructs a QXmppJingleIq. */
 QXmppJingleIq::QXmppJingleIq()
     : d(new QXmppJingleIqPrivate())
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppJingleIq::QXmppJingleIq(const QXmppJingleIq &) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppJingleIq::QXmppJingleIq(QXmppJingleIq &&) = default;
 
 QXmppJingleIq::~QXmppJingleIq() = default;
 
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppJingleIq &QXmppJingleIq::operator=(const QXmppJingleIq &) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppJingleIq &QXmppJingleIq::operator=(QXmppJingleIq &&) = default;
 
-///
-/// Returns the Jingle IQ's action.
-///
+/*! Returns the Jingle IQ's action. */
 QXmppJingleIq::Action QXmppJingleIq::action() const
 {
     return d->action;
 }
 
-/// Sets the Jingle IQ's action.
-///
-/// \param action
+/*!
+    Sets the Jingle IQ's \a action.
+*/
 
 void QXmppJingleIq::setAction(QXmppJingleIq::Action action)
 {
     d->action = action;
 }
 
-///
-/// Adds an element to the IQ's content elements.
-///
-/// \since QXmpp 0.9.2
-///
+/*!
+    Adds an element to the IQ's content elements.
+
+    \since QXmpp 0.9.2
+
+    \a content.
+*/
 void QXmppJingleIq::addContent(const QXmppJingleIq::Content &content)
 {
     d->contents << content;
 }
 
-///
-/// Returns the IQ's content elements.
-///
-/// \since QXmpp 0.9.2
-///
+/*!
+    Returns the IQ's content elements.
+
+    \since QXmpp 0.9.2
+*/
 QList<QXmppJingleIq::Content> QXmppJingleIq::contents() const
 {
     return d->contents;
 }
 
-///
-/// Sets the IQ's content elements.
-///
-/// \since QXmpp 0.9.2
-///
+/*!
+    Sets the IQ's content elements.
+
+    \since QXmpp 0.9.2
+
+    \a contents.
+*/
 void QXmppJingleIq::setContents(const QList<QXmppJingleIq::Content> &contents)
 {
     d->contents = contents;
 }
 
-/// Returns the session initiator.
+/*! Returns the session initiator. */
 QString QXmppJingleIq::initiator() const
 {
     return d->initiator;
 }
 
-/// Sets the session initiator.
+/*! Sets the session \a initiator. */
 void QXmppJingleIq::setInitiator(const QString &initiator)
 {
     d->initiator = initiator;
 }
 
-///
-/// Returns the reason for the action (in most cases the error).
-///
-/// \since QXmpp 1.11
-///
+/*!
+    Returns the reason for the action (in most cases the error).
+
+    \since QXmpp 1.11
+*/
 std::optional<QXmppJingleReason> QXmppJingleIq::actionReason() const
 {
     if (d->actionReasonSet) {
@@ -1192,11 +1187,13 @@ std::optional<QXmppJingleReason> QXmppJingleIq::actionReason() const
     return {};
 }
 
-///
-/// Sets the reason for the action (in most cases the error).
-///
-/// \since QXmpp 1.11
-///
+/*!
+    Sets the reason for the action (in most cases the error).
+
+    \since QXmpp 1.11
+
+    \a reason.
+*/
 void QXmppJingleIq::setActionReason(const std::optional<QXmppJingleReason> &reason)
 {
     d->actionReasonSet = reason.has_value();
@@ -1205,44 +1202,44 @@ void QXmppJingleIq::setActionReason(const std::optional<QXmppJingleReason> &reas
     }
 }
 
-///
-/// Returns a reference to the IQ's reason element.
-///
-/// \deprecated Deprecated since QXmpp 1.11: Use actionReason() instead.
-///
+/*!
+    Returns a reference to the IQ's reason element.
+
+    \deprecated Deprecated since QXmpp 1.11: Use actionReason() instead.
+*/
 QXmppJingleReason &QXmppJingleIq::reason()
 {
     return d->actionReason;
 }
 
-///
-/// Returns a const reference to the IQ's reason element.
-///
-/// \deprecated Deprecated since QXmpp 1.11: Use actionReason() instead.
-///
+/*!
+    Returns a const reference to the IQ's reason element.
+
+    \deprecated Deprecated since QXmpp 1.11: Use actionReason() instead.
+*/
 const QXmppJingleReason &QXmppJingleIq::reason() const
 {
     return d->actionReason;
 }
 
-/// Returns the session responder.
+/*! Returns the session responder. */
 QString QXmppJingleIq::responder() const
 {
     return d->responder;
 }
 
-/// Sets the session responder.
+/*! Sets the session \a responder. */
 void QXmppJingleIq::setResponder(const QString &responder)
 {
     d->responder = responder;
 }
 
-///
-/// Returns true if the call is ringing.
-///
-/// \deprecated This method is deprecated since QXmpp 1.5. Use \c QXmppJingleIq::rtpSessionState()
-/// instead.
-///
+/*!
+    Returns true if the call is ringing.
+
+    \deprecated This method is deprecated since QXmpp 1.5. Use \c QXmppJingleIq::rtpSessionState()
+    instead.
+*/
 bool QXmppJingleIq::ringing() const
 {
     if (d->rtpSessionState) {
@@ -1252,14 +1249,12 @@ bool QXmppJingleIq::ringing() const
     return false;
 }
 
-///
-/// Set to true if the call is ringing.
-///
-/// \param ringing
-///
-/// \deprecated This method is deprecated since QXmpp 1.5. Use
-/// \c QXmppJingleIq::setRtpSessionState() instead.
-///
+/*!
+    Sets via \a ringing whether the call is ringing.
+
+    \deprecated This method is deprecated since QXmpp 1.5. Use
+    \c QXmppJingleIq::setRtpSessionState() instead.
+*/
 void QXmppJingleIq::setRinging(bool ringing)
 {
     if (ringing) {
@@ -1269,73 +1264,69 @@ void QXmppJingleIq::setRinging(bool ringing)
     }
 }
 
-/// Returns the session ID.
+/*! Returns the session ID. */
 QString QXmppJingleIq::sid() const
 {
     return d->sid;
 }
 
-/// Sets the session ID.
+/*!
+    Sets the session ID.
+
+    \a sid.
+*/
 void QXmppJingleIq::setSid(const QString &sid)
 {
     d->sid = sid;
 }
 
-///
-/// Returns the JID of the \xep{0272, Multiparty Jingle (Muji)} group chat.
-///
-/// \return the Muji group chat JID
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the JID of the \xep{0272}{Multiparty Jingle (Muji)} group chat.
+
+    \since QXmpp 1.5
+*/
 QString QXmppJingleIq::mujiGroupChatJid() const
 {
     return d->mujiGroupChatJid;
 }
 
-///
-/// Sets the JID of the \xep{0272, Multiparty Jingle (Muji)} group chat.
-///
-/// \param mujiGroupChatJid Muji group chat JID
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a mujiGroupChatJid of the \xep{0272}{Multiparty Jingle (Muji)}
+    group chat.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::setMujiGroupChatJid(const QString &mujiGroupChatJid)
 {
     d->mujiGroupChatJid = mujiGroupChatJid;
 }
 
-///
-/// Returns the state of an RTP session as specified by \xep{0167, Jingle RTP Sessions}
-/// Informational Messages.
-///
-/// \return the session's state
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the state of an RTP session as specified by \xep{0167}{Jingle RTP Sessions}
+    Informational Messages.
+
+    \since QXmpp 1.5
+*/
 std::optional<QXmppJingleIq::RtpSessionState> QXmppJingleIq::rtpSessionState() const
 {
     return d->rtpSessionState;
 }
 
-///
-/// Sets the state of an RTP session as specified by \xep{0167, Jingle RTP Sessions} Informational
-/// Messages.
-///
-/// The appropriate action is set as well.
-/// Thus, it is not needed to set it manually.
-///
-/// \param rtpSessionState session's state
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a rtpSessionState of an RTP session as specified by \xepn{0167}
+    (Jingle RTP Sessions) Informational Messages.
+
+    The appropriate action is set as well.
+    Thus, it is not needed to set it manually.
+
+    \since QXmpp 1.5
+*/
 void QXmppJingleIq::setRtpSessionState(const std::optional<RtpSessionState> &rtpSessionState)
 {
     d->rtpSessionState = rtpSessionState;
     d->action = Action::SessionInfo;
 }
 
-/// \cond
 void QXmppJingleIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement jingleElement = element.firstChildElement(u"jingle"_s);
@@ -1419,7 +1410,6 @@ void QXmppJingleIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond
 
 class QXmppJingleCandidatePrivate : public QSharedData
 {
@@ -1443,173 +1433,169 @@ QXmppJingleCandidatePrivate::QXmppJingleCandidatePrivate()
 {
 }
 
-///
-/// Constructs an empty candidate.
-///
+/*! Constructs an empty candidate. */
 QXmppJingleCandidate::QXmppJingleCandidate()
     : d(new QXmppJingleCandidatePrivate())
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppJingleCandidate::QXmppJingleCandidate(const QXmppJingleCandidate &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppJingleCandidate::QXmppJingleCandidate(QXmppJingleCandidate &&) = default;
 QXmppJingleCandidate::~QXmppJingleCandidate() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppJingleCandidate &QXmppJingleCandidate::operator=(const QXmppJingleCandidate &other) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppJingleCandidate &QXmppJingleCandidate::operator=(QXmppJingleCandidate &&) = default;
 
-/// Returns the candidate's component ID.
+/*! Returns the candidate's component ID. */
 int QXmppJingleCandidate::component() const
 {
     return d->component;
 }
 
-/// Sets the candidates's component ID.
+/*! Sets the candidates's \a component ID. */
 void QXmppJingleCandidate::setComponent(int component)
 {
     d->component = component;
 }
 
-///
-/// Returns the candidate's foundation.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Returns the candidate's foundation.
+
+    \since QXmpp 0.9
+*/
 QString QXmppJingleCandidate::foundation() const
 {
     return d->foundation;
 }
 
-///
-/// Sets the candidate's foundation.
-///
-/// \param foundation
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Sets the candidate's \a foundation.
+
+    \since QXmpp 0.9
+*/
 void QXmppJingleCandidate::setFoundation(const QString &foundation)
 {
     d->foundation = foundation;
 }
 
-///
-/// Returns the candidate's generation.
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Returns the candidate's generation.
+
+    \since QXmpp 0.9
+*/
 int QXmppJingleCandidate::generation() const
 {
     return d->generation;
 }
 
-///
-/// Sets the candidate's generation.
-///
-/// \param generation
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Sets the candidate's \a generation.
+
+    \since QXmpp 0.9
+*/
 void QXmppJingleCandidate::setGeneration(int generation)
 {
     d->generation = generation;
 }
 
-/// Returns the candidate's host address.
-///
+/*! Returns the candidate's host address. */
 
 QHostAddress QXmppJingleCandidate::host() const
 {
     return d->host;
 }
 
-/// Sets the candidate's host address.
+/*! Sets the candidate's \a host address. */
 void QXmppJingleCandidate::setHost(const QHostAddress &host)
 {
     d->host = host;
 }
 
-/// Returns the candidate's unique identifier.
+/*! Returns the candidate's unique identifier. */
 QString QXmppJingleCandidate::id() const
 {
     return d->id;
 }
 
-/// Sets the candidate's unique identifier.
+/*!
+    Sets the candidate's unique identifier.
+
+    \a id.
+*/
 void QXmppJingleCandidate::setId(const QString &id)
 {
     d->id = id;
 }
 
-/// Returns the network index (starting at 0) the candidate is on.
+/*! Returns the network index (starting at 0) the candidate is on. */
 int QXmppJingleCandidate::network() const
 {
     return d->network;
 }
 
-/// Sets the network index (starting at 0) the candidate is on.
+/*! Sets the \a network index (starting at 0) the candidate is on. */
 void QXmppJingleCandidate::setNetwork(int network)
 {
     d->network = network;
 }
 
-/// Returns the candidate's port number.
+/*! Returns the candidate's port number. */
 quint16 QXmppJingleCandidate::port() const
 {
     return d->port;
 }
 
-/// Sets the candidate's port number.
+/*! Sets the candidate's \a port number. */
 void QXmppJingleCandidate::setPort(quint16 port)
 {
     d->port = port;
 }
 
-/// Returns the candidate's priority.
+/*! Returns the candidate's priority. */
 int QXmppJingleCandidate::priority() const
 {
     return d->priority;
 }
 
-/// Sets the candidate's priority.
+/*! Sets the candidate's \a priority. */
 void QXmppJingleCandidate::setPriority(int priority)
 {
     d->priority = priority;
 }
 
-/// Returns the candidate's protocol (e.g. "udp").
+/*! Returns the candidate's protocol (e.g. "udp"). */
 QString QXmppJingleCandidate::protocol() const
 {
     return d->protocol;
 }
 
-/// Sets the candidate's protocol (e.g. "udp").
+/*! Sets the candidate's \a protocol (e.g. "udp"). */
 void QXmppJingleCandidate::setProtocol(const QString &protocol)
 {
     d->protocol = protocol;
 }
 
-/// Returns the candidate type (e.g. "host").
+/*! Returns the candidate type (e.g. "host"). */
 QXmppJingleCandidate::Type QXmppJingleCandidate::type() const
 {
     return d->type;
 }
 
-/// Sets the candidate type (e.g. "host").
+/*! Sets the candidate \a type (e.g. "host"). */
 void QXmppJingleCandidate::setType(QXmppJingleCandidate::Type type)
 {
     d->type = type;
 }
 
-/// Returns true if the host address or port are empty.
+/*! Returns true if the host address or port are empty. */
 bool QXmppJingleCandidate::isNull() const
 {
     return d->host.isNull() || !d->port;
 }
 
-/// \cond
 void QXmppJingleCandidate::parse(const QDomElement &element)
 {
     d->component = element.attribute(u"component"_s).toInt();
@@ -1640,7 +1626,6 @@ void QXmppJingleCandidate::toXml(QXmlStreamWriter *writer) const
         Attribute { u"type", d->type },
     });
 }
-/// \endcond
 
 class QXmppJinglePayloadTypePrivate : public QSharedData
 {
@@ -1670,7 +1655,7 @@ QXmppJinglePayloadType::QXmppJinglePayloadType()
 {
 }
 
-/// Constructs a copy of other.
+/*! Constructs a copy of other. */
 QXmppJinglePayloadType::QXmppJinglePayloadType(const QXmppJinglePayloadType &other)
     : d(other.d)
 {
@@ -1680,136 +1665,139 @@ QXmppJinglePayloadType::~QXmppJinglePayloadType()
 {
 }
 
-/// Returns the number of channels (e.g. 1 for mono, 2 for stereo).
+/*! Returns the number of channels (e.g. 1 for mono, 2 for stereo). */
 unsigned char QXmppJinglePayloadType::channels() const
 {
     return d->channels;
 }
 
-/// Sets the number of channels (e.g. 1 for mono, 2 for stereo).
+/*! Sets the number of \a channels (e.g. 1 for mono, 2 for stereo). */
 void QXmppJinglePayloadType::setChannels(unsigned char channels)
 {
     d->channels = channels;
 }
 
-/// Returns the clockrate in Hz, i.e. the number of samples per second.
+/*! Returns the clockrate in Hz, i.e. the number of samples per second. */
 unsigned int QXmppJinglePayloadType::clockrate() const
 {
     return d->clockrate;
 }
 
-/// Sets the clockrate in Hz, i.e. the number of samples per second.
+/*! Sets the \a clockrate in Hz, i.e. the number of samples per second. */
 void QXmppJinglePayloadType::setClockrate(unsigned int clockrate)
 {
     d->clockrate = clockrate;
 }
 
-/// Returns the payload type identifier.
+/*! Returns the payload type identifier. */
 unsigned char QXmppJinglePayloadType::id() const
 {
     return d->id;
 }
 
-/// Sets the payload type identifier.
+/*!
+    Sets the payload type identifier.
+
+    \a id.
+*/
 void QXmppJinglePayloadType::setId(unsigned char id)
 {
     Q_ASSERT(id <= 127);
     d->id = id;
 }
 
-/// Returns the maximum packet time in milliseconds.
+/*! Returns the maximum packet time in milliseconds. */
 unsigned int QXmppJinglePayloadType::maxptime() const
 {
     return d->maxptime;
 }
 
-/// Sets the maximum packet type in milliseconds.
+/*!
+    Sets the maximum packet type in milliseconds.
+
+    \a maxptime.
+*/
 void QXmppJinglePayloadType::setMaxptime(unsigned int maxptime)
 {
     d->maxptime = maxptime;
 }
 
-/// Returns the payload type name.
+/*! Returns the payload type name. */
 QString QXmppJinglePayloadType::name() const
 {
     return d->name;
 }
 
-/// Sets the payload type name.
+/*! Sets the payload type \a name. */
 void QXmppJinglePayloadType::setName(const QString &name)
 {
     d->name = name;
 }
 
-/// Returns the payload parameters.
+/*! Returns the payload parameters. */
 QMap<QString, QString> QXmppJinglePayloadType::parameters() const
 {
     return d->parameters;
 }
 
-/// Sets the payload parameters.
+/*! Sets the payload \a parameters. */
 void QXmppJinglePayloadType::setParameters(const QMap<QString, QString> &parameters)
 {
     d->parameters = parameters;
 }
 
-/// Returns the packet time in milliseconds (20 by default).
+/*! Returns the packet time in milliseconds (20 by default). */
 unsigned int QXmppJinglePayloadType::ptime() const
 {
     return d->ptime ? d->ptime : 20;
 }
 
-/// Sets the packet time in milliseconds (20 by default).
+/*!
+    Sets the packet time in milliseconds (20 by default).
+
+    \a ptime.
+*/
 void QXmppJinglePayloadType::setPtime(unsigned int ptime)
 {
     d->ptime = ptime;
 }
 
-///
-/// Returns the properties of RTP feedback.
-///
-/// \return the RTP feedback properties
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the RTP feedback properties.
+
+    \since QXmpp 1.5
+*/
 QVector<QXmppJingleRtpFeedbackProperty> QXmppJinglePayloadType::rtpFeedbackProperties() const
 {
     return d->rtpFeedbackProperties;
 }
 
-///
-/// Sets the properties of RTP feedback.
-///
-/// \param rtpFeedbackProperties RTP feedback properties
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \a rtpFeedbackProperties of RTP feedback.
+
+    \since QXmpp 1.5
+*/
 void QXmppJinglePayloadType::setRtpFeedbackProperties(const QVector<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties)
 {
     d->rtpFeedbackProperties = rtpFeedbackProperties;
 }
 
-///
-/// Returns the intervals of RTP feedback.
-///
-/// \return the RTP feedback intervals
-///
+/*!
+    Returns the RTP feedback intervals.
+*/
 QVector<QXmppJingleRtpFeedbackInterval> QXmppJinglePayloadType::rtpFeedbackIntervals() const
 {
     return d->rtpFeedbackIntervals;
 }
 
-///
-/// Sets the intervals of RTP feedback.
-///
-/// \param rtpFeedbackIntervals RTP feedback intervals
-///
+/*!
+    Sets the \a rtpFeedbackIntervals of RTP feedback.
+*/
 void QXmppJinglePayloadType::setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals)
 {
     d->rtpFeedbackIntervals = rtpFeedbackIntervals;
 }
 
-/// \cond
 void QXmppJinglePayloadType::parse(const QDomElement &element)
 {
     d->id = parseInt<uint8_t>(element.attribute(u"id"_s)).value_or(0);
@@ -1851,11 +1839,10 @@ void QXmppJinglePayloadType::toXml(QXmlStreamWriter *writer) const
         d->rtpFeedbackIntervals,
     });
 }
-/// \endcond
 
-/// Assigns the other payload type to this one.
-///
-/// \param other
+/*!
+    Assigns \a other payload type to this one.
+*/
 
 QXmppJinglePayloadType &QXmppJinglePayloadType::operator=(const QXmppJinglePayloadType &other)
 {
@@ -1863,9 +1850,9 @@ QXmppJinglePayloadType &QXmppJinglePayloadType::operator=(const QXmppJinglePaylo
     return *this;
 }
 
-/// Returns true if this QXmppJinglePayloadType and \a other refer to the same payload type.
-///
-/// \param other
+/*!
+    Returns true if this QXmppJinglePayloadType and \a other refer to the same payload type.
+*/
 
 bool QXmppJinglePayloadType::operator==(const QXmppJinglePayloadType &other) const
 {
@@ -1889,25 +1876,26 @@ public:
     QList<QXmppJinglePayloadType> payloadTypes;
 };
 
-///
-/// \class QXmppJingleRtpDescription
-///
-/// \brief Represents a description for \xep{0167, Jingle RTP Sessions}, including media type,
-/// streaming source, namespace and payload types.
-///
-/// \since QXmpp 1.6
-///
+/*!
+    \class QXmppJingleRtpDescription
+    \inmodule QXmpp
+
+    \brief Represents a description for \xep{0167}{Jingle RTP Sessions}, including media type,
+    streaming source, namespace and payload types.
+
+    \since QXmpp 1.6
+*/
 
 QXmppJingleRtpDescription::QXmppJingleRtpDescription()
     : d(new QXmppJingleRtpDescriptionPrivate())
 {
 }
 
-///
-/// Default constructor
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Default constructor
+
+    \since QXmpp 1.14
+*/
 QXmppJingleRtpDescription::QXmppJingleRtpDescription(const QString &media, quint32 ssrc, const QList<QXmppJinglePayloadType> &payloadTypes)
     : d(new QXmppJingleRtpDescriptionPrivate())
 {
@@ -1918,63 +1906,56 @@ QXmppJingleRtpDescription::QXmppJingleRtpDescription(const QString &media, quint
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpDescription)
 
-///
-/// Returns the media type.
-///
+/*! Returns the media type. */
 QString QXmppJingleRtpDescription::media() const
 {
     return d->media;
 }
 
-///
-/// Sets the media type.
-///
+/*! Sets the \a media type. */
 void QXmppJingleRtpDescription::setMedia(const QString &media)
 {
     d->media = media;
 }
 
-///
-/// Returns the streaming source.
-///
+/*! Returns the streaming source. */
 quint32 QXmppJingleRtpDescription::ssrc() const
 {
     return d->ssrc;
 }
 
-///
-/// Sets the streaming source.
-///
+/*!
+    Sets the streaming source.
+
+    \a ssrc.
+*/
 void QXmppJingleRtpDescription::setSsrc(quint32 ssrc)
 {
     d->ssrc = ssrc;
 }
 
-///
-/// Adds a payload type to the list of payload types.
-///
+/*! Adds a \a payload type to the list of payload types. */
 void QXmppJingleRtpDescription::addPayloadType(const QXmppJinglePayloadType &payload)
 {
     d->payloadTypes.append(payload);
 }
 
-///
-/// Returns a list of payload types.
-///
+/*! Returns a list of payload types. */
 const QList<QXmppJinglePayloadType> &QXmppJingleRtpDescription::payloadTypes() const
 {
     return d->payloadTypes;
 }
 
-///
-/// Sets the list of payload types.
-///
+/*!
+    Sets the list of payload types.
+
+    \a payloadTypes.
+*/
 void QXmppJingleRtpDescription::setPayloadTypes(const QList<QXmppJinglePayloadType> &payloadTypes)
 {
     d->payloadTypes = payloadTypes;
 }
 
-/// \cond
 void QXmppJingleRtpDescription::parse(const QDomElement &element)
 {
     d->media = element.attribute(u"media"_s);
@@ -1991,7 +1972,6 @@ void QXmppJingleRtpDescription::toXml(QXmlStreamWriter *writer) const
         d->payloadTypes,
     });
 }
-/// \endcond
 
 class QXmppSdpParameterPrivate : public QSharedData
 {
@@ -2000,18 +1980,17 @@ public:
     QString value;
 };
 
-///
-/// \class QXmppSdpParameter
-///
-/// \brief The QXmppSdpParameter class represents a Session Description Protocol (SDP) parameter
-/// specified by RFC 4566 and used by several XEPs based on \xep{0166, Jingle}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppSdpParameter
+    \inmodule QXmpp
 
-///
-/// Constructs a Session Description Protocol parameter.
-///
+    \brief The QXmppSdpParameter class represents a Session Description Protocol (SDP) parameter
+    specified by RFC 4566 and used by several XEPs based on \xep{0166}{Jingle}.
+
+    \since QXmpp 1.5
+*/
+
+/*! Constructs a Session Description Protocol parameter. */
 QXmppSdpParameter::QXmppSdpParameter()
     : d(new QXmppSdpParameterPrivate())
 {
@@ -2019,51 +1998,42 @@ QXmppSdpParameter::QXmppSdpParameter()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppSdpParameter)
 
-///
-/// Returns the name of the parameter.
-///
-/// \return the parameter's name
-///
+/*!
+    Returns the name of the parameter.
+*/
 QString QXmppSdpParameter::name() const
 {
     return d->name;
 }
 
-///
-/// Sets the name of the parameter.
-///
-/// \param name parameter's name
-///
+/*!
+    Sets the \a name of the parameter.
+*/
 void QXmppSdpParameter::setName(const QString &name)
 {
     d->name = name;
 }
 
-///
-/// Returns the value of the parameter.
-///
-/// \return the parameter's value
-///
+/*!
+    Returns the value of the parameter.
+*/
 QString QXmppSdpParameter::value() const
 {
     return d->value;
 }
 
-///
-/// Sets the value of the parameter.
-///
-/// A parameter in the form "a=b" can be created by this method.
-/// Any other form of parameters can be created by not using this method.
-/// The value stays a default-constructed QString then.
-///
-/// \param value parameter's value
-///
+/*!
+    Sets the \a value of the parameter.
+
+    A parameter in the form "a=b" can be created by this method.
+    Any other form of parameters can be created by not using this method.
+    The value stays a default-constructed QString then.
+*/
 void QXmppSdpParameter::setValue(const QString &value)
 {
     d->value = value;
 }
 
-/// \cond
 void QXmppSdpParameter::parse(const QDomElement &element)
 {
     d->name = element.attribute(u"name"_s);
@@ -2078,15 +2048,14 @@ void QXmppSdpParameter::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"value", d->value },
     });
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is a Session Description Protocol parameter element.
-///
-/// \param element DOM element being checked
-///
-/// \return whether element is a Session Description Protocol parameter element
-///
+/*!
+    Determines whether the given DOM \a element is a Session Description
+    Protocol parameter element.
+
+    Returns true if \a element is a Session Description Protocol parameter
+    element.
+*/
 bool QXmppSdpParameter::isSdpParameter(const QDomElement &element)
 {
     return element.tagName() == u"parameter";
@@ -2101,18 +2070,17 @@ public:
     QString sessionParams;
 };
 
-///
-/// \class QXmppJingleRtpCryptoElement
-///
-/// \brief The QXmppJingleRtpCryptoElement class represents the \xep{0167: Jingle RTP Sessions}
-/// "crypto" element used for SRTP negotiation.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppJingleRtpCryptoElement
+    \inmodule QXmpp
 
-///
-/// Constructs a Jingle RTP crypto element.
-///
+    \brief The QXmppJingleRtpCryptoElement class represents the \xep{0167}{Jingle RTP Sessions}
+    "crypto" element used for SRTP negotiation.
+
+    \since QXmpp 1.5
+*/
+
+/*! Constructs a Jingle RTP crypto element. */
 QXmppJingleRtpCryptoElement::QXmppJingleRtpCryptoElement()
     : d(new QXmppJingleRtpCryptoElementPrivate())
 {
@@ -2120,89 +2088,74 @@ QXmppJingleRtpCryptoElement::QXmppJingleRtpCryptoElement()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpCryptoElement)
 
-///
-/// Returns the tag used as an identifier for the crypto element.
-///
-/// \return the identifying tag
-///
+/*!
+    Returns the tag used as an identifier for the crypto element.
+*/
 uint32_t QXmppJingleRtpCryptoElement::tag() const
 {
     return d->tag;
 }
 
-///
-/// Sets the tag used as an identifier for the crypto element.
-///
-/// \param tag identifying tag
-///
+/*!
+    Sets the \a tag used as an identifier for the crypto element.
+*/
 void QXmppJingleRtpCryptoElement::setTag(uint32_t tag)
 {
     d->tag = tag;
 }
 
-///
-/// Returns the crypto suite used as an identifier for describing the encryption and authentication
-/// algorithms.
-///
-/// \return the identifying crypto suite
-///
+/*!
+    Returns the crypto suite used as an identifier for describing the encryption and authentication
+    algorithms.
+*/
 QString QXmppJingleRtpCryptoElement::cryptoSuite() const
 {
     return d->cryptoSuite;
 }
 
-///
-/// Sets the crypto suite used as an identifier for describing the encryption and authentication
-/// algorithms.
-///
-/// \param cryptoSuite identifying crypto suite
-///
+/*!
+    Sets the \a cryptoSuite used as an identifier for describing the encryption
+    and authentication algorithms.
+*/
 void QXmppJingleRtpCryptoElement::setCryptoSuite(const QString &cryptoSuite)
 {
     d->cryptoSuite = cryptoSuite;
 }
 
-///
-/// Returns the key parameters providing one or more sets of keying material for the crypto suite.
-///
-/// \return the key parameters providing one or more sets of keying material
-///
+/*!
+    Returns the key parameters providing one or more sets of keying material
+    for the crypto suite.
+*/
 QString QXmppJingleRtpCryptoElement::keyParams() const
 {
     return d->keyParams;
 }
 
-///
-/// Sets the key parameters providing one or more sets of keying material for the crypto suite.
-///
-/// \param keyParams key parameters providing one or more sets of keying material
-///
+/*!
+    Sets the \a keyParams providing one or more sets of keying material for the
+    crypto suite.
+*/
 void QXmppJingleRtpCryptoElement::setKeyParams(const QString &keyParams)
 {
     d->keyParams = keyParams;
 }
 
-///
-/// Returns the session parameters providing transport-specific data.
-///
-/// \return the session parameters providing transport-specific data
-///
+/*!
+    Returns the session parameters providing transport-specific data.
+*/
 QString QXmppJingleRtpCryptoElement::sessionParams() const
 {
     return d->sessionParams;
 }
 
-///
-/// Sets the session parameters providing transport-specific data.
-///
-/// \param sessionParams session parameters providing transport-specific data
-///
+/*!
+    Sets the \a sessionParams providing transport-specific data.
+*/
 void QXmppJingleRtpCryptoElement::setSessionParams(const QString &sessionParams)
 {
     d->sessionParams = sessionParams;
 }
 
-/// \cond
 void QXmppJingleRtpCryptoElement::parse(const QDomElement &element)
 {
     d->tag = element.attribute(u"tag"_s).toUInt();
@@ -2223,15 +2176,12 @@ void QXmppJingleRtpCryptoElement::toXml(QXmlStreamWriter *writer) const
         });
     }
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is an RTP crypto element.
-///
-/// \param element DOM element being checked
-///
-/// \return whether element is an RTP crypto element
-///
+/*!
+    Determines whether the given DOM \a element is an RTP crypto element.
+
+    Returns true if \a element is an RTP crypto element.
+*/
 bool QXmppJingleRtpCryptoElement::isJingleRtpCryptoElement(const QDomElement &element)
 {
     return element.tagName() == u"crypto";
@@ -2244,18 +2194,17 @@ public:
     QVector<QXmppJingleRtpCryptoElement> cryptoElements;
 };
 
-///
-/// \class QXmppJingleRtpEncryption
-///
-/// \brief The QXmppJingleRtpEncryption class represents the \xep{0167: Jingle RTP Sessions}
-/// "encryption" element used for SRTP negotiation.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppJingleRtpEncryption
+    \inmodule QXmpp
 
-///
-/// Constructs a Jingle RTP encryption.
-///
+    \brief The QXmppJingleRtpEncryption class represents the \xep{0167}{Jingle RTP Sessions}
+    "encryption" element used for SRTP negotiation.
+
+    \since QXmpp 1.5
+*/
+
+/*! Constructs a Jingle RTP encryption. */
 QXmppJingleRtpEncryption::QXmppJingleRtpEncryption()
     : d(new QXmppJingleRtpEncryptionPrivate())
 {
@@ -2263,47 +2212,38 @@ QXmppJingleRtpEncryption::QXmppJingleRtpEncryption()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpEncryption)
 
-///
-/// Returns whether encryption via SRTP is required.
-///
-/// \return whether encryption is required
-///
+/*!
+    Returns whether encryption via SRTP is required.
+*/
 bool QXmppJingleRtpEncryption::isRequired() const
 {
     return d->isRequired;
 }
 
-///
-/// Sets whether encryption via SRTP is required.
-///
-/// \param isRequired whether encryption is required
-///
+/*!
+    Sets via \a isRequired whether encryption via SRTP is required.
+*/
 void QXmppJingleRtpEncryption::setRequired(bool isRequired)
 {
     d->isRequired = isRequired;
 }
 
-///
-/// Returns the crypto elements used for encryption via SRTP.
-///
-/// \return the crypto elements
-///
+/*!
+    Returns the crypto elements used for encryption via SRTP.
+*/
 QVector<QXmppJingleRtpCryptoElement> QXmppJingleRtpEncryption::cryptoElements() const
 {
     return d->cryptoElements;
 }
 
-///
-/// Sets the crypto elements used for encryption via SRTP.
-///
-/// \param cryptoElements the crypto elements
-///
+/*!
+    Sets the \a cryptoElements used for encryption via SRTP.
+*/
 void QXmppJingleRtpEncryption::setCryptoElements(const QVector<QXmppJingleRtpCryptoElement> &cryptoElements)
 {
     d->cryptoElements = cryptoElements;
 }
 
-/// \cond
 void QXmppJingleRtpEncryption::parse(const QDomElement &element)
 {
     d->isRequired = parseBoolean(element.attribute(u"required"_s)).value_or(false);
@@ -2320,15 +2260,12 @@ void QXmppJingleRtpEncryption::toXml(QXmlStreamWriter *writer) const
         });
     }
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is an RTP encryption element.
-///
-/// \param element DOM element being checked
-///
-/// \return whether element is an RTP encryption element
-///
+/*!
+    Determines whether the given DOM \a element is an RTP encryption element.
+
+    Returns true if \a element is an RTP encryption element.
+*/
 bool QXmppJingleRtpEncryption::isJingleRtpEncryption(const QDomElement &element)
 {
     return element.tagName() == u"encryption" &&
@@ -2343,26 +2280,27 @@ public:
     QVector<QXmppSdpParameter> parameters;
 };
 
-///
-/// \class QXmppJingleRtpFeedbackProperty
-///
-/// \brief The QXmppJingleRtpFeedbackProperty class represents the
-/// \xep{0293, Jingle RTP Feedback Negotiation} "rtcp-fb" element.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppJingleRtpFeedbackProperty
+    \inmodule QXmpp
 
-/// Default constructor
+    \brief The QXmppJingleRtpFeedbackProperty class represents the
+    \xep{0293}{Jingle RTP Feedback Negotiation} "rtcp-fb" element.
+
+    \since QXmpp 1.5
+*/
+
+/*! Default constructor */
 QXmppJingleRtpFeedbackProperty::QXmppJingleRtpFeedbackProperty()
     : d(new QXmppJingleRtpFeedbackPropertyPrivate())
 {
 }
 
-///
-/// Default constructor
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Default constructor
+
+    \since QXmpp 1.14
+*/
 QXmppJingleRtpFeedbackProperty::QXmppJingleRtpFeedbackProperty(const QString &type, const QString &subtype)
     : d(new QXmppJingleRtpFeedbackPropertyPrivate())
 {
@@ -2372,74 +2310,61 @@ QXmppJingleRtpFeedbackProperty::QXmppJingleRtpFeedbackProperty(const QString &ty
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpFeedbackProperty)
 
-///
-/// Returns the type of RTP feedback.
-///
-/// \return the RTP feedback type
-///
+/*!
+    Returns the type of RTP feedback.
+*/
 QString QXmppJingleRtpFeedbackProperty::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the type of RTP feedback.
-///
-/// \param type RTP feedback type
-///
+/*!
+    Sets the \a type of RTP feedback.
+*/
 void QXmppJingleRtpFeedbackProperty::setType(const QString &type)
 {
     d->type = type;
 }
 
-///
-/// Returns the subtype for RTP feedback.
-///
-/// \return the RTP feedback subtype
-///
+/*!
+    Returns the subtype for RTP feedback.
+*/
 QString QXmppJingleRtpFeedbackProperty::subtype() const
 {
     return d->subtype;
 }
 
-///
-/// Sets the subtype of RTP feedback.
-///
-/// If there is more than one parameter, use QXmppJingleRtpFeedbackProperty::setParameters()
-/// instead of this method.
-///
-/// \param subtype RTP feedback subtype
-///
+/*!
+    Sets the \a subtype of RTP feedback.
+
+    If there is more than one parameter, use QXmppJingleRtpFeedbackProperty::setParameters()
+    instead of this method.
+*/
 void QXmppJingleRtpFeedbackProperty::setSubtype(const QString &subtype)
 {
     d->subtype = subtype;
 }
 
-///
-/// Returns the parameters of RTP feedback.
-///
-/// \return the RTP feedback parameters
-///
+/*!
+    Returns the parameters of RTP feedback.
+*/
 QVector<QXmppSdpParameter> QXmppJingleRtpFeedbackProperty::parameters() const
 {
     return d->parameters;
 }
 
-///
-/// Sets the parameters of RTP feedback.
-///
-/// Additional parameters can be set by this method.
-/// If there is only one parameter, use QXmppJingleRtpFeedbackProperty::setSubtype()
-/// instead of this method.
-///
-/// \param parameters RTP feedback parameters
-///
+/*!
+    Sets the \a parameters of RTP feedback.
+
+    Additional parameters can be set by this method.
+    If there is only one parameter, use QXmppJingleRtpFeedbackProperty::setSubtype()
+    instead of this method.
+*/
 void QXmppJingleRtpFeedbackProperty::setParameters(const QVector<QXmppSdpParameter> &parameters)
 {
     d->parameters = parameters;
 }
 
-/// \cond
 void QXmppJingleRtpFeedbackProperty::parse(const QDomElement &element)
 {
     d->type = element.attribute(u"type"_s);
@@ -2457,60 +2382,51 @@ void QXmppJingleRtpFeedbackProperty::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"subtype", d->subtype },
     });
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is an RTP feedback property element.
-///
-/// \param element DOM element being checked
-///
-/// \return whether element is an RTP feedback property element
-///
+/*!
+    Determines whether the given DOM \a element is an RTP feedback property element.
+
+    Returns true if \a element is an RTP feedback property element.
+*/
 bool QXmppJingleRtpFeedbackProperty::isJingleRtpFeedbackProperty(const QDomElement &element)
 {
     return element.tagName() == u"rtcp-fb" &&
         element.namespaceURI() == ns_jingle_rtcp_fb;
 }
 
-///
-/// \class QXmppJingleRtpFeedbackInterval
-///
-/// \brief The QXmppJingleRtpFeedbackInterval class represents the
-/// \xep{0293, Jingle RTP Feedback Negotiation} "rtcp-fb-trr-int" element.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppJingleRtpFeedbackInterval
+    \inmodule QXmpp
 
-///
-/// Constructs a Jingle RTP feedback interval.
-///
+    \brief The QXmppJingleRtpFeedbackInterval class represents the
+    \xep{0293}{Jingle RTP Feedback Negotiation} "rtcp-fb-trr-int" element.
+
+    \since QXmpp 1.5
+*/
+
+/*! Constructs a Jingle RTP feedback interval. */
 QXmppJingleRtpFeedbackInterval::QXmppJingleRtpFeedbackInterval()
 {
 }
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpFeedbackInterval)
 
-///
-/// Returns the value of the RTP feedback interval.
-///
-/// \return the RTP feedback interval value
-///
+/*!
+    Returns the value of the RTP feedback interval.
+*/
 uint64_t QXmppJingleRtpFeedbackInterval::value() const
 {
     return m_value;
 }
 
-///
-/// Sets the value of the RTP feedback interval.
-///
-/// \param value RTP feedback interval value
-///
+/*!
+    Sets the \a value of the RTP feedback interval.
+*/
 void QXmppJingleRtpFeedbackInterval::setValue(uint64_t value)
 {
     m_value = value;
 }
 
-/// \cond
 void QXmppJingleRtpFeedbackInterval::parse(const QDomElement &element)
 {
     m_value = element.attribute(u"value"_s).toUInt();
@@ -2523,15 +2439,13 @@ void QXmppJingleRtpFeedbackInterval::toXml(QXmlStreamWriter *writer) const
         Attribute { u"value", m_value },
     });
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is an RTP feedback interval element.
-///
-/// \param element DOM element being checked
-///
-/// \return whether element is an RTP feedback interval element
-///
+/*!
+    Determines whether the given DOM \a element is an RTP feedback interval
+    element.
+
+    Returns true if \a element is an RTP feedback interval element.
+*/
 bool QXmppJingleRtpFeedbackInterval::isJingleRtpFeedbackInterval(const QDomElement &element)
 {
     return element.tagName() == u"rtcp-fb-trr-int" &&
@@ -2547,32 +2461,37 @@ public:
     QVector<QXmppSdpParameter> parameters;
 };
 
-///
-/// \enum QXmppJingleRtpHeaderExtensionProperty::Senders
-///
-/// Parties that are allowed to send the negotiated RTP header extension
-///
+/*!
+    \enum QXmppJingleRtpHeaderExtensionProperty::Senders
 
-///
-/// \class QXmppJingleRtpHeaderExtensionProperty
-///
-/// \brief The QXmppJingleRtpHeaderExtensionProperty class represents the
-/// \xep{0294, Jingle RTP Header Extensions Negotiation} "rtp-hdrext" element.
-///
-/// \since QXmpp 1.5
-///
+    Parties that are allowed to send the negotiated RTP header extension.
 
-/// Default constructor
+    \value Both The initiator and the sender are allowed.
+    \value Initiator Only the initiator is allowed.
+    \value Responder Only the responder is allowed.
+*/
+
+/*!
+    \class QXmppJingleRtpHeaderExtensionProperty
+    \inmodule QXmpp
+
+    \brief The QXmppJingleRtpHeaderExtensionProperty class represents the
+    \xep{0294}{Jingle RTP Header Extensions Negotiation} "rtp-hdrext" element.
+
+    \since QXmpp 1.5
+*/
+
+/*! Default constructor */
 QXmppJingleRtpHeaderExtensionProperty::QXmppJingleRtpHeaderExtensionProperty()
     : d(new QXmppJingleRtpHeaderExtensionPropertyPrivate())
 {
 }
 
-///
-/// Default constructor
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Default constructor
+
+    \since QXmpp 1.14
+*/
 QXmppJingleRtpHeaderExtensionProperty::QXmppJingleRtpHeaderExtensionProperty(const QString &uri, uint32_t id)
     : d(new QXmppJingleRtpHeaderExtensionPropertyPrivate())
 {
@@ -2582,93 +2501,77 @@ QXmppJingleRtpHeaderExtensionProperty::QXmppJingleRtpHeaderExtensionProperty(con
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleRtpHeaderExtensionProperty)
 
-///
-/// Returns the ID of the RTP header extension.
-///
-/// The ID is 0 if it is unset.
-///
-/// \return the RTP header extension's ID
-///
+/*!
+    Returns the ID of the RTP header extension.
+
+    The ID is 0 if it is unset.
+*/
 uint32_t QXmppJingleRtpHeaderExtensionProperty::id() const
 {
     return d->id;
 }
 
-///
-/// Sets the ID of the RTP header extension.
-///
-/// The ID must either be at least 1 and at most 256 or at least 4096 and at most 4351.
-///
-/// \param id RTP header extension's ID
-///
+/*!
+    Sets the \a id of the RTP header extension.
+
+    The ID must either be at least 1 and at most 256 or at least 4096 and at most 4351.
+*/
 void QXmppJingleRtpHeaderExtensionProperty::setId(uint32_t id)
 {
     d->id = id;
 }
 
-///
-/// Returns the URI defning the RTP header extension.
-///
-/// \return the RTP header extension's URI
-///
+/*!
+    Returns the URI defning the RTP header extension.
+*/
 QString QXmppJingleRtpHeaderExtensionProperty::uri() const
 {
     return d->uri;
 }
 
-///
-/// Sets the URI defning the RTP header extension.
-///
-/// \param uri RTP header extension's URI
-///
+/*!
+    Sets the \a uri defning the RTP header extension.
+*/
 void QXmppJingleRtpHeaderExtensionProperty::setUri(const QString &uri)
 {
     d->uri = uri;
 }
 
-///
-/// Returns the parties that are allowed to send the negotiated RTP header extensions.
-///
-/// \return the parties that are allowed to send the RTP header extensions
-///
+/*!
+    Returns the parties that are allowed to send the negotiated RTP header extensions.
+*/
 QXmppJingleRtpHeaderExtensionProperty::Senders QXmppJingleRtpHeaderExtensionProperty::senders() const
 {
     return d->senders;
 }
 
-///
-/// Sets the parties that are allowed to send the negotiated RTP header extensions.
-///
-/// \param senders parties that are allowed to send the RTP header extensions
-///
+/*!
+    Sets the \a senders that are allowed to send the negotiated RTP header
+    extensions.
+*/
 void QXmppJingleRtpHeaderExtensionProperty::setSenders(Senders senders)
 {
     d->senders = senders;
 }
 
-///
-/// Returns the parameters of the RTP header extension.
-///
-/// \return the RTP header extension's parameters
-///
+/*!
+    Returns the parameters of the RTP header extension.
+*/
 QVector<QXmppSdpParameter> QXmppJingleRtpHeaderExtensionProperty::parameters() const
 {
     return d->parameters;
 }
 
-///
-/// Sets the parameters of the RTP header extension.
-///
-/// Additional parameters can be set by this method.
-///
-/// \param parameters RTP header extension's parameters
-///
+/*!
+    Sets the \a parameters of the RTP header extension.
+
+    Additional parameters can be set by this method.
+*/
 void QXmppJingleRtpHeaderExtensionProperty::setParameters(const QVector<QXmppSdpParameter> &parameters)
 {
     d->parameters = parameters;
 }
 
-/// \cond
 void QXmppJingleRtpHeaderExtensionProperty::parse(const QDomElement &element)
 {
     if (element.tagName() == u"rtp-hdrext" && element.namespaceURI() == ns_jingle_rtp_hdrext) {
@@ -2690,15 +2593,13 @@ void QXmppJingleRtpHeaderExtensionProperty::toXml(QXmlStreamWriter *writer) cons
         d->parameters,
     });
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is an RTP header extensions property element.
-///
-/// \param element DOM element being checked
-///
-/// \return whether element is an RTP header extension property element
-///
+/*!
+    Determines whether the given DOM \a element is an RTP header extensions
+    property element.
+
+    Returns true if \a element is an RTP header extension property element.
+*/
 bool QXmppJingleRtpHeaderExtensionProperty::isJingleRtpHeaderExtensionProperty(const QDomElement &element)
 {
     return element.tagName() == u"rtp-hdrext" &&
@@ -2720,66 +2621,63 @@ public:
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleReason)
 
-///
-/// \enum QXmppJingleMessageInitiationElement::Type
-///
-/// Possible types of Jingle Message Initiation elements
-///
+/*!
+    \enum QXmppJingleMessageInitiationElement::Type
 
-///
-/// \class QXmppJingleMessageInitiationElement
-///
-/// \brief The QXmppJingleMessageInitiationElement class represents a Jingle Message Initiation
-/// element as specified by \xep{0353, Jingle Message Initiation}.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.6
-///
+    Possible types of Jingle Message Initiation elements.
 
-///
-/// \brief Constructs a Jingle Message Initiation element.
-///
+    \value None
+    \value Propose
+    \value Ringing
+    \value Proceed
+    \value Reject
+    \value Retract
+    \value Finish
+*/
+
+/*!
+    \class QXmppJingleMessageInitiationElement
+    \inmodule QXmpp
+
+    \brief The QXmppJingleMessageInitiationElement class represents a Jingle Message Initiation
+    element as specified by \xep{0353}{Jingle Message Initiation}.
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.6
+*/
+
+/*! \brief Constructs a Jingle Message Initiation element. */
 QXmppJingleMessageInitiationElement::QXmppJingleMessageInitiationElement()
     : d(new QXmppJingleMessageInitiationElementPrivate())
 {
 }
 
-///
-/// Returns the Jingle Message Initiation element type
-///
+/*! Returns the Jingle Message Initiation element type */
 QXmppJingleMessageInitiationElement::Type QXmppJingleMessageInitiationElement::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the Jingle Message Initiation element type.
-///
+/*! Sets the Jingle Message Initiation element \a type. */
 void QXmppJingleMessageInitiationElement::setType(Type type)
 {
     d->type = type;
 }
 
-///
-/// Returns the Jingle Message Initiation element id.
-///
+/*! Returns the Jingle Message Initiation element id. */
 QString QXmppJingleMessageInitiationElement::id() const
 {
     return d->id;
 }
 
-///
-/// Sets the Jingle Message Initiation element id.
-///
+/*! Sets the Jingle Message Initiation element \a id. */
 void QXmppJingleMessageInitiationElement::setId(const QString &id)
 {
     d->id = id;
 }
 
-///
-/// Returns the Jingle Message Initiation element descriptions.
-///
+/*! Returns the Jingle Message Initiation element descriptions. */
 std::optional<QXmppJingleRtpDescription> QXmppJingleMessageInitiationElement::description() const
 {
     if (d->descriptions.isEmpty()) {
@@ -2788,9 +2686,11 @@ std::optional<QXmppJingleRtpDescription> QXmppJingleMessageInitiationElement::de
     return d->descriptions.first();
 }
 
-///
-/// Sets the Jingle Message Initiation element descriptions.
-///
+/*!
+    Sets the Jingle Message Initiation element descriptions.
+
+    \a description.
+*/
 void QXmppJingleMessageInitiationElement::setDescription(std::optional<QXmppJingleRtpDescription> description)
 {
     if (description.has_value()) {
@@ -2800,77 +2700,76 @@ void QXmppJingleMessageInitiationElement::setDescription(std::optional<QXmppJing
     }
 }
 
-///
-/// Returns the Jingle Message Initiation element descriptions.
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Returns the Jingle Message Initiation element descriptions.
+
+    \since QXmpp 1.14
+*/
 QList<QXmppJingleRtpDescription> QXmppJingleMessageInitiationElement::descriptions() const
 {
     return d->descriptions;
 }
 
-///
-/// Sets the Jingle Message Initiation element descriptions.
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Sets the Jingle Message Initiation element descriptions.
+
+    \since QXmpp 1.14
+
+    \a descriptions.
+*/
 void QXmppJingleMessageInitiationElement::setDescriptions(const QList<QXmppJingleRtpDescription> &descriptions)
 {
     d->descriptions = descriptions;
 }
 
-///
-/// Returns the Jingle Message Initiation element reason.
-///
+/*! Returns the Jingle Message Initiation element reason. */
 std::optional<QXmppJingleReason> QXmppJingleMessageInitiationElement::reason() const
 {
     return d->reason;
 }
 
-///
-/// Sets the Jingle Message Initiation element reason.
-///
+/*! Sets the Jingle Message Initiation element \a reason. */
 void QXmppJingleMessageInitiationElement::setReason(std::optional<QXmppJingleReason> reason)
 {
     d->reason = reason;
 }
 
-///
-/// Returns true if the Jingle Message Initiation element contains a <tie-break/> tag.
-///
+/*! Returns true if the Jingle Message Initiation element contains a <tie-break/> tag. */
 bool QXmppJingleMessageInitiationElement::containsTieBreak() const
 {
     return d->containsTieBreak;
 }
 
-///
-/// Sets if the Jingle Message Initiation element contains a <tie-break/> tag.
-///
+/*!
+    Sets if the Jingle Message Initiation element contains a <tie-break/> tag.
+
+    \a containsTieBreak.
+*/
 void QXmppJingleMessageInitiationElement::setContainsTieBreak(bool containsTieBreak)
 {
     d->containsTieBreak = containsTieBreak;
 }
 
-///
-/// Returns the Jingle Message Initiation element ID migrated to if the Jingle is being migrated
-/// to a different device.
-///
+/*!
+    Returns the Jingle Message Initiation element ID migrated to if the Jingle is being migrated
+    to a different device.
+*/
 QString QXmppJingleMessageInitiationElement::migratedTo() const
 {
     return d->migratedTo;
 }
 
-///
-/// Sets the Jingle Message Initiation element ID migrated to if the Jingle is being migrated
-/// to a different device.
-///
+/*!
+    Sets the Jingle Message Initiation element ID migrated to if the Jingle is being migrated
+    to a different device.
+
+    \a migratedTo.
+*/
 void QXmppJingleMessageInitiationElement::setMigratedTo(const QString &migratedTo)
 {
     d->migratedTo = migratedTo;
 }
 
-/// \cond
 void QXmppJingleMessageInitiationElement::parse(const QDomElement &element)
 {
     if (auto type = Enums::fromString<Type>(element.tagName())) {
@@ -2920,13 +2819,10 @@ void QXmppJingleMessageInitiationElement::toXml(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleMessageInitiationElement)
 
-///
-/// Returns true if passed QDomElement is a Jingle Message Initiation element
-///
+/*! Returns true if passed QDomElement is a Jingle Message Initiation \a element */
 bool QXmppJingleMessageInitiationElement::isJingleMessageInitiationElement(const QDomElement &element)
 {
     return Enums::fromString<Type>(element.tagName()).has_value() &&
@@ -2947,128 +2843,109 @@ public:
     bool video = false;
 };
 
-///
-/// \enum QXmppCallInviteElement::Type
-///
-/// Possible types of Call Invite elements
-///
+/*!
+    \enum QXmppCallInviteElement::Type
 
-///
-/// \class QXmppCallInviteElement
-///
-/// \brief The QXmppCallInviteElement class represents a Call Invite
-/// element as specified by \xep{0482, Call Invites}.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.6
-///
+    Possible types of Call Invite elements.
 
-///
-/// \brief Constructs a Call Invite element.
-///
+    \value None
+    \value Invite
+    \value Retract
+    \value Accept
+    \value Reject
+    \value Left
+*/
+
+/*!
+    \class QXmppCallInviteElement
+    \inmodule QXmpp
+
+    \brief The QXmppCallInviteElement class represents a Call Invite
+    element as specified by \xep{0482}{Call Invites}.
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.6
+*/
+
+/*! \brief Constructs a Call Invite element. */
 QXmppCallInviteElement::QXmppCallInviteElement()
     : d(new QXmppCallInviteElementPrivate())
 {
 }
 
-///
-/// Returns the Call Invite element type.
-///
+/*! Returns the Call Invite element type. */
 QXmppCallInviteElement::Type QXmppCallInviteElement::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the Call Invite element type.
-///
+/*! Sets the Call Invite element \a type. */
 void QXmppCallInviteElement::setType(Type type)
 {
     d->type = type;
 }
 
-///
-/// Returns the Call Invite element id.
-///
+/*! Returns the Call Invite element id. */
 QString QXmppCallInviteElement::id() const
 {
     return d->id;
 }
 
-///
-/// Sets the Call Invite element id.
-///
+/*! Sets the Call Invite element \a id. */
 void QXmppCallInviteElement::setId(const QString &id)
 {
     d->id = id;
 }
 
-///
-/// Returns the Call Invite element audio flag.
-///
+/*! Returns the Call Invite element audio flag. */
 bool QXmppCallInviteElement::audio() const
 {
     return d->audio;
 }
 
-///
-/// Sets the Call Invite element audio flag.
-///
+/*! Sets the Call Invite element \a audio flag. */
 void QXmppCallInviteElement::setAudio(bool audio)
 {
     d->audio = audio;
 }
 
-///
-/// Returns the Call Invite element video flag.
-///
+/*! Returns the Call Invite element video flag. */
 bool QXmppCallInviteElement::video() const
 {
     return d->video;
 }
 
-///
-/// Sets the Call Invite element video flag.
-///
+/*! Sets the Call Invite element \a video flag. */
 void QXmppCallInviteElement::setVideo(bool video)
 {
     d->video = video;
 }
 
-///
-/// Returns a possible Call Invite element "jingle" sub element.
-///
+/*! Returns a possible Call Invite element "jingle" sub element. */
 std::optional<QXmppCallInviteElement::Jingle> QXmppCallInviteElement::jingle() const
 {
     return d->jingle;
 }
 
-///
-/// Sets a possible Call Invite "jingle" sub element.
-///
+/*! Sets a possible Call Invite "\a jingle" sub element. */
 void QXmppCallInviteElement::setJingle(std::optional<Jingle> jingle)
 {
     d->jingle = jingle;
 }
 
-///
-/// Returns possible Call Invite "external" sub elements.
-///
+/*! Returns possible Call Invite "external" sub elements. */
 std::optional<QVector<QXmppCallInviteElement::External>> QXmppCallInviteElement::external() const
 {
     return d->external;
 }
 
-///
-/// Sets possible Call Invite "external" sub elements.
-///
+/*! Sets possible Call Invite "\a external" sub elements. */
 void QXmppCallInviteElement::setExternal(std::optional<QVector<External>> external)
 {
     d->external = external;
 }
 
-/// \cond
 void QXmppCallInviteElement::parse(const QDomElement &element)
 {
     if (auto type = Enums::fromString<Type>(element.tagName())) {
@@ -3121,13 +2998,10 @@ void QXmppCallInviteElement::toXml(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppCallInviteElement)
 
-///
-/// Returns true if passed QDomElement is a Call Invite element
-///
+/*! Returns true if passed QDomElement is a Call Invite \a element */
 bool QXmppCallInviteElement::isCallInviteElement(const QDomElement &element)
 {
     auto type = Enums::fromString<Type>(element.tagName());
@@ -3137,7 +3011,6 @@ bool QXmppCallInviteElement::isCallInviteElement(const QDomElement &element)
         element.namespaceURI() == ns_call_invites;
 }
 
-/// \cond
 void QXmppCallInviteElement::Jingle::parse(const QDomElement &element)
 {
     if (element.hasAttribute(u"sid"_s)) {
@@ -3167,4 +3040,3 @@ void QXmppCallInviteElement::External::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { u"external", Attribute { u"uri", uri } });
 }
-/// \endcond

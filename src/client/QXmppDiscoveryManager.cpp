@@ -40,16 +40,17 @@ static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, co
         parseIqResponseFlat<Response>);
 }
 
-///
-/// \class QXmppDiscoveryManager
-///
-/// \brief The QXmppDiscoveryManager class makes it possible to discover information about other
-/// entities as defined by \xep{0030, Service Discovery}.
-///
-/// Since QXmpp 1.12 info and items queries are cached per session by default.
-///
-/// \ingroup Managers
-///
+/*!
+    \class QXmppDiscoveryManager
+    \inmodule QXmpp
+
+    \brief The QXmppDiscoveryManager class makes it possible to discover information about other
+    entities as defined by \xep{0030}{Service Discovery}.
+
+    Since QXmpp 1.12 info and items queries are cached per session by default.
+
+    \ingroup Managers
+*/
 
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
@@ -62,11 +63,13 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
 
 QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
 
-///
-/// Fetches discovery info from the specified XMPP entity.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Fetches discovery info from the specified XMPP entity.
+
+    \since QXmpp 1.12
+
+    \a cachePolicy, \a node, and \a jid.
+*/
 QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
     if (cachePolicy == CachePolicy::Relaxed) {
@@ -93,11 +96,13 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
         this);
 }
 
-///
-/// Fetches discovery items from the specified XMPP entity.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Fetches discovery items from the specified XMPP entity.
+
+    \since QXmpp 1.12
+
+    \a cachePolicy, \a node, and \a jid.
+*/
 QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
     if (cachePolicy == CachePolicy::Relaxed) {
@@ -125,70 +130,74 @@ QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QStr
         this);
 }
 
-///
-/// Returns the base identities of this client.
-///
-/// The identities are added to the service discovery information other entities can request.
-///
-/// \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
-///
-/// \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Returns the base identities of this client.
+
+    The identities are added to the service discovery information other entities can request.
+
+    \note Additionally also all \a identities reported via QXmppClientExtension::discoveryIdentities() are added.
+
+    \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
+
+    \since QXmpp 1.12
+*/
 const QList<QXmppDiscoIdentity> &QXmppDiscoveryManager::identities() const
 {
     return d->identities;
 }
 
-///
-/// Sets the base identities of this client.
-///
-/// The identities are added to the service discovery information other entities can request.
-///
-/// \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
-///
-/// \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Sets the base identities of this client.
+
+    The identities are added to the service discovery information other entities can request.
+
+    \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
+
+    \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
+
+    \since QXmpp 1.12
+
+    \a identities.
+*/
 void QXmppDiscoveryManager::setIdentities(const QList<QXmppDiscoIdentity> &identities)
 {
     d->identities = identities;
 }
 
-///
-/// Returns the data forms for this client as defined in \xep{0128, Service Discovery Extensions}.
-///
-/// The data forms are added to the service discovery information other entities can request.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Returns the data forms for this client as defined in \xep{0128}{Service Discovery Extensions}.
+
+    The data forms are added to the service discovery information other entities can request.
+
+    \since QXmpp 1.12
+*/
 const QList<QXmppDataForm> &QXmppDiscoveryManager::infoForms() const
 {
     return d->dataForms;
 }
 
-///
-/// Sets the data forms for this client as defined in \xep{0128, Service Discovery Extensions}.
-///
-/// The data forms are added to the service discovery information other entities can request.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Sets the data forms for this client as defined in \xep{0128}{Service Discovery Extensions}.
+
+    The data forms are added to the service discovery information other entities can request.
+
+    \since QXmpp 1.12
+
+    \a dataForms.
+*/
 void QXmppDiscoveryManager::setInfoForms(const QList<QXmppDataForm> &dataForms)
 {
     d->dataForms = dataForms;
 }
 
-///
-/// Builds a full disco info element for this client.
-///
-/// Contains features and identities from all extensions and identities and data forms configured
-/// in this manager.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Builds a full disco info element for this client.
+
+    Contains features and identities from all extensions and identities and data forms configured
+    in this manager.
+
+    \since QXmpp 1.12
+*/
 QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
 {
     const auto extensions = client()->extensions();
@@ -210,36 +219,33 @@ QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
 
 // QXmppDiscoServicesWatch
 
-///
-/// Returns whether all discovery queries have completed.
-///
+/*! Returns whether all discovery queries have completed. */
 QBindable<bool> QXmppDiscoServicesWatch::loaded() const
 {
     return &d->loaded;
 }
 
-///
-/// Returns the list of discovered services matching the filter.
-///
+/*! Returns the list of discovered services matching the filter. */
 QBindable<QList<QXmppDiscoService>> QXmppDiscoServicesWatch::services() const
 {
     return &d->services;
 }
 
-///
-/// \brief Watches for server services matching the given identity category and optional type.
-///
-/// Returns a lightweight handle that provides reactive access to discovered
-/// services via QBindable properties. The watch is automatically started and
-/// will be populated as discovery results arrive.
-///
-/// \param category The identity category to filter by.
-/// \param type Optional identity type to filter by. If not set, matches any type.
-/// \param requiredFeatures Features that discovered services must support.
-/// \return A watch handle. Keep it alive as long as you need updates.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    \brief Watches for server services matching the given identity \a category and optional \a type.
+
+    Returns a lightweight handle that provides reactive access to discovered
+    services via QBindable properties. The watch is automatically started and
+    will be populated as discovery results arrive.
+
+    \a category is the identity category to filter by. \a type is the optional identity type
+    to filter by. If not set, matches any \a type. \a requiredFeatures specifies features that
+    discovered services must support.
+
+    Returns a watch handle. Keep it alive as long as you need updates.
+
+    \since QXmpp 1.16
+*/
 QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(Disco::Category category, std::optional<Disco::Type> type, QStringList requiredFeatures)
 {
     std::optional<QString> typeStr;
@@ -249,13 +255,15 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(Disco::Category 
     return discoverServices(Enums::toString(category), std::move(typeStr), std::move(requiredFeatures));
 }
 
-///
-/// \brief Watches for server services matching the given identity category and optional type strings.
-///
-/// This overload accepts raw strings for non-standard or unregistered categories and types.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    \brief Watches for server services matching the given identity category and optional type strings.
+
+    This overload accepts raw strings for non-standard or unregistered categories and types.
+
+    \since QXmpp 1.16
+
+    \a requiredFeatures, \a category, and \a type.
+*/
 QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category, std::optional<QString> type, QStringList requiredFeatures)
 {
     auto data = std::make_shared<QXmppDiscoServicesWatch::Data>();
@@ -285,27 +293,28 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category
     return watch;
 }
 
-///
-/// Returns the capabilities node of the local XMPP client.
-///
-/// By default this is "org.qxmpp.caps".
-///
+/*!
+    Returns the capabilities node of the local XMPP client.
+
+    By default this is "org.qxmpp.caps".
+*/
 QString QXmppDiscoveryManager::clientCapabilitiesNode() const
 {
     return d->clientCapabilitiesNode;
 }
 
-///
-/// Sets the capabilities node of the local XMPP client.
-///
-/// By default this is "org.qxmpp.caps".
-///
+/*!
+    Sets the capabilities node of the local XMPP client.
+
+    By default this is "org.qxmpp.caps".
+
+    \a node.
+*/
 void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
 {
     d->clientCapabilitiesNode = node;
 }
 
-/// \cond
 QStringList QXmppDiscoveryManager::discoveryFeatures() const
 {
     return { ns_disco_info.toString() };
@@ -344,7 +353,6 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
     }
     return false;
 }
-/// \endcond
 
 void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
 {

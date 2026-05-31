@@ -3,8 +3,6 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-/// \cond
-
 #include "QXmppOmemoManager_p.h"
 
 #include "QXmppFallback.h"
@@ -46,21 +44,16 @@ using ManagerPrivate = QXmppOmemoManagerPrivate;
 class Address
 {
 public:
-    //
     // Creates an OMEMO device address.
     //
-    // \param jid bare JID of the device owner
-    // \param deviceId ID of the device
-    //
+    // \a jid is bare JID of the device owner. \a deviceId is ID of the device.
     Address(const QString &jid, uint32_t deviceId)
         : m_jid(jid.toUtf8()), m_deviceId(int32_t(deviceId))
     {
     }
-    //
     // Returns the representation of the OMEMO device address used by the OMEMO library.
     //
-    // \return the OMEMO library device address
-    //
+    // Returns the OMEMO library device address.
     signal_protocol_address data() const
     {
         return { m_jid.data(), size_t(m_jid.size()), m_deviceId };
@@ -71,11 +64,9 @@ private:
     int32_t m_deviceId;
 };
 
-//
 // Creates a PEP node configuration for the device list.
 //
-// \return the device list node configuration
-//
+// Returns the device list node configuration.
 static QXmppPubSubNodeConfig deviceListNodeConfig()
 {
     QXmppPubSubNodeConfig config;
@@ -84,11 +75,9 @@ static QXmppPubSubNodeConfig deviceListNodeConfig()
     return config;
 }
 
-//
 // Creates publish options for publishing the device list to a corresponding PEP node.
 //
-// \return the device list node publish options
-//
+// Returns the device list node publish options.
 static QXmppPubSubPublishOptions deviceListNodePublishOptions()
 {
     QXmppPubSubPublishOptions publishOptions;
@@ -97,11 +86,9 @@ static QXmppPubSubPublishOptions deviceListNodePublishOptions()
     return publishOptions;
 }
 
-//
 // Creates a PEP node configuration for device bundles.
 //
-// \return the device bundles node configuration
-//
+// Returns the device bundles node configuration.
 static QXmppPubSubNodeConfig deviceBundlesNodeConfig(QXmppPubSubNodeConfig::ItemLimit itemLimit = QXmppPubSubNodeConfig::Max())
 {
     QXmppPubSubNodeConfig config;
@@ -111,11 +98,9 @@ static QXmppPubSubNodeConfig deviceBundlesNodeConfig(QXmppPubSubNodeConfig::Item
     return config;
 }
 
-//
 // Creates publish options for publishing device bundles to a corresponding PEP node.
 //
-// \return the device bundles node publish options
-//
+// Returns the device bundles node publish options.
 static QXmppPubSubPublishOptions deviceBundlesNodePublishOptions(QXmppPubSubNodeConfig::ItemLimit itemLimit = QXmppPubSubNodeConfig::Max())
 {
     QXmppPubSubPublishOptions publishOptions;
@@ -125,28 +110,23 @@ static QXmppPubSubPublishOptions deviceBundlesNodePublishOptions(QXmppPubSubNode
     return publishOptions;
 }
 
-//
 // Deserializes the signature of a signed public pre key.
 //
-// \param signedPublicPreKeySignature signed public pre key signature location
-// \param serializedSignedPublicPreKeySignature serialized signature of the
-//        signed public pre key
+// \a signedPublicPreKeySignature is signed public pre key signature location. \a
+// serializedSignedPublicPreKeySignature is serialized signature of the signed public pre key.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 static int deserializeSignedPublicPreKeySignature(const uint8_t **signedPublicPreKeySignature, const QByteArray &serializedSignedPublicPreKeySignature)
 {
     *signedPublicPreKeySignature = reinterpret_cast<const uint8_t *>(serializedSignedPublicPreKeySignature.constData());
     return serializedSignedPublicPreKeySignature.size();
 }
 
-//
 // Extracts the JID from an address used by the OMEMO library.
 //
-// \param address address containing the JID data
+// \a address is address containing the JID data.
 //
-// \return the extracted JID
-//
+// Returns the extracted JID.
 static QString extractJid(signal_protocol_address address)
 {
     return QString::fromUtf8(address.name, address.name_len);
@@ -203,11 +183,9 @@ void ManagerPrivate::initOmemoLibrary()
     }
 }
 
-//
 // Initializes the OMEMO library's global context.
 //
-// \return whether the initialization succeeded
-//
+// Returns whether the initialization succeeded.
 bool ManagerPrivate::initGlobalContext()
 {
     // "q" is passed as the parameter "user_data" to functions called by
@@ -221,11 +199,9 @@ bool ManagerPrivate::initGlobalContext()
     return true;
 }
 
-//
 // Initializes the OMEMO library's locking functions.
 //
-// \return whether the initialization succeeded
-//
+// Returns whether the initialization succeeded.
 bool ManagerPrivate::initLocking()
 {
     const auto lock = [](void *user_data) {
@@ -248,11 +224,9 @@ bool ManagerPrivate::initLocking()
     return true;
 }
 
-//
 // Initializes the OMEMO library's crypto provider.
 //
-// \return whether the initialization succeeded
-//
+// Returns whether the initialization succeeded.
 bool ManagerPrivate::initCryptoProvider()
 {
     cryptoProvider = createOmemoCryptoProvider(this);
@@ -265,11 +239,9 @@ bool ManagerPrivate::initCryptoProvider()
     return true;
 }
 
-//
 // Initializes the OMEMO library's stores.
 //
-// \return whether the initialization succeeded
-//
+// Returns whether the initialization succeeded.
 void ManagerPrivate::initStores()
 {
     identityKeyStore = createIdentityKeyStore();
@@ -284,13 +256,11 @@ void ManagerPrivate::initStores()
     signal_protocol_store_context_set_session_store(storeContext.get(), &sessionStore);
 }
 
-//
 // Creates the OMEMO library's identity key store.
 //
 // The identity key is the long-term key.
 //
-// \return the identity key store
-//
+// Returns the identity key store.
 signal_protocol_identity_key_store ManagerPrivate::createIdentityKeyStore() const
 {
     signal_protocol_identity_key_store store;
@@ -340,13 +310,11 @@ signal_protocol_identity_key_store ManagerPrivate::createIdentityKeyStore() cons
     return store;
 }
 
-//
 // Creates the OMEMO library's signed pre key store.
 //
 // A signed pre key is used for building a session.
 //
-// \return the signed pre key store
-//
+// Returns the signed pre key store.
 signal_protocol_signed_pre_key_store ManagerPrivate::createSignedPreKeyStore() const
 {
     signal_protocol_signed_pre_key_store store;
@@ -404,13 +372,11 @@ signal_protocol_signed_pre_key_store ManagerPrivate::createSignedPreKeyStore() c
     return store;
 }
 
-//
 // Creates the OMEMO library's pre key store.
 //
 // A pre key is used for building a session.
 //
-// \return the pre key store
-//
+// Returns the pre key store.
 signal_protocol_pre_key_store ManagerPrivate::createPreKeyStore() const
 {
     signal_protocol_pre_key_store store;
@@ -466,13 +432,11 @@ signal_protocol_pre_key_store ManagerPrivate::createPreKeyStore() const
     return store;
 }
 
-//
 // Creates the OMEMO library's session store.
 //
 // A session contains all data needed for encryption and decryption.
 //
-// \return the session store
-//
+// Returns the session store.
 signal_protocol_session_store ManagerPrivate::createSessionStore() const
 {
     signal_protocol_session_store store;
@@ -584,15 +548,13 @@ signal_protocol_session_store ManagerPrivate::createSessionStore() const
     return store;
 }
 
-//
 // Sets up the device ID.
 //
 // The more devices a user has, the higher the possibility of duplicate device IDs is.
 // Especially for IoT scenarios with millions of devices, that can be an issue.
 // Therefore, a new device ID is generated in case of a duplicate.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 QXmppTask<bool> ManagerPrivate::setUpDeviceId()
 {
     auto result = co_await pubSubManager->requestOwnPepItemIds(staticString(ns_omemo_2_bundles)).withContext(q);
@@ -658,13 +620,11 @@ std::optional<uint32_t> QXmppOmemoManagerPrivate::generateDeviceId(const QVector
     return deviceId;
 }
 
-//
 // Sets up an identity key pair.
 //
 // The identity key pair consists of a private and a public long-term key.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::setUpIdentityKeyPair(ratchet_identity_key_pair **identityKeyPair)
 {
     if (signal_protocol_key_helper_generate_identity_key_pair(identityKeyPair, globalContext.get()) < 0) {
@@ -746,7 +706,6 @@ void ManagerPrivate::renewSignedPreKeyPairs()
     }
 }
 
-//
 // Updates the signed pre key pairs.
 //
 // Make sure that
@@ -755,12 +714,11 @@ void ManagerPrivate::renewSignedPreKeyPairs()
 // \endcode
 // is called afterwards to store the change of
 // \code
-//  d->ownDevice.latestSignedPreKeyId()
+// d->ownDevice.latestSignedPreKeyId()
 // \endcode
 // .
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::updateSignedPreKeyPair(ratchet_identity_key_pair *identityKeyPair)
 {
     RefCountedPtr<session_signed_pre_key> signedPreKeyPair;
@@ -810,13 +768,11 @@ bool ManagerPrivate::updateSignedPreKeyPair(ratchet_identity_key_pair *identityK
     return true;
 }
 
-//
 // Deletes a pre key pair and creates a new one.
 //
-// \param keyPairBeingRenewed key pair being replaced by a new one
+// \a keyPairBeingRenewed is key pair being replaced by a new one.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::renewPreKeyPairs(uint32_t keyPairBeingRenewed)
 {
     preKeyPairs.remove(keyPairBeingRenewed);
@@ -839,7 +795,6 @@ bool ManagerPrivate::renewPreKeyPairs(uint32_t keyPairBeingRenewed)
     return true;
 }
 
-//
 // Updates the pre key pairs locally.
 //
 // Make sure that
@@ -853,10 +808,9 @@ bool ManagerPrivate::renewPreKeyPairs(uint32_t keyPairBeingRenewed)
 // \endcode
 // .
 //
-// \param count number of pre key pairs to update
+// \a count is number of pre key pairs to update.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::updatePreKeyPairs(uint32_t count)
 {
     KeyListNodePtr newPreKeyPairs;
@@ -937,16 +891,13 @@ void ManagerPrivate::removeDevicesRemovedFromServer()
     }
 }
 
-//
 // Encrypts a message for specific recipients.
 //
-// \param message message to be encrypted
-// \param recipientJids JIDs for whom the message is encrypted
-// \param acceptedTrustLevels trust levels the keys of the recipients' devices must have to
-//        encrypt for them
+// \a message is message to be encrypted. \a recipientJids is JIDs for whom the message is
+// encrypted. \a acceptedTrustLevels is trust levels the keys of the recipients' devices must
+// have to encrypt for them.
 //
-// \return the result of the encryption
-//
+// Returns the result of the encryption.
 QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessageForRecipients(QXmppMessage &&messageRef, QVector<QString> recipientJids, TrustLevels acceptedTrustLevels)
 {
     // Move into local to prevent use-after-free: rvalue reference parameters
@@ -970,7 +921,7 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
     }
 
     // Messages with a body or trust messages use
-    // \xep{0380, Explicit Message Encryption} and a fallback body.
+    // \xep{0380}{Explicit Message Encryption} and a fallback body.
     //
     // In the former case, a client can display the fallback body to its user if it does
     // not support the used encrpytion.
@@ -1009,17 +960,14 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
     co_return std::make_unique<QXmppMessage>(std::move(message));
 }
 
-//
 // Encrypts a message or IQ stanza.
 //
-// \param stanza stanza to be encrypted
-// \param recipientJids JIDs of the devices for whom the stanza is encrypted
-// \param acceptedTrustLevels trust levels the keys of the recipients' devices must have to
-//        encrypt for them
+// \a stanza is stanza to be encrypted. \a recipientJids is JIDs of the devices for whom the
+// stanza is encrypted. \a acceptedTrustLevels is trust levels the keys of the recipients'
+// devices must have to encrypt for them.
 //
-// \return the OMEMO element containing the stanza's encrypted content if the encryption is
-//         successful, otherwise none
-//
+// Returns the OMEMO element containing the stanza's encrypted content if the encryption is
+// successful, otherwise none.
 template<typename T>
 QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const T &stanza, const QVector<QString> &recipientJids, TrustLevels acceptedTrustLevels)
 {
@@ -1216,13 +1164,11 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
 template QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza<QXmppIq>(const QXmppIq &, const QVector<QString> &, TrustLevels);
 template QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza<QXmppMessage>(const QXmppMessage &, const QVector<QString> &, TrustLevels);
 
-//
 // Encrypts a payload symmetrically.
 //
-// \param payload payload being symmetrically encrypted
+// \a payload is payload being symmetrically encrypted.
 //
-// \return the data used for encryption and the result
-//
+// Returns the data used for encryption and the result.
 std::optional<PayloadEncryptionResult> ManagerPrivate::encryptPayload(const QByteArray &payload) const
 {
     using namespace Crypto;
@@ -1263,18 +1209,16 @@ std::optional<PayloadEncryptionResult> ManagerPrivate::encryptPayload(const QByt
     return payloadEncryptionData;
 }
 
-//
-// Creates the SCE envelope as defined in \xep{0420, Stanza Content Encryption} for a message
+// Creates the SCE envelope as defined in \xep{0420}{Stanza Content Encryption} for a message
 // or IQ stanza.
 //
 // The stanza's content that should be encrypted is put into the SCE content and that is added
 // to the SCE envelope.
 // Additionally, the standard SCE affix elements are added to the SCE envelope.
 //
-// \param stanza stanza for whom the SCE envelope is created
+// \a stanza is stanza for whom the SCE envelope is created.
 //
-// \return the serialized SCE envelope
-//
+// Returns the serialized SCE envelope.
 template<typename T>
 QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
 {
@@ -1304,19 +1248,16 @@ QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
     return serializedSceEnvelope;
 }
 
-//
 // Creates the data of an OMEMO envelope.
 //
 // Encrypts the data used for a symmetric encryption of a payload asymmetrically with the
 // recipient device's key.
 //
-// \param address address of a recipient device
-// \param payloadDecryptionData data used for symmetric encryption being asymmetrically
-//        encrypted
+// \a address is address of a recipient device. \a payloadDecryptionData is data used for
+// symmetric encryption being asymmetrically encrypted.
 //
-// \return the encrypted and serialized OMEMO envelope data or a default-constructed byte array
-//         on failure
-//
+// Returns the encrypted and serialized OMEMO envelope data or a default-constructed byte array
+// on failure.
 QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address &address, const Crypto::SecureByteArray &payloadDecryptionData) const
 {
     SessionCipherPtr sessionCipher;
@@ -1342,7 +1283,6 @@ QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address
     };
 }
 
-//
 // Decrypts a message stanza.
 //
 // In case of an empty (i.e., without payload) OMEMO message for session initiation, only the
@@ -1350,10 +1290,9 @@ QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address
 // In case of a normal OMEMO message (i.e., with payload), the payload is decrypted and set as
 // the content (i.e., first child element) of the returned stanza.
 //
-// \param stanza message stanza to be decrypted
+// \a stanza is message stanza to be decrypted.
 //
-// \return the decrypted stanza if it could be decrypted
-//
+// Returns the decrypted stanza if it could be decrypted.
 QXmppTask<std::optional<QXmppMessage>> ManagerPrivate::decryptMessage(QXmppMessage stanza)
 {
     // At this point, the stanza has always an OMEMO element.
@@ -1395,16 +1334,14 @@ QXmppTask<std::optional<QXmppMessage>> ManagerPrivate::decryptMessage(QXmppMessa
     co_return {};
 }
 
-//
 // Decrypts an IQ stanza.
 //
 // The payload is decrypted and set as the content (i.e., first child element) of the returned
 // stanza.
 //
-// \param iqElement DOM element of the IQ stanza to be decrypted. It MUST be an QXmppOmemoIq.
+// \a iqElement is DOM element of the IQ stanza to be decrypted. It MUST be an QXmppOmemoIq.
 //
-// \return the serialized decrypted stanza if it could be decrypted
-//
+// Returns the serialized decrypted stanza if it could be decrypted.
 QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(QDomElement iqElement)
 {
     using Result = std::optional<IqDecryptionResult>;
@@ -1430,7 +1367,6 @@ QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(QDomEleme
     co_return {};
 }
 
-//
 // Decrypts a message or IQ stanza.
 //
 // In case of an empty (i.e., without payload) OMEMO message for session initiation, only the
@@ -1438,15 +1374,12 @@ QXmppTask<std::optional<IqDecryptionResult>> ManagerPrivate::decryptIq(QDomEleme
 // In case of a normal OMEMO stanza (i.e., with payload), the payload is decrypted and set as
 // the content (i.e., first child element) of the returned stanza.
 //
-// \param stanza message or IQ stanza being decrypted
-// \param senderJid JID of the stanza's sender
-// \param senderDeviceId device ID of the stanza's sender
-// \param omemoEnvelope OMEMO envelope within the OMEMO element
-// \param omemoPayload OMEMO payload within the OMEMO element
-// \param isMessageStanza whether the received stanza is a message stanza
+// \a stanza is message or IQ stanza being decrypted. \a senderJid is JID of the stanza's
+// sender. \a senderDeviceId is device ID of the stanza's sender. \a omemoEnvelope is OMEMO
+// envelope within the OMEMO element. \a omemoPayload is OMEMO payload within the OMEMO
+// element. \a isMessageStanza indicates whether the received stanza is a message stanza.
 //
-// \return the result of the decryption if it succeeded
-//
+// Returns the result of the decryption if it succeeded.
 template<typename T>
 QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanza, QString senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, const QByteArray &omemoPayload, bool isMessageStanza)
 {
@@ -1501,21 +1434,18 @@ QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanz
     co_return DecryptionResult { sceEnvelopeReader.contentElement(), std::move(e2eeMetadata) };
 }
 
-//
 // Extracts the SCE envelope from an OMEMO payload.
 //
 // The data used to encrypt the payload is decrypted and then used to decrypt the payload which
 // contains the SCE envelope.
 //
-// \param senderJid bare JID of the stanza's sender
-// \param senderDeviceId device ID of the stanza's sender
-// \param omemoEnvelope OMEMO envelope containing the payload decryption data
-// \param omemoPayload OMEMO payload containing the SCE envelope
-// \param isMessageStanza whether the received stanza is a message stanza
+// \a senderJid is bare JID of the stanza's sender. \a senderDeviceId is device ID of the
+// stanza's sender. \a omemoEnvelope is OMEMO envelope containing the payload decryption data.
+// \a omemoPayload is OMEMO payload containing the SCE envelope. \a isMessageStanza is whether
+// the received stanza is a message stanza.
 //
-// \return the serialized SCE envelope if it could be extracted, otherwise a
-//         default-constructed byte array
-//
+// Returns the serialized SCE envelope if it could be extracted, otherwise a
+// default-constructed byte array.
 QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJid, uint32_t senderDeviceId, const QXmppOmemoEnvelope &omemoEnvelope, QByteArray omemoPayload, bool isMessageStanza)
 {
     auto payloadDecryptionData =
@@ -1528,18 +1458,16 @@ QXmppTask<QByteArray> ManagerPrivate::extractSceEnvelope(const QString &senderJi
     co_return decryptPayload(*payloadDecryptionData, omemoPayload);
 }
 
-//
 // Extracts the data used to decrypt the OMEMO payload.
 //
 // Decrypts the the payload decryption data and handles the OMEMO sessions.
 //
-// \param senderJid bare JID of the stanza's sender
-// \param senderDeviceId device ID of the stanza's sender
-// \param omemoEnvelope OMEMO envelope containing the payload decryption data
-// \param isMessageStanza whether the received stanza is a message stanza
+// \a senderJid is bare JID of the stanza's sender. \a senderDeviceId is device ID of the
+// stanza's sender. \a omemoEnvelope is OMEMO envelope containing the payload decryption data.
+// \a isMessageStanza indicates whether the received stanza is a message stanza.
 //
-// \return the serialized payload decryption data if it could be extracted, otherwise std::nullopt
-//
+// Returns the serialized payload decryption data if it could be extracted, otherwise
+// std::nullopt.
 QXmppTask<std::optional<Crypto::SecureByteArray>> ManagerPrivate::extractPayloadDecryptionData(const QString &senderJid, uint32_t senderDeviceId, QXmppOmemoEnvelope omemoEnvelope, bool isMessageStanza)
 {
     SessionCipherPtr sessionCipher;
@@ -1681,14 +1609,12 @@ QXmppTask<std::optional<Crypto::SecureByteArray>> ManagerPrivate::extractPayload
     co_return {};
 }
 
-//
 // Decrypts the OMEMO payload.
 //
-// \param payloadDecryptionData data needed to decrypt the payload
-// \param payload payload to be decrypted
+// \a payloadDecryptionData is data needed to decrypt the payload. \a payload is payload to be
+// decrypted.
 //
-// \return the decrypted payload or a default-constructed byte array on failure
-//
+// Returns the decrypted payload or a default-constructed byte array on failure.
 QByteArray ManagerPrivate::decryptPayload(const Crypto::SecureByteArray &payloadDecryptionData, const QByteArray &payload) const
 {
     using namespace Crypto;
@@ -1733,11 +1659,9 @@ QByteArray ManagerPrivate::decryptPayload(const Crypto::SecureByteArray &payload
     return decryptedPayload;
 }
 
-//
 // Publishes the OMEMO data for this device.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishOmemoData()
 {
     auto result = co_await pubSubManager->requestOwnPepFeatures().withContext(q);
@@ -1810,24 +1734,20 @@ QXmppTask<bool> ManagerPrivate::publishOmemoData()
     }
 }
 
-//
 // Publishes this device's bundle.
 //
 // If no node for device bundles exists, a new one is created.
 //
-// \param isDeviceBundlesNodeExistent whether the PEP node for device bundles exists
-// \param arePublishOptionsSupported whether publish options are supported by the PEP service
-// \param isAutomaticCreationSupported whether the PEP service supports the automatic creation
-//        of nodes when new items are published
-// \param isCreationAndConfigurationSupported whether the PEP service supports the
-//        configuration of nodes during their creation
-// \param isCreationSupported whether the PEP service supports creating nodes
-// \param isConfigurationSupported whether the PEP service supports configuring existing
-//        nodes
-// \param isConfigNodeMaxSupported whether the PEP service supports to set the maximum number
-//        of allowed items per node to the maximum it supports
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isDeviceBundlesNodeExistent indicates whether the PEP node for device bundles exists. \a
+// arePublishOptionsSupported is whether publish options are supported by the PEP service. \a
+// isAutomaticCreationSupported is whether the PEP service supports the automatic creation of
+// nodes when new items are published. \a isCreationAndConfigurationSupported indicates whether the
+// PEP service supports the configuration of nodes during their creation. \a
+// isCreationSupported is whether the PEP service supports creating nodes. \a
+// isConfigurationSupported is whether the PEP service supports configuring existing nodes. \a
+// isConfigNodeMaxSupported is whether the PEP service supports to set the maximum number of
+// allowed items per node to the maximum it supports. \a continuation is the function to be called
+// with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceBundle(bool isDeviceBundlesNodeExistent,
                                                     bool arePublishOptionsSupported,
                                                     bool isAutomaticCreationSupported,
@@ -1907,21 +1827,17 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundle(bool isDeviceBundlesNodeExis
     }
 }
 
-//
 // Publish this device's bundle without publish options.
 //
 // If no node for device bundles exists, a new one is created.
 //
-// \param isDeviceBundlesNodeExistent whether the PEP node for device bundles exists
-// \param isCreationAndConfigurationSupported whether the PEP service supports the
-//        configuration of nodes during their creation
-// \param isCreationSupported whether the PEP service supports creating nodes
-// \param isConfigurationSupported whether the PEP service supports configuring existing
-//        nodes
-// \param isConfigNodeMaxSupported whether the PEP service supports to set the maximum number
-//        of allowed items per node to the maximum it supports
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isDeviceBundlesNodeExistent indicates whether the PEP node for device bundles exists. \a
+// isCreationAndConfigurationSupported is whether the PEP service supports the configuration of
+// nodes during their creation. \a isCreationSupported indicates whether the PEP service supports
+// creating nodes. \a isConfigurationSupported indicates whether the PEP service supports configuring
+// existing nodes. \a isConfigNodeMaxSupported indicates whether the PEP service supports to set the
+// maximum number of allowed items per node to the maximum it supports. \a continuation is
+// function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceBundleWithoutOptions(bool isDeviceBundlesNodeExistent,
                                                                   bool isCreationAndConfigurationSupported,
                                                                   bool isCreationSupported,
@@ -1950,13 +1866,11 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundleWithoutOptions(bool isDeviceB
     }
 }
 
-//
 // Configures the existing PEP node for device bundles and publishes this device's bundle on it.
 //
-// \param isConfigNodeMaxSupported whether the PEP service supports to set the maximum number
-//        of allowed items per node to the maximum it supports
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isConfigNodeMaxSupported indicates whether the PEP service supports to set the maximum number of
+// allowed items per node to the maximum it supports. \a continuation is the function to be called
+// with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceBundle(bool isConfigNodeMaxSupported)
 {
     auto configured = co_await configureDeviceBundlesNode(isConfigNodeMaxSupported);
@@ -1966,13 +1880,11 @@ QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceBundle(bool isConfi
     co_return false;
 }
 
-//
 // Creates a PEP node for device bundles and configures it accordingly.
 //
-// \param isConfigNodeMaxSupported whether the PEP service supports to set the maximum number
-//        of allowed items per node to the maximum it supports
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isConfigNodeMaxSupported indicates whether the PEP service supports to set the maximum number of
+// allowed items per node to the maximum it supports. \a continuation is the function to be called
+// with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::createAndConfigureDeviceBundlesNode(bool isConfigNodeMaxSupported)
 {
     if (isConfigNodeMaxSupported) {
@@ -1987,17 +1899,14 @@ QXmppTask<bool> ManagerPrivate::createAndConfigureDeviceBundlesNode(bool isConfi
     co_return false;
 }
 
-//
 // Creates a PEP node for device bundles.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::createDeviceBundlesNode()
 {
     return createNode(staticString(ns_omemo_2_bundles));
 }
 
-//
 // Configures an existing PEP node for device bundles.
 //
 // There is no feature (like ns_pubsub_config_node_max as a config option) and no error case
@@ -2008,10 +1917,9 @@ QXmppTask<bool> ManagerPrivate::createDeviceBundlesNode()
 // Each pre-defined value can exceed the maximum supported by the PEP service.
 // Therefore, multiple values are tried.
 //
-// \param isConfigNodeMaxSupported whether the PEP service supports to set the
-//        maximum number of allowed items per node to the maximum it supports
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isConfigNodeMaxSupported indicates whether the PEP service supports to set the maximum number of
+// allowed items per node to the maximum it supports. \a continuation is the function to be called
+// with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::configureDeviceBundlesNode(bool isConfigNodeMaxSupported)
 {
     if (isConfigNodeMaxSupported) {
@@ -2026,17 +1934,14 @@ QXmppTask<bool> ManagerPrivate::configureDeviceBundlesNode(bool isConfigNodeMaxS
     co_return false;
 }
 
-//
 // Publishes this device bundle's item on the corresponding existing PEP node.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceBundleItem()
 {
     return publishItem(staticString(ns_omemo_2_bundles), deviceBundleItem());
 }
 
-//
 // Publishes this device bundle's item with publish options.
 //
 // If no node for device bundles exists, a new one is created.
@@ -2049,8 +1954,7 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundleItem()
 // Each pre-defined value can exceed the maximum supported by the PEP service.
 // Therefore, multiple values are tried.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceBundleItemWithOptions()
 {
     if (co_await publishItem(staticString(ns_omemo_2_bundles), deviceBundleItem(), deviceBundlesNodePublishOptions()).withContext(q)) {
@@ -2065,11 +1969,9 @@ QXmppTask<bool> ManagerPrivate::publishDeviceBundleItemWithOptions()
     co_return false;
 }
 
-//
 // Creates a PEP item for this device's bundle.
 //
-// \return this device bundle's item
-//
+// Returns this device bundle's item.
 QXmppOmemoDeviceBundleItem ManagerPrivate::deviceBundleItem() const
 {
     QXmppOmemoDeviceBundleItem item;
@@ -2079,14 +1981,12 @@ QXmppOmemoDeviceBundleItem ManagerPrivate::deviceBundleItem() const
     return item;
 }
 
-//
 // Requests a device bundle from a PEP service.
 //
-// \param deviceOwnerJid bare JID of the device's owner
-// \param deviceId ID of the device whose bundle is requested
+// \a deviceOwnerJid is bare JID of the device's owner. \a deviceId is ID of the device whose
+// bundle is requested.
 //
-// \return the device bundle on success, otherwise a nullptr
-//
+// Returns the device bundle on success, otherwise a nullptr.
 QXmppTask<std::optional<QXmppOmemoDeviceBundle>> ManagerPrivate::requestDeviceBundle(QString deviceOwnerJid, uint32_t deviceId) const
 {
     auto result = co_await pubSubManager->requestItem<QXmppOmemoDeviceBundleItem>(deviceOwnerJid, staticString(ns_omemo_2_bundles), QString::number(deviceId))
@@ -2100,12 +2000,10 @@ QXmppTask<std::optional<QXmppOmemoDeviceBundle>> ManagerPrivate::requestDeviceBu
     co_return item.deviceBundle();
 }
 
-//
 // Removes the device bundle for this device or deletes the whole node if it would be empty
 // after the retraction.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::deleteDeviceBundle()
 {
     if (otherOwnDevices().isEmpty()) {
@@ -2115,22 +2013,18 @@ QXmppTask<bool> ManagerPrivate::deleteDeviceBundle()
     }
 }
 
-//
 // Publishes this device's element within the device list.
 //
 // If no node for the device list exists, a new one is created.
 //
-// \param isDeviceListNodeExistent whether the PEP node for the device list exists
-// \param arePublishOptionsSupported whether publish options are supported by the PEP service
-// \param isAutomaticCreationSupported whether the PEP service supports the automatic creation
-//        of nodes when new items are published
-// \param isCreationAndConfigurationSupported whether the PEP service supports the
-//        configuration of nodes during their creation
-// \param isCreationSupported whether the PEP service supports creating nodes
-// \param isConfigurationSupported whether the PEP service supports configuring existing
-//        nodes
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isDeviceListNodeExistent indicates whether the PEP node for the device list exists. \a
+// arePublishOptionsSupported is whether publish options are supported by the PEP service. \a
+// isAutomaticCreationSupported is whether the PEP service supports the automatic creation of
+// nodes when new items are published. \a isCreationAndConfigurationSupported indicates whether the
+// PEP service supports the configuration of nodes during their creation. \a
+// isCreationSupported is whether the PEP service supports creating nodes. \a
+// isConfigurationSupported is whether the PEP service supports configuring existing nodes. \a
+// continuation is function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceElement(bool isDeviceListNodeExistent,
                                                      bool arePublishOptionsSupported,
                                                      bool isAutomaticCreationSupported,
@@ -2214,19 +2108,16 @@ QXmppTask<bool> ManagerPrivate::publishDeviceElement(bool isDeviceListNodeExiste
     }
 }
 
-//
 // Publish this device's element without publish options.
 //
 // If no node for the device list exists, a new one is created.
 //
-// \param isDeviceListNodeExistent whether the PEP node for the device list exists
-// \param isCreationAndConfigurationSupported whether the PEP service supports the
-//        configuration of nodes during their creation
-// \param isCreationSupported whether the PEP service supports creating nodes
-// \param isConfigurationSupported whether the PEP service supports configuring existing
-//        nodes
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isDeviceListNodeExistent indicates whether the PEP node for the device list exists. \a
+// isCreationAndConfigurationSupported is whether the PEP service supports the configuration of
+// nodes during their creation. \a isCreationSupported indicates whether the PEP service supports
+// creating nodes. \a isConfigurationSupported indicates whether the PEP service supports configuring
+// existing nodes. \a continuation is the function to be called with the bool value whether it
+// succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceElementWithoutOptions(bool isDeviceListNodeExistent, bool isCreationAndConfigurationSupported, bool isCreationSupported, bool isConfigurationSupported)
 {
     if (isDeviceListNodeExistent && isConfigurationSupported) {
@@ -2248,12 +2139,10 @@ QXmppTask<bool> ManagerPrivate::publishDeviceElementWithoutOptions(bool isDevice
     }
 }
 
-//
 // Configures the existing PEP node for the device list and publishes this device's element on
 // it.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceElement()
 {
     auto configured = co_await configureDeviceListNode();
@@ -2263,64 +2152,52 @@ QXmppTask<bool> ManagerPrivate::configureNodeAndPublishDeviceElement()
     co_return co_await publishDeviceListItem(true);
 }
 
-//
 // Creates a PEP node for the device list and configures it accordingly.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::createAndConfigureDeviceListNode()
 {
     return createNode(staticString(ns_omemo_2_devices), deviceListNodeConfig());
 }
 
-//
 // Creates a PEP node for the device list.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::createDeviceListNode()
 {
     return createNode(staticString(ns_omemo_2_devices));
 }
 
-//
 // Configures an existing PEP node for the device list.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::configureDeviceListNode()
 {
     return configureNode(staticString(ns_omemo_2_devices), deviceListNodeConfig());
 }
 
-//
 // Publishes the device list item containing this device's element on the corresponding existing
 // PEP node.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceListItem(bool addOwnDevice)
 {
     return publishItem(staticString(ns_omemo_2_devices), deviceListItem(addOwnDevice));
 }
 
-//
 // Publishes the device list item containing this device's element with publish options.
 //
 // If no node for the device list exists, a new one is created.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::publishDeviceListItemWithOptions()
 {
     return publishItem(staticString(ns_omemo_2_devices), deviceListItem(), deviceListNodePublishOptions());
 }
 
-//
 // Creates a PEP item for the device list containing this device's element.
 //
-// \return the device list item
-//
+// Returns the device list item.
 QXmppOmemoDeviceListItem ManagerPrivate::deviceListItem(bool addOwnDevice)
 {
     QXmppOmemoDeviceList deviceList;
@@ -2352,13 +2229,11 @@ QXmppOmemoDeviceListItem ManagerPrivate::deviceListItem(bool addOwnDevice)
     return item;
 }
 
-//
 // Updates the own locally stored devices by requesting the current device list from the own
 // PEP service.
 //
-// \param isDeviceListNodeExistent whether the node for the device list exists
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a isDeviceListNodeExistent indicates whether the node for the device list exists. \a continuation
+// is function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::updateOwnDevicesLocally(bool isDeviceListNodeExistent)
 {
     if (isDeviceListNodeExistent && otherOwnDevices().isEmpty()) {
@@ -2406,14 +2281,12 @@ QXmppTask<bool> ManagerPrivate::updateOwnDevicesLocally(bool isDeviceListNodeExi
     co_return true;
 }
 
-//
 // Updates all locally stored devices of a contact.
 //
-// \param deviceOwnerJid bare JID of the devices' owner
-// \param deviceListItems PEP items that may contain a device list
+// \a deviceOwnerJid is bare JID of the devices' owner. \a deviceListItems is PEP items that
+// may contain a device list.
 //
-// \returns a found device list item
-//
+// Returns a found device list item.
 std::optional<QXmppOmemoDeviceListItem> QXmppOmemoManagerPrivate::updateContactDevices(const QString &deviceOwnerJid, const QVector<QXmppOmemoDeviceListItem> &deviceListItems)
 {
     if (deviceListItems.size() > 1) {
@@ -2436,12 +2309,10 @@ std::optional<QXmppOmemoDeviceListItem> QXmppOmemoManagerPrivate::updateContactD
     return item;
 }
 
-//
 // Updates all locally stored devices by a passed device list item.
 //
-// \param deviceOwnerJid bare JID of the devices' owner
-// \param deviceListItem PEP item containing the device list
-//
+// \a deviceOwnerJid is bare JID of the devices' owner. \a deviceListItem is PEP item
+// containing the device list.
 void ManagerPrivate::updateDevices(const QString &deviceOwnerJid, const QXmppOmemoDeviceListItem &deviceListItem)
 {
     const auto isOwnDeviceListNode = ownBareJid() == deviceOwnerJid;
@@ -2579,12 +2450,10 @@ void ManagerPrivate::updateDevices(const QString &deviceOwnerJid, const QXmppOme
     }
 }
 
-//
 // Corrects the own device list on the PEP service by the locally stored
 // devices or sets a contact device to be removed locally in the future.
 //
-// \param deviceOwnerJid bare JID of the devices' owner
-//
+// \a deviceOwnerJid is bare JID of the devices' owner.
 void ManagerPrivate::handleIrregularDeviceListChanges(const QString &deviceOwnerJid)
 {
     const auto isOwnDeviceListNode = ownBareJid() == deviceOwnerJid;
@@ -2644,12 +2513,10 @@ void ManagerPrivate::handleIrregularDeviceListChanges(const QString &deviceOwner
     }
 }
 
-//
 // Removes the device element for this device or deletes the whole PEP node if
 // it would be empty after the retraction.
 //
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a continuation is the function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::deleteDeviceElement()
 {
     if (otherOwnDevices().isEmpty()) {
@@ -2659,12 +2526,10 @@ QXmppTask<bool> ManagerPrivate::deleteDeviceElement()
     }
 }
 
-//
 // Creates a PEP node.
 //
-// \param node node to be created
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a node is node to be created. \a continuation is the function to be called with the bool value
+// whether it succeeded.
 QXmppTask<bool> ManagerPrivate::createNode(const QString &node)
 {
     return runPubSubQueryWithContinuation(
@@ -2672,13 +2537,10 @@ QXmppTask<bool> ManagerPrivate::createNode(const QString &node)
         u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be created");
 }
 
-//
 // Creates a PEP node with a configuration.
 //
-// \param node node to be created
-// \param config configuration to be applied
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a node is node to be created. \a config is configuration to be applied. \a continuation is
+// function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::createNode(const QString &node, const QXmppPubSubNodeConfig &config)
 {
     return runPubSubQueryWithContinuation(
@@ -2686,13 +2548,10 @@ QXmppTask<bool> ManagerPrivate::createNode(const QString &node, const QXmppPubSu
         u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be created");
 }
 
-//
 // Configures an existing PEP node.
 //
-// \param node node to be configured
-// \param config configuration to be applied
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a node is node to be configured. \a config is configuration to be applied. \a continuation
+// is function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::configureNode(const QString &node, const QXmppPubSubNodeConfig &config)
 {
     return runPubSubQueryWithContinuation(
@@ -2700,13 +2559,10 @@ QXmppTask<bool> ManagerPrivate::configureNode(const QString &node, const QXmppPu
         u"Node '" + node + u"' of JID '" + ownBareJid() + u"' could not be configured");
 }
 
-//
 // Retracts an item from a PEP node.
 //
-// \param node node containing the item
-// \param itemId ID of the item
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a node is node containing the item. \a itemId is ID of the item. \a continuation is
+// function to be called with the bool value whether it succeeded.
 QXmppTask<bool> ManagerPrivate::retractItem(const QString &node, uint32_t itemId)
 {
     const auto itemIdString = QString::number(itemId);
@@ -2715,12 +2571,10 @@ QXmppTask<bool> ManagerPrivate::retractItem(const QString &node, uint32_t itemId
         u"Item '" + itemIdString + u"' of node '" + node + u"' and JID '" + ownBareJid() + u"' could not be retracted");
 }
 
-//
 // Deletes a PEP node.
 //
-// \param node node to be deleted
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a node is node to be deleted. \a continuation is the function to be called with the bool value
+// whether it succeeded.
 QXmppTask<bool> ManagerPrivate::deleteNode(QString node)
 {
     auto result = co_await pubSubManager->deleteOwnPepNode(node).withContext(q);
@@ -2741,13 +2595,10 @@ QXmppTask<bool> ManagerPrivate::deleteNode(QString node)
     }
 }
 
-//
 // Publishes a PEP item.
 //
-// \param node node containing the item
-// \param item item to be published
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a node is node containing the item. \a item is item to be published. \a continuation is
+// function to be called with the bool value whether it succeeded.
 template<typename T>
 QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item)
 {
@@ -2756,14 +2607,11 @@ QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item)
         u"Item with ID '" + item.id() + u"' could not be published to node '" + node + u"' of JID '" + ownBareJid() + u"'");
 }
 
-//
 // Publishes a PEP item with publish options.
 //
-// \param node node containing the item
-// \param item item to be published
-// \param publishOptions publish options to be applied
-// \param continuation function to be called with the bool value whether it succeeded
-//
+// \a node is node containing the item. \a item is item to be published. \a publishOptions is
+// publish options to be applied. \a continuation is the function to be called with the bool value
+// whether it succeeded.
 template<typename T>
 QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item, const QXmppPubSubPublishOptions &publishOptions)
 {
@@ -2772,13 +2620,10 @@ QXmppTask<bool> ManagerPrivate::publishItem(const QString &node, const T &item, 
         u"Item with ID '" + item.id() + u"' could not be published to node '" + node + u"' of JID '" + ownBareJid() + u"'");
 }
 
-//
 // Runs a PubSub query and processes a continuation function.
 //
-// \param future PubSub query to be run
-// \param errorMessage message to be logged in case of an error
-// \param continuation function to be called after the PubSub query
-//
+// \a future is PubSub query to be run. \a errorMessage is message to be logged in case of an
+// error. \a continuation is the function to be called after the PubSub query.
 template<typename T>
 QXmppTask<bool> QXmppOmemoManagerPrivate::runPubSubQueryWithContinuation(QXmppTask<T> future, QString errorMessage)
 {
@@ -2807,21 +2652,19 @@ QXmppTask<bool> ManagerPrivate::changeDeviceLabel(QString deviceLabel)
     }
 }
 
-//
 // Requests the device list of a contact manually and stores it locally.
 //
 // This should be called for offline contacts whose servers do not distribute
 // the last published PubSub item if that contact is offline (e.g., with at
 // least ejabberd version <= 21.12)
 //
-// \param jid JID of the contact whose device list is being requested
+// \a jid is JID of the contact whose device list is being requested.
 //
-// \return the result of the request
-//
+// Returns the result of the request.
 QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> ManagerPrivate::requestDeviceList(QString jid)
 {
     // Since the usage of the item ID \c QXmppPubSubManager::Current is only RECOMMENDED by
-    // \xep{0060, Publish-Subscribe} (PubSub) but not obligatory, all items are requested even if
+    // \xep{0060}{Publish-Subscribe} (PubSub) but not obligatory, all items are requested even if
     // the node should contain only one item.
     auto result = co_await pubSubManager->requestItems<QXmppOmemoDeviceListItem>(jid, staticString(ns_omemo_2_devices)).withContext(q);
 
@@ -2844,12 +2687,10 @@ QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> ManagerPriva
     co_return QXmppError { u"Device list for JID '" + jid + u"' could not be retrieved because the node does not contain an appropriate item", {} };
 }
 
-//
 // Subscribes to the device list of a contact if the contact's device is not stored yet.
 //
-// \param jid JID of the contact whose device list is being subscribed
-// \param deviceId ID of the device that is checked
-//
+// \a jid is JID of the contact whose device list is being subscribed. \a deviceId is ID of the
+// device that is checked.
 void ManagerPrivate::subscribeToNewDeviceLists(const QString &jid, uint32_t deviceId)
 {
     if (!devices.value(jid).contains(deviceId)) {
@@ -2857,17 +2698,15 @@ void ManagerPrivate::subscribeToNewDeviceLists(const QString &jid, uint32_t devi
     }
 }
 
-//
 // Subscribes the current user's resource to a device list manually.
 //
 // A server may not send the last published item automatically.
 // To ensure that the subscribed device list can be stored locally in any case,
 // the current PubSub item containing the device list is requested manually.
 //
-// \param jid JID of the contact whose device list is being subscribed
+// \a jid is JID of the contact whose device list is being subscribed.
 //
-// \return the result of the subscription and manual request
-//
+// Returns the result of the subscription and manual request.
 QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(QString jid)
 {
     auto result = co_await pubSubManager->subscribeToNode(jid, staticString(ns_omemo_2_devices), ownFullJid()).withContext(q);
@@ -2881,16 +2720,13 @@ QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(QStr
     co_return mapToSuccess(co_await requestDeviceList(jid).withContext(q));
 }
 
-//
 // Unsubscribes the current user's resource from device lists that were
 // manually subscribed by
 // \c QXmppOmemoManagerPrivate::subscribeToDeviceList().
 //
-// \param jids JIDs of the contacts whose device lists are being
-//             unsubscribed
+// \a jids is JIDs of the contacts whose device lists are being unsubscribed.
 //
-// \return the results of each unsubscribe request
-//
+// Returns the results of each unsubscribe request.
 QXmppTask<QVector<Manager::DevicesResult>> ManagerPrivate::unsubscribeFromDeviceLists(const QList<QString> &jids)
 {
     if (jids.isEmpty()) {
@@ -2922,15 +2758,13 @@ QXmppTask<QVector<Manager::DevicesResult>> ManagerPrivate::unsubscribeFromDevice
     return state->interface.task();
 }
 
-//
 // Unsubscribes the current user's resource from a device list that were
 // manually subscribed by
 // \c QXmppOmemoManagerPrivate::subscribeToDeviceList().
 //
-// \param jid JID of the contact whose device list is being unsubscribed
+// \a jid is JID of the contact whose device list is being unsubscribed.
 //
-// \return the result of the unsubscription
-//
+// Returns the result of the unsubscription.
 QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::unsubscribeFromDeviceList(QString jid)
 {
     auto result = co_await pubSubManager->unsubscribeFromNode(jid, staticString(ns_omemo_2_devices), ownFullJid()).withContext(q);
@@ -3004,18 +2838,14 @@ void ManagerPrivate::resetCachedData()
     Q_EMIT q->allDevicesRemoved();
 }
 
-//
 // Builds a new session for a new received device if that is enabled.
 //
-// \see QXmppOmemoManager::setNewDeviceAutoSessionBuildingEnabled()
+// \sa QXmppOmemoManager::setNewDeviceAutoSessionBuildingEnabled()
 //
-// \param jid JID of the device's owner
-// \param deviceId ID of the device
-// \param device locally stored device which will be modified
+// \a jid is JID of the device's owner. \a deviceId is ID of the device. \a device is locally
+// stored device which will be modified.
 //
-// \return true if a session could be built or it is not enabled, otherwise
-//         false
-//
+// Returns true if a session could be built or it is not enabled, otherwise false.
 QXmppTask<bool> ManagerPrivate::buildSessionForNewDevice(const QString &jid, uint32_t deviceId, QXmppOmemoStorage::Device &device)
 {
     if (isNewDeviceAutoSessionBuildingEnabled) {
@@ -3025,15 +2855,12 @@ QXmppTask<bool> ManagerPrivate::buildSessionForNewDevice(const QString &jid, uin
     }
 }
 
-//
 // Requests a device bundle and builds a new session with it.
 //
-// \param jid JID of the device's owner
-// \param deviceId ID of the device
-// \param device locally stored device which will be modified
+// \a jid is JID of the device's owner. \a deviceId is ID of the device. \a device is locally
+// stored device which will be modified.
 //
-// \return whether a session could be built
-//
+// Returns whether a session could be built.
 QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(QString jid, uint32_t deviceId, QXmppOmemoStorage::Device &device)
 {
     auto deviceBundle = co_await requestDeviceBundle(jid, deviceId).withContext(q);
@@ -3073,16 +2900,14 @@ QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(QString jid, uint32
     co_return true;
 }
 
-//
 // Builds an OMEMO session.
 //
 // A session is used for encryption and decryption.
 //
-// \param address address of the device for whom the session is built
-// \param deviceBundle device bundle containing all data to build the session
+// \a address is address of the device for whom the session is built. \a deviceBundle is device
+// bundle containing all data to build the session.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::buildSession(signal_protocol_address address, const QXmppOmemoDeviceBundle &deviceBundle)
 {
     // Choose a pre key randomly.
@@ -3124,20 +2949,16 @@ bool ManagerPrivate::buildSession(signal_protocol_address address, const QXmppOm
     return true;
 }
 
-//
 // Creates a session bundle.
 //
-// \param sessionBundle session bundle location
-// \param serializedPublicIdentityKey serialized public identity key
-// \param serializedSignedPublicPreKey serialized signed public pre key
-// \param signedPublicPreKeyId ID of the signed public pre key
-// \param serializedSignedPublicPreKeySignature serialized signature of the
-//        signed public pre key
-// \param serializedPublicPreKey serialized public pre key
-// \param publicPreKeyId ID of the public pre key
+// \a sessionBundle is session bundle location. \a serializedPublicIdentityKey is serialized
+// public identity key. \a serializedSignedPublicPreKey is serialized signed public pre key. \a
+// signedPublicPreKeyId is ID of the signed public pre key. \a
+// serializedSignedPublicPreKeySignature is serialized signature of the signed public pre key.
+// \a serializedPublicPreKey is serialized public pre key. \a publicPreKeyId is ID of the
+// public pre key.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::createSessionBundle(session_pre_key_bundle **sessionBundle,
                                          const QByteArray &serializedPublicIdentityKey,
                                          const QByteArray &serializedSignedPublicPreKey,
@@ -3181,15 +3002,13 @@ bool ManagerPrivate::createSessionBundle(session_pre_key_bundle **sessionBundle,
     }
 }
 
-//
 // Deserializes the locally stored identity key pair.
 //
 // The identity key pair is the pair of private and a public long-term keys.
 //
-// \param identityKeyPair identity key pair location
+// \a identityKeyPair is identity key pair location.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::deserializeIdentityKeyPair(ratchet_identity_key_pair **identityKeyPair) const
 {
     RefCountedPtr<ec_private_key> privateIdentityKey;
@@ -3206,14 +3025,12 @@ bool ManagerPrivate::deserializeIdentityKeyPair(ratchet_identity_key_pair **iden
     return true;
 }
 
-//
 // Deserializes a private identity key.
 //
-// \param privateIdentityKey private identity key location
-// \param serializedPrivateIdentityKey serialized private identity key
+// \a privateIdentityKey is private identity key location. \a serializedPrivateIdentityKey is
+// serialized private identity key.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::deserializePrivateIdentityKey(ec_private_key **privateIdentityKey, const QByteArray &serializedPrivateIdentityKey) const
 {
     BufferSecurePtr privateIdentityKeyBuffer = BufferSecurePtr::fromByteArray(serializedPrivateIdentityKey);
@@ -3231,14 +3048,12 @@ bool ManagerPrivate::deserializePrivateIdentityKey(ec_private_key **privateIdent
     return true;
 }
 
-//
 // Deserializes a public identity key.
 //
-// \param publicIdentityKey public identity key location
-// \param serializedPublicIdentityKey serialized public identity key
+// \a publicIdentityKey is public identity key location. \a serializedPublicIdentityKey is
+// serialized public identity key.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::deserializePublicIdentityKey(ec_public_key **publicIdentityKey, const QByteArray &serializedPublicIdentityKey) const
 {
     BufferPtr publicIdentityKeyBuffer = BufferPtr::fromByteArray(serializedPublicIdentityKey);
@@ -3256,14 +3071,12 @@ bool ManagerPrivate::deserializePublicIdentityKey(ec_public_key **publicIdentity
     return true;
 }
 
-//
 // Deserializes a signed public pre key.
 //
-// \param signedPublicPreKey signed public pre key location
-// \param serializedSignedPublicPreKey serialized signed public pre key
+// \a signedPublicPreKey is signed public pre key location. \a serializedSignedPublicPreKey is
+// serialized signed public pre key.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::deserializeSignedPublicPreKey(ec_public_key **signedPublicPreKey, const QByteArray &serializedSignedPublicPreKey) const
 {
     BufferPtr signedPublicPreKeyBuffer = BufferPtr::fromByteArray(serializedSignedPublicPreKey);
@@ -3281,14 +3094,12 @@ bool ManagerPrivate::deserializeSignedPublicPreKey(ec_public_key **signedPublicP
     return true;
 }
 
-//
 // Deserializes a public pre key.
 //
-// \param publicPreKey public pre key location
-// \param serializedPublicPreKey serialized public pre key
+// \a publicPreKey is public pre key location. \a serializedPublicPreKey is serialized public
+// pre key.
 //
-// \return whether it succeeded
-//
+// Returns whether it succeeded.
 bool ManagerPrivate::deserializePublicPreKey(ec_public_key **publicPreKey, const QByteArray &serializedPublicPreKey) const
 {
     auto publicPreKeyBuffer = BufferPtr::fromByteArray(serializedPublicPreKey);
@@ -3306,19 +3117,16 @@ bool ManagerPrivate::deserializePublicPreKey(ec_public_key **publicPreKey, const
     return true;
 }
 
-//
 // Sends an empty OMEMO message.
 //
 // An empty OMEMO message is a message without an OMEMO payload.
 // It is used to trigger the completion, rebuilding or refreshing of OMEMO
 // sessions.
 //
-// \param recipientJid JID of the message's recipient
-// \param recipientDeviceId ID of the recipient's device
-// \param isKeyExchange whether the message is used to build a new session
+// \a recipientJid is JID of the message's recipient. \a recipientDeviceId is ID of the
+// recipient's device. \a isKeyExchange indicates whether the message is used to build a new session.
 //
-// \return the result of the sending
-//
+// Returns the result of the sending.
 QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId, bool isKeyExchange) const
 {
     const auto address = Address(recipientJid, recipientDeviceId);
@@ -3359,15 +3167,12 @@ QXmppTask<void> ManagerPrivate::storeOwnKey() const
     return trustManager->setOwnKey(staticString(ns_omemo_2), ownDevice.publicIdentityKey);
 }
 
-//
 // Stores a key while its trust level is determined by the used security
 // policy.
 //
-// \param keyOwnerJid bare JID of the key owner
-// \param key key to store
+// \a keyOwnerJid is bare JID of the key owner. \a key is key to store.
 //
-// \return the trust level of the stored key
-//
+// Returns the trust level of the stored key.
 QXmppTask<TrustLevel> ManagerPrivate::storeKeyDependingOnSecurityPolicy(QString keyOwnerJid, QByteArray key)
 {
     auto securityPolicy = co_await q->securityPolicy().withContext(q);
@@ -3393,15 +3198,12 @@ QXmppTask<TrustLevel> ManagerPrivate::storeKeyDependingOnSecurityPolicy(QString 
     }
 }
 
-//
 // Stores a key.
 //
-// \param keyOwnerJid bare JID of the key owner
-// \param key key to store
-// \param trustLevel trust level of the key
+// \a keyOwnerJid is bare JID of the key owner. \a key is key to store. \a trustLevel is trust
+// level of the key.
 //
-// \return the trust level of the stored key
-//
+// Returns the trust level of the stored key.
 QXmppTask<TrustLevel> ManagerPrivate::storeKey(QString keyOwnerJid, QByteArray key, TrustLevel trustLevel) const
 {
     co_await trustManager->addKeys(staticString(ns_omemo_2), keyOwnerJid, { key }, trustLevel).withContext(q);
@@ -3409,45 +3211,35 @@ QXmppTask<TrustLevel> ManagerPrivate::storeKey(QString keyOwnerJid, QByteArray k
     co_return trustLevel;
 }
 
-//
 // Returns the own bare JID set in the client's configuration.
 //
-// \return the own bare JID
-//
+// Returns the own bare JID.
 QString ManagerPrivate::ownBareJid() const
 {
     return q->client()->configuration().jidBare();
 }
 
-//
 // Returns the own full JID set in the client's configuration.
 //
-// \return the own full JID
-//
+// Returns the own full JID.
 QString ManagerPrivate::ownFullJid() const
 {
     return q->client()->configuration().jid();
 }
 
-//
 // Returns the devices with the own JID except the device of this client
 // instance.
 //
-// \return the other own devices
-//
+// Returns the other own devices.
 QHash<uint32_t, QXmppOmemoStorage::Device> ManagerPrivate::otherOwnDevices()
 {
     return devices.value(ownBareJid());
 }
 
-//
 // Calls the logger warning method.
 //
-// \param msg warning message
-//
+// \a msg is warning message.
 void ManagerPrivate::warning(const QString &msg) const
 {
     q->warning(msg);
 }
-
-/// \endcond

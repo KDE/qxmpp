@@ -20,13 +20,14 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppHttpFileSharingProvider
-///
-/// A file sharing provider that uses HTTP File Upload to upload and download files.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppHttpFileSharingProvider
+    \inmodule QXmpp
+
+    A file sharing provider that uses HTTP File Upload to upload and download files.
+
+    \since QXmpp 1.5
+*/
 
 class QXmppHttpFileSharingProviderPrivate
 {
@@ -35,11 +36,10 @@ public:
     QNetworkAccessManager *netManager;
 };
 
-///
-/// \brief Create a QXmppHttpFileSharingProvider
-/// \param manager
-/// \param netManager QNetworkAccessManager that can be reused all over your application.
-///
+/*!
+    \brief Create a QXmppHttpFileSharingProvider with the given upload \a manager. \a netManager
+    is a QNetworkAccessManager that can be reused all over your application.
+*/
 QXmppHttpFileSharingProvider::QXmppHttpFileSharingProvider(QXmppHttpUploadManager *manager, QNetworkAccessManager *netManager)
     : d(std::make_unique<QXmppHttpFileSharingProviderPrivate>())
 {

@@ -7,23 +7,32 @@
 
 #include "QXmppStanza.h"
 
-///
-/// \brief The QXmppStartTlsPacket represents packets used for initiating
-/// STARTTLS negotiation when connecting.
-///
-/// \ingroup Stanzas
-///
-/// \deprecated STARTTLS packets will be removed from the public API.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppStartTlsPacket represents packets used for initiating
+    STARTTLS negotiation when connecting.
+
+    \ingroup Stanzas
+
+    \deprecated STARTTLS packets will be removed from the public API.
+*/
 class QXMPP_EXPORT QXmppStartTlsPacket : public QXmppNonza
 {
 public:
-    /// The type of the STARTTLS packet.
+    /*!
+        The type of the STARTTLS packet.
+
+        \value StartTls Used by the client to initiate STARTTLS.
+        \value Proceed Used by the server to accept STARTTLS.
+        \value Failure Used by the server to reject STARTTLS.
+        \value Invalid Invalid type.
+    */
     enum Type {
-        StartTls,  ///< Used by the client to initiate STARTTLS.
-        Proceed,   ///< Used by the server to accept STARTTLS.
-        Failure,   ///< Used by the server to reject STARTTLS.
-        Invalid,   ///< Invalid type
+        StartTls,
+        Proceed,
+        Failure,
+        Invalid,
     };
 
     [[deprecated]]
@@ -33,10 +42,8 @@ public:
     Type type() const;
     void setType(Type type);
 
-    /// \cond
     void parse(const QDomElement &element) override;
     void toXml(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
     [[deprecated]]
     static bool isStartTlsPacket(const QDomElement &element);

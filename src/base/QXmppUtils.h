@@ -20,7 +20,11 @@ class QDateTime;
 class QDomElement;
 class QString;
 
-/// \brief The QXmppUtils class contains static utility functions.
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppUtils class contains static utility functions.
+*/
 class QXMPP_EXPORT QXmppUtils
 {
 public:
@@ -55,11 +59,19 @@ QXMPP_EXPORT std::tuple<QString, QString> iqPayloadXmlTag(const QDomElement &el)
 
 QXMPP_EXPORT QString generateSequentialStanzaId();
 
-/// \brief Checks whether a QDomElement is an IQ stanza of a specific type T.
+/*!
+    \brief Returns true if a QDomElement is an IQ stanza of a specific type T.
+
+    \a el.
+*/
 template<typename T>
 bool isIqElement(const QDomElement &el) { return Private::isPayloadType<T>(Private::iqPayloadXmlTag(el)); }
 
-/// \brief Checks whether an XML element has the correct tag name and namespace URI for type T.
+/*!
+    \brief Returns true if an XML element has the correct tag name and namespace URI for type T.
+
+    \a el.
+*/
 template<Private::HasXmlTag T>
 bool isElement(const QDomElement &el) { return Private::elementXmlTag(el) == T::XmlTag; }
 

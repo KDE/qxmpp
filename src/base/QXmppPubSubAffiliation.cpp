@@ -15,17 +15,18 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppPubSubAffiliation
-///
-/// This class represents an affiliation of a user with a PubSub node as defined
-/// in \xep{0060, Publish-Subscribe}.
-///
-/// \sa QXmppPubSubIq
-/// \sa QXmppPubSubEvent
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppPubSubAffiliation
+    \inmodule QXmpp
+
+    This class represents an affiliation of a user with a PubSub node as defined
+    in \xep{0060}{Publish-Subscribe}.
+
+    \sa QXmppPubSubIq
+    \sa QXmppPubSubEvent
+
+    \since QXmpp 1.5
+*/
 
 template<>
 struct Enums::Data<QXmppPubSubAffiliation::Affiliation> {
@@ -61,9 +62,7 @@ QXmppPubSubAffiliationPrivate::QXmppPubSubAffiliationPrivate(QXmppPubSubAffiliat
 {
 }
 
-///
-/// Default constructor.
-///
+/*! Default constructor. */
 QXmppPubSubAffiliation::QXmppPubSubAffiliation(Affiliation type,
                                                const QString &node,
                                                const QString &jid)
@@ -71,67 +70,57 @@ QXmppPubSubAffiliation::QXmppPubSubAffiliation(Affiliation type,
 {
 }
 
-/// Copy constructor.
+/*! Copy constructor. */
 QXmppPubSubAffiliation::QXmppPubSubAffiliation(const QXmppPubSubAffiliation &) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppPubSubAffiliation::QXmppPubSubAffiliation(QXmppPubSubAffiliation &&) = default;
 QXmppPubSubAffiliation::~QXmppPubSubAffiliation() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppPubSubAffiliation &QXmppPubSubAffiliation::operator=(const QXmppPubSubAffiliation &) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppPubSubAffiliation &QXmppPubSubAffiliation::operator=(QXmppPubSubAffiliation &&) = default;
 
-///
-/// Returns the type of the affiliation.
-///
+/*! Returns the type of the affiliation. */
 QXmppPubSubAffiliation::Affiliation QXmppPubSubAffiliation::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the type of the affiliation.
-///
+/*! Sets the \a type of the affiliation. */
 void QXmppPubSubAffiliation::setType(Affiliation type)
 {
     d->type = type;
 }
 
-///
-/// Returns the node name of the node the affiliation belongs to.
-///
+/*! Returns the node name of the node the affiliation belongs to. */
 QString QXmppPubSubAffiliation::node() const
 {
     return d->node;
 }
 
-///
-/// Sets the node name.
-///
+/*! Sets the \a node name. */
 void QXmppPubSubAffiliation::setNode(const QString &node)
 {
     d->node = node;
 }
 
-///
-/// Returns the JID of the user.
-///
+/*! Returns the JID of the user. */
 QString QXmppPubSubAffiliation::jid() const
 {
     return d->jid;
 }
 
-///
-/// Sets the JID of the user.
-///
+/*!
+    Sets the JID of the user.
+
+    \a jid.
+*/
 void QXmppPubSubAffiliation::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
-///
-/// Returns true if the DOM element is a PubSub affiliation.
-///
+/*! Returns true if the DOM \a element is a PubSub affiliation. */
 bool QXmppPubSubAffiliation::isAffiliation(const QDomElement &element)
 {
     if (element.tagName() != u"affiliation" ||
@@ -148,7 +137,6 @@ bool QXmppPubSubAffiliation::isAffiliation(const QDomElement &element)
     return false;
 }
 
-/// \cond
 void QXmppPubSubAffiliation::parse(const QDomElement &element)
 {
     d->type = Enums::fromString<Affiliation>(element.attribute(u"affiliation"_s)).value_or(None);
@@ -166,4 +154,3 @@ void QXmppPubSubAffiliation::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"jid", d->jid },
     });
 }
-/// \endcond

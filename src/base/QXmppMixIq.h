@@ -81,15 +81,11 @@ public:
     std::optional<QXmppMixInvitation> invitation() const;
     void setInvitation(const std::optional<QXmppMixInvitation> &);
 
-    /// \cond
     static bool isMixIq(const QDomElement &);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &) override;
     void toXmlElementFromChild(QXmlStreamWriter *) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppMixIqPrivate> d;

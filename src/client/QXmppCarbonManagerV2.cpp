@@ -58,42 +58,40 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
     return {};
 }
 
-///
-/// \class QXmppCarbonManagerV2
-///
-/// \brief The QXmppCarbonManagerV2 class handles message carbons as described in \xep{0280,
-/// Message Carbons}.
-///
-/// The manager automatically enables carbons when a connection is established. Either by using
-/// \xep{0386, Bind 2} if available or by sending a normal IQ request on connection.
-/// Carbon copied messages from other devices of the same account and carbon copied messages from
-/// other accounts are injected into the QXmppClient. This way you can handle them like any other
-/// incoming message by implementing QXmppMessageHandler or using QXmppClient::messageReceived().
-///
-/// Checks are done to ensure that the entity sending the carbon copy is allowed to send the
-/// forwarded message.
-///
-/// You don't need to do anything other than adding the extension to the client to use it.
-/// \code
-/// QXmppClient client;
-/// client.addNewExtension<QXmppCarbonManagerV2>();
-/// \endcode
-///
-/// To distinguish carbon messages, you can use QXmppMessage::isCarbonMessage().
-///
-/// \note Enabling via Bind 2 has been added in QXmpp 1.8.
-///
-/// \ingroup Managers
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppCarbonManagerV2
+    \inmodule QXmpp
+
+    \brief The QXmppCarbonManagerV2 class handles message carbons as described in \xep{0280}{Message Carbons}.
+
+    The manager automatically enables carbons when a connection is established. Either by using
+    \xep{0386}{Bind 2} if available or by sending a normal IQ request on connection.
+    Carbon copied messages from other devices of the same account and carbon copied messages from
+    other accounts are injected into the QXmppClient. This way you can handle them like any other
+    incoming message by implementing QXmppMessageHandler or using QXmppClient::messageReceived().
+
+    Checks are done to ensure that the entity sending the carbon copy is allowed to send the
+    forwarded message.
+
+    You don't need to do anything other than adding the extension to the client to use it.
+    \code
+    QXmppClient client;
+    client.addNewExtension<QXmppCarbonManagerV2>();
+    \endcode
+
+    To distinguish carbon messages, you can use QXmppMessage::isCarbonMessage().
+
+    \note Enabling via Bind 2 has been added in QXmpp 1.8.
+
+    \ingroup Managers
+
+    \since QXmpp 1.5
+*/
 
 QXmppCarbonManagerV2::QXmppCarbonManagerV2() = default;
 QXmppCarbonManagerV2::~QXmppCarbonManagerV2() = default;
 
-///
-/// Returns whether message carbons are currently enabled on the server.
-///
+/*! Returns whether message carbons are currently enabled on the server. */
 QBindable<bool> QXmppCarbonManagerV2::enabled() const
 {
     return &m_enabled;

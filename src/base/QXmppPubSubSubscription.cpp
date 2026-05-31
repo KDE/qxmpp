@@ -17,17 +17,18 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppPubSubSubscription
-///
-/// The QXmppPubSubSubscription class represents a PubSub subscription contained
-/// in event notifications and IQ requests, as defined in \xep{0060, Publish-
-/// Subscribe}.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppPubSubSubscription
+    \inmodule QXmpp
+
+    The QXmppPubSubSubscription class represents a PubSub subscription contained
+    in event notifications and IQ requests, as defined in \xep{0060}{Publish-
+    Subscribe}.
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.5
+*/
 
 template<>
 struct Enums::Data<QXmppPubSubSubscription::State> {
@@ -75,16 +76,10 @@ QXmppPubSubSubscriptionPrivate::QXmppPubSubSubscriptionPrivate(const QString &ji
 {
 }
 
-///
-/// Creates a new QXmppPubSubSubscription.
-///
-/// \param jid
-/// \param node
-/// \param subId
-/// \param state
-/// \param configurationSupport
-/// \param expiry
-///
+/*!
+    Creates a new QXmppPubSubSubscription with \a jid, \a node, \a subId, \a state,
+    \a configurationSupport and \a expiry.
+*/
 QXmppPubSubSubscription::QXmppPubSubSubscription(const QString &jid,
                                                  const QString &node,
                                                  const QString &subId,
@@ -95,138 +90,128 @@ QXmppPubSubSubscription::QXmppPubSubSubscription(const QString &jid,
 {
 }
 
-/// Copy contructor.
+/*! Copy contructor. */
 QXmppPubSubSubscription::QXmppPubSubSubscription(const QXmppPubSubSubscription &) = default;
-/// Move contructor.
+/*! Move contructor. */
 QXmppPubSubSubscription::QXmppPubSubSubscription(QXmppPubSubSubscription &&) = default;
 QXmppPubSubSubscription::~QXmppPubSubSubscription() = default;
-/// Copy assignment operator.
+/*! Copy assignment operator. */
 QXmppPubSubSubscription &QXmppPubSubSubscription::operator=(const QXmppPubSubSubscription &) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppPubSubSubscription &QXmppPubSubSubscription::operator=(QXmppPubSubSubscription &&) = default;
 
-///
-/// Returns the JID of the user of this subscription.
-///
+/*! Returns the JID of the user of this subscription. */
 QString QXmppPubSubSubscription::jid() const
 {
     return d->jid;
 }
 
-///
-/// Sets the JID of the user of this subscription.
-///
+/*!
+    Sets the JID of the user of this subscription.
+
+    \a jid.
+*/
 void QXmppPubSubSubscription::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
-///
-/// Returns the node name of this subscription.
-///
+/*! Returns the node name of this subscription. */
 QString QXmppPubSubSubscription::node() const
 {
     return d->node;
 }
 
-///
-/// Sets the node name of this subscription.
-///
+/*! Sets the \a node name of this subscription. */
 void QXmppPubSubSubscription::setNode(const QString &node)
 {
     d->node = node;
 }
 
-///
-/// Returns the subscription ID (may be empty).
-///
+/*! Returns the subscription ID (may be empty). */
 QString QXmppPubSubSubscription::subId() const
 {
     return d->subId;
 }
 
-///
-/// Sets the subscription ID (may be empty).
-///
+/*!
+    Sets the subscription ID (may be empty).
+
+    \a subId.
+*/
 void QXmppPubSubSubscription::setSubId(const QString &subId)
 {
     d->subId = subId;
 }
 
-///
-/// Returns the state of the subscription.
-///
+/*! Returns the state of the subscription. */
 QXmppPubSubSubscription::State QXmppPubSubSubscription::state() const
 {
     return d->state;
 }
 
-///
-/// Sets the state of the subscription.
-///
+/*! Sets the \a state of the subscription. */
 void QXmppPubSubSubscription::setState(State state)
 {
     d->state = state;
 }
 
-///
-/// Returns the expiry date of the subscription.
-///
-/// If this timestamp is valid, the subscription is going to be cancelled at
-/// this date.
-///
+/*!
+    Returns the expiry date of the subscription.
+
+    If this timestamp is valid, the subscription is going to be cancelled at
+    this date.
+*/
 QDateTime QXmppPubSubSubscription::expiry() const
 {
     return d->expiry;
 }
 
-///
-/// Sets the expiry date of the subscription.
-///
-/// If this timestamp is valid, the subscription is going to be cancelled at
-/// this date.
-///
+/*!
+    Sets the expiry date of the subscription.
+
+    If this timestamp is valid, the subscription is going to be cancelled at
+    this date.
+
+    \a expiry.
+*/
 void QXmppPubSubSubscription::setExpiry(const QDateTime &expiry)
 {
     d->expiry = expiry;
 }
 
-///
-/// Returns the availability of a subscription configuration.
-///
+/*! Returns the availability of a subscription configuration. */
 QXmppPubSubSubscription::ConfigurationSupport QXmppPubSubSubscription::configurationSupport() const
 {
     return d->configurationSupport;
 }
 
-///
-/// Sets the availability of a subscription configuration.
-///
+/*!
+    Sets the availability of a subscription configuration.
+
+    \a support.
+*/
 void QXmppPubSubSubscription::setConfigurationSupport(ConfigurationSupport support)
 {
     d->configurationSupport = support;
 }
 
-///
-/// Returns whether a configuration of the subscription is possible.
-///
+/*! Returns whether a configuration of the subscription is possible. */
 bool QXmppPubSubSubscription::isConfigurationSupported() const
 {
     return d->configurationSupport > Unavailable;
 }
 
-///
-/// Returns whether configuration of the subscription required before event
-/// notifications are going to be sent to the user.
-///
+/*!
+    Returns whether configuration of the subscription required before event
+    notifications are going to be sent to the user.
+*/
 bool QXmppPubSubSubscription::isConfigurationRequired() const
 {
     return d->configurationSupport == Required || d->state == Unconfigured;
 }
 
-///
-/// Returns true, if the element is a PubSub subscription element.
-///
+/*! Returns true, if the \a element is a PubSub subscription element. */
 bool QXmppPubSubSubscription::isSubscription(const QDomElement &element)
 {
     if (element.tagName() != u"subscription") {
@@ -250,7 +235,6 @@ bool QXmppPubSubSubscription::isSubscription(const QDomElement &element)
     return false;
 }
 
-/// \cond
 void QXmppPubSubSubscription::parse(const QDomElement &element)
 {
     bool isPubSub = element.namespaceURI() == ns_pubsub;
@@ -301,4 +285,3 @@ void QXmppPubSubSubscription::toXml(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond

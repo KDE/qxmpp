@@ -27,10 +27,8 @@ public:
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &) override;
     void toXmlElementFromChild(QXmlStreamWriter *) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppExternalServiceDiscoveryIqPrivate> d;

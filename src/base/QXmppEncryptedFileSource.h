@@ -38,11 +38,9 @@ public:
     const QVector<QXmppHttpFileSource> &httpSources() const;
     void setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"encrypted", QXmpp::Private::ns_esfs };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppEncryptedFileSourcePrivate> d;

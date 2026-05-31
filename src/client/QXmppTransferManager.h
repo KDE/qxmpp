@@ -50,11 +50,9 @@ public:
     QXmppTransferFileInfo &operator=(const QXmppTransferFileInfo &other);
     bool operator==(const QXmppTransferFileInfo &other) const;
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"file", QXmpp::Private::ns_stream_initiation_file_transfer };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppTransferFileInfoPrivate> d;
@@ -64,69 +62,124 @@ class QXMPP_EXPORT QXmppTransferJob : public QXmppLoggable
 {
     Q_OBJECT
     Q_FLAGS(Method Methods)
-    /// The job's transfer direction
+    /*!
+        \property QXmppTransferJob::direction
+
+        The job's transfer direction
+    */
     Q_PROPERTY(Direction direction READ direction CONSTANT)
-    /// The local file URL
+    /*!
+        \property QXmppTransferJob::localFileUrl
+
+        The local file URL
+    */
     Q_PROPERTY(QUrl localFileUrl READ localFileUrl WRITE setLocalFileUrl NOTIFY localFileUrlChanged)
-    /// The remote party's JID
+    /*!
+        \property QXmppTransferJob::jid
+
+        The remote party's JID
+    */
     Q_PROPERTY(QString jid READ jid CONSTANT)
-    /// The job's transfer method
+    /*!
+        \property QXmppTransferJob::method
+
+        The job's transfer method
+    */
     Q_PROPERTY(Method method READ method CONSTANT)
-    /// The job's state
+    /*!
+        \property QXmppTransferJob::state
+
+        The job's state
+    */
     Q_PROPERTY(State state READ state NOTIFY stateChanged)
 
-    /// The name of the file
+    /*!
+        \property QXmppTransferJob::fileName
+
+        The name of the file
+    */
     Q_PROPERTY(QString fileName READ fileName CONSTANT)
-    /// The size of the file
+    /*!
+        \property QXmppTransferJob::fileSize
+
+        The size of the file
+    */
     Q_PROPERTY(qint64 fileSize READ fileSize CONSTANT)
 
 public:
-    /// This enum is used to describe the direction of a transfer job.
+    /*!
+        This enum is used to describe the direction of a transfer job.
+
+        \value IncomingDirection The file is being received.
+        \value OutgoingDirection The file is being sent.
+    */
     enum Direction {
-        IncomingDirection,  ///< The file is being received.
-        OutgoingDirection   ///< The file is being sent.
+        IncomingDirection,
+        OutgoingDirection
     };
     Q_ENUM(Direction)
 
-    /// This enum is used to describe the type of error encountered by a transfer job.
+    /*!
+        This enum is used to describe the type of error encountered by a transfer job.
+
+        \value NoError No error occurred.
+        \value AbortError The file transfer was aborted.
+        \value FileAccessError An error was encountered trying to access a local file.
+        \value FileCorruptError The file is corrupt: the file size or hash do not match.
+        \value ProtocolError An error was encountered in the file transfer protocol.
+    */
     enum Error {
-        NoError = 0,       ///< No error occurred.
-        AbortError,        ///< The file transfer was aborted.
-        FileAccessError,   ///< An error was encountered trying to access a local file.
-        FileCorruptError,  ///< The file is corrupt: the file size or hash do not match.
-        ProtocolError      ///< An error was encountered in the file transfer protocol.
+        NoError = 0,
+        AbortError,
+        FileAccessError,
+        FileCorruptError,
+        ProtocolError
     };
     Q_ENUM(Error)
 
-    /// This enum is used to describe a transfer method.
+    /*!
+        This enum is used to describe a transfer method.
+
+        \value NoMethod No transfer method.
+        \value InBandMethod \xep{0047}{In-Band Bytestreams}.
+        \value SocksMethod \xep{0065}{SOCKS5 Bytestreams}.
+        \value AnyMethod Any supported transfer method.
+    */
     enum Method {
-        NoMethod = 0,      ///< No transfer method.
-        InBandMethod = 1,  ///< \xep{0047, In-Band Bytestreams}
-        SocksMethod = 2,   ///< \xep{0065, SOCKS5 Bytestreams}
-        AnyMethod = 3      ///< Any supported transfer method.
+        NoMethod = 0,
+        InBandMethod = 1,
+        SocksMethod = 2,
+        AnyMethod = 3
     };
     Q_ENUM(Method)
     Q_DECLARE_FLAGS(Methods, Method)
 
-    /// This enum is used to describe the state of a transfer job.
+    /*!
+        This enum is used to describe the state of a transfer job.
+
+        \value OfferState The transfer is being offered to the remote party.
+        \value StartState The transfer is being connected.
+        \value TransferState The transfer is ongoing.
+        \value FinishedState The transfer is finished.
+    */
     enum State {
-        OfferState = 0,     ///< The transfer is being offered to the remote party.
-        StartState = 1,     ///< The transfer is being connected.
-        TransferState = 2,  ///< The transfer is ongoing.
-        FinishedState = 3   ///< The transfer is finished.
+        OfferState = 0,
+        StartState = 1,
+        TransferState = 2,
+        FinishedState = 3
     };
     Q_ENUM(State)
 
     ~QXmppTransferJob() override;
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Returns the job's transfer direction.
+    /*! Returns the job's transfer direction. */
     QXmppTransferJob::Direction direction() const;
-    /// Returns the remote party's JID.
+    /*! Returns the remote party's JID. */
     QString jid() const;
-    /// Returns the job's transfer method.
+    /*! Returns the job's transfer method. */
     QXmppTransferJob::Method method() const;
-    /// Returns the job's state.
+    /*! Returns the job's state. */
     QXmppTransferJob::State state() const;
 
     QXmppTransferJob::Error error() const;
@@ -136,37 +189,47 @@ public:
     // XEP-0096 : File transfer
     QXmppTransferFileInfo fileInfo() const;
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Returns the local file URL.
+    /*! Returns the local file URL. */
     QUrl localFileUrl() const;
     void setLocalFileUrl(const QUrl &localFileUrl);
 
-    /// \cond
     QDateTime fileDate() const;
     QByteArray fileHash() const;
     QString fileName() const;
     qint64 fileSize() const;
-    /// \endcond
 
-    /// This signal is emitted when an error is encountered while
-    /// processing the transfer job.
+    /*!
+        This signal is emitted when an error is encountered while
+        processing the transfer job.
+    */
     Q_SIGNAL void error(QXmppTransferJob::Error error);
 
-    /// This signal is emitted when the transfer job is finished.
-    ///
-    /// You can determine if the job completed successfully by testing whether
-    /// error() returns QXmppTransferJob::NoError.
-    ///
-    /// Note: Do not delete the job in the slot connected to this signal,
-    /// instead use deleteLater().
+    /*!
+        This signal is emitted when the transfer job is finished.
+
+        You can determine if the job completed successfully by testing whether
+        error() returns QXmppTransferJob::NoError.
+
+        Note: Do not delete the job in the slot connected to this signal,
+        instead use deleteLater().
+    */
     Q_SIGNAL void finished();
 
-    /// This signal is emitted when the local file URL changes.
+    /*!
+        This signal is emitted when the local file URL changes.
+
+        \a localFileUrl.
+    */
     Q_SIGNAL void localFileUrlChanged(const QUrl &localFileUrl);
 
-    /// This signal is emitted to indicate the progress of this transfer job.
+    /*!
+        This signal is emitted to indicate the progress of this transfer job.
+
+        \a done and \a total.
+    */
     Q_SIGNAL void progress(qint64 done, qint64 total);
 
-    /// This signal is emitted when the transfer job changes state.
+    /*! This signal is emitted when the transfer job changes \a state. */
     Q_SIGNAL void stateChanged(QXmppTransferJob::State state);
 
     Q_SLOT void abort();
@@ -192,11 +255,23 @@ class QXMPP_EXPORT QXmppTransferManager : public QXmppClientExtension
 {
     Q_OBJECT
 
-    /// The JID of the bytestream proxy to use for outgoing transfers
+    /*!
+        \property QXmppTransferManager::proxy
+
+        The JID of the bytestream proxy to use for outgoing transfers
+    */
     Q_PROPERTY(QString proxy READ proxy WRITE setProxy)
-    /// Whether the proxy will systematically be used for outgoing SOCKS5 bytestream transfers
+    /*!
+        \property QXmppTransferManager::proxyOnly
+
+        Whether the proxy will systematically be used for outgoing SOCKS5 bytestream transfers
+    */
     Q_PROPERTY(bool proxyOnly READ proxyOnly WRITE setProxyOnly)
-    /// The supported stream methods
+    /*!
+        \property QXmppTransferManager::supportedMethods
+
+        The supported stream methods
+    */
     Q_PROPERTY(QXmppTransferJob::Methods supportedMethods READ supportedMethods WRITE setSupportedMethods)
 
 public:
@@ -204,50 +279,58 @@ public:
     ~QXmppTransferManager() override;
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Return the JID of the bytestream proxy to use for outgoing transfers.
+    /*! Return the JID of the bytestream proxy to use for outgoing transfers. */
     QString proxy() const;
     void setProxy(const QString &proxyJid);
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Return whether the proxy will systematically be used for outgoing
-    /// SOCKS5 bytestream transfers.
+    /*!
+        Return whether the proxy will systematically be used for outgoing
+        SOCKS5 bytestream transfers.
+    */
     bool proxyOnly() const;
     void setProxyOnly(bool proxyOnly);
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Return the supported stream methods.
-    ///
-    /// The methods are a combination of zero or more QXmppTransferJob::Method.
+    /*!
+        Return the supported stream methods.
+
+        The methods are a combination of zero or more QXmppTransferJob::Method.
+    */
     QXmppTransferJob::Methods supportedMethods() const;
     void setSupportedMethods(QXmppTransferJob::Methods methods);
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
-    /// \endcond
 
-    /// This signal is emitted when a new file transfer offer is received.
-    ///
-    /// To accept the transfer job, call the job's QXmppTransferJob::accept() method.
-    /// To refuse the transfer job, call the job's QXmppTransferJob::abort() method.
+    /*!
+        This signal is emitted when a new file transfer offer is received.
+
+        To accept the transfer job, call the job's QXmppTransferJob::accept() method.
+        To refuse the transfer job, call the job's QXmppTransferJob::abort() method.
+
+        \a job.
+    */
     Q_SIGNAL void fileReceived(QXmppTransferJob *job);
 
-    /// This signal is emitted whenever a transfer job is started.
+    /*! This signal is emitted whenever a transfer \a job is started. */
     Q_SIGNAL void jobStarted(QXmppTransferJob *job);
 
-    /// This signal is emitted whenever a transfer job is finished.
-    ///
-    /// \sa QXmppTransferJob::finished()
+    /*!
+        This signal is emitted whenever a transfer job is finished.
+
+        \sa QXmppTransferJob::finished()
+
+        \a job.
+    */
     Q_SIGNAL void jobFinished(QXmppTransferJob *job);
 
     Q_SLOT QXmppTransferJob *sendFile(const QString &jid, const QString &filePath, const QString &description = QString());
     Q_SLOT QXmppTransferJob *sendFile(const QString &jid, QIODevice *device, const QXmppTransferFileInfo &fileInfo, const QString &sid = QString());
 
 protected:
-    /// \cond
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
-    /// \endcond
 
 private:
     Q_SLOT void _q_iqReceived(const QXmppIq &);

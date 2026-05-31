@@ -36,9 +36,7 @@ public:
         bool channelsSearchable = false;
         bool channelCreationAllowed = false;
 
-        /// \cond
         bool operator==(const Service &other) const;
-        /// \endcond
     };
 
     struct Subscription {
@@ -132,11 +130,9 @@ public:
     Q_SIGNAL void channelDeleted(const QString &channelJid);
 
 protected:
-    /// \cond
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
-    /// \endcond
 
 private:
     QXmppMixIq prepareJoinIq(const QString &channelJid, const QString &nickname, QXmppMixConfigItem::Nodes nodes);

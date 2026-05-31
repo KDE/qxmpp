@@ -15,19 +15,30 @@
 
 class QXmppIqPrivate;
 
-/// \brief The QXmppIq class is the base class for all IQs.
-///
-/// \ingroup Stanzas
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppIq class is the base class for all IQs.
+
+    \ingroup Stanzas
+*/
 
 class QXMPP_EXPORT QXmppIq : public QXmppStanza
 {
 public:
-    /// This enum describes the type of IQ.
+    /*!
+        This enum describes the type of IQ.
+
+        \value Error Error response.
+        \value Get Get request.
+        \value Set Set request.
+        \value Result Result.
+    */
     enum Type {
-        Error = 0,  ///< Error response.
-        Get,        ///< Get request.
-        Set,        ///< Set request.
-        Result      ///< Result.
+        Error = 0,
+        Get,
+        Set,
+        Result
     };
 
     QXmppIq(QXmppIq::Type type = QXmppIq::Get);
@@ -43,13 +54,11 @@ public:
 
     bool isXmppStanza() const override;
 
-    /// \cond
     void parse(const QDomElement &element) override;
     void toXml(QXmlStreamWriter *writer) const override;
 
     virtual void parseElementFromChild(const QDomElement &element);
     virtual void toXmlElementFromChild(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppIqPrivate> d;

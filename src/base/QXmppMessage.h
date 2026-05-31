@@ -33,38 +33,43 @@ class QXmppCallInviteElement;
 
 namespace QXmpp {
 
-///
-/// Message reply as defined in \xep{0461, Message Replies}.
-///
-/// \since QXmpp 1.9
-///
+/*!
+    \inmodule QXmpp
+
+    Message reply as defined in \xep{0461}{Message Replies}.
+
+    \since QXmpp 1.9
+*/
 struct Reply {
-    /// Full JID of the sender of the referenced message (optional).
-    /// In 1:1 chats the bare JID may also be used.
+    /*!
+        Full JID of the sender of the referenced message (optional).
+        In 1:1 chats the bare JID may also be used.
+    */
     QString to;
-    /// ID of the referenced message.
+    /*! ID of the referenced message. */
     QString id;
 };
 
 }  // namespace QXmpp
 
 struct QXmppStanzaId {
-    /// Identifier of the stanza element
+    /*! Identifier of the stanza element */
     QString id;
-    /// JID of the generating entity
+    /*! JID of the generating entity */
     QString by;
 };
 
-///
-/// \brief The QXmppMessage class represents an XMPP message.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppMessage class represents an XMPP message.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppMessage : public QXmppStanza
 {
 public:
 #if QXMPP_DEPRECATED_SINCE(1, 5)
-    /// \cond
     using EncryptionMethod = QXmpp::EncryptionMethod;
 
     static const EncryptionMethod NoEncryption = EncryptionMethod::NoEncryption;
@@ -73,10 +78,17 @@ public:
     static const EncryptionMethod LegacyOpenPGP = EncryptionMethod::LegacyOpenPgp;
     static const EncryptionMethod OX = EncryptionMethod::Ox;
     static const EncryptionMethod OMEMO = EncryptionMethod::Omemo0;
-    /// \endcond
 #endif
 
-    /// This enum describes a message type.
+    /*!
+        This enum describes a message type.
+
+        \value Error
+        \value Normal
+        \value Chat
+        \value GroupChat
+        \value Headline
+    */
     enum Type {
         Error = 0,
         Normal,
@@ -85,26 +97,38 @@ public:
         Headline
     };
 
-    ///
-    /// This enum describes a chat state as defined by \xep{0085, Chat State
-    /// Notifications}.
-    ///
-    /// \since QXmpp 0.2
-    ///
+    /*!
+        This enum describes a chat state as defined by \xep{0085}{Chat State
+        Notifications}.
+
+        \since QXmpp 0.2
+
+        \value None The message does not contain any chat state information.
+        \value Active User is actively participating in the chat session.
+        \value Inactive User has not been actively participating in the chat session.
+        \value Gone User has effectively ended their participation in the chat session.
+        \value Composing User is composing a message.
+        \value Paused User had been composing but now has stopped.
+    */
     enum State {
-        None = 0,   ///< The message does not contain any chat state information.
-        Active,     ///< User is actively participating in the chat session.
-        Inactive,   ///< User has not been actively participating in the chat session.
-        Gone,       ///< User has effectively ended their participation in the chat session.
-        Composing,  ///< User is composing a message.
-        Paused      ///< User had been composing but now has stopped.
+        None = 0,
+        Active,
+        Inactive,
+        Gone,
+        Composing,
+        Paused
     };
 
-    ///
-    /// This enum describes a chat marker as defined by \xep{0333, Chat Markers}.
-    ///
-    /// \since QXmpp 0.8.1
-    ///
+    /*!
+        This enum describes a chat marker as defined by \xep{0333}{Chat Markers}.
+
+        \since QXmpp 0.8.1
+
+        \value NoMarker
+        \value Received
+        \value Displayed
+        \value Acknowledged
+    */
     enum Marker {
         NoMarker = 0,
         Received,
@@ -112,16 +136,21 @@ public:
         Acknowledged
     };
 
-    ///
-    /// \xep{0334, Message Processing Hints}
-    ///
-    /// \since QXmpp 1.1
-    ///
+    /*!
+        \xep{0334}{Message Processing Hints}
+
+        \since QXmpp 1.1
+
+        \value NoPermanentStore Do not allow permanent storage.
+        \value NoStore Do not store at all.
+        \value NoCopy Do not copy the message.
+        \value Store Do store the message.
+    */
     enum Hint {
-        NoPermanentStore = 1 << 0,  ///< Do not allow permanent storage
-        NoStore = 1 << 1,           ///< Do not store at all
-        NoCopy = 1 << 2,            ///< Do not copy the message
-        Store = 1 << 3              ///< Do store the message
+        NoPermanentStore = 1 << 0,
+        NoStore = 1 << 1,
+        NoCopy = 1 << 2,
+        Store = 1 << 3
     };
     Q_DECLARE_FLAGS(Hints, Hint)
 
@@ -330,7 +359,6 @@ public:
     std::optional<QXmppCallInviteElement> callInviteElement() const;
     void setCallInviteElement(std::optional<QXmppCallInviteElement> callInviteElement);
 
-    /// \cond
 #ifdef BUILD_OMEMO
     // XEP-0384: OMEMO Encryption
     std::optional<QXmppOmemoElement> omemoElement() const;
@@ -341,7 +369,6 @@ public:
     virtual void parse(const QDomElement &element, QXmpp::SceMode);
     void toXml(QXmlStreamWriter *writer) const override final;
     virtual void toXml(QXmlStreamWriter *writer, QXmpp::SceMode) const;
-    /// \endcond
 
     void parseExtensions(const QDomElement &element, QXmpp::SceMode sceMode);
     virtual bool parseExtension(const QDomElement &element, QXmpp::SceMode);

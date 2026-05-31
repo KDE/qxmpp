@@ -64,27 +64,27 @@ static void serializeRosterData(const RosterData &d, QXmlStreamWriter &writer)
 
 }  // namespace QXmpp::Private
 
-///
-/// \fn QXmppRosterManager::subscriptionRequestReceived
-///
-/// This signal is emitted when a JID asks to subscribe to the user's presence.
-///
-/// The user can either accept the request by calling acceptSubscription() or refuse it
-/// by calling refuseSubscription().
-///
-/// Since *QXmpp 1.10.2* only verified \xep{0283, Moved} old JIDs are passed in \a presence. If
-/// verification fails or the given old JID is not valid, the attribute is cleared in the
-/// QXmppPresence. See \ref rostermanager_moved "above" for more details.
-///
-/// \note If QXmppConfiguration::autoAcceptSubscriptions() is set to true or the subscription
-/// request is automatically accepted by the QXmppMovedManager, this signal will not be emitted.
-///
-/// \param subscriberBareJid bare JID that wants to subscribe to the user's presence
-/// \param presence presence stanza, e.g. containing the message (presence.statusText()),
-/// \xep{0283, Moved} old JID or other information
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \fn QXmppRosterManager::subscriptionRequestReceived
+
+    This signal is emitted when a JID asks to subscribe to the user's presence.
+
+    The user can either accept the request by calling acceptSubscription() or refuse it
+    by calling refuseSubscription().
+
+    Since *QXmpp 1.10.2* only verified \xep{0283}{Moved} old JIDs are passed in \a presence. If
+    verification fails or the given old JID is not valid, the attribute is cleared in the
+    QXmppPresence. See \l rostermanager_moved "above" for more details.
+
+    \note If QXmppConfiguration::autoAcceptSubscriptions() is set to true or the subscription
+    request is automatically accepted by the QXmppMovedManager, this signal will not be emitted.
+
+    \a subscriberBareJid is the bare JID that wants to subscribe to the user's presence.
+    \a presence is the presence stanza, e.g. containing the message (presence.statusText()),
+    \xep{0283}{Moved} old JID or other information.
+
+    \since QXmpp 1.5
+*/
 
 class QXmppRosterManagerPrivate
 {
@@ -115,9 +115,11 @@ void QXmppRosterManagerPrivate::clear()
     isRosterReceived = false;
 }
 
-///
-/// Constructs a roster manager.
-///
+/*!
+    Constructs a roster manager.
+
+    \a client.
+*/
 QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
     : d(std::make_unique<QXmppRosterManagerPrivate>())
 {
@@ -135,19 +137,21 @@ QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
 
 QXmppRosterManager::~QXmppRosterManager() = default;
 
-///
-/// Accepts an existing subscription request or pre-approves future subscription
-/// requests.
-///
-/// You can call this method in reply to the subscriptionRequest() signal or to
-/// create a pre-approved subscription.
-///
-/// \note Pre-approving subscription requests is only allowed, if the server
-/// supports RFC6121 and advertises the 'urn:xmpp:features:pre-approval' stream
-/// feature.
-///
-/// \sa QXmppStreamFeatures::preApprovedSubscriptionsSupported()
-///
+/*!
+    Accepts an existing subscription request or pre-approves future subscription
+    requests. Returns true on success.
+
+    You can call this method in reply to the subscriptionRequest() signal or to
+    create a pre-approved subscription.
+
+    \note Pre-approving subscription requests is only allowed, if the server
+    supports RFC6121 and advertises the 'urn:xmpp:features:pre-approval' stream
+    feature.
+
+    \sa QXmppStreamFeatures::preApprovedSubscriptionsSupported()
+
+    \a reason and \a bareJid.
+*/
 bool QXmppRosterManager::acceptSubscription(const QString &bareJid, const QString &reason)
 {
     QXmppPresence presence;
@@ -157,9 +161,7 @@ bool QXmppRosterManager::acceptSubscription(const QString &bareJid, const QStrin
     return client()->sendLegacy(presence);
 }
 
-///
-/// Upon XMPP connection, request the roster.
-///
+/*! Upon XMPP connection, request the roster. */
 void QXmppRosterManager::_q_connected()
 {
     // clear cache if stream has not been resumed
@@ -193,7 +195,6 @@ void QXmppRosterManager::_q_disconnected()
     }
 }
 
-/// \cond
 bool QXmppRosterManager::handleStanza(const QDomElement &element)
 {
     if (!isIqElement<QXmppRosterIq>(element)) {
@@ -246,7 +247,6 @@ bool QXmppRosterManager::handleStanza(const QDomElement &element)
 
     return true;
 }
-/// \endcond
 
 void QXmppRosterManager::_q_presenceReceived(const QXmppPresence &presence)
 {
@@ -315,18 +315,16 @@ QXmppTask<QXmppRosterManager::RosterResult> QXmppRosterManager::requestRoster()
     co_return parseIq<QXmppRosterIq>(co_await client()->sendIq(std::move(iq)));
 }
 
-///
-/// Adds a new item to the roster without sending any subscription requests.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemAdded() or itemChanged() signal to be emitted.
-///
-/// \param bareJid
-/// \param name Optional name for the item.
-/// \param groups Optional groups for the item.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Adds a new item with bare JID \a bareJid to the roster without sending any subscription
+    requests. \a name is an optional name for the item and \a groups specifies optional groups
+    for the item.
+
+    As a result, the server will initiate a roster push, causing the
+    itemAdded() or itemChanged() signal to be emitted.
+
+    \since QXmpp 1.5 Returns true on success.
+*/
 QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::addRosterItem(const QString &bareJid, const QString &name, const QSet<QString> &groups)
 {
     QXmppRosterIq::Item item;
@@ -341,16 +339,15 @@ QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::addRosterItem(const QS
     return client()->sendGenericIq(std::move(iq));
 }
 
-///
-/// Removes a roster item and cancels subscriptions to and from the contact.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemRemoved() signal to be emitted.
-///
-/// \param bareJid
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Removes the roster item with bare JID \a bareJid and cancels subscriptions to and from the
+    contact.
+
+    As a result, the server will initiate a roster push, causing the
+    itemRemoved() signal to be emitted.
+
+    \since QXmpp 1.5 Returns true on success.
+*/
 QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::removeRosterItem(const QString &bareJid)
 {
     QXmppRosterIq::Item item;
@@ -363,17 +360,14 @@ QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::removeRosterItem(const
     return client()->sendGenericIq(std::move(iq));
 }
 
-///
-/// Renames a roster item.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemChanged() signal to be emitted.
-///
-/// \param bareJid
-/// \param name
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Renames the roster item with bare JID \a bareJid to \a name.
+
+    As a result, the server will initiate a roster push, causing the
+    itemChanged() signal to be emitted.
+
+    \since QXmpp 1.5
+*/
 QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::renameRosterItem(const QString &bareJid, const QString &name)
 {
     if (!d->entries.contains(bareJid)) {
@@ -395,14 +389,16 @@ QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::renameRosterItem(const
     return client()->sendGenericIq(std::move(iq));
 }
 
-///
-/// Requests a subscription to the given contact.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemAdded() or itemChanged() signal to be emitted.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Requests a subscription to the given contact.
+
+    As a result, the server will initiate a roster push, causing the
+    itemAdded() or itemChanged() signal to be emitted.
+
+    \since QXmpp 1.5
+
+    \a reason and \a bareJid.
+*/
 QXmppTask<QXmpp::SendResult> QXmppRosterManager::subscribeTo(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
@@ -412,14 +408,16 @@ QXmppTask<QXmpp::SendResult> QXmppRosterManager::subscribeTo(const QString &bare
     return client()->sendSensitive(std::move(packet));
 }
 
-///
-/// Removes a subscription to the given contact.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemChanged() signal to be emitted.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Removes a subscription to the given contact.
+
+    As a result, the server will initiate a roster push, causing the
+    itemChanged() signal to be emitted.
+
+    \since QXmpp 1.5 Returns true on success.
+
+    \a reason and \a bareJid.
+*/
 QXmppTask<QXmpp::SendResult> QXmppRosterManager::unsubscribeFrom(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
@@ -429,11 +427,13 @@ QXmppTask<QXmpp::SendResult> QXmppRosterManager::unsubscribeFrom(const QString &
     return client()->sendSensitive(std::move(packet));
 }
 
-///
-/// Refuses a subscription request.
-///
-/// You can call this method in reply to the subscriptionRequest() signal.
-///
+/*!
+    Refuses a subscription request. Returns true on success.
+
+    You can call this method in reply to the subscriptionRequest() signal.
+
+    \a reason and \a bareJid.
+*/
 bool QXmppRosterManager::refuseSubscription(const QString &bareJid, const QString &reason)
 {
     QXmppPresence presence;
@@ -443,16 +443,14 @@ bool QXmppRosterManager::refuseSubscription(const QString &bareJid, const QStrin
     return client()->sendLegacy(presence);
 }
 
-///
-/// Adds a new item  the roster without sending any subscription requests.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemAdded() or itemChanged() signal to be emitted.
-///
-/// \param bareJid
-/// \param name Optotional name for the item.
-/// \param groups Optional groups for the item.
-///
+/*!
+    Adds a new item with bare JID \a bareJid to the roster without sending any subscription
+    requests. \a name is an optional name for the item and \a groups specifies optional groups
+    for the item.
+
+    As a result, the server will initiate a roster push, causing the
+    itemAdded() or itemChanged() signal to be emitted. Returns true on success.
+*/
 bool QXmppRosterManager::addItem(const QString &bareJid, const QString &name, const QSet<QString> &groups)
 {
     QXmppRosterIq::Item item;
@@ -467,14 +465,13 @@ bool QXmppRosterManager::addItem(const QString &bareJid, const QString &name, co
     return client()->sendLegacy(iq);
 }
 
-///
-/// Removes a roster item and cancels subscriptions to and from the contact.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemRemoved() signal to be emitted.
-///
-/// \param bareJid
-///
+/*!
+    Removes the roster item with bare JID \a bareJid and cancels subscriptions to and from the
+    contact.
+
+    As a result, the server will initiate a roster push, causing the
+    itemRemoved() signal to be emitted. Returns true on success.
+*/
 bool QXmppRosterManager::removeItem(const QString &bareJid)
 {
     QXmppRosterIq::Item item;
@@ -487,15 +484,13 @@ bool QXmppRosterManager::removeItem(const QString &bareJid)
     return client()->sendLegacy(iq);
 }
 
-///
-/// Renames a roster item.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemChanged() signal to be emitted.
-///
-/// \param bareJid
-/// \param name
-///
+/*!
+    Renames the roster item with bare JID \a bareJid to \a name; returns
+    true on success.
+
+    As a result, the server will initiate a roster push, causing the
+    itemChanged() signal to be emitted.
+*/
 bool QXmppRosterManager::renameItem(const QString &bareJid, const QString &name)
 {
     if (!d->entries.contains(bareJid)) {
@@ -516,12 +511,14 @@ bool QXmppRosterManager::renameItem(const QString &bareJid, const QString &name)
     return client()->sendLegacy(iq);
 }
 
-///
-/// Requests a subscription to the given contact.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemAdded() or itemChanged() signal to be emitted.
-///
+/*!
+    Requests a subscription to the given contact; returns true on success.
+
+    As a result, the server will initiate a roster push, causing the
+    itemAdded() or itemChanged() signal to be emitted.
+
+    \a reason and \a bareJid.
+*/
 bool QXmppRosterManager::subscribe(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
@@ -531,12 +528,14 @@ bool QXmppRosterManager::subscribe(const QString &bareJid, const QString &reason
     return client()->sendLegacy(packet);
 }
 
-///
-/// Removes a subscription to the given contact.
-///
-/// As a result, the server will initiate a roster push, causing the
-/// itemChanged() signal to be emitted.
-///
+/*!
+    Removes a subscription to the given contact.
+
+    As a result, the server will initiate a roster push, causing the
+    itemChanged() signal to be emitted. Returns true on success.
+
+    \a reason and \a bareJid.
+*/
 bool QXmppRosterManager::unsubscribe(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
@@ -600,22 +599,18 @@ void QXmppRosterManager::onUnregistered(QXmppClient *client)
     }
 }
 
-///
-/// Function to get all the bareJids present in the roster.
-///
-/// \return QStringList list of all the bareJids
-///
+/*!
+    Returns a QStringList list of all the bareJids present in the roster.
+*/
 QStringList QXmppRosterManager::getRosterBareJids() const
 {
     return d->entries.keys();
 }
 
-///
-/// Returns the roster entry of the given bareJid. If the bareJid is not in the
-/// database and empty QXmppRosterIq::Item will be returned.
-///
-/// \param bareJid as a QString
-///
+/*!
+    Returns the roster entry of the given \a bareJid. If \a bareJid is not in the
+    database and empty QXmppRosterIq::Item will be returned.
+*/
 QXmppRosterIq::Item QXmppRosterManager::getRosterEntry(
     const QString &bareJid) const
 {
@@ -626,12 +621,9 @@ QXmppRosterIq::Item QXmppRosterManager::getRosterEntry(
     return {};
 }
 
-///
-/// Get all the associated resources with the given bareJid.
-///
-/// \param bareJid as a QString
-/// \return list of associated resources as a QStringList
-///
+/*!
+    Returns the list of associated resources for the given \a bareJid as a QStringList.
+*/
 QStringList QXmppRosterManager::getResources(const QString &bareJid) const
 {
     if (d->presences.contains(bareJid)) {
@@ -640,14 +632,11 @@ QStringList QXmppRosterManager::getResources(const QString &bareJid) const
     return {};
 }
 
-///
-/// Get all the presences of all the resources of the given bareJid. A bareJid
-/// can have multiple resources and each resource will have a presence
-/// associated with it.
-///
-/// \param bareJid as a QString
-/// \return Map of resource and its respective presence QMap<QString, QXmppPresence>
-///
+/*!
+    Returns a QMap<QString, QXmppPresence> of resource and its respective presence for all the
+    resources of the given \a bareJid. A bareJid can have multiple resources and each resource
+    will have a presence associated with it.
+*/
 QMap<QString, QXmppPresence> QXmppRosterManager::getAllPresencesForBareJid(
     const QString &bareJid) const
 {
@@ -657,13 +646,9 @@ QMap<QString, QXmppPresence> QXmppRosterManager::getAllPresencesForBareJid(
     return {};
 }
 
-///
-/// Get the presence of the given resource of the given bareJid.
-///
-/// \param bareJid as a QString
-/// \param resource as a QString
-/// \return QXmppPresence
-///
+/*!
+    Returns the QXmppPresence of the given \a resource of the given \a bareJid.
+*/
 QXmppPresence QXmppRosterManager::getPresence(const QString &bareJid,
                                               const QString &resource) const
 {
@@ -676,14 +661,12 @@ QXmppPresence QXmppRosterManager::getPresence(const QString &bareJid,
     return presence;
 }
 
-///
-/// Function to check whether the roster has been received or not.
-///
-/// On disconnecting this is reset to false if no stream management is used by
-/// the client and so the stream cannot be resumed later.
-///
-/// \return true if roster received else false
-///
+/*!
+    Returns true if the roster has been received, otherwise false.
+
+    On disconnecting this is reset to false if no stream management is used by
+    the client and so the stream cannot be resumed later.
+*/
 bool QXmppRosterManager::isRosterReceived() const
 {
     return d->isRosterReceived;

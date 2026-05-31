@@ -53,13 +53,12 @@ QString QXmppIncomingServerPrivate::origin() const
     }
 }
 
-///
-/// Constructs a new incoming server stream.
-///
-/// \param socket The socket for the XMPP stream.
-/// \param domain The local domain.
-/// \param parent The parent QObject for the stream (optional).
-///
+/*!
+    Constructs a new incoming server stream.
+
+    \a socket is the socket for the XMPP stream, \a domain is the local domain
+    and \a parent is the optional parent QObject for the stream.
+*/
 QXmppIncomingServer::QXmppIncomingServer(QSslSocket *socket, const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppIncomingServerPrivate>(socket, this))
@@ -77,39 +76,47 @@ QXmppIncomingServer::QXmppIncomingServer(QSslSocket *socket, const QString &doma
 
 QXmppIncomingServer::~QXmppIncomingServer() = default;
 
-/// Returns true if the socket is connected and the remote server is
-/// authenticated.
+/*!
+    Returns true if the socket is connected and the remote server is
+    authenticated.
+*/
 bool QXmppIncomingServer::isConnected() const
 {
     return d->socket.isConnected() && !d->authenticated.isEmpty();
 }
 
-/// Disconnects from the remote host.
+/*! Disconnects from the remote host. */
 void QXmppIncomingServer::disconnectFromHost()
 {
     d->socket.disconnectFromHost();
 }
 
-/// Returns the stream's identifier.
+/*! Returns the stream's identifier. */
 QString QXmppIncomingServer::localStreamId() const
 {
     return d->localStreamId;
 }
 
-/// Sends an XMPP packet to the peer.
+/*!
+    Sends an XMPP packet to the peer; returns true on success.
+
+    \a nonza.
+*/
 bool QXmppIncomingServer::sendPacket(const QXmppNonza &nonza)
 {
     return d->socket.sendData(serializeXml(nonza));
 }
 
-/// Sends raw data to the peer.
+/*! Sends raw \a data to the peer; returns true on success. */
 bool QXmppIncomingServer::sendData(const QByteArray &data)
 {
     return d->socket.sendData(data);
 }
 
-/// Handles a stream start event, which occurs when the underlying transport
-/// becomes ready (socket connected, encryption started).
+/*!
+    Handles a stream start event, which occurs when the underlying transport
+    becomes ready (socket connected, encryption started).
+*/
 void QXmppIncomingServer::handleStart()
 {
 }
@@ -184,7 +191,7 @@ void QXmppIncomingServer::handleStanza(const QDomElement &stanza)
     }
 }
 
-/// Handles a dialback response received from the authority server.
+/*! Handles a dialback response received from the authority server. */
 void QXmppIncomingServer::slotDialbackResponseReceived(const QXmppDialback &dialback)
 {
     auto *stream = qobject_cast<QXmppOutgoingServer *>(sender());

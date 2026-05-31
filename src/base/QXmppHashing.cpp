@@ -26,7 +26,6 @@ constexpr std::size_t PROCESS_SYNC_MAX_SIZE = 32 * 1024;
 // 512 kB (two buffers are used so 1 MB)
 constexpr std::size_t BUFFER_SIZE = 512 * 1024;
 
-/// \cond
 static HashAlgorithm toHashAlgorithm(QCryptographicHash::Algorithm algorithm)
 {
     switch (algorithm) {
@@ -482,6 +481,5 @@ QFuture<HashVerificationResultPtr> QXmpp::Private::verifyHashes(std::unique_ptr<
     HashGenerator::calculateHashes(std::move(data), { expected.algorithm() }, std::move(finish), std::move(isCancelled));
     return interface.future();
 }
-/// \endcond
 
 #include "QXmppHashing.moc"

@@ -19,20 +19,14 @@ struct QXmppError;
 #define QXMPP_AUTOTEST_EXPORT
 #define QXMPP_PRIVATE_EXPORT QXMPP_EXPORT
 
-///
-/// This macro expands a numeric value of the form 0xMMNNPP (MM =
-/// major, NN = minor, PP = patch) that specifies QXmpp's version
-/// number. For example, if you compile your application against
-/// QXmpp 1.2.3, the QXMPP_VERSION macro will expand to 0x010203.
-///
-/// You can use QXMPP_VERSION to use the latest QXmpp features where
-/// available.
-///
+// This macro expands a numeric value of the form 0xMMNNPP (MM = major,
+// NN = minor, PP = patch) that specifies QXmpp's version number. For
+// example, if you compile your application against QXmpp 1.2.3, the
+// QXMPP_VERSION macro will expand to 0x010203. You can use QXMPP_VERSION to
+// use the latest QXmpp features where available.
 #define QXMPP_VERSION QT_VERSION_CHECK(QXMPP_VERSION_MAJOR, QXMPP_VERSION_MINOR, QXMPP_VERSION_PATCH)
 
-///
-/// Returns the version of QXmpp used at compile time as a string.
-///
+/*! Returns the version of QXmpp used at compile time as a string. */
 inline QLatin1String QXmppVersion()
 {
     return QLatin1String(
@@ -82,168 +76,185 @@ inline QLatin1String QXmppVersion()
     outer::name &outer::name::operator=(const outer::name &) = default; \
     outer::name &outer::name::operator=(outer::name &&) noexcept = default;
 
-///
-/// \namespace QXmpp
-///
-/// Contains global functions and enumerations.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \namespace QXmpp
+    \inmodule QXmpp
+
+    Contains global functions and enumerations.
+
+    \since QXmpp 1.5
+*/
 namespace QXmpp {
 
-///
-/// This enum describes different end-to-end encryption methods. These can
-/// be used to mark a stanza as encrypted or decrypted with a specific algorithm
-/// (e.g., for \xep{0380, Explicit Message Encryption}).
-///
-/// \since QXmpp 1.5
-///
+/*!
+    This enum describes different end-to-end encryption methods. These can
+    be used to mark a stanza as encrypted or decrypted with a specific algorithm
+    (e.g., for \xep{0380}{Explicit Message Encryption}).
+
+    \since QXmpp 1.5
+
+    \value NoEncryption No encryption.
+    \value UnknownEncryption Unknown encryption.
+    \value Otr \xep{0364}{Current Off-the-Record Messaging Usage}.
+    \value LegacyOpenPgp \xep{0027}{Current Jabber OpenPGP Usage}.
+    \value Ox \xep{0373}{OpenPGP for XMPP}.
+    \value Omemo0 \xep{0384}{OMEMO Encryption}.
+    \value Omemo1 \xep{0384}{OMEMO Encryption} since version 0.4.
+    \value Omemo2 \xep{0384}{OMEMO Encryption} since version 0.8.
+    \value OTR \xep{0364}{Current Off-the-Record Messaging Usage} \deprecated This enum is deprecated since QXmpp 1.5. Use \c QXmpp::Otr instead.
+    \value LegacyOpenPGP \xep{0027}{Current Jabber OpenPGP Usage} \deprecated This enum is deprecated since QXmpp 1.5. Use \c QXmpp::LegacyOpenPgp instead.
+    \value OX \xep{0373}{OpenPGP for XMPP} \deprecated This enum is deprecated since QXmpp 1.5. Use \c QXmpp::Ox instead.
+    \value OMEMO \xep{0384}{OMEMO Encryption} \deprecated This enum is deprecated since QXmpp 1.5. Use \c QXmpp::Omemo0 instead.
+*/
 enum EncryptionMethod {
-    /// No encryption
     NoEncryption,
-    /// Unknown encryption
     UnknownEncryption,
-    /// \xep{0364, Current Off-the-Record Messaging Usage}
     Otr,
-    /// \xep{0027, Current Jabber OpenPGP Usage}
     LegacyOpenPgp,
-    /// \xep{0373, OpenPGP for XMPP}
     Ox,
-    /// \xep{0384, OMEMO Encryption}
     Omemo0,
-    /// \xep{0384, OMEMO Encryption} since version 0.4
     Omemo1,
-    /// \xep{0384, OMEMO Encryption} since version 0.8
     Omemo2,
 
 // Keep in sync with namespaces and names in Global/Message.cpp!
 
 #if QXMPP_DEPRECATED_SINCE(1, 5)
-    /// \xep{0364, Current Off-the-Record Messaging Usage}
-    /// \deprecated This enum is deprecated since QXmpp 1.5. Use
-    /// \c QXmpp::Otr instead.
     OTR = Otr,
-    /// \xep{0027, Current Jabber OpenPGP Usage}
-    /// \deprecated This enum is deprecated since QXmpp 1.5. Use
-    /// \c QXmpp::LegacyOpenPgp instead.
     LegacyOpenPGP = LegacyOpenPgp,
-    /// \xep{0373, OpenPGP for XMPP}
-    /// \deprecated This enum is deprecated since QXmpp 1.5. Use
-    /// \c QXmpp::Ox instead.
     OX = Ox,
-    /// \xep{0384, OMEMO Encryption}
-    /// \deprecated This enum is deprecated since QXmpp 1.5. Use
-    /// \c QXmpp::Omemo0 instead.
     OMEMO = Omemo0,
 #endif
 };
 
-///
-/// Parsing/serialization mode when using Stanza Content Encryption.
-///
-/// \sa \xep{0420, Stanza Content Encryption}
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Parsing/serialization mode when using Stanza Content Encryption
+    (\xep{0420}{Stanza Content Encryption}).
+
+    \since QXmpp 1.5
+
+    \value SceAll Processes all known elements.
+    \value ScePublic Only processes 'public' elements (e.g. needed for routing).
+    \value SceSensitive Only processes sensitive elements that should be encrypted.
+*/
 enum SceMode : uint8_t {
-    SceAll,        ///< Processes all known elements.
-    ScePublic,     ///< Only processes 'public' elements (e.g. needed for routing).
-    SceSensitive,  ///< Only processes sensitive elements that should be encrypted.
+    SceAll,
+    ScePublic,
+    SceSensitive,
 };
 
-///
-/// Checks whether a mode is enabled.
-///
-/// When an SceMode is given you can use this to check whether Public or Private
-/// elements are enabled.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns true if a mode is enabled.
+
+    When an SceMode is given you can use this to check whether Public or Private
+    elements are enabled.
+
+    \since QXmpp 1.5
+*/
 inline constexpr bool operator&(SceMode mode1, SceMode mode2)
 {
     return mode1 == SceAll || mode1 == mode2;
 }
 
-///
-/// Cipher for encrypting data streams and files.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Cipher for encrypting data streams and files.
+
+    \since QXmpp 1.5
+
+    \value Aes128GcmNoPad
+    \value Aes256GcmNoPad
+    \value Aes256CbcPkcs7
+*/
 enum Cipher {
     Aes128GcmNoPad,
     Aes256GcmNoPad,
     Aes256CbcPkcs7,
 };
 
-///
-/// An empty struct indicating success in results.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \inmodule QXmpp
+
+    An empty struct indicating success in results.
+
+    \since QXmpp 1.5
+*/
 struct Success { };
 
-///
-/// Unit struct used to indicate that a process has been cancelled.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \inmodule QXmpp
+
+    Unit struct used to indicate that a process has been cancelled.
+
+    \since QXmpp 1.5
+*/
 struct Cancelled { };
 
-///
-/// Unit struct indicating a client-side timeout (or keep-alive) error.
-///
-/// It occurs if no response is received from the connected entity within a given timeout.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \inmodule QXmpp
+
+    Unit struct indicating a client-side timeout (or keep-alive) error.
+
+    It occurs if no response is received from the connected entity within a given timeout.
+
+    \since QXmpp 1.7
+*/
 struct TimeoutError { };
 
-///
-/// Generic result type offering value or QXmppError
-///
-/// T defaults to QXmpp::Success since QXmpp 1.13.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    \typealias QXmpp::Result
+
+    Generic result type offering value or QXmppError.
+
+    T defaults to QXmpp::Success since QXmpp 1.13.
+
+    \since QXmpp 1.12
+*/
 template<typename T = Success>
 using Result = std::variant<T, QXmppError>;
 
-///
-/// Returns whether a result contains the expected value
-/// \since QXmpp 1.13
-///
+/*!
+    Returns whether a result contains the expected value
+    \since QXmpp 1.13
+
+    \a r.
+*/
 template<typename T>
 bool hasValue(const Result<T> &r) { return std::holds_alternative<T>(r); }
 
-///
-/// Returns whether a result contains an error
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Returns whether a result contains an error
+
+    \since QXmpp 1.13
+
+    \a r.
+*/
 template<typename T>
 bool hasError(const Result<T> &r) { return std::holds_alternative<QXmppError>(r); }
 
-///
-/// Returns the value of a result or throws
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Returns the value of a result or throws
+
+    \since QXmpp 1.13
+
+    \a r.
+*/
 template<typename T>
 const T &getValue(const Result<T> &r) { return std::get<T>(r); }
 
-///
-/// Returns the value of a result or throws
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Returns the value of a result or throws
+
+    \since QXmpp 1.13
+
+    \a r.
+*/
 template<typename T>
 T &getValue(Result<T> &r) { return std::get<T>(r); }
 
-///
-/// Returns the value of a result or throws
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Returns the value of a result or throws
+
+    \since QXmpp 1.13
+*/
 template<typename T>
 T getValue(Result<T> &&r) { return std::get<T>(std::move(r)); }
 

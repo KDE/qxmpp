@@ -9,17 +9,17 @@
 
 namespace QXmpp {
 
-///
-/// Security policy to decide which public long-term keys are used for encryption because they are
-/// trusted
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Security policy to decide which public long-term keys are used for encryption because they are
+    trusted
+
+    \since QXmpp 1.5
+
+    \value NoSecurityPolicy New keys must be trusted manually.
+    \value Toakafa New keys are trusted automatically until the first authentication but automatically distrusted afterwards. \sa \xep{0450}{Automatic Trust Management (ATM)}.
+*/
 enum TrustSecurityPolicy {
-    /// New keys must be trusted manually.
     NoSecurityPolicy,
-    /// New keys are trusted automatically until the first authentication but automatically
-    /// distrusted afterwards. \see \xep{0450, Automatic Trust Management (ATM)}
     Toakafa,
 };
 

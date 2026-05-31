@@ -8,17 +8,28 @@
 #include "QXmppDataForm.h"
 #include "QXmppIq.h"
 
-///
-/// \brief The QXmppMucItem class represents a chat room "item".
-///
-/// It is used to convey information such as permissions.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppMucItem class represents a chat room "item".
+
+    It is used to convey information such as permissions.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppMucItem
 {
 public:
-    /// This enum is used to represent long-lived permissions in a room (affiliations).
+    /*!
+        This enum is used to represent long-lived permissions in a room (affiliations).
+
+        \value UnspecifiedAffiliation
+        \value OutcastAffiliation
+        \value NoAffiliation
+        \value MemberAffiliation
+        \value AdminAffiliation
+        \value OwnerAffiliation
+    */
     enum Affiliation {
         UnspecifiedAffiliation,
         OutcastAffiliation,
@@ -28,7 +39,15 @@ public:
         OwnerAffiliation
     };
 
-    /// This enum is used to represent short-lived permissions in a room (roles).
+    /*!
+        This enum is used to represent short-lived permissions in a room (roles).
+
+        \value UnspecifiedRole
+        \value NoRole
+        \value VisitorRole
+        \value ParticipantRole
+        \value ModeratorRole
+    */
     enum Role {
         UnspecifiedRole,
         NoRole,
@@ -58,11 +77,9 @@ public:
     Role role() const;
     void setRole(Role role);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_muc_admin };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QString m_actor;
@@ -73,57 +90,53 @@ private:
     Role m_role;
 };
 
-///
-/// \brief The QXmppMucAdminIq class represents a chat room administration IQ
-/// as defined by \xep{0045, Multi-User Chat}.
-///
-/// It is used to get or modify room memberships.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppMucAdminIq class represents a chat room administration IQ
+    as defined by \xep{0045}{Multi-User Chat}.
+
+    It is used to get or modify room memberships.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppMucAdminIq : public QXmppIq
 {
 public:
     QList<QXmppMucItem> items() const;
     void setItems(const QList<QXmppMucItem> &items);
 
-    /// \cond
     static bool isMucAdminIq(const QDomElement &element);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QList<QXmppMucItem> m_items;
 };
 
-///
-/// \brief The QXmppMucOwnerIq class represents a chat room configuration IQ as
-/// defined by \xep{0045, Multi-User Chat}.
-///
-/// It is used to get or modify room configuration options.
-///
-/// \sa QXmppDataForm
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppMucOwnerIq class represents a chat room configuration IQ as
+    defined by \xep{0045}{Multi-User Chat}.
+
+    It is used to get or modify room configuration options.
+
+    \sa QXmppDataForm
+*/
 class QXMPP_EXPORT QXmppMucOwnerIq : public QXmppIq
 {
 public:
     QXmppDataForm form() const;
     void setForm(const QXmppDataForm &form);
 
-    /// \cond
     static bool isMucOwnerIq(const QDomElement &element);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QXmppDataForm m_form;

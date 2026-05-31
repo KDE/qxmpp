@@ -37,26 +37,41 @@ struct Enums::Data<HashAlgorithm> {
     });
 };
 
-///
-/// \enum QXmpp::HashAlgorithm
-///
-/// One of the hash algorithms specified by the IANA registry or \xep{0300, Use
-/// of Cryptographic Hash Functions in XMPP}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \enum QXmpp::HashAlgorithm
 
-///
-/// \class QXmppHash
-///
-/// Contains a hash value and its algorithm.
-///
-/// \since QXmpp 1.5
-///
+    One of the hash algorithms specified by the IANA registry or \xep{0300}{Use
+    of Cryptographic Hash Functions in XMPP}.
+
+    \since QXmpp 1.5
+
+    \value Unknown
+    \value Md2
+    \value Md5
+    \value Shake128
+    \value Shake256
+    \value Sha1
+    \value Sha224
+    \value Sha256
+    \value Sha384
+    \value Sha512
+    \value Sha3_256
+    \value Sha3_512
+    \value Blake2b_256
+    \value Blake2b_512
+*/
+
+/*!
+    \class QXmppHash
+    \inmodule QXmpp
+
+    Contains a hash value and its algorithm.
+
+    \since QXmpp 1.5
+*/
 
 QXmppHash::QXmppHash() = default;
 
-/// \cond
 bool QXmppHash::parse(const QDomElement &el)
 {
     if (el.tagName() == u"hash" && el.namespaceURI() == ns_hashes) {
@@ -80,27 +95,24 @@ void QXmppHash::toXml(QXmlStreamWriter *writer) const
         Characters { Base64 { m_hash } },
     });
 }
-/// \endcond
 
-///
-/// \class QXmppHashUsed
-///
-/// Annotates the used hashing algorithm.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppHashUsed
+    \inmodule QXmpp
+
+    Annotates the used hashing algorithm.
+
+    \since QXmpp 1.5
+*/
 
 QXmppHashUsed::QXmppHashUsed() = default;
 
-///
-/// Creates an object that tells other XMPP entities to use this hash algorithm.
-///
+/*! Creates an object that tells other XMPP entities to use this hash algorithm. */
 QXmppHashUsed::QXmppHashUsed(QXmpp::HashAlgorithm algorithm)
     : m_algorithm(algorithm)
 {
 }
 
-/// \cond
 bool QXmppHashUsed::parse(const QDomElement &el)
 {
     if (el.tagName() != u"hash-used" || el.namespaceURI() != ns_hashes) {
@@ -115,51 +127,38 @@ void QXmppHashUsed::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { XmlTag, Attribute { u"algo", m_algorithm } });
 }
-/// \endcond
 
-///
-/// Returns the algorithm used to create the hash.
-///
+/*! Returns the algorithm used to create the hash. */
 HashAlgorithm QXmppHash::algorithm() const
 {
     return m_algorithm;
 }
 
-///
-/// Sets the algorithm that was used to create the hashed data
-///
+/*! Sets the \a algorithm that was used to create the hashed data */
 void QXmppHash::setAlgorithm(QXmpp::HashAlgorithm algorithm)
 {
     m_algorithm = algorithm;
 }
 
-///
-/// Returns the binary data of the hash.
-///
+/*! Returns the binary data of the hash. */
 QByteArray QXmppHash::hash() const
 {
     return m_hash;
 }
 
-///
-/// Sets the hashed data.
-///
+/*! Sets the hashed \a data. */
 void QXmppHash::setHash(const QByteArray &data)
 {
     m_hash = data;
 }
 
-///
-/// Returns the algorithm that is supposed to be used for hashing.
-///
+/*! Returns the algorithm that is supposed to be used for hashing. */
 HashAlgorithm QXmppHashUsed::algorithm() const
 {
     return m_algorithm;
 }
 
-///
-/// Sets the algorithm that was used to create the hashed data
-///
+/*! Sets the \a algorithm that was used to create the hashed data */
 void QXmppHashUsed::setAlgorithm(QXmpp::HashAlgorithm algorithm)
 {
     m_algorithm = algorithm;

@@ -13,7 +13,7 @@ struct QXmppContactAddressesPrivate;
 class QXMPP_EXPORT QXmppContactAddresses : public QXmppExtensibleDataFormBase
 {
 public:
-    /// FORM_TYPE of this data form
+    /*! FORM_TYPE of this data form */
     static constexpr auto DataFormType = QXmpp::Private::ns_contact_addresses;
     static std::optional<QXmppContactAddresses> fromDataForm(const QXmppDataForm &form);
 

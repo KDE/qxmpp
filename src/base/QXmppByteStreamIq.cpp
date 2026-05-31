@@ -24,83 +24,75 @@ struct Enums::Data<QXmppByteStreamIq::Mode> {
     });
 };
 
-///
-/// \enum QXmppByteStreamIq::Mode
-///
-/// Used to select the transport layer protocol (TCP or UDP).
-///
+/*!
+    \enum QXmppByteStreamIq::Mode
 
-///
-/// \class QXmppByteStreamIq::StreamHost
-///
-/// StreamHost represents information about a specific SOCKS5 bytestreams host.
-///
+    Used to select the transport layer protocol (TCP or UDP).
+*/
 
-///
-/// Returns the host address of the stream host.
-///
+/*!
+    \class QXmppByteStreamIq::StreamHost
+    \inmodule QXmpp
+
+    StreamHost represents information about a specific SOCKS5 bytestreams host.
+*/
+
+/*! Returns the host address of the stream host. */
 QString QXmppByteStreamIq::StreamHost::host() const
 {
     return m_host;
 }
 
-///
-/// Sets the host address of the stream host.
-///
+/*! Sets the \a host address of the stream host. */
 void QXmppByteStreamIq::StreamHost::setHost(const QString &host)
 {
     m_host = host;
 }
 
-///
-/// Returns the JID of the stream host.
-///
+/*! Returns the JID of the stream host. */
 QString QXmppByteStreamIq::StreamHost::jid() const
 {
     return m_jid;
 }
 
-///
-/// Sets the JID of the stream host.
-///
+/*!
+    Sets the JID of the stream host.
+
+    \a jid.
+*/
 void QXmppByteStreamIq::StreamHost::setJid(const QString &jid)
 {
     m_jid = jid;
 }
 
-///
-/// Returns the port of the stream host.
-///
+/*! Returns the port of the stream host. */
 quint16 QXmppByteStreamIq::StreamHost::port() const
 {
     return m_port;
 }
 
-///
-/// Sets the port of the stream host.
-///
+/*! Sets the \a port of the stream host. */
 void QXmppByteStreamIq::StreamHost::setPort(quint16 port)
 {
     m_port = port;
 }
 
-///
-/// Returns the zero-configuration service available for bytestreaming.
-///
+/*! Returns the zero-configuration service available for bytestreaming. */
 QString QXmppByteStreamIq::StreamHost::zeroconf() const
 {
     return m_zeroconf;
 }
 
-///
-/// Sets the zero-configuration service available for bytestreaming.
-///
+/*!
+    Sets the zero-configuration service available for bytestreaming.
+
+    \a zeroconf.
+*/
 void QXmppByteStreamIq::StreamHost::setZeroconf(const QString &zeroconf)
 {
     m_zeroconf = zeroconf;
 }
 
-/// \cond
 std::optional<QXmppByteStreamIq::StreamHost> QXmppByteStreamIq::StreamHost::fromDom(const QDomElement &el)
 {
     StreamHost streamHost;
@@ -121,96 +113,95 @@ void QXmppByteStreamIq::StreamHost::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"zeroconf", m_zeroconf },
     });
 }
-/// \endcond
 
-///
-/// \class QXmppByteStreamIq
-///
-/// QXmppByteStreamIq represents a SOCKS5 bytestreams negoatiation IQ as defined
-/// by \xep{0065, SOCKS5 Bytestreams}.
-///
+/*!
+    \class QXmppByteStreamIq
+    \inmodule QXmpp
 
-///
-/// Returns the protocol type (UDP or TCP).
-///
+    QXmppByteStreamIq represents a SOCKS5 bytestreams negoatiation IQ as defined
+    by \xep{0065}{SOCKS5 Bytestreams}.
+*/
+
+/*! Returns the protocol type (UDP or TCP). */
 QXmppByteStreamIq::Mode QXmppByteStreamIq::mode() const
 {
     return m_mode;
 }
 
-///
-/// Sets the protocol type (UDP or TCP).
-///
+/*!
+    Sets the protocol type (UDP or TCP).
+
+    \a mode.
+*/
 void QXmppByteStreamIq::setMode(QXmppByteStreamIq::Mode mode)
 {
     m_mode = mode;
 }
 
-///
-/// Returns the bytestream stream ID.
-///
+/*! Returns the bytestream stream ID. */
 QString QXmppByteStreamIq::sid() const
 {
     return m_sid;
 }
 
-///
-/// Sets the bytestream stream ID.
-///
+/*!
+    Sets the bytestream stream ID.
+
+    \a sid.
+*/
 void QXmppByteStreamIq::setSid(const QString &sid)
 {
     m_sid = sid;
 }
 
-///
-/// Returns the jid of the target.
-///
+/*! Returns the jid of the target. */
 QString QXmppByteStreamIq::activate() const
 {
     return m_activate;
 }
 
-///
-/// Sets the jid of the target.
-///
+/*!
+    Sets the jid of the target.
+
+    \a activate.
+*/
 void QXmppByteStreamIq::setActivate(const QString &activate)
 {
     m_activate = activate;
 }
 
-///
-/// Returns available SOCKS5 stream hosts.
-///
+/*! Returns available SOCKS5 stream hosts. */
 QList<QXmppByteStreamIq::StreamHost> QXmppByteStreamIq::streamHosts() const
 {
     return m_streamHosts;
 }
 
-///
-/// Sets available SOCKS5 stream hosts.
-///
+/*!
+    Sets available SOCKS5 stream hosts.
+
+    \a streamHosts.
+*/
 void QXmppByteStreamIq::setStreamHosts(const QList<QXmppByteStreamIq::StreamHost> &streamHosts)
 {
     m_streamHosts = streamHosts;
 }
 
-///
-/// Returns the JID of the used stream host.
-///
+/*! Returns the JID of the used stream host. */
 QString QXmppByteStreamIq::streamHostUsed() const
 {
     return m_streamHostUsed;
 }
 
-///
-/// Sets the JID of the used stream host.
-///
+/*!
+    Sets the JID of the used stream host.
+
+    \a jid.
+*/
 void QXmppByteStreamIq::setStreamHostUsed(const QString &jid)
 {
     m_streamHostUsed = jid;
 }
 
-/// \cond
 void QXmppByteStreamIq::parseElementFromChild(const QDomElement &element)
 {
     auto queryElement = firstChildElement(element, u"query", ns_bytestreams);
@@ -241,4 +232,3 @@ void QXmppByteStreamIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         SingleAttributeElements { u"streamhost-used", u"jid", QList<QString> { m_streamHostUsed } },
     });
 }
-/// \endcond

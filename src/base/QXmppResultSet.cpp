@@ -31,93 +31,100 @@ QXmppResultSetQuery::QXmppResultSetQuery()
 {
 }
 
-///
-/// Returns the maximum number of results.
-///
-/// \note -1 means no limit, 0 means no results are wanted.
-///
+/*!
+    Returns the maximum number of results.
+
+    \note -1 means no limit, 0 means no results are wanted.
+*/
 int QXmppResultSetQuery::max() const
 {
     return m_max;
 }
 
-///
-/// Sets the maximum number of results.
-///
-/// \note -1 means no limit, 0 means no results are wanted.
-///
+/*!
+    Sets the maximum number of results.
+
+    \note -1 means no limit, 0 means no results are wanted.
+
+    \a max.
+*/
 void QXmppResultSetQuery::setMax(int max)
 {
     m_max = max;
 }
 
-///
-/// Returns the index for the first element in the page.
-///
-/// This is used for retrieving pages out of order.
-///
+/*!
+    Returns the index for the first element in the page.
+
+    This is used for retrieving pages out of order.
+*/
 int QXmppResultSetQuery::index() const
 {
     return m_index;
 }
 
-///
-/// Sets the index for the first element in the page.
-///
-/// This is used for retrieving pages out of order.
-///
+/*!
+    Sets the index for the first element in the page.
+
+    This is used for retrieving pages out of order.
+
+    \a index.
+*/
 void QXmppResultSetQuery::setIndex(int index)
 {
     m_index = index;
 }
 
-///
-/// Returns the UID of the first result in the next page.
-///
-/// This is used for for paging backwards through results.
-///
+/*!
+    Returns the UID of the first result in the next page.
+
+    This is used for for paging backwards through results.
+*/
 QString QXmppResultSetQuery::before() const
 {
     return m_before;
 }
 
-///
-/// Sets the UID of the first result in the next page.
-///
-/// This is used for for paging backwards through results.
-///
+/*!
+    Sets the UID of the first result in the next page.
+
+    This is used for for paging backwards through results.
+
+    \a before.
+*/
 void QXmppResultSetQuery::setBefore(const QString &before)
 {
     m_before = before;
 }
 
-///
-/// Returns the UID of the last result in the previous page.
-///
-/// This is used for for paging forwards through results.
-///
+/*!
+    Returns the UID of the last result in the previous page.
+
+    This is used for for paging forwards through results.
+*/
 QString QXmppResultSetQuery::after() const
 {
     return m_after;
 }
 
-///
-/// Sets the UID of the last result in the previous page.
-///
-/// This is used for for paging forwards through results.
-///
+/*!
+    Sets the UID of the last result in the previous page.
+
+    This is used for for paging forwards through results.
+
+    \a after.
+*/
 void QXmppResultSetQuery::setAfter(const QString &after)
 {
     m_after = after;
 }
 
-/// Returns true if no result set information is present.
+/*! Returns true if no result set information is present. */
 bool QXmppResultSetQuery::isNull() const
 {
     return m_max == -1 && m_index == -1 && m_after.isNull() && m_before.isNull();
 }
 
-/// \cond
 void QXmppResultSetQuery::parse(const QDomElement &element)
 {
     QDomElement setElement = (element.tagName() == u"set") ? element : element.firstChildElement(u"set"_s);
@@ -143,88 +150,90 @@ void QXmppResultSetQuery::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"index", toOptional(m_index) },
     });
 }
-/// \endcond
 
 QXmppResultSetReply::QXmppResultSetReply()
     : m_count(-1), m_index(-1)
 {
 }
 
-/// Returns the UID of the first result in the page.
+/*! Returns the UID of the first result in the page. */
 QString QXmppResultSetReply::first() const
 {
     return m_first;
 }
 
-/// Sets the UID of the first result in the page.
+/*! Sets the UID of the \a first result in the page. */
 void QXmppResultSetReply::setFirst(const QString &first)
 {
     m_first = first;
 }
 
-/// Returns the UID of the last result in the page.
+/*! Returns the UID of the last result in the page. */
 QString QXmppResultSetReply::last() const
 {
     return m_last;
 }
 
-/// Sets the UID of the last result in the page.
+/*! Sets the UID of the \a last result in the page. */
 void QXmppResultSetReply::setLast(const QString &last)
 {
     m_last = last;
 }
 
-///
-/// Returns the total number of items in the set.
-///
-/// \note This may be an approximate count.
-///
+/*!
+    Returns the total number of items in the set.
+
+    \note This may be an approximate count.
+*/
 int QXmppResultSetReply::count() const
 {
     return m_count;
 }
 
-///
-/// Sets the total number of items in the set.
-///
-/// \note This may be an approximate count.
-///
+/*!
+    Sets the total number of items in the set.
+
+    \note This may be an approximate count.
+
+    \a count.
+*/
 void QXmppResultSetReply::setCount(int count)
 {
     m_count = count;
 }
 
-///
-/// Returns the index for the first result in the page.
-///
-/// This is used for retrieving pages out of order.
-///
-/// \note This may be an approximate index.
-///
+/*!
+    Returns the index for the first result in the page.
+
+    This is used for retrieving pages out of order.
+
+    \note This may be an approximate index.
+*/
 int QXmppResultSetReply::index() const
 {
     return m_index;
 }
 
-///
-/// Sets the index for the first result in the page.
-///
-/// This is used for retrieving pages out of order.
-///
-/// \note This may be an approximate index.
-///
+/*!
+    Sets the index for the first result in the page.
+
+    This is used for retrieving pages out of order.
+
+    \note This may be an approximate index.
+
+    \a index.
+*/
 void QXmppResultSetReply::setIndex(int index)
 {
     m_index = index;
 }
 
-/// Returns true if no result set information is present.
+/*! Returns true if no result set information is present. */
 bool QXmppResultSetReply::isNull() const
 {
     return m_count == -1 && m_index == -1 && m_first.isNull() && m_last.isNull();
 }
 
-/// \cond
 void QXmppResultSetReply::parse(const QDomElement &element)
 {
     QDomElement setElement = (element.tagName() == u"set") ? element : firstChildElement(element, u"set");
@@ -257,4 +266,3 @@ void QXmppResultSetReply::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"count", toOptional(m_count) },
     });
 }
-/// \endcond

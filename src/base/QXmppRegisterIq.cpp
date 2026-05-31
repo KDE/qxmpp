@@ -44,27 +44,26 @@ QXmppRegisterIq::QXmppRegisterIq()
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppRegisterIq::QXmppRegisterIq(const QXmppRegisterIq &other) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppRegisterIq::QXmppRegisterIq(QXmppRegisterIq &&) = default;
 QXmppRegisterIq::~QXmppRegisterIq() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppRegisterIq &QXmppRegisterIq::operator=(const QXmppRegisterIq &other) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppRegisterIq &QXmppRegisterIq::operator=(QXmppRegisterIq &&) = default;
 
-///
-/// Constructs a regular change password request.
-///
-/// \param username The username of the account of which the password should be
-/// changed.
-/// \param newPassword The new password that should be set.
-/// \param to Optional JID of the registration service. If this is omitted, the
-/// IQ is automatically addressed to the local server.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Constructs a regular change password request.
+
+    \a username is the username of the account of which the password should be
+    changed. \a newPassword is the new password that should be set. \a to is
+    the optional JID of the registration service. If this is omitted, the
+    IQ is automatically addressed to the local server.
+
+    \since QXmpp 1.2
+*/
 QXmppRegisterIq QXmppRegisterIq::createChangePasswordRequest(const QString &username, const QString &newPassword, const QString &to)
 {
     QXmppRegisterIq iq;
@@ -75,14 +74,14 @@ QXmppRegisterIq QXmppRegisterIq::createChangePasswordRequest(const QString &user
     return iq;
 }
 
-///
-/// Constructs a regular unregistration request.
-///
-/// \param to Optional JID of the registration service. If this is omitted, the
-/// IQ is automatically addressed to the local server.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Constructs a regular unregistration request.
+
+    \a to is the optional JID of the registration service. If this is omitted,
+    the IQ is automatically addressed to the local server.
+
+    \since QXmpp 1.2
+*/
 QXmppRegisterIq QXmppRegisterIq::createUnregistrationRequest(const QString &to)
 {
     QXmppRegisterIq iq;
@@ -92,171 +91,182 @@ QXmppRegisterIq QXmppRegisterIq::createUnregistrationRequest(const QString &to)
     return iq;
 }
 
-/// Returns the email for this registration IQ.
+/*! Returns the email for this registration IQ. */
 QString QXmppRegisterIq::email() const
 {
     return d->email;
 }
 
-/// Sets the \a email for this registration IQ.
+/*! Sets the \a email for this registration IQ. */
 void QXmppRegisterIq::setEmail(const QString &email)
 {
     d->email = email;
 }
 
-/// Returns the QXmppDataForm for this registration IQ.
+/*! Returns the QXmppDataForm for this registration IQ. */
 QXmppDataForm QXmppRegisterIq::form() const
 {
     return d->form;
 }
 
-/// Sets the QXmppDataForm for this registration IQ.
+/*!
+    Sets the QXmppDataForm for this registration IQ.
+
+    \a form.
+*/
 void QXmppRegisterIq::setForm(const QXmppDataForm &form)
 {
     d->form = form;
 }
 
-/// Returns the instructions for this registration IQ.
+/*! Returns the instructions for this registration IQ. */
 QString QXmppRegisterIq::instructions() const
 {
     return d->instructions;
 }
 
-/// Sets the \a instructions for this registration IQ.
+/*! Sets the \a instructions for this registration IQ. */
 void QXmppRegisterIq::setInstructions(const QString &instructions)
 {
     d->instructions = instructions;
 }
 
-/// Returns the password for this registration IQ.
+/*! Returns the password for this registration IQ. */
 QString QXmppRegisterIq::password() const
 {
     return d->password;
 }
 
-/// Sets the \a password for this registration IQ.
+/*! Sets the \a password for this registration IQ. */
 void QXmppRegisterIq::setPassword(const QString &password)
 {
     d->password = password;
 }
 
-/// Returns the username for this registration IQ.
+/*! Returns the username for this registration IQ. */
 QString QXmppRegisterIq::username() const
 {
     return d->username;
 }
 
-/// Sets the \a username for this registration IQ.
+/*! Sets the \a username for this registration IQ. */
 void QXmppRegisterIq::setUsername(const QString &username)
 {
     d->username = username;
 }
 
-///
-/// Returns whether the account is registered.
-///
-/// By default this is set to false.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Returns whether the account is registered.
+
+    By default this is set to false.
+
+    \since QXmpp 1.2
+*/
 bool QXmppRegisterIq::isRegistered() const
 {
     return d->isRegistered;
 }
 
-///
-/// Sets whether the account is registered.
-///
-/// By default this is set to false.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Sets whether the account is registered.
+
+    By default this is set to false.
+
+    \since QXmpp 1.2
+
+    \a isRegistered.
+*/
 void QXmppRegisterIq::setIsRegistered(bool isRegistered)
 {
     d->isRegistered = isRegistered;
 }
 
-///
-/// Returns whether to remove (unregister) the account.
-///
-/// By default this is set to false.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Returns whether to remove (unregister) the account.
+
+    By default this is set to false.
+
+    \since QXmpp 1.2
+*/
 bool QXmppRegisterIq::isRemove() const
 {
     return d->isRemove;
 }
 
-///
-/// Sets whether to remove (unregister) the account.
-///
-/// By default this is set to false.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Sets whether to remove (unregister) the account.
+
+    By default this is set to false.
+
+    \since QXmpp 1.2
+
+    \a isRemove.
+*/
 void QXmppRegisterIq::setIsRemove(bool isRemove)
 {
     d->isRemove = isRemove;
 }
 
-///
-/// Returns a list of data packages attached using \xep{0231, Bits of Binary}.
-///
-/// This could be used to resolve a \c cid: URL of an CAPTCHA field of the
-/// form.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Returns a list of data packages attached using \xep{0231}{Bits of Binary}.
+
+    This could be used to resolve a \c cid: URL of an CAPTCHA field of the
+    form.
+
+    \since QXmpp 1.2
+*/
 QXmppBitsOfBinaryDataList QXmppRegisterIq::bitsOfBinaryData() const
 {
     return d->bitsOfBinaryData;
 }
 
-///
-/// Returns a list of data attached using \xep{0231, Bits of Binary}.
-///
-/// This could be used to resolve a \c cid: URL of an CAPTCHA field of the
-/// form.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Returns a list of data attached using \xep{0231}{Bits of Binary}.
+
+    This could be used to resolve a \c cid: URL of an CAPTCHA field of the
+    form.
+
+    \since QXmpp 1.2
+*/
 QXmppBitsOfBinaryDataList &QXmppRegisterIq::bitsOfBinaryData()
 {
     return d->bitsOfBinaryData;
 }
 
-///
-/// Sets a list of \xep{0231, Bits of Binary} attachments to be included.
-///
-/// \since QXmpp 1.2
-///
+/*!
+    Sets a list of \xep{0231}{Bits of Binary} attachments to be included.
+
+    \since QXmpp 1.2
+
+    \a bitsOfBinaryData.
+*/
 void QXmppRegisterIq::setBitsOfBinaryData(const QXmppBitsOfBinaryDataList &bitsOfBinaryData)
 {
     d->bitsOfBinaryData = bitsOfBinaryData;
 }
 
-///
-/// Returns a \xep{0066, Out of Band Data} URL used for out-of-band registration.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns a \xep{0066}{Out of Band Data} URL used for out-of-band registration.
+
+    \since QXmpp 1.5
+*/
 QString QXmppRegisterIq::outOfBandUrl() const
 {
     return d->outOfBandUrl;
 }
 
-///
-/// Sets a \xep{0066, Out of Band Data} URL used for out-of-band registration.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets a \xep{0066}{Out of Band Data} URL used for out-of-band registration.
+
+    \since QXmpp 1.5
+
+    \a outOfBandUrl.
+*/
 void QXmppRegisterIq::setOutOfBandUrl(const QString &outOfBandUrl)
 {
     d->outOfBandUrl = outOfBandUrl;
 }
 
-/// \cond
 void QXmppRegisterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -295,5 +305,3 @@ void QXmppRegisterIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         },
     });
 }
-
-/// \endcond

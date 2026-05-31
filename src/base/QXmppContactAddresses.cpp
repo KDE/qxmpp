@@ -18,23 +18,28 @@ struct QXmppContactAddressesPrivate : QSharedData {
     QList<QString> supportAddresses;
 };
 
-///
-/// \class QXmppContactAddresses
-///
-/// Data form used in service discovery information for publishing service contact addresses. See
-/// \xep{0157, Contact Addresses for XMPP Services} for details.
-///
-/// ```
-/// QXmppDiscoveryIq iq;
-/// if (auto contactAddresses = iq.dataForm<QXmppContactAddresses>()) {
-///     auto abuseAddresses = contactAddresses->abuseAddresses();
-/// }
-/// ```
-///
-/// \since QXmpp 1.12
-///
+/*!
+    \class QXmppContactAddresses
+    \inmodule QXmpp
 
-/// Parses QXmppDataForm into contact addresses and returns it if successful.
+    Data form used in service discovery information for publishing service contact addresses. See
+    \xep{0157}{Contact Addresses for XMPP Services} for details.
+
+    ```
+    QXmppDiscoveryIq iq;
+    if (auto contactAddresses = iq.dataForm<QXmppContactAddresses>()) {
+    auto abuseAddresses = contactAddresses->abuseAddresses();
+    }
+    ```
+
+    \since QXmpp 1.12
+*/
+
+/*!
+    Parses QXmppDataForm into contact addresses and returns it if successful. Returns true on success.
+
+    \a form.
+*/
 std::optional<QXmppContactAddresses> QXmppContactAddresses::fromDataForm(const QXmppDataForm &form)
 {
     if (form.formType() != DataFormType) {
@@ -55,85 +60,113 @@ QXmppContactAddresses::QXmppContactAddresses()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppContactAddresses)
 
-/// Returns addresses for communication related to abusive traffic.
+/*! Returns addresses for communication related to abusive traffic. */
 QList<QString> QXmppContactAddresses::abuseAddresses() const
 {
     return d->abuseAddresses;
 }
 
-/// Sets addresses for communication related to abusive traffic.
+/*!
+    Sets addresses for communication related to abusive traffic.
+
+    \a abuseAddresses.
+*/
 void QXmppContactAddresses::setAbuseAddresses(const QList<QString> &abuseAddresses)
 {
     d->abuseAddresses = abuseAddresses;
 }
 
-/// Returns addresses for communication with the service administrators.
+/*! Returns addresses for communication with the service administrators. */
 QList<QString> QXmppContactAddresses::adminAddresses() const
 {
     return d->adminAddresses;
 }
 
-/// Sets addresses for communication with the service administrators.
+/*!
+    Sets addresses for communication with the service administrators.
+
+    \a newAdminAddresses.
+*/
 void QXmppContactAddresses::setAdminAddresses(const QList<QString> &newAdminAddresses)
 {
     d->adminAddresses = newAdminAddresses;
 }
 
-/// Returns addresses for customer feedback.
+/*! Returns addresses for customer feedback. */
 QList<QString> QXmppContactAddresses::feedbackAddresses() const
 {
     return d->feedbackAddresses;
 }
 
-/// Sets addresses for customer feedback.
+/*!
+    Sets addresses for customer feedback.
+
+    \a newFeedbackAddresses.
+*/
 void QXmppContactAddresses::setFeedbackAddresses(const QList<QString> &newFeedbackAddresses)
 {
     d->feedbackAddresses = newFeedbackAddresses;
 }
 
-/// Returns addresses for communication related to sales and marketing.
+/*! Returns addresses for communication related to sales and marketing. */
 QList<QString> QXmppContactAddresses::salesAddresses() const
 {
     return d->salesAddresses;
 }
 
-/// Sets addresses for communication related to sales and marketing.
+/*!
+    Sets addresses for communication related to sales and marketing.
+
+    \a newSalesAddresses.
+*/
 void QXmppContactAddresses::setSalesAddresses(const QList<QString> &newSalesAddresses)
 {
     d->salesAddresses = newSalesAddresses;
 }
 
-/// Returns addresses for communication related to security concerns.
+/*! Returns addresses for communication related to security concerns. */
 QList<QString> QXmppContactAddresses::securityAddresses() const
 {
     return d->securityAddresses;
 }
 
-/// Sets addresses for communication related to security concerns.
+/*!
+    Sets addresses for communication related to security concerns.
+
+    \a newSecurityAddresses.
+*/
 void QXmppContactAddresses::setSecurityAddresses(const QList<QString> &newSecurityAddresses)
 {
     d->securityAddresses = newSecurityAddresses;
 }
 
-/// Returns addresses for service status.
+/*! Returns addresses for service status. */
 QList<QString> QXmppContactAddresses::statusAddresses() const
 {
     return d->statusAddresses;
 }
 
-/// Sets addresses for service status.
+/*!
+    Sets addresses for service status.
+
+    \a newStatusAddresses.
+*/
 void QXmppContactAddresses::setStatusAddresses(const QList<QString> &newStatusAddresses)
 {
     d->statusAddresses = newStatusAddresses;
 }
 
-/// Returns addresses for customer support.
+/*! Returns addresses for customer support. */
 QList<QString> QXmppContactAddresses::supportAddresses() const
 {
     return d->supportAddresses;
 }
 
-/// Sets addresses for customer support.
+/*!
+    Sets addresses for customer support.
+
+    \a newSupportAddresses.
+*/
 void QXmppContactAddresses::setSupportAddresses(const QList<QString> &newSupportAddresses)
 {
     d->supportAddresses = newSupportAddresses;

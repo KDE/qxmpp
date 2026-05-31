@@ -35,39 +35,47 @@ QXmppUploadService::QXmppUploadService()
 {
 }
 
-/// Copy constructor
+/*! Copy constructor */
 QXmppUploadService::QXmppUploadService(const QXmppUploadService &) = default;
 
 QXmppUploadService::~QXmppUploadService() = default;
 
-/// Equal operator
+/*! Equal operator */
 QXmppUploadService &QXmppUploadService::operator=(const QXmppUploadService &) = default;
 
-/// Returns the JID of the HTTP File Upload service.
+/*! Returns the JID of the HTTP File Upload service. */
 QString QXmppUploadService::jid() const
 {
     return d->jid;
 }
 
-/// Sets the JID of the HTTP File Upload service.
+/*!
+    Sets the JID of the HTTP File Upload service.
+
+    \a jid.
+*/
 void QXmppUploadService::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
-///
-/// Returns the size limit of files that can be uploaded to this upload
-/// service.
-///
-/// A size limit of -1 means that there is no file size limit or it could not
-/// be determined.
-///
+/*!
+    Returns the size limit of files that can be uploaded to this upload
+    service.
+
+    A size limit of -1 means that there is no file size limit or it could not
+    be determined.
+*/
 qint64 QXmppUploadService::sizeLimit() const
 {
     return d->sizeLimit;
 }
 
-/// Sets the size limit of files that can be uploaded to this upload service.
+/*!
+    Sets the size limit of files that can be uploaded to this upload service.
+
+    \a sizeLimit.
+*/
 void QXmppUploadService::setSizeLimit(qint64 sizeLimit)
 {
     d->sizeLimit = sizeLimit;
@@ -79,14 +87,14 @@ public:
     QVector<QXmppUploadService> uploadServices;
 };
 
-///
-/// \typedef QXmppUploadRequestManager::SlotResult
-///
-/// Contains the requested upload slot from the service or a QXmppStanza::Error
-/// in case the request failed.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \typedef QXmppUploadRequestManager::SlotResult
+
+    Contains the requested upload slot from the service or a QXmppStanza::Error
+    in case the request failed.
+
+    \since QXmpp 1.5
+*/
 
 QXmppUploadRequestManager::QXmppUploadRequestManager()
     : d(std::make_unique<QXmppUploadRequestManagerPrivate>())
@@ -95,36 +103,33 @@ QXmppUploadRequestManager::QXmppUploadRequestManager()
 
 QXmppUploadRequestManager::~QXmppUploadRequestManager() = default;
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param file The info of the file to be uploaded.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-/// \return The id of the sent IQ. If sendPacket() isn't successful or no
-///         upload service has been discovered yet, an empty string will be
-///         returned.
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a file is the info of the file to be uploaded.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    Returns the id of the sent IQ. If sendPacket() isn't successful or no
+    upload service has been discovered yet, an empty string will be returned.
+*/
 QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
                                                      const QString &uploadService)
 {
     return requestUploadSlot(file, file.fileName(), uploadService);
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param file The info of the file to be uploaded.
-/// \param customFileName This name is used instead of the file's actual name
-///                       for requesting the upload slot.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-/// \return The id of the sent IQ. If sendPacket() isn't successful or no
-///         upload service has been discovered yet, an empty string will be
-///         returned.
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a file is the info of the file to be uploaded.
+    \a customFileName is used instead of the file's actual name for requesting the upload slot.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    Returns the id of the sent IQ. If sendPacket() isn't successful or no
+    upload service has been discovered yet, an empty string will be returned.
+*/
 QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
                                                      const QString &customFileName,
                                                      const QString &uploadService)
@@ -134,22 +139,21 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QFileInfo &file,
                              uploadService);
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param fileName The name of the file to be uploaded. This may be used by
-///                 the server to generate the URL.
-/// \param fileSize The size of the file to be uploaded. The server may reject
-///                 too large files.
-/// \param mimeType The content-type of the file. This can be used by the
-///                 server to set the HTTP MIME-type of the URL.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-/// \return The id of the sent IQ. If sendPacket() isn't successful or no
-///         upload service has been discovered yet, an empty string will be
-///         returned.
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a fileName is the name of the file to be uploaded. This may be used by
+    the server to generate the URL.
+    \a fileSize is the size of the file to be uploaded. The server may reject
+    too large files.
+    \a mimeType is the content-type of the file. This can be used by the
+    server to set the HTTP MIME-type of the URL.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    Returns the id of the sent IQ. If sendPacket() isn't successful or no
+    upload service has been discovered yet, an empty string will be returned.
+*/
 QString QXmppUploadRequestManager::requestUploadSlot(const QString &fileName,
                                                      qint64 fileSize,
                                                      const QMimeType &mimeType,
@@ -173,34 +177,31 @@ QString QXmppUploadRequestManager::requestUploadSlot(const QString &fileName,
     return client()->sendLegacyId(iq);
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param file The info of the file to be uploaded.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a file is the info of the file to be uploaded.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    \since QXmpp 1.5
+*/
 auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
                                             const QString &uploadService) -> QXmppTask<SlotResult>
 {
     return requestSlot(file, file.fileName(), uploadService);
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param file The info of the file to be uploaded.
-/// \param customFileName This name is used instead of the file's actual name
-///                       for requesting the upload slot.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a file is the info of the file to be uploaded.
+    \a customFileName is used instead of the file's actual name for requesting the upload slot.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    \since QXmpp 1.5
+*/
 auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
                                             const QString &customFileName,
                                             const QString &uploadService) -> QXmppTask<SlotResult>
@@ -210,21 +211,20 @@ auto QXmppUploadRequestManager::requestSlot(const QFileInfo &file,
                        uploadService);
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param fileName The name of the file to be uploaded. This may be used by
-///                 the server to generate the URL.
-/// \param fileSize The size of the file to be uploaded. The server may reject
-///                 too large files.
-/// \param mimeType The content-type of the file. This can be used by the
-///                 server to set the HTTP MIME-type of the URL.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a fileName is the name of the file to be uploaded. This may be used by
+    the server to generate the URL.
+    \a fileSize is the size of the file to be uploaded. The server may reject
+    too large files.
+    \a mimeType is the content-type of the file. This can be used by the
+    server to set the HTTP MIME-type of the URL.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    \since QXmpp 1.5
+*/
 auto QXmppUploadRequestManager::requestSlot(const QString &fileName,
                                             qint64 fileSize,
                                             const QMimeType &mimeType,
@@ -249,13 +249,13 @@ auto QXmppUploadRequestManager::requestSlot(const QString &fileName,
     co_return parseIq<QXmppHttpUploadSlotIq>(co_await client()->sendIq(std::move(iq)));
 }
 
-/// Returns true if an HTTP File Upload service has been discovered.
+/*! Returns true if an HTTP File Upload service has been discovered. */
 bool QXmppUploadRequestManager::serviceFound() const
 {
     return !d->uploadServices.isEmpty();
 }
 
-/// Returns all discovered HTTP File Upload services.
+/*! Returns all discovered HTTP File Upload services. */
 QVector<QXmppUploadService> QXmppUploadRequestManager::uploadServices() const
 {
     return d->uploadServices;

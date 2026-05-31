@@ -106,366 +106,375 @@ QXmppPresencePrivate::QXmppPresencePrivate()
 {
 }
 
-///
-/// Constructs a QXmppPresence.
-///
+/*! Constructs a QXmppPresence. */
 QXmppPresence::QXmppPresence(QXmppPresence::Type type)
     : d(new QXmppPresencePrivate)
 {
     d->type = type;
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppPresence::QXmppPresence(const QXmppPresence &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppPresence::QXmppPresence(QXmppPresence &&) = default;
-/// Destroys a QXmppPresence.
+/*! Destroys a QXmppPresence. */
 QXmppPresence::~QXmppPresence() = default;
-/// Assignemnt operator.
+/*! Assignemnt operator. */
 QXmppPresence &QXmppPresence::operator=(const QXmppPresence &other) = default;
-/// Move-assignemnt operator.
+/*! Move-assignemnt operator. */
 QXmppPresence &QXmppPresence::operator=(QXmppPresence &&) = default;
 
-///
-/// Indicates if the QXmppStanza is a stanza in the XMPP sence (i. e. a message,
-/// iq or presence)
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns whether the QXmppStanza is a stanza in the XMPP sence (i. e. a message,
+    iq or presence)
+
+    \since QXmpp 1.0
+*/
 bool QXmppPresence::isXmppStanza() const
 {
     return true;
 }
 
-///
-/// Returns the availability status type, for instance busy or away.
-///
-/// This will not tell you whether a contact is connected, check whether
-/// type() is QXmppPresence::Available instead.
-///
+/*!
+    Returns the availability status type, for instance busy or away.
+
+    This will not tell you whether a contact is connected, check whether
+    type() is QXmppPresence::Available instead.
+*/
 QXmppPresence::AvailableStatusType QXmppPresence::availableStatusType() const
 {
     return d->availableStatusType;
 }
 
-/// Sets the availability status type, for instance busy or away.
+/*! Sets the availability status \a type, for instance busy or away. */
 void QXmppPresence::setAvailableStatusType(AvailableStatusType type)
 {
     d->availableStatusType = type;
 }
 
-/// Returns the priority level of the resource.
+/*! Returns the priority level of the resource. */
 int QXmppPresence::priority() const
 {
     return d->priority;
 }
 
-/// Sets the \a priority level of the resource.
+/*! Sets the \a priority level of the resource. */
 void QXmppPresence::setPriority(int priority)
 {
     d->priority = priority;
 }
 
-/// Returns the status text, a textual description of the user's status.
+/*! Returns the status text, a textual description of the user's status. */
 QString QXmppPresence::statusText() const
 {
     return d->statusText;
 }
 
-///
-/// Sets the status text, a textual description of the user's status.
-///
-/// \param statusText The status text, for example "Gone fishing".
-///
+/*!
+    Sets the \a statusText, a textual description of the user's status, for
+    example "Gone fishing".
+*/
 void QXmppPresence::setStatusText(const QString &statusText)
 {
     d->statusText = statusText;
 }
 
-///
-/// Returns the presence type.
-///
-/// You can use this method to determine the action which needs to be
-/// taken in response to receiving the presence. For instance, if the type is
-/// QXmppPresence::Available or QXmppPresence::Unavailable, you could update
-/// the icon representing a contact's availability.
-///
+/*!
+    Returns the presence type.
+
+    You can use this method to determine the action which needs to be
+    taken in response to receiving the presence. For instance, if the type is
+    QXmppPresence::Available or QXmppPresence::Unavailable, you could update
+    the icon representing a contact's availability.
+*/
 QXmppPresence::Type QXmppPresence::type() const
 {
     return d->type;
 }
 
-/// Sets the presence type.
+/*! Sets the presence \a type. */
 void QXmppPresence::setType(QXmppPresence::Type type)
 {
     d->type = type;
 }
 
-/// Returns the photo-hash of the VCardUpdate.
+/*! Returns the photo-hash of the VCardUpdate. */
 QByteArray QXmppPresence::photoHash() const
 {
     return d->photoHash;
 }
 
-///
-/// Sets the photo-hash of the VCardUpdate.
-///
-/// \param photoHash as QByteArray
-///
+/*!
+    Sets the \a photoHash of the VCardUpdate.
+*/
 void QXmppPresence::setPhotoHash(const QByteArray &photoHash)
 {
     d->photoHash = photoHash;
 }
 
-/// Returns the type of VCardUpdate
+/*! Returns the type of VCardUpdate */
 QXmppPresence::VCardUpdateType QXmppPresence::vCardUpdateType() const
 {
     return d->vCardUpdateType;
 }
 
-/// Sets the type of VCardUpdate
+/*! Sets the \a type of VCardUpdate */
 void QXmppPresence::setVCardUpdateType(VCardUpdateType type)
 {
     d->vCardUpdateType = type;
 }
 
-/// \xep{0115, Entity Capabilities}
+/*! \xep{0115}{Entity Capabilities} */
 QString QXmppPresence::capabilityHash() const
 {
     return d->capabilityHash;
 }
 
-/// \xep{0115, Entity Capabilities}
+/*!
+    \xep{0115}{Entity Capabilities}
+
+    \a hash.
+*/
 void QXmppPresence::setCapabilityHash(const QString &hash)
 {
     d->capabilityHash = hash;
 }
 
-/// \xep{0115, Entity Capabilities}
+/*! \xep{0115}{Entity Capabilities} */
 QString QXmppPresence::capabilityNode() const
 {
     return d->capabilityNode;
 }
 
-/// \xep{0115, Entity Capabilities}
+/*!
+    \xep{0115}{Entity Capabilities}
+
+    \a node.
+*/
 void QXmppPresence::setCapabilityNode(const QString &node)
 {
     d->capabilityNode = node;
 }
 
-/// \xep{0115, Entity Capabilities}
+/*! \xep{0115}{Entity Capabilities} */
 QByteArray QXmppPresence::capabilityVer() const
 {
     return d->capabilityVer;
 }
 
-/// \xep{0115, Entity Capabilities}
+/*!
+    \xep{0115}{Entity Capabilities}
+
+    \a ver.
+*/
 void QXmppPresence::setCapabilityVer(const QByteArray &ver)
 {
     d->capabilityVer = ver;
 }
 
-///
-/// Returns whether a \xep{0272, Multiparty Jingle (Muji)} session is being prepared.
-///
-/// \return whether a Muji session is being prepared
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns whether a \xep{0272}{Multiparty Jingle (Muji)} session is being prepared.
+
+    \since QXmpp 1.5
+*/
 bool QXmppPresence::isPreparingMujiSession() const
 {
     return d->isPreparingMujiSession;
 }
 
-///
-/// Sets whether a \xep{0272, Multiparty Jingle (Muji)} session is being prepared.
-///
-/// \param isPreparingMujiSession whether a Muji session is being prepared
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets whether a \xep{0272}{Multiparty Jingle (Muji)} session is being prepared
+    via \a isPreparingMujiSession.
+
+    \since QXmpp 1.5
+*/
 void QXmppPresence::setIsPreparingMujiSession(bool isPreparingMujiSession)
 {
     d->isPreparingMujiSession = isPreparingMujiSession;
 }
 
-///
-/// Returns \xep{0272, Multiparty Jingle (Muji)} contents.
-///
-/// \return Muji contents
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the \xep{0272}{Multiparty Jingle (Muji)} contents.
+
+    \since QXmpp 1.5
+*/
 QVector<QXmppJingleIq::Content> QXmppPresence::mujiContents() const
 {
     return d->mujiContents;
 }
 
-///
-/// Sets \xep{0272, Multiparty Jingle (Muji)} contents.
-///
-/// \param mujiContents Muji contents
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the \xep{0272}{Multiparty Jingle (Muji)} \a mujiContents.
+
+    \since QXmpp 1.5
+*/
 void QXmppPresence::setMujiContents(const QVector<QXmppJingleIq::Content> &mujiContents)
 {
     d->mujiContents = mujiContents;
 }
 
-/// Returns the MUC item.
+/*! Returns the MUC item. */
 QXmppMucItem QXmppPresence::mucItem() const
 {
     return d->mucItem;
 }
 
-/// Sets the MUC item.
+/*! Sets the MUC \a item. */
 void QXmppPresence::setMucItem(const QXmppMucItem &item)
 {
     d->mucItem = item;
 }
 
-/// Returns the password used to join a MUC room.
+/*! Returns the password used to join a MUC room. */
 QString QXmppPresence::mucPassword() const
 {
     return d->mucPassword;
 }
 
-/// Sets the password used to join a MUC room.
+/*! Sets the \a password used to join a MUC room. */
 void QXmppPresence::setMucPassword(const QString &password)
 {
     d->mucPassword = password;
 }
 
-/// Returns the MUC status codes.
+/*! Returns the MUC status codes. */
 QList<int> QXmppPresence::mucStatusCodes() const
 {
     return d->mucStatusCodes;
 }
 
-/// Sets the MUC status codes.
+/*! Sets the MUC status \a codes. */
 void QXmppPresence::setMucStatusCodes(const QList<int> &codes)
 {
     d->mucStatusCodes = codes;
 }
 
-/// Returns true if the sender has indicated MUC support.
+/*! Returns true if the sender has indicated MUC support. */
 bool QXmppPresence::isMucSupported() const
 {
     return d->mucSupported;
 }
 
-/// Sets whether MUC is \a supported.
+/*! Sets whether MUC is \a supported. */
 void QXmppPresence::setMucSupported(bool supported)
 {
     d->mucSupported = supported;
 }
 
-///
-/// Returns the \xep{0283, Moved} user's old jid.
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Returns the \xep{0283}{Moved} user's old jid.
+
+    \since QXmpp 1.9
+*/
 QString QXmppPresence::oldJid() const
 {
     return d->oldJid;
 }
 
-///
-/// Sets the \xep{0283, Moved} user's old jid.
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Sets the \xep{0283}{Moved} user's old jid.
+
+    \since QXmpp 1.9
+
+    \a oldJid.
+*/
 void QXmppPresence::setOldJid(const QString &oldJid)
 {
     d->oldJid = oldJid;
 }
 
-///
-/// Returns when the last user interaction with the client took place. See
-/// \xep{0319, Last User Interaction in Presence} for details.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns when the last user interaction with the client took place. See
+    \xep{0319}{Last User Interaction in Presence} for details.
+
+    \since QXmpp 1.0
+*/
 QDateTime QXmppPresence::lastUserInteraction() const
 {
     return d->lastUserInteraction;
 }
 
-///
-/// Sets the time of the last user interaction as defined in
-/// \xep{0319, Last User Interaction in Presence}.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Sets the time of the last user interaction as defined in
+    \xep{0319}{Last User Interaction in Presence}.
+
+    \since QXmpp 1.0
+
+    \a lastUserInteraction.
+*/
 void QXmppPresence::setLastUserInteraction(const QDateTime &lastUserInteraction)
 {
     d->lastUserInteraction = lastUserInteraction;
 }
 
-///
-/// Returns the actual (full) JID of the MIX channel participant.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the actual (full) JID of the MIX channel participant.
+
+    \since QXmpp 1.1
+*/
 QString QXmppPresence::mixUserJid() const
 {
     return d->mixUserJid;
 }
 
-///
-/// Sets the actual (full) JID of the MIX channel participant.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the actual (full) JID of the MIX channel participant.
+
+    \since QXmpp 1.1
+
+    \a mixUserJid.
+*/
 void QXmppPresence::setMixUserJid(const QString &mixUserJid)
 {
     d->mixUserJid = mixUserJid;
 }
 
-///
-/// Returns the MIX participant's nickname.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the MIX participant's nickname.
+
+    \since QXmpp 1.1
+*/
 QString QXmppPresence::mixUserNick() const
 {
     return d->mixUserNick;
 }
 
-///
-/// Sets the MIX participant's nickname.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the MIX participant's nickname.
+
+    \since QXmpp 1.1
+
+    \a mixUserNick.
+*/
 void QXmppPresence::setMixUserNick(const QString &mixUserNick)
 {
     d->mixUserNick = mixUserNick;
 }
 
-///
-/// Returns the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
-/// MUCs}.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Returns the MUC Occupant ID as defined in \xep{0421}{Occupant identifiers for semi-anonymous
+    MUCs}.
+
+    \since QXmpp 1.13
+*/
 QString QXmppPresence::mucOccupantId() const
 {
     return d->mucOccupantId;
 }
 
-///
-/// Sets the MUC Occupant ID as defined in \xep{0421, Occupant identifiers for semi-anonymous
-/// MUCs}.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Sets the MUC Occupant ID as defined in \xep{0421}{Occupant identifiers for semi-anonymous
+    MUCs}.
+
+    \since QXmpp 1.13
+
+    \a id.
+*/
 void QXmppPresence::setMucOccupantId(const QString &id)
 {
     d->mucOccupantId = id;
 }
 
-/// \cond
 void QXmppPresence::parse(const QDomElement &element)
 {
     QXmppStanza::parse(element);
@@ -646,4 +655,3 @@ void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
 }
 
 QStringList QXmppPresence::capabilityExt() const { return d->capabilityExt; }
-/// \endcond

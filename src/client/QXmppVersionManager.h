@@ -10,16 +10,18 @@
 class QXmppVersionIq;
 class QXmppVersionManagerPrivate;
 
-///
-/// \brief The QXmppVersionManager class makes it possible to request for
-/// the software version of an entity as defined by \xep{0092, Software Version}.
-///
-/// \note Its object should not be created using its constructor. Instead
-/// \c QXmppClient::findExtension<QXmppVersionManager>() should be used to get
-/// the instantiated object of this class.
-///
-/// \ingroup Managers
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppVersionManager class makes it possible to request for
+    the software version of an entity as defined by \xep{0092}{Software Version}.
+
+    \note Its object should not be created using its constructor. Instead
+    \c QXmppClient::findExtension<QXmppVersionManager>() should be used to get
+    the instantiated object of this class.
+
+    \ingroup Managers
+*/
 class QXMPP_EXPORT QXmppVersionManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -38,13 +40,11 @@ public:
     QString clientVersion() const;
     QString clientOs() const;
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
     QXmppVersionIq handleIq(QXmppVersionIq &&iq);
-    /// \endcond
 
-    /// \brief This signal is emitted when a version response is received.
+    /*! \brief This signal is emitted when a version response is received. */
     Q_SIGNAL void versionReceived(const QXmppVersionIq &);
 
 private:

@@ -41,10 +41,8 @@ public:
     QString value() const;
     void setValue(const QString &value);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isSdpParameter(const QDomElement &element);
 
@@ -71,11 +69,9 @@ public:
     QString sessionParams() const;
     void setSessionParams(const QString &sessionParams);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"crypto", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isJingleRtpCryptoElement(const QDomElement &element);
 
@@ -96,11 +92,9 @@ public:
     QVector<QXmppJingleRtpCryptoElement> cryptoElements() const;
     void setCryptoElements(const QVector<QXmppJingleRtpCryptoElement> &cryptoElements);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"encryption", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isJingleRtpEncryption(const QDomElement &element);
 
@@ -124,11 +118,9 @@ public:
     QVector<QXmppSdpParameter> parameters() const;
     void setParameters(const QVector<QXmppSdpParameter> &parameters);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"rtcp-fb", QXmpp::Private::ns_jingle_rtcp_fb };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isJingleRtpFeedbackProperty(const QDomElement &element);
 
@@ -146,11 +138,9 @@ public:
     uint64_t value() const;
     void setValue(uint64_t value);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"rtcp-fb-trr-int", QXmpp::Private::ns_jingle_rtcp_fb };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isJingleRtpFeedbackInterval(const QDomElement &element);
 
@@ -162,11 +152,8 @@ class QXMPP_EXPORT QXmppJingleRtpHeaderExtensionProperty
 {
 public:
     enum Senders {
-        /// The initiator and the sender are allowed.
         Both,
-        /// Only the initiator is allowed.
         Initiator,
-        /// Only the responder is allowed.
         Responder
     };
 
@@ -186,11 +173,9 @@ public:
     QVector<QXmppSdpParameter> parameters() const;
     void setParameters(const QVector<QXmppSdpParameter> &parameters);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"rtp-hdrext", QXmpp::Private::ns_jingle_rtp_hdrext };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isJingleRtpHeaderExtensionProperty(const QDomElement &element);
 
@@ -198,10 +183,12 @@ private:
     QSharedDataPointer<QXmppJingleRtpHeaderExtensionPropertyPrivate> d;
 };
 
-///
-/// \brief The QXmppJinglePayloadType class represents a payload type
-/// as specified by \xep{0167, Jingle RTP Sessions} and RFC 5245.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppJinglePayloadType class represents a payload type
+    as specified by \xep{0167}{Jingle RTP Sessions} and RFC 5245.
+*/
 class QXMPP_EXPORT QXmppJinglePayloadType
 {
 public:
@@ -236,11 +223,9 @@ public:
     QVector<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals() const;
     void setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"payload-type", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     QXmppJinglePayloadType &operator=(const QXmppJinglePayloadType &other);
     bool operator==(const QXmppJinglePayloadType &other) const;
@@ -266,11 +251,9 @@ public:
     const QList<QXmppJinglePayloadType> &payloadTypes() const;
     void setPayloadTypes(const QList<QXmppJinglePayloadType> &payloadTypes);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"description", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppJingleRtpDescriptionPrivate> d;
@@ -280,22 +263,28 @@ private:
 using QXmppJingleDescription [[deprecated]] = QXmppJingleRtpDescription;
 #endif
 
-///
-/// \brief The QXmppJingleCandidate class represents a transport candidate
-/// as specified by \xep{0176, Jingle ICE-UDP Transport Method}.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppJingleCandidate class represents a transport candidate
+    as specified by \xep{0176}{Jingle ICE-UDP Transport Method}.
+*/
 class QXMPP_EXPORT QXmppJingleCandidate
 {
 public:
-    /// This enum is used to describe a candidate's type.
+    /*!
+        This enum is used to describe a candidate's type.
+
+        \value HostType Host candidate, a local address/port.
+        \value PeerReflexiveType Peer-reflexive candidate, the address/port as seen from the peer.
+        \value ServerReflexiveType Server-reflexive candidate, the address/port as seen by the STUN server.
+        \value RelayedType Relayed candidate, a candidate from a TURN relay.
+    */
     enum Type {
-        HostType,             ///< Host candidate, a local address/port.
-        PeerReflexiveType,    ///< Peer-reflexive candidate,
-                              ///< the address/port as seen from the peer.
-        ServerReflexiveType,  ///< Server-reflexive candidate,
-                              ///< the address/port as seen by the STUN server
-        RelayedType           ///< Relayed candidate, a candidate from
-                              ///< a TURN relay.
+        HostType,
+        PeerReflexiveType,
+        ServerReflexiveType,
+        RelayedType
     };
 
     QXmppJingleCandidate();
@@ -338,11 +327,9 @@ public:
 
     bool isNull() const;
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"candidate", QXmpp::Private::ns_jingle_ice_udp };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppJingleCandidatePrivate> d;
@@ -351,58 +338,61 @@ private:
 class QXMPP_EXPORT QXmppJingleReason
 {
 public:
-    /// This enum is used to describe a reason's type.
+    /*!
+        This enum is used to describe a reason's type.
+
+        \value AlternativeSession The party prefers to use an existing session with the peer rather than initiate a new session; the Jingle session ID of the alternative session SHOULD be provided as the XML character data of the &lt;sid/&gt; child.
+        \value Busy The party is busy and cannot accept a session.
+        \value Cancel The initiator wishes to formally cancel the session initiation request.
+        \value ConnectivityError The action is related to connectivity problems.
+        \value Decline The party wishes to formally decline the session.
+        \value Expired The session length has exceeded a pre-defined time limit (e.g., a meeting hosted at a conference service).
+        \value FailedApplication The party has been unable to initialize processing related to the application type.
+        \value FailedTransport The party has been unable to establish connectivity for the transport method.
+        \value GeneralError The action is related to a non-specific application error.
+        \value Gone The entity is going offline or is no longer available.
+        \value IncompatibleParameters The party supports the offered application type but does not support the offered or negotiated parameters.
+        \value MediaError The action is related to media processing problems.
+        \value SecurityError The action is related to a violation of local security policies.
+        \value Success The action is generated during the normal course of state management and does not reflect any error.
+        \value Timeout A request has not been answered so the sender is timing out the request.
+        \value UnsupportedApplications The party supports none of the offered application types.
+        \value UnsupportedTransports The party supports none of the offered transport methods.
+
+        \value None
+    */
     enum Type {
         None,
-        /// The party prefers to use an existing session with the peer rather than initiate a new
-        /// session; the Jingle session ID of the alternative session SHOULD be provided as the XML
-        /// character data of the &lt;sid/&gt; child.
         AlternativeSession,
-        /// The party is busy and cannot accept a session.
         Busy,
-        /// The initiator wishes to formally cancel the session initiation request.
         Cancel,
-        /// The action is related to connectivity problems.
         ConnectivityError,
-        /// The party wishes to formally decline the session.
         Decline,
-        /// The session length has exceeded a pre-defined time limit (e.g., a meeting hosted at a
-        /// conference service).
         Expired,
-        /// The party has been unable to initialize processing related to the application type.
         FailedApplication,
-        /// The party has been unable to establish connectivity for the transport method.
         FailedTransport,
-        /// The action is related to a non-specific application error.
         GeneralError,
-        /// The entity is going offline or is no longer available.
         Gone,
-        /// The party supports the offered application type but does not support the offered or
-        /// negotiated parameters.
         IncompatibleParameters,
-        /// The action is related to media processing problems.
         MediaError,
-        /// The action is related to a violation of local security policies.
         SecurityError,
-        /// The action is generated during the normal course of state management and does not
-        /// reflect any error.
         Success,
-        /// A request has not been answered so the sender is timing out the request.
         Timeout,
-        /// The party supports none of the offered application types.
         UnsupportedApplications,
-        /// The party supports none of the offered transport methods.
         UnsupportedTransports
     };
 
-    /// Condition of an RTP-specific error
-    /// \since QXmpp 1.5
+    /*!
+        Condition of an RTP-specific error
+        \since QXmpp 1.5
+
+        \value NoErrorCondition There is no error condition.
+        \value InvalidCrypto The encryption offer is rejected.
+        \value CryptoRequired Encryption is required but not offered.
+    */
     enum RtpErrorCondition {
-        /// There is no error condition.
         NoErrorCondition,
-        /// The encryption offer is rejected.
         InvalidCrypto,
-        /// Encryption is required but not offered.
         CryptoRequired
     };
 
@@ -419,26 +409,44 @@ public:
     RtpErrorCondition rtpErrorCondition() const;
     void setRtpErrorCondition(RtpErrorCondition rtpErrorCondition);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"reason", QXmpp::Private::ns_jingle };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppJingleIqReasonPrivate> d;
 };
 
-///
-/// \brief The QXmppJingleIq class represents an IQ used for initiating media
-/// sessions as specified by \xep{0166, Jingle}.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppJingleIq class represents an IQ used for initiating media
+    sessions as specified by \xep{0166}{Jingle}.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppJingleIq : public QXmppIq
 {
 public:
-    /// This enum is used to describe a Jingle action.
+    /*!
+        This enum is used to describe a Jingle action.
+
+        \value ContentAccept
+        \value ContentAdd
+        \value ContentModify
+        \value ContentReject
+        \value ContentRemove
+        \value DescriptionInfo
+        \value SecurityInfo
+        \value SessionAccept
+        \value SessionInfo
+        \value SessionInitiate
+        \value SessionTerminate
+        \value TransportAccept
+        \value TransportInfo
+        \value TransportReject
+        \value TransportReplace
+    */
     enum Action {
         ContentAccept,
         ContentAdd,
@@ -458,9 +466,7 @@ public:
     };
 
     enum Creator {
-        /// The initiator generated the content type.
         Initiator,
-        /// The responder generated the content type.
         Responder
     };
 
@@ -468,26 +474,35 @@ public:
     struct RtpSessionStateHold { };
     struct RtpSessionStateUnhold { };
     struct RtpSessionStateMuting {
-        /// True when temporarily not sending media to the other party but continuing to accept
-        /// media from it, false for ending mute state
+        /*!
+            True when temporarily not sending media to the other party but continuing to accept
+            media from it, false for ending mute state
+        */
         bool isMute;
-        /// Creator of the corresponding session
+        /*! Creator of the corresponding session */
         Creator creator;
-        /// Session to be muted (e.g., only audio or video)
+        /*! Session to be muted (e.g., only audio or video) */
         QString name;
     };
     struct RtpSessionStateRinging { };
 
     using RtpSessionState = std::variant<RtpSessionStateActive, RtpSessionStateHold, RtpSessionStateUnhold, RtpSessionStateMuting, RtpSessionStateRinging>;
 
-    /// Alias to QXmppJingleReason for compatibility.
+    /*!
+        \typealias QXmppJingleIq::Reason
+
+        Alias to QXmppJingleReason for compatibility.
+    */
     using Reason = QXmppJingleReason;
 
-    /// \internal
-    ///
-    /// The QXmppJingleIq::Content class represents the "content" element of a
-    /// QXmppJingleIq.
-    ///
+    /*!
+        \inmodule QXmpp
+
+        \internal
+
+        The QXmppJingleIq::Content class represents the "content" element of a
+        QXmppJingleIq.
+    */
     class QXMPP_EXPORT Content
     {
     public:
@@ -562,14 +577,12 @@ public:
         QString transportFingerprintSetup() const;
         void setTransportFingerprintSetup(const QString &setup);
 
-        /// \cond
         static constexpr std::tuple XmlTag = { u"content", QXmpp::Private::ns_jingle };
         void parse(const QDomElement &element);
         void toXml(QXmlStreamWriter *writer) const;
 
         bool parseSdp(const QString &sdp);
         QString toSdp() const;
-        /// \endcond
 
     private:
         QSharedDataPointer<QXmppJingleIqContentPrivate> d;
@@ -622,17 +635,13 @@ public:
     std::optional<RtpSessionState> rtpSessionState() const;
     void setRtpSessionState(const std::optional<RtpSessionState> &rtpSessionState);
 
-    /// \cond
     static constexpr std::tuple<QStringView, QStringView> PayloadXmlTag = { u"jingle", QXmpp::Private::ns_jingle };
     [[deprecated("Use QXmpp::isIqType()")]]
     static bool isJingleIq(const QDomElement &element);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppJingleIqPrivate> d;
@@ -674,10 +683,8 @@ public:
     QString migratedTo() const;
     void setMigratedTo(const QString &migratedTo);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isJingleMessageInitiationElement(const QDomElement &);
 
@@ -738,10 +745,8 @@ public:
     std::optional<QVector<External>> external() const;
     void setExternal(std::optional<QVector<External>> external);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isCallInviteElement(const QDomElement &);
 

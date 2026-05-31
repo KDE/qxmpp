@@ -11,21 +11,25 @@
 
 #include <QDateTime>
 
-/// \brief The QXmppArchiveManager class makes it possible to access message
-/// archives as defined by \xep{0136, Message Archiving}.
-///
-/// To make use of this manager, you need to instantiate it and load it into
-/// the QXmppClient instance as follows:
-///
-/// \code
-/// QXmppArchiveManager *manager = new QXmppArchiveManager;
-/// client->addExtension(manager);
-/// \endcode
-///
-/// \note Few servers support message archiving. Check if the server in use supports
-/// this XEP.
-///
-/// \ingroup Managers
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppArchiveManager class makes it possible to access message
+    archives as defined by \xep{0136}{Message Archiving}.
+
+    To make use of this manager, you need to instantiate it and load it into
+    the QXmppClient instance as follows:
+
+    \code
+    QXmppArchiveManager *manager = new QXmppArchiveManager;
+    client->addExtension(manager);
+    \endcode
+
+    \note Few servers support message archiving. Check if the server in use supports
+    this XEP.
+
+    \ingroup Managers
+*/
 
 class QXMPP_EXPORT QXmppArchiveManager : public QXmppClientExtension
 {
@@ -39,17 +43,23 @@ public:
     void retrieveCollection(const QString &jid, const QDateTime &start, const QXmppResultSetQuery &rsm = QXmppResultSetQuery());
     void retrieveCollection(const QString &jid, const QDateTime &start, int max);
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
-    /// \endcond
 
-    /// This signal is emitted when archive list is received
-    /// after calling listCollections()
+    /*!
+        This signal is emitted when archive list is received
+        after calling listCollections()
+
+        \a rsm.
+    */
     Q_SIGNAL void archiveListReceived(const QList<QXmppArchiveChat> &, const QXmppResultSetReply &rsm = QXmppResultSetReply());
 
-    /// This signal is emitted when archive chat is received
-    /// after calling retrieveCollection()
+    /*!
+        This signal is emitted when archive chat is received
+        after calling retrieveCollection()
+
+        \a rsm.
+    */
     Q_SIGNAL void archiveChatReceived(const QXmppArchiveChat &, const QXmppResultSetReply &rsm = QXmppResultSetReply());
 };
 

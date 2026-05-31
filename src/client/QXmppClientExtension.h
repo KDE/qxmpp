@@ -17,17 +17,19 @@ class QXmppClient;
 class QXmppClientExtensionPrivate;
 class QXmppMessage;
 
-///
-/// \brief The QXmppClientExtension class is the base class for QXmppClient
-/// extensions.
-///
-/// If you want to extend QXmppClient, for instance to support an IQ type
-/// which is not natively supported, you can subclass QXmppClientExtension
-/// and implement handleStanza(). You can then add your extension to the
-/// client instance using QXmppClient::addExtension().
-///
-/// \ingroup Core
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppClientExtension class is the base class for QXmppClient
+    extensions.
+
+    If you want to extend QXmppClient, for instance to support an IQ type
+    which is not natively supported, you can subclass QXmppClientExtension
+    and implement handleStanza(). You can then add your extension to the
+    client instance using QXmppClient::addExtension().
+
+    \ingroup Core
+*/
 class QXMPP_EXPORT QXmppClientExtension : public QXmppLoggable, public QXmppExtension
 {
     Q_OBJECT
