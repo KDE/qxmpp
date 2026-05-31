@@ -1,0 +1,35 @@
+// SPDX-FileCopyrightText: 2014 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+/*!
+\group Core
+\title Core classes
+
+Core classes include all necessary classes to build a basic client or server
+application. This for example also includes the logging class QXmppLogger.
+
+\generatelist {classesbygroup}
+*/
+
+/*!
+\group Managers
+\title Managers
+
+Managers are used to extend the basic QXmppClient. Some of them are loaded by
+default, others need to be added to the client using
+QXmppClient::addExtension().
+
+\generatelist {classesbygroup}
+*/
+
+/*!
+\group Stanzas
+\title Stanzas
+
+All packets that are sent and received are serialized in Stanzas, so this
+includes IQ stanzas, message stanzas, presence stanzas and other stanzas.
+
+\generatelist {classesbygroup}
+*/

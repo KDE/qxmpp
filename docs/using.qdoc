@@ -2,15 +2,17 @@
 //
 // SPDX-License-Identifier: CC0-1.0
 
-/*! \page using Using QXmpp
+/*!
+\page using.html
+\title Using QXmpp
 
+\section1 Example: example_0_connected
 
-<h2>Example: example_0_connected</h2>
-
-This example just connects to the xmpp server. And starts receiving presences (updates) from the server.
-After running this example, you can see this user online, if it's added in your roster (friends list).
-Logging type has been set to stdout. You can see the progress on the command line.
-This example is also available with the source code in the example directory.
+This example just connects to the xmpp server. And starts receiving presences
+(updates) from the server. After running this example, you can see this user
+online, if it's added in your roster (friends list). Logging type has been set
+to stdout. You can see the progress on the command line. This example is also
+available with the source code in the example directory.
 
 \code
 #include <QtCore/QCoreApplication>
@@ -35,12 +37,12 @@ int main(int argc, char *argv[])
 }
 \endcode
 
-<h2>Example: example_1_echoClient</h2>
+\section1 Example: example_1_echoClient
 
-This is a very simple bot which echoes the message sent to it.
-Run this example, send it a message from a friend of this bot. You will receive the message back.
-This example shows how to receive and send messages.
-This example is also available with the source code in the example directory.
+This is a very simple bot which echoes the message sent to it. Run this example,
+send it a message from a friend of this bot. You will receive the message back.
+This example shows how to receive and send messages. This example is also
+available with the source code in the example directory.
 
 \code
 // subclass the QXmppClient and create a new class echoClient
@@ -61,7 +63,6 @@ public:
 public slots:
     void messageReceived(const QXmppMessage&);
 };
-}}}
 \endcode
 
 \code
@@ -91,7 +92,6 @@ void echoClient::messageReceived(const QXmppMessage& message)
 
     sendPacket(QXmppMessage("", from, "Your message: " + msg));
 }
-}}}
 \endcode
 
 \code

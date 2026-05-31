@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: 2014 Jeremy Lainé <jeremy.laine@m4x.org>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+/*!
+\page xep.html
+\title XMPP Extension Protocols
+
+This document lists the XMPP Extension Protocols (XEPs) supported by QXmpp.
+
+\raw HTML
+<script>
+function resizeIframe(obj) {
+    obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 20 + 'px';
+}
+</script>
+<iframe src="doap.xml" class="xeps" style="position: absolute; height: 85%; width: 99%; border: none" frameborder="0" onload="resizeIframe(this)"></iframe>
+\endraw
+
+*/

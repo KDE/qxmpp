@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# Shared KDE/Qt documentation infrastructure: HTML header & footer, default
+# stylesheet (offline.css + offline-dark.css copied alongside), macros and
+# preprocessor defines. api.kde.org's build pipeline points $KDE_DOCS at the
+# kde-qdoc-common repo; for local builds, docs/CMakeLists.txt falls back to
+# Qt's installed doc tree (same layout, kde-qdoc-common is forked from it).
+include($KDE_DOCS/global/qt-module-defaults.qdocconf)
+
+project                 = QXmpp
+description             = QXmpp -- a cross-platform C++ XMPP client and server library
+version                 = $QT_VERSION
+url                     = https://doc.qxmpp.org
+
+# Override Qt-branded fields from the shared global qdocconf:
+# - productname feeds navigation.hometitle ("$productname $QT_VER") and the
+#   "Project | ..." suffix in <title>
+# - buildversion is the small line shown above each page's navigation bar
+productname             = QXmpp
+buildversion            = "QXmpp $QT_VERSION Reference Documentation"
+
+# QXmpp keeps its API documentation right next to the declarations in
+# the public headers. This option tells qdoc's clang frontend to look
+# for /*! */ blocks in headers, not just .cpp/.qdoc files.
+documentationinheaders  = true
+
+# directories scanned for .qdoc page files and source-side documentation
+sourcedirs              = ../src \
+                          ../docs
+
+headerdirs              = ../src
+
+exampledirs             = ../examples
+
+imagedirs               = ../docs/images
+
+# excluded from scanning. *_p.h and *_p.cpp are private implementation
+# files; the codec/sasl files use constructs that confuse qdoc's parser.
+# Append: qt-cpp-defines.qdocconf adds Qt's own platform-suffix excludes.
+excludefiles           += ../src/base/QXmppCodec.cpp \
+                          ../src/base/QXmppSasl.cpp \
+                          ../src/base/*_p.h ../src/base/*_p.cpp \
+                          ../src/client/*_p.h ../src/client/*_p.cpp \
+                          ../src/omemo/*_p.h ../src/omemo/*_p.cpp \
+                          ../src/server/*_p.h ../src/server/*_p.cpp
+excludedirs             = ../src/base/hsluv
+
+# cross-references to Qt's documentation
+depends                 = qtcore qtnetwork qtxml qtgui qtmultimedia qtcore5compat
+
+# preprocessor defines that affect parsing of headers. Append: qt-cpp-defines
+# and config.qdocconf set Qt-side defines (QT_GUI_LIB, qt6, offlinedocs, …)
+# that affect how Qt headers parse.
+defines                +=  "QXMPP_DOC" \
+                           "QXMPP_EXPORT=" \
+                           "QXMPP_PRIVATE_EXPORT=" \
+                           "QXMPPOMEMO_EXPORT=" \
+                           "BUILD_OMEMO" \
+                           "WITH_ENCRYPTION" \
+                           "WITH_GSTREAMER"
+
+outputformats           = HTML
+
+# Allow current QDoc warning count without failing the build. Qt's
+# config.qdocconf sets warninglimit = 10; the QXmpp doc tree still emits
+# more than that until the long tail of mechanical-conversion warnings is
+# cleared. Lower this as warnings are fixed.
+warninglimit            = 1000
+
+# Custom commands for XEP cross-links (replaces Doxygen \xep{} ALIAS).
+# \xep{NNNN}{Title} produces a single link rendered as "XEP-NNNN: Title".
+# \xepn{NNNN} is the bare form used where the surrounding prose already
+# names the XEP, rendered as "XEP-NNNN".
+macro.xep.HTML          = "<a href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1: \2</a>"
+macro.xep.DocBook       = "<link xlink:href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1: \2</link>"
+macro.xepn.HTML         = "<a href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1</a>"
+macro.xepn.DocBook      = "<link xlink:href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1</link>"
+
+navigation.homepage     = QXmpp
+navigation.landingpage  = QXmpp
+
+# qhp (Qt Help) — needed by ecm_generate_qch
+qhp.projects                  = QXmpp
+qhp.QXmpp.file                = qxmpp.qhp
+qhp.QXmpp.namespace           = org.qxmpp.qxmpp.$QT_VERSION_TAG
+qhp.QXmpp.virtualFolder       = qxmpp
+qhp.QXmpp.indexTitle          = QXmpp
+qhp.QXmpp.indexRoot           =
+qhp.QXmpp.subprojects         = classes
+
+qhp.QXmpp.subprojects.classes.title         = Classes
+qhp.QXmpp.subprojects.classes.indexTitle    = QXmpp Classes
+qhp.QXmpp.subprojects.classes.selectors     = class fake:headerfile
+qhp.QXmpp.subprojects.classes.sortPages     = true
