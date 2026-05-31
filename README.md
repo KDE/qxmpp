@@ -73,7 +73,7 @@ You can pass the following arguments to CMake:
 Option | Default | Description
 ---|---|---
 `BUILD_SHARED` | `ON` | Build as shared library, otherwise static
-`BUILD_DOCUMENTATION` | `ON` | Build documentation, requires Doxygen
+`BUILD_DOCUMENTATION` | `OFF` | Build HTML API documentation, requires QDoc and ECM ≥ 6.11
 `BUILD_EXAMPLES` | `ON` | Build examples
 `BUILD_TESTING` | `ON` | Build unit tests
 `BUILD_OMEMO` | `ON` (if libomemo-c found) | Build the [OMEMO module][omemo]

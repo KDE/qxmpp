@@ -58,16 +58,29 @@ Replace `<jid>` and `<password>` with the credentials of the account for connect
 
 ## Documentation
 
-The documentation is generated using Doxygen.
-You can enable it using the CMake option `-DBUILD_DOCUMENTATION=ON` and build it manually using:
+The API documentation is generated with QDoc (the Qt documentation generator)
+via [extra-cmake-modules ≥ 6.11][ecm]. Enable it with `-DBUILD_DOCUMENTATION=ON`
+and build it explicitly:
+
 ```
-make doc
+cmake --build build --target generate_docs_QXmppQt6
 ```
 
-The generated files are located in `doc/html/`.
-You can open `doc/html/index.html` for reading the documentation.
+The output ends up in `build/doc/qdoc/qxmpp/` (override with
+`-DDOC_DESTDIR=...`); open `index.html` to read the docs.
+
+QDoc is used (instead of Doxygen as in earlier QXmpp releases) so that
+[api.kde.org][apikde] can resolve cross-references into the Qt
+documentation.
+
+Use `/*! ... */` blocks (not `///`) for new documentation, refer to
+parameters with `\a paramname` inline in prose (QDoc has no `\param`
+command), and keep custom XEP links via `\xep{NUM}` or `\xep{NUM} (Title)`.
 
 To correctly view the list of supported XEPs, a local webserver is needed, see the [DOAP rendering documentation][doap-rendering] for details.
+
+[ecm]: https://api.kde.org/ecm/
+[apikde]: https://api.kde.org/
 
 ## Copyright
 
