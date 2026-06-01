@@ -23,10 +23,8 @@ public:
     QByteArray data() const;
     void setData(const QByteArray &data);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isOmemoEnvelope(const QDomElement &element);
 

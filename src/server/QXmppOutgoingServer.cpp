@@ -50,12 +50,10 @@ QXmppOutgoingServerPrivate::QXmppOutgoingServerPrivate(QObject *q)
 {
 }
 
-///
-/// Constructs a new outgoing server-to-server stream.
-///
-/// \param domain the local domain
-/// \param parent the parent object
-///
+/*!
+    Constructs a new outgoing server-to-server stream with local domain
+    \a domain and parent object \a parent.
+*/
 QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppOutgoingServerPrivate>(this))
@@ -81,11 +79,9 @@ QXmppOutgoingServer::QXmppOutgoingServer(const QString &domain, QObject *parent)
 
 QXmppOutgoingServer::~QXmppOutgoingServer() = default;
 
-///
-/// Attempts to connect to an XMPP server for the specified \a domain.
-///
-/// \param domain
-///
+/*!
+    Attempts to connect to an XMPP server for the specified \a domain.
+*/
 void QXmppOutgoingServer::connectToHost(const QString &domain)
 {
     d->remoteDomain = domain;
@@ -210,50 +206,58 @@ void QXmppOutgoingServer::handleStanza(const QDomElement &stanza)
     }
 }
 
-/// Returns true if the socket is connected and authentication succeeded.
+/*! Returns true if the socket is connected and authentication succeeded. */
 bool QXmppOutgoingServer::isConnected() const
 {
     return d->socket.isConnected() && d->ready;
 }
 
-/// Disconnects from the remote host.
+/*! Disconnects from the remote host. */
 void QXmppOutgoingServer::disconnectFromHost()
 {
     d->socket.disconnectFromHost();
 }
 
-/// Sends raw data to the peer.
+/*! Sends raw \a data to the peer; returns true on success. */
 bool QXmppOutgoingServer::sendData(const QByteArray &data)
 {
     return d->socket.sendData(data);
 }
 
-/// Sends an XMPP packet to the peer.
+/*!
+    Sends an XMPP packet to the peer; returns true on success.
+
+    \a nonza.
+*/
 bool QXmppOutgoingServer::sendPacket(const QXmppNonza &nonza)
 {
     return d->socket.sendData(serializeXml(nonza));
 }
 
-/// Returns the stream's local dialback key.
+/*! Returns the stream's local dialback key. */
 QString QXmppOutgoingServer::localStreamKey() const
 {
     return d->localStreamKey;
 }
 
-/// Sets the stream's local dialback key.
+/*! Sets the stream's local dialback \a key. */
 void QXmppOutgoingServer::setLocalStreamKey(const QString &key)
 {
     d->localStreamKey = key;
 }
 
-/// Sets the stream's verification information.
+/*!
+    Sets the stream's verification information.
+
+    \a key and \a id.
+*/
 void QXmppOutgoingServer::setVerify(const QString &id, const QString &key)
 {
     d->verifyId = id;
     d->verifyKey = key;
 }
 
-/// Sends or queues data until connected.
+/*! Sends or queues \a data until connected. */
 void QXmppOutgoingServer::queueData(const QByteArray &data)
 {
     if (isConnected()) {
@@ -263,7 +267,7 @@ void QXmppOutgoingServer::queueData(const QByteArray &data)
     }
 }
 
-/// Returns the remote server's domain.
+/*! Returns the remote server's domain. */
 QString QXmppOutgoingServer::remoteDomain() const
 {
     return d->remoteDomain;

@@ -103,11 +103,7 @@ QXmppServerPrivate::QXmppServerPrivate(QXmppServer *qq)
 {
 }
 
-/// Routes XMPP data to the given recipient.
-///
-/// \param to
-/// \param data
-///
+// Routes XMPP \a data to the recipient \a to.
 
 bool QXmppServerPrivate::routeData(const QString &to, const QByteArray &data)
 {
@@ -175,7 +171,7 @@ bool QXmppServerPrivate::routeData(const QString &to, const QByteArray &data)
     }
 }
 
-/// Handles an incoming XML element.
+// Handles an incoming XML element.
 static void handleStanza(QXmppServer *server, const QDomElement &element)
 {
     // try extensions
@@ -240,7 +236,7 @@ void QXmppServerPrivate::warning(const QString &message)
     }
 }
 
-/// Load the server's extensions.
+// Load the server's extensions.
 void QXmppServerPrivate::loadExtensions(QXmppServer *server)
 {
     if (!loaded) {
@@ -260,7 +256,7 @@ void QXmppServerPrivate::loadExtensions(QXmppServer *server)
     }
 }
 
-/// Start the server's extensions.
+// Start the server's extensions.
 void QXmppServerPrivate::startExtensions()
 {
     if (!started) {
@@ -273,7 +269,7 @@ void QXmppServerPrivate::startExtensions()
     }
 }
 
-/// Stop the server's extensions (in reverse order).
+// Stop the server's extensions (in reverse order).
 void QXmppServerPrivate::stopExtensions()
 {
     if (started) {
@@ -284,7 +280,11 @@ void QXmppServerPrivate::stopExtensions()
     }
 }
 
-/// Constructs a new XMPP server instance.
+/*!
+    Constructs a new XMPP server instance.
+
+    \a parent.
+*/
 QXmppServer::QXmppServer(QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppServerPrivate>(this))
@@ -297,7 +297,7 @@ QXmppServer::~QXmppServer()
     close();
 }
 
-/// Registers a new extension with the server.
+/*! Registers a new \a extension with the server. Returns true on success. */
 void QXmppServer::addExtension(QXmppServerExtension *extension)
 {
     if (!extension || d->extensions.contains(extension)) {
@@ -318,20 +318,20 @@ void QXmppServer::addExtension(QXmppServerExtension *extension)
     d->extensions << extension;
 }
 
-/// Returns the list of loaded extensions.
+/*! Returns the list of loaded extensions. */
 QList<QXmppServerExtension *> QXmppServer::extensions()
 {
     d->loadExtensions(this);
     return d->extensions;
 }
 
-/// Returns the server's domain.
+/*! Returns the server's domain. */
 QString QXmppServer::domain() const
 {
     return d->domain;
 }
 
-/// Sets the server's domain.
+/*! Sets the server's \a domain. */
 void QXmppServer::setDomain(const QString &domain)
 {
     d->domain = domain;
@@ -342,7 +342,11 @@ QXmppLogger *QXmppServer::logger()
     return d->logger;
 }
 
-/// Sets the QXmppLogger associated with the server.
+/*!
+    Sets the QXmppLogger associated with the server.
+
+    \a logger.
+*/
 void QXmppServer::setLogger(QXmppLogger *logger)
 {
     if (logger != d->logger) {
@@ -369,19 +373,19 @@ void QXmppServer::setLogger(QXmppLogger *logger)
     }
 }
 
-/// Returns the password checker used to verify client credentials.
+/*! Returns the password checker used to verify client credentials. */
 QXmppPasswordChecker *QXmppServer::passwordChecker()
 {
     return d->passwordChecker;
 }
 
-/// Sets the password checker used to verify client credentials.
+/*! Sets the password \a checker used to verify client credentials. */
 void QXmppServer::setPasswordChecker(QXmppPasswordChecker *checker)
 {
     d->passwordChecker = checker;
 }
 
-/// Returns the statistics for the server.
+/*! Returns the statistics for the server. */
 QVariantMap QXmppServer::statistics() const
 {
     QVariantMap stats;
@@ -392,7 +396,7 @@ QVariantMap QXmppServer::statistics() const
     return stats;
 }
 
-/// Sets the path for additional SSL CA certificates.
+/*! Sets the \a path for additional SSL CA certificates. */
 void QXmppServer::addCaCertificates(const QString &path)
 {
     // load certificates
@@ -414,7 +418,7 @@ void QXmppServer::addCaCertificates(const QString &path)
     }
 }
 
-/// Sets the path for the local SSL certificate.
+/*! Sets the path for the local SSL certificate. */
 void QXmppServer::setLocalCertificate(const QString &path)
 {
     // load certificate
@@ -438,13 +442,11 @@ void QXmppServer::setLocalCertificate(const QString &path)
     }
 }
 
-///
-/// Sets the local SSL certificate
-///
-/// \param certificate
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Sets the local SSL \a certificate.
+
+    \since QXmpp 0.9
+*/
 void QXmppServer::setLocalCertificate(const QSslCertificate &certificate)
 {
     d->localCertificate = certificate;
@@ -458,7 +460,7 @@ void QXmppServer::setLocalCertificate(const QSslCertificate &certificate)
     }
 }
 
-/// Sets the path for the local SSL private key.
+/*! Sets the path for the local SSL private key. */
 void QXmppServer::setPrivateKey(const QString &path)
 {
     // load key
@@ -482,13 +484,11 @@ void QXmppServer::setPrivateKey(const QString &path)
     }
 }
 
-///
-/// Sets the local SSL private key.
-///
-/// \param key
-///
-/// \since QXmpp 0.9
-///
+/*!
+    Sets the local SSL private key to \a key.
+
+    \since QXmpp 0.9
+*/
 void QXmppServer::setPrivateKey(const QSslKey &key)
 {
     d->privateKey = key;
@@ -502,7 +502,11 @@ void QXmppServer::setPrivateKey(const QSslKey &key)
     }
 }
 
-/// Listen for incoming XMPP client connections.
+/*!
+    Listens for incoming XMPP client connections; returns true on success.
+
+    \a port and \a address.
+*/
 bool QXmppServer::listenForClients(const QHostAddress &address, quint16 port)
 {
     bool check;
@@ -536,7 +540,7 @@ bool QXmppServer::listenForClients(const QHostAddress &address, quint16 port)
     return true;
 }
 
-/// Closes the server.
+/*! Closes the server. */
 void QXmppServer::close()
 {
     // prevent new connections
@@ -567,7 +571,11 @@ void QXmppServer::close()
     }
 }
 
-/// Listen for incoming XMPP server connections.
+/*!
+    Listens for incoming XMPP server connections; returns true on success.
+
+    \a port and \a address.
+*/
 bool QXmppServer::listenForServers(const QHostAddress &address, quint16 port)
 {
     bool check;
@@ -601,7 +609,11 @@ bool QXmppServer::listenForServers(const QHostAddress &address, quint16 port)
     return true;
 }
 
-/// Route an XMPP stanza.
+/*!
+    Routes an XMPP stanza; returns true on success.
+
+    \a element.
+*/
 bool QXmppServer::sendElement(const QDomElement &element)
 {
     // serialize data
@@ -613,7 +625,7 @@ bool QXmppServer::sendElement(const QDomElement &element)
     return d->routeData(element.attribute(u"to"_s), data);
 }
 
-/// Route an XMPP packet.
+/*! Routes an XMPP \a packet; returns true on success. */
 bool QXmppServer::sendPacket(const QXmppStanza &packet)
 {
     // serialize data
@@ -625,12 +637,12 @@ bool QXmppServer::sendPacket(const QXmppStanza &packet)
     return d->routeData(packet.to(), data);
 }
 
-///
-/// Add a new incoming client \a stream.
-///
-/// This method can be used for instance to implement BOSH support
-/// as a server extension.
-///
+/*!
+    Add a new incoming client \a stream.
+
+    This method can be used for instance to implement BOSH support
+    as a server extension.
+*/
 void QXmppServer::addIncomingClient(QXmppIncomingClient *stream)
 {
 
@@ -645,7 +657,7 @@ void QXmppServer::addIncomingClient(QXmppIncomingClient *stream)
     Q_EMIT setGauge(u"incoming-client.count"_s, d->incomingClients.size());
 }
 
-/// Handle a new incoming TCP connection from a client.
+/*! Handle a new incoming TCP connection from a client. */
 void QXmppServer::_q_clientConnection(QSslSocket *socket)
 {
     // check the socket didn't die since the signal was emitted
@@ -660,7 +672,7 @@ void QXmppServer::_q_clientConnection(QSslSocket *socket)
     addIncomingClient(stream);
 }
 
-/// Handle a successful stream connection for a client.
+/*! Handle a successful stream connection for a client. */
 void QXmppServer::_q_clientConnected()
 {
     auto *client = qobject_cast<QXmppIncomingClient *>(sender());
@@ -684,7 +696,7 @@ void QXmppServer::_q_clientConnected()
     Q_EMIT clientConnected(jid);
 }
 
-/// Handle a stream disconnection for a client.
+/*! Handle a stream disconnection for a client. */
 void QXmppServer::_q_clientDisconnected()
 {
     auto *client = qobject_cast<QXmppIncomingClient *>(sender());
@@ -748,13 +760,13 @@ void QXmppServer::_q_dialbackRequestReceived(const QXmppDialback &dialback)
     }
 }
 
-/// Handle an incoming XML element.
+/*! Handle an incoming XML \a element. */
 void QXmppServer::handleElement(const QDomElement &element)
 {
     handleStanza(this, element);
 }
 
-/// Handle a stream disconnection for an outgoing server.
+/*! Handle a stream disconnection for an outgoing server. */
 void QXmppServer::_q_outgoingServerDisconnected()
 {
     auto *outgoing = qobject_cast<QXmppOutgoingServer *>(sender());
@@ -768,7 +780,7 @@ void QXmppServer::_q_outgoingServerDisconnected()
     }
 }
 
-/// Handle a new incoming TCP connection from a server.
+/*! Handle a new incoming TCP connection from a server. */
 void QXmppServer::_q_serverConnection(QSslSocket *socket)
 {
 
@@ -795,7 +807,7 @@ void QXmppServer::_q_serverConnection(QSslSocket *socket)
     Q_EMIT setGauge(u"incoming-server.count"_s, d->incomingServers.size());
 }
 
-/// Handle a stream disconnection for an incoming server.
+/*! Handle a stream disconnection for an incoming server. */
 void QXmppServer::_q_serverDisconnected()
 {
     auto *incoming = qobject_cast<QXmppIncomingServer *>(sender());
@@ -817,7 +829,11 @@ public:
     QSslKey privateKey;
 };
 
-/// Constructs a new SSL server instance.
+/*!
+    Constructs a new SSL server instance.
+
+    \a parent.
+*/
 QXmppSslServer::QXmppSslServer(QObject *parent)
     : QTcpServer(parent),
       d(std::make_unique<QXmppSslServerPrivate>())
@@ -846,22 +862,24 @@ void QXmppSslServer::incomingConnection(qintptr socketDescriptor)
     Q_EMIT newConnection(socket);
 }
 
-///
-/// Adds the given certificates to the CA certificate database to be used
-/// for incoming connections.
-///
+/*!
+    Adds the given certificates to the CA certificate database to be used
+    for incoming connections.
+
+    \a certificates.
+*/
 void QXmppSslServer::addCaCertificates(const QList<QSslCertificate> &certificates)
 {
     d->caCertificates += certificates;
 }
 
-/// Sets the local certificate to be used for incoming connections.
+/*! Sets the local \a certificate to be used for incoming connections. */
 void QXmppSslServer::setLocalCertificate(const QSslCertificate &certificate)
 {
     d->localCertificate = certificate;
 }
 
-/// Sets the local private key to be used for incoming connections.
+/*! Sets the local private \a key to be used for incoming connections. */
 void QXmppSslServer::setPrivateKey(const QSslKey &key)
 {
     d->privateKey = key;

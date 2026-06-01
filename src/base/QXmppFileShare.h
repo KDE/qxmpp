@@ -78,7 +78,6 @@ public:
     const QVector<QXmppEncryptedFileSource> &encryptedSources() const;
     void setEncryptedSourecs(const QVector<QXmppEncryptedFileSource> &newEncryptedSources);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"file-sharing", QXmpp::Private::ns_sfs };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
@@ -90,7 +89,6 @@ protected:
     // Private, internally used API:
     void visitSources(std::function<bool(const std::any &)> &&visitor) const;
     void addSource(const std::any &source);
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppFileSharePrivate> d;

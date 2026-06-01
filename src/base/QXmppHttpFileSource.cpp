@@ -15,18 +15,19 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppHttpFileSource
-///
-/// Represents an HTTP File source for file sharing.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppHttpFileSource
+    \inmodule QXmpp
 
-/// Default constructor.
+    Represents an HTTP File source for file sharing.
+
+    \since QXmpp 1.5
+*/
+
+/*! Default constructor. */
 QXmppHttpFileSource::QXmppHttpFileSource() = default;
 
-/// Default constructor.
+/*! Default constructor. */
 QXmppHttpFileSource::QXmppHttpFileSource(QUrl url)
     : m_url(std::move(url))
 {
@@ -34,23 +35,18 @@ QXmppHttpFileSource::QXmppHttpFileSource(QUrl url)
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppHttpFileSource)
 
-///
-/// Returns the HTTP url.
-///
+/*! Returns the HTTP url. */
 const QUrl &QXmppHttpFileSource::url() const
 {
     return m_url;
 }
 
-///
-/// Sets the HTTP url.
-///
+/*! Sets the HTTP \a url. */
 void QXmppHttpFileSource::setUrl(QUrl url)
 {
     m_url = std::move(url);
 }
 
-/// \cond
 bool QXmppHttpFileSource::parse(const QDomElement &el)
 {
     if (el.tagName() == u"url-data" && el.namespaceURI() == ns_url_data) {
@@ -64,4 +60,3 @@ void QXmppHttpFileSource::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { XmlTag, Attribute { u"target", m_url } });
 }
-/// \endcond

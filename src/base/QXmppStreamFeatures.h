@@ -15,10 +15,12 @@ namespace QXmpp::Private::Sasl2 {
 struct StreamFeature;
 }
 
-///
-/// \brief The QXmppStreamFeatures class represents the features returned by an
-/// XMPP server or client.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppStreamFeatures class represents the features returned by an
+    XMPP server or client.
+*/
 class QXMPP_EXPORT QXmppStreamFeatures : public QXmppNonza
 {
 public:
@@ -30,7 +32,13 @@ public:
     QXmppStreamFeatures &operator=(const QXmppStreamFeatures &);
     QXmppStreamFeatures &operator=(QXmppStreamFeatures &&);
 
-    /// Mode of a feature
+    /*!
+        Mode of a feature
+
+        \value Disabled
+        \value Enabled
+        \value Required
+    */
     enum Mode {
         Disabled = 0,
         Enabled,
@@ -73,12 +81,10 @@ public:
     bool rosterVersioningSupported() const;
     void setRosterVersioningSupported(bool);
 
-    /// \cond
     void parse(const QDomElement &element) override;
     void toXml(QXmlStreamWriter *writer) const override;
 
     static bool isStreamFeatures(const QDomElement &element);
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppStreamFeaturesPrivate> d;

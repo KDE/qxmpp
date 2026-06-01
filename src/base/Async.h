@@ -115,7 +115,7 @@ struct AttachableRequests {
 
     std::vector<Request> requests;
 
-    /// Find existing request and attach if found.
+    /*! Find existing request and attach if found. */
     std::optional<QXmppTask<Response>> attach(const Params &key)
     {
         auto itr = std::ranges::find(requests, key, &Request::params);

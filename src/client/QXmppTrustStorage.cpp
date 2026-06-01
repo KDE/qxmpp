@@ -2,200 +2,155 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-///
-/// \class QXmppTrustStorage
-///
-/// \brief The QXmppTrustStorage class stores end-to-end encryption trust data.
-///
-/// The term "key" is used for a public long-term key.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppTrustStorage
+    \inmodule QXmpp
 
-///
-/// \fn QXmppTrustStorage::setSecurityPolicy(const QString &encryption, QXmpp::SecurityPolicy securityPolicy)
-///
-/// Sets the security policy for an encryption protocol.
-///
-/// \param encryption encryption protocol namespace
-/// \param securityPolicy security policy being applied
-///
+    \brief The QXmppTrustStorage class stores end-to-end encryption trust data.
 
-///
-/// \fn QXmppTrustStorage::resetSecurityPolicy(const QString &encryption)
-///
-/// Resets the security policy for an encryption protocol.
-///
-/// \param encryption encryption protocol namespace
-///
+    The term "key" is used for a public long-term key.
 
-///
-/// \fn QXmppTrustStorage::securityPolicy(const QString &encryption)
-///
-/// Returns the security policy for an encryption protocol.
-///
-/// \param encryption encryption protocol namespace
-///
-/// \return the set security policy
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \fn QXmppTrustStorage::setOwnKey(const QString &encryption, const QByteArray &keyId)
-///
-/// Sets the own key (i.e., the key used by this client instance) for an
-/// encryption protocol.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyId ID of the key
-///
+/*!
+    \fn QXmppTask<void> QXmppTrustStorage::setSecurityPolicy(const QString &encryption, QXmpp::TrustSecurityPolicy securityPolicy)
 
-///
-/// \fn QXmppTrustStorage::resetOwnKey(const QString &encryption)
-///
-/// Resets the own key (i.e., the key used by this client instance) for an
-/// encryption protocol.
-///
-/// \param encryption encryption protocol namespace
-///
+    Sets the security policy \a securityPolicy for the encryption protocol
+    namespace \a encryption.
+*/
 
-///
-/// \fn QXmppTrustStorage::ownKey(const QString &encryption)
-///
-/// Returns the own key (i.e., the key used by this client instance) for an
-/// encryption protocol.
-///
-/// \param encryption encryption protocol namespace
-///
-/// \return the ID of the own key
-///
+/*!
+    \fn QXmppTrustStorage::resetSecurityPolicy(const QString &encryption)
 
-///
-/// \fn QXmppTrustStorage::addKeys(const QString &encryption, const QString &keyOwnerJid, const QList<QByteArray> &keyIds, QXmpp::TrustLevel trustLevel)
-///
-/// Adds keys.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJid key owner's bare JID
-/// \param keyIds IDs of the keys
-/// \param trustLevel trust level of the keys
-///
+    Resets the security policy for the encryption protocol namespace
+    \a encryption.
+*/
 
-///
-/// \fn QXmppTrustStorage::removeKeys(const QString &encryption, const QList<QByteArray> &keyIds)
-///
-/// Removes keys.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyIds IDs of the keys
-///
+/*!
+    \fn QXmppTrustStorage::securityPolicy(const QString &encryption)
 
-///
-/// \fn QXmppTrustStorage::removeKeys(const QString &encryption, const QString &keyOwnerJid)
-///
-/// Removes all keys of a key owner.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJid key owner's bare JID
-///
+    Returns the security policy for the encryption protocol namespace
+    \a encryption.
+*/
 
-///
-/// \fn QXmppTrustStorage::removeKeys(const QString &encryption)
-///
-/// Removes all keys for encryption.
-///
-/// \param encryption encryption protocol namespace
-///
+/*!
+    \fn QXmppTrustStorage::setOwnKey(const QString &encryption, const QByteArray &keyId)
 
-///
-/// \fn QXmppTrustStorage::keys(const QString &encryption, QXmpp::TrustLevels trustLevels = {})
-///
-/// Returns the JIDs of all key owners mapped to the IDs of their keys with
-/// specific trust levels.
-///
-/// If no trust levels are passed, all keys for encryption are returned.
-///
-/// \param encryption encryption protocol namespace
-/// \param trustLevels trust levels of the keys
-///
-/// \return the key owner JIDs mapped to their keys with specific trust levels
-///
+    Sets the own key (i.e., the key used by this client instance) for the
+    encryption protocol namespace \a encryption to the key with ID \a keyId.
+*/
 
-///
-/// \fn QXmppTrustStorage::keys(const QString &encryption, const QList<QString> &keyOwnerJids, QXmpp::TrustLevels trustLevels = {})
-///
-/// Returns the IDs of keys mapped to their trust levels for specific key
-/// owners.
-///
-/// If no trust levels are passed, all keys for encryption and keyOwnerJids are
-/// returned.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJids key owners' bare JIDs
-/// \param trustLevels trust levels of the keys
-///
-/// \return the key IDs mapped to their trust levels for specific key owners
-///
+/*!
+    \fn QXmppTrustStorage::resetOwnKey(const QString &encryption)
 
-///
-/// \fn QXmppTrustStorage::hasKey(const QString &encryption, const QString &keyOwnerJid, QXmpp::TrustLevels trustLevels)
-///
-/// Returns whether at least one key of a key owner with a specific trust level
-/// is stored.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJid key owner's bare JID
-/// \param trustLevels possible trust levels of the key
-///
-/// \return whether a key of the key owner with a passed trust level is stored
-///
+    Resets the own key (i.e., the key used by this client instance) for the
+    encryption protocol namespace \a encryption.
+*/
 
-///
-/// \fn QXmppTrustStorage::setTrustLevel(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIds, QXmpp::TrustLevel trustLevel)
-///
-/// Sets the trust level of keys.
-///
-/// If a key is not stored, it is added to the storage.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyIds key owners' bare JIDs mapped to the IDs of their keys
-/// \param trustLevel trust level being set
-///
-/// \return the key owner JIDs mapped to their modified keys for specific
-///         encryption protocols
-///
+/*!
+    \fn QXmppTrustStorage::ownKey(const QString &encryption)
 
-///
-/// \fn QXmppTrustStorage::setTrustLevel(const QString &encryption, const QList<QString> &keyOwnerJids, QXmpp::TrustLevel oldTrustLevel, QXmpp::TrustLevel newTrustLevel)
-///
-/// Sets the trust level of keys specified by their key owner and trust level.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJids key owners' bare JIDs
-/// \param oldTrustLevel trust level being changed
-/// \param newTrustLevel trust level being set
-///
-/// \return the key owner JIDs mapped to their modified keys for specific
-///         encryption protocols
-///
+    Returns the ID of the own key (i.e., the key used by this client instance)
+    for the encryption protocol namespace \a encryption.
+*/
 
-///
-/// \fn QXmppTrustStorage::trustLevel(const QString &encryption, const QString &keyOwnerJid, const QByteArray &keyId)
-///
-/// Returns the trust level of a key.
-///
-/// If the key is not stored, the trust in that key is undecided.
-///
-/// \param encryption encryption protocol namespace
-/// \param keyOwnerJid key owner's bare JID
-/// \param keyId ID of the key
-///
-/// \return the key's trust level
-///
+/*!
+    \fn QXmppTrustStorage::addKeys(const QString &encryption, const QString &keyOwnerJid, const QList<QByteArray> &keyIds, QXmpp::TrustLevel trustLevel)
 
-///
-/// \fn QXmppTrustStorage::resetAll(const QString &encryption)
-///
-/// Resets all data for encryption.
-///
-/// \param encryption encryption protocol namespace
-///
+    Adds keys.
+
+    \a encryption is the encryption protocol namespace. \a keyOwnerJid is the
+    key owner's bare JID. \a keyIds are the IDs of the keys. \a trustLevel is
+    the trust level of the keys.
+*/
+
+/*!
+    \fn QXmppTrustStorage::removeKeys(const QString &encryption, const QList<QByteArray> &keyIds)
+
+    Removes the keys with IDs \a keyIds for the encryption protocol namespace
+    \a encryption.
+*/
+
+/*!
+    \fn QXmppTrustStorage::removeKeys(const QString &encryption, const QString &keyOwnerJid)
+
+    Removes all keys of the key owner with bare JID \a keyOwnerJid for the
+    encryption protocol namespace \a encryption.
+*/
+
+/*!
+    \fn QXmppTrustStorage::removeKeys(const QString &encryption)
+
+    Removes all keys for the encryption protocol namespace \a encryption.
+*/
+
+/*!
+    \fn QXmppTrustStorage::keys(const QString &encryption, QXmpp::TrustLevels trustLevels = {})
+
+    Returns the JIDs of all key owners mapped to the IDs of their keys with the
+    trust levels \a trustLevels for the encryption protocol namespace
+    \a encryption.
+
+    If no trust levels are passed, all keys for \a encryption are returned.
+*/
+
+/*!
+    \fn QXmppTrustStorage::keys(const QString &encryption, const QList<QString> &keyOwnerJids, QXmpp::TrustLevels trustLevels = {})
+
+    Returns the IDs of keys mapped to their trust levels for the key owners
+    with bare JIDs \a keyOwnerJids and the encryption protocol namespace
+    \a encryption, restricted to the trust levels \a trustLevels.
+
+    If no trust levels are passed, all keys for \a encryption and
+    \a keyOwnerJids are returned.
+*/
+
+/*!
+    \fn QXmppTrustStorage::hasKey(const QString &encryption, const QString &keyOwnerJid, QXmpp::TrustLevels trustLevels)
+
+    Returns whether at least one key of the key owner with bare JID
+    \a keyOwnerJid and one of the possible trust levels \a trustLevels is
+    stored for the encryption protocol namespace \a encryption.
+*/
+
+/*!
+    \fn QXmppTrustStorage::setTrustLevel(const QString &encryption, const QMultiHash<QString, QByteArray> &keyIds, QXmpp::TrustLevel trustLevel)
+
+    Sets the trust level \a trustLevel of keys for the encryption protocol
+    namespace \a encryption. \a keyIds maps key owners' bare JIDs to the IDs
+    of their keys.
+
+    If a key is not stored, it is added to the storage.
+
+    Returns the key owner JIDs mapped to their modified keys for specific
+    encryption protocols.
+*/
+
+/*!
+    \fn QXmppTrustStorage::setTrustLevel(const QString &encryption, const QList<QString> &keyOwnerJids, QXmpp::TrustLevel oldTrustLevel, QXmpp::TrustLevel newTrustLevel)
+
+    Sets the trust level of keys specified by their key owner and trust level.
+
+    \a encryption is the encryption protocol namespace. \a keyOwnerJids are the
+    key owners' bare JIDs. \a oldTrustLevel is the trust level being changed.
+    \a newTrustLevel is the trust level being set.
+
+    Returns the key owner JIDs mapped to their modified keys for specific
+    encryption protocols.
+*/
+
+/*!
+    \fn QXmppTrustStorage::trustLevel(const QString &encryption, const QString &keyOwnerJid, const QByteArray &keyId)
+
+    Returns the trust level of the key with ID \a keyId, owned by the JID
+    \a keyOwnerJid, for the encryption protocol namespace \a encryption.
+
+    If the key is not stored, the trust in that key is undecided.
+*/
+
+/*!
+    \fn QXmppTrustStorage::resetAll(const QString &encryption)
+
+    Resets all data for the encryption protocol namespace \a encryption.
+*/

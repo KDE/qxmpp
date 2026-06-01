@@ -22,13 +22,14 @@ using namespace QXmpp::Private;
 
 constexpr auto ENCRYPTION_DEFAULT_CIPHER = Aes256CbcPkcs7;
 
-///
-/// \class QXmppEncryptedFileSharingProvider
-///
-/// Encrypts or decrypts files on the fly when uploading or downloading.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppEncryptedFileSharingProvider
+    \inmodule QXmpp
+
+    Encrypts or decrypts files on the fly when uploading or downloading.
+
+    \since QXmpp 1.5
+*/
 
 class QXmppEncryptedFileSharingProviderPrivate
 {
@@ -37,13 +38,13 @@ public:
     std::shared_ptr<QXmppFileSharingProvider> uploadBaseProvider;
 };
 
-///
-/// \brief Create a new QXmppEncryptedFileSharingProvider
-///
-/// \param manager QXmppFileSharingManager to be used to find other providers for downloading
-/// encrypted files.
-/// \param uploadBaseProvider Provider to be used for uploading the encrypted files.
-///
+/*!
+    \brief Create a new QXmppEncryptedFileSharingProvider.
+
+    \a manager is the QXmppFileSharingManager to be used to find other providers for
+    downloading encrypted files. \a uploadBaseProvider is the provider to be used for uploading
+    the encrypted files.
+*/
 QXmppEncryptedFileSharingProvider::QXmppEncryptedFileSharingProvider(
     QXmppFileSharingManager *manager,
     std::shared_ptr<QXmppFileSharingProvider> uploadBaseProvider)

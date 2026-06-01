@@ -14,12 +14,35 @@
 
 namespace QXmpp::Disco {
 
-///
-/// \brief Service discovery identity category as registered at
-/// https://xmpp.org/registrar/disco-categories.html
-///
-/// \since QXmpp 1.16
-///
+/*!
+    \namespace QXmpp::Disco
+    \inmodule QXmpp
+
+    Contains types for \xep{0030}{Service Discovery}.
+*/
+
+/*!
+    \brief Service discovery identity category as registered at
+    https://xmpp.org/registrar/disco-categories.html
+
+    \since QXmpp 1.16
+
+    \value Account
+    \value Auth
+    \value Automation
+    \value Client
+    \value Collaboration
+    \value Component
+    \value Conference
+    \value Directory
+    \value Gateway
+    \value Headline
+    \value Hierarchy
+    \value Proxy
+    \value PubSub
+    \value Server
+    \value Store
+*/
 enum class Category {
     Account,
     Auth,
@@ -38,15 +61,33 @@ enum class Category {
     Store,
 };
 
-///
-/// \brief Service discovery identity type as registered at
-/// https://xmpp.org/registrar/disco-categories.html
-///
-/// Note: not all category/type combinations are valid. See the registry for
-/// valid combinations.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    \brief Service discovery identity type as registered at
+    https://xmpp.org/registrar/disco-categories.html
+
+    Note: not all category/type combinations are valid. See the registry for
+    valid combinations.
+
+    \since QXmpp 1.16
+
+    \value Bot
+    \value Console
+    \value Game
+    \value Handheld
+    \value Pc
+    \value Phone
+    \value Sms
+    \value Tablet
+    \value Web
+    \value Irc
+    \value Mix
+    \value Text
+    \value Collection
+    \value Leaf
+    \value Pep
+    \value Service
+    \value File
+*/
 enum class Type {
     // client
     Bot,
@@ -83,30 +124,40 @@ class QXMPP_EXPORT QXmppDiscoItem
 {
 public:
     QXmppDiscoItem() { }
-    /// Default constructor
+    /*! Default constructor */
     explicit QXmppDiscoItem(const QString &jid, const QString &name = {}, const QString &node = {})
         : m_jid(jid), m_name(name), m_node(node) { }
 
-    /// Returns the JID of the item.
+    /*! Returns the JID of the item. */
     const QString &jid() const { return m_jid; }
-    /// Sets the JID of the item.
+    /*!
+        Sets the JID of the item.
+
+        \a newJid.
+    */
     void setJid(const QString &newJid) { m_jid = newJid; }
 
-    /// Returns the name of the item.
+    /*! Returns the name of the item. */
     const QString &name() const { return m_name; }
-    /// Sets the name of the item.
+    /*!
+        Sets the name of the item.
+
+        \a newName.
+    */
     void setName(const QString &newName) { m_name = newName; }
 
-    /// Returns the node for querying the information.
+    /*! Returns the node for querying the information. */
     const QString &node() const { return m_node; }
-    /// Sets the node for querying the information.
+    /*!
+        Sets the node for querying the information.
+
+        \a newNode.
+    */
     void setNode(const QString &newNode) { m_node = newNode; }
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_disco_items };
     static std::optional<QXmppDiscoItem> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QString m_jid;
@@ -118,25 +169,31 @@ class QXMPP_EXPORT QXmppDiscoItems
 {
 public:
     QXmppDiscoItems() { }
-    /// Default constructor
+    /*! Default constructor */
     explicit QXmppDiscoItems(const QString &node, const QList<QXmppDiscoItem> &items = {})
         : m_node(node), m_items(items) { }
 
-    /// Returns the items.
+    /*! Returns the items. */
     const QList<QXmppDiscoItem> &items() const { return m_items; }
-    /// Sets the items.
+    /*!
+        Sets the items.
+
+        \a newItems.
+    */
     void setItems(const QList<QXmppDiscoItem> &newItems) { m_items = newItems; }
 
-    /// Returns the node of the query.
+    /*! Returns the node of the query. */
     const QString &node() const { return m_node; }
-    /// Sets the node of the query.
+    /*!
+        Sets the node of the query.
+
+        \a newNode.
+    */
     void setNode(const QString &newNode) { m_node = newNode; }
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"query", QXmpp::Private::ns_disco_items };
     static std::optional<QXmppDiscoItems> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QList<QXmppDiscoItem> m_items;
@@ -147,53 +204,63 @@ class QXMPP_EXPORT QXmppDiscoIdentity
 {
 public:
     QXmppDiscoIdentity() { }
-    /// Default constructor
+    /*! Default constructor */
     explicit QXmppDiscoIdentity(const QString &category, const QString &type = {}, const QString &name = {}, const QString &lang = {})
         : m_category(category), m_type(type), m_name(name), m_language(lang) { }
 
-    /// Returns the category of the identity.
+    /*! Returns the category of the identity. */
     const QString &category() const { return m_category; }
-    /// Sets the category of the identity.
+    /*!
+        Sets the category of the identity.
+
+        \a newCategory.
+    */
     void setCategory(const QString &newCategory) { m_category = newCategory; }
 
-    ///
-    /// Returns the service type in this category.
-    ///
-    /// See https://xmpp.org/registrar/disco-categories.html for details.
-    ///
+    /*!
+        Returns the service type in this category.
+
+        See https://xmpp.org/registrar/disco-categories.html for details.
+    */
     const QString &type() const { return m_type; }
-    ///
-    /// Sets the service type in this category.
-    ///
-    /// See https://xmpp.org/registrar/disco-categories.html for details.
-    ///
+    /*!
+        Sets the service type in this category.
+
+        See https://xmpp.org/registrar/disco-categories.html for details.
+
+        \a newType.
+    */
     void setType(const QString &newType) { m_type = newType; }
 
-    /// Returns the human-readable name of the service.
+    /*! Returns the human-readable name of the service. */
     const QString &name() const { return m_name; }
-    /// Sets the human-readable name of the service.
+    /*!
+        Sets the human-readable name of the service.
+
+        \a newName.
+    */
     void setName(const QString &newName) { m_name = newName; }
 
-    ///
-    /// Returns the xml:lang code of the name.
-    ///
-    /// It is possible that the same identity (same type and same category) is
-    /// included multiple times with different languages and localized names.
-    ///
+    /*!
+        Returns the xml:lang code of the name.
+
+        It is possible that the same identity (same type and same category) is
+        included multiple times with different languages and localized names.
+    */
     const QString &language() const { return m_language; }
-    ///
-    /// Sets the xml:lang code of the name.
-    ///
-    /// It is possible that the same identity (same type and same category) is
-    /// included multiple times with different languages and localized names.
-    ///
+    /*!
+        Sets the xml:lang code of the name.
+
+        It is possible that the same identity (same type and same category) is
+        included multiple times with different languages and localized names.
+
+        \a newLanguage.
+    */
     void setLanguage(const QString &newLanguage) { m_language = newLanguage; }
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"identity", QXmpp::Private::ns_disco_info };
     static std::optional<QXmppDiscoIdentity> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QString m_category;
@@ -206,33 +273,49 @@ class QXMPP_EXPORT QXmppDiscoInfo
 {
 public:
     QXmppDiscoInfo() { }
-    /// Default constructor
+    /*! Default constructor */
     explicit QXmppDiscoInfo(const QString &node, const QList<QXmppDiscoIdentity> &identities = {}, const QList<QString> &features = {}, const QList<QXmppDataForm> &dataForms = {})
         : m_node(node), m_identities(identities), m_features(features), m_dataForms(dataForms) { }
 
-    /// Returns the node of the query.
+    /*! Returns the node of the query. */
     const QString &node() const { return m_node; }
-    /// Sets the node of the query.
+    /*!
+        Sets the node of the query.
+
+        \a newNode.
+    */
     void setNode(const QString &newNode) { m_node = newNode; }
 
-    /// Returns the identities of the entity.
+    /*! Returns the identities of the entity. */
     const QList<QXmppDiscoIdentity> &identities() const { return m_identities; }
-    /// Sets the identities of the entity.
+    /*!
+        Sets the identities of the entity.
+
+        \a newIdentities.
+    */
     void setIdentities(const QList<QXmppDiscoIdentity> &newIdentities) { m_identities = newIdentities; }
 
-    /// Returns the features supported by the entity.
+    /*! Returns the features supported by the entity. */
     const QList<QString> &features() const { return m_features; }
-    /// Sets the features supported by the entity.
+    /*!
+        Sets the features supported by the entity.
+
+        \a newFeatures.
+    */
     void setFeatures(const QList<QString> &newFeatures) { m_features = newFeatures; }
 
-    /// Returns additional data forms as specified in \xep{0128, Service Discovery Extensions}.
+    /*! Returns additional data forms as specified in \xep{0128}{Service Discovery Extensions}. */
     const QList<QXmppDataForm> &dataForms() const { return m_dataForms; }
-    /// Sets additional data forms as specified in \xep{0128, Service Discovery Extensions}.
-    /// Forms MUST have a FORM_TYPE and each FORM_TYPE MUST occur only once.
+    /*!
+        Sets additional data forms as specified in \xep{0128}{Service Discovery Extensions}.
+        Forms MUST have a FORM_TYPE and each FORM_TYPE MUST occur only once.
+
+        \a newDataForms.
+    */
     void setDataForms(const QList<QXmppDataForm> &newDataForms) { m_dataForms = newDataForms; }
     std::optional<QXmppDataForm> dataForm(QStringView formType) const;
 
-    /// Looks for a form with the form type of FormType and parses it if found.
+    /*! Looks for a form with the form type of FormType and parses it if found. */
     template<QXmpp::Private::DataFormConvertible FormType>
     std::optional<FormType> dataForm() const
     {
@@ -246,11 +329,9 @@ public:
 
     QByteArray calculateEntityCapabilitiesHash() const;
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"query", QXmpp::Private::ns_disco_info };
     static std::optional<QXmppDiscoInfo> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QString m_node;
@@ -259,17 +340,19 @@ private:
     QList<QXmppDataForm> m_dataForms;
 };
 
-///
-/// \brief A discovered service with its JID and disco info.
-///
-/// Returned by QXmppDiscoServicesWatch when discovering server services.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    \inmodule QXmpp
+
+    \brief A discovered service with its JID and disco info.
+
+    Returned by QXmppDiscoServicesWatch when discovering server services.
+
+    \since QXmpp 1.16
+*/
 struct QXMPP_EXPORT QXmppDiscoService {
-    /// JID of the service.
+    /*! JID of the service. */
     QString jid;
-    /// Service discovery information of the service.
+    /*! Service discovery information of the service. */
     QXmppDiscoInfo info;
 };
 
@@ -277,9 +360,17 @@ struct QXMPP_EXPORT QXmppDiscoService {
 class QXMPP_EXPORT QXmppDiscoveryIq : public QXmppIq
 {
 public:
-    /// Alias for backwards-compatibility
+    /*!
+        \typealias QXmppDiscoveryIq::Identity
+
+        Alias for backwards-compatibility.
+    */
     using Identity [[deprecated]] = QXmppDiscoIdentity;
-    /// Alias for backwards-compatibility
+    /*!
+        \typealias QXmppDiscoveryIq::Item
+
+        Alias for backwards-compatibility.
+    */
     using Item [[deprecated]] = QXmppDiscoItem;
 
     [[deprecated("Use QXmppDiscoInfo/Items")]]
@@ -309,8 +400,10 @@ public:
     void setDataForms(const QList<QXmppDataForm> &dataForms);
     std::optional<QXmppDataForm> dataForm(QStringView formType) const;
 
-    /// Looks for a form with the form type of FormT and parses it if found.
-    /// \since QXmpp 1.12
+    /*!
+        Looks for a form with the form type of FormT and parses it if found.
+        \since QXmpp 1.12
+    */
     template<QXmpp::Private::DataFormConvertible FormT>
     std::optional<FormT> dataForm() const
     {
@@ -330,7 +423,6 @@ public:
 
     QByteArray verificationString() const;
 
-    /// \cond
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isDiscoveryIq(const QDomElement &element);
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
@@ -338,7 +430,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppDiscoveryIqPrivate> d;

@@ -43,9 +43,7 @@ public:
     QString subject;
 };
 
-///
-/// Constructs a new QXmppMucManager.
-///
+/*! Constructs a new QXmppMucManager. */
 QXmppMucManager::QXmppMucManager()
     : d(std::make_unique<QXmppMucManagerPrivate>())
 {
@@ -53,9 +51,9 @@ QXmppMucManager::QXmppMucManager()
 
 QXmppMucManager::~QXmppMucManager() = default;
 
-/// Adds the given chat room to the set of managed rooms.
-///
-/// \param roomJid
+/*!
+    Adds the chat room with bare JID \a roomJid to the set of managed rooms.
+*/
 
 QXmppMucRoom *QXmppMucManager::addRoom(const QString &roomJid)
 {
@@ -77,7 +75,6 @@ QList<QXmppMucRoom *> QXmppMucManager::rooms() const
     return d->rooms.values();
 }
 
-/// \cond
 QStringList QXmppMucManager::discoveryFeatures() const
 {
     // XEP-0045: Multi-User Chat
@@ -136,7 +133,6 @@ void QXmppMucManager::onUnregistered(QXmppClient *client)
     disconnect(client, &QXmppClient::messageReceived,
                this, &QXmppMucManager::_q_messageReceived);
 }
-/// \endcond
 
 void QXmppMucManager::_q_messageReceived(const QXmppMessage &msg)
 {
@@ -157,9 +153,9 @@ void QXmppMucManager::_q_roomDestroyed(QObject *object)
     d->rooms.remove(key);
 }
 
-/// Constructs a new QXmppMucRoom.
-///
-/// \param parent
+/*!
+    Constructs a new QXmppMucRoom with the given \a parent.
+*/
 
 QXmppMucRoom::QXmppMucRoom(QXmppClient *client, const QString &jid, QObject *parent)
     : QObject(parent),
@@ -191,13 +187,14 @@ QXmppMucRoom::Actions QXmppMucRoom::allowedActions() const
     return d->allowedActions;
 }
 
-///
-/// Bans the specified user from the chat room.
-///
-/// The specified \a jid is the Bare JID of the form "user@host".
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Bans the specified user from the chat room.
+
+    The specified \a jid is the Bare JID of the form "user@host". \a reason gives the reason
+    for the ban.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::ban(const QString &jid, const QString &reason)
 {
     if (!QXmppUtils::jidToResource(jid).isEmpty()) {
@@ -228,11 +225,11 @@ QString QXmppMucRoom::jid() const
     return d->jid;
 }
 
-///
-/// Joins the chat room.
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Joins the chat room.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::join()
 {
     if (isJoined() || d->nickName.isEmpty()) {
@@ -248,13 +245,14 @@ bool QXmppMucRoom::join()
     return d->client->sendLegacy(packet);
 }
 
-///
-/// Kicks the specified user from the chat room.
-///
-/// The specified \a jid is the Occupant JID of the form "room@service/nick".
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Kicks the specified user from the chat room.
+
+    The specified \a jid is the Occupant JID of the form "room@service/nick". \a reason gives
+    the reason for the kick.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::kick(const QString &jid, const QString &reason)
 {
     QXmppMucItem item;
@@ -270,13 +268,11 @@ bool QXmppMucRoom::kick(const QString &jid, const QString &reason)
     return d->client->sendLegacy(iq);
 }
 
-///
-/// Leaves the chat room.
-///
-/// \param message An optional message.
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Leaves the chat room with an optional \a message.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::leave(const QString &message)
 {
     QXmppPresence packet;
@@ -296,14 +292,11 @@ QString QXmppMucRoom::nickName() const
     return d->nickName;
 }
 
-///
-/// Invites a user to the chat room.
-///
-/// \param jid
-/// \param reason
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Invites the user with JID \a jid to the chat room with the given \a reason.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::sendInvitation(const QString &jid, const QString &reason)
 {
     QXmppMessage message;
@@ -314,15 +307,15 @@ bool QXmppMucRoom::sendInvitation(const QString &jid, const QString &reason)
     return d->client->sendLegacy(message);
 }
 
-///
-/// Sends a message to the room.
-///
-/// This is just a helper function, you can as well also send a message to the
-/// channel manually by setting the message type to 'groupchat' and addressing
-/// the JID of the MUC room.
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Sends a message with body \a text to the room.
+
+    This is just a helper function, you can as well also send a message to the
+    channel manually by setting the message type to 'groupchat' and addressing
+    the JID of the MUC room.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::sendMessage(const QString &text)
 {
     QXmppMessage msg;
@@ -332,13 +325,11 @@ bool QXmppMucRoom::sendMessage(const QString &text)
     return d->client->sendLegacy(msg);
 }
 
-///
-/// Sets your own nickname.
-///
-/// You need to set your nickname before calling join().
-///
-/// \param nickName
-///
+/*!
+    Sets your own nickname to \a nickName.
+
+    You need to set your nickname before calling join().
+*/
 void QXmppMucRoom::setNickName(const QString &nickName)
 {
     if (nickName == d->nickName) {
@@ -357,11 +348,11 @@ void QXmppMucRoom::setNickName(const QString &nickName)
     }
 }
 
-///
-/// Returns the "Full JID" of the given participant.
-///
-/// The specified \a jid is the Occupant JID of the form "room@service/nick".
-///
+/*!
+    Returns the "Full JID" of the given participant.
+
+    The specified \a jid is the Occupant JID of the form "room@service/nick".
+*/
 QString QXmppMucRoom::participantFullJid(const QString &jid) const
 {
     if (d->participants.contains(jid)) {
@@ -371,11 +362,11 @@ QString QXmppMucRoom::participantFullJid(const QString &jid) const
     }
 }
 
-///
-/// Returns the presence for the given participant.
-///
-/// The specified \a jid is the Occupant JID of the form "room@service/nick".
-///
+/*!
+    Returns the presence for the given participant.
+
+    The specified \a jid is the Occupant JID of the form "room@service/nick".
+*/
 QXmppPresence QXmppMucRoom::participantPresence(const QString &jid) const
 {
     if (d->participants.contains(jid)) {
@@ -398,11 +389,9 @@ QString QXmppMucRoom::password() const
     return d->password;
 }
 
-///
-/// Sets the chat room password.
-///
-/// \param password
-///
+/*!
+    Sets the chat room \a password.
+*/
 void QXmppMucRoom::setPassword(const QString &password)
 {
     d->password = password;
@@ -413,11 +402,9 @@ QString QXmppMucRoom::subject() const
     return d->subject;
 }
 
-///
-/// Sets the chat room's subject.
-///
-/// \param subject
-///
+/*!
+    Sets the chat room's \a subject.
+*/
 void QXmppMucRoom::setSubject(const QString &subject)
 {
     QXmppMessage msg;
@@ -427,13 +414,13 @@ void QXmppMucRoom::setSubject(const QString &subject)
     d->client->send(std::move(msg));
 }
 
-///
-/// Request the configuration form for the chat room.
-///
-/// \return true if the request was sent, false otherwise
-///
-/// \sa configurationReceived()
-///
+/*!
+    Request the configuration form for the chat room.
+
+    Returns true if the request was sent, false otherwise.
+
+    \sa configurationReceived()
+*/
 bool QXmppMucRoom::requestConfiguration()
 {
     QXmppMucOwnerIq iq;
@@ -441,13 +428,11 @@ bool QXmppMucRoom::requestConfiguration()
     return d->client->sendLegacy(iq);
 }
 
-///
-/// Send the configuration form for the chat room.
-///
-/// \param form
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Send the configuration \a form for the chat room.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::setConfiguration(const QXmppDataForm &form)
 {
     QXmppMucOwnerIq iqPacket;
@@ -457,13 +442,13 @@ bool QXmppMucRoom::setConfiguration(const QXmppDataForm &form)
     return d->client->sendLegacy(iqPacket);
 }
 
-///
-/// Request the room's permissions.
-///
-/// \return true if the request was sent, false otherwise
-///
-/// \sa permissionsReceived()
-///
+/*!
+    Request the room's permissions.
+
+    Returns true if the request was sent, false otherwise.
+
+    \sa permissionsReceived()
+*/
 bool QXmppMucRoom::requestPermissions()
 {
     QList<QXmppMucItem::Affiliation> affiliations;
@@ -489,13 +474,11 @@ bool QXmppMucRoom::requestPermissions()
     return true;
 }
 
-///
-/// Sets the room's permissions.
-///
-/// \param permissions
-///
-/// \return true if the request was sent, false otherwise
-///
+/*!
+    Sets the room's \a permissions.
+
+    Returns true if the request was sent, false otherwise.
+*/
 bool QXmppMucRoom::setPermissions(const QList<QXmppMucItem> &permissions)
 {
     QList<QXmppMucItem> items;

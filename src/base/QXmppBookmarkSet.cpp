@@ -14,63 +14,76 @@
 
 using namespace QXmpp::Private;
 
-/// Constructs a new conference room bookmark.
+/*! Constructs a new conference room bookmark. */
 QXmppBookmarkConference::QXmppBookmarkConference()
     : m_autoJoin(false)
 {
 }
 
-/// Returns whether the client should automatically join the conference room
-/// on login.
+/*!
+    Returns whether the client should automatically join the conference room
+    on login.
+*/
 bool QXmppBookmarkConference::autoJoin() const
 {
     return m_autoJoin;
 }
 
-/// Sets whether the client should automatically join the conference room
-/// on login.
+/*!
+    Sets whether the client should automatically join the conference room
+    on login.
+
+    \a autoJoin.
+*/
 void QXmppBookmarkConference::setAutoJoin(bool autoJoin)
 {
     m_autoJoin = autoJoin;
 }
 
-/// Returns the JID of the conference room.
+/*! Returns the JID of the conference room. */
 QString QXmppBookmarkConference::jid() const
 {
     return m_jid;
 }
 
-/// Sets the JID of the conference room.
+/*!
+    Sets the JID of the conference room.
+
+    \a jid.
+*/
 void QXmppBookmarkConference::setJid(const QString &jid)
 {
     m_jid = jid;
 }
 
-/// Returns the friendly name for the bookmark.
+/*! Returns the friendly name for the bookmark. */
 QString QXmppBookmarkConference::name() const
 {
     return m_name;
 }
 
-/// Sets the friendly name for the bookmark.
+/*! Sets the friendly \a name for the bookmark. */
 void QXmppBookmarkConference::setName(const QString &name)
 {
     m_name = name;
 }
 
-/// Returns the preferred nickname for the conference room.
+/*! Returns the preferred nickname for the conference room. */
 QString QXmppBookmarkConference::nickName() const
 {
     return m_nickName;
 }
 
-/// Sets the preferred nickname for the conference room.
+/*!
+    Sets the preferred nickname for the conference room.
+
+    \a nickName.
+*/
 void QXmppBookmarkConference::setNickName(const QString &nickName)
 {
     m_nickName = nickName;
 }
 
-/// \cond
 std::optional<QXmppBookmarkConference> QXmppBookmarkConference::fromDom(const QDomElement &el)
 {
     QXmppBookmarkConference conference;
@@ -91,33 +104,35 @@ void QXmppBookmarkConference::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"nick", m_nickName },
     });
 }
-/// \endcond
 
-/// Returns the friendly name for the bookmark.
+/*! Returns the friendly name for the bookmark. */
 QString QXmppBookmarkUrl::name() const
 {
     return m_name;
 }
 
-/// Sets the friendly name for the bookmark.
+/*! Sets the friendly \a name for the bookmark. */
 void QXmppBookmarkUrl::setName(const QString &name)
 {
     m_name = name;
 }
 
-/// Returns the URL for the web page.
+/*! Returns the URL for the web page. */
 QUrl QXmppBookmarkUrl::url() const
 {
     return m_url;
 }
 
-/// Sets the URL for the web page.
+/*!
+    Sets the URL for the web page.
+
+    \a url.
+*/
 void QXmppBookmarkUrl::setUrl(const QUrl &url)
 {
     m_url = url;
 }
 
-/// \cond
 std::optional<QXmppBookmarkUrl> QXmppBookmarkUrl::fromDom(const QDomElement &el)
 {
     QXmppBookmarkUrl url;
@@ -134,33 +149,39 @@ void QXmppBookmarkUrl::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"url", m_url },
     });
 }
-/// \endcond
 
-/// Returns the conference rooms bookmarks in this bookmark set.
+/*! Returns the conference rooms bookmarks in this bookmark set. */
 QList<QXmppBookmarkConference> QXmppBookmarkSet::conferences() const
 {
     return m_conferences;
 }
 
-/// Sets the conference rooms bookmarks in this bookmark set.
+/*!
+    Sets the conference rooms bookmarks in this bookmark set.
+
+    \a conferences.
+*/
 void QXmppBookmarkSet::setConferences(const QList<QXmppBookmarkConference> &conferences)
 {
     m_conferences = conferences;
 }
 
-/// Returns the web page bookmarks in this bookmark set.
+/*! Returns the web page bookmarks in this bookmark set. */
 QList<QXmppBookmarkUrl> QXmppBookmarkSet::urls() const
 {
     return m_urls;
 }
 
-/// Sets the web page bookmarks in this bookmark set.
+/*!
+    Sets the web page bookmarks in this bookmark set.
+
+    \a urls.
+*/
 void QXmppBookmarkSet::setUrls(const QList<QXmppBookmarkUrl> &urls)
 {
     m_urls = urls;
 }
 
-/// \cond
 bool QXmppBookmarkSet::isBookmarkSet(const QDomElement &element)
 {
     return element.tagName() == u"storage" &&
@@ -177,4 +198,3 @@ void QXmppBookmarkSet::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { XmlTag, m_conferences, m_urls });
 }
-/// \endcond

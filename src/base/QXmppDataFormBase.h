@@ -104,14 +104,12 @@ class QXMPP_EXPORT QXmppExtensibleDataFormBase : public QXmppDataFormBase
 {
 public:
     QXmppExtensibleDataFormBase();
-    /// \cond
     QXmppExtensibleDataFormBase(const QXmppExtensibleDataFormBase &);
     QXmppExtensibleDataFormBase(QXmppExtensibleDataFormBase &&);
     virtual ~QXmppExtensibleDataFormBase();
 
     QXmppExtensibleDataFormBase &operator=(const QXmppExtensibleDataFormBase &);
     QXmppExtensibleDataFormBase &operator=(QXmppExtensibleDataFormBase &&);
-    /// \endcond
 
     QList<QXmppDataForm::Field> unknownFields() const;
     void setUnknownFields(const QList<QXmppDataForm::Field> &unknownFields);

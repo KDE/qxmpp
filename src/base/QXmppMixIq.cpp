@@ -42,57 +42,47 @@ struct Enums::Data<QXmppMixIq::Type> {
 // \class QXmppMixSubscriptionUpdateIq
 //
 // This class represents an IQ used to subscribe to nodes and unsubcribe from nodes of a MIX
-// channel as defined by \xep{0369, Mediated Information eXchange (MIX)}.
+// channel as defined by \xep{0369}{Mediated Information eXchange (MIX)}.
 //
 // \since QXmpp 1.7
 //
 // \ingroup Stanzas
 //
 
-///
-/// Constructs a MIX subscription update IQ.
-///
+/*! Constructs a MIX subscription update IQ. */
 QXmppMixSubscriptionUpdateIq::QXmppMixSubscriptionUpdateIq()
 {
 }
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMixSubscriptionUpdateIq)
 
-///
-/// Returns the nodes to subscribe to.
-///
-/// \return the nodes being subscribed to
-///
+/*!
+    Returns the nodes to subscribe to.
+*/
 QXmppMixConfigItem::Nodes QXmppMixSubscriptionUpdateIq::additions() const
 {
     return m_additions;
 }
 
-///
-/// Sets the nodes to subscribe to.
-///
-/// \param additions nodes being subscribed to
-///
+/*!
+    Sets the nodes to subscribe to via \a additions.
+*/
 void QXmppMixSubscriptionUpdateIq::setAdditions(QXmppMixConfigItem::Nodes additions)
 {
     m_additions = additions;
 }
 
-///
-/// Returns the nodes to unsubscribe from.
-///
-/// \return the nodes being unsubscribed from
-///
+/*!
+    Returns the nodes to unsubscribe from.
+*/
 QXmppMixConfigItem::Nodes QXmppMixSubscriptionUpdateIq::removals() const
 {
     return m_removals;
 }
 
-///
-/// Sets the nodes to unsubscribe from.
-///
-/// \param removals nodes being unsubscribed from
-///
+/*!
+    Sets the nodes to unsubscribe from via \a removals.
+*/
 void QXmppMixSubscriptionUpdateIq::setRemovals(QXmppMixConfigItem::Nodes removals)
 {
     m_removals = removals;
@@ -124,37 +114,33 @@ void QXmppMixSubscriptionUpdateIq::toXmlElementFromChild(QXmlStreamWriter *write
 // \class QXmppMixInvitationRequestIq
 //
 // This class represents an IQ used to request an invitation to a MIX channel as defined by
-// \xep{0407, Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
+// \xep{0407}{Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
 //
 // \since QXmpp 1.7
 //
 // \ingroup Stanzas
 //
 
-///
-/// Constructs a MIX invitation request IQ.
-///
+/*! Constructs a MIX invitation request IQ. */
 QXmppMixInvitationRequestIq::QXmppMixInvitationRequestIq()
 {
 }
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMixInvitationRequestIq)
 
-///
-/// Returns the JID of the invitee for whom an invitation is requested from a channel.
-///
-/// \return the invitee's JID
-///
+/*!
+    Returns the JID of the invitee for whom an invitation is requested from a
+    channel.
+*/
 QString QXmppMixInvitationRequestIq::inviteeJid() const
 {
     return m_inviteeJid;
 }
 
-///
-/// Sets the JID of the invitee for whom an invitation is requested from a channel.
-///
-/// \param inviteeJid invitee's JID
-///
+/*!
+    Sets the \a inviteeJid of the invitee for whom an invitation is requested
+    from a channel.
+*/
 void QXmppMixInvitationRequestIq::setInviteeJid(const QString &inviteeJid)
 {
     m_inviteeJid = inviteeJid;
@@ -185,37 +171,31 @@ void QXmppMixInvitationRequestIq::toXmlElementFromChild(QXmlStreamWriter *writer
 // \class QXmppMixInvitationResponseIq
 //
 // This class represents an IQ that contains a requested invitation to a MIX channel as defined by
-// \xep{0407, Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
+// \xep{0407}{Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
 //
 // \since QXmpp 1.7
 //
 // \ingroup Stanzas
 //
 
-///
-/// Constructs a MIX invitation response IQ.
-///
+/*! Constructs a MIX invitation response IQ. */
 QXmppMixInvitationResponseIq::QXmppMixInvitationResponseIq()
 {
 }
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMixInvitationResponseIq)
 
-///
-/// Returns the invitation to a channel.
-///
-/// \return the channel invitation
-///
+/*!
+    Returns the channel invitation.
+*/
 QXmppMixInvitation QXmppMixInvitationResponseIq::invitation() const
 {
     return m_invitation;
 }
 
-///
-/// Sets the invitation to a channel.
-///
-/// \param invitation channel invitation
-///
+/*!
+    Sets the channel \a invitation.
+*/
 void QXmppMixInvitationResponseIq::setInvitation(const QXmppMixInvitation &invitation)
 {
     m_invitation = invitation;
@@ -252,84 +232,64 @@ public:
     QXmppMixIq::Type actionType = QXmppMixIq::None;
 };
 
-///
-/// \class QXmppMixIq
-///
-/// This class represents an IQ used to do actions on a MIX channel as defined by
-/// \xep{0369, Mediated Information eXchange (MIX)},
-/// \xep{0405, Mediated Information eXchange (MIX): Participant Server Requirements} and
-/// \xep{0407, Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
-///
-/// \since QXmpp 1.1
-///
-/// \ingroup Stanzas
-///
+/*!
+    \class QXmppMixIq
+    \inmodule QXmpp
 
-///
-/// \enum QXmppMixIq::Type
-///
-/// Action type of the MIX IQ stanza.
-///
-/// \var QXmppMixIq::None
-///
-/// Nothing is done.
-///
-/// \var QXmppMixIq::ClientJoin
-///
-/// The client sends a request to join a MIX channel to the user's server.
-///
-/// \var QXmppMixIq::ClientLeave
-///
-/// The client sends a request to leave a MIX channel to the user's server.
-///
-/// \var QXmppMixIq::Join
-///
-/// The user's server forwards a join request from the client to the MIX channel.
-///
-/// \var QXmppMixIq::Leave
-///
-/// The user's server forwards a leave request from the client to the MIX channel.
-///
-/// \var QXmppMixIq::UpdateSubscription
-///
-/// The client subscribes to MIX nodes or unsubscribes from MIX nodes.
-///
-/// \deprecated This is deprecated since QXmpp 1.7. Use QXmppMixManager instead.
-///
-/// \var QXmppMixIq::SetNick
-///
-/// The client changes the user's nickname within the MIX channel.
-///
-/// \var QXmppMixIq::Create
-///
-/// The client creates a MIX channel.
-///
-/// \var QXmppMixIq::Destroy
-///
-/// The client destroys a MIX channel.
-///
+    This class represents an IQ used to do actions on a MIX channel as defined by
+    \xep{0369}{Mediated Information eXchange (MIX)},
+    \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements} and
+    \xep{0407}{Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
+
+    \since QXmpp 1.1
+
+    \ingroup Stanzas
+*/
+
+/*!
+    \enum QXmppMixIq::Type
+
+    Action type of the MIX IQ stanza.
+
+    \value None Nothing is done.
+    \value ClientJoin The client sends a request to join a MIX channel to the
+    user's server.
+    \value ClientLeave The client sends a request to leave a MIX channel to
+    the user's server.
+    \value Join The user's server forwards a join request from the client to
+    the MIX channel.
+    \value Leave The user's server forwards a leave request from the client
+    to the MIX channel.
+    \value UpdateSubscription The client subscribes to MIX nodes or
+    unsubscribes from MIX nodes. \e {Deprecated since QXmpp 1.7. Use
+    QXmppMixManager instead.}
+    \value SetNick The client changes the user's nickname within the MIX
+    channel.
+    \value Create The client creates a MIX channel.
+    \value Destroy The client destroys a MIX channel.
+*/
 
 QXmppMixIq::QXmppMixIq()
     : d(new QXmppMixIqPrivate)
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppMixIq::QXmppMixIq(const QXmppMixIq &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppMixIq::QXmppMixIq(QXmppMixIq &&) = default;
 QXmppMixIq::~QXmppMixIq() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppMixIq &QXmppMixIq::operator=(const QXmppMixIq &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppMixIq &QXmppMixIq::operator=(QXmppMixIq &&) = default;
-///
-/// Returns the channel JID, in case of a Join/ClientJoin query result, containing the participant
-/// ID.
-///
-/// \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::participantId() and
-/// QXmppMixIq::channelJid() instead.
-///
+/*!
+    Returns the channel JID, in case of a Join/ClientJoin query result, containing the participant
+    ID.
+
+    \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::participantId() and
+    QXmppMixIq::channelJid() instead.
+*/
 QString QXmppMixIq::jid() const
 {
     if (d->participantId.isEmpty()) {
@@ -343,14 +303,13 @@ QString QXmppMixIq::jid() const
     return d->participantId % u'#' % d->channelJid;
 }
 
-///
-/// Sets the channel JID, in case of a Join/ClientJoin query result, containing the participant ID.
-///
-/// \param jid channel JID including a possible participant ID
-///
-/// \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::setParticipantId() and
-/// QXmppMixIq::setChannelJid() instead.
-///
+/*!
+    Sets the channel \a jid (including a possible participant ID), in case of a
+    Join/ClientJoin query result, containing the participant ID.
+
+    \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::setParticipantId() and
+    QXmppMixIq::setChannelJid() instead.
+*/
 void QXmppMixIq::setJid(const QString &jid)
 {
     const auto jidParts = jid.split(u'#');
@@ -363,224 +322,195 @@ void QXmppMixIq::setJid(const QString &jid)
     }
 }
 
-///
-/// Returns the participant ID for a Join/ClientJoin result.
-///
-/// \return the participant ID
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the participant ID for a Join/ClientJoin result.
+
+    \since QXmpp 1.7
+*/
 QString QXmppMixIq::participantId() const
 {
     return d->participantId;
 }
 
-///
-/// Sets the participant ID for a Join/ClientJoin result.
-///
-/// @param participantId ID of the user in the channel
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets the \a participantId (ID of the user in the channel) for a
+    Join/ClientJoin result.
+
+    \since QXmpp 1.7
+*/
 void QXmppMixIq::setParticipantId(const QString &participantId)
 {
     d->participantId = participantId;
 }
 
-///
-/// Returns the channel's ID (the local part of the channel JID).
-///
-/// It can be empty if a JID was set.
-///
-/// \return the ID of the channel
-///
-/// \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::channelId() instead.
-///
+/*!
+    Returns the channel's ID (the local part of the channel JID).
+
+    It can be empty if a JID was set.
+
+    \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::channelId() instead.
+*/
 QString QXmppMixIq::channelName() const
 {
     return d->channelId;
 }
 
-///
-/// Sets the channel's ID (the local part of the channel JID) for creating or destroying a channel.
-///
-/// If you create a new channel, the channel ID can be left empty to let the server generate an ID.
-///
-/// \param channelName ID of the channel
-///
-/// \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::setChannelId()
-/// instead.
-///
+/*!
+    Sets the channel's ID (the local part of the channel JID) for creating or
+    destroying a channel via \a channelName.
+
+    If you create a new channel, the channel ID can be left empty to let the
+    server generate an ID.
+
+    \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::setChannelId()
+    instead.
+*/
 void QXmppMixIq::setChannelName(const QString &channelName)
 {
     d->channelId = channelName;
 }
 
-///
-/// Returns the channel's ID (the local part of the channel JID).
-///
-/// It can be empty if a JID was set.
-///
-/// \return the ID of the channel
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the channel's ID (the local part of the channel JID).
+
+    It can be empty if a JID was set.
+
+    \since QXmpp 1.7
+*/
 QString QXmppMixIq::channelId() const
 {
     return d->channelId;
 }
 
-///
-/// Sets the channel's ID (the local part of the channel JID) for creating or destroying a channel.
-///
-/// If you create a new channel, the channel ID can be left empty to let the server generate an ID.
-///
-/// @param channelId channel ID to be set
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets the \a channelId (the local part of the channel JID) for creating or
+    destroying a channel.
+
+    If you create a new channel, the channel ID can be left empty to let the
+    server generate an ID.
+
+    \since QXmpp 1.7
+*/
 void QXmppMixIq::setChannelId(const QString &channelId)
 {
     d->channelId = channelId;
 }
 
-///
-/// Returns the channel's JID.
-///
-/// \return the JID of the channel
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the channel's JID.
+
+    \since QXmpp 1.7
+*/
 QString QXmppMixIq::channelJid() const
 {
     return d->channelJid;
 }
 
-///
-/// Sets the channel's JID.
-///
-/// @param channelJid JID to be set
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets the channel's JID to \a channelJid.
+
+    \since QXmpp 1.7
+*/
 void QXmppMixIq::setChannelJid(const QString &channelJid)
 {
     d->channelJid = channelJid;
 }
 
-///
-/// Returns the nodes being subscribed to.
-///
-/// \return the nodes being subscribed to
-///
-/// \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::subscriptions() instead.
-///
+/*!
+    Returns the nodes being subscribed to.
+
+    \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::subscriptions() instead.
+*/
 QStringList QXmppMixIq::nodes() const
 {
     return Enums::toStringList(d->subscriptions);
 }
 
-///
-/// Sets the nodes being subscribed to.
-///
-/// \param nodes nodes being subscribed to
-///
-/// \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::setSubscriptions()
-/// instead.
-///
+/*!
+    Sets the \a nodes being subscribed to.
+
+    \deprecated This method is deprecated since QXmpp 1.7. Use QXmppMixIq::setSubscriptions()
+    instead.
+*/
 void QXmppMixIq::setNodes(const QStringList &nodes)
 {
     d->subscriptions = Enums::fromStrings<QXmppMixConfigItem::Node>(nodes);
 }
 
-///
-/// Returns the nodes to subscribe to.
-///
-/// \return the nodes being subscribed to
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the nodes to subscribe to.
+
+    \since QXmpp 1.7
+*/
 QXmppMixConfigItem::Nodes QXmppMixIq::subscriptions() const
 {
     return d->subscriptions;
 }
 
-///
-/// Sets the nodes to subscribe to.
-///
-/// \param subscriptions nodes being subscribed to
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets the nodes to subscribe to via \a subscriptions.
+
+    \since QXmpp 1.7
+*/
 void QXmppMixIq::setSubscriptions(QXmppMixConfigItem::Nodes subscriptions)
 {
     d->subscriptions = subscriptions;
 }
 
-///
-/// Returns the user's nickname in the channel.
-///
-/// \return the nickname of the user
-///
+/*!
+    Returns the user's nickname in the channel.
+*/
 QString QXmppMixIq::nick() const
 {
     return d->nick;
 }
 
-///
-/// Sets the user's nickname used for the channel.
-///
-/// \param nick nick of the user to be set
-///
+/*!
+    Sets the user's \a nick used for the channel.
+*/
 void QXmppMixIq::setNick(const QString &nick)
 {
     d->nick = nick;
 }
 
-///
-/// Returns the invitation to the channel being joined via Type::ClientJoin or Type::Join.
-///
-/// \return the channel invitation
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the channel invitation to the channel being joined via
+    Type::ClientJoin or Type::Join.
+
+    \since QXmpp 1.7
+*/
 std::optional<QXmppMixInvitation> QXmppMixIq::invitation() const
 {
     return d->invitation;
 }
 
-///
-/// Sets the invitation to the channel being joined via Type::ClientJoin or Type::Join.
-///
-/// \param invitation channel invitation
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets the channel \a invitation to the channel being joined via
+    Type::ClientJoin or Type::Join.
+
+    \since QXmpp 1.7
+*/
 void QXmppMixIq::setInvitation(const std::optional<QXmppMixInvitation> &invitation)
 {
     d->invitation = invitation;
 }
 
-/// Returns the MIX channel's action type.
-///
-/// \return the action type of the channel
-///
+/*!
+    Returns the MIX channel's action type.
+*/
 QXmppMixIq::Type QXmppMixIq::actionType() const
 {
     return d->actionType;
 }
 
-///
-/// Sets the MIX channel's action type.
-///
-/// \param type action type of the channel
-///
+/*!
+    Sets the MIX channel's action \a type.
+*/
 void QXmppMixIq::setActionType(QXmppMixIq::Type type)
 {
     d->actionType = type;
 }
 
-/// \cond
 bool QXmppMixIq::isMixIq(const QDomElement &element)
 {
     const QDomElement &child = element.firstChildElement();
@@ -647,4 +577,3 @@ void QXmppMixIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         });
     }
 }
-/// \endcond

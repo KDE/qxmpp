@@ -15,7 +15,6 @@
 
 using namespace QXmpp::Private;
 
-/// \cond
 class QXmppGeolocItemPrivate : public QSharedData
 {
 public:
@@ -25,77 +24,71 @@ public:
     std::optional<double> latitude;
     std::optional<double> longitude;
 };
-/// \endcond
 
-///
-/// \class QXmppGeolocItem
-///
-/// This class represents a PubSub item for \xep{0080, User Location}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppGeolocItem
+    \inmodule QXmpp
 
-///
-/// Default constructor
-///
+    This class represents a PubSub item for \xep{0080}{User Location}.
+
+    \since QXmpp 1.5
+*/
+
+/*! Default constructor */
 QXmppGeolocItem::QXmppGeolocItem()
     : d(new QXmppGeolocItemPrivate)
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppGeolocItem::QXmppGeolocItem(const QXmppGeolocItem &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppGeolocItem::QXmppGeolocItem(QXmppGeolocItem &&) = default;
 QXmppGeolocItem::~QXmppGeolocItem() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppGeolocItem &QXmppGeolocItem::operator=(const QXmppGeolocItem &other) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppGeolocItem &QXmppGeolocItem::operator=(QXmppGeolocItem &&) = default;
 
-///
-/// Returns the horizontal GPS error in meters.
-///
+/*! Returns the horizontal GPS error in meters. */
 std::optional<double> QXmppGeolocItem::accuracy() const
 {
     return d->accuracy;
 }
 
-///
-/// Sets the horizontal GPS error.
-///
+/*!
+    Sets the horizontal GPS error.
+
+    \a accuracy.
+*/
 void QXmppGeolocItem::setAccuracy(std::optional<double> accuracy)
 {
     d->accuracy = std::move(accuracy);
 }
 
-///
-/// Returns the country.
-///
+/*! Returns the country. */
 QString QXmppGeolocItem::country() const
 {
     return d->country;
 }
 
-///
-/// Sets the country.
-///
+/*! Sets the \a country. */
 void QXmppGeolocItem::setCountry(QString country)
 {
     d->country = std::move(country);
 }
 
-///
-/// Returns the latitude in decimal degrees.
-///
+/*! Returns the latitude in decimal degrees. */
 std::optional<double> QXmppGeolocItem::latitude() const
 {
     return d->latitude;
 }
 
-///
-/// Sets the latitude.
-///
+/*!
+    Sets the latitude.
+
+    \a lat.
+*/
 void QXmppGeolocItem::setLatitude(std::optional<double> lat)
 {
     if (lat && (*lat > 90 || *lat < -90)) {
@@ -105,33 +98,29 @@ void QXmppGeolocItem::setLatitude(std::optional<double> lat)
     d->latitude = std::move(lat);
 }
 
-///
-/// Returns the locality such as a town or a city.
-///
+/*! Returns the locality such as a town or a city. */
 QString QXmppGeolocItem::locality() const
 {
     return d->locality;
 }
 
-///
-/// Sets the locality.
-///
+/*! Sets the \a locality. */
 void QXmppGeolocItem::setLocality(QString locality)
 {
     d->locality = std::move(locality);
 }
 
-///
-/// Returns the longitude in decimal degrees.
-///
+/*! Returns the longitude in decimal degrees. */
 std::optional<double> QXmppGeolocItem::longitude() const
 {
     return d->longitude;
 }
 
-///
-/// Sets the longitude.
-///
+/*!
+    Sets the longitude.
+
+    \a lon.
+*/
 void QXmppGeolocItem::setLongitude(std::optional<double> lon)
 {
     if (lon && (*lon > 180 || *lon < -180)) {
@@ -141,9 +130,11 @@ void QXmppGeolocItem::setLongitude(std::optional<double> lon)
     d->longitude = std::move(lon);
 }
 
-///
-/// Returns true, if the element is a valid \xep{0080, User Location} PubSub item.
-///
+/*!
+    Returns true, if the element is a valid \xep{0080}{User Location} PubSub item.
+
+    \a itemElement.
+*/
 bool QXmppGeolocItem::isItem(const QDomElement &itemElement)
 {
     auto isPayloadValid = [](const QDomElement &payload) -> bool {
@@ -154,7 +145,6 @@ bool QXmppGeolocItem::isItem(const QDomElement &itemElement)
     return QXmppPubSubBaseItem::isItem(itemElement, isPayloadValid);
 }
 
-/// \cond
 void QXmppGeolocItem::parsePayload(const QDomElement &tune)
 {
     for (const auto &child : iterChildElements(tune)) {
@@ -184,4 +174,3 @@ void QXmppGeolocItem::serializePayload(QXmlStreamWriter *writer) const
         OptionalTextElement { u"lon", d->longitude },
     });
 }
-/// \endcond

@@ -17,7 +17,6 @@ public:
     QXmppTrustMemoryStorage();
     ~QXmppTrustMemoryStorage();
 
-    /// \cond
     QXmppTask<void> setSecurityPolicy(const QString &encryption, QXmpp::TrustSecurityPolicy securityPolicy) override;
     QXmppTask<void> resetSecurityPolicy(const QString &encryption) override;
     QXmppTask<QXmpp::TrustSecurityPolicy> securityPolicy(const QString &encryption) override;
@@ -39,7 +38,6 @@ public:
     QXmppTask<QXmpp::TrustLevel> trustLevel(const QString &encryption, const QString &keyOwnerJid, const QByteArray &keyId) override;
 
     QXmppTask<void> resetAll(const QString &encryption) override;
-    /// \endcond
 
 private:
     std::unique_ptr<QXmppTrustMemoryStoragePrivate> d;

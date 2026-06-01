@@ -36,52 +36,50 @@ QXmppRosterIq::QXmppRosterIq()
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppRosterIq::QXmppRosterIq(const QXmppRosterIq &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppRosterIq::QXmppRosterIq(QXmppRosterIq &&) = default;
 QXmppRosterIq::~QXmppRosterIq() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppRosterIq &QXmppRosterIq::operator=(const QXmppRosterIq &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppRosterIq &QXmppRosterIq::operator=(QXmppRosterIq &&) = default;
 
-///
-/// Adds an item to the roster IQ.
-///
-/// \param item
-///
+/*!
+    Adds an \a item to the roster IQ.
+*/
 void QXmppRosterIq::addItem(const Item &item)
 {
     d->items.append(item);
 }
 
-///
-/// Returns the roster IQ's items.
-///
+/*! Returns the roster IQ's items. */
 QList<QXmppRosterIq::Item> QXmppRosterIq::items() const
 {
     return d->items;
 }
 
-///
-/// Sets the roster IQ's items.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    Sets the roster IQ's items.
+
+    \since QXmpp 1.8
+
+    \a items.
+*/
 void QXmppRosterIq::setItems(const QList<Item> &items)
 {
     d->items = items;
 }
 
-///
-/// Returns the roster version of the IQ.
-///
-/// \deprecated Use versionOpt() instead, which distinguishes "no \c ver attribute" from
-/// \c ver="". This getter conflates both cases as an empty string.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns the roster version of the IQ.
+
+    \deprecated Use versionOpt() instead, which distinguishes "no \c ver attribute" from
+    \c ver="". This getter conflates both cases as an empty string.
+
+    \since QXmpp 1.0
+*/
 QString QXmppRosterIq::version() const
 {
     return d->version.value_or(QString());
@@ -100,13 +98,13 @@ std::optional<QString> QXmppRosterIq::versionOpt() const
     return d->version;
 }
 
-///
-/// Sets the roster version of the IQ.
-///
-/// Pass \c std::nullopt to omit the \c ver attribute. Pass an empty string to emit \c ver="".
-///
-/// \since QXmpp 1.0 (parameter type changed to \c std::optional<QString> in QXmpp 1.16)
-///
+/*!
+    Sets the roster \a version of the IQ.
+
+    Pass \c std::nullopt to omit the \c ver attribute. Pass an empty string to emit \c ver="".
+
+    \since QXmpp 1.0 (parameter type changed to std::optional<QString> in QXmpp 1.16)
+*/
 void QXmppRosterIq::setVersion(std::optional<QString> version)
 {
     d->version = std::move(version);
@@ -136,28 +134,29 @@ void QXmppRosterIq::setHasQuery(bool hasQuery)
     d->hasQuery = hasQuery;
 }
 
-///
-/// Whether to annotate which items are MIX channels.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns whether to annotate which items are MIX channels.
+
+    \since QXmpp 1.3
+*/
 bool QXmppRosterIq::mixAnnotate() const
 {
     return d->mixAnnotate;
 }
 
-///
-/// Sets whether to include which roster items are MIX channels. This MUST only
-/// be enabled in get requests.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets whether to include which roster items are MIX channels. This MUST only
+    be enabled in get requests.
+
+    \since QXmpp 1.3
+
+    \a mixAnnotate.
+*/
 void QXmppRosterIq::setMixAnnotate(bool mixAnnotate)
 {
     d->mixAnnotate = mixAnnotate;
 }
 
-/// \cond
 void QXmppRosterIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -181,7 +180,6 @@ void QXmppRosterIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         d->items,
     });
 }
-/// \endcond
 
 class QXmppRosterIq::ItemPrivate : public QSharedData
 {
@@ -206,145 +204,128 @@ QXmppRosterIq::ItemPrivate::ItemPrivate()
 {
 }
 
-///
-/// Constructs a new roster entry.
-///
+/*! Constructs a new roster entry. */
 QXmppRosterIq::Item::Item()
     : d(new ItemPrivate)
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppRosterIq::Item::Item(const QXmppRosterIq::Item &other) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppRosterIq::Item::Item(QXmppRosterIq::Item &&) = default;
 QXmppRosterIq::Item::~Item() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppRosterIq::Item &QXmppRosterIq::Item::operator=(const Item &other) = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppRosterIq::Item &QXmppRosterIq::Item::operator=(Item &&) = default;
 
-///
-/// Returns the bareJid of the roster entry.
-///
-/// \return bareJid as a QString
-///
+/*!
+    Returns the bareJid of the roster entry as a QString.
+*/
 QString QXmppRosterIq::Item::bareJid() const
 {
     return d->bareJid;
 }
 
-/// Sets the bareJid of the roster entry.
-///
-/// \param bareJid as a QString
-///
+/*!
+    Sets the \a bareJid of the roster entry.
+*/
 void QXmppRosterIq::Item::setBareJid(const QString &bareJid)
 {
     d->bareJid = bareJid;
 }
 
-///
-/// Returns the groups of the roster entry.
-///
-/// \return QSet<QString> list of all the groups
-///
+/*!
+    Returns the groups of the roster entry as a QSet<QString> list of all the
+    groups.
+*/
 QSet<QString> QXmppRosterIq::Item::groups() const
 {
     return d->groups;
 }
 
-///
-/// Sets the groups of the roster entry.
-///
-/// \param groups list of all the groups as a QSet<QString>
-///
+/*!
+    Sets the \a groups of the roster entry as a QSet<QString> list of all the
+    groups.
+*/
 void QXmppRosterIq::Item::setGroups(const QSet<QString> &groups)
 {
     d->groups = groups;
 }
 
-///
-/// Returns the name of the roster entry.
-///
-/// \return name as a QString
-///
+/*!
+    Returns the name of the roster entry as a QString.
+*/
 QString QXmppRosterIq::Item::name() const
 {
     return d->name;
 }
 
-///
-/// Sets the name of the roster entry.
-///
-/// \param name as a QString
-///
+/*!
+    Sets the \a name of the roster entry.
+*/
 void QXmppRosterIq::Item::setName(const QString &name)
 {
     d->name = name;
 }
 
-///
-/// Returns the subscription status of the roster entry. It is the "ask"
-/// attribute in the Roster IQ stanza. Its value can be "subscribe" or "unsubscribe"
-/// or empty.
-///
-/// \return subscription status as a QString
-///
+/*!
+    Returns the subscription status of the roster entry as a QString. It is the
+    "ask" attribute in the Roster IQ stanza. Its value can be "subscribe" or
+    "unsubscribe" or empty.
+*/
 QString QXmppRosterIq::Item::subscriptionStatus() const
 {
     return d->subscriptionStatus;
 }
 
-///
-/// Sets the subscription status of the roster entry. It is the "ask"
-/// attribute in the Roster IQ stanza. Its value can be "subscribe" or "unsubscribe"
-/// or empty.
-///
-/// \param status as a QString
-///
+/*!
+    Sets the subscription \a status of the roster entry. It is the "ask"
+    attribute in the Roster IQ stanza. Its value can be "subscribe" or
+    "unsubscribe" or empty.
+*/
 void QXmppRosterIq::Item::setSubscriptionStatus(const QString &status)
 {
     d->subscriptionStatus = status;
 }
 
-///
-/// Returns the subscription type of the roster entry.
-///
+/*! Returns the subscription type of the roster entry. */
 QXmppRosterIq::Item::SubscriptionType
 QXmppRosterIq::Item::subscriptionType() const
 {
     return d->type;
 }
 
-///
-/// Sets the subscription type of the roster entry.
-///
-/// \param type
-///
+/*!
+    Sets the subscription \a type of the roster entry.
+*/
 void QXmppRosterIq::Item::setSubscriptionType(SubscriptionType type)
 {
     d->type = type;
 }
 
-///
-/// Returns whether the item has a pre-approved presence subscription.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns whether the item has a pre-approved presence subscription.
+
+    \since QXmpp 1.3
+*/
 bool QXmppRosterIq::Item::isApproved() const
 {
     return d->approved;
 }
 
-///
-/// Sets whether the item has a pre-approved presence subscription.
-///
-/// This cannot be used to initiate a pre-approved subscription. For this
-/// purpose the client must send a &lt;presence/&gt; stanza of type
-/// \c subscribed to the user.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets whether the item has a pre-approved presence subscription.
+
+    This cannot be used to initiate a pre-approved subscription. For this
+    purpose the client must send a &lt;presence/&gt; stanza of type
+    \c subscribed to the user.
+
+    \since QXmpp 1.3
+
+    \a approved.
+*/
 void QXmppRosterIq::Item::setIsApproved(bool approved)
 {
     d->approved = approved;
@@ -391,47 +372,50 @@ void QXmppRosterIq::Item::setSubscriptionTypeFromStr(const QString &type)
     }
 }
 
-///
-/// Returns whether this is a MIX channel.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns whether this is a MIX channel.
+
+    \since QXmpp 1.3
+*/
 bool QXmppRosterIq::Item::isMixChannel() const
 {
     return d->isMixChannel;
 }
 
-///
-/// Sets whether this is a MIX channel.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets whether this is a MIX channel.
+
+    \since QXmpp 1.3
+
+    \a isMixChannel.
+*/
 void QXmppRosterIq::Item::setIsMixChannel(bool isMixChannel)
 {
     d->isMixChannel = isMixChannel;
 }
 
-///
-/// Returns the participant id for this MIX channel.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Returns the participant id for this MIX channel.
+
+    \since QXmpp 1.3
+*/
 QString QXmppRosterIq::Item::mixParticipantId() const
 {
     return d->mixParticipantId;
 }
 
-///
-/// Sets the participant id for this MIX channel.
-///
-/// \since QXmpp 1.3
-///
+/*!
+    Sets the participant id for this MIX channel.
+
+    \since QXmpp 1.3
+
+    \a participantId.
+*/
 void QXmppRosterIq::Item::setMixParticipantId(const QString &participantId)
 {
     d->mixParticipantId = participantId;
 }
 
-/// \cond
 void QXmppRosterIq::Item::parse(const QDomElement &element)
 {
     d->name = element.attribute(u"name"_s);
@@ -479,4 +463,3 @@ void QXmppRosterIq::Item::toXml(QXmlStreamWriter *writer, bool external) const
         },
     });
 }
-/// \endcond

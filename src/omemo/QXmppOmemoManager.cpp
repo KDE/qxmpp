@@ -38,70 +38,62 @@ public:
     QByteArray keyId;
 };
 
-///
-/// \class QXmppOmemoOwnDevice
-///
-/// \brief The QXmppOmemoOwnDevice class represents the \xep{0384, OMEMO Encryption} device of this
-/// client instance.
-///
+/*!
+    \class QXmppOmemoOwnDevice
+    \inmodule QXmpp
 
-///
-/// Constructs an OMEMO device for this client instance.
-///
+    \brief The QXmppOmemoOwnDevice class represents the \xep{0384}{OMEMO Encryption} device of this
+    client instance.
+*/
+
+/*! Constructs an OMEMO device for this client instance. */
 QXmppOmemoOwnDevice::QXmppOmemoOwnDevice()
     : d(new QXmppOmemoOwnDevicePrivate)
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppOmemoOwnDevice::QXmppOmemoOwnDevice(const QXmppOmemoOwnDevice &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppOmemoOwnDevice::QXmppOmemoOwnDevice(QXmppOmemoOwnDevice &&) noexcept = default;
 QXmppOmemoOwnDevice::~QXmppOmemoOwnDevice() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppOmemoOwnDevice &QXmppOmemoOwnDevice::operator=(const QXmppOmemoOwnDevice &) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppOmemoOwnDevice &QXmppOmemoOwnDevice::operator=(QXmppOmemoOwnDevice &&) = default;
 
-///
-/// Returns the human-readable string used to identify the device by users.
-///
-/// If no label is set, a default-constructed QString is returned.
-///
-/// \return the label to identify the device
-///
+/*!
+    Returns the human-readable string used to identify the device by users.
+
+    If no label is set, a default-constructed QString is returned.
+*/
 QString QXmppOmemoOwnDevice::label() const
 {
     return d->label;
 }
 
-///
-/// Sets an optional human-readable string used to identify the device by users.
-///
-/// The label should not contain more than 53 characters.
-///
-/// \param label label to identify the device
-///
+/*!
+    Sets an optional human-readable string \a label used to identify the device
+    by users.
+
+    The label should not contain more than 53 characters.
+*/
 void QXmppOmemoOwnDevice::setLabel(const QString &label)
 {
     d->label = label;
 }
 
-///
-/// Returns the ID of the public long-term key which never changes.
-///
-/// \return public long-term key ID
-///
+/*!
+    Returns the ID of the public long-term key which never changes.
+*/
 QByteArray QXmppOmemoOwnDevice::keyId() const
 {
     return d->keyId;
 }
 
-///
-/// Sets the ID of the public long-term key which never changes.
-///
-/// \param keyId public long-term key ID
-///
+/*!
+    Sets the ID of the public long-term key (which never changes) to \a keyId.
+*/
 void QXmppOmemoOwnDevice::setKeyId(const QByteArray &keyId)
 {
     d->keyId = keyId;
@@ -116,222 +108,204 @@ public:
     QByteArray keyId;
 };
 
-///
-/// \class QXmppOmemoDevice
-///
-/// \brief The QXmppOmemoDevice class represents a \xep{0384, OMEMO Encryption} device.
-///
+/*!
+    \class QXmppOmemoDevice
+    \inmodule QXmpp
 
-///
-/// Constructs an OMEMO device.
-///
+    \brief The QXmppOmemoDevice class represents a \xep{0384}{OMEMO Encryption} device.
+*/
+
+/*! Constructs an OMEMO device. */
 QXmppOmemoDevice::QXmppOmemoDevice()
     : d(new QXmppOmemoDevicePrivate)
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppOmemoDevice::QXmppOmemoDevice(const QXmppOmemoDevice &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppOmemoDevice::QXmppOmemoDevice(QXmppOmemoDevice &&) noexcept = default;
 QXmppOmemoDevice::~QXmppOmemoDevice() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppOmemoDevice &QXmppOmemoDevice::operator=(const QXmppOmemoDevice &) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppOmemoDevice &QXmppOmemoDevice::operator=(QXmppOmemoDevice &&) = default;
 
-///
-/// Returns the device owner's bare JID.
-///
-/// \return the bare JID
-///
+/*!
+    Returns the device owner's bare JID.
+*/
 QString QXmppOmemoDevice::jid() const
 {
     return d->jid;
 }
 
-///
-/// Sets the device owner's bare JID.
-///
-/// \param jid bare JID of the device owner
-///
+/*!
+    Sets the device owner's bare JID to \a jid.
+*/
 void QXmppOmemoDevice::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
-///
-/// Returns the human-readable string used to identify the device by users.
-///
-/// If no label is set, a default-constructed QString is returned.
-///
-/// \return the label to identify the device
-///
+/*!
+    Returns the human-readable string used to identify the device by users.
+
+    If no label is set, a default-constructed QString is returned.
+*/
 QString QXmppOmemoDevice::label() const
 {
     return d->label;
 }
 
-///
-/// Sets an optional human-readable string used to identify the device by users.
-///
-/// The label should not contain more than 53 characters.
-///
-/// \param label label to identify the device
-///
+/*!
+    Sets an optional human-readable string \a label used to identify the device
+    by users.
+
+    The label should not contain more than 53 characters.
+*/
 void QXmppOmemoDevice::setLabel(const QString &label)
 {
     d->label = label;
 }
 
-///
-/// Returns the ID of the public long-term key which never changes.
-///
-/// \return public long-term key ID
-///
+/*!
+    Returns the ID of the public long-term key which never changes.
+*/
 QByteArray QXmppOmemoDevice::keyId() const
 {
     return d->keyId;
 }
 
-///
-/// Sets the ID of the public long-term key which never changes.
-///
-/// \param keyId public long-term key ID
-///
+/*!
+    Sets the ID of the public long-term key (which never changes) to \a keyId.
+*/
 void QXmppOmemoDevice::setKeyId(const QByteArray &keyId)
 {
     d->keyId = keyId;
 }
 
-///
-/// Returns the trust level of the key.
-///
-/// \return the key's trust level
-///
+/*!
+    Returns the trust level of the key.
+*/
 TrustLevel QXmppOmemoDevice::trustLevel() const
 {
     return d->trustLevel;
 }
 
-///
-/// Sets the trust level of the key.
-///
-/// \param trustLevel key's trust level
-///
+/*!
+    Sets the trust level of the key to \a trustLevel.
+*/
 void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
 {
     d->trustLevel = trustLevel;
 }
 
-///
-/// \class QXmppOmemoManager
-///
-/// The QXmppOmemoManager class manages OMEMO encryption as defined in \xep{0384,
-/// OMEMO Encryption}.
-///
-/// OMEMO uses \xep{0060, Publish-Subscribe} (PubSub) and \xep{0163, Personal Eventing Protocol}
-/// (PEP).
-/// Thus, they must be supported by the server and the corresponding PubSub manager must be added to
-/// the client:
-/// \code
-/// QXmppPubSubManager *pubSubManager = new QXmppPubSubManager;
-/// client->addExtension(pubSubManager);
-/// \endcode
-///
-/// For interacting with the storage, corresponding implementations of the storage interfaces must
-/// be instantiated.
-/// Those implementations have to be adapted to your storage such as a database.
-/// In case you only need memory and no persistent storage, you can use the existing
-/// implementations:
-/// \code
-/// QXmppOmemoStorage *omemoStorage = new QXmppOmemoMemoryStorage;
-/// QXmppTrustStorage *trustStorage = new QXmppTrustMemoryStorage;
-/// \endcode
-///
-/// A trust manager using its storage must be added to the client:
-/// \code
-/// client->addNewExtension<QXmppAtmManager>(trustStorage);
-/// \endcode
-///
-/// Afterwards, the OMEMO manager using its storage must be added to the client and activated to be
-/// used for encryption:
-/// \code
-/// auto *manager = client->addNewExtension<QXmppOmemoManager>(omemoStorage);
-/// client->setEncryptionExtension(manager);
-/// \endcode
-///
-/// You can set a security policy used by OMEMO.
-/// Is is recommended to apply TOAKAFA for good security and usability when using
-/// \xep{0450, Automatic Trust Management (ATM)}:
-/// \code
-/// manager->setSecurityPolicy(QXmpp::Toakafa);
-/// \endcode
-///
-/// \xep{0280, Message Carbons} should be used for delivering messages to all endpoints of a user:
-/// \code
-/// client->addNewExtension<QXmppCarbonManagerV2>();
-/// \endcode
-///
-/// The old QXmppCarbonManager cannot be used with OMEMO.
-///
-/// The OMEMO data must be loaded before connecting to the server:
-/// \code
-///     manager->load();
-/// });
-/// \endcode
-///
-/// If no OMEMO data could be loaded (i.e., the result of \c load() is "false"), it must be set up
-/// first.
-/// That can be done as soon as the user is logged in to the server:
-/// \code
-/// connect(client, &QXmppClient::connected, this, [=]() {
-///     auto future = manager->start();
-/// });
-/// \endcode
-///
-/// Once the future is finished and the result is "true", the manager is ready for use.
-/// Otherwise, check the logging output for details.
-///
-/// The OMEMO manager is initialized after a successful call (i.e., the result is "true") of load()
-/// or setUp().
-///
-/// By default, stanzas are only sent to devices having keys with the following trust levels:
-/// \code
-/// QXmpp::TrustLevel::AutomaticallyTrusted | QXmpp::TrustLevel::ManuallyTrusted
-/// | QXmpp::TrustLevel::Authenticated
-/// \endcode
-/// That behavior can be changed for each message being sent by specifying the
-/// accepted trust levels:
-/// \code
-/// QXmppSendStanzaParams params;
-/// params.setAcceptedTrustLevels(QXmpp::TrustLevel::Authenticated)
-/// client->send(stanza, params);
-/// \endcode
-///
-/// Stanzas can be encrypted for multiple JIDs which is needed in group chats:
-/// \code
-/// QXmppSendStanzaParams params;
-/// params.setEncryptionJids({ "alice@example.org", "bob@example.com" })
-/// client->send(stanza, params);
-/// \endcode
-///
-/// \ingroup Managers
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppOmemoManager
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppOmemoManager::Result
-///
-/// Contains QXmpp::Success for success or an QXmppStanza::Error for an error.
-///
+    The QXmppOmemoManager class manages OMEMO encryption as defined in \xep{0384}{OMEMO Encryption}.
 
-///
-/// Constructs an OMEMO manager.
-///
-/// \param omemoStorage storage used to store all OMEMO data
-///
+    OMEMO uses \xep{0060}{Publish-Subscribe} (PubSub) and \xep{0163}{Personal Eventing Protocol}
+    (PEP).
+    Thus, they must be supported by the server and the corresponding PubSub manager must be added to
+    the client:
+    \code
+    QXmppPubSubManager *pubSubManager = new QXmppPubSubManager;
+    client->addExtension(pubSubManager);
+    \endcode
+
+    For interacting with the storage, corresponding implementations of the storage interfaces must
+    be instantiated.
+    Those implementations have to be adapted to your storage such as a database.
+    In case you only need memory and no persistent storage, you can use the existing
+    implementations:
+    \code
+    QXmppOmemoStorage *omemoStorage = new QXmppOmemoMemoryStorage;
+    QXmppTrustStorage *trustStorage = new QXmppTrustMemoryStorage;
+    \endcode
+
+    A trust manager using its storage must be added to the client:
+    \code
+    client->addNewExtension<QXmppAtmManager>(trustStorage);
+    \endcode
+
+    Afterwards, the OMEMO manager using its storage must be added to the client and activated to be
+    used for encryption:
+    \code
+    auto *manager = client->addNewExtension<QXmppOmemoManager>(omemoStorage);
+    client->setEncryptionExtension(manager);
+    \endcode
+
+    You can set a security policy used by OMEMO.
+    Is is recommended to apply TOAKAFA for good security and usability when using
+    \xep{0450}{Automatic Trust Management (ATM)}:
+    \code
+    manager->setSecurityPolicy(QXmpp::Toakafa);
+    \endcode
+
+    \xep{0280}{Message Carbons} should be used for delivering messages to all endpoints of a user:
+    \code
+    client->addNewExtension<QXmppCarbonManagerV2>();
+    \endcode
+
+    The old QXmppCarbonManager cannot be used with OMEMO.
+
+    The OMEMO data must be loaded before connecting to the server:
+    \code
+    manager->load();
+    });
+    \endcode
+
+    If no OMEMO data could be loaded (i.e., the result of \c load() is "false"), it must be set up
+    first.
+    That can be done as soon as the user is logged in to the server:
+    \code
+    connect(client, &QXmppClient::connected, this, [=]() {
+    auto future = manager->start();
+    });
+    \endcode
+
+    Once the future is finished and the result is "true", the manager is ready for use.
+    Otherwise, check the logging output for details.
+
+    The OMEMO manager is initialized after a successful call (i.e., the result is "true") of load()
+    or setUp().
+
+    By default, stanzas are only sent to devices having keys with the following trust levels:
+    \code
+    QXmpp::TrustLevel::AutomaticallyTrusted | QXmpp::TrustLevel::ManuallyTrusted
+    | QXmpp::TrustLevel::Authenticated
+    \endcode
+    That behavior can be changed for each message being sent by specifying the
+    accepted trust levels:
+    \code
+    QXmppSendStanzaParams params;
+    params.setAcceptedTrustLevels(QXmpp::TrustLevel::Authenticated)
+    client->send(stanza, params);
+    \endcode
+
+    Stanzas can be encrypted for multiple JIDs which is needed in group chats:
+    \code
+    QXmppSendStanzaParams params;
+    params.setEncryptionJids({ "alice@example.org", "bob@example.com" })
+    client->send(stanza, params);
+    \endcode
+
+    \ingroup Managers
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \typedef QXmppOmemoManager::Result
+
+    Contains QXmpp::Success for success or an QXmppStanza::Error for an error.
+*/
+
+/*!
+    Constructs an OMEMO manager using \a omemoStorage to store all OMEMO data.
+*/
 QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     : d(new ManagerPrivate(this, omemoStorage))
 {
@@ -342,19 +316,19 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
 
 QXmppOmemoManager::~QXmppOmemoManager() = default;
 
-///
-/// Loads all locally stored OMEMO data.
-///
-/// This should be called after starting the client and before the login.
-/// It must only be called after \c setUp() has been called once for the user
-/// during one of the past login sessions.
-/// It does not need to be called if setUp() has been called during the current
-/// login session.
-///
-/// \see QXmppOmemoManager::setUp()
-///
-/// \return whether everything is loaded successfully
-///
+/*!
+    Loads all locally stored OMEMO data.
+
+    This should be called after starting the client and before the login.
+    It must only be called after \c setUp() has been called once for the user
+    during one of the past login sessions.
+    It does not need to be called if setUp() has been called during the current
+    login session.
+
+    Returns whether everything is loaded successfully.
+
+    \sa QXmppOmemoManager::setUp()
+*/
 QXmppTask<bool> Manager::load()
 {
     if (d->initialized) {
@@ -393,15 +367,14 @@ QXmppTask<bool> Manager::load()
     co_return true;
 }
 
-///
-/// Sets up all OMEMO data locally and on the server.
-///
-/// The user must be logged in while calling this.
-///
-/// \param deviceLabel human-readable string used to identify the own device
-///
-/// \return whether everything is set up successfully
-///
+/*!
+    Sets up all OMEMO data locally and on the server.
+
+    The user must be logged in while calling this. \a deviceLabel is a
+    human-readable string used to identify the own device.
+
+    Returns whether everything is set up successfully.
+*/
 QXmppTask<bool> Manager::setUp(QString deviceLabel)
 {
     if (!co_await d->setUpDeviceId()) {
@@ -426,133 +399,113 @@ QXmppTask<bool> Manager::setUp(QString deviceLabel)
     co_return false;
 }
 
-///
-/// Returns the key of this client instance.
-///
-/// \return the own key
-///
+/*!
+    Returns the key of this client instance.
+*/
 QXmppTask<QByteArray> Manager::ownKey()
 {
     return d->trustManager->ownKey(staticString(ns_omemo_2));
 }
 
-///
-/// Returns the JIDs of all key owners mapped to the IDs of their keys with
-/// specific trust levels except for the own key.
-///
-/// If no trust levels are passed, all keys are returned.
-///
-/// This should be called in order to get all stored keys which can be more than
-/// the stored devices because of trust decisions made without a published or
-/// received device.
-///
-/// \param trustLevels trust levels of the keys
-///
-/// \return the key owner JIDs mapped to their keys with specific trust levels except for the own
-///         key
-///
+/*!
+    Returns the JIDs of all key owners mapped to the IDs of their keys with
+    the specified \a trustLevels except for the own key.
+
+    If no trust levels are passed, all keys are returned.
+
+    This should be called in order to get all stored keys which can be more than
+    the stored devices because of trust decisions made without a published or
+    received device.
+*/
 QXmppTask<QHash<QXmpp::TrustLevel, QMultiHash<QString, QByteArray>>> Manager::keys(QXmpp::TrustLevels trustLevels)
 {
     return d->trustManager->keys(staticString(ns_omemo_2), trustLevels);
 }
 
-///
-/// Returns the IDs of keys mapped to their trust levels for specific key
-/// owners except for the own key.
-///
-/// If no trust levels are passed, all keys for jids are returned.
-///
-/// This should be called in order to get the stored keys which can be more than
-/// the stored devices because of trust decisions made without a published or
-/// received device.
-///
-/// \param jids key owners' bare JIDs
-/// \param trustLevels trust levels of the keys
-///
-/// \return the key IDs mapped to their trust levels for specific key owners except for the own key
-///
+/*!
+    Returns the IDs of keys mapped to their trust levels for the key owners
+    with the bare JIDs in \a jids and matching the specified \a trustLevels,
+    except for the own key.
+
+    If no trust levels are passed, all keys for the JIDs are returned.
+
+    This should be called in order to get the stored keys which can be more than
+    the stored devices because of trust decisions made without a published or
+    received device.
+*/
 QXmppTask<QHash<QString, QHash<QByteArray, QXmpp::TrustLevel>>> Manager::keys(const QList<QString> &jids, QXmpp::TrustLevels trustLevels)
 {
     return d->trustManager->keys(staticString(ns_omemo_2), jids, trustLevels);
 }
 
-///
-/// Changes the label of the own (this client instance's current user's) device.
-///
-/// The label is a human-readable string used to identify the device by users.
-///
-/// \param deviceLabel own device's label
-///
-/// \return whether the action was successful
-///
+/*!
+    Changes the label of the own (this client instance's current user's) device
+    to \a deviceLabel.
+
+    The label is a human-readable string used to identify the device by users.
+
+    Returns whether the action was successful.
+*/
 QXmppTask<bool> Manager::changeDeviceLabel(const QString &deviceLabel)
 {
     return d->changeDeviceLabel(deviceLabel);
 }
 
-///
-/// Returns the maximum count of devices stored per JID.
-///
-/// If more devices than that maximum are received for one JID from a server,
-/// they will not be stored locally and thus not used for encryption.
-///
-/// \return the maximum count of devices stored per JID
-///
+/*!
+    Returns the maximum count of devices stored per JID.
+
+    If more devices than that maximum are received for one JID from a server,
+    they will not be stored locally and thus not used for encryption.
+*/
 int Manager::maximumDevicesPerJid() const
 {
     return d->maximumDevicesPerJid;
 }
 
-///
-/// Sets the maximum count of devices stored per JID.
-///
-/// If more devices than that maximum are received for one JID from a server,
-/// they will not be stored locally and thus not used for encryption.
-///
-/// \param maximum maximum count of devices stored per JID
-///
+/*!
+    Sets the \a maximum count of devices stored per JID.
+
+    If more devices than that maximum are received for one JID from a server,
+    they will not be stored locally and thus not used for encryption.
+*/
 void Manager::setMaximumDevicesPerJid(int maximum)
 {
     d->maximumDevicesPerJid = maximum;
 }
 
-///
-/// Returns the maximum count of devices for whom a stanza is encrypted.
-///
-/// If more devices than that maximum are stored for all addressed recipients of
-/// a stanza, the stanza will only be encrypted for first devices until the
-/// maximum is reached.
-///
-/// \return the maximum count of devices for whom a stanza is encrypted
-///
+/*!
+    Returns the maximum count of devices for whom a stanza is encrypted.
+
+    If more devices than that maximum are stored for all addressed recipients of
+    a stanza, the stanza will only be encrypted for first devices until the
+    maximum is reached.
+*/
 int Manager::maximumDevicesPerStanza() const
 {
     return d->maximumDevicesPerStanza;
 }
 
-/// Sets the maximum count of devices for whom a stanza is encrypted.
-///
-/// If more devices than that maximum are stored for all addressed recipients of
-/// a stanza, the stanza will only be encrypted for first devices until the
-/// maximum is reached.
-///
-/// \param maximum maximum count of devices for whom a stanza is encrypted
-///
+/*!
+    Sets the \a maximum count of devices for whom a stanza is encrypted.
+
+    If more devices than that maximum are stored for all addressed recipients of
+    a stanza, the stanza will only be encrypted for first devices until the
+    maximum is reached.
+*/
 void Manager::setMaximumDevicesPerStanza(int maximum)
 {
     d->maximumDevicesPerStanza = maximum;
 }
 
-///
-/// Requests device lists from contacts and stores them locally.
-///
-/// The user must be logged in while calling this.
-/// The JID of the current user must not be passed.
-///
-/// \param jids JIDs of the contacts whose device lists are being requested
-///
-/// \return the results of the requests for each JID
-///
+/*!
+    Requests device lists from contacts with the JIDs in \a jids and stores
+    them locally.
+
+    The user must be logged in while calling this.
+    The JID of the current user must not be passed.
+
+    Returns the results of the requests for each JID.
+*/
 QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QString> jids)
 {
     Q_ASSERT_X(!jids.contains(d->ownBareJid()), "Requesting contact's device list", "Own JID passed");
@@ -570,20 +523,19 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QSt
     co_return devicesResults;
 }
 
-///
-/// Subscribes the current user's resource to device lists manually.
-///
-/// This should be called after each login and only for contacts without
-/// presence subscription because their device lists are not automatically
-/// subscribed.
-/// The user must be logged in while calling this.
-///
-/// Call \c QXmppOmemoManager::unsubscribeFromDeviceLists() before logout.
-///
-/// \param jids JIDs of the contacts whose device lists are being subscribed
-///
-/// \return the results of the subscription for each JID
-///
+/*!
+    Subscribes the current user's resource to device lists manually for the
+    contacts with the JIDs in \a jids.
+
+    This should be called after each login and only for contacts without
+    presence subscription because their device lists are not automatically
+    subscribed.
+    The user must be logged in while calling this.
+
+    Call \c QXmppOmemoManager::unsubscribeFromDeviceLists() before logout.
+
+    Returns the results of the subscription for each JID.
+*/
 QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList<QString> jids)
 {
     QVector<DevicesResult> devicesResults;
@@ -598,25 +550,23 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList
     co_return devicesResults;
 }
 
-///
-/// Unsubscribes the current user's resource from all device lists that were
-/// manually subscribed by \c QXmppOmemoManager::subscribeToDeviceList().
-///
-/// This should be called before each logout.
-/// The user must be logged in while calling this.
-///
-/// \return the results of the unsubscription for each JID
-///
+/*!
+    Unsubscribes the current user's resource from all device lists that were
+    manually subscribed by \c QXmppOmemoManager::subscribeToDeviceList().
+
+    This should be called before each logout.
+    The user must be logged in while calling this.
+
+    Returns the results of the unsubscription for each JID.
+*/
 QXmppTask<QVector<Manager::DevicesResult>> Manager::unsubscribeFromDeviceLists()
 {
     return d->unsubscribeFromDeviceLists(d->jidsOfManuallySubscribedDevices);
 }
 
-///
-/// Returns the device of this client instance's current user.
-///
-/// \return the own device
-///
+/*!
+    Returns the device of this client instance's current user.
+*/
 QXmppOmemoOwnDevice Manager::ownDevice()
 {
     QXmppOmemoOwnDevice device;
@@ -626,38 +576,34 @@ QXmppOmemoOwnDevice Manager::ownDevice()
     return device;
 }
 
-/// Returns all locally stored devices except the own device.
-///
-/// Only devices that have been received after subscribing the corresponding device lists on the
-/// server are stored locally.
-/// Thus, only those are returned.
-/// Call \c QXmppOmemoManager::subscribeToDeviceLists() for contacts without presence subscription
-/// before.
-///
-/// You must build sessions before you can get devices with corresponding keys.
-///
-/// \return all devices except the own device
-///
+/*!
+    Returns all locally stored devices except the own device.
+
+    Only devices that have been received after subscribing the corresponding device lists on the
+    server are stored locally.
+    Thus, only those are returned.
+    Call \c QXmppOmemoManager::subscribeToDeviceLists() for contacts without presence subscription
+    before.
+
+    You must build sessions before you can get devices with corresponding keys.
+*/
 QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices()
 {
     return devices(d->devices.keys());
 }
 
-///
-/// Returns locally stored devices except the own device.
-///
-/// Only devices that have been received after subscribing the corresponding device lists on the
-/// server are stored locally.
-/// Thus, only those are returned.
-/// Call \c QXmppOmemoManager::subscribeToDeviceLists() for contacts without presence subscription
-/// before.
-///
-/// You must build sessions before you can get devices with corresponding keys.
-///
-/// \param jids JIDs whose devices are being retrieved
-///
-/// \return all devices of the passed JIDs
-///
+/*!
+    Returns the locally stored devices for the JIDs in \a jids, except the own
+    device.
+
+    Only devices that have been received after subscribing the corresponding device lists on the
+    server are stored locally.
+    Thus, only those are returned.
+    Call \c QXmppOmemoManager::subscribeToDeviceLists() for contacts without presence subscription
+    before.
+
+    You must build sessions before you can get devices with corresponding keys.
+*/
 QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(QList<QString> jids)
 {
     auto keys = co_await this->keys(jids).withContext(this);
@@ -686,19 +632,17 @@ QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(QList<QString> jids)
     co_return devices;
 }
 
-///
-/// Removes all devices of a contact and the subscription to the contact's
-/// device list.
-///
-/// This should be called after removing a contact.
-/// The JID of the current user must not be passed.
-/// Use \c QXmppOmemoManager::resetAll() in order to remove all devices of the
-/// user.
-///
-/// \param jid JID of the contact whose devices are being removed
-///
-/// \return the result of the contact device removals
-///
+/*!
+    Removes all devices of the contact with JID \a jid and the subscription to
+    the contact's device list.
+
+    This should be called after removing a contact.
+    The JID of the current user must not be passed.
+    Use \c QXmppOmemoManager::resetAll() in order to remove all devices of the
+    user.
+
+    Returns the result of the contact device removals.
+*/
 QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(QString jid)
 {
     Q_ASSERT_X(jid != d->ownBareJid(), "Removing contact device", "Own JID passed");
@@ -720,79 +664,69 @@ QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(QString jid)
     co_return result;
 }
 
-///
-/// Sets the trust levels keys must have in order to build sessions for their
-/// devices.
-///
-/// \param trustLevels trust levels of the keys used for building sessions
-///
+/*!
+    Sets the \a trustLevels keys must have in order to build sessions for their
+    devices.
+*/
 void Manager::setAcceptedSessionBuildingTrustLevels(QXmpp::TrustLevels trustLevels)
 {
     d->acceptedSessionBuildingTrustLevels = trustLevels;
 }
 
-///
-/// Returns the trust levels keys must have in order to build sessions for their
-/// devices.
-///
-/// \return the trust levels of the keys used for building sessions
-///
+/*!
+    Returns the trust levels keys must have in order to build sessions for their
+    devices.
+*/
 TrustLevels Manager::acceptedSessionBuildingTrustLevels()
 {
     return d->acceptedSessionBuildingTrustLevels;
 }
 
-///
-/// Sets whether sessions are built when new devices are received from the
-/// server.
-///
-/// This can be used to not call \c QXmppOmemoManager::buildMissingSessions
-/// manually.
-/// But it should not be used before the initial setup and storing lots of
-/// devices locally.
-/// Otherwise, it could lead to a massive computation and network load when
-/// there are many devices for whom sessions are built.
-///
-/// \see QXmppOmemoManager::buildMissingSessions
-///
-/// \param isNewDeviceAutoSessionBuildingEnabled whether sessions are built for
-///        incoming devices
-///
+/*!
+    Sets whether sessions are built when new devices are received from the
+    server, controlled by \a isNewDeviceAutoSessionBuildingEnabled.
+
+    This can be used to not call \c QXmppOmemoManager::buildMissingSessions
+    manually.
+    But it should not be used before the initial setup and storing lots of
+    devices locally.
+    Otherwise, it could lead to a massive computation and network load when
+    there are many devices for whom sessions are built.
+
+    \sa QXmppOmemoManager::buildMissingSessions
+*/
 void Manager::setNewDeviceAutoSessionBuildingEnabled(bool isNewDeviceAutoSessionBuildingEnabled)
 {
     d->isNewDeviceAutoSessionBuildingEnabled = isNewDeviceAutoSessionBuildingEnabled;
 }
 
-///
-/// Returns whether sessions are built when new devices are received from the
-/// server.
-///
-/// \see QXmppOmemoManager::setNewDeviceAutoSessionBuildingEnabled
-///
-/// \return whether sessions are built for incoming devices
-///
+/*!
+    Returns whether sessions are built when new devices are received from the
+    server.
+
+    \sa QXmppOmemoManager::setNewDeviceAutoSessionBuildingEnabled
+*/
 bool Manager::isNewDeviceAutoSessionBuildingEnabled()
 {
     return d->isNewDeviceAutoSessionBuildingEnabled;
 }
 
-///
-/// Builds sessions manually with devices for whom no sessions are available.
-///
-/// Usually, sessions are built during sending a first message to a device or after a first message
-/// is received from a device.
-/// This can be called in order to speed up the sending of a message.
-/// If this method is called before sending the first message, all sessions can be built and when
-/// the first message is being sent, the message only needs to be encrypted.
-/// Especially for chats with multiple devices, that can decrease the noticeable time a user has to
-/// wait for sending a message.
-/// Additionally, the keys are automatically retrieved from the server which is helpful in order to
-/// get them when calling \c QXmppOmemoManager::devices().
-///
-/// The user must be logged in while calling this.
-///
-/// \param jids JIDs of the device owners for whom the sessions are built
-///
+/*!
+    Builds sessions manually with devices for whom no sessions are available.
+
+    Usually, sessions are built during sending a first message to a device or after a first message
+    is received from a device.
+    This can be called in order to speed up the sending of a message.
+    If this method is called before sending the first message, all sessions can be built and when
+    the first message is being sent, the message only needs to be encrypted.
+    Especially for chats with multiple devices, that can decrease the noticeable time a user has to
+    wait for sending a message.
+    Additionally, the keys are automatically retrieved from the server which is helpful in order to
+    get them when calling \c QXmppOmemoManager::devices().
+
+    The user must be logged in while calling this. \a jids contains the JIDs
+    of the device owners for whom the sessions are built.
+*/
 QXmppTask<void> Manager::buildMissingSessions(QList<QString> jids)
 {
     auto &devices = d->devices;
@@ -828,118 +762,107 @@ QXmppTask<void> Manager::buildMissingSessions(QList<QString> jids)
     }
 }
 
-///
-/// Resets all local OMEMO data for this device and the trust data used by OMEMO.
-///
-/// ATTENTION: This should only be called after an account is removed from the server since the data
-/// on the server is not reset.
-///
-/// Call \c setUp() once this method is finished and you are logged in to a new account if you want
-/// to set up everything for it.
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Resets all local OMEMO data for this device and the trust data used by OMEMO.
+
+    ATTENTION: This should only be called after an account is removed from the server since the data
+    on the server is not reset.
+
+    Call \c setUp() once this method is finished and you are logged in to a new account if you want
+    to set up everything for it.
+
+    \since QXmpp 1.9
+*/
 QXmppTask<void> QXmppOmemoManager::resetOwnDeviceLocally()
 {
     return d->resetOwnDeviceLocally();
 }
 
-///
-/// Resets all OMEMO data for this device and the trust data used by OMEMO.
-///
-/// ATTENTION: This should only be called when an account is removed locally or
-/// if there are unrecoverable problems with the OMEMO setup of this device.
-///
-/// The data on the server for other own devices is not removed.
-/// Call \c resetAll() for that purpose.
-///
-/// The user must be logged in while calling this.
-///
-/// Call \c setUp() once this method is finished if you want to set up
-/// everything again for this device.
-/// Existing sessions are reset, which might lead to undecryptable incoming
-/// stanzas until everything is set up again.
-///
-/// \return whether the action was successful
-///
+/*!
+    Resets all OMEMO data for this device and the trust data used by OMEMO.
+
+    ATTENTION: This should only be called when an account is removed locally or
+    if there are unrecoverable problems with the OMEMO setup of this device.
+
+    The data on the server for other own devices is not removed.
+    Call \c resetAll() for that purpose.
+
+    The user must be logged in while calling this.
+
+    Call \c setUp() once this method is finished if you want to set up
+    everything again for this device.
+    Existing sessions are reset, which might lead to undecryptable incoming
+    stanzas until everything is set up again.
+
+    Returns whether the action was successful.
+*/
 QXmppTask<bool> Manager::resetOwnDevice()
 {
     return d->resetOwnDevice();
 }
 
-///
-/// Resets all OMEMO data for all own devices and the trust data used by OMEMO.
-///
-/// ATTENTION: This should only be called if there is a certain reason for it
-/// since it deletes the data for this device and for other own devices from the
-/// server.
-///
-/// Call \c resetOwnDevice() if you only want to delete the OMEMO data for this
-/// device.
-///
-/// The user must be logged in while calling this.
-///
-/// Call \c setUp() once this method is finished if you want to set up
-/// everything again.
-/// Existing sessions are reset, which might lead to undecryptable incoming
-/// stanzas until everything is set up again.
-///
-/// \return whether the action was successful
-///
+/*!
+    Resets all OMEMO data for all own devices and the trust data used by OMEMO.
+
+    ATTENTION: This should only be called if there is a certain reason for it
+    since it deletes the data for this device and for other own devices from the
+    server.
+
+    Call \c resetOwnDevice() if you only want to delete the OMEMO data for this
+    device.
+
+    The user must be logged in while calling this.
+
+    Call \c setUp() once this method is finished if you want to set up
+    everything again.
+    Existing sessions are reset, which might lead to undecryptable incoming
+    stanzas until everything is set up again.
+
+    Returns whether the action was successful.
+*/
 QXmppTask<bool> Manager::resetAll()
 {
     return d->resetAll();
 }
 
-///
-/// Sets the security policy used by this E2EE extension.
-///
-/// \param securityPolicy security policy being set
-///
+/*!
+    Sets the security policy used by this E2EE extension to \a securityPolicy.
+*/
 QXmppTask<void> Manager::setSecurityPolicy(QXmpp::TrustSecurityPolicy securityPolicy)
 {
     return d->trustManager->setSecurityPolicy(staticString(ns_omemo_2), securityPolicy);
 }
 
-///
-/// Returns the security policy used by this E2EE extension.
-///
-/// \return the used security policy
-///
+/*!
+    Returns the security policy used by this E2EE extension.
+*/
 QXmppTask<QXmpp::TrustSecurityPolicy> Manager::securityPolicy()
 {
     return d->trustManager->securityPolicy(staticString(ns_omemo_2));
 }
 
-///
-/// Sets the trust level of keys.
-///
-/// If a key is not stored, it is added to the storage.
-///
-/// \param keyIds key owners' bare JIDs mapped to the IDs of their keys
-/// \param trustLevel trust level being set
-///
+/*!
+    Sets the \a trustLevel of keys identified by \a keyIds, which maps key
+    owners' bare JIDs to the IDs of their keys.
+
+    If a key is not stored, it is added to the storage.
+*/
 QXmppTask<void> Manager::setTrustLevel(const QMultiHash<QString, QByteArray> &keyIds, QXmpp::TrustLevel trustLevel)
 {
     return d->trustManager->setTrustLevel(staticString(ns_omemo_2), keyIds, trustLevel);
 }
 
-///
-/// Returns the trust level of a key.
-///
-/// If the key is not stored, the trust in that key is undecided.
-///
-/// \param keyOwnerJid key owner's bare JID
-/// \param keyId ID of the key
-///
-/// \return the key's trust level
-///
+/*!
+    Returns the trust level of the key identified by \a keyOwnerJid (the key
+    owner's bare JID) and \a keyId (the ID of the key).
+
+    If the key is not stored, the trust in that key is undecided.
+*/
 QXmppTask<QXmpp::TrustLevel> Manager::trustLevel(const QString &keyOwnerJid, const QByteArray &keyId)
 {
     return d->trustManager->trustLevel(staticString(ns_omemo_2), keyOwnerJid, keyId);
 }
 
-/// \cond
 QXmppTask<QXmppE2eeExtension::MessageEncryptResult> Manager::encryptMessage(QXmppMessage &&message, const std::optional<QXmppSendStanzaParams> &params)
 {
     QVector<QString> recipientJids;
@@ -1107,58 +1030,47 @@ bool Manager::handleMessage(const QXmppMessage &message)
 
     return false;
 }
-/// \endcond
 
-///
-/// \fn QXmppOmemoManager::trustLevelsChanged(const QMultiHash<QString, QByteArray> &modifiedKeys)
-///
-/// Emitted when the trust levels of keys changed.
-///
-/// \param modifiedKeys key owners' bare JIDs mapped to their modified keys
-///
+/*!
+    \fn QXmppOmemoManager::trustLevelsChanged(const QMultiHash<QString, QByteArray> &modifiedKeys)
 
-///
-/// \fn QXmppOmemoManager::deviceAdded(const QString &jid, uint32_t deviceId)
-///
-/// Emitted when a device is added.
-///
-/// \param jid device owner's bare JID
-/// \param deviceId ID of the device
-///
+    Emitted when the trust levels of keys changed. \a modifiedKeys maps key
+    owners' bare JIDs to their modified keys.
+*/
 
-///
-/// \fn QXmppOmemoManager::deviceChanged(const QString &jid, uint32_t deviceId)
-///
-/// Emitted when a device changed.
-///
-/// \param jid device owner's bare JID
-/// \param deviceId ID of the device
-///
+/*!
+    \fn QXmppOmemoManager::deviceAdded(const QString &jid, uint32_t deviceId)
 
-///
-/// \fn QXmppOmemoManager::deviceRemoved(const QString &jid, uint32_t deviceId)
-///
-/// Emitted when a device is removed.
-///
-/// \param jid device owner's bare JID
-/// \param deviceId ID of the device
-///
+    Emitted when a device is added. \a jid is the device owner's bare JID and
+    \a deviceId is the ID of the device.
+*/
 
-///
-/// \fn QXmppOmemoManager::devicesRemoved(const QString &jid)
-///
-/// Emitted when all devices of an owner are removed.
-///
-/// \param jid device owner's bare JID
-///
+/*!
+    \fn QXmppOmemoManager::deviceChanged(const QString &jid, uint32_t deviceId)
 
-///
-/// \fn QXmppOmemoManager::allDevicesRemoved()
-///
-/// Emitted when all devices are removed.
-///
+    Emitted when a device changed. \a jid is the device owner's bare JID and
+    \a deviceId is the ID of the device.
+*/
 
-/// \cond
+/*!
+    \fn QXmppOmemoManager::deviceRemoved(const QString &jid, uint32_t deviceId)
+
+    Emitted when a device is removed. \a jid is the device owner's bare JID
+    and \a deviceId is the ID of the device.
+*/
+
+/*!
+    \fn QXmppOmemoManager::devicesRemoved(const QString &jid)
+
+    Emitted when all devices of the owner with bare JID \a jid are removed.
+*/
+
+/*!
+    \fn QXmppOmemoManager::allDevicesRemoved()
+
+    Emitted when all devices are removed.
+*/
+
 void Manager::onRegistered(QXmppClient *client)
 {
     d->trustManager = client->findExtension<QXmppTrustManager>();
@@ -1220,7 +1132,7 @@ bool Manager::handlePubSubEvent(const QDomElement &element, const QString &pubSu
             // notification-only events.
             if (const auto &items = event.items(); !items.isEmpty()) {
                 // Since the usage of the item ID \c QXmppPubSubManager::Current is only RECOMMENDED
-                // by \xep{0060, Publish-Subscribe} (PubSub) but not obligatory, an appropriate
+                // by \xep{0060}{Publish-Subscribe} (PubSub) but not obligatory, an appropriate
                 // contact device list is determined.
                 // In case of the own device list node, it is sctrictly processed as a recommended
                 // singleton item and changed to fit that if needed.
@@ -1259,4 +1171,3 @@ bool Manager::handlePubSubEvent(const QDomElement &element, const QString &pubSu
 
     return false;
 }
-/// \endcond

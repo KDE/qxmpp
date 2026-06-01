@@ -8,7 +8,6 @@
 
 #include "QXmppIq.h"
 
-/// \cond
 #if QXMPP_DEPRECATED_SINCE(1, 12)
 class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API") QXmppBindIq : public QXmppIq
 {
@@ -34,6 +33,5 @@ private:
     QString m_resource;
 };
 #endif
-/// \endcond
 
 #endif  // QXMPPBIND_H

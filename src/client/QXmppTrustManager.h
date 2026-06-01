@@ -47,12 +47,10 @@ public:
     Q_SIGNAL void trustLevelsChanged(const QHash<QString, QMultiHash<QString, QByteArray>> &modifiedKeys);
 
 protected:
-    /// \cond
     inline QXmppTrustStorage *trustStorage() const
     {
         return m_trustStorage;
     }
-    /// \endcond
 
 private:
     QXmppTrustStorage *m_trustStorage;

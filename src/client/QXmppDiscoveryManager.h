@@ -22,22 +22,22 @@ class QXmppDiscoveryIq;
 class QXmppDiscoveryManagerPrivate;
 struct QXmppError;
 
-///
-/// \brief Lightweight handle to a service discovery watch.
-///
-/// Returned by QXmppDiscoveryManager::discoverServices(). Provides reactive access
-/// to discovered server services matching a filter. Cheap to copy — all copies
-/// share the same underlying state. When the last copy goes out of scope, the
-/// watch is automatically unregistered from the discovery manager.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Lightweight handle to a service discovery watch.
+
+    Returned by QXmppDiscoveryManager::discoverServices(). Provides reactive access
+    to discovered server services matching a filter. Cheap to copy — all copies
+    share the same underlying state. When the last copy goes out of scope, the
+    watch is automatically unregistered from the discovery manager.
+
+    \since QXmpp 1.16
+*/
 class QXMPP_EXPORT QXmppDiscoServicesWatch
 {
 public:
-    /// Whether all discovery queries have completed.
     QBindable<bool> loaded() const;
-    /// The list of discovered services matching the filter.
     QBindable<QList<QXmppDiscoService>> services() const;
 
 private:
@@ -57,13 +57,14 @@ class QXMPP_EXPORT QXmppDiscoveryManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
-    /// Policies for how cached service discovery information is used.
+    /*!
+        Policies for how cached service discovery information is used.
+
+        \value Strict Always ensure the data is up-to-date. Cached data may be used only if it is guaranteed to be current (e.g. via entity capabilities).
+        \value Relaxed Cached data may be used even if it is not guaranteed to be current, within the configured limits.
+    */
     enum class CachePolicy {
-        /// Always ensure the data is up-to-date. Cached data may be used only if it is guaranteed
-        /// to be current (e.g. via entity capabilities).
         Strict,
-        /// Cached data may be used even if it is not guaranteed to be current, within the
-        /// configured limits.
         Relaxed,
     };
 
@@ -87,19 +88,21 @@ public:
 
     QXmppDiscoInfo buildClientInfo() const;
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
-    /// \endcond
 
 #if QXMPP_DEPRECATED_SINCE(1, 13)
-    /// This signal is emitted when an information response is received.
-    /// \deprecated
+    /*!
+        This signal is emitted when an information response is received.
+        \deprecated
+    */
     [[deprecated("Use info()")]]
     Q_SIGNAL void infoReceived(const QXmppDiscoveryIq &);
 
-    /// This signal is emitted when an items response is received.
-    /// \deprecated
+    /*!
+        This signal is emitted when an items response is received.
+        \deprecated
+    */
     [[deprecated("Use items()")]]
     Q_SIGNAL void itemsReceived(const QXmppDiscoveryIq &);
 #endif

@@ -14,7 +14,6 @@ public:
     QXmppBitsOfBinaryIq();
     ~QXmppBitsOfBinaryIq() override;
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"data", QXmpp::Private::ns_oob };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isBitsOfBinaryIq(const QDomElement &element);
@@ -22,7 +21,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 };
 
 #endif  // QXMPPBITSOFBINARYIQ_H

@@ -12,14 +12,16 @@
 class QXmppPushEnableIqPrivate;
 class QXmppDataForm;
 
-///
-/// \brief This class represents an IQ to enable or disablepush notifications
-/// on the user server.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.3
-///
+/*!
+    \inmodule QXmpp
+
+    \brief This class represents an IQ to enable or disablepush notifications
+    on the user server.
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.3
+*/
 class QXMPP_EXPORT QXmppPushEnableIq : public QXmppIq
 {
 public:
@@ -30,10 +32,13 @@ public:
     QXmppPushEnableIq &operator=(const QXmppPushEnableIq &);
     QXmppPushEnableIq &operator=(QXmppPushEnableIq &&);
 
-    ///
-    /// \brief The Mode enum describes whether the IQ should enable or disable
-    /// push notifications
-    ///
+    /*!
+        \brief The Mode enum describes whether the IQ should enable or disable
+        push notifications
+
+        \value Enable
+        \value Disable
+    */
     enum Mode : bool {
         Enable = true,
         Disable = false
@@ -54,10 +59,8 @@ public:
     static bool isPushEnableIq(const QDomElement &element);
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppPushEnableIqPrivate> d;

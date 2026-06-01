@@ -65,16 +65,17 @@ public:
     FileSources sources;
 };
 
-///
-/// \class QXmppFileSourcesAttachment
-///
-/// Attachment of file sources to a previous file sharing element from \xep{0447, Stateless file
-/// sharing}.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \class QXmppFileSourcesAttachment
+    \inmodule QXmpp
 
-/// Default constructor
+    Attachment of file sources to a previous file sharing element from \xep{0447}{Stateless file
+    sharing}.
+
+    \since QXmpp 1.7
+*/
+
+/*! Default constructor */
 QXmppFileSourcesAttachment::QXmppFileSourcesAttachment()
     : d(new QXmppFileSourcesAttachmentPrivate)
 {
@@ -82,49 +83,49 @@ QXmppFileSourcesAttachment::QXmppFileSourcesAttachment()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFileSourcesAttachment)
 
-///
-/// Returns the ID of the referenced file-sharing element.
-///
+/*! Returns the ID of the referenced file-sharing element. */
 const QString &QXmppFileSourcesAttachment::id() const
 {
     return d->id;
 }
 
-///
-/// Sets the ID of the referenced file-sharing element.
-///
+/*!
+    Sets the ID of the referenced file-sharing element.
+
+    \a id.
+*/
 void QXmppFileSourcesAttachment::setId(const QString &id)
 {
     d->id = id;
 }
 
-///
-/// Returns the HTTP sources for this file.
-///
+/*! Returns the HTTP sources for this file. */
 const QVector<QXmppHttpFileSource> &QXmppFileSourcesAttachment::httpSources() const
 {
     return d->sources.httpSources;
 }
 
-///
-/// Sets the HTTP sources for this file.
-///
+/*!
+    Sets the HTTP sources for this file.
+
+    \a newHttpSources.
+*/
 void QXmppFileSourcesAttachment::setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources)
 {
     d->sources.httpSources = newHttpSources;
 }
 
-///
-/// Returns the encrypted sources for this file.
-///
+/*! Returns the encrypted sources for this file. */
 const QVector<QXmppEncryptedFileSource> &QXmppFileSourcesAttachment::encryptedSources() const
 {
     return d->sources.encryptedSources;
 }
 
-///
-/// Sets the encrypted sources for this file.
-///
+/*!
+    Sets the encrypted sources for this file.
+
+    \a newEncryptedSources.
+*/
 void QXmppFileSourcesAttachment::setEncryptedSources(const QVector<QXmppEncryptedFileSource> &newEncryptedSources)
 {
     d->sources.encryptedSources = newEncryptedSources;
@@ -141,7 +142,11 @@ std::optional<QXmppFileSourcesAttachment> QXmppFileSourcesAttachment::fromDom(co
     return result;
 }
 
-/// Serialize to XML
+/*!
+    Serialize to XML
+
+    \a writer.
+*/
 void QXmppFileSourcesAttachment::toXml(QXmpp::Private::XmlWriter &writer) const
 {
     writer.write(Element {
@@ -160,25 +165,29 @@ public:
     QXmppFileShare::Disposition disposition = Disposition::Inline;
 };
 
-///
-/// \class QXmppFileShare
-///
-/// File sharing element from \xep{0447, Stateless file sharing}. Contains
-/// metadata and source URLs.
-///
-/// \note jinglepub references are currently missing
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppFileShare
+    \inmodule QXmpp
 
-///
-/// \enum QXmppFileShare::Disposition
-///
-/// \brief Decides whether to display the file contents (e.g. an image) inline in the chat or as
-/// a file.
-///
+    File sharing element from \xep{0447}{Stateless file sharing}. Contains
+    metadata and source URLs.
 
-/// Default constructor
+    \note jinglepub references are currently missing
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \enum QXmppFileShare::Disposition
+
+    \brief Decides whether to display the file contents (e.g. an image) inline in the chat or as
+    a file.
+
+    \value Inline
+    \value Attachment
+*/
+
+/*! Default constructor */
 QXmppFileShare::QXmppFileShare()
     : d(new QXmppFileSharePrivate)
 {
@@ -186,87 +195,92 @@ QXmppFileShare::QXmppFileShare()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFileShare)
 
-/// Returns the disposition setting for this file.
+/*! Returns the disposition setting for this file. */
 QXmppFileShare::Disposition QXmppFileShare::disposition() const
 {
     return d->disposition;
 }
 
-/// Sets the disposition setting for this file.
+/*!
+    Sets the disposition setting for this file.
+
+    \a disp.
+*/
 void QXmppFileShare::setDisposition(Disposition disp)
 {
     d->disposition = disp;
 }
 
-///
-/// Returns the ID of this file element.
-///
-/// This is useful for attaching sources to one of multiple files in a message.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Returns the ID of this file element.
+
+    This is useful for attaching sources to one of multiple files in a message.
+
+    \since QXmpp 1.7
+*/
 const QString &QXmppFileShare::id() const
 {
     return d->id;
 }
 
-///
-/// Sets the ID of this file element.
-///
-/// This is useful for attaching sources to one of multiple files in a message.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    Sets the ID of this file element.
+
+    This is useful for attaching sources to one of multiple files in a message.
+
+    \since QXmpp 1.7
+
+    \a id.
+*/
 void QXmppFileShare::setId(const QString &id)
 {
     d->id = id;
 }
 
-/// Returns the metadata of the shared file.
+/*! Returns the metadata of the shared file. */
 const QXmppFileMetadata &QXmppFileShare::metadata() const
 {
     return d->metadata;
 }
 
-/// Sets the metadata of the shared file.
+/*! Sets the \a metadata of the shared file. */
 void QXmppFileShare::setMetadata(const QXmppFileMetadata &metadata)
 {
     d->metadata = metadata;
 }
 
-///
-/// Returns the HTTP sources for this file.
-///
+/*! Returns the HTTP sources for this file. */
 const QVector<QXmppHttpFileSource> &QXmppFileShare::httpSources() const
 {
     return d->sources.httpSources;
 }
 
-///
-/// Sets the HTTP sources for this file.
-///
+/*!
+    Sets the HTTP sources for this file.
+
+    \a newHttpSources.
+*/
 void QXmppFileShare::setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources)
 {
     d->sources.httpSources = newHttpSources;
 }
 
-///
-/// Returns the encrypted sources for this file.
-///
+/*! Returns the encrypted sources for this file. */
 const QVector<QXmppEncryptedFileSource> &QXmppFileShare::encryptedSources() const
 {
     return d->sources.encryptedSources;
 }
 
-///
-/// Sets the encrypted sources for this file.
-///
+/*!
+    Sets the encrypted sources for this file.
+
+    \a newEncryptedSources.
+*/
 void QXmppFileShare::setEncryptedSourecs(const QVector<QXmppEncryptedFileSource> &newEncryptedSources)
 {
     d->sources.encryptedSources = newEncryptedSources;
 }
 
-/// \cond
 void QXmppFileShare::visitSources(std::function<bool(const std::any &)> &&visitor) const
 {
     for (const auto &httpSource : d->sources.httpSources) {
@@ -324,4 +338,3 @@ void QXmppFileShare::toXml(QXmlStreamWriter *writer) const
         Element { u"sources", d->sources },
     });
 }
-/// \endcond

@@ -25,22 +25,28 @@ class QXmppServerPrivate;
 class QXmppSslServer;
 class QXmppStanza;
 
-///
-/// \brief The QXmppServer class represents an XMPP server.
-///
-/// It provides support for both client-to-server and server-to-server
-/// communications, SSL encryption and logging facilities.
-///
-/// QXmppServer comes with a number of modules for service discovery,
-/// XMPP ping, statistics and file transfer proxy support. You can write
-/// your own extensions for QXmppServer by subclassing QXmppServerExtension.
-///
-/// \ingroup Core
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppServer class represents an XMPP server.
+
+    It provides support for both client-to-server and server-to-server
+    communications, SSL encryption and logging facilities.
+
+    QXmppServer comes with a number of modules for service discovery,
+    XMPP ping, statistics and file transfer proxy support. You can write
+    your own extensions for QXmppServer by subclassing QXmppServerExtension.
+
+    \ingroup Core
+*/
 class QXMPP_EXPORT QXmppServer : public QXmppLoggable
 {
     Q_OBJECT
-    /// The QXmppLogger associated with the server
+    /*!
+        \property QXmppServer::logger
+
+        The QXmppLogger associated with the server
+    */
     Q_PROPERTY(QXmppLogger *logger READ logger WRITE setLogger NOTIFY loggerChanged)
 
 public:
@@ -54,7 +60,7 @@ public:
     void setDomain(const QString &domain);
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Returns the QXmppLogger associated with the server.
+    /*! Returns the QXmppLogger associated with the server. */
     QXmppLogger *logger();
     void setLogger(QXmppLogger *logger);
 
@@ -78,13 +84,21 @@ public:
 
     void addIncomingClient(QXmppIncomingClient *stream);
 
-    /// This signal is emitted when a client has connected.
+    /*!
+        This signal is emitted when a client has connected.
+
+        \a jid.
+    */
     Q_SIGNAL void clientConnected(const QString &jid);
 
-    /// This signal is emitted when a client has disconnected.
+    /*!
+        This signal is emitted when a client has disconnected.
+
+        \a jid.
+    */
     Q_SIGNAL void clientDisconnected(const QString &jid);
 
-    /// This signal is emitted when the logger changes.
+    /*! This signal is emitted when the \a logger changes. */
     Q_SIGNAL void loggerChanged(QXmppLogger *logger);
 
     Q_SLOT void handleElement(const QDomElement &element);
@@ -105,8 +119,11 @@ private:
 
 class QXmppSslServerPrivate;
 
-/// \brief The QXmppSslServer class represents an SSL-enabled TCP server.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppSslServer class represents an SSL-enabled TCP server.
+*/
 
 class QXMPP_EXPORT QXmppSslServer : public QTcpServer
 {
@@ -120,7 +137,11 @@ public:
     void setLocalCertificate(const QSslCertificate &certificate);
     void setPrivateKey(const QSslKey &key);
 
-    /// This signal is emitted when a new connection is established.
+    /*!
+        This signal is emitted when a new connection is established.
+
+        \a socket.
+    */
     Q_SIGNAL void newConnection(QSslSocket *socket);
 
 private:

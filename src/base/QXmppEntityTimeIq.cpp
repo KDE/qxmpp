@@ -27,43 +27,34 @@ struct QXmpp::Private::StringSerializer<TimezoneOffset> {
     }
 };
 
-///
-/// Returns the timezone offset in seconds.
-///
+/*! Returns the timezone offset in seconds. */
 int QXmppEntityTimeIq::tzo() const
 {
     return m_tzo;
 }
 
-///
-/// Sets the timezone offset in seconds.
-///
-/// \param tzo
-///
+/*!
+    Sets the timezone offset in seconds to \a tzo.
+*/
 void QXmppEntityTimeIq::setTzo(int tzo)
 {
     m_tzo = tzo;
 }
 
-///
-/// Returns the date/time in Coordinated Universal Time (UTC).
-///
+/*! Returns the date/time in Coordinated Universal Time (UTC). */
 QDateTime QXmppEntityTimeIq::utc() const
 {
     return m_utc;
 }
 
-///
-/// Sets the date/time in Coordinated Universal Time (UTC).
-///
-/// \param utc
-///
+/*!
+    Sets the date/time in Coordinated Universal Time (UTC) to \a utc.
+*/
 void QXmppEntityTimeIq::setUtc(const QDateTime &utc)
 {
     m_utc = utc;
 }
 
-/// \cond
 void QXmppEntityTimeIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement timeElement = firstChildElement(element, u"time");
@@ -82,4 +73,3 @@ void QXmppEntityTimeIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond

@@ -12,11 +12,23 @@ using namespace Qt::Literals::StringLiterals;
 
 namespace QXmpp::Private {
 
-/// Creates a QString from a QStringView with static storage duration without copying.
-///
-/// Constructs a QString with a null QArrayData header, same as QStringLiteral. This means
-/// no ref-counting, no heap allocation, and no deallocation. Only safe for QStringViews
-/// backed by static storage (e.g. inline constexpr QStringView literals).
+/*!
+    \namespace QXmpp::Private
+    \inmodule QXmpp
+    \internal
+*/
+
+/*!
+    \internal
+
+    Creates a QString from a QStringView with static storage duration without copying.
+
+    Constructs a QString with a null QArrayData header, same as QStringLiteral. This means
+    no ref-counting, no heap allocation, and no deallocation. Only safe for QStringViews
+    backed by static storage (e.g. inline constexpr QStringView literals).
+
+    \a sv.
+*/
 inline QString staticString(QStringView sv)
 {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)

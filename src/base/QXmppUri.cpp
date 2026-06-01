@@ -34,123 +34,137 @@ static QString queryItemValue(const QUrlQuery &query, const QString &key)
     return query.queryItemValue(key, QUrl::FullyDecoded);
 }
 
-///
-/// \namespace QXmpp::Uri
-///
-/// Contains URI classes that can be serialized to URI queries (see QXmppUri).
-///
-/// \since QXmpp 1.8
-///
+/*!
+    \namespace QXmpp::Uri
+    \inmodule QXmpp
+
+    Contains URI classes that can be serialized to URI queries (see QXmppUri).
+
+    \since QXmpp 1.8
+*/
 
 namespace QXmpp::Uri {
 
-///
-/// \struct Command
-///
-/// A "command" query from \xep{0050, Ad-Hoc Commands}.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    \struct QXmpp::Uri::Command
+    \inmodule QXmpp
 
-///
-/// \struct Invite
-///
-/// An "invite" query from \xep{0045, Multi-User Chat}.
-///
-/// \since QXmpp 1.8
-///
+    A "command" query from \xep{0050}{Ad-Hoc Commands}.
 
-///
-/// \struct Join
-///
-/// A "join" query from \xep{0045, Multi-User Chat}.
-///
-/// \since QXmpp 1.8
-///
+    \since QXmpp 1.8
+*/
 
-///
-/// \struct Login
-///
-/// A "login" query, not formally specified.
-///
-/// Used in the wild, e.g. by Kaidan.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    \struct QXmpp::Uri::Invite
+    \inmodule QXmpp
 
-///
-/// \struct Message
-///
-/// A "message" query defined in \xep{0147, XMPP URI Scheme Query Components}.
-///
-/// \since QXmpp 1.8
-///
+    An "invite" query from \xep{0045}{Multi-User Chat}.
 
-///
-/// \struct Unregister
-///
-/// An "unregister" query defined in \xep{0077, In-Band Registration}.
-///
-/// \since QXmpp 1.8
-///
+    \since QXmpp 1.8
+*/
 
-///
-/// \struct Unsubscribe
-///
-/// An "unsubscribe" query defined in \xep{0147, XMPP URI Scheme Query Components}.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    \struct QXmpp::Uri::Join
+    \inmodule QXmpp
 
-///
-/// \struct Register
-///
-/// A "register" query defined in \xep{0077, In-Band Registration}.
-///
-/// \since QXmpp 1.8
-///
+    A "join" query from \xep{0045}{Multi-User Chat}.
 
-///
-/// \struct Remove
-///
-/// A "remove" query defined in \xep{0147, XMPP URI Scheme Query Components}.
-///
-/// \since QXmpp 1.8
-///
+    \since QXmpp 1.8
+*/
 
-///
-/// \struct Roster
-///
-/// A "roster" query defined in \xep{0147, XMPP URI Scheme Query Components}.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    \struct QXmpp::Uri::Login
+    \inmodule QXmpp
 
-///
-/// \struct Subscribe
-///
-/// A "subscribe" query defined in \xep{0147, XMPP URI Scheme Query Components}.
-///
-/// \since QXmpp 1.8
-///
+    A "login" query, not formally specified.
 
-///
-/// \struct TrustMessage
-///
-/// A "trust-message" query defined in \xep{0434, Trust Messages (TM)}.
-///
-/// \since QXmpp 1.8
-///
+    Used in the wild, e.g. by Kaidan.
 
-///
-/// \struct CustomQuery
-///
-/// A query with a custom name and custom key-value pairs.
-///
-/// Queries will be parsed into this type if they are unknown.
-///
-/// \since QXmpp 1.8
-///
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::Message
+    \inmodule QXmpp
+
+    A "message" query defined in \xep{0147}{XMPP URI Scheme Query Components}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::Unregister
+    \inmodule QXmpp
+
+    An "unregister" query defined in \xep{0077}{In-Band Registration}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::Unsubscribe
+    \inmodule QXmpp
+
+    An "unsubscribe" query defined in \xep{0147}{XMPP URI Scheme Query Components}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::Register
+    \inmodule QXmpp
+
+    A "register" query defined in \xep{0077}{In-Band Registration}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::Remove
+    \inmodule QXmpp
+
+    A "remove" query defined in \xep{0147}{XMPP URI Scheme Query Components}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::Roster
+    \inmodule QXmpp
+
+    A "roster" query defined in \xep{0147}{XMPP URI Scheme Query Components}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::Subscribe
+    \inmodule QXmpp
+
+    A "subscribe" query defined in \xep{0147}{XMPP URI Scheme Query Components}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::TrustMessage
+    \inmodule QXmpp
+
+    A "trust-message" query defined in \xep{0434}{Trust Messages (TM)}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::CustomQuery
+    \inmodule QXmpp
+
+    A query with a custom name and custom key-value pairs.
+
+    Queries will be parsed into this type if they are unknown.
+
+    \since QXmpp 1.8
+*/
 
 }  // namespace QXmpp::Uri
 
@@ -326,34 +340,33 @@ struct QXmppUriPrivate : QSharedData {
     std::any query;
 };
 
-///
-/// \class QXmppUri
-///
-/// This class represents an XMPP URI as specified by RFC 5122 -  Internationalized Resource
-/// Identifiers (IRIs) and Uniform Resource Identifiers (URIs) for the Extensible Messaging and
-/// Presence Protocol (XMPP) and XEP-0147: XMPP URI Scheme Query Components.
-///
-/// A QUrlQuery is used by this class to represent a query (component) of an XMPP URI. A query
-/// conisists of query items which can be the query type or a key-value pair.
-///
-/// A query type is used to perform an action while the key-value pairs are used to define its
-/// behavior.
-///
-/// Example:
-/// xmpp:alice@example.org?message;subject=Hello;body=world
-///
-/// query (component): message;subject=Hello;body=world
-/// query items: message, subject=Hello, body=world
-/// query type: message
-/// key-value pair 1: subject=Hello
-/// key-value pair 2: body=world
-///
-/// \since QXmpp 1.8
-///
+/*!
+    \class QXmppUri
+    \inmodule QXmpp
 
-///
-/// Creates an empty XMPP URI
-///
+    This class represents an XMPP URI as specified by RFC 5122 -  Internationalized Resource
+    Identifiers (IRIs) and Uniform Resource Identifiers (URIs) for the Extensible Messaging and
+    Presence Protocol (XMPP) and XEP-0147: XMPP URI Scheme Query Components.
+
+    A QUrlQuery is used by this class to represent a query (component) of an XMPP URI. A query
+    conisists of query items which can be the query type or a key-value pair.
+
+    A query type is used to perform an action while the key-value pairs are used to define its
+    behavior.
+
+    Example:
+    xmpp:alice@example.org?message;subject=Hello;body=world
+
+    query (component): message;subject=Hello;body=world
+    query items: message, subject=Hello, body=world
+    query type: message
+    key-value pair 1: subject=Hello
+    key-value pair 2: body=world
+
+    \since QXmpp 1.8
+*/
+
+/*! Creates an empty XMPP URI */
 QXmppUri::QXmppUri()
     : d(new QXmppUriPrivate)
 {
@@ -361,11 +374,9 @@ QXmppUri::QXmppUri()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppUri)
 
-///
-/// Parses an XMPP URI.
-///
-/// \return Parsed URI or an error if the string could not be parsed.
-///
+/*! Parses an XMPP URI from the string \a input.
+
+    Returns the parsed URI or an error if the string could not be parsed. Returns true on success. */
 std::variant<QXmppUri, QXmppError> QXmppUri::fromString(const QString &input)
 {
     QUrl url(input);
@@ -438,9 +449,7 @@ bool serialize(const std::any &query, QUrlQuery &urlQuery)
     return false;
 }
 
-///
-/// Serializes the URI to a string.
-///
+/*! Serializes the URI to a string. */
 QString QXmppUri::toString()
 {
     QUrl url;
@@ -472,30 +481,32 @@ QString QXmppUri::toString()
     return QString::fromUtf8(url.toEncoded(QUrl::FullyEncoded));
 }
 
-///
-/// Returns the JID this URI is about.
-///
-/// This can also be e.g. a MUC room in case of a Join action.
-///
+/*!
+    Returns the JID this URI is about.
+
+    This can also be e.g. a MUC room in case of a Join action.
+*/
 QString QXmppUri::jid() const
 {
     return d->jid;
 }
 
-///
-/// Sets the JID this URI links to.
-///
+/*!
+    Sets the JID this URI links to.
+
+    \a jid.
+*/
 void QXmppUri::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
-///
-/// Returns the query of the URI.
-///
-/// It may be empty (has_value() returns false). Possible URI types are available in the namespace
-/// QXmpp::Uri.
-///
+/*!
+    Returns the query of the URI.
+
+    It may be empty (has_value() returns false). Possible URI types are available in the namespace
+    QXmpp::Uri.
+*/
 std::any QXmppUri::query() const
 {
     return d->query;

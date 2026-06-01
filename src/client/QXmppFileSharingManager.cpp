@@ -57,61 +57,59 @@ public:
     bool success = false;
 };
 
-///
-/// \class QXmppFileUpload
-///
-/// \brief Provides progress of stateless file sharing uploads.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppFileUpload
+    \inmodule QXmpp
 
-///
-/// \class QXmppFileUpload::FileResult
-///
-/// \brief Contains QXmppFileShare of the uploaded file and possible data blobs containing
-/// referenced thumbnails.
-///
+    \brief Provides progress of stateless file sharing uploads.
 
-///
-/// \var QXmppFileUpload::FileResult::fileShare
-///
-/// \brief File share with file metadata and file shares of the uploaded file.
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \var QXmppFileUpload::FileResult::dataBlobs
-///
-/// \brief Data blobs of possibly in the metadata referenced thumbnails.
-///
-/// The QXmppFileSharingManager may generate file thumbnails.
-///
+/*!
+    \class QXmppFileUpload::FileResult
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppFileUpload::Result
-///
-/// \brief Contains FileResult (successfully finished), QXmpp::Cancelled (manually cancelled)
-/// or QXmppError (an error occured while uploading).
-///
+    \brief Contains QXmppFileShare of the uploaded file and possible data blobs containing
+    referenced thumbnails.
+*/
+
+/*!
+    \variable QXmppFileUpload::FileResult::fileShare
+
+    \brief File share with file metadata and file shares of the uploaded file.
+*/
+
+/*!
+    \variable QXmppFileUpload::FileResult::dataBlobs
+
+    \brief Data blobs of possibly in the metadata referenced thumbnails.
+
+    The QXmppFileSharingManager may generate file thumbnails.
+*/
+
+/*!
+    \typedef QXmppFileUpload::Result
+
+    \brief Contains FileResult (successfully finished), QXmpp::Cancelled (manually cancelled)
+    or QXmppError (an error occured while uploading).
+*/
 
 QXmppFileUpload::~QXmppFileUpload() = default;
 
-///
-/// Returns the current progress between 0.0 and 1.0.
-///
+/*! Returns the current progress between 0.0 and 1.0. */
 float QXmppFileUpload::progress() const
 {
     return calculateProgress(d->bytesSent, d->bytesTotal);
 }
 
-///
-/// \fn QXmppFileUpload::progressChanged()
-///
-/// \brief Emitted when new bytes have been transferred.
-///
+/*!
+    \fn QXmppFileUpload::progressChanged()
 
-///
-/// \brief Cancels the file transfer. finished() will be emitted.
-///
+    \brief Emitted when new bytes have been transferred.
+*/
+
+/*! \brief Cancels the file transfer. finished() will be emitted. */
 void QXmppFileUpload::cancel()
 {
     if (d->providerUpload) {
@@ -121,35 +119,29 @@ void QXmppFileUpload::cancel()
     d->hashesFuture.cancel();
 }
 
-///
-/// \brief Returns whether the file transfer is finished.
-///
+/*! \brief Returns whether the file transfer is finished. */
 bool QXmppFileUpload::isFinished() const
 {
     return d->finished;
 }
 
-///
-/// \brief Returns the number of bytes that have been uploaded or downloaded.
-///
+/*! \brief Returns the number of bytes that have been uploaded or downloaded. */
 quint64 QXmppFileUpload::bytesTransferred() const
 {
     return d->bytesSent;
 }
 
-///
-/// \brief Returns the number of bytes that totally need to be transferred.
-///
+/*! \brief Returns the number of bytes that totally need to be transferred. */
 quint64 QXmppFileUpload::bytesTotal() const
 {
     return d->bytesTotal;
 }
 
-///
-/// \brief Returns the result of the upload.
-///
-/// The upload must be finished when calling this.
-///
+/*!
+    \brief Returns the result of the upload.
+
+    The upload must be finished when calling this.
+*/
 QXmppFileUpload::Result QXmppFileUpload::result() const
 {
     Q_ASSERT(d->finished);
@@ -171,11 +163,11 @@ QXmppFileUpload::Result QXmppFileUpload::result() const
     Q_UNREACHABLE();
 }
 
-///
-/// \fn QXmppFileUpload::finished
-///
-/// Emitted when the upload has finished.
-///
+/*!
+    \fn void QXmppFileUpload::finished()
+
+    Emitted when the upload has finished.
+*/
 
 QXmppFileUpload::QXmppFileUpload()
     : d(std::make_unique<QXmppFileUploadPrivate>())
@@ -203,58 +195,50 @@ public:
     bool finished = false;
 };
 
-///
-/// \class QXmppFileDownload
-///
-/// \brief Provides progress of stateless file sharing uploads.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppFileDownload
+    \inmodule QXmpp
 
-///
-/// \enum QXmppFileDownload::HashVerificationResult
-///
-/// Describes the result of the hash verification.
-///
+    \brief Provides progress of stateless file sharing uploads.
 
-///
-/// \struct QXmppFileDownload::Downloaded
-///
-/// Indicates that the file could be downloaded.
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \var QXmppFileDownload::Downloaded::hashVerificationResult
-///
-/// Describes the result of the hash verification.
-///
+/*!
+    \struct QXmppFileDownload::Downloaded
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppFileDownload::Result
-///
-/// \brief Contains QXmpp::Success (successfully finished), QXmpp::Cancelled (manually cancelled)
-/// or QXmppError (an error occured while downloading).
-///
+    Indicates that the file could be downloaded.
+*/
+
+/*!
+    \variable QXmppFileDownload::Downloaded::hashVerificationResult
+
+    Describes the result of the hash verification.
+*/
+
+/*!
+    \typedef QXmppFileDownload::Result
+
+    \brief Contains QXmpp::Success (successfully finished), QXmpp::Cancelled (manually cancelled)
+    or QXmppError (an error occured while downloading).
+*/
 
 QXmppFileDownload::~QXmppFileDownload() = default;
 
-///
-/// Returns the current progress between 0.0 and 1.0.
-///
+/*! Returns the current progress between 0.0 and 1.0. */
 float QXmppFileDownload::progress() const
 {
     return calculateProgress(d->bytesReceived, d->bytesTotal);
 }
 
-///
-/// \fn QXmppFileDownload::progressChanged
-///
-/// \brief Emitted when new bytes have been transferred.
-///
+/*!
+    \fn void QXmppFileDownload::progressChanged()
 
-///
-/// \brief Cancels the file transfer. finished() will be emitted.
-///
+    \brief Emitted when new bytes have been transferred.
+*/
+
+/*! \brief Cancels the file transfer. finished() will be emitted. */
 void QXmppFileDownload::cancel()
 {
     if (d->providerDownload) {
@@ -263,46 +247,40 @@ void QXmppFileDownload::cancel()
     d->hashesFuture.cancel();
 }
 
-///
-/// \brief Returns whether the file transfer is finished.
-///
+/*! \brief Returns whether the file transfer is finished. */
 bool QXmppFileDownload::isFinished() const
 {
     return d->finished;
 }
 
-///
-/// \brief Returns the number of bytes that have been uploaded or downloaded.
-///
+/*! \brief Returns the number of bytes that have been uploaded or downloaded. */
 quint64 QXmppFileDownload::bytesTransferred() const
 {
     return d->bytesReceived;
 }
 
-///
-/// \brief Returns the number of bytes that totally need to be transferred.
-///
+/*! \brief Returns the number of bytes that totally need to be transferred. */
 quint64 QXmppFileDownload::bytesTotal() const
 {
     return d->bytesTotal;
 }
 
-///
-/// \brief Returns the result of the download.
-///
-/// The download must be finished when calling this.
-///
+/*!
+    \brief Returns the result of the download.
+
+    The download must be finished when calling this.
+*/
 QXmppFileDownload::Result QXmppFileDownload::result() const
 {
     Q_ASSERT(d->finished);
     return d->result;
 }
 
-///
-/// \fn QXmppFileDownload::finished
-///
-/// Emitted when the download has finished.
-///
+/*!
+    \fn void QXmppFileDownload::finished()
+
+    Emitted when the download has finished.
+*/
 
 QXmppFileDownload::QXmppFileDownload()
     : d(std::make_unique<QXmppFileDownloadPrivate>())
@@ -332,25 +310,33 @@ public:
     std::unordered_map<std::type_index, std::shared_ptr<QXmppFileSharingProvider>> providers;
 };
 
-///
-/// \class QXmppFileSharingProvider
-///
-/// Base class for Stateless File Sharing providers
-///
-/// A provider defines the way that files can be uploaded and downloaded.
-///
-/// An example is the QXmppHttpFileSharingProvider, which uses HTTP File Upload.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppFileSharingProvider
+    \inmodule QXmpp
 
-///
-/// \class QXmppFileSharingManager
-///
-/// The file sharing manager allows to easily send and retrieve files in a chat.
-///
-/// \since QXmpp 1.5
-///
+    Base class for Stateless File Sharing providers
+
+    A provider defines the way that files can be uploaded and downloaded.
+
+    To use it, implement all the pure virtual functions, and add a using
+    declaration for the type of source you want to handle.
+    \code
+    using SourceType = QXmppHttpFileSource;
+    \endcode
+
+    An example is the QXmppHttpFileSharingProvider, which uses HTTP File Upload.
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \class QXmppFileSharingManager
+    \inmodule QXmpp
+
+    The file sharing manager allows to easily send and retrieve files in a chat.
+
+    \since QXmpp 1.5
+*/
 
 QXmppFileSharingManager::QXmppFileSharingManager()
     : d(std::make_unique<QXmppFileSharingManagerPrivate>())
@@ -359,33 +345,39 @@ QXmppFileSharingManager::QXmppFileSharingManager()
 
 QXmppFileSharingManager::~QXmppFileSharingManager() = default;
 
-///
-/// \typedef QXmppFileSharingManager::MetadataGenerator
-///
-/// The function signature of a metadata generator function
-///
+/*!
+    \typedef QXmppFileSharingManager::MetadataGenerator
 
-///
-/// \brief Register a function that is called when metadata needs to be gererated for a file.
-///
-/// The function is passed a QIODevice, so if you need the path of the file on disk,
-/// you can dynamically cast it to a QFile and access the fileName.
-/// When doing that, make sure to check the result,
-/// as in the future this function might be passed other QIODevices than QFile.
-///
+    The function signature of a metadata \a generator function
+
+    \a generator.
+*/
+
+/*!
+    \brief Register a function that is called when metadata needs to be gererated for a file.
+
+    The function is passed a QIODevice, so if you need the path of the file on disk,
+    you can dynamically cast it to a QFile and access the fileName.
+    When doing that, make sure to check the result,
+    as in the future this function might be passed other QIODevices than QFile.
+
+    \a generator.
+*/
 void QXmppFileSharingManager::setMetadataGenerator(MetadataGenerator &&generator)
 {
     d->metadataGenerator = std::move(generator);
 }
 
-///
-/// \brief Upload a file in a way that it can be attached to a message.
-/// \param provider The provider class decides how the file is uploaded
-/// \param filePath Path to a file that should be uploaded
-/// \param description Optional description of the file
-/// \return An object that allows to track the progress of the upload.
-///         Once the upload is finished, the finished signal is emitted on it.
-///
+/*!
+    \brief Upload a file in a way that it can be attached to a message.
+
+    \a provider is the provider class that decides how the file is uploaded. \a filePath is the
+    path to a file that should be uploaded. \a description is an optional description of the
+    file.
+
+    Returns an object that allows to track the progress of the upload.
+    Once the upload is finished, the finished signal is emitted on it.
+*/
 std::shared_ptr<QXmppFileUpload> QXmppFileSharingManager::uploadFile(std::shared_ptr<QXmppFileSharingProvider> provider,
                                                                      const QString &filePath,
                                                                      const std::optional<QString> &description)
@@ -487,19 +479,19 @@ std::shared_ptr<QXmppFileUpload> QXmppFileSharingManager::uploadFile(std::shared
     return upload;
 }
 
-///
-/// \brief Download a file from a QXmppFileShare
-///
-/// \warning This function currently does not check the hash of the downloaded file.
-///
-/// Make sure to register the provider
-/// that handles the sources used in this file share before calling this function.
-///
-/// \param fileShare The file share object which you want to download
-/// \param output An open QIODevice that the data should be written into.
-///               In most cases, a QFile
-/// \return An object that allows to track the progress of the download.
-///
+/*!
+    \brief Download a file from a QXmppFileShare
+
+    \warning This function currently does not check the hash of the downloaded file.
+
+    Make sure to register the provider
+    that handles the sources used in this file share before calling this function.
+
+    \a fileShare is the file share object which you want to download. \a output is an open
+    QIODevice that the data should be written into, in most cases a QFile.
+
+    Returns an object that allows to track the progress of the download.
+*/
 std::shared_ptr<QXmppFileDownload> QXmppFileSharingManager::downloadFile(
     const QXmppFileShare &fileShare,
     std::unique_ptr<QIODevice> output)

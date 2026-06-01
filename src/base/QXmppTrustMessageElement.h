@@ -36,11 +36,9 @@ public:
     void setKeyOwners(const QList<QXmppTrustMessageKeyOwner> &keyOwners);
     void addKeyOwner(const QXmppTrustMessageKeyOwner &keyOwner);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"trust-message", QXmpp::Private::ns_tm };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isTrustMessageElement(const QDomElement &element);
 

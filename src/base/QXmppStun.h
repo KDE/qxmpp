@@ -26,11 +26,13 @@ struct StunServer;
 struct TurnServer;
 }  // namespace QXmpp
 
-///
-/// \internal
-///
-/// The QXmppStunMessage class represents a STUN message.
-///
+/*!
+    \inmodule QXmpp
+
+    \internal
+
+    The QXmppStunMessage class represents a STUN message.
+*/
 class QXMPP_EXPORT QXmppStunMessage
 {
 public:
@@ -147,11 +149,13 @@ private:
     QString m_username;
 };
 
-///
-/// \brief The QXmppIceComponent class represents a piece of a media stream
-/// requiring a single transport address, as defined by RFC 5245
-/// (Interactive Connectivity Establishment).
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppIceComponent class represents a piece of a media stream
+    requiring a single transport address, as defined by RFC 5245
+    (Interactive Connectivity Establishment).
+*/
 class QXMPP_EXPORT QXmppIceComponent : public QXmppLoggable
 {
     Q_OBJECT
@@ -170,16 +174,20 @@ public:
     Q_SLOT void connectToHost();
     Q_SLOT qint64 sendDatagram(const QByteArray &datagram);
 
-    /// \brief This signal is emitted once ICE negotiation succeeds.
+    /*! \brief This signal is emitted once ICE negotiation succeeds. */
     Q_SIGNAL void connected();
 
-    /// \brief This signal is emitted when a data packet is received.
+    /*!
+        \brief This signal is emitted when a data packet is received.
+
+        \a datagram.
+    */
     Q_SIGNAL void datagramReceived(const QByteArray &datagram);
 
-    /// This signal is emitted when the gathering state of local candidates changes.
+    /*! This signal is emitted when the gathering state of local candidates changes. */
     Q_SIGNAL void gatheringStateChanged();
 
-    /// \brief This signal is emitted when the list of local candidates changes.
+    /*! \brief This signal is emitted when the list of local candidates changes. */
     Q_SIGNAL void localCandidatesChanged();
 
 private:
@@ -196,51 +204,58 @@ private:
     friend class QXmppIceConnection;
 };
 
-///
-/// \brief The QXmppIceConnection class represents a set of UDP sockets
-/// capable of performing Interactive Connectivity Establishment (RFC 5245).
-///
-/// A typical example is:
-///
-/// \code
-/// QXmppIceConnection *connection = new QXmppIceConnection();
-/// connection->setIceControlling(true);
-/// connection->addComponent(1);
-///
-/// // if needed, set STUN / TURN configuration
-/// // connection->setStunServer(..);
-/// // connection->setTurnServer(..);
-///
-/// // start listening
-/// connection->bind(QXmppIceComponent::discoverAddresses());
-///
-/// // receive remote information: user, password, candidates
-/// // ...
-///
-/// // set remote information and start connecting
-/// connection->setRemoteUser("foo");
-/// connection->setRemoteUser("bar");
-/// connection->addRemoteCandidate(..);
-/// connection->connectToHost();
-/// \endcode
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppIceConnection class represents a set of UDP sockets
+    capable of performing Interactive Connectivity Establishment (RFC 5245).
+
+    A typical example is:
+
+    \code
+    QXmppIceConnection *connection = new QXmppIceConnection();
+    connection->setIceControlling(true);
+    connection->addComponent(1);
+
+    // if needed, set STUN / TURN configuration
+    // connection->setStunServer(..);
+    // connection->setTurnServer(..);
+
+    // start listening
+    connection->bind(QXmppIceComponent::discoverAddresses());
+
+    // receive remote information: user, password, candidates
+    // ...
+
+    // set remote information and start connecting
+    connection->setRemoteUser("foo");
+    connection->setRemoteUser("bar");
+    connection->addRemoteCandidate(..);
+    connection->connectToHost();
+    \endcode
+*/
 class QXMPP_EXPORT QXmppIceConnection : public QXmppLoggable
 {
     Q_OBJECT
 
-    ///
-    /// The ICE gathering state, that is the discovery of local candidates
-    ///
-    /// \since QXmpp 0.9.3
-    ///
+    /*!
+        \property QXmppIceConnection::gatheringState
+
+        The ICE gathering state, that is the discovery of local candidates
+        \since QXmpp 0.9.3
+    */
     Q_PROPERTY(QXmppIceConnection::GatheringState gatheringState READ gatheringState NOTIFY gatheringStateChanged)
 
 public:
-    ///
-    /// This enum describes the gathering state of the ICE connection.
-    ///
-    /// \since QXmpp 0.9.3
-    ///
+    /*!
+        This enum describes the gathering state of the ICE connection.
+
+        \since QXmpp 0.9.3
+
+        \value NewGatheringState
+        \value BusyGatheringState
+        \value CompleteGatheringState
+    */
     enum GatheringState {
         NewGatheringState,
         BusyGatheringState,
@@ -282,28 +297,28 @@ public:
     bool isConnected() const;
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    ///
-    /// Returns the ICE gathering state, that is the discovery of local
-    /// candidates.
-    ///
-    /// \since QXmpp 0.9.3
-    ///
+    /*!
+        Returns the ICE gathering state, that is the discovery of local
+        candidates.
+
+        \since QXmpp 0.9.3
+    */
     GatheringState gatheringState() const;
 
-    /// \brief This signal is emitted once ICE negotiation succeeds.
+    /*! \brief This signal is emitted once ICE negotiation succeeds. */
     Q_SIGNAL void connected();
 
-    /// \brief This signal is emitted when ICE negotiation fails.
+    /*! \brief This signal is emitted when ICE negotiation fails. */
     Q_SIGNAL void disconnected();
 
-    ///
-    /// \brief This signal is emitted when the gathering state of local candidates changes.
-    ///
-    /// \since QXmpp 0.9.3
-    ///
+    /*!
+        \brief This signal is emitted when the gathering state of local candidates changes.
+
+        \since QXmpp 0.9.3
+    */
     Q_SIGNAL void gatheringStateChanged();
 
-    /// \brief This signal is emitted when the list of local candidates changes.
+    /*! \brief This signal is emitted when the list of local candidates changes. */
     Q_SIGNAL void localCandidatesChanged();
 
     Q_SLOT void close();

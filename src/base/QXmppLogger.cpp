@@ -107,9 +107,9 @@ static void relaySignals(QXmppLoggable *from, QXmppLoggable *to)
                      to, &QXmppLoggable::updateCounter);
 }
 
-/// Constructs a new QXmppLoggable.
-///
-/// \param parent
+/*!
+    Constructs a new QXmppLoggable with \a parent.
+*/
 
 QXmppLoggable::QXmppLoggable(QObject *parent)
     : QObject(parent)
@@ -120,7 +120,6 @@ QXmppLoggable::QXmppLoggable(QObject *parent)
     }
 }
 
-/// \cond
 void QXmppLoggable::childEvent(QChildEvent *event)
 {
     auto *child = qobject_cast<QXmppLoggable *>(event->child());
@@ -139,7 +138,6 @@ void QXmppLoggable::childEvent(QChildEvent *event)
                    this, &QXmppLoggable::updateCounter);
     }
 }
-/// \endcond
 
 class QXmppLoggerPrivate
 {
@@ -162,11 +160,9 @@ QXmppLoggerPrivate::QXmppLoggerPrivate()
 {
 }
 
-///
-/// Constructs a new QXmppLogger.
-///
-/// \param parent
-///
+/*!
+    Constructs a new QXmppLogger with \a parent.
+*/
 QXmppLogger::QXmppLogger(QObject *parent)
     : QObject(parent),
       d(std::make_unique<QXmppLoggerPrivate>())
@@ -177,9 +173,7 @@ QXmppLogger::QXmppLogger(QObject *parent)
 
 QXmppLogger::~QXmppLogger() = default;
 
-///
-/// Returns the default logger.
-///
+/*! Returns the default logger. */
 QXmppLogger *QXmppLogger::getLogger()
 {
     if (!m_logger) {
@@ -194,7 +188,11 @@ QXmppLogger::LoggingType QXmppLogger::loggingType()
     return d->loggingType;
 }
 
-/// Sets the handler for logging messages.
+/*!
+    Sets the handler for logging messages.
+
+    \a type.
+*/
 void QXmppLogger::setLoggingType(QXmppLogger::LoggingType type)
 {
     if (d->loggingType != type) {
@@ -204,20 +202,20 @@ void QXmppLogger::setLoggingType(QXmppLogger::LoggingType type)
     }
 }
 
-///
-/// \fn QXmppLogger::loggingTypeChanged()
-///
-/// Emitted when the logging type has been changed.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \fn QXmppLogger::loggingTypeChanged()
+
+    Emitted when the logging type has been changed.
+
+    \since QXmpp 1.7
+*/
 
 QXmppLogger::MessageTypes QXmppLogger::messageTypes()
 {
     return d->messageTypes;
 }
 
-/// Sets the types of messages to log.
+/*! Sets the \a types of messages to log. */
 void QXmppLogger::setMessageTypes(QXmppLogger::MessageTypes types)
 {
     if (d->messageTypes != types) {
@@ -226,15 +224,19 @@ void QXmppLogger::setMessageTypes(QXmppLogger::MessageTypes types)
     }
 }
 
-///
-/// \fn QXmppLogger::messageTypesChanged()
-///
-/// Emitted when the message types have been changed.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \fn QXmppLogger::messageTypesChanged()
 
-/// Add a logging message.
+    Emitted when the message types have been changed.
+
+    \since QXmpp 1.7
+*/
+
+/*!
+    Add a logging message.
+
+    \a type and \a text.
+*/
 void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
 {
     // filter messages
@@ -282,21 +284,21 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
     }
 }
 
-///
-/// Returns whether Sent/Received XML stanzas are pretty-printed.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Returns whether Sent/Received XML stanzas are pretty-printed.
+
+    \since QXmpp 1.16
+*/
 bool QXmppLogger::prettyXml() const
 {
     return d->prettyXml;
 }
 
-///
-/// Sets whether Sent/Received XML stanzas should be pretty-printed.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Sets whether Sent/Received XML stanzas should be pretty-printed (\a enable).
+
+    \since QXmpp 1.16
+*/
 void QXmppLogger::setPrettyXml(bool enable)
 {
     if (d->prettyXml != enable) {
@@ -305,21 +307,21 @@ void QXmppLogger::setPrettyXml(bool enable)
     }
 }
 
-///
-/// Returns the current ANSI color mode used for pretty-printed XML.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Returns the current ANSI color mode used for pretty-printed XML.
+
+    \since QXmpp 1.16
+*/
 QXmppLogger::ColorMode QXmppLogger::colorMode() const
 {
     return d->colorMode;
 }
 
-///
-/// Sets the ANSI color mode for pretty-printed XML. See ColorMode.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Sets the ANSI color \a mode for pretty-printed XML. See ColorMode.
+
+    \since QXmpp 1.16
+*/
 void QXmppLogger::setColorMode(QXmppLogger::ColorMode mode)
 {
     if (d->colorMode != mode) {
@@ -328,15 +330,15 @@ void QXmppLogger::setColorMode(QXmppLogger::ColorMode mode)
     }
 }
 
-///
-/// Enables pretty-printing of Sent/Received XML stanzas and sets ColorAuto so
-/// ANSI escapes appear on a TTY.
-///
-/// Equivalent to calling setPrettyXml(enable) and, if enabling,
-/// setColorMode(ColorAuto).
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Enables (\a enable) pretty-printing of Sent/Received XML stanzas and sets ColorAuto so
+    ANSI escapes appear on a TTY.
+
+    Equivalent to calling setPrettyXml(enable) and, if enabling,
+    setColorMode(ColorAuto).
+
+    \since QXmpp 1.16
+*/
 void QXmppLogger::enablePrettyXml(bool enable)
 {
     setPrettyXml(enable);
@@ -345,22 +347,22 @@ void QXmppLogger::enablePrettyXml(bool enable)
     }
 }
 
-///
-/// Sets the given \a gauge to \a value.
-///
-/// NOTE: the base implementation does nothing.
-///
+/*!
+    Sets the given \a gauge to \a value.
+
+    NOTE: the base implementation does nothing.
+*/
 void QXmppLogger::setGauge(const QString &gauge, double value)
 {
     Q_UNUSED(gauge)
     Q_UNUSED(value)
 }
 
-///
-/// Updates the given \a counter by \a amount.
-///
-/// NOTE: the base implementation does nothing.
-///
+/*!
+    Updates the given \a counter by \a amount.
+
+    NOTE: the base implementation does nothing.
+*/
 void QXmppLogger::updateCounter(const QString &counter, qint64 amount)
 {
     Q_UNUSED(counter)
@@ -372,13 +374,11 @@ QString QXmppLogger::logFilePath()
     return d->logFilePath;
 }
 
-///
-/// Sets the path to which logging messages should be written.
-///
-/// \param path
-///
-/// \sa setLoggingType()
-///
+/*!
+    Sets the path to which logging messages should be written to \a path.
+
+    \sa setLoggingType()
+*/
 void QXmppLogger::setLogFilePath(const QString &path)
 {
     if (d->logFilePath != path) {
@@ -388,15 +388,15 @@ void QXmppLogger::setLogFilePath(const QString &path)
     }
 }
 
-///
-/// \fn QXmppLogger::logFilePathChanged()
-///
-/// Emitted when the log file path has been changed.
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \fn QXmppLogger::logFilePathChanged()
 
-/// If logging to a file, causes the file to be re-opened.
+    Emitted when the log file path has been changed.
+
+    \since QXmpp 1.7
+*/
+
+/*! If logging to a file, causes the file to be re-opened. */
 void QXmppLogger::reopen()
 {
     if (d->logFile) {

@@ -21,10 +21,12 @@ namespace QXmpp::Private {
 struct StreamOpen;
 }
 
-///
-/// \brief The QXmppOutgoingServer class represents an outgoing XMPP stream
-/// to another XMPP server.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppOutgoingServer class represents an outgoing XMPP stream
+    to another XMPP server.
+*/
 class QXMPP_EXPORT QXmppOutgoingServer : public QXmppLoggable
 {
     Q_OBJECT
@@ -38,9 +40,9 @@ public:
     void disconnectFromHost();
     Q_SLOT void queueData(const QByteArray &data);
 
-    /// This signal is emitted when the stream is connected.
+    /*! This signal is emitted when the stream is connected. */
     Q_SIGNAL void connected();
-    /// This signal is emitted when the stream is disconnected.
+    /*! This signal is emitted when the stream is disconnected. */
     Q_SIGNAL void disconnected();
 
     bool sendData(const QByteArray &);
@@ -52,7 +54,7 @@ public:
 
     QString remoteDomain() const;
 
-    /// This signal is emitted when a dialback verify response is received.
+    /*! This signal is emitted when a dialback verify \a response is received. */
     Q_SIGNAL void dialbackResponseReceived(const QXmppDialback &response);
 
 private:

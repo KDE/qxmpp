@@ -75,23 +75,20 @@ QXmppElementPrivate::~QXmppElementPrivate()
     }
 }
 
-///
-/// \class QXmppElement
-///
-/// QXmppElement represents a raw XML element with possible children.
-///
+/*!
+    \class QXmppElement
+    \inmodule QXmpp
 
-///
-/// Default constructor
-///
+    QXmppElement represents a raw XML element with possible children.
+*/
+
+/*! Default constructor */
 QXmppElement::QXmppElement()
 {
     d = new QXmppElementPrivate();
 }
 
-///
-/// Copy constructor
-///
+/*! Copy constructor */
 QXmppElement::QXmppElement(const QXmppElement &other)
 {
     other.d->counter.ref();
@@ -104,9 +101,7 @@ QXmppElement::QXmppElement(QXmppElementPrivate *other)
     d = other;
 }
 
-///
-/// Copy-construct DOM element contents
-///
+/*! Copy-construct DOM element contents */
 QXmppElement::QXmppElement(const QDomElement &element)
 {
     d = new QXmppElementPrivate(element);
@@ -119,9 +114,7 @@ QXmppElement::~QXmppElement()
     }
 }
 
-///
-/// Assignment operator
-///
+/*! Assignment operator, copying \a other. */
 QXmppElement &QXmppElement::operator=(const QXmppElement &other)
 {
     // self-assignment check
@@ -135,12 +128,12 @@ QXmppElement &QXmppElement::operator=(const QXmppElement &other)
     return *this;
 }
 
-///
-/// Creates a DOM element from the source element
-///
-/// The source DOM element is saved as XML and needs to be parsed again in this
-/// step.
-///
+/*!
+    Creates a DOM element from the source element
+
+    The source DOM element is saved as XML and needs to be parsed again in this
+    step.
+*/
 QDomElement QXmppElement::sourceDomElement() const
 {
     if (d->serializedSource.isEmpty()) {
@@ -160,33 +153,29 @@ QDomElement QXmppElement::sourceDomElement() const
     return doc.documentElement();
 }
 
-///
-/// Returns the list of attributes
-///
+/*! Returns the list of attributes */
 QStringList QXmppElement::attributeNames() const
 {
     return d->attributes.keys();
 }
 
-///
-/// Returns an attribute by name
-///
+/*! Returns an attribute by \a name */
 QString QXmppElement::attribute(const QString &name) const
 {
     return d->attributes.value(name);
 }
 
-///
-/// Sets an attribute
-///
+/*!
+    Sets an attribute
+
+    \a name and \a value.
+*/
 void QXmppElement::setAttribute(const QString &name, const QString &value)
 {
     d->attributes.insert(name, value);
 }
 
-///
-/// Adds a child element
-///
+/*! Adds a \a child element */
 void QXmppElement::appendChild(const QXmppElement &child)
 {
     if (child.d->parent == d) {
@@ -202,10 +191,10 @@ void QXmppElement::appendChild(const QXmppElement &child)
     d->children.append(child.d);
 }
 
-///
-/// Returns the first child element with the given name or the first child
-/// element if the given name is empty.
-///
+/*!
+    Returns the first child element with the given \a name or the first child
+    element if the given \a name is empty.
+*/
 QXmppElement QXmppElement::firstChildElement(const QString &name) const
 {
     for (auto *child_d : std::as_const(d->children)) {
@@ -216,10 +205,12 @@ QXmppElement QXmppElement::firstChildElement(const QString &name) const
     return QXmppElement();
 }
 
-///
-/// Returns the next sibling element with the given name or the next sibling
-/// element if the given name is empty.
-///
+/*!
+    Returns the next sibling element with the given name or the next sibling
+    element if the given name is empty.
+
+    \a name.
+*/
 QXmppElement QXmppElement::nextSiblingElement(const QString &name) const
 {
     if (!d->parent) {
@@ -234,17 +225,13 @@ QXmppElement QXmppElement::nextSiblingElement(const QString &name) const
     return QXmppElement();
 }
 
-///
-/// Returns true if the element is null
-///
+/*! Returns true if the element is null */
 bool QXmppElement::isNull() const
 {
     return d->name.isEmpty();
 }
 
-///
-/// Removes a child element
-///
+/*! Removes a \a child element */
 void QXmppElement::removeChild(const QXmppElement &child)
 {
     if (child.d->parent != d) {
@@ -256,41 +243,43 @@ void QXmppElement::removeChild(const QXmppElement &child)
     child.d->parent = nullptr;
 }
 
-///
-/// Returns the tag name of the element
-///
+/*! Returns the tag name of the element */
 QString QXmppElement::tagName() const
 {
     return d->name;
 }
 
-///
-/// Sets the tag name of the element
-///
+/*!
+    Sets the tag name of the element
+
+    \a tagName.
+*/
 void QXmppElement::setTagName(const QString &tagName)
 {
     d->name = tagName;
 }
 
-///
-/// Returns the text content of the element
-///
+/*! Returns the text content of the element */
 QString QXmppElement::value() const
 {
     return d->value;
 }
 
-///
-/// Sets the text content of the element
-///
+/*!
+    Sets the text content of the element
+
+    \a value.
+*/
 void QXmppElement::setValue(const QString &value)
 {
     d->value = value;
 }
 
-///
-/// Serializes the element to XML
-///
+/*!
+    Serializes the element to XML
+
+    \a writer.
+*/
 void QXmppElement::toXml(QXmlStreamWriter *writer) const
 {
     using std::ranges::transform_view;

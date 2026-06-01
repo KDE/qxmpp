@@ -42,69 +42,80 @@ namespace QXmpp::Private {
 struct SessionBegin;
 }
 
-///
-/// \defgroup Core Core classes
-///
-/// Core classes include all necessary classes to build a basic client or
-/// server application. This for example also includes the logging class
-/// QXmppLogger.
-///
-
-///
-/// \defgroup Managers Managers
-///
-/// Managers are used to extend the basic QXmppClient. Some of them are loaded
-/// by default, others need to be added to the client using
-/// QXmppClient::addExtension().
-///
-
 class QXMPP_EXPORT QXmppClient : public QXmppLoggable
 {
     Q_OBJECT
 
-    /// The QXmppLogger associated with the current QXmppClient
+    /*!
+        \property QXmppClient::logger
+
+        The QXmppLogger associated with the current QXmppClient
+    */
     Q_PROPERTY(QXmppLogger *logger READ logger WRITE setLogger NOTIFY loggerChanged)
-    /// The client's current state
+    /*!
+        \property QXmppClient::state
+
+        The client's current state
+    */
     Q_PROPERTY(State state READ state NOTIFY stateChanged)
 
 public:
     using IqResult = std::variant<QDomElement, QXmppError>;
     using EmptyResult = std::variant<QXmpp::Success, QXmppError>;
 
-    /// An enumeration for type of error.
-    /// Error could come due a TCP socket or XML stream or due to various stanzas.
+    /*!
+        An enumeration for type of error.
+        Error could come due a TCP socket or XML stream or due to various stanzas.
+
+        \value NoError No error.
+        \value SocketError Error due to TCP socket.
+        \value KeepAliveError Error due to no response to a keep alive.
+        \value XmppStreamError Error due to XML stream.
+    */
     enum Error {
-        NoError,          ///< No error.
-        SocketError,      ///< Error due to TCP socket.
-        KeepAliveError,   ///< Error due to no response to a keep alive.
-        XmppStreamError,  ///< Error due to XML stream.
+        NoError,
+        SocketError,
+        KeepAliveError,
+        XmppStreamError,
     };
     Q_ENUM(Error)
 
-    /// This enumeration describes a client state.
+    /*!
+        This enumeration describes a client state.
+
+        \value DisconnectedState Disconnected from the server.
+        \value ConnectingState Trying to connect to the server.
+        \value ConnectedState Connected to the server.
+    */
     enum State {
-        DisconnectedState,  ///< Disconnected from the server.
-        ConnectingState,    ///< Trying to connect to the server.
-        ConnectedState      ///< Connected to the server.
+        DisconnectedState,
+        ConnectingState,
+        ConnectedState
     };
     Q_ENUM(State)
 
-    /// Describes the use of \xep{0198, Stream Management}
+    /*!
+        Describes the use of \xep{0198}{Stream Management}
+
+        \value NoStreamManagement Stream Management is not used.
+        \value NewStream Stream Management is used and the previous stream has not been resumed.
+        \value ResumedStream Stream Management is used and the previous stream has been resumed.
+    */
     enum StreamManagementState {
-        /// Stream Management is not used.
         NoStreamManagement,
-        /// Stream Management is used and the previous stream has not been resumed.
         NewStream,
-        /// Stream Management is used and the previous stream has been resumed.
         ResumedStream
     };
 
-    /// Used to decide which extensions should be added by default.
-    /// \since QXmpp 1.6
+    /*!
+        Used to decide which extensions should be added by default.
+        \since QXmpp 1.6
+
+        \value NoExtensions Creates a client without any extensions.
+        \value BasicExtensions Creates a client with the default set of extensions.
+    */
     enum InitialExtensions {
-        /// Creates a client without any extensions.
         NoExtensions,
-        /// Creates a client with the default set of extensions.
         BasicExtensions,
     };
 
@@ -128,19 +139,19 @@ public:
 
     QList<QXmppClientExtension *> extensions() const;
 
-    ///
-    /// \brief Returns the extension which can be cast into type T*, or 0
-    /// if there is no such extension.
-    ///
-    /// Usage example:
-    /// \code
-    /// QXmppDiscoveryManager* ext = client->findExtension<QXmppDiscoveryManager>();
-    /// if(ext)
-    /// {
-    ///     //extension found, do stuff...
-    /// }
-    /// \endcode
-    ///
+    /*!
+        \brief Returns the extension which can be cast into type T*, or 0
+        if there is no such extension.
+
+        Usage example:
+        \code
+        QXmppDiscoveryManager* ext = client->findExtension<QXmppDiscoveryManager>();
+        if(ext)
+        {
+        //extension found, do stuff...
+        }
+        \endcode
+    */
     template<typename T>
     T *findExtension() const
     {
@@ -154,21 +165,21 @@ public:
         return nullptr;
     }
 
-    ///
-    /// \brief Returns the index of an extension
-    ///
-    /// Usage example:
-    /// \code
-    /// int index = client->indexOfExtension<QXmppDiscoveryManager>();
-    /// if (index > 0) {
-    ///     // extension found, do stuff...
-    /// } else {
-    ///     // extension not found
-    /// }
-    /// \endcode
-    ///
-    /// \since QXmpp 1.2
-    ///
+    /*!
+        \brief Returns the index of an extension
+
+        Usage example:
+        \code
+        int index = client->indexOfExtension<QXmppDiscoveryManager>();
+        if (index > 0) {
+        // extension found, do stuff...
+        } else {
+        // extension not found
+        }
+        \endcode
+
+        \since QXmpp 1.2
+    */
     template<typename T>
     int indexOfExtension() const
     {
@@ -195,7 +206,7 @@ public:
     QXmppConfiguration &configuration();
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Returns the QXmppLogger associated with the current QXmppClient.
+    /*! Returns the QXmppLogger associated with the current QXmppClient. */
     QXmppLogger *logger() const;
     void setLogger(QXmppLogger *logger);
 
@@ -203,7 +214,7 @@ public:
     QString socketErrorString() const;
 
     // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /// Returns the client's current state.
+    /*! Returns the client's current state. */
     State state() const;
     QXmppStanza::Error::Condition xmppStreamError();
 
@@ -214,85 +225,113 @@ public:
     QXmppTask<IqResult> sendSensitiveIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
     QXmppTask<EmptyResult> sendGenericIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
 
-    /// This signal is emitted when the client connects successfully to the
-    /// XMPP server i.e. when a successful XMPP connection is established.
-    /// XMPP Connection involves following sequential steps:
-    ///     - TCP socket connection
-    ///     - Client sends start stream
-    ///     - Server sends start stream
-    ///     - TLS negotiation (encryption)
-    ///     - Authentication
-    ///     - Resource binding
-    ///     - Session establishment
-    ///
-    /// After all these steps a successful XMPP connection is established and
-    /// connected() signal is emitted.
-    ///
-    /// After the connected() signal is emitted QXmpp will send the roster
-    /// request to the server. On receiving the roster, QXmpp will emit
-    /// QXmppRosterManager::rosterReceived(). After this signal,
-    /// QXmppRosterManager object gets populated and you can use
-    /// \c findExtension<QXmppRosterManager>() to get the handle of
-    /// QXmppRosterManager object.
+    /*!
+        This signal is emitted when the client connects successfully to the
+        XMPP server i.e. when a successful XMPP connection is established.
+        XMPP Connection involves following sequential steps:
+        \list
+            \li TCP socket connection
+            \li Client sends start stream
+            \li Server sends start stream
+            \li TLS negotiation (encryption)
+            \li Authentication
+            \li Resource binding
+            \li Session establishment
+        \endlist
+
+        After all these steps a successful XMPP connection is established and
+        connected() signal is emitted.
+
+        After the connected() signal is emitted QXmpp will send the roster
+        request to the server. On receiving the roster, QXmpp will emit
+        QXmppRosterManager::rosterReceived(). After this signal,
+        QXmppRosterManager object gets populated and you can use
+        \c findExtension<QXmppRosterManager>() to get the handle of
+        QXmppRosterManager object.
+    */
     Q_SIGNAL void connected();
 
-    /// This signal is emitted when the XMPP connection disconnects.
+    /*! This signal is emitted when the XMPP connection disconnects. */
     Q_SIGNAL void disconnected();
 
-    /// This signal is emitted when the XMPP connection encounters any error.
-    /// The QXmppClient::Error parameter specifies the type of error occurred.
-    /// It could be due to TCP socket or the xml stream or the stanza.
-    /// Depending upon the type of error occurred use the respective get function to
-    /// know the error.
+    /*!
+        This signal is emitted when the XMPP connection encounters any error.
+        The QXmppClient::Error parameter specifies the type of error occurred.
+        It could be due to TCP socket or the xml stream or the stanza.
+        Depending upon the type of error occurred use the respective get function to
+        know the error.
+    */
     Q_SIGNAL void error(QXmppClient::Error);
 
-    /// This signal is emitted when the XMPP connection encounters any fatal error.
-    ///
-    /// \param error Detailed error object with a description. It may contain
-    ///  * QAbstractSocket::SocketError
-    ///  * QXmpp::TimeoutError
-    ///  * QXmpp::StreamError
-    ///  * QXmpp::AuthenticationError
-    ///  * QXmpp::BindError
-    ///
-    /// \since QXmpp 1.7
+    /*!
+        This signal is emitted when the XMPP connection encounters any fatal error.
+
+        \a error is a detailed error object with a description. It may contain
+        \list
+            \li QAbstractSocket::SocketError
+            \li QXmpp::TimeoutError
+            \li QXmpp::StreamError
+            \li QXmpp::AuthenticationError
+            \li QXmpp::BindError
+        \endlist
+
+        \since QXmpp 1.7
+    */
     Q_SIGNAL void errorOccurred(const QXmppError &error);
 
-    /// This signal is emitted when the logger changes.
+    /*! This signal is emitted when the \a logger changes. */
     Q_SIGNAL void loggerChanged(QXmppLogger *logger);
 
-    /// Notifies that an XMPP message stanza is received. The QXmppMessage
-    /// parameter contains the details of the message sent to this client.
-    /// In other words whenever someone sends you a message this signal is
-    /// emitted.
+    /*!
+        Notifies that an XMPP message stanza is received. The QXmppMessage
+        parameter contains the details of the message sent to this client.
+        In other words whenever someone sends you a message this signal is
+        emitted.
+
+        \a message is the received message stanza.
+    */
     Q_SIGNAL void messageReceived(const QXmppMessage &message);
 
-    /// Notifies that an XMPP presence stanza is received. The QXmppPresence
-    /// parameter contains the details of the presence sent to this client.
-    /// This signal is emitted when someone login/logout or when someone's status
-    /// changes Busy, Idle, Invisible etc.
+    /*!
+        Notifies that an XMPP presence stanza is received. The QXmppPresence
+        parameter contains the details of the presence sent to this client.
+        This signal is emitted when someone login/logout or when someone's status
+        changes Busy, Idle, Invisible etc.
+
+        \a presence is the received presence stanza.
+    */
     Q_SIGNAL void presenceReceived(const QXmppPresence &presence);
 
-    /// This signal is emitted when IQs of type result or error are received by
-    /// the client and no registered QXmppClientExtension could handle it.
-    ///
-    /// This is useful when it is only important to check whether the response
-    /// of an IQ was successful. However, the recommended way is still to use an
-    /// additional QXmppClientExtension for this kind of tasks.
+    /*!
+        This signal is emitted when IQs of type result or error are received by
+        the client and no registered QXmppClientExtension could handle it.
+
+        This is useful when it is only important to check whether the response
+        of an IQ was successful. However, the recommended way is still to use an
+        additional QXmppClientExtension for this kind of tasks.
+
+        \a iq is the received IQ stanza.
+    */
     Q_SIGNAL void iqReceived(const QXmppIq &iq);
 
-    /// This signal is emitted to indicate that one or more SSL errors were
-    /// encountered while establishing the identity of the server.
+    /*!
+        This signal is emitted to indicate that one or more SSL errors were
+        encountered while establishing the identity of the server.
+
+        \a errors.
+    */
     Q_SIGNAL void sslErrors(const QList<QSslError> &errors);
 
-    /// This signal is emitted when the client state changes.
+    /*! This signal is emitted when the client \a state changes. */
     Q_SIGNAL void stateChanged(QXmppClient::State state);
 
-    /// Emitted when the credentials, e.g. tokens have changed.
-    ///
-    /// This means that the QXmppCredentials in the QXmppConfiguration of this client has changed.
-    ///
-    /// \since QXmpp 1.8
+    /*!
+        Emitted when the credentials, e.g. tokens have changed.
+
+        This means that the QXmppCredentials in the QXmppConfiguration of this client has changed.
+
+        \since QXmpp 1.8
+    */
     Q_SIGNAL void credentialsChanged();
 
     Q_SLOT void connectToServer(const QXmppConfiguration &, const QXmppPresence &initialPresence = {});
@@ -316,7 +355,6 @@ public:
     Q_SLOT void sendMessage(const QString &bareJid, const QString &message);
 #endif
 
-    /// \cond
     bool sendLegacy(const QXmppNonza &s)
     {
         QT_WARNING_PUSH
@@ -325,7 +363,6 @@ public:
         QT_WARNING_POP
     }
     QString sendLegacyId(const QXmppStanza &s) { return sendLegacy(s) ? s.id() : QString(); }
-    /// \endcond
 
 private:
     QXmppOutgoingClient *stream() const;

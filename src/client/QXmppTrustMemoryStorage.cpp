@@ -11,14 +11,15 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppTrustMemoryStorage
-///
-/// \brief The QXmppTrustMemoryStorage class stores trust data for end-to-end
-/// encryption in the memory.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppTrustMemoryStorage
+    \inmodule QXmpp
+
+    \brief The QXmppTrustMemoryStorage class stores trust data for end-to-end
+    encryption in the memory.
+
+    \since QXmpp 1.5
+*/
 
 struct Key {
     QByteArray id;
@@ -39,9 +40,7 @@ public:
     QMultiHash<QString, Key> keys;
 };
 
-///
-/// Constructs a trust memory storage.
-///
+/*! Constructs a trust memory storage. */
 QXmppTrustMemoryStorage::QXmppTrustMemoryStorage()
     : d(new QXmppTrustMemoryStoragePrivate)
 {
@@ -49,7 +48,6 @@ QXmppTrustMemoryStorage::QXmppTrustMemoryStorage()
 
 QXmppTrustMemoryStorage::~QXmppTrustMemoryStorage() = default;
 
-/// \cond
 QXmppTask<void> QXmppTrustMemoryStorage::setSecurityPolicy(const QString &encryption, TrustSecurityPolicy securityPolicy)
 {
     d->securityPolicies.insert(encryption, securityPolicy);
@@ -246,4 +244,3 @@ QXmppTask<void> QXmppTrustMemoryStorage::resetAll(const QString &encryption)
     d->keys.remove(encryption);
     co_return;
 }
-/// \endcond

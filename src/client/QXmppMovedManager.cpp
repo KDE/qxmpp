@@ -30,7 +30,7 @@ QXmppMovedItem::QXmppMovedItem(const QString &newJid)
     setId(QXmppPubSubManager::standardItemIdToString(QXmppPubSubManager::Current));
 }
 
-// Returns true if the given DOM element is a valid \xep{0283, Moved} item.
+// Returns true if the given DOM element is a valid \xep{0283}{Moved} item.
 bool QXmppMovedItem::isItem(const QDomElement &itemElement)
 {
     return QXmppPubSubBaseItem::isItem(itemElement, [](const QDomElement &payload) {
@@ -60,8 +60,8 @@ void QXmppMovedItem::serializePayload(QXmlStreamWriter *writer) const
 
 // Ensures that both JIDs match.
 //
-// \param newBareJid JID of the contact that sent the subscription request
-// \param pepBareJid JID of the new account as fetched from the old account statement
+// \a newBareJid is the JID of the contact that sent the subscription request.
+// \a pepBareJid is the JID of the new account as fetched from the old account statement.
 static QXmppMovedManager::Result movedJidsMatch(const QString &newBareJid, const QString &pepBareJid)
 {
     if (newBareJid == pepBareJid) {
@@ -77,53 +77,52 @@ public:
     bool supportedByServer = false;
 };
 
-///
-/// \class QXmppMovedManager
-///
-/// This class manages user account moving as specified in \xep{0283, Moved}
-///
-/// In order to use this manager, make sure to add all managers needed by this manager:
-/// \code
-/// client->addNewExtension<QXmppDiscoveryManager>();
-/// client->addNewExtension<QXmppPubSubManager>();
-/// \endcode
-///
-/// Afterwards, you need to add this manager to the client:
-/// \code
-/// auto *manager = client->addNewExtension<QXmppMovedManager>();
-/// \endcode
-///
-/// If you want to publish a moved statement use the publishStatement call with the old account:
-/// \code
-/// manager->publishStatement("new@example.org");
-/// \endcode
-///
-/// Once you published your statement, you then need to subscribe to your old contacts with the new account:
-/// \code
-/// manager->notifyContact("contact@xmpp.example", "old@example.org", "Hey, I moved my account, please accept me.");
-/// \endcode
-///
-/// When a contact receive a subscription request from a moved user he needs to verify the authenticity of the request.
-/// The QXmppRosterManager handle it on its own if the client has the QXmppMovedManager extension available.
-/// The request will be ignored entirely if the old jid incoming subscription is not part of the roster with a 'from' or 'both' type.
-/// In case of the authenticity can't be established the moved element is ignored entirely. Alternatively, if the client
-/// does not has QXmppMovedManager support the request message will be changed to introduce a warning message before emitting
-/// the subscription{Request}Received signal.
-///
-/// \ingroup Managers
-///
-/// \since QXmpp 1.9
-///
+/*!
+    \class QXmppMovedManager
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppMovedManager::Result
-///
-/// Contains QXmpp::Success or an error.
-///
+    This class manages user account moving as specified in \xep{0283}{Moved}
 
-///
-/// Constructs a \xep{0283, Moved} manager.
-///
+    In order to use this manager, make sure to add all managers needed by this manager:
+    \code
+    client->addNewExtension<QXmppDiscoveryManager>();
+    client->addNewExtension<QXmppPubSubManager>();
+    \endcode
+
+    Afterwards, you need to add this manager to the client:
+    \code
+    auto *manager = client->addNewExtension<QXmppMovedManager>();
+    \endcode
+
+    If you want to publish a moved statement use the publishStatement call with the old account:
+    \code
+    manager->publishStatement("new@example.org");
+    \endcode
+
+    Once you published your statement, you then need to subscribe to your old contacts with the new account:
+    \code
+    manager->notifyContact("contact@xmpp.example", "old@example.org", "Hey, I moved my account, please accept me.");
+    \endcode
+
+    When a contact receive a subscription request from a moved user he needs to verify the authenticity of the request.
+    The QXmppRosterManager handle it on its own if the client has the QXmppMovedManager extension available.
+    The request will be ignored entirely if the old jid incoming subscription is not part of the roster with a 'from' or 'both' type.
+    In case of the authenticity can't be established the moved element is ignored entirely. Alternatively, if the client
+    does not has QXmppMovedManager support the request message will be changed to introduce a warning message before emitting
+    the subscription{Request}Received signal.
+
+    \ingroup Managers
+
+    \since QXmpp 1.9
+*/
+
+/*!
+    \typedef QXmppMovedManager::Result
+
+    Contains QXmpp::Success or an error.
+*/
+
+/*! Constructs a \xep{0283}{Moved} manager. */
 QXmppMovedManager::QXmppMovedManager()
     : d(new QXmppMovedManagerPrivate())
 {
@@ -136,35 +135,31 @@ QStringList QXmppMovedManager::discoveryFeatures() const
     return { staticString(ns_moved) };
 }
 
-///
-/// \property QXmppMovedManager::supportedByServer
-///
-/// \see QXmppMovedManager::supportedByServer()
-///
+/*!
+    \property QXmppMovedManager::supportedByServer
 
-///
-/// Returns whether the own server supports \xep{0283, Moved} feature.
-///
-/// \return whether \xep{0283, Moved} feature is supported
-///
+    \sa QXmppMovedManager::supportedByServer()
+*/
+
+/*!
+    Returns whether the own server supports the \xep{0283}{Moved} feature.
+*/
 bool QXmppMovedManager::supportedByServer() const
 {
     return d->supportedByServer;
 }
 
-///
-/// \fn QXmppMovedManager::supportedByServerChanged()
-///
-/// Emitted when the server enabled or disabled support for \xep{0283, Moved}.
-///
+/*!
+    \fn QXmppMovedManager::supportedByServerChanged()
 
-///
-/// Publish a moved statement.
-///
-/// \param newBareJid JID of the new account
-///
-/// \return the result of the action
-///
+    Emitted when the server enabled or disabled support for \xep{0283}{Moved}.
+*/
+
+/*!
+    Publish a moved statement. \a newBareJid is the JID of the new account.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(QString newBareJid)
 {
     co_return mapToSuccess(co_await client()
@@ -173,14 +168,14 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMovedManager::publishStatement(QString 
                                .withContext(this));
 }
 
-///
-/// Verify a user moved statement.
-///
-/// \param oldBareJid JID of the old account to check statement
-/// \param newBareJid JID of the new account that send the subscription request
-///
-/// \return the result of the action
-///
+/*!
+    Verify a user moved statement.
+
+    \a oldBareJid is the JID of the old account to check statement. \a newBareJid is the JID of
+    the new account that sent the subscription request.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(QString oldBareJid, QString newBareJid)
 {
     co_return std::visit(
@@ -222,16 +217,15 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(QString 
             .withContext(this));
 }
 
-///
-/// Notifies a contact that the user has moved to another account.
-///
-/// \param contactBareJid JID of the contact to send the subscription request
-/// \param oldBareJid JID of the old account we moved from
-/// \param sensitive If true the notification is sent sensitively
-/// \param reason The reason of the move
-///
-/// \return the result of the action
-///
+/*!
+    Notifies a contact that the user has moved to another account.
+
+    \a contactBareJid is the JID of the contact to send the subscription request. \a oldBareJid
+    is the JID of the old account we moved from. If \a sensitive is true the notification is
+    sent sensitively. \a reason is the reason of the move.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmpp::SendResult> QXmppMovedManager::notifyContact(const QString &contactBareJid, const QString &oldBareJid, bool sensitive, const QString &reason)
 {
     QXmppPresence packet;
@@ -242,7 +236,6 @@ QXmppTask<QXmpp::SendResult> QXmppMovedManager::notifyContact(const QString &con
     return sensitive ? client()->sendSensitive(std::move(packet)) : client()->send(std::move(packet));
 }
 
-/// \cond
 void QXmppMovedManager::onRegistered(QXmppClient *client)
 {
     connect(client, &QXmppClient::connected, this, [this]() {
@@ -271,17 +264,17 @@ void QXmppMovedManager::onUnregistered(QXmppClient *client)
     resetCachedData();
     disconnect(client, &QXmppClient::connected, this, nullptr);
 }
-/// \endcond
 
-///
-/// Verifies an old JID in a received presence subscription request and removes it if it is invalid.
-///
-/// This requires the QXmppRosterManager to be registered with the client.
-///
-/// \param presence presence subscription request to be processed containing a non-empty old JID.
-///
-/// \returns the processed presence subscription request
-///
+/*!
+    Verifies an old JID in a received presence subscription request and removes it if it is invalid.
+
+    This requires the QXmppRosterManager to be registered with the client.
+
+    \a presence is the presence subscription request to be processed containing a non-empty old
+    JID.
+
+    Returns the processed presence subscription request.
+*/
 QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPresence presence)
 {
     Q_ASSERT(!presence.oldJid().isEmpty());
@@ -309,11 +302,9 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
     }
 }
 
-///
-/// Sets whether the own server supports \xep{0283, Moved}.
-///
-/// \param supportedByServer whether \xep{0283, Moved} is supported by the server
-///
+/*!
+    Sets whether the own server supports \xep{0283}{Moved} via \a supportedByServer.
+*/
 void QXmppMovedManager::setSupportedByServer(bool supportedByServer)
 {
     if (d->supportedByServer != supportedByServer) {
@@ -322,9 +313,7 @@ void QXmppMovedManager::setSupportedByServer(bool supportedByServer)
     }
 }
 
-///
-/// Resets the cached data.
-///
+/*! Resets the cached data. */
 void QXmppMovedManager::resetCachedData()
 {
     setSupportedByServer(false);

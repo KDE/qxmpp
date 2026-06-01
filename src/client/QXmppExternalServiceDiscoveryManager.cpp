@@ -14,36 +14,34 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \brief The QXmppExternalServiceDiscoveryManager class makes it possible to
-/// discover information about external services from providers
-/// as defined by \xep{0215, External Service Discovery}.
-///
-/// To make use of this manager, you need to instantiate it and load it into
-/// the QXmppClient instance as follows:
-///
-/// \code
-/// auto *manager = client->addNewExtension<QXmppExternalServiceDiscoveryManager>();
-/// \endcode
-///
-/// \ingroup Managers
-///
-/// \since QXmpp 1.6
-///
+/*!
+    \brief The QXmppExternalServiceDiscoveryManager class makes it possible to
+    discover information about external services from providers
+    as defined by \xep{0215}{External Service Discovery}.
+
+    To make use of this manager, you need to instantiate it and load it into
+    the QXmppClient instance as follows:
+
+    \code
+    auto *manager = client->addNewExtension<QXmppExternalServiceDiscoveryManager>();
+    \endcode
+
+    \ingroup Managers
+
+    \since QXmpp 1.6
+*/
 QXmppExternalServiceDiscoveryManager::QXmppExternalServiceDiscoveryManager()
 {
 }
 
 QXmppExternalServiceDiscoveryManager::~QXmppExternalServiceDiscoveryManager() = default;
 
-///
-/// Requests external services from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
-/// \since QXmpp 1.6
-///
+/*!
+    Requests external services from the specified XMPP entity. \a jid is the target entity's
+    JID. \a node is the target node (optional).
+
+    \since QXmpp 1.6
+*/
 QXmppTask<QXmppExternalServiceDiscoveryManager::ServicesResult> QXmppExternalServiceDiscoveryManager::requestServices(const QString &jid, const QString &node)
 {
     QXmppExternalServiceDiscoveryIq request;
@@ -55,9 +53,7 @@ QXmppTask<QXmppExternalServiceDiscoveryManager::ServicesResult> QXmppExternalSer
     });
 }
 
-/// \cond
 QStringList QXmppExternalServiceDiscoveryManager::discoveryFeatures() const
 {
     return { staticString(ns_external_service_discovery) };
 }
-/// \endcond

@@ -16,14 +16,15 @@
 
 using namespace QXmpp::Private;
 
-/// Constructs a QXmppMessageReceiptManager to handle incoming and outgoing
-/// message delivery receipts.
+/*!
+    Constructs a QXmppMessageReceiptManager to handle incoming and outgoing
+    message delivery receipts.
+*/
 QXmppMessageReceiptManager::QXmppMessageReceiptManager()
     : QXmppClientExtension()
 {
 }
 
-/// \cond
 QStringList QXmppMessageReceiptManager::discoveryFeatures() const
 {
     return { ns_message_receipts.toString() };
@@ -59,4 +60,3 @@ bool QXmppMessageReceiptManager::handleMessage(const QXmppMessage &message)
     // Continue processing.
     return false;
 }
-/// \endcond

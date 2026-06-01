@@ -22,13 +22,11 @@ public:
 
     std::optional<QXmppBitsOfBinaryData> find(const QXmppBitsOfBinaryContentId &cid) const;
 
-    /// \cond
     QXmppBitsOfBinaryDataList(const QVector<QXmppBitsOfBinaryData> &data) : QVector<QXmppBitsOfBinaryData>(data) { }
     QXmppBitsOfBinaryDataList(QVector<QXmppBitsOfBinaryData> &&data) : QVector<QXmppBitsOfBinaryData>(std::move(data)) { }
 
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 };
 
 #endif  // QXMPPBITSOFBINARYDATACONTAINER_H

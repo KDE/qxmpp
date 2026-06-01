@@ -211,13 +211,7 @@ public:
         serializeOptional(form, Type::ListSingleField, staticString(PRIVATE_MESSAGES_PERMITTED_KEY), privateMessagesPermitted);
     }
 
-    ///
-    /// Serializes a role to a form field.
-    ///
-    /// \param form data form
-    /// \param name name of the form field
-    /// \param role role to serialize
-    ///
+    // Serializes a role to a form field with the given name in the data form.
     static void serializeRole(QXmppDataForm &form, const QString &name, std::optional<QXmppMixConfigItem::Role> role)
     {
         if (role) {
@@ -225,7 +219,7 @@ public:
         }
     }
 
-    /// Converts a nodes flag to a list of nodes.
+    // Converts a nodes flag to a list of nodes.
     static QStringList nodesToList(QXmppMixConfigItem::Nodes nodes)
     {
         QStringList nodeList;
@@ -239,7 +233,7 @@ public:
         return nodeList;
     }
 
-    /// Converts a list of nodes to a nodes flag
+    // Converts a list of nodes to a nodes flag.
     static QXmppMixConfigItem::Nodes listToNodes(const QStringList &nodeList)
     {
         QXmppMixConfigItem::Nodes nodes;
@@ -254,645 +248,542 @@ public:
     }
 };
 
-///
-/// \class QXmppMixConfigItem
-///
-/// \brief The QXmppMixConfigItem class represents a PubSub item of a MIX channel containing its
-/// configuration as defined by \xep{0369, Mediated Information eXchange (MIX)}.
-///
-/// \since QXmpp 1.7
-///
-/// \ingroup Stanzas
-///
+/*!
+    \class QXmppMixConfigItem
+    \inmodule QXmpp
 
-///
-/// \enum QXmppMixConfigItem::Node
-///
-/// PubSub node belonging to a MIX channel.
-///
-/// \var QXmppMixConfigItem::Node::AllowedJids
-///
-/// JIDs allowed to participate in the channel.
-///
-/// If this node does not exist, all JIDs are allowed to participate in the channel.
-///
-/// \var QXmppMixConfigItem::Node::AvatarData
-///
-/// Channel's avatar data.
-///
-/// \var QXmppMixConfigItem::Node::AvatarMetadata
-///
-/// Channel's avatar metadata.
-///
-/// \var QXmppMixConfigItem::Node::BannedJids
-///
-/// JIDs banned from participating in the channel.
-///
-/// \var QXmppMixConfigItem::Node::Configuration
-///
-/// Channel's onfiguration.
-///
-/// \var QXmppMixConfigItem::Node::Information
-///
-/// Channel's information.
-///
-/// \var QXmppMixConfigItem::Node::JidMap
-///
-/// Mappings from the partipants' IDs to their JIDs.
-///
-/// This is needed for JID hidden channels.
-///
-/// \var QXmppMixConfigItem::Node::Messages
-///
-/// Messages sent through the channel.
-///
-/// \var QXmppMixConfigItem::Node::Participants
-///
-/// Users participating in the channel.
-///
-/// \var QXmppMixConfigItem::Node::Presence
-///
-/// Presence of users participating in the channel.
-///
+    \brief The QXmppMixConfigItem class represents a PubSub item of a MIX channel containing its
+    configuration as defined by \xep{0369}{Mediated Information eXchange (MIX)}.
 
-///
-/// \enum QXmppMixConfigItem::Role
-///
-/// Roles for a MIX channel with various rights.
-///
-/// The rights are defined in a strictly hierarchical manner following the order of this
-/// enumeration, so that for example Owners will always have rights that Administrators have.
-///
-/// \var QXmppMixConfigItem::Role::Owner
-///
-/// Allowed to update the channel configuration.
-/// Specified by the channel configuration.
-///
-/// \var QXmppMixConfigItem::Role::Administrator
-///
-/// Allowed to update the JIDs that are allowed to participate or banned from participating in a
-/// channel.
-/// Specified in the channel configuration.
-///
-/// \var QXmppMixConfigItem::Role::Participant
-///
-/// Participant of the channel.
-///
-/// \var QXmppMixConfigItem::Role::Allowed
-///
-/// User that is allowed to participate in the channel.
-/// Users are allowed if their JIDs do not match a JID in the node Node::BannedJids and either there
-/// is no node Node::AllowedJids or their JIDs match a JID in it.
-///
-/// \var QXmppMixConfigItem::Role::Anyone
-///
-/// Any user, including users in the node BannedJids.
-///
-/// \var QXmppMixConfigItem::Role::Nobody
-///
-/// No user, including owners and administrators.
-///
+    \since QXmpp 1.7
+
+    \ingroup Stanzas
+*/
+
+/*!
+    \enum QXmppMixConfigItem::Node
+
+    PubSub node belonging to a MIX channel.
+
+    \value AllowedJids JIDs allowed to participate in the channel. If this
+    node does not exist, all JIDs are allowed to participate.
+    \value AvatarData Channel's avatar data.
+    \value AvatarMetadata Channel's avatar metadata.
+    \value BannedJids JIDs banned from participating in the channel.
+    \value Configuration Channel's configuration.
+    \value Information Channel's information.
+    \value JidMap Mappings from the participants' IDs to their JIDs (needed
+    for JID-hidden channels).
+    \value Messages Messages sent through the channel.
+    \value Participants Users participating in the channel.
+    \value Presence Presence of users participating in the channel.
+*/
+
+/*!
+    \enum QXmppMixConfigItem::Role
+
+    Roles for a MIX channel with various rights.
+
+    The rights are defined in a strictly hierarchical manner following the order of this
+    enumeration, so that for example Owners will always have rights that Administrators have.
+
+    \value Owner Allowed to update the channel configuration. Specified by
+    the channel configuration.
+    \value Administrator Allowed to update the JIDs that are allowed to
+    participate or banned from participating in a channel. Specified in the
+    channel configuration.
+    \value Participant Participant of the channel.
+    \value Allowed User that is allowed to participate in the channel.
+    Users are allowed if their JIDs do not match a JID in the
+    \c Node::BannedJids node and either there is no \c Node::AllowedJids
+    node or their JIDs match a JID in it.
+    \value Anyone Any user, including users in the BannedJids.
+    \value Nobody No user, including owners and administrators.
+*/
 
 QXmppMixConfigItem::QXmppMixConfigItem()
     : d(new QXmppMixConfigItemPrivate)
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppMixConfigItem::QXmppMixConfigItem(const QXmppMixConfigItem &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppMixConfigItem::QXmppMixConfigItem(QXmppMixConfigItem &&) = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppMixConfigItem &QXmppMixConfigItem::operator=(const QXmppMixConfigItem &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppMixConfigItem &QXmppMixConfigItem::operator=(QXmppMixConfigItem &&) = default;
 QXmppMixConfigItem::~QXmppMixConfigItem() = default;
 
-///
-/// Returns the type of the data form that contains the channel's configuration.
-///
-/// \return the data form's type
-///
+/*!
+    Returns the type of the data form that contains the channel's configuration.
+*/
 QXmppDataForm::Type QXmppMixConfigItem::formType() const
 {
     return d->dataFormType;
 }
 
-///
-/// Sets the type of the data form that contains the channel's configuration.
-///
-/// \param formType data form's type
-///
+/*!
+    Sets the data form's \a formType that contains the channel's configuration.
+*/
 void QXmppMixConfigItem::setFormType(QXmppDataForm::Type formType)
 {
     d->dataFormType = formType;
 }
 
-///
-/// Returns the bare JID of the user that made the latest change to the channel's configuration.
-///
-/// The JID is set by the server on each configuration change.
-///
-/// \return the JID of the last editor
-///
+/*!
+    Returns the bare JID of the user that made the latest change to the channel's configuration.
+
+    The JID is set by the server on each configuration change.
+*/
 QString QXmppMixConfigItem::lastEditorJid() const
 {
     return d->lastEditorJid;
 }
 
-///
-/// Sets the bare JID of the user that made the latest change to the channel's configuration.
-///
-/// \see lastEditorJid()
-///
-/// \param lastEditorJid last editor JID
-///
+/*!
+    Sets the bare \a lastEditorJid of the user that made the latest change to
+    the channel's configuration.
+
+    \sa lastEditorJid()
+*/
 void QXmppMixConfigItem::setLastEditorJid(const QString &lastEditorJid)
 {
     d->lastEditorJid = lastEditorJid;
 }
 
-///
-/// Returns the bare JIDs of the channel owners.
-///
-/// When a channel is created, the JID of the user that created it is set as the first owner.
-///
-/// \see Role::Owner
-///
-/// \return the JIDs of the owners
-///
+/*!
+    Returns the bare JIDs of the channel owners.
+
+    When a channel is created, the JID of the user that created it is set as the first owner.
+
+    \sa Role::Owner
+*/
 QStringList QXmppMixConfigItem::ownerJids() const
 {
     return d->ownerJids;
 }
 
-///
-/// Sets the bare JIDs of the channel owners.
-///
-/// \see ownerJids()
-///
-/// \param ownerJids JIDs of the owners
-///
+/*!
+    Sets the bare \a ownerJids of the channel owners.
+
+    \sa ownerJids()
+*/
 void QXmppMixConfigItem::setOwnerJids(const QStringList &ownerJids)
 {
     d->ownerJids = ownerJids;
 }
 
-///
-/// Returns the bare JIDs of the channel administrators.
-///
-/// \see Role::Administrator
-///
-/// \return the JIDs of the administrators
-///
+/*!
+    Returns the bare JIDs of the channel administrators.
+
+    \sa Role::Administrator
+*/
 QStringList QXmppMixConfigItem::administratorJids() const
 {
     return d->administratorJids;
 }
 
-///
-/// Sets the bare JIDs of the channel administrators.
-///
-/// \see administratorJids()
-///
-/// \param administratorJids JIDs of the administrators
-///
+/*!
+    Sets the bare \a administratorJids of the channel administrators.
+
+    \sa administratorJids()
+*/
 void QXmppMixConfigItem::setAdministratorJids(const QStringList &administratorJids)
 {
     d->administratorJids = administratorJids;
 }
 
-///
-/// Returns the date and time when the channel is automatically deleted.
-///
-/// If no date/time is set, the channel is permanent.
-///
-/// \return the channel deletion date/time
-///
+/*!
+    Returns the date and time when the channel is automatically deleted.
+
+    If no date/time is set, the channel is permanent.
+*/
 QDateTime QXmppMixConfigItem::channelDeletion() const
 {
     return d->channelDeletion;
 }
 
-///
-/// Sets the date and time when the channel is automatically deleted.
-///
-/// \see channelDeletion()
-///
-/// \param channelDeletion channel deletion date/time
-///
+/*!
+    Sets \a channelDeletion, the date and time when the channel is
+    automatically deleted.
+
+    \sa channelDeletion()
+*/
 void QXmppMixConfigItem::setChannelDeletion(const QDateTime &channelDeletion)
 {
     d->channelDeletion = channelDeletion;
 }
 
-///
-/// Returns which nodes are present for the channel.
-///
-/// \return the present nodes
-///
+/*!
+    Returns which nodes are present for the channel.
+*/
 QXmppMixConfigItem::Nodes QXmppMixConfigItem::nodes() const
 {
     return d->nodes;
 }
 
-///
-/// Sets which nodes are present for the channel.
-///
-/// \param nodes present nodes
-///
+/*!
+    Sets which \a nodes are present for the channel.
+*/
 void QXmppMixConfigItem::setNodes(Nodes nodes)
 {
     d->nodes = nodes;
 }
 
-///
-/// Returns the role that is permitted to subscribe to messages sent through the channel.
-///
-/// \return the role permitted to subscribe to the messages
-///
+/*!
+    Returns the role that is permitted to subscribe to messages sent through the channel.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::messagesSubscribeRole() const
 {
     return d->messagesSubscribeRole;
 }
 
-///
-/// Sets the role that is permitted to subscribe to messages sent through the channel.
-///
-/// Only the following roles are valid:
-///     * Role::Participant
-///     * Role::Allowed
-///     * Role::Anyone
-///
-/// \param messagesSubscribeRole role permitted to subscribe to the messages
-///
+/*!
+    Sets the \a messagesSubscribeRole that is permitted to subscribe to
+    messages sent through the channel.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Participant
+        \li Role::Allowed
+        \li Role::Anyone
+    \endlist
+*/
 void QXmppMixConfigItem::setMessagesSubscribeRole(std::optional<Role> messagesSubscribeRole)
 {
     d->messagesSubscribeRole = messagesSubscribeRole;
 }
 
-///
-/// Returns the role that is permitted to retract any message sent through the channel.
-///
-/// \return the role permitted to retract any message
-///
+/*!
+    Returns the role that is permitted to retract any message sent through the channel.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::messagesRetractRole() const
 {
     return d->messagesRetractRole;
 }
 
-///
-/// Sets the role that is permitted to retract any message sent through the channel.
-///
-/// Only the following roles are valid:
-///     * Role::Owner
-///     * Role::Administrator
-///     * Role::Nobody
-///
-/// \param messagesRetractRole role permitted to retract any message
-///
+/*!
+    Sets the \a messagesRetractRole that is permitted to retract any message
+    sent through the channel.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Owner
+        \li Role::Administrator
+        \li Role::Nobody
+    \endlist
+*/
 void QXmppMixConfigItem::setMessagesRetractRole(std::optional<Role> messagesRetractRole)
 {
     d->messagesRetractRole = messagesRetractRole;
 }
 
-///
-/// Returns the role that is permitted to subscribe to the channel's user' presence.
-///
-/// \return the role permitted to subscribe to the presence
-///
+/*!
+    Returns the role that is permitted to subscribe to the channel's user' presence.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::presenceSubscribeRole() const
 {
     return d->presenceSubscribeRole;
 }
 
-///
-/// Sets the role that is permitted to subscribe to the channel's users' presence.
-///
-/// Only the following roles are valid:
-///     * Role::Participant
-///     * Role::Allowed
-///     * Role::Anyone
-///
-/// \param presenceSubscribeRole role permitted to subscribe to the presence
-///
+/*!
+    Sets the \a presenceSubscribeRole that is permitted to subscribe to the
+    channel's users' presence.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Participant
+        \li Role::Allowed
+        \li Role::Anyone
+    \endlist
+*/
 void QXmppMixConfigItem::setPresenceSubscribeRole(std::optional<Role> presenceSubscribeRole)
 {
     d->presenceSubscribeRole = presenceSubscribeRole;
 }
 
-///
-/// Returns the role that is permitted to subscribe to the channel's participants.
-///
-/// \return the role permitted to subscribe to the participants
-///
+/*!
+    Returns the role that is permitted to subscribe to the channel's participants.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::participantsSubscribeRole() const
 {
     return d->participantsSubscribeRole;
 }
 
-///
-/// Sets the role that is permitted to subscribe to the channel's participants.
-///
-/// \param participantsSubscribeRole role permitted to subscribe to the participants
-///
+/*!
+    Sets the \a participantsSubscribeRole that is permitted to subscribe to the
+    channel's participants.
+*/
 void QXmppMixConfigItem::setParticipantsSubscribeRole(std::optional<Role> participantsSubscribeRole)
 {
     d->participantsSubscribeRole = participantsSubscribeRole;
 }
 
-///
-/// Returns the role that is permitted to subscribe to the channel's information.
-///
-/// \return the role permitted to subscribe to the information
-///
+/*!
+    Returns the role that is permitted to subscribe to the channel's information.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::informationSubscribeRole() const
 {
     return d->informationSubscribeRole;
 }
 
-///
-/// Sets the role that is permitted to subscribe to the channel's information.
-///
-/// Only the following roles are valid:
-///     * Role::Participant
-///     * Role::Allowed
-///     * Role::Anyone
-///
-/// \param informationSubscribeRole role permitted to subscribe to the information
-///
+/*!
+    Sets the \a informationSubscribeRole that is permitted to subscribe to the
+    channel's information.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Participant
+        \li Role::Allowed
+        \li Role::Anyone
+    \endlist
+*/
 void QXmppMixConfigItem::setInformationSubscribeRole(std::optional<Role> informationSubscribeRole)
 {
     d->informationSubscribeRole = informationSubscribeRole;
 }
 
-///
-/// Returns the role that is permitted to update the channel's information.
-///
-/// \return the role permitted to update the information
-///
+/*!
+    Returns the role that is permitted to update the channel's information.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::informationUpdateRole() const
 {
     return d->informationUpdateRole;
 }
 
-///
-/// Sets the role that is permitted to update the channel's information.
-///
-/// Only the following roles are valid:
-///     * Role::Owner
-///     * Role::Administrator
-///     * Role::Participant
-///
-/// \param informationUpdateRole role permitted to update the information
-///
+/*!
+    Sets the \a informationUpdateRole that is permitted to update the
+    channel's information.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Owner
+        \li Role::Administrator
+        \li Role::Participant
+    \endlist
+*/
 void QXmppMixConfigItem::setInformationUpdateRole(std::optional<Role> informationUpdateRole)
 {
     d->informationUpdateRole = informationUpdateRole;
 }
 
-///
-/// Returns the role that is permitted to subscribe to the JIDs that are allowed to participate in
-/// the channel.
-///
-/// \return the role permitted to subscribe to the allowed JIDs
-///
+/*!
+    Returns the role that is permitted to subscribe to the JIDs that are allowed to participate in
+    the channel.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::allowedJidsSubscribeRole() const
 {
     return d->allowedJidsSubscribeRole;
 }
 
-///
-/// Sets the role that is permitted to subscribe to the JIDs that are allowed to participate in the
-/// channel.
-///
-/// Only the following roles are valid:
-///     * Role::Owner
-///     * Role::Administrator
-///     * Role::Participant
-///     * Role::Allowed
-///     * Role::Nobody
-///
-/// \param allowedJidsSubscribeRole role permitted to subscribe to the allowed JIDs
-///
+/*!
+    Sets the \a allowedJidsSubscribeRole that is permitted to subscribe to the
+    JIDs that are allowed to participate in the channel.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Owner
+        \li Role::Administrator
+        \li Role::Participant
+        \li Role::Allowed
+        \li Role::Nobody
+    \endlist
+*/
 void QXmppMixConfigItem::setAllowedJidsSubscribeRole(std::optional<Role> allowedJidsSubscribeRole)
 {
     d->allowedJidsSubscribeRole = allowedJidsSubscribeRole;
 }
 
-///
-/// Returns the role that is permitted to subscribe to the JIDs that are banned from participating
-/// in the channel.
-///
-/// \return the role permitted to subscribe to the banned JIDs
-///
+/*!
+    Returns the role that is permitted to subscribe to the JIDs that are banned from participating
+    in the channel.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::bannedJidsSubscribeRole() const
 {
     return d->bannedJidsSubscribeRole;
 }
 
-///
-/// Sets the role that is permitted to subscribe to the JIDs that are banned from participating in
-/// the channel.
-///
-/// Only the following roles are valid:
-///     * Role::Owner
-///     * Role::Administrator
-///     * Role::Participant
-///     * Role::Allowed
-///     * Role::Nobody
-///
-/// \param bannedJidsSubscribeRole role permitted to subscribe to the banned JIDs
-///
+/*!
+    Sets the \a bannedJidsSubscribeRole that is permitted to subscribe to the
+    JIDs that are banned from participating in the channel.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Owner
+        \li Role::Administrator
+        \li Role::Participant
+        \li Role::Allowed
+        \li Role::Nobody
+    \endlist
+*/
 void QXmppMixConfigItem::setBannedJidsSubscribeRole(std::optional<Role> bannedJidsSubscribeRole)
 {
     d->bannedJidsSubscribeRole = bannedJidsSubscribeRole;
 }
 
-///
-/// Returns the role that is permitted to subscribe to and read the channel's configuration.
-///
-/// \return the role permitted to subscribe to and read the configuration
-///
+/*!
+    Returns the role that is permitted to subscribe to and read the channel's configuration.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::configurationReadRole() const
 {
     return d->configurationReadRole;
 }
 
-///
-/// Sets the role that is permitted to subscribe to and read the channel's configuration.
-///
-/// Only the following roles are valid:
-///     * Role::Owner
-///     * Role::Administrator
-///     * Role::Participant
-///     * Role::Allowed
-///     * Role::Nobody
-///
-/// \param configurationReadRole role permitted to subscribe to and read the configuration
-///
+/*!
+    Sets the \a configurationReadRole that is permitted to subscribe to and
+    read the channel's configuration.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Owner
+        \li Role::Administrator
+        \li Role::Participant
+        \li Role::Allowed
+        \li Role::Nobody
+    \endlist
+*/
 void QXmppMixConfigItem::setConfigurationReadRole(std::optional<Role> configurationReadRole)
 {
     d->configurationReadRole = configurationReadRole;
 }
 
-///
-/// Returns the role that is permitted to update the channel's avatar.
-///
-/// \return the role permitted to update the avatar
-///
+/*!
+    Returns the role that is permitted to update the channel's avatar.
+*/
 std::optional<QXmppMixConfigItem::Role> QXmppMixConfigItem::avatarUpdateRole() const
 {
     return d->avatarUpdateRole;
 }
 
-///
-/// Sets the role that is permitted to update the channel's avatar.
-///
-/// Only the following roles are valid:
-///     * Role::Owner
-///     * Role::Administrator
-///     * Role::Participant
-///
-/// \param avatarUpdateRole role permitted to update the avatar
-///
+/*!
+    Sets the \a avatarUpdateRole that is permitted to update the channel's
+    avatar.
+
+    Only the following roles are valid:
+    \list
+        \li Role::Owner
+        \li Role::Administrator
+        \li Role::Participant
+    \endlist
+*/
 void QXmppMixConfigItem::setAvatarUpdateRole(std::optional<Role> avatarUpdateRole)
 {
     d->avatarUpdateRole = avatarUpdateRole;
 }
 
-///
-/// Returns whether participants need nicknames.
-///
-/// \return whether nicknames are required
-///
+/*!
+    Returns whether participants need nicknames.
+*/
 std::optional<bool> QXmppMixConfigItem::nicknameRequired() const
 {
     return d->nicknameRequired;
 }
 
-///
-/// Sets whether participants need nicknames.
-///
-/// \param nicknameRequired whether nicknames are required
-///
+/*!
+    Sets via \a nicknameRequired whether participants need nicknames.
+*/
 void QXmppMixConfigItem::setNicknameRequired(std::optional<bool> nicknameRequired)
 {
     d->nicknameRequired = nicknameRequired;
 }
 
-///
-/// Returns whether participants need to share their presence.
-///
-/// \return whether presence is required
-///
+/*!
+    Returns whether participants need to share their presence.
+*/
 std::optional<bool> QXmppMixConfigItem::presenceRequired() const
 {
     return d->presenceRequired;
 }
 
-///
-/// Sets whether participants need to share their presence.
-///
-/// \param presenceRequired whether presence is required
-///
+/*!
+    Sets via \a presenceRequired whether participants need to share their
+    presence.
+*/
 void QXmppMixConfigItem::setPresenceRequired(std::optional<bool> presenceRequired)
 {
     d->presenceRequired = presenceRequired;
 }
 
-///
-/// Returns whether only participants are permitted to share their presence.
-///
-/// \return whether only participants are permitted to share their presence
-///
+/*!
+    Returns whether only participants are permitted to share their presence.
+*/
 std::optional<bool> QXmppMixConfigItem::onlyParticipantsPermittedToSubmitPresence() const
 {
     return d->onlyParticipantsPermittedToSubmitPresence;
 }
 
-///
-/// Sets whether only participants are permitted to share their presence.
-///
-/// \param onlyParticipantsPermittedToSubmitPresence whether only participants are permitted to
-///        share their presence
-///
+/*!
+    Sets via \a onlyParticipantsPermittedToSubmitPresence whether only
+    participants are permitted to share their presence.
+*/
 void QXmppMixConfigItem::setOnlyParticipantsPermittedToSubmitPresence(std::optional<bool> onlyParticipantsPermittedToSubmitPresence)
 {
     d->onlyParticipantsPermittedToSubmitPresence = onlyParticipantsPermittedToSubmitPresence;
 }
 
-///
-/// Returns whether users are permitted to retract their own messages sent through the channel.
-///
-/// \return whether users are permitted to retract their own messages
-///
+/*!
+    Returns whether users are permitted to retract their own messages sent through the channel.
+*/
 std::optional<bool> QXmppMixConfigItem::ownMessageRetractionPermitted() const
 {
     return d->ownMessageRetractionPermitted;
 }
 
-///
-/// Sets whether users are permitted to retract their own messages sent through the channel.
-///
-/// \param ownMessageRetractionPermitted whether users are permitted to retract their own messages
-///
+/*!
+    Sets via \a ownMessageRetractionPermitted whether users are permitted to
+    retract their own messages sent through the channel.
+*/
 void QXmppMixConfigItem::setOwnMessageRetractionPermitted(std::optional<bool> ownMessageRetractionPermitted)
 {
     d->ownMessageRetractionPermitted = ownMessageRetractionPermitted;
 }
 
-///
-/// Returns whether participants are permitted to invite users to the channel.
-///
-/// In order to use that feature, the participant must request the invitation from the channel and
-/// send it to the invitee.
-/// The invitee can use the invitation to join the channel.
-///
-/// \sa QXmppMixInvitation
-///
-/// \return whether channel participants are permitted to invite users
-///
+/*!
+    Returns whether channel participants are permitted to invite users to the
+    channel.
+
+    In order to use that feature, the participant must request the invitation from the channel and
+    send it to the invitee.
+    The invitee can use the invitation to join the channel.
+
+    \sa QXmppMixInvitation
+*/
 std::optional<bool> QXmppMixConfigItem::invitationsPermitted() const
 {
     return d->invitationsPermitted;
 }
 
-///
-/// Sets whether participants are permitted to invite users to the channel.
-///
-/// \see invitationsPermitted()
-///
-/// \param invitationsPermitted whether participants are permitted to invite users
-///
+/*!
+    Sets via \a invitationsPermitted whether participants are permitted to
+    invite users to the channel.
+
+    \sa invitationsPermitted()
+*/
 void QXmppMixConfigItem::setInvitationsPermitted(std::optional<bool> invitationsPermitted)
 {
     d->invitationsPermitted = invitationsPermitted;
 }
 
-///
-/// Returns whether participants are permitted to exchange private messages through the channel.
-///
-/// \return whether participants are permitted to exchange private messages
-///
+/*!
+    Returns whether participants are permitted to exchange private messages through the channel.
+*/
 std::optional<bool> QXmppMixConfigItem::privateMessagesPermitted() const
 {
     return d->privateMessagesPermitted;
 }
 
-///
-/// Sets whether participants are permitted to exchange private messages through the channel.
-///
-/// \param privateMessagesPermitted whether participants are permitted to exchange private messages
-///
+/*!
+    Sets via \a privateMessagesPermitted whether participants are permitted to
+    exchange private messages through the channel.
+*/
 void QXmppMixConfigItem::setPrivateMessagesPermitted(std::optional<bool> privateMessagesPermitted)
 {
     d->privateMessagesPermitted = privateMessagesPermitted;
 }
 
-///
-/// Returns true if the given DOM element is a MIX channel config item.
-///
+/*! Returns true if the given DOM \a element is a MIX channel config item. */
 bool QXmppMixConfigItem::isItem(const QDomElement &element)
 {
     return QXmppPubSubBaseItem::isItem(element, [](const QDomElement &payload) {
@@ -911,7 +802,6 @@ bool QXmppMixConfigItem::isItem(const QDomElement &element)
     });
 }
 
-/// \cond
 void QXmppMixConfigItem::parsePayload(const QDomElement &payload)
 {
     d->reset();
@@ -926,7 +816,6 @@ void QXmppMixConfigItem::serializePayload(QXmlStreamWriter *writer) const
 {
     d->toDataForm().toXml(writer);
 }
-/// \endcond
 
 class QXmppMixInfoItemPrivate : public QSharedData, public QXmppDataFormBase
 {
@@ -979,105 +868,94 @@ public:
     }
 };
 
-///
-/// \class QXmppMixInfoItem
-///
-/// \brief The QXmppMixInfoItem class represents a PubSub item of a MIX
-/// channel containing channel information as defined by \xep{0369, Mediated
-/// Information eXchange (MIX)}.
-///
-/// \since QXmpp 1.5
-///
-/// \ingroup Stanzas
-///
+/*!
+    \class QXmppMixInfoItem
+    \inmodule QXmpp
+
+    \brief The QXmppMixInfoItem class represents a PubSub item of a MIX
+    channel containing channel information as defined by \xep{0369}{Mediated
+    Information eXchange (MIX)}.
+
+    \since QXmpp 1.5
+
+    \ingroup Stanzas
+*/
 
 QXmppMixInfoItem::QXmppMixInfoItem()
     : d(new QXmppMixInfoItemPrivate)
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppMixInfoItem::QXmppMixInfoItem(const QXmppMixInfoItem &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppMixInfoItem::QXmppMixInfoItem(QXmppMixInfoItem &&) = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppMixInfoItem &QXmppMixInfoItem::operator=(const QXmppMixInfoItem &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppMixInfoItem &QXmppMixInfoItem::operator=(QXmppMixInfoItem &&) = default;
 QXmppMixInfoItem::~QXmppMixInfoItem() = default;
 
-///
-/// Returns the type of the data form that contains the channel information.
-///
-/// \return the data form's type
-///
+/*!
+    Returns the type of the data form that contains the channel information.
+*/
 QXmppDataForm::Type QXmppMixInfoItem::formType() const
 {
     return d->dataFormType;
 }
 
-///
-/// Sets the type of the data form that contains the channel information.
-///
-/// \param formType data form's type
-///
+/*!
+    Sets the data form's \a formType that contains the channel information.
+*/
 void QXmppMixInfoItem::setFormType(QXmppDataForm::Type formType)
 {
     d->dataFormType = formType;
 }
 
-///
-/// Returns the user-specified name of the MIX channel. This is not the name
-/// part of the channel's JID.
-///
+/*!
+    Returns the user-specified name of the MIX channel. This is not the name
+    part of the channel's JID.
+*/
 const QString &QXmppMixInfoItem::name() const
 {
     return d->name;
 }
 
-///
-/// Sets the name of the channel.
-///
+/*! Sets the \a name of the channel. */
 void QXmppMixInfoItem::setName(QString name)
 {
     d->name = std::move(name);
 }
 
-///
-/// Returns the description of the channel. This string might be very long.
-///
+/*! Returns the description of the channel. This string might be very long. */
 const QString &QXmppMixInfoItem::description() const
 {
     return d->description;
 }
 
-///
-/// Sets the longer channel description.
-///
+/*! Sets the longer channel \a description. */
 void QXmppMixInfoItem::setDescription(QString description)
 {
     d->description = std::move(description);
 }
 
-///
-/// Returns a list of JIDs that are responsible for this channel.
-///
+/*! Returns a list of JIDs that are responsible for this channel. */
 const QStringList &QXmppMixInfoItem::contactJids() const
 {
     return d->contactJids;
 }
 
-///
-/// Sets a list of public JIDs that are responsible for this channel.
-///
+/*!
+    Sets a list of public JIDs that are responsible for this channel.
+
+    \a contactJids.
+*/
 void QXmppMixInfoItem::setContactJids(QStringList contactJids)
 {
     d->contactJids = std::move(contactJids);
 }
 
-///
-/// Returns true, if the given dom element is a MIX channel info item.
-///
+/*! Returns true, if the given dom \a element is a MIX channel info item. */
 bool QXmppMixInfoItem::isItem(const QDomElement &element)
 {
     return QXmppPubSubBaseItem::isItem(element, [](const QDomElement &payload) {
@@ -1094,7 +972,6 @@ bool QXmppMixInfoItem::isItem(const QDomElement &element)
     });
 }
 
-/// \cond
 void QXmppMixInfoItem::parsePayload(const QDomElement &payload)
 {
     d->reset();
@@ -1109,7 +986,6 @@ void QXmppMixInfoItem::serializePayload(QXmlStreamWriter *writer) const
 {
     d->toDataForm().toXml(writer);
 }
-/// \endcond
 
 class QXmppMixParticipantItemPrivate : public QSharedData
 {
@@ -1118,65 +994,65 @@ public:
     QString jid;
 };
 
-///
-/// \class QXmppMixParticipantItem
-///
-/// The QXmppMixParticipantItem class represents a PubSub item of a MIX channel
-/// participant as defined by \xep{0369, Mediated Information eXchange (MIX)}.
-///
-/// \since QXmpp 1.5
-///
-/// \ingroup Stanzas
-///
+/*!
+    \class QXmppMixParticipantItem
+    \inmodule QXmpp
+
+    The QXmppMixParticipantItem class represents a PubSub item of a MIX channel
+    participant as defined by \xep{0369}{Mediated Information eXchange (MIX)}.
+
+    \since QXmpp 1.5
+
+    \ingroup Stanzas
+*/
 
 QXmppMixParticipantItem::QXmppMixParticipantItem()
     : d(new QXmppMixParticipantItemPrivate)
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppMixParticipantItem::QXmppMixParticipantItem(const QXmppMixParticipantItem &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppMixParticipantItem::QXmppMixParticipantItem(QXmppMixParticipantItem &&) = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppMixParticipantItem &QXmppMixParticipantItem::operator=(const QXmppMixParticipantItem &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppMixParticipantItem &QXmppMixParticipantItem::operator=(QXmppMixParticipantItem &&) = default;
 QXmppMixParticipantItem::~QXmppMixParticipantItem() = default;
 
-///
-/// Returns the participant's nickname.
-///
+/*! Returns the participant's nickname. */
 const QString &QXmppMixParticipantItem::nick() const
 {
     return d->nick;
 }
 
-///
-/// Sets the participants nickname.
-///
+/*!
+    Sets the participants nickname.
+
+    \a nick.
+*/
 void QXmppMixParticipantItem::setNick(QString nick)
 {
     d->nick = std::move(nick);
 }
 
-///
-/// Returns the participant's JID.
-///
+/*! Returns the participant's JID. */
 const QString &QXmppMixParticipantItem::jid() const
 {
     return d->jid;
 }
 
-///
-/// Sets the participant's JID.
-///
+/*!
+    Sets the participant's JID.
+
+    \a jid.
+*/
 void QXmppMixParticipantItem::setJid(QString jid)
 {
     d->jid = std::move(jid);
 }
 
-/// \cond
 void QXmppMixParticipantItem::parsePayload(const QDomElement &payload)
 {
     d->nick = payload.firstChildElement(u"nick"_s).text();
@@ -1191,11 +1067,8 @@ void QXmppMixParticipantItem::serializePayload(QXmlStreamWriter *writer) const
         OptionalTextElement { u"nick", d->nick },
     });
 }
-/// \endcond
 
-///
-/// Returns true, if this dom element is a MIX participant item.
-///
+/*! Returns true, if this dom \a element is a MIX participant item. */
 bool QXmppMixParticipantItem::isItem(const QDomElement &element)
 {
     return QXmppPubSubBaseItem::isItem(element, [](const QDomElement &payload) {

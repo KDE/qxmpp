@@ -61,7 +61,7 @@ public:
 
     Q_SLOT virtual void disconnectFromHost() = 0;
 
-    /// \brief This signal is emitted when a data packet is received.
+    /*! \brief This signal is emitted when a data packet is received. */
     Q_SIGNAL void datagramReceived(const QByteArray &data, const QHostAddress &host, quint16 port);
 };
 
@@ -95,10 +95,10 @@ public:
     QXmppJingleCandidate localCandidate(int component) const override;
     qint64 writeDatagram(const QByteArray &data, const QHostAddress &host, quint16 port) override;
 
-    /// \brief This signal is emitted once TURN allocation succeeds.
+    /*! \brief This signal is emitted once TURN allocation succeeds. */
     Q_SIGNAL void connected();
 
-    /// \brief This signal is emitted when TURN allocation fails.
+    /*! \brief This signal is emitted when TURN allocation fails. */
     Q_SIGNAL void disconnected();
 
     Q_SLOT void connectToHost();

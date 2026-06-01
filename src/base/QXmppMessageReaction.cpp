@@ -22,18 +22,17 @@ public:
     QVector<QString> emojis;
 };
 
-///
-/// \class QXmppMessageReaction
-///
-/// \brief The QXmppMessageReaction class represents a reaction to a message in the form of emojis
-/// as specified by \xep{0444, Message Reactions}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppMessageReaction
+    \inmodule QXmpp
 
-///
-/// Constructs a message reaction.
-///
+    \brief The QXmppMessageReaction class represents a reaction to a message in the form of emojis
+    as specified by \xep{0444}{Message Reactions}.
+
+    \since QXmpp 1.5
+*/
+
+/*! Constructs a message reaction. */
 QXmppMessageReaction::QXmppMessageReaction()
     : d(new QXmppMessageReactionPrivate)
 {
@@ -41,61 +40,52 @@ QXmppMessageReaction::QXmppMessageReaction()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMessageReaction)
 
-///
-/// Returns the ID of the message for that the reaction is sent.
-///
-/// For a group chat message, \code QXmppMessage::stanzaId() \endcode is used.
-///
-/// For other message types, \code QXmppMessage::originId() \endcode is used.
-/// If that is not available, \code QXmppMessage::id() \endcode is used.
-///
-/// \return the message's ID
-///
+/*!
+    Returns the ID of the message for that the reaction is sent.
+
+    For a group chat message, \c {QXmppMessage::stanzaId()} is used.
+
+    For other message types, \c {QXmppMessage::originId()} is used.
+    If that is not available, \c {QXmppMessage::id()} is used.
+*/
 QString QXmppMessageReaction::messageId() const
 {
     return d->messageId;
 }
 
-///
-/// Sets the ID of the message for that the reaction is sent.
-///
-/// For a group chat message, \code QXmppMessage::stanzaId() \endcode must be used.
-/// If there is no such ID, a message reaction must not be sent.
-///
-/// For other message types, \code QXmppMessage::originId() \endcode should be used.
-/// If that is not available, \code QXmppMessage::id() \endcode should be used.
-///
-/// \param messageId message's ID
-///
+/*!
+    Sets the ID of the message for that the reaction is sent to \a messageId.
+
+    For a group chat message, \c {QXmppMessage::stanzaId()} must be used.
+    If there is no such ID, a message reaction must not be sent.
+
+    For other message types, \c {QXmppMessage::originId()} should be used.
+    If that is not available, \c {QXmppMessage::id()} should be used.
+*/
 void QXmppMessageReaction::setMessageId(const QString &messageId)
 {
     d->messageId = messageId;
 }
 
-///
-/// Returns the emojis in reaction to a message.
-///
-/// \return the emoji reactions
-///
+/*!
+    Returns the emojis in reaction to a message.
+*/
 QVector<QString> QXmppMessageReaction::emojis() const
 {
     return d->emojis;
 }
 
-///
-/// Sets the emojis in reaction to a message.
-///
-/// Each reaction should only consist of unicode codepoints that can be displayed as a single emoji.
-/// Duplicates are not allowed.
-///
-/// \param emojis emoji reactions
-///
+/*!
+    Sets the \a emojis in reaction to a message.
+
+    Each reaction should only consist of unicode codepoints that can be displayed as a single emoji.
+    Duplicates are not allowed.
+*/
 void QXmppMessageReaction::setEmojis(const QVector<QString> &emojis)
 {
     d->emojis = emojis;
 }
 
-/// \cond
 void QXmppMessageReaction::parse(const QDomElement &element)
 {
     d->messageId = element.attribute(u"id"_s);
@@ -114,15 +104,12 @@ void QXmppMessageReaction::toXml(QXmlStreamWriter *writer) const
         TextElements { u"reaction", d->emojis },
     });
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is a message reaction element.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is a message reaction element, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is a message reaction element.
+
+    Returns true if \a element is a message reaction element, otherwise false.
+*/
 bool QXmppMessageReaction::isMessageReaction(const QDomElement &element)
 {
     return element.tagName() == u"reactions" &&

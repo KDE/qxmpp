@@ -38,19 +38,24 @@ public:
     std::optional<uint32_t> width;
 };
 
-///
-/// \class QXmppFileMetadata
-///
-/// File metadata from \xep{0446, File metadata element}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppFileMetadata
+    \inmodule QXmpp
 
-///
-/// \brief Creates a QXmppFileMetadata object from information from QFileInfo.
-///
-/// Sets the filename, file size, media type and the last modification date.
-///
+    File metadata from \xep{0446}{File metadata element}.
+
+    \since QXmpp 1.5
+
+    \a info.
+*/
+
+/*!
+    \brief Creates a QXmppFileMetadata object from information from QFileInfo.
+
+    Sets the filename, file size, media type and the last modification date.
+
+    \a info.
+*/
 QXmppFileMetadata QXmppFileMetadata::fromFileInfo(const QFileInfo &info)
 {
     QXmppFileMetadata metadata;
@@ -68,7 +73,6 @@ QXmppFileMetadata::QXmppFileMetadata()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFileMetadata)
 
-/// \cond
 bool QXmppFileMetadata::parse(const QDomElement &el)
 {
     if (el.isNull()) {
@@ -123,123 +127,134 @@ void QXmppFileMetadata::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"width", d->width },
     });
 }
-/// \endcond
 
-/// Returns when the file was last modified
+/*! Returns when the file was last modified */
 const std::optional<QDateTime> &QXmppFileMetadata::lastModified() const
 {
     return d->date;
 }
 
-/// Sets when the file was last modified
+/*!
+    Sets when the file was last modified
+
+    \a date.
+*/
 void QXmppFileMetadata::setLastModified(const std::optional<QDateTime> &date)
 {
     d->date = date;
 }
 
-/// Returns the description of the file
+/*! Returns the description of the file */
 const std::optional<QString> &QXmppFileMetadata::description() const
 {
     return d->desc;
 }
 
-/// Sets the description of the file
+/*! Sets the \a description of the file */
 void QXmppFileMetadata::setDescription(const std::optional<QString> &description)
 {
     d->desc = description;
 }
 
-/// Returns the hashes of the file
+/*! Returns the hashes of the file */
 const QVector<QXmppHash> &QXmppFileMetadata::hashes() const
 {
     return d->hashes;
 }
 
-/// Sets the hashes of the file
+/*! Sets the \a hashes of the file */
 void QXmppFileMetadata::setHashes(const QVector<QXmppHash> &hashes)
 {
     d->hashes = hashes;
 }
 
-/// Returns the height of the image
+/*! Returns the height of the image */
 std::optional<uint32_t> QXmppFileMetadata::height() const
 {
     return d->height;
 }
 
-/// Sets the height of the image
+/*! Sets the \a height of the image */
 void QXmppFileMetadata::setHeight(std::optional<uint32_t> height)
 {
     d->height = height;
 }
 
-/// Returns the length of a video or audio file
+/*! Returns the length of a video or audio file */
 std::optional<uint32_t> QXmppFileMetadata::length() const
 {
     return d->length;
 }
 
-/// Sets the length of a video or audio file
+/*! Sets the \a length of a video or audio file */
 void QXmppFileMetadata::setLength(std::optional<uint32_t> length)
 {
     d->length = length;
 }
 
-/// Returns the media type of the file
+/*! Returns the media type of the file */
 const std::optional<QMimeType> &QXmppFileMetadata::mediaType() const
 {
     return d->mediaType;
 }
 
-/// Sets the media type of the file
+/*!
+    Sets the media type of the file
+
+    \a mediaType.
+*/
 void QXmppFileMetadata::setMediaType(std::optional<QMimeType> mediaType)
 {
     d->mediaType = std::move(mediaType);
 }
 
-/// Returns the filename
+/*! Returns the filename */
 std::optional<QString> QXmppFileMetadata::filename() const
 {
     return d->name;
 }
 
-/// Sets the filename
+/*!
+    Sets the filename
+
+    \a name.
+*/
 void QXmppFileMetadata::setFilename(std::optional<QString> name)
 {
     d->name = std::move(name);
 }
 
-/// Returns the size of the file in bytes
+/*! Returns the size of the file in bytes */
 std::optional<uint64_t> QXmppFileMetadata::size() const
 {
     return d->size;
 }
 
-/// Sets the size of the file in bytes
+/*! Sets the \a size of the file in bytes */
 void QXmppFileMetadata::setSize(std::optional<uint64_t> size)
 {
     d->size = size;
 }
 
-/// Returns the thumbnail references.
+/*! Returns the thumbnail references. */
 const QVector<QXmppThumbnail> &QXmppFileMetadata::thumbnails() const
 {
     return d->thumbnails;
 }
 
-/// Sets the thumbnail references.
+/*! Sets the \a thumbnail references. */
 void QXmppFileMetadata::setThumbnails(const QVector<QXmppThumbnail> &thumbnail)
 {
     d->thumbnails = thumbnail;
 }
 
-/// Returns the width of the image or video.
+/*! Returns the width of the image or video. */
 std::optional<uint32_t> QXmppFileMetadata::width() const
 {
     return d->width;
 }
 
-/// Sets the width of the image or video.
+/*! Sets the \a width of the image or video. */
 void QXmppFileMetadata::setWidth(std::optional<uint32_t> width)
 {
     d->width = width;

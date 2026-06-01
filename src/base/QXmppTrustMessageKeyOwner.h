@@ -34,11 +34,9 @@ public:
     QList<QByteArray> distrustedKeys() const;
     void setDistrustedKeys(const QList<QByteArray> &keyIds);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"key-owner", QXmpp::Private::ns_tm };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isTrustMessageKeyOwner(const QDomElement &element);
 

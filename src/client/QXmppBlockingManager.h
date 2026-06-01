@@ -45,7 +45,11 @@ class QXMPP_EXPORT QXmppBlockingManager : public QXmppClientExtension
 {
     Q_OBJECT
 
-    /// Whether the blocking manager is currently receiving updates of the blocklist.
+    /*!
+        \property QXmppBlockingManager::subscribed
+
+        Whether the blocking manager is currently receiving updates of the blocklist.
+    */
     Q_PROPERTY(bool subscribed READ isSubscribed NOTIFY subscribedChanged)
 
 public:
@@ -67,12 +71,10 @@ public:
     Q_SIGNAL void blocked(const QVector<QString> &jids);
     Q_SIGNAL void unblocked(const QVector<QString> &jids);
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     void onRegistered(QXmppClient *) override;
     void onUnregistered(QXmppClient *) override;
     bool handleStanza(const QDomElement &, const std::optional<QXmppE2eeMetadata> &) override;
-    /// \endcond
 
 private:
     void onConnected();

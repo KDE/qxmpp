@@ -122,7 +122,6 @@ public:
     QXmppTask<void> setTrustLevel(const QMultiHash<QString, QByteArray> &keyIds, QXmpp::TrustLevel trustLevel);
     QXmppTask<QXmpp::TrustLevel> trustLevel(const QString &keyOwnerJid, const QByteArray &keyId);
 
-    /// \cond
     QXmppTask<MessageEncryptResult> encryptMessage(QXmppMessage &&message, const std::optional<QXmppSendStanzaParams> &params) override;
     QXmppTask<MessageDecryptResult> decryptMessage(QXmppMessage &&message) override;
 
@@ -135,7 +134,6 @@ public:
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &stanza) override;
     bool handleMessage(const QXmppMessage &message) override;
-    /// \endcond
 
     Q_SIGNAL void trustLevelsChanged(const QMultiHash<QString, QByteArray> &modifiedKeys);
 
@@ -146,11 +144,9 @@ public:
     Q_SIGNAL void allDevicesRemoved();
 
 protected:
-    /// \cond
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
     bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
-    /// \endcond
 
 private:
     std::unique_ptr<QXmppOmemoManagerPrivate> d;

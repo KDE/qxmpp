@@ -19,22 +19,20 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-///
-/// \typedef QXmppEntityTimeManager::EntityTimeResult
-///
-/// Contains the requested entity time or the returned error in case of a
-/// failure.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \typedef QXmppEntityTimeManager::EntityTimeResult
 
-///
-/// Request the time from an XMPP entity.
-///
-/// The result is emitted on the timeReceived() signal.
-///
-/// \param jid
-///
+    Contains the requested entity time or the returned error in case of a
+    failure.
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    Request the time from the XMPP entity with JID \a jid.
+
+    The result is emitted on the timeReceived() signal.
+*/
 QString QXmppEntityTimeManager::requestTime(const QString &jid)
 {
     QXmppEntityTimeIq request;
@@ -43,13 +41,15 @@ QString QXmppEntityTimeManager::requestTime(const QString &jid)
     return client()->sendLegacyId(request);
 }
 
-///
-/// Requests the time from an XMPP entity and reports it via a QFuture.
-///
-/// The timeReceived() signal is not emitted.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Requests the time from an XMPP entity and reports it via a QFuture.
+
+    The timeReceived() signal is not emitted.
+
+    \since QXmpp 1.5
+
+    \a jid.
+*/
 auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<EntityTimeResult>
 {
     QXmppEntityTimeIq iq;
@@ -59,7 +59,6 @@ auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<
     co_return parseIq<QXmppEntityTimeIq>(co_await client()->sendIq(std::move(iq)));
 }
 
-/// \cond
 QStringList QXmppEntityTimeManager::discoveryFeatures() const
 {
     return { staticString(ns_entity_time) };
@@ -101,4 +100,3 @@ std::variant<QXmppEntityTimeIq, QXmppStanza::Error> QXmppEntityTimeManager::hand
     responseIq.setTzo(utc.secsTo(currentTime));
     return responseIq;
 }
-/// \endcond

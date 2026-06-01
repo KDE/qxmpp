@@ -50,7 +50,6 @@ static bool isIqResponse(const QDomElement &el)
     return el.tagName() == u"iq" && (type == u"result" || type == u"error");
 }
 
-/// \cond
 QXmppClientPrivate::QXmppClientPrivate(QXmppClient *qq)
     : clientPresence(QXmppPresence::Available),
       logger(nullptr),
@@ -157,7 +156,6 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
     Q_EMIT q->error(oldError);
     Q_EMIT q->errorOccurred(QXmppError { text, into<std::any>(std::move(err)) });
 }
-/// \endcond
 
 namespace QXmpp::Private::StanzaPipeline {
 
@@ -208,96 +206,99 @@ bool process(QXmppClient *client, const QList<QXmppClientExtension *> &extension
 
 }  // namespace QXmpp::Private::MessagePipeline
 
-///
-/// \class QXmppClient
-///
-/// \brief Main class for starting and managing connections to XMPP servers.
-///
-/// It provides the user all the required functionality to connect to the
-/// server and perform operations afterwards.
-///
-/// This class will provide the handle/reference to QXmppRosterManager
-/// (roster management), QXmppVCardManager (vCard manager), and
-/// QXmppVersionManager (software version information).
-///
-/// By default, the client will automatically try reconnecting to the server.
-/// You can change that behaviour using
-/// QXmppConfiguration::setAutoReconnectionEnabled().
-///
-/// Not all the managers or extensions have been enabled by default. One can
-/// enable/disable the managers using the functions \c addExtension() and
-/// \c removeExtension(). \c findExtension() can be used to find a
-/// reference/pointer to a particular instantiated and enabled manager.
-///
-/// List of managers enabled by default:
-/// - QXmppRosterManager
-/// - QXmppVCardManager
-/// - QXmppVersionManager
-/// - QXmppDiscoveryManager
-/// - QXmppEntityTimeManager
-///
-/// ## Connection details
-///
-/// If no explicit host and port are configured, the client will look up the SRV records of the
-/// domain of the configured JID. Since QXmpp 1.8 both TCP and direct TLS records are looked up
-/// and connection via direct TLS is preferred as it saves the extra round trip from STARTTLS. See
-/// also \xep{0368, SRV records for XMPP over TLS}.
-///
-/// On connection errors the other SRV records are tested too (if multiple are available).
-///
-/// For servers without SRV records or if looking up the records did not succeed, domain and the
-/// default port of 5223 (TLS) and 5222 (TCP/STARTTLS) are tried.
-///
-/// ## Usage of FAST token-based authentication
-///
-/// QXmpp uses \xep{0484, Fast Authentication Streamlining Tokens} if enabled and supported by the
-/// server. FAST tokens can be requested after a first time authentication using a password or
-/// another strong authentication mechanism. The tokens can then be used to log in, without a
-/// password. The tokens are linked to a specific device ID (set via the SASL 2 user agent) and
-/// only this device can use the token. Tokens also expire and are rotated by the server.
-///
-/// The advantage of this mechanism is that a client does not necessarily need to store the
-/// password of an account and in the future clients that are logged in could be listed and logged
-/// out manually. FAST also allows for performance improvements as it only requires one round trip
-/// for authentication (and may be included in TLS 0-RTT data although that is not implemented in
-/// QXmpp) while other mechanisms like SCRAM need multiple round trips.
-///
-/// FAST itself is enabled by default (see QXmppConfiguration::useFastTokenAuthentication()), but
-/// you also need to set a SASL user agent with a stable device ID, so FAST can be used.
-/// After that you can login and use QXmppCredentials to serialize the token data and store it
-/// permanently. Note that the token may change over time, though.
-///
-/// \ingroup Core
-///
+/*!
+    \class QXmppClient
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppClient::IqResult
-///
-/// Result of an IQ request, either contains the QDomElement of the IQ reponse (in case of an
-/// 'result' IQ type) or it contains an QXmppError with a QXmppStanza::Error (on type 'error') or
-/// a QXmpp::SendError.
-///
-/// \since QXmpp 1.5
-///
+    \brief Main class for starting and managing connections to XMPP servers.
 
-///
-/// \typedef QXmppClient::EmptyResult
-///
-/// Result of a generic request without a return value. Contains Success in case
-/// everything went well. If the returned IQ contained an error a
-/// QXmppStanza::Error is reported.
-///
-/// \since QXmpp 1.5
-///
+    It provides the user all the required functionality to connect to the
+    server and perform operations afterwards.
 
-///
-/// Creates a QXmppClient object.
-///
-/// \param initialExtensions can be used to set the initial set of extensions.
-/// \param parent is passed to the QObject's constructor. The default value is 0.
-///
-/// \since QXmpp 1.6
-///
+    This class will provide the handle/reference to QXmppRosterManager
+    (roster management), QXmppVCardManager (vCard manager), and
+    QXmppVersionManager (software version information).
+
+    By default, the client will automatically try reconnecting to the server.
+    You can change that behaviour using
+    QXmppConfiguration::setAutoReconnectionEnabled().
+
+    Not all the managers or extensions have been enabled by default. One can
+    enable/disable the managers using the functions \c addExtension() and
+    \c removeExtension(). \c findExtension() can be used to find a
+    reference/pointer to a particular instantiated and enabled manager.
+
+    List of managers enabled by default:
+    \list
+        \li QXmppRosterManager
+        \li QXmppVCardManager
+        \li QXmppVersionManager
+        \li QXmppDiscoveryManager
+        \li QXmppEntityTimeManager
+    \endlist
+
+    \section1 Connection details
+
+    If no explicit host and port are configured, the client will look up the SRV records of the
+    domain of the configured JID. Since QXmpp 1.8 both TCP and direct TLS records are looked up
+    and connection via direct TLS is preferred as it saves the extra round trip from STARTTLS. See
+    also \xep{0368}{SRV records for XMPP over TLS}.
+
+    On connection errors the other SRV records are tested too (if multiple are available).
+
+    For servers without SRV records or if looking up the records did not succeed, domain and the
+    default port of 5223 (TLS) and 5222 (TCP/STARTTLS) are tried.
+
+    \section1 Usage of FAST token-based authentication
+
+    QXmpp uses \xep{0484}{Fast Authentication Streamlining Tokens} if enabled and supported by the
+    server. FAST tokens can be requested after a first time authentication using a password or
+    another strong authentication mechanism. The tokens can then be used to log in, without a
+    password. The tokens are linked to a specific device ID (set via the SASL 2 user agent) and
+    only this device can use the token. Tokens also expire and are rotated by the server.
+
+    The advantage of this mechanism is that a client does not necessarily need to store the
+    password of an account and in the future clients that are logged in could be listed and logged
+    out manually. FAST also allows for performance improvements as it only requires one round trip
+    for authentication (and may be included in TLS 0-RTT data although that is not implemented in
+    QXmpp) while other mechanisms like SCRAM need multiple round trips.
+
+    FAST itself is enabled by default (see QXmppConfiguration::useFastTokenAuthentication()), but
+    you also need to set a SASL user agent with a stable device ID, so FAST can be used.
+    After that you can login and use QXmppCredentials to serialize the token data and store it
+    permanently. Note that the token may change over time, though.
+
+    \ingroup Core
+*/
+
+/*!
+    \typedef QXmppClient::IqResult
+
+    Result of an IQ request, either contains the QDomElement of the IQ reponse (in case of an
+    'result' IQ type) or it contains an QXmppError with a QXmppStanza::Error (on type 'error') or
+    a QXmpp::SendError.
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \typedef QXmppClient::EmptyResult
+
+    Result of a generic request without a return value. Contains Success in case
+    everything went well. If the returned IQ contained an error a
+    QXmppStanza::Error is reported.
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    Creates a QXmppClient object.
+
+    \a initialExtensions can be used to set the initial set of extensions.
+    \a parent is passed to the QObject's constructor. The default value is 0.
+
+    \since QXmpp 1.6
+*/
 QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     : QXmppLoggable(parent),
       d(new QXmppClientPrivate(this))
@@ -354,10 +355,9 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     }
 }
 
-///
-/// Creates a QXmppClient object.
-/// \param parent is passed to the QObject's constructor.
-///
+/*!
+    Creates a QXmppClient object. \a parent is passed to the QObject's constructor.
+*/
 QXmppClient::QXmppClient(QObject *parent)
     : QXmppClient(BasicExtensions, parent)
 {
@@ -365,23 +365,23 @@ QXmppClient::QXmppClient(QObject *parent)
 
 QXmppClient::~QXmppClient() = default;
 
-///
-/// \fn QXmppClient::addNewExtension()
-///
-/// Creates a new extension and adds it to the client.
-///
-/// \returns the newly created extension
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \fn template <typename T, typename... Args> T *QXmppClient::addNewExtension(Args... args)
 
-/// Registers a new \a extension with the client.
+    Creates a new extension (forwarding \a args to its constructor) and adds it to the client.
+
+    Returns the newly created extension.
+
+    \since QXmpp 1.5
+*/
+
+/*! Registers a new \a extension with the client. Returns true on success. */
 bool QXmppClient::addExtension(QXmppClientExtension *extension)
 {
     return insertExtension(d->extensions.size(), extension);
 }
 
-/// Registers a new \a extension with the client at the given \a index.
+/*! Registers a new \a extension with the client at the given \a index. Returns true on success. */
 bool QXmppClient::insertExtension(int index, QXmppClientExtension *extension)
 {
     if (d->extensions.contains(extension)) {
@@ -395,10 +395,12 @@ bool QXmppClient::insertExtension(int index, QXmppClientExtension *extension)
     return true;
 }
 
-///
-/// Unregisters the given extension from the client. If the extension
-/// is found, it will be destroyed.
-///
+/*!
+    Returns whether the extension was unregistered. Unregisters the given extension from the client. If the extension
+    is found, it will be destroyed.
+
+    \a extension.
+*/
 bool QXmppClient::removeExtension(QXmppClientExtension *extension)
 {
     if (d->extensions.contains(extension)) {
@@ -412,48 +414,50 @@ bool QXmppClient::removeExtension(QXmppClientExtension *extension)
     }
 }
 
-///
-/// Returns the currently used encryption extension.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Returns the currently used encryption extension.
+
+    \since QXmpp 1.5
+*/
 QXmppE2eeExtension *QXmppClient::encryptionExtension() const
 {
     return d->encryptionExtension;
 }
 
-///
-/// Sets the extension to be used for end-to-end-encryption.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sets the extension to be used for end-to-end-encryption.
+
+    \since QXmpp 1.5
+
+    \a extension.
+*/
 void QXmppClient::setEncryptionExtension(QXmppE2eeExtension *extension)
 {
     d->encryptionExtension = extension;
 }
 
-/// Returns a list containing all the client's extensions.
+/*! Returns a list containing all the client's extensions. */
 QList<QXmppClientExtension *> QXmppClient::extensions() const
 {
     return d->extensions;
 }
 
-/// Returns a modifiable reference to the current configuration of QXmppClient.
+/*! Returns a modifiable reference to the current configuration of QXmppClient. */
 QXmppConfiguration &QXmppClient::configuration()
 {
     return d->stream->configuration();
 }
 
-///
-/// Attempts to connect to the XMPP server. Server details and other configurations
-/// are specified using the config parameter. Use signals connected(), error(QXmppClient::Error)
-/// and disconnected() to know the status of the connection.
-///
-/// \param config Specifies the configuration object for connecting the XMPP server.
-/// This contains the host name, user, password etc. See QXmppConfiguration for details.
-/// \param initialPresence The initial presence which will be set for this user
-/// after establishing the session. The default value is QXmppPresence::Available
-///
+/*!
+    Attempts to connect to the XMPP server. Server details and other configurations
+    are specified using the config parameter. Use signals connected(), error(QXmppClient::Error)
+    and disconnected() to know the status of the connection.
+
+    \a config specifies the configuration object for connecting the XMPP server.
+    This contains the host name, user, password etc. See QXmppConfiguration for details.
+    \a initialPresence is the initial presence which will be set for this user
+    after establishing the session. The default value is QXmppPresence::Available.
+*/
 void QXmppClient::connectToServer(const QXmppConfiguration &config,
                                   const QXmppPresence &initialPresence)
 {
@@ -469,12 +473,10 @@ void QXmppClient::connectToServer(const QXmppConfiguration &config,
     d->stream->connectToHost();
 }
 
-///
-/// Overloaded function to simply connect to an XMPP server with a JID and password.
-///
-/// \param jid JID for the account.
-/// \param password Password for the account.
-///
+/*!
+    Overloaded function to simply connect to an XMPP server with a \a jid and \a password for
+    the account.
+*/
 void QXmppClient::connectToServer(const QString &jid, const QString &password)
 {
     QXmppConfiguration config;
@@ -483,20 +485,22 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
     connectToServer(config);
 }
 
-///
-/// Sends a packet and reports the result via QXmppTask.
-///
-/// If stream management is enabled, the task continues to be active until the
-/// server acknowledges the packet. On success, QXmpp::SendSuccess with
-/// acknowledged == true is reported and the task finishes.
-///
-/// If connection errors occur, the packet is resent if possible. If
-/// reconnecting is not possible, an error is reported.
-///
-/// \returns A QXmppTask that makes it possible to track the state of the packet.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sends a packet and reports the result via QXmppTask.
+
+    If stream management is enabled, the task continues to be active until the
+    server acknowledges the packet. On success, QXmpp::SendSuccess with
+    acknowledged == true is reported and the task finishes.
+
+    If connection errors occur, the packet is resent if possible. If
+    reconnecting is not possible, an error is reported.
+
+    Returns a QXmppTask that makes it possible to track the state of the packet.
+
+    \since QXmpp 1.5
+
+    \a params and \a stanza.
+*/
 QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
     if (d->encryptionExtension) {
@@ -531,30 +535,32 @@ QXmppTask<QXmpp::SendResult> QXmppClientPrivate::sendEncryptedIq(QXmppTask<QXmpp
     co_return co_await stream->streamAckManager().send(QXmppPacket(*std::get<std::unique_ptr<QXmppIq>>(result)));
 }
 
-///
-/// Sends a packet always without end-to-end-encryption.
-///
-/// This does the same as send(), but does not do any end-to-end encryption on
-/// the stanza.
-///
-/// \returns A QXmppTask that makes it possible to track the state of the packet.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sends a packet always without end-to-end-encryption.
+
+    This does the same as send(), but does not do any end-to-end encryption on
+    the \a stanza.
+
+    Returns a QXmppTask that makes it possible to track the state of the packet.
+
+    \since QXmpp 1.5
+*/
 QXmppTask<QXmpp::SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &)
 {
     return d->stream->streamAckManager().send(stanza);
 }
 
-///
-/// Sends the stanza with the same encryption as \p e2eeMetadata.
-///
-/// When there is no e2eeMetadata given this always sends the stanza without
-/// end-to-end encryption.
-/// Intended to be used for replies to IQs and messages.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sends the stanza with the same encryption as \a e2eeMetadata.
+
+    When there is no e2eeMetadata given this always sends the stanza without
+    end-to-end encryption.
+    Intended to be used for replies to IQs and messages.
+
+    \since QXmpp 1.5
+
+    \a params and \a stanza.
+*/
 QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> &params)
 {
     // This should pick the right e2ee manager as soon as multiple encryptions
@@ -565,41 +571,45 @@ QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std:
     return send(std::move(stanza), params);
 }
 
-///
-/// Sends an IQ packet and returns the response asynchronously.
-///
-/// This is useful for further processing and parsing of the returned
-/// QDomElement. If you don't expect a special response, you may want use
-/// sendGenericIq().
-///
-/// IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
-/// QXmppStanza::Error.
-///
-/// This does not do any end-to-encryption on the IQ.
-///
-/// \sa sendSensitiveIq()
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sends an IQ packet and returns the response asynchronously.
+
+    This is useful for further processing and parsing of the returned
+    QDomElement. If you don't expect a special response, you may want use
+    sendGenericIq().
+
+    IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
+    QXmppStanza::Error.
+
+    This does not do any end-to-encryption on the IQ.
+
+    \sa sendSensitiveIq()
+
+    \since QXmpp 1.5
+
+    \a iq.
+*/
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
 {
     return d->stream->sendIq(std::move(iq));
 }
 
-///
-/// Tries to encrypt and send an IQ packet and returns the response
-/// asynchronously.
-///
-/// This can be used for sensitive IQ requests performed from client to client.
-/// Most IQ requests like service discovery requests cannot be end-to-end
-/// encrypted or it only makes little sense to do so. This is why the default
-/// sendIq() does not do any additional end-to-end encryption.
-///
-/// IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
-/// QXmppStanza::Error.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Tries to encrypt and send an IQ packet and returns the response
+    asynchronously.
+
+    This can be used for sensitive IQ requests performed from client to client.
+    Most IQ requests like service discovery requests cannot be end-to-end
+    encrypted or it only makes little sense to do so. This is why the default
+    sendIq() does not do any additional end-to-end encryption.
+
+    IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
+    QXmppStanza::Error.
+
+    \since QXmpp 1.5
+
+    \a params and \a iq.
+*/
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &params)
 {
     return d->encryptionExtension ? d->sendSensitiveIq(std::move(iq), params) : d->stream->sendIq(std::move(iq));
@@ -642,31 +652,31 @@ QXmppTask<QXmppClient::IqResult> QXmppClientPrivate::sendSensitiveIq(QXmppIq iq,
         std::move(decryptResult));
 }
 
-///
-/// Sends an IQ and returns possible stanza errors.
-///
-/// If you want to parse a special IQ response in the result case, you can use
-/// sendIq() and parse the returned QDomElement.
-///
-/// \returns Returns QXmpp::Success (on response type 'result') or the contained
-/// QXmppStanza::Error (on response type 'error')
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Sends an IQ \a iq and returns possible stanza errors.
+
+    If you want to parse a special IQ response in the result case, you can use
+    sendIq() and parse the returned QDomElement.
+
+    Returns QXmpp::Success (on response type 'result') or the contained
+    QXmppStanza::Error (on response type 'error').
+
+    \since QXmpp 1.5
+*/
 QXmppTask<QXmppClient::EmptyResult>
 QXmppClient::sendGenericIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
 {
     co_return mapToSuccess(co_await sendIq(std::move(iq)));
 }
 
-///
-/// Disconnects the client and the current presence of client changes to
-/// QXmppPresence::Unavailable and status text changes to "Logged out".
-///
-/// \note Make sure that the clientPresence is changed to
-/// QXmppPresence::Available, if you are again calling connectToServer() after
-/// calling the disconnectFromServer() function.
-///
+/*!
+    Disconnects the client and the current presence of client changes to
+    QXmppPresence::Unavailable and status text changes to "Logged out".
+
+    \note Make sure that the clientPresence is changed to
+    QXmppPresence::Available, if you are again calling connectToServer() after
+    calling the disconnectFromServer() function.
+*/
 void QXmppClient::disconnectFromServer()
 {
     // cancel reconnection
@@ -681,50 +691,52 @@ void QXmppClient::disconnectFromServer()
     d->stream->disconnectFromHost();
 }
 
-/// Returns true if the client has authenticated with the XMPP server.
+/*! Returns true if the client has authenticated with the XMPP server. */
 bool QXmppClient::isAuthenticated() const
 {
     return d->stream->isAuthenticated();
 }
 
-/// Returns true if the client is connected to the XMPP server.
+/*! Returns true if the client is connected to the XMPP server. */
 bool QXmppClient::isConnected() const
 {
     return d->stream->isConnected();
 }
 
-///
-/// Returns true if the current client state is "active", false if it is
-/// "inactive". See \xep{0352, Client State Indication} for details.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Returns true if the current client state is "active", false if it is
+    "inactive". See \xep{0352}{Client State Indication} for details.
+
+    \since QXmpp 1.0
+*/
 bool QXmppClient::isActive() const
 {
     return d->stream->csiManager().state() == CsiManager::Active;
 }
 
-///
-/// Sets the client state as described in \xep{0352, Client State Indication}.
-///
-/// Since QXmpp 1.8, the state is restored across reconnects. QXmpp will re-send the state of
-/// 'inactive' on connection if that was set before. Stream resumptions are also handled.
-///
-/// \since QXmpp 1.0
-///
+/*!
+    Sets the client state as described in \xep{0352}{Client State Indication}.
+
+    Since QXmpp 1.8, the state is restored across reconnects. QXmpp will re-send the state of
+    'inactive' on connection if that was set before. Stream resumptions are also handled.
+
+    \since QXmpp 1.0
+
+    \a active.
+*/
 void QXmppClient::setActive(bool active)
 {
     d->stream->csiManager().setState(active ? CsiManager::Active : CsiManager::Inactive);
 }
 
-///
-/// Returns the current \xep{0198, Stream Management} state of the connection.
-///
-/// Upon connection of the client this can be used to check whether the
-/// previous stream has been resumed.
-///
-/// \since QXmpp 1.4
-///
+/*!
+    Returns the current \xep{0198}{Stream Management} state of the connection.
+
+    Upon connection of the client this can be used to check whether the
+    previous stream has been resumed.
+
+    \since QXmpp 1.4
+*/
 QXmppClient::StreamManagementState QXmppClient::streamManagementState() const
 {
     if (d->stream->c2sStreamManager().enabled()) {
@@ -754,25 +766,26 @@ QXmppClient::State QXmppClient::state() const
     }
 }
 
-/// Returns the client's current presence.
+/*! Returns the client's current presence. */
 QXmppPresence QXmppClient::clientPresence() const
 {
     return d->clientPresence;
 }
 
-///
-/// Changes the presence of the connected client.
-///
-/// The connection to the server will be updated accordingly:
-///
-/// \li If the presence type is QXmppPresence::Unavailable, the connection
-/// to the server will be closed.
-///
-/// \li Otherwise, the connection to the server will be established
-/// as needed.
-///
-/// \param presence QXmppPresence object
-///
+/*!
+    Changes the presence of the connected client.
+
+    The connection to the server will be updated accordingly:
+
+    \list
+    \li If the presence type is QXmppPresence::Unavailable, the connection
+    to the server will be closed.
+    \li Otherwise, the connection to the server will be established
+    as needed.
+    \endlist
+
+    \a presence is a QXmppPresence object.
+*/
 void QXmppClient::setClientPresence(const QXmppPresence &presence)
 {
     d->clientPresence = presence;
@@ -796,19 +809,19 @@ void QXmppClient::setClientPresence(const QXmppPresence &presence)
     }
 }
 
-/// Returns the socket error if error() is QXmppClient::SocketError.
+/*! Returns the socket error if error() is QXmppClient::SocketError. */
 QAbstractSocket::SocketError QXmppClient::socketError()
 {
     return d->stream->xmppSocket().internalSocket()->error();
 }
 
-/// Returns the human-readable description of the last socket error if error() is QXmppClient::SocketError.
+/*! Returns the human-readable description of the last socket error if error() is QXmppClient::SocketError. */
 QString QXmppClient::socketErrorString() const
 {
     return d->stream->xmppSocket().internalSocket()->errorString();
 }
 
-/// Returns the XMPP stream error if QXmppClient::Error is QXmppClient::XmppStreamError.
+/*! Returns the XMPP stream error if QXmppClient::Error is QXmppClient::XmppStreamError. */
 QXmppStanza::Error::Condition QXmppClient::xmppStreamError()
 {
     return d->stream->xmppStreamError();
@@ -838,9 +851,7 @@ void QXmppClient::injectIq(const QDomElement &element, const std::optional<QXmpp
     }
 }
 
-///
-/// Processes the message with message handlers and emits messageReceived as a fallback.
-///
+/*! Processes the message with message handlers and emits messageReceived as a fallback. */
 bool QXmppClient::injectMessage(QXmppMessage &&message)
 {
     auto handled = MessagePipeline::process(this, d->extensions, std::move(message));
@@ -851,21 +862,17 @@ bool QXmppClient::injectMessage(QXmppMessage &&message)
     return handled;
 }
 
-///
-/// Sets stream errors that are ignored if they occur.
-///
-/// \param errors stream errors to be ignored
-///
-/// \since QXmpp 1.9
-///
+/*!
+    Sets stream errors \a errors that are ignored if they occur.
+
+    \since QXmpp 1.9
+*/
 void QXmppClient::setIgnoredStreamErrors(const QVector<QXmpp::StreamError> &errors)
 {
     d->ignoredStreamErrors = errors;
 }
 
-///
-/// Give extensions a chance to handle incoming stanzas.
-///
+/*! Give extensions a chance to handle incoming stanzas. */
 void QXmppClient::_q_elementReceived(const QDomElement &element, bool &handled)
 {
     // The stanza comes directly from the XMPP stream, so it's not end-to-end
@@ -888,7 +895,7 @@ void QXmppClient::onInternalSocketStateChanged()
     Q_EMIT stateChanged(state());
 }
 
-/// At connection establishment, send initial presence.
+/*! At connection establishment, send initial presence. */
 void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session)
 {
     d->receivedConflict = false;
@@ -919,7 +926,11 @@ QXmppLogger *QXmppClient::logger() const
     return d->logger;
 }
 
-/// Sets the QXmppLogger associated with the current QXmppClient.
+/*!
+    Sets the QXmppLogger associated with the current QXmppClient.
+
+    \a logger.
+*/
 void QXmppClient::setLogger(QXmppLogger *logger)
 {
     if (logger != d->logger) {

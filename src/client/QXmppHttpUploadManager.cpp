@@ -24,43 +24,38 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-///
-/// \property QXmppHttpUploadManager::support
-///
-/// \see QXmppHttpUploadManager::support()
-///
-/// \since QXmpp 1.13
-///
+/*!
+    \property QXmppHttpUploadManager::support
 
-///
-/// \property QXmppHttpUploadManager::services
-///
-/// \see QXmppHttpUploadManager::services()
-///
-/// \since QXmpp 1.13
-///
+    \sa QXmppHttpUploadManager::support()
 
-///
-/// \enum QXmppHttpUploadManager::Support
-///
-/// Server support for the feature.
-///
-/// \var QXmppHttpUploadManager::Support::Unknown
-///
-/// Whether the server supports the feature is not known.
-///
-/// That means, there is no corresponding information from the server (yet).
-///
-/// \var QXmppHttpUploadManager::Unsupported
-///
-/// The server does not support the feature.
-///
-/// \var QXmppHttpUploadManager::Support::Supported
-///
-/// The server supports the feature.
-///
-/// \since QXmpp 1.13
-///
+    \since QXmpp 1.13
+*/
+
+/*!
+    \property QXmppHttpUploadManager::services
+
+    \sa QXmppHttpUploadManager::services()
+
+    \since QXmpp 1.13
+*/
+
+/*!
+    \enum QXmppHttpUploadManager::Support
+
+    Server support for the feature.
+
+    \value Unknown
+        Whether the server supports the feature is not known.
+
+        That means, there is no corresponding information from the server (yet).
+    \value Unsupported
+        The server does not support the feature.
+    \value Supported
+        The server supports the feature.
+
+    \since QXmpp 1.13
+*/
 
 class QXmppHttpUploadServicePrivate : public QSharedData
 {
@@ -69,13 +64,14 @@ public:
     std::optional<quint64> sizeLimit;
 };
 
-///
-/// \class QXmppHttpUploadService
-///
-/// \brief QXmppHttpUploadService represents an HTTP File Upload service.
-///
-/// It is used to store the JID and maximum file size for uploads.
-///
+/*!
+    \class QXmppHttpUploadService
+    \inmodule QXmpp
+
+    \brief QXmppHttpUploadService represents an HTTP File Upload service.
+
+    It is used to store the JID and maximum file size for uploads.
+*/
 
 QXmppHttpUploadService::QXmppHttpUploadService()
     : d(new QXmppHttpUploadServicePrivate)
@@ -84,28 +80,36 @@ QXmppHttpUploadService::QXmppHttpUploadService()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppHttpUploadService)
 
-/// Returns the JID of the HTTP File Upload service.
+/*! Returns the JID of the HTTP File Upload service. */
 QString QXmppHttpUploadService::jid() const
 {
     return d->jid;
 }
 
-/// Sets the JID of the HTTP File Upload service.
+/*!
+    Sets the JID of the HTTP File Upload service.
+
+    \a jid.
+*/
 void QXmppHttpUploadService::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
-///
-/// Returns the size limit of files that can be uploaded to this upload
-/// service.
-///
+/*!
+    Returns the size limit of files that can be uploaded to this upload
+    service.
+*/
 std::optional<quint64> QXmppHttpUploadService::sizeLimit() const
 {
     return d->sizeLimit;
 }
 
-/// Sets the size limit of files that can be uploaded to this upload service.
+/*!
+    Sets the size limit of files that can be uploaded to this upload service.
+
+    \a sizeLimit.
+*/
 void QXmppHttpUploadService::setSizeLimit(std::optional<quint64> sizeLimit)
 {
     d->sizeLimit = sizeLimit;
@@ -171,94 +175,87 @@ private:
     QXmppHttpUpload *q;
 };
 
-///
-/// \class QXmppHttpUpload
-///
-/// Object that represents an ongoing or finished upload.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppHttpUpload
+    \inmodule QXmpp
 
-///
-/// \property QXmppHttpUpload::progress
-///
-/// The current progress of the upload as a floating point number between 0 and 1.
-///
+    Object that represents an ongoing or finished upload.
 
-///
-/// \property QXmppHttpUpload::bytesSent
-///
-/// Number of bytes sent so far
-///
+    \since QXmpp 1.5
+*/
 
-///
-/// \property QXmppHttpUpload::bytesTotal
-///
-/// Number of bytes that need to be sent in total to complete the upload
-///
+/*!
+    \property QXmppHttpUpload::progress
 
-///
-/// \fn QXmppHttpUpload::progressChanged
-///
-/// Emitted when the upload has made progress.
-///
+    The current progress of the upload as a floating point number between 0 and 1.
+*/
 
-///
-/// \fn QXmppHttpUpload::finished
-///
-/// Emitted when the upload has finished for any reason (success, cancelled, error).
-///
-/// \param result Result of the upload
-///
+/*!
+    \property QXmppHttpUpload::bytesSent
+
+    Number of bytes sent so far
+*/
+
+/*!
+    \property QXmppHttpUpload::bytesTotal
+
+    Number of bytes that need to be sent in total to complete the upload
+*/
+
+/*!
+    \fn void QXmppHttpUpload::progressChanged()
+
+    Emitted when the upload has made progress.
+*/
+
+/*!
+    \fn void QXmppHttpUpload::finished(const QXmppHttpUpload::Result &result)
+
+    Emitted when the upload has finished for any reason (success, cancelled, error).
+    \a result is the result of the upload.
+*/
 
 QXmppHttpUpload::~QXmppHttpUpload() = default;
 
-///
-/// \class QXmppHttpUploadManager
-///
-/// The upload manager allows to upload a file to a server via \xep{0363, HTTP File Upload}.
-/// This can be used for sending files to other users.
-///
-/// QXmppHttpUploadManager depends on QXmppDiscoveryManager.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppHttpUploadManager
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppHttpUpload::Result
-///
-/// Represents the result of an upload. It can either be a url to the
-/// uploaded file, a QXmppHttpUpload::Cancelled unit struct, or an error as
-/// QXmppError.
-///
+    The upload manager allows to upload a file to a server via \xep{0363}{HTTP File Upload}.
+    This can be used for sending files to other users.
 
-///
-/// Returns the current progress of the upload as a floating point number between 0 and 1.
-///
+    QXmppHttpUploadManager depends on QXmppDiscoveryManager.
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \typedef QXmppHttpUpload::Result
+
+    Represents the result of an upload. It can either be a url to the
+    uploaded file, a QXmppHttpUpload::Cancelled unit struct, or an error as
+    QXmppError.
+*/
+
+/*! Returns the current progress of the upload as a floating point number between 0 and 1. */
 float QXmppHttpUpload::progress() const
 {
     return calculateProgress(d->bytesSent, d->bytesTotal);
 }
 
-///
-/// The number of bytes sent so far.
-///
+/*! The number of bytes sent so far. */
 quint64 QXmppHttpUpload::bytesSent() const
 {
     return d->bytesSent;
 }
 
-///
-/// The number of bytes that need to be sent in total to complete the upload.
-///
+/*! The number of bytes that need to be sent in total to complete the upload. */
 quint64 QXmppHttpUpload::bytesTotal() const
 {
     return d->bytesTotal;
 }
 
-///
-/// Cancels the upload.
-///
+/*! Cancels the upload. */
 void QXmppHttpUpload::cancel()
 {
     d->cancelled = true;
@@ -267,18 +264,16 @@ void QXmppHttpUpload::cancel()
     }
 }
 
-///
-/// Returns whether the upload is already finished.
-///
+/*! Returns whether the upload is already finished. */
 bool QXmppHttpUpload::isFinished() const
 {
     return d->finished;
 }
 
-///
-/// If the upload has already finished, returns the result of the upload as QXmppHttpUpload::Result,
-/// otherwise returns an empty std::optional.
-///
+/*!
+    If the upload has already finished, returns the result of the upload as QXmppHttpUpload::Result,
+    otherwise returns an empty std::optional.
+*/
 std::optional<QXmppHttpUpload::Result> QXmppHttpUpload::result() const
 {
     if (d->finished) {
@@ -354,91 +349,92 @@ struct QXmppHttpUploadManagerPrivate {
     QPropertyNotifier supportNotifier;
 };
 
-///
-/// Constructor
-///
-/// Creates and uses a new network access manager.
-///
+/*!
+    Constructor
+
+    Creates and uses a new network access manager.
+*/
 QXmppHttpUploadManager::QXmppHttpUploadManager()
     : d(std::make_unique<QXmppHttpUploadManagerPrivate>(this, new QNetworkAccessManager(this)))
 {
 }
 
-///
-/// Constructor
-///
-/// \param netManager shared network access manager, needs to have at least the lifetime of this
-/// manager.
-///
+/*!
+    Constructor
+
+    \a netManager is a shared network access manager, which needs to have at least the lifetime
+    of this manager.
+*/
 QXmppHttpUploadManager::QXmppHttpUploadManager(QNetworkAccessManager *netManager)
     : d(std::make_unique<QXmppHttpUploadManagerPrivate>(this, netManager))
 {
 }
 
-///
-/// Returns all discovered HTTP File Upload services.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Returns all discovered HTTP File Upload services.
+
+    \since QXmpp 1.13
+*/
 QVector<QXmppHttpUploadService> QXmppHttpUploadManager::services() const
 {
     return d->services;
 }
 
-///
-/// \fn QXmppHttpUploadManager::servicesChanged()
-///
-/// \brief Emitted when services have changed.
-///
+/*!
+    \fn QXmppHttpUploadManager::servicesChanged()
 
-///
-/// Returns the server's support for upload services.
-///
-/// \since QXmpp 1.13
-///
+    \brief Emitted when services have changed.
+*/
+
+/*!
+    Returns the server's support for upload services.
+
+    \since QXmpp 1.13
+*/
 QXmppHttpUploadManager::Support QXmppHttpUploadManager::support() const
 {
     return d->support;
 }
 
-///
-/// \fn QXmppHttpUploadManager::supportChanged()
-///
-/// \brief Emitted when support has changed.
-///
+/*!
+    \fn QXmppHttpUploadManager::supportChanged()
+
+    \brief Emitted when support has changed.
+*/
 
 QXmppHttpUploadManager::~QXmppHttpUploadManager() = default;
 
-///
-/// Uploads the data from a QIODevice.
-///
-/// \param data QIODevice to read the data from. This can for example be a QFile.
-///        It can be sequential or non-sequential.
-/// \param filename How the file on the server should be called.
-///        This is commonly used as last part of the resulting url.
-/// \param fileSize The size of the file, in byte. If negative the size from the IO device is used.
-/// \param mimeType The mime type of the file
-/// \param uploadServiceJid optionally,
-///        the jid from which an upload url can be requested (upload service)
-/// \return an object representing the ongoing upload.
-///         The object is passed as a shared_ptr,
-///         which means it will be stored as long as there is a reference to it.
-///         While this avoids errors from accessing it after it was deleted,
-///         you should try not store it unneccesarily long to keep the memory usage down.
-///         You can for example use std::weak_ptr to not increase the lifetime,
-///         for example when capturing in long living lambdas, for example in connects.
-///         You should also make sure to use the 4-arg QObject::connect,
-///         so the connection and the connected lambda can be deleted after the upload finished.
-///         \code
-///         std::weak_ptr<QXmppHttpUpload> uploadPtr = upload;
-///         connect(upload.get(), &QXmppHttpUpload::progressChanged, this, [uploadPtr]() {
-///             auto upload = uploadPtr.lock();
-///             if (upload) {
-///                 qDebug() << upload->progress();
-///             }
-///         });
-///         \endcode
-///
+/*!
+    Uploads the data from a QIODevice.
+
+    \a data is the QIODevice to read the data from. This can for example be a QFile.
+    It can be sequential or non-sequential.
+    \a filename specifies how the file on the server should be called.
+    This is commonly used as last part of the resulting url.
+    \a fileSize is the size of the file, in bytes. If negative the size from the IO device is used.
+    \a mimeType is the mime type of the file.
+    \a uploadServiceJid optionally specifies the jid from which an upload url can be requested
+    (upload service).
+
+    Returns an object representing the ongoing upload.
+    The object is passed as a shared_ptr,
+    which means it will be stored as long as there is a reference to it.
+    While this avoids errors from accessing it after it was deleted,
+    you should try not store it unneccesarily long to keep the memory usage down.
+    You can for example use std::weak_ptr to not increase the lifetime,
+    for example when capturing in long living lambdas, for example in connects.
+    You should also make sure to use the 4-arg QObject::connect,
+    so the connection and the connected lambda can be deleted after the upload finished.
+    \code
+    std::weak_ptr<QXmppHttpUpload> uploadPtr = upload;
+    connect(upload.get(), &QXmppHttpUpload::progressChanged, this, [uploadPtr]() {
+    auto upload = uploadPtr.lock();
+    if (upload) {
+    qDebug() << upload->progress();
+    }
+    });
+    \endcode
+*/
 std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_ptr<QIODevice> data, const QString &filename, const QMimeType &mimeType, qint64 fileSize, const QString &uploadServiceJid)
 {
     std::shared_ptr<QXmppHttpUpload> upload(new QXmppHttpUpload);
@@ -520,32 +516,34 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
     return upload;
 }
 
-///
-/// Upload data from a local file.
-///
-/// \param fileInfo QFileInfo about a local file
-/// \param filename filename How the file on the server should be called.
-///        This is commonly used as last part of the resulting url.
-/// \param uploadServiceJid optionally,
-///        the jid from which an upload url can be requested (upload service)
-/// \return an object representing the ongoing upload.
-///         The object is passed as a shared_ptr,
-///         which means it will be stored as long as there is a reference to it.
-///         While this avoids errors from accessing it after it was deleted,
-///         you should try not store it unneccesarily long to keep the memory usage down.
-///         You can for example use std::weak_ptr to not increase the lifetime,
-///         for example when capturing in long living lambdas, for example in connects.
-///         You should also make sure to use the 4-arg QObject::connect,
-///         so the connection and the connected lambda can be deleted after the upload finished.
-///         \code
-///         std::weak_ptr<QXmppHttpUpload> uploadPtr = upload;
-///         connect(upload.get(), &QXmppHttpUpload::progressChanged, this, [uploadPtr]() {
-///             auto upload = uploadPtr.lock();
-///             if (upload) {
-///                 qDebug() << upload->progress();
-///             }
-///         });
-///         \endcode
+/*!
+    Upload data from a local file.
+
+    \a fileInfo is a QFileInfo about a local file.
+    \a filename specifies how the file on the server should be called.
+    This is commonly used as last part of the resulting url.
+    \a uploadServiceJid optionally specifies the jid from which an upload url can be requested
+    (upload service).
+
+    Returns an object representing the ongoing upload.
+    The object is passed as a shared_ptr,
+    which means it will be stored as long as there is a reference to it.
+    While this avoids errors from accessing it after it was deleted,
+    you should try not store it unneccesarily long to keep the memory usage down.
+    You can for example use std::weak_ptr to not increase the lifetime,
+    for example when capturing in long living lambdas, for example in connects.
+    You should also make sure to use the 4-arg QObject::connect,
+    so the connection and the connected lambda can be deleted after the upload finished.
+    \code
+    std::weak_ptr<QXmppHttpUpload> uploadPtr = upload;
+    connect(upload.get(), &QXmppHttpUpload::progressChanged, this, [uploadPtr]() {
+    auto upload = uploadPtr.lock();
+    if (upload) {
+    qDebug() << upload->progress();
+    }
+    });
+    \endcode
+*/
 std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(const QFileInfo &fileInfo, const QString &filename, const QString &uploadServiceJid)
 {
     auto file = std::make_unique<QFile>(fileInfo.absoluteFilePath());
@@ -579,34 +577,31 @@ void QXmppHttpUploadManager::onUnregistered(QXmppClient *)
     d->servicesWatch = {};
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param file The info of the file to be uploaded.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a file is the info of the file to be uploaded.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    \since QXmpp 1.13
+*/
 QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlot(const QFileInfo &file,
                                                                                   const QString &uploadService)
 {
     return requestSlot(file, file.fileName(), uploadService);
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param file The info of the file to be uploaded.
-/// \param customFileName This name is used instead of the file's actual name
-///                       for requesting the upload slot.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a file is the info of the file to be uploaded.
+    \a customFileName is used instead of the file's actual name for requesting the upload slot.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    \since QXmpp 1.13
+*/
 QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlot(const QFileInfo &file,
                                                                                   const QString &customFileName,
                                                                                   const QString &uploadService)
@@ -616,21 +611,20 @@ QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlo
                        uploadService);
 }
 
-///
-/// Requests an upload slot from the server.
-///
-/// \param fileName The name of the file to be uploaded. This may be used by
-///                 the server to generate the URL.
-/// \param fileSize The size of the file to be uploaded. The server may reject
-///                 too large files.
-/// \param mimeType The content-type of the file. This can be used by the
-///                 server to set the HTTP MIME-type of the URL.
-/// \param uploadService The HTTP File Upload service that is used to request
-///                      the upload slot. If this is empty, the first
-///                      discovered one is used.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    Requests an upload slot from the server.
+
+    \a fileName is the name of the file to be uploaded. This may be used by
+    the server to generate the URL.
+    \a fileSize is the size of the file to be uploaded. The server may reject
+    too large files.
+    \a mimeType is the content-type of the file. This can be used by the
+    server to set the HTTP MIME-type of the URL.
+    \a uploadService is the HTTP File Upload service that is used to request
+    the upload slot. If this is empty, the first discovered one is used.
+
+    \since QXmpp 1.13
+*/
 QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlot(const QString &fileName,
                                                                                   qint64 fileSize,
                                                                                   const QMimeType &mimeType,

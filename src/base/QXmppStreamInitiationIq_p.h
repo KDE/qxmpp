@@ -24,7 +24,6 @@
 // We mean it.
 //
 
-/// \cond
 class QXMPP_AUTOTEST_EXPORT QXmppStreamInitiationIq : public QXmppIq
 {
 public:
@@ -61,6 +60,5 @@ private:
     Profile m_profile;
     QString m_siId;
 };
-/// \endcond
 
 #endif

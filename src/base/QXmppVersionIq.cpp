@@ -14,43 +14,46 @@
 
 using namespace QXmpp::Private;
 
-/// Returns the name of the software.
+/*! Returns the name of the software. */
 QString QXmppVersionIq::name() const
 {
     return m_name;
 }
 
-/// Sets the name of the software.
+/*! Sets the \a name of the software. */
 void QXmppVersionIq::setName(const QString &name)
 {
     m_name = name;
 }
 
-/// Returns the operating system.
+/*! Returns the operating system. */
 QString QXmppVersionIq::os() const
 {
     return m_os;
 }
 
-/// Sets the operating system.
+/*!
+    Sets the operating system.
+
+    \a os.
+*/
 void QXmppVersionIq::setOs(const QString &os)
 {
     m_os = os;
 }
 
-/// Returns the software version.
+/*! Returns the software version. */
 QString QXmppVersionIq::version() const
 {
     return m_version;
 }
 
-/// Sets the software version.
+/*! Sets the software \a version. */
 void QXmppVersionIq::setVersion(const QString &version)
 {
     m_version = version;
 }
 
-/// \cond
 void QXmppVersionIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -68,4 +71,3 @@ void QXmppVersionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         OptionalTextElement { u"version", m_version },
     });
 }
-/// \endcond

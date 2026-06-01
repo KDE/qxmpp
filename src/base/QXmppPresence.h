@@ -13,46 +13,72 @@
 
 class QXmppPresencePrivate;
 
-///
-/// \brief The QXmppPresence class represents an XMPP presence stanza.
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppPresence class represents an XMPP presence stanza.
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppPresence : public QXmppStanza
 {
 public:
-    /// This enum is used to describe a presence type.
+    /*!
+        This enum is used to describe a presence type.
+
+        \value Error An error has occurred regarding processing or delivery of a previously-sent presence stanza.
+        \value Available Signals that the sender is online and available for communication.
+        \value Unavailable Signals that the sender is no longer available for communication.
+        \value Subscribe The sender wishes to subscribe to the recipient's  presence.
+        \value Subscribed The sender has allowed the recipient to receive their presence.
+        \value Unsubscribe The sender is unsubscribing from another entity's presence.
+        \value Unsubscribed The subscription request has been denied or a previously-granted subscription has been cancelled.
+        \value Probe A request for an entity's current presence; SHOULD be generated only by a server on behalf of a user.
+    */
     enum Type {
-        Error = 0,     ///< An error has occurred regarding processing or delivery of a previously-sent presence stanza.
-        Available,     ///< Signals that the sender is online and available for communication.
-        Unavailable,   ///< Signals that the sender is no longer available for communication.
-        Subscribe,     ///< The sender wishes to subscribe to the recipient's  presence.
-        Subscribed,    ///< The sender has allowed the recipient to receive their presence.
-        Unsubscribe,   ///< The sender is unsubscribing from another entity's presence.
-        Unsubscribed,  ///< The subscription request has been denied or a previously-granted subscription has been cancelled.
-        Probe          ///< A request for an entity's current presence; SHOULD be generated only by a server on behalf of a user.
+        Error = 0,
+        Available,
+        Unavailable,
+        Subscribe,
+        Subscribed,
+        Unsubscribe,
+        Unsubscribed,
+        Probe
     };
 
-    /// This enum is used to describe an availability status.
+    /*!
+        This enum is used to describe an availability status.
+
+        \value Online The entity or resource is online.
+        \value Away The entity or resource is temporarily away.
+        \value XA The entity or resource is away for an extended period.
+        \value DND The entity or resource is busy ("Do Not Disturb").
+        \value Chat The entity or resource is actively interested in chatting.
+        \value Invisible obsolete \xep{0018}{Invisible Presence}.
+    */
     enum AvailableStatusType {
-        Online = 0,  ///< The entity or resource is online.
-        Away,        ///< The entity or resource is temporarily away.
-        XA,          ///< The entity or resource is away for an extended period.
-        DND,         ///< The entity or resource is busy ("Do Not Disturb").
-        Chat,        ///< The entity or resource is actively interested in chatting.
-        Invisible    ///< obsolete \xep{0018, Invisible Presence}
+        Online = 0,
+        Away,
+        XA,
+        DND,
+        Chat,
+        Invisible
     };
 
-    /// This enum is used to describe vCard updates as defined by
-    /// \xep{0153, vCard-Based Avatars}
-    enum VCardUpdateType {
-        VCardUpdateNone = 0,    ///< Protocol is not supported
-        VCardUpdateNoPhoto,     ///< User is not using any image
-        VCardUpdateValidPhoto,  ///< User is advertising an image
-        VCardUpdateNotReady     ///< User is not ready to advertise an image
+    /*!
+        This enum is used to describe vCard updates as defined by
+        \xep{0153}{vCard-Based Avatars}
 
-        /// \note This enables recipients to distinguish between the absence of an image
-        /// (empty photo element) and mere support for the protocol (empty update child).
+        \value VCardUpdateNone Protocol is not supported.
+        \value VCardUpdateNoPhoto User is not using any image.
+        \value VCardUpdateValidPhoto User is advertising an image.
+        \value VCardUpdateNotReady User is not ready to advertise an image.
+    */
+    enum VCardUpdateType {
+        VCardUpdateNone = 0,
+        VCardUpdateNoPhoto,
+        VCardUpdateValidPhoto,
+        VCardUpdateNotReady
     };
 
     QXmppPresence(QXmppPresence::Type type = QXmppPresence::Available);
@@ -133,7 +159,6 @@ public:
     QString mucOccupantId() const;
     void setMucOccupantId(const QString &);
 
-    /// \cond
     void parse(const QDomElement &element) override;
     void toXml(QXmlStreamWriter *writer) const override;
 
@@ -141,12 +166,9 @@ public:
     [[deprecated("Legacy entity capabilities (used 2003-2007)")]]
     QStringList capabilityExt() const;
 #endif
-    /// \endcond
 
 private:
-    /// \cond
     void parseExtension(const QDomElement &element, QXmppElementList &unknownElements);
-    /// \endcond
 
     QSharedDataPointer<QXmppPresencePrivate> d;
 };

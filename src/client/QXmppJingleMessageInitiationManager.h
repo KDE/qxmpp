@@ -36,7 +36,11 @@ public:
         QString migratedTo;
     };
 
-    /// Variant of Rejected, Retracted, Finished or Error result types
+    /*!
+        \typealias QXmppJingleMessageInitiation::Result
+
+        Variant of Rejected, Retracted, Finished or Error result types.
+    */
     using Result = std::variant<Rejected, Retracted, Finished, QXmppError>;
 
     ~QXmppJingleMessageInitiation();
@@ -78,9 +82,7 @@ public:
     QXmppJingleMessageInitiationManager();
     ~QXmppJingleMessageInitiationManager();
 
-    /// \cond
     QStringList discoveryFeatures() const override;
-    /// \endcond
 
     QXmppTask<ProposeResult> propose(
         const QString &remoteJid,
@@ -99,9 +101,7 @@ public:
         const QList<QXmppJingleRtpDescription> &descriptions);
 
 protected:
-    /// \cond
     bool handleMessage(const QXmppMessage &) override;
-    /// \endcond
 
 private:
     QXmppTask<ProposeResult> propose(

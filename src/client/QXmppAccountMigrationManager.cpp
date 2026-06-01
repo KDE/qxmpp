@@ -205,64 +205,61 @@ struct QXmppAccountMigrationManagerPrivate {
     std::unordered_map<std::type_index, ExtensionData> extensions;
 };
 
-///
-/// \brief Allows to export and import account data.
-///
-/// You can use exportData() to start a data export. Afterwards you can use the exported data to
-/// start a data import on another account using importData().
-///
-/// The data that is exported (or imported) is determined by the other registered client
-/// extensions. They can register callbacks for export and import using registerExtension().
-///
-/// \ingroup Managers
-/// \since QXmpp 1.8
-///
+/*!
+    \class QXmppAccountMigrationManager
+    \inmodule QXmpp
 
-///
-/// \class QXmppAccountMigrationManager
-///
-/// This manager help migrating a user account into another server.
-///
+    \brief Allows to export and import account data.
 
-///
-/// \typedef QXmppAccountMigrationManager::Result<T>
-///
-/// Contains T or QXmppError.
-///
+    This manager helps migrating a user account into another server.
 
-///
-/// \fn QXmppAccountMigrationManager::errorOccurred(const QXmppError &error)
-///
-/// Emitted when an error occured during export or import.
-///
-/// \param error The occured error
-///
+    You can use exportData() to start a data export. Afterwards you can use the exported data to
+    start a data import on another account using importData().
 
-///
-/// \fn QXmppAccountMigrationManager::registerExportData(ImportFunc importFunc, ExportFunc exportFunc)
-///
-/// Registers a data type that can be imported to an account using importFunc and generated using
-/// exportFunc.
-///
-/// The functions are used when importData() or exportData() is called. You can unregister the
-/// functions using unregisterExportData().
-///
-/// The data type MUST also be registered via QXmppExportData::registerExtension() so it can be
-/// serialized.
-///
+    The data that is exported (or imported) is determined by the other registered client
+    extensions. They can register callbacks for export and import using registerExtension().
 
-///
-/// \fn QXmppAccountMigrationManager::unregisterExportData()
-///
-/// Unregisters a data type.
-///
+    \ingroup Managers
+    \since QXmpp 1.8
+*/
 
-///
-/// Constructs an account migration manager.
-///
-/// \note You would need the `QXmppClient(QXmppClient::NoExtensions, this)` approach to use this manager
-/// because it needs to be instantiated before others using it.
-///
+/*!
+    \typealias QXmppAccountMigrationManager::Result
+
+    Contains T or QXmppError.
+*/
+
+/*!
+    \fn QXmppAccountMigrationManager::errorOccurred(const QXmppError &error)
+
+    Emitted when an error occured during export or import. \a error is the occured error.
+*/
+
+/*!
+    \fn template <typename DataType, typename ImportFunc, typename ExportFunc> void QXmppAccountMigrationManager::registerExportData(ImportFunc importFunc, ExportFunc exportFunc)
+
+    Registers a data type that can be imported to an account using \a importFunc and generated using
+    \a exportFunc.
+
+    The functions are used when importData() or exportData() is called. You can unregister the
+    functions using unregisterExportData().
+
+    The data type MUST also be registered via QXmppExportData::registerExtension() so it can be
+    serialized.
+*/
+
+/*!
+    \fn template <typename DataType> void QXmppAccountMigrationManager::unregisterExportData()
+
+    Unregisters a data type.
+*/
+
+/*!
+    Constructs an account migration manager.
+
+    \note You would need the `QXmppClient(QXmppClient::NoExtensions, this)` approach to use this manager
+    because it needs to be instantiated before others using it.
+*/
 QXmppAccountMigrationManager::QXmppAccountMigrationManager()
     : d(std::make_unique<QXmppAccountMigrationManagerPrivate>())
 {
@@ -270,9 +267,7 @@ QXmppAccountMigrationManager::QXmppAccountMigrationManager()
 
 QXmppAccountMigrationManager::~QXmppAccountMigrationManager() = default;
 
-///
-/// Imports QXmppExportData to the currently connected account.
-///
+/*! Imports QXmppExportData to the currently connected \a account. */
 QXmppTask<QXmppAccountMigrationManager::Result<>> QXmppAccountMigrationManager::importData(const QXmppExportData &account)
 {
     if (account.extensions().empty()) {
@@ -314,9 +309,7 @@ QXmppTask<QXmppAccountMigrationManager::Result<>> QXmppAccountMigrationManager::
     return task;
 }
 
-///
-/// Creates a data export of the current account.
-///
+/*! Creates a data export of the current account. */
 QXmppTask<QXmppAccountMigrationManager::Result<QXmppExportData>> QXmppAccountMigrationManager::exportData()
 {
     struct State {

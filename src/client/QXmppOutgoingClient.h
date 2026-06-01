@@ -106,29 +106,31 @@ public:
     QXmpp::Private::CarbonManager &carbonManager() const;
     QXmpp::Private::CsiManager &csiManager() const;
 
-    /// This signal is emitted when the stream is connected.
+    /*! This signal is emitted when the stream is connected. */
     Q_SIGNAL void connected(const QXmpp::Private::SessionBegin &);
 
-    /// This signal is emitted when the stream is disconnected.
+    /*! This signal is emitted when the stream is disconnected. */
     Q_SIGNAL void disconnected(const QXmpp::Private::SessionEnd &);
 
-    /// This signal is emitted when an error is encountered.
+    /*! This signal is emitted when an error is encountered. */
     Q_SIGNAL void errorOccurred(const QString &text, const QXmppOutgoingClient::ConnectionError &details, QXmppClient::Error oldError);
 
-    /// This signal is emitted when an element is received.
+    /*! This signal is emitted when an element is received. */
     Q_SIGNAL void elementReceived(const QDomElement &element, bool &handled);
 
-    /// This signal is emitted when a presence is received.
+    /*! This signal is emitted when a presence is received. */
     Q_SIGNAL void presenceReceived(const QXmppPresence &);
 
-    /// This signal is emitted when a message is received.
+    /*! This signal is emitted when a message is received. */
     Q_SIGNAL void messageReceived(const QXmppMessage &);
 
-    /// This signal is emitted when an IQ response (type result or error) has
-    /// been received that was not handled by elementReceived().
+    /*!
+        This signal is emitted when an IQ response (type result or error) has
+        been received that was not handled by elementReceived().
+    */
     Q_SIGNAL void iqReceived(const QXmppIq &);
 
-    /// This signal is emitted when SSL errors are encountered.
+    /*! This signal is emitted when SSL errors are encountered. */
     Q_SIGNAL void sslErrors(const QList<QSslError> &errors);
 
 private:

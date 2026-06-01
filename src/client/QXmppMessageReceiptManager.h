@@ -9,27 +9,31 @@
 #include "QXmppClientExtension.h"
 #include "QXmppMessageHandler.h"
 
-///
-/// \brief The QXmppMessageReceiptManager class makes it possible to
-/// send and receive message delivery receipts as defined in
-/// \xep{0184, Message Delivery Receipts}.
-///
-/// \ingroup Managers
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppMessageReceiptManager class makes it possible to
+    send and receive message delivery receipts as defined in
+    \xep{0184}{Message Delivery Receipts}.
+
+    \ingroup Managers
+*/
 class QXMPP_EXPORT QXmppMessageReceiptManager : public QXmppClientExtension, public QXmppMessageHandler
 {
     Q_OBJECT
 public:
     QXmppMessageReceiptManager();
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleMessage(const QXmppMessage &) override;
-    /// \endcond
 
-    /// This signal is emitted when receipt for the message with the
-    /// given id is received. The id could be previously obtained by
-    /// calling QXmppMessage::id().
+    /*!
+        This signal is emitted when receipt for the message with the
+        given id is received. The id could be previously obtained by
+        calling QXmppMessage::id().
+
+        \a jid and \a id.
+    */
     Q_SIGNAL void messageDelivered(const QString &jid, const QString &id);
 };
 

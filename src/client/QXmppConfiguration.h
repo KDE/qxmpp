@@ -22,39 +22,50 @@ namespace QXmpp::Private {
 struct Credentials;
 }
 
-///
-/// \brief The QXmppConfiguration class holds configuration options.
-///
-/// It can be passed to QXmppClient to specify the options when connecting to
-/// an XMPP server.
-///
-/// It is a container of all the settings, configuration required for
-/// connecting to an XMPP server. E.g. server name, username, port, type
-/// of authentication mechanism, type of security used by stream (encryption),
-/// etc..
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppConfiguration class holds configuration options.
+
+    It can be passed to QXmppClient to specify the options when connecting to
+    an XMPP server.
+
+    It is a container of all the settings, configuration required for
+    connecting to an XMPP server. E.g. server name, username, port, type
+    of authentication mechanism, type of security used by stream (encryption),
+    etc..
+*/
 class QXMPP_EXPORT QXmppConfiguration
 {
 public:
-    /// An enumeration for type of the Security Mode that is stream is encrypted or not.
-    /// The server may or may not have TLS feature. Server may force the encryption.
-    /// Depending upon all this user can specify following options.
+    /*!
+        An enumeration for type of the Security Mode that is stream is encrypted or not.
+        The server may or may not have TLS feature. Server may force the encryption.
+        Depending upon all this user can specify following options.
+
+        \value TLSEnabled Encryption is used if available (default).
+        \value TLSDisabled No encryption even if the server offers it.
+        \value TLSRequired Encryption must be available, otherwise the connection will not be established.
+        \value LegacySSL Use direct TLS connection only and connect to configured host and port or domain and 5223 or 5222. No SRV records are looked up.
+    */
     enum StreamSecurityMode {
-        TLSEnabled = 0,  ///< Encryption is used if available (default).
-        TLSDisabled,     ///< No encryption even if the server offers it.
-        TLSRequired,     ///< Encryption must be available, otherwise the
-                         ///< connection will not be established.
-        /// Use direct TLS connection only and connect to configured host and port or domain and
-        /// 5223 or 5222. No SRV records are looked up.
+        TLSEnabled = 0,
+        TLSDisabled,
+        TLSRequired,
         LegacySSL
     };
 
-    /// An enumeration for various Non-SASL authentication mechanisms available.
-    /// The server may or may not allow QXmppConfiguration::Plain mechanism. So
-    /// specifying the mechanism is just a hint to the library.
+    /*!
+        An enumeration for various Non-SASL authentication mechanisms available.
+        The server may or may not allow QXmppConfiguration::Plain mechanism. So
+        specifying the mechanism is just a hint to the library.
+
+        \value NonSASLPlain Plain.
+        \value NonSASLDigest Digest (default).
+    */
     enum NonSASLAuthMechanism {
-        NonSASLPlain = 0,  ///< Plain
-        NonSASLDigest      ///< Digest (default)
+        NonSASLPlain = 0,
+        NonSASLDigest
     };
 
     QXmppConfiguration();
@@ -156,10 +167,8 @@ public:
     QList<QSslCertificate> caCertificates() const;
     void setCaCertificates(const QList<QSslCertificate> &);
 
-    /// \cond
     const QXmpp::Private::Credentials &credentialData() const;
     QXmpp::Private::Credentials &credentialData();
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppConfigurationPrivate> d;

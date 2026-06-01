@@ -18,80 +18,70 @@
 
 using namespace QXmpp::Private;
 
-/// \cond
-///
-/// \class QXmppOmemoEnvelope
-///
-/// \brief The QXmppOmemoEnvelope class represents an OMEMO envelope as
-/// defined by \xep{0384, OMEMO Encryption}.
-///
+/*!
+    \class QXmppOmemoEnvelope
+    \inmodule QXmpp
 
-///
-/// Returns the ID of the recipient's device.
-///
-/// The ID is 0 if it is unset.
-///
-/// \return the recipient's device ID
-///
+    \brief The QXmppOmemoEnvelope class represents an OMEMO envelope as
+    defined by \xep{0384}{OMEMO Encryption}.
+*/
+
+/*!
+    Returns the ID of the recipient's device.
+
+    The ID is 0 if it is unset.
+*/
 uint32_t QXmppOmemoEnvelope::recipientDeviceId() const
 {
     return m_recipientDeviceId;
 }
 
-///
-/// Sets the ID of the recipient's device.
-///
-/// The ID must be at least 1 and at most \c std::numeric_limits<int32_t>::max().
-///
-/// \param id recipient's device ID
-///
+/*!
+    Sets the \a id of the recipient's device.
+
+    The ID must be at least 1 and at most \c std::numeric_limits<int32_t>::max().
+*/
 void QXmppOmemoEnvelope::setRecipientDeviceId(uint32_t id)
 {
     m_recipientDeviceId = id;
 }
 
-///
-/// Returns true if a pre-key was used to prepare this envelope.
-///
-/// The default is false.
-///
-/// \return true if a pre-key was used to prepare this envelope, otherwise false
-///
+/*!
+    Returns true if a pre-key was used to prepare this envelope, otherwise false.
+
+    The default is false.
+*/
 bool QXmppOmemoEnvelope::isUsedForKeyExchange() const
 {
     return m_isUsedForKeyExchange;
 }
 
-///
-/// Sets whether a pre-key was used to prepare this envelope.
-///
-/// \param isUsed whether a pre-key was used to prepare this envelope
-///
+/*!
+    Sets via \a isUsed whether a pre-key was used to prepare this envelope.
+*/
 void QXmppOmemoEnvelope::setUsedForKeyExchange(bool isUsed)
 {
     m_isUsedForKeyExchange = isUsed;
 }
 
-///
-/// Returns the BLOB containing the data for the underlying double ratchet library.
-///
-/// It should be treated like an obscure BLOB being passed as is to the ratchet
-/// library for further processing.
-///
-/// \return the binary data for the ratchet library
-///
+/*!
+    Returns the BLOB containing the binary data for the underlying double
+    ratchet library.
+
+    It should be treated like an obscure BLOB being passed as is to the ratchet
+    library for further processing.
+*/
 QByteArray QXmppOmemoEnvelope::data() const
 {
     return m_data;
 }
 
-///
-/// Sets the BLOB containing the data from the underlying double ratchet library.
-///
-/// It should be treated like an obscure BLOB produced by the ratchet library.
-///
-/// \param data binary data from the ratchet library
-///
+/*!
+    Sets the BLOB containing the binary \a data from the underlying double
+    ratchet library.
+
+    It should be treated like an obscure BLOB produced by the ratchet library.
+*/
 void QXmppOmemoEnvelope::setData(const QByteArray &data)
 {
     m_data = data;
@@ -119,78 +109,67 @@ void QXmppOmemoEnvelope::toXml(QXmlStreamWriter *writer) const
     });
 }
 
-///
-/// Determines whether the given DOM element is an OMEMO envelope.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is an OMEMO envelope, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is an OMEMO envelope.
+
+    Returns true if \a element is an OMEMO envelope, otherwise false.
+*/
 bool QXmppOmemoEnvelope::isOmemoEnvelope(const QDomElement &element)
 {
     return element.tagName() == u"key" && element.namespaceURI() == ns_omemo_2;
 }
 
-///
-/// \class QXmppOmemoElement
-///
-/// \brief The QXmppOmemoElement class represents an OMEMO element as
-/// defined by \xep{0384, OMEMO Encryption}.
-///
+/*!
+    \class QXmppOmemoElement
+    \inmodule QXmpp
 
-///
-/// Returns the ID of the sender's device.
-///
-/// The ID is 0 if it is unset.
-///
-/// \return the sender's device ID
-///
+    \brief The QXmppOmemoElement class represents an OMEMO element as
+    defined by \xep{0384}{OMEMO Encryption}.
+*/
+
+/*!
+    Returns the ID of the sender's device.
+
+    The ID is 0 if it is unset.
+*/
 uint32_t QXmppOmemoElement::senderDeviceId() const
 {
     return m_senderDeviceId;
 }
 
-///
-/// Sets the ID of the sender's device.
-///
-/// The ID must be at least 1 and at most
-/// \c std::numeric_limits<int32_t>::max().
-///
-/// \param id sender's device ID
-///
+/*!
+    Sets the \a id of the sender's device.
+
+    The ID must be at least 1 and at most
+    \c std::numeric_limits<int32_t>::max().
+*/
 void QXmppOmemoElement::setSenderDeviceId(uint32_t id)
 {
     m_senderDeviceId = id;
 }
 
-///
-/// Returns the payload which consists of the encrypted SCE envelope.
-///
-/// \return the encrypted payload
-///
+/*!
+    Returns the encrypted payload which consists of the encrypted SCE envelope.
+*/
 QByteArray QXmppOmemoElement::payload() const
 {
     return m_payload;
 }
 
-///
-/// Sets the payload which consists of the encrypted SCE envelope.
-///
-/// \param payload encrypted payload
-///
+/*!
+    Sets the encrypted \a payload which consists of the encrypted SCE envelope.
+*/
 void QXmppOmemoElement::setPayload(const QByteArray &payload)
 {
     m_payload = payload;
 }
 
-///
-/// Searches for an OMEMO envelope by its recipient JID and device ID.
-///
-/// \param recipientJid bare JID of the recipient
-/// \param recipientDeviceId ID of the recipient's device
-///
-/// \return the found OMEMO envelope
-///
+/*!
+    Searches for an OMEMO envelope by its \a recipientJid (bare JID of the
+    recipient) and \a recipientDeviceId (ID of the recipient's device).
+
+    Returns the found OMEMO envelope.
+*/
 std::optional<QXmppOmemoEnvelope> QXmppOmemoElement::searchEnvelope(const QString &recipientJid, uint32_t recipientDeviceId) const
 {
     for (auto itr = m_envelopes.constFind(recipientJid);
@@ -205,16 +184,13 @@ std::optional<QXmppOmemoEnvelope> QXmppOmemoElement::searchEnvelope(const QStrin
     return std::nullopt;
 }
 
-///
-/// Adds an OMEMO envelope.
-///
-/// If a full JID is passed as recipientJid, it is converted into a bare JID.
-///
-/// \see QXmppOmemoEnvelope
-///
-/// \param recipientJid bare JID of the recipient
-/// \param envelope OMEMO envelope
-///
+/*!
+    Adds an OMEMO \a envelope for the recipient with bare JID \a recipientJid.
+
+    If a full JID is passed as \a recipientJid, it is converted into a bare JID.
+
+    \sa QXmppOmemoEnvelope
+*/
 void QXmppOmemoElement::addEnvelope(const QString &recipientJid, const QXmppOmemoEnvelope &envelope)
 {
     m_envelopes.insert(QXmppUtils::jidToBareJid(recipientJid), envelope);
@@ -268,15 +244,12 @@ void QXmppOmemoElement::toXml(QXmlStreamWriter *writer) const
     });
 }
 
-///
-/// Determines whether the given DOM element is an OMEMO element.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is an OMEMO element, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is an OMEMO element.
+
+    Returns true if \a element is an OMEMO element, otherwise false.
+*/
 bool QXmppOmemoElement::isOmemoElement(const QDomElement &element)
 {
     return element.tagName() == u"encrypted" && element.namespaceURI() == ns_omemo_2;
 }
-/// \endcond

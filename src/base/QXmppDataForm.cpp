@@ -60,30 +60,26 @@ public:
     QMimeType contentType;
 };
 
-///
-/// \class QXmppDataForm::MediaSource
-///
-/// The QXmppDataForm::MediaSource class represents a link to one of possibly
-/// multiple sources for a media element from \xep{0221, Data Forms Media
-/// Element} consisting of a MIME type and a QUrl.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    \class QXmppDataForm::MediaSource
+    \inmodule QXmpp
 
-///
-/// Default constructor
-///
+    The QXmppDataForm::MediaSource class represents a link to one of possibly
+    multiple sources for a media element from \xep{0221}{Data Forms Media
+    Element} consisting of a MIME type and a QUrl.
+
+    \since QXmpp 1.1
+*/
+
+/*! Default constructor */
 QXmppDataForm::MediaSource::MediaSource()
     : d(new QXmppDataFormMediaSourcePrivate)
 {
 }
 
-///
-/// Constructs a MediaSource and sets its uri and contentType.
-///
-/// \param uri
-/// \param contentType
-///
+/*!
+    Constructs a MediaSource and sets its \a uri and \a contentType.
+*/
 QXmppDataForm::MediaSource::MediaSource(const QUrl &uri, const QMimeType &contentType)
     : d(new QXmppDataFormMediaSourcePrivate)
 {
@@ -91,52 +87,52 @@ QXmppDataForm::MediaSource::MediaSource(const QUrl &uri, const QMimeType &conten
     d->contentType = contentType;
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppDataForm::MediaSource::MediaSource(const QXmppDataForm::MediaSource &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppDataForm::MediaSource::MediaSource(QXmppDataForm::MediaSource &&) = default;
 QXmppDataForm::MediaSource::~MediaSource() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppDataForm::MediaSource &QXmppDataForm::MediaSource::operator=(const QXmppDataForm::MediaSource &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppDataForm::MediaSource &QXmppDataForm::MediaSource::operator=(QXmppDataForm::MediaSource &&) = default;
 
-///
-/// Returns the media URI as QUrl. This can be i.e. a \c http:// URL or a
-/// \c cid: Bits of Binary URI.
-///
+/*!
+    Returns the media URI as QUrl. This can be i.e. a \c http:// URL or a
+    \c cid: Bits of Binary URI.
+*/
 QUrl QXmppDataForm::MediaSource::uri() const
 {
     return d->uri;
 }
 
-///
-/// Sets the URI.
-///
+/*!
+    Sets the URI.
+
+    \a uri.
+*/
 void QXmppDataForm::MediaSource::setUri(const QUrl &uri)
 {
     d->uri = uri;
 }
 
-///
-/// Returns the content type of the source
-///
+/*! Returns the content type of the source */
 QMimeType QXmppDataForm::MediaSource::contentType() const
 {
     return d->contentType;
 }
 
-///
-/// Sets the content type of the media source.
-///
+/*!
+    Sets the content type of the media source.
+
+    \a contentType.
+*/
 void QXmppDataForm::MediaSource::setContentType(const QMimeType &contentType)
 {
     d->contentType = contentType;
 }
 
-///
-/// Returns true if two media sources are identical.
-///
+/*! Returns true if this media source and \a other are identical. */
 bool QXmppDataForm::MediaSource::operator==(const QXmppDataForm::MediaSource &other) const
 {
     return d->uri == other.uri() && d->contentType == other.contentType();
@@ -149,115 +145,114 @@ public:
     QList<QPair<QString, QString>> uris;
 };
 
-///
-/// \class QXmppDataForm::Media
-///
-/// The QXmppDataForm::Media class represents a media field as defined by
-/// \xep{0221, Data Forms Media Element}.
-///
-/// \deprecated This class is deprecated since QXmpp 1.1.
-///
+/*!
+    \class QXmppDataForm::Media
+    \inmodule QXmpp
 
-///
-/// Constructs an empty QXmppDataForm::Media.
-///
-/// \deprecated This class is deprecated since QXmpp 1.1.
-///
+    The QXmppDataForm::Media class represents a media field as defined by
+    \xep{0221}{Data Forms Media Element}.
+
+    \deprecated This class is deprecated since QXmpp 1.1.
+*/
+
+/*!
+    Constructs an empty QXmppDataForm::Media.
+
+    \deprecated This class is deprecated since QXmpp 1.1.
+*/
 QXmppDataForm::Media::Media()
     : d(new QXmppDataFormMediaPrivate)
 {
 }
 
-///
-/// Constructs a copy of \a other.
-///
-/// \deprecated This class is deprecated since QXmpp 1.1.
-///
+/*!
+    Constructs a copy of \a other.
+
+    \deprecated This class is deprecated since QXmpp 1.1.
+*/
 QXmppDataForm::Media::Media(const QXmppDataForm::Media &other) = default;
 
-///
-/// Destroys the media.
-///
-/// \deprecated This class is deprecated since QXmpp 1.1.
-///
+/*!
+    Destroys the media.
+
+    \deprecated This class is deprecated since QXmpp 1.1.
+*/
 QXmppDataForm::Media::~Media() = default;
 
-///
-/// Assigns \a other to this media.
-///
-/// \deprecated This class is deprecated since QXmpp 1.1.
-///
+/*!
+    Assigns \a other to this media.
+
+    \deprecated This class is deprecated since QXmpp 1.1.
+*/
 QXmppDataForm::Media &QXmppDataForm::Media::operator=(const QXmppDataForm::Media &other) = default;
 
-///
-/// Returns media's height.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Field::mediaSize().height() instead.
-///
+/*!
+    Returns media's height.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppDataForm::Field::mediaSize().height() instead.
+*/
 int QXmppDataForm::Media::height() const
 {
     return d->size.height();
 }
 
-///
-/// Sets media's \a height.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Field::mediaSize().setHeight() instead.
-///
+/*!
+    Sets media's \a height.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppDataForm::Field::mediaSize().setHeight() instead.
+*/
 void QXmppDataForm::Media::setHeight(int height)
 {
     d->size.setHeight(height);
 }
 
-///
-/// Returns media's width.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Field::mediaSize().width() instead.
-///
+/*!
+    Returns media's width.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppDataForm::Field::mediaSize().width() instead.
+*/
 int QXmppDataForm::Media::width() const
 {
     return d->size.width();
 }
 
-///
-/// Sets media's \a width.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Field::mediaSize().setWidth() instead.
-///
+/*!
+    Sets media's \a width.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppDataForm::Field::mediaSize().setWidth() instead.
+*/
 void QXmppDataForm::Media::setWidth(int width)
 {
     d->size.setWidth(width);
 }
 
-///
-/// Returns media's uris.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Field::mediaSources() instead.
-///
+/*!
+    Returns media's uris.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppDataForm::Field::mediaSources() instead.
+*/
 QList<QPair<QString, QString>> QXmppDataForm::Media::uris() const
 {
     return d->uris;
 }
 
-///
-/// Sets media's \a uris.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppDataForm::Media::setMediaSources() instead.
-///
+/*!
+    Sets media's \a uris.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppDataForm::Media::setMediaSources() instead.
+*/
 void QXmppDataForm::Media::setUris(const QList<QPair<QString, QString>> &uris)
 {
     d->uris = uris;
 }
 
-///
-/// Returns true if no media tag present.
-///
+/*! Returns true if no media tag present. */
 bool QXmppDataForm::Media::isNull() const
 {
     return d->uris.isEmpty();
@@ -296,18 +291,19 @@ public:
     QVector<QXmppDataForm::MediaSource> mediaSources;
 };
 
-///
-/// \class QXmppDataForm::Field
-///
-/// The QXmppDataForm::Field class represents a data form field as defined by
-/// \xep{0004, Data Forms}.
-///
+/*!
+    \class QXmppDataForm::Field
+    \inmodule QXmpp
 
-///
-/// Constructs a QXmppDataForm::Field with the specified attributes.
-///
-/// \since QXmpp 1.3
-///
+    The QXmppDataForm::Field class represents a data form field as defined by
+    \xep{0004}{Data Forms}.
+*/
+
+/*!
+    Constructs a QXmppDataForm::Field with the specified attributes.
+
+    \since QXmpp 1.3
+*/
 QXmppDataForm::Field::Field(QXmppDataForm::Field::Type type,
                             const QString &key,
                             const QVariant &value,
@@ -326,74 +322,60 @@ QXmppDataForm::Field::Field(QXmppDataForm::Field::Type type,
     setOptions(options);
 }
 
-/// Constructs a copy of \a other.
+/*! Constructs a copy of \a other. */
 QXmppDataForm::Field::Field(const QXmppDataForm::Field &other) = default;
-/// Default move constructor.
+/*! Default move constructor. */
 QXmppDataForm::Field::Field(QXmppDataForm::Field &&) = default;
-/// Destroys the form field.
+/*! Destroys the form field. */
 QXmppDataForm::Field::~Field() = default;
-/// Assigns \a other to this field.
+/*! Assigns \a other to this field. */
 QXmppDataForm::Field &QXmppDataForm::Field::operator=(const QXmppDataForm::Field &other) = default;
-/// Default move-assignment operator.
+/*! Default move-assignment operator. */
 QXmppDataForm::Field &QXmppDataForm::Field::operator=(QXmppDataForm::Field &&) = default;
 
-///
-/// Returns the field's description.
-///
+/*! Returns the field's description. */
 QString QXmppDataForm::Field::description() const
 {
     return d->description;
 }
 
-///
-/// Sets the field's description.
-///
-/// \param description
-///
+/*!
+    Sets the field's \a description.
+*/
 void QXmppDataForm::Field::setDescription(const QString &description)
 {
     d->description = description;
 }
 
-///
-/// Returns the field's key.
-///
+/*! Returns the field's key. */
 QString QXmppDataForm::Field::key() const
 {
     return d->key;
 }
 
-///
-/// Sets the field's key.
-///
-/// \param key
-///
+/*!
+    Sets the field's \a key.
+*/
 void QXmppDataForm::Field::setKey(const QString &key)
 {
     d->key = key;
 }
 
-///
-/// Returns the field's label.
-///
+/*! Returns the field's label. */
 QString QXmppDataForm::Field::label() const
 {
     return d->label;
 }
 
-///
-/// Sets the field's label.
-///
-/// \param label
-///
+/*!
+    Sets the field's \a label.
+*/
 void QXmppDataForm::Field::setLabel(const QString &label)
 {
     d->label = label;
 }
 
-///
-/// Returns the field's options.
-///
+/*! Returns the field's options. */
 QList<QPair<QString, QString>> QXmppDataForm::Field::options() const
 {
     return transform<QList<QPair<QString, QString>>>(d->options, [](const auto &option) {
@@ -401,11 +383,9 @@ QList<QPair<QString, QString>> QXmppDataForm::Field::options() const
     });
 }
 
-///
-/// Sets the field's options.
-///
-/// \param options
-///
+/*!
+    Sets the field's \a options.
+*/
 void QXmppDataForm::Field::setOptions(const QList<QPair<QString, QString>> &options)
 {
     d->options = transform<QList<DataFormListOption>>(options, [](const auto &pair) {
@@ -413,105 +393,97 @@ void QXmppDataForm::Field::setOptions(const QList<QPair<QString, QString>> &opti
     });
 }
 
-///
-/// Returns true if the field is required, false otherwise.
-///
+/*! Returns true if the field is required, false otherwise. */
 bool QXmppDataForm::Field::isRequired() const
 {
     return d->required;
 }
 
-///
-/// Set to true if the field is required, false otherwise.
-///
-/// \param required
-///
+/*!
+    Sets \a required to true if the field is required, false otherwise.
+*/
 void QXmppDataForm::Field::setRequired(bool required)
 {
     d->required = required;
 }
 
-///
-/// Returns the field's type.
-///
+/*! Returns the field's type. */
 QXmppDataForm::Field::Type QXmppDataForm::Field::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the field's type.
-///
-/// \param type
-///
+/*!
+    Sets the field's \a type.
+*/
 void QXmppDataForm::Field::setType(QXmppDataForm::Field::Type type)
 {
     d->type = type;
 }
 
-///
-/// Returns the field's value.
-///
+/*! Returns the field's value. */
 QVariant QXmppDataForm::Field::value() const
 {
     return d->value;
 }
 
-///
-/// Sets the field's value.
-///
-/// \param value
-///
+/*!
+    Sets the field's \a value.
+*/
 void QXmppDataForm::Field::setValue(const QVariant &value)
 {
     d->value = value;
 }
 
-///
-/// Returns the size of the attached media according to \xep{0221, Data Forms Media Element}.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the size of the attached media according to \xep{0221}{Data Forms Media Element}.
+
+    \since QXmpp 1.1
+*/
 QSize QXmppDataForm::Field::mediaSize() const
 {
     return d->mediaSize;
 }
 
-///
-/// Sets the size of the attached media according to \xep{0221, Data Forms Media Element}.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the size of the attached media according to \xep{0221}{Data Forms Media Element}.
+
+    \since QXmpp 1.1
+
+    \a size.
+*/
 void QXmppDataForm::Field::setMediaSize(const QSize &size)
 {
     d->mediaSize = size;
 }
 
-///
-/// Returns the sources for the attached media according to \xep{0221, Data Forms Media Element}.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns the sources for the attached media according to \xep{0221}{Data Forms Media Element}.
+
+    \since QXmpp 1.1
+*/
 QVector<QXmppDataForm::MediaSource> QXmppDataForm::Field::mediaSources() const
 {
     return d->mediaSources;
 }
 
-///
-/// Sets the sources to the attached media of the field according to \xep{0221, Data Forms Media Element}.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Sets the sources to the attached media of the field according to \xep{0221}{Data Forms Media Element}.
+
+    \since QXmpp 1.1
+
+    \a mediaSources.
+*/
 void QXmppDataForm::Field::setMediaSources(const QVector<QXmppDataForm::MediaSource> &mediaSources)
 {
     d->mediaSources = mediaSources;
 }
 
-///
-/// Returns true if the other field is identical to this one.
-///
-/// \since QXmpp 1.1
-///
+/*!
+    Returns true if \a other is identical to this field.
+
+    \since QXmpp 1.1
+*/
 bool QXmppDataForm::Field::operator==(const QXmppDataForm::Field &other) const
 {
     return d->description == other.description() &&
@@ -525,7 +497,6 @@ bool QXmppDataForm::Field::operator==(const QXmppDataForm::Field &other) const
         d->mediaSize == other.mediaSize();
 }
 
-/// \cond
 std::optional<QXmppDataForm::Field> QXmppDataForm::Field::fromDom(const QDomElement &el)
 {
     QXmppDataForm::Field field;
@@ -695,7 +666,6 @@ QSize &QXmppDataForm::Field::mediaSize()
 {
     return d->mediaSize;
 }
-/// \endcond
 
 class QXmppDataFormPrivate : public QSharedData
 {
@@ -706,18 +676,18 @@ public:
     QXmppDataForm::Type type = QXmppDataForm::None;
 };
 
-///
-/// \class QXmppDataForm
-///
-/// The QXmppDataForm class represents a data form as defined by \xep{0004,
-/// Data Forms}.
-///
+/*!
+    \class QXmppDataForm
+    \inmodule QXmpp
 
-///
-/// Constructs a QXmppDataForm with the specified attributes.
-///
-/// \since QXmpp 1.3
-///
+    The QXmppDataForm class represents a data form as defined by \xep{0004}{Data Forms}.
+*/
+
+/*!
+    Constructs a QXmppDataForm with the specified attributes.
+
+    \since QXmpp 1.3
+*/
 QXmppDataForm::QXmppDataForm(Type type,
                              const QList<Field> &fields,
                              const QString &title,
@@ -730,58 +700,66 @@ QXmppDataForm::QXmppDataForm(Type type,
     d->instructions = instructions;
 }
 
-///
-/// Constructs a data form from any type based on QXmppDataFormBase.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Constructs a data form from any type based on QXmppDataFormBase.
+
+    \since QXmpp 1.5
+*/
 QXmppDataForm::QXmppDataForm(const QXmppDataFormBase &based)
 {
     *this = based.toDataForm();
 }
 
-/// Constructs a copy of \a other.
+/*! Constructs a copy of \a other. */
 QXmppDataForm::QXmppDataForm(const QXmppDataForm &other) = default;
-/// Default move constructor.
+/*! Default move constructor. */
 QXmppDataForm::QXmppDataForm(QXmppDataForm &&other) = default;
-/// Destroys the form.
+/*! Destroys the form. */
 QXmppDataForm::~QXmppDataForm() = default;
-/// Assigns \a other to this form.
+/*! Assigns \a other to this form. */
 QXmppDataForm &QXmppDataForm::operator=(const QXmppDataForm &other) = default;
-/// Default move-assignment operator.
+/*! Default move-assignment operator. */
 QXmppDataForm &QXmppDataForm::operator=(QXmppDataForm &&) = default;
 
-/// Returns all fields.
+/*! Returns all fields. */
 QList<QXmppDataForm::Field> QXmppDataForm::fields() const
 {
     return d->fields;
 }
 
-/// Returns all fields.
-/// \since QXmpp 1.12
+/*!
+    Returns all fields.
+    \since QXmpp 1.12
+*/
 const QList<QXmppDataForm::Field> &QXmppDataForm::constFields() const
 {
     return d->fields;
 }
 
-/// Sets the form's fields.
+/*! Sets the form's \a fields. */
 void QXmppDataForm::setFields(const QList<QXmppDataForm::Field> &fields)
 {
     d->fields = fields;
 }
 
-/// Appends a field.
-/// \since QXmpp 1.12
+/*!
+    Appends a field.
+    \since QXmpp 1.12
+
+    \a field.
+*/
 void QXmppDataForm::appendField(Field &&field)
 {
     d->fields.append(std::move(field));
 }
 
-///
-/// Look up field by name.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Look up field by name.
+
+    \since QXmpp 1.12
+
+    \a fieldName.
+*/
 std::optional<QXmppDataForm::Field> QXmppDataForm::field(QStringView fieldName) const
 {
     auto itr = std::ranges::find(d->fields, fieldName, &Field::key);
@@ -791,11 +769,13 @@ std::optional<QXmppDataForm::Field> QXmppDataForm::field(QStringView fieldName) 
     return {};
 }
 
-///
-/// Look up field by name and return value if found.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Look up field by name and return value if found.
+
+    \since QXmpp 1.12
+
+    \a fieldName.
+*/
 std::optional<QVariant> QXmppDataForm::fieldValue(QStringView fieldName) const
 {
     auto itr = std::ranges::find(d->fields, fieldName, &Field::key);
@@ -805,68 +785,56 @@ std::optional<QVariant> QXmppDataForm::fieldValue(QStringView fieldName) const
     return {};
 }
 
-///
-/// Returns the form's instructions.
-///
+/*! Returns the form's instructions. */
 QString QXmppDataForm::instructions() const
 {
     return d->instructions;
 }
 
-///
-/// Sets the form's instructions.
-///
-/// \param instructions
-///
+/*!
+    Sets the form's \a instructions.
+*/
 void QXmppDataForm::setInstructions(const QString &instructions)
 {
     d->instructions = instructions;
 }
 
-///
-/// Returns the form's title.
-///
+/*! Returns the form's title. */
 QString QXmppDataForm::title() const
 {
     return d->title;
 }
 
-///
-/// Sets the form's title.
-///
-/// \param title
-///
+/*!
+    Sets the form's \a title.
+*/
 void QXmppDataForm::setTitle(const QString &title)
 {
     d->title = title;
 }
 
-///
-/// Returns the form's type.
-///
+/*! Returns the form's type. */
 QXmppDataForm::Type QXmppDataForm::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the form's type.
-///
-/// \param type
-///
+/*!
+    Sets the form's \a type.
+*/
 void QXmppDataForm::setType(QXmppDataForm::Type type)
 {
     d->type = type;
 }
 
-///
-/// Searches for a hidden field called 'FORM_TYPE' and returns its value.
-///
-/// \returns The string value of the field or a null string if the field
-/// couldn't be found.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    Searches for a hidden field called 'FORM_TYPE' and returns its value.
+
+    Returns the string value of the field or a null string if the field
+    couldn't be found.
+
+    \since QXmpp 1.5
+*/
 QString QXmppDataForm::formType() const
 {
     const auto formTypeItr = std::find_if(d->fields.begin(), d->fields.end(), [](const QXmppDataForm::Field &field) {
@@ -880,15 +848,12 @@ QString QXmppDataForm::formType() const
     return {};
 }
 
-///
-/// Returns true if the form has an unknown type.
-///
+/*! Returns true if the form has an unknown type. */
 bool QXmppDataForm::isNull() const
 {
     return d->type == QXmppDataForm::None;
 }
 
-/// \cond
 void QXmppDataForm::parse(const QDomElement &element)
 {
     if (element.isNull()) {
@@ -927,4 +892,3 @@ void QXmppDataForm::toXml(QXmlStreamWriter *writer) const
 }
 
 QList<QXmppDataForm::Field> &QXmppDataForm::fields() { return d->fields; }
-/// \endcond

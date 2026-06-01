@@ -25,16 +25,16 @@ public:
     };
 
     struct Range {
-        /// Start index of the range
+        /*! Start index of the range */
         uint32_t start;
-        /// End index of the range
+        /*! End index of the range */
         uint32_t end;
     };
 
     struct Reference {
-        /// Element of the message stanza this refers to
+        /*! Element of the message stanza this refers to */
         Element element;
-        /// Optional character range in the text
+        /*! Optional character range in the text */
         std::optional<Range> range;
     };
 

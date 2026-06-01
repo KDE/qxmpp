@@ -12,13 +12,14 @@ const auto NODE = u"pubsub#node"_s;
 const auto SUBSCRIBER_JID = u"pubsub#subscriber_jid"_s;
 const auto SUBID = u"pubsub#subid"_s;
 
-///
-/// \class QXmppPubSubSubAuthorization
-///
-/// This class represents a PubSub subscribe authorization data form.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppPubSubSubAuthorization
+    \inmodule QXmpp
+
+    This class represents a PubSub subscribe authorization data \a form.
+
+    \since QXmpp 1.5
+*/
 
 class QXmppPubSubSubAuthorizationPrivate : public QSharedData
 {
@@ -29,11 +30,13 @@ public:
     QString subid;
 };
 
-///
-/// Tries to parse a PubSub subscribe authorization form from a plain data form.
-///
-/// \returns The parsed data form on success.
-///
+/*!
+    Tries to parse a PubSub subscribe authorization form from a plain data form.
+
+    Returns the parsed data form on success.
+
+    \a form.
+*/
 std::optional<QXmppPubSubSubAuthorization> QXmppPubSubSubAuthorization::fromDataForm(const QXmppDataForm &form)
 {
     if (auto parsed = QXmppPubSubSubAuthorization();
@@ -48,75 +51,71 @@ QXmppPubSubSubAuthorization::QXmppPubSubSubAuthorization()
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppPubSubSubAuthorization::QXmppPubSubSubAuthorization(const QXmppPubSubSubAuthorization &) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppPubSubSubAuthorization::QXmppPubSubSubAuthorization(QXmppPubSubSubAuthorization &&) = default;
 QXmppPubSubSubAuthorization::~QXmppPubSubSubAuthorization() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppPubSubSubAuthorization &QXmppPubSubSubAuthorization::operator=(const QXmppPubSubSubAuthorization &) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppPubSubSubAuthorization &QXmppPubSubSubAuthorization::operator=(QXmppPubSubSubAuthorization &&) = default;
 
-///
-/// Returns whether the subscription is allowed.
-///
+/*! Returns whether the subscription is allowed. */
 std::optional<bool> QXmppPubSubSubAuthorization::allowSubscription() const
 {
     return d->allowSubscription;
 }
 
-///
-/// Sets whether the subscription is allowed.
-///
+/*!
+    Sets whether the subscription is allowed.
+
+    \a allowSubscription.
+*/
 void QXmppPubSubSubAuthorization::setAllowSubscription(std::optional<bool> allowSubscription)
 {
     d->allowSubscription = allowSubscription;
 }
 
-///
-/// Returns the node name of the relevant node.
-///
+/*! Returns the node name of the relevant node. */
 QString QXmppPubSubSubAuthorization::node() const
 {
     return d->node;
 }
 
-///
-/// Sets the node name of the relevant node.
-///
+/*! Sets the \a node name of the relevant node. */
 void QXmppPubSubSubAuthorization::setNode(const QString &node)
 {
     d->node = node;
 }
 
-///
-/// Returns the JID of the user requesting to subscribe.
-///
+/*! Returns the JID of the user requesting to subscribe. */
 QString QXmppPubSubSubAuthorization::subscriberJid() const
 {
     return d->subscriberJid;
 }
 
-///
-/// Sets the JID of the user requesting to subscribe.
-///
+/*!
+    Sets the JID of the user requesting to subscribe.
+
+    \a subscriberJid.
+*/
 void QXmppPubSubSubAuthorization::setSubscriberJid(const QString &subscriberJid)
 {
     d->subscriberJid = subscriberJid;
 }
 
-///
-/// Returns the subscription ID associated with the subscription request.
-///
+/*! Returns the subscription ID associated with the subscription request. */
 QString QXmppPubSubSubAuthorization::subid() const
 {
     return d->subid;
 }
 
-///
-/// Sets the subscription ID associated with the subscription request.
-///
+/*!
+    Sets the subscription ID associated with the subscription request.
+
+    \a subid.
+*/
 void QXmppPubSubSubAuthorization::setSubid(const QString &subid)
 {
     d->subid = subid;

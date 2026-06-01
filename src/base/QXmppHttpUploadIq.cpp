@@ -27,68 +27,59 @@ QXmppHttpUploadRequestIq::QXmppHttpUploadRequestIq()
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppHttpUploadRequestIq::QXmppHttpUploadRequestIq(const QXmppHttpUploadRequestIq &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppHttpUploadRequestIq::QXmppHttpUploadRequestIq(QXmppHttpUploadRequestIq &&) = default;
 QXmppHttpUploadRequestIq::~QXmppHttpUploadRequestIq() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppHttpUploadRequestIq &QXmppHttpUploadRequestIq::operator=(const QXmppHttpUploadRequestIq &) = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppHttpUploadRequestIq &QXmppHttpUploadRequestIq::operator=(QXmppHttpUploadRequestIq &&) = default;
 
-///
-/// Returns the file name of the file to be uploaded.
-///
+/*! Returns the file name of the file to be uploaded. */
 QString QXmppHttpUploadRequestIq::fileName() const
 {
     return d->fileName;
 }
 
-///
-/// Sets the file name. The upload service will use this to create the upload/
-/// download URLs. This may also differ from the actual file name to get a
-/// different URL. It's not required to replace special characters (this is the
-/// server's job).
-///
+/*!
+    Sets the file name. The upload service will use this to create the upload/
+    download URLs. This may also differ from the actual file name to get a
+    different URL. It's not required to replace special characters (this is the
+    server's job).
+
+    \a fileName.
+*/
 void QXmppHttpUploadRequestIq::setFileName(const QString &fileName)
 {
     d->fileName = fileName;
 }
 
-///
-/// Returns the file's size in bytes.
-///
+/*! Returns the file's size in bytes. */
 qint64 QXmppHttpUploadRequestIq::size() const
 {
     return d->size;
 }
 
-///
-/// Sets the file's size in bytes.
-///
+/*! Sets the file's \a size in bytes. */
 void QXmppHttpUploadRequestIq::setSize(qint64 size)
 {
     d->size = size;
 }
 
-///
-/// Returns the (optional) MIME-type of the file.
-///
+/*! Returns the (optional) MIME-type of the file. */
 QMimeType QXmppHttpUploadRequestIq::contentType() const
 {
     return d->contentType;
 }
 
-///
-/// Sets the MIME-type of the file. This is optional.
-///
+/*! Sets the MIME-\a type of the file. This is optional. */
 void QXmppHttpUploadRequestIq::setContentType(const QMimeType &type)
 {
     d->contentType = type;
 }
 
-/// \cond
 void QXmppHttpUploadRequestIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement request = firstChildElement(element, u"request");
@@ -112,7 +103,6 @@ void QXmppHttpUploadRequestIq::toXmlElementFromChild(QXmlStreamWriter *writer) c
         OptionalAttribute { u"content-type", d->contentType },
     });
 }
-/// \endcond
 
 class QXmppHttpUploadSlotIqPrivate : public QSharedData
 {
@@ -127,63 +117,65 @@ QXmppHttpUploadSlotIq::QXmppHttpUploadSlotIq()
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppHttpUploadSlotIq::QXmppHttpUploadSlotIq(const QXmppHttpUploadSlotIq &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppHttpUploadSlotIq::QXmppHttpUploadSlotIq(QXmppHttpUploadSlotIq &&) = default;
 QXmppHttpUploadSlotIq::~QXmppHttpUploadSlotIq() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppHttpUploadSlotIq &QXmppHttpUploadSlotIq::operator=(const QXmppHttpUploadSlotIq &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppHttpUploadSlotIq &QXmppHttpUploadSlotIq::operator=(QXmppHttpUploadSlotIq &&) = default;
 
-///
-/// Returns the URL for uploading via. HTTP PUT.
-///
+/*! Returns the URL for uploading via. HTTP PUT. */
 QUrl QXmppHttpUploadSlotIq::putUrl() const
 {
     return d->putUrl;
 }
 
-///
-/// Sets the URL the client should use for uploading.
-///
+/*!
+    Sets the URL the client should use for uploading.
+
+    \a putUrl.
+*/
 void QXmppHttpUploadSlotIq::setPutUrl(const QUrl &putUrl)
 {
     d->putUrl = putUrl;
 }
 
-///
-/// Returns the URL to where the file will be served.
-///
+/*! Returns the URL to where the file will be served. */
 QUrl QXmppHttpUploadSlotIq::getUrl() const
 {
     return d->getUrl;
 }
 
-///
-/// Sets the download URL.
-///
+/*!
+    Sets the download URL.
+
+    \a getUrl.
+*/
 void QXmppHttpUploadSlotIq::setGetUrl(const QUrl &getUrl)
 {
     d->getUrl = getUrl;
 }
 
-///
-/// Returns a map of header fields (header name -> value) that need to be
-/// included in the PUT (upload) request. This won't contain any other fields
-/// than: "Authorization", "Cookie" or "Expires".
-///
+/*!
+    Returns a map of header fields (header name -> value) that need to be
+    included in the PUT (upload) request. This won't contain any other fields
+    than: "Authorization", "Cookie" or "Expires".
+*/
 QMap<QString, QString> QXmppHttpUploadSlotIq::putHeaders() const
 {
     return d->putHeaders;
 }
 
-///
-/// Sets the header fields the client needs to include in the PUT (upload)
-/// request. All fields other than "Authorization", "Cookie" or "Expires" will
-/// be ignored.
-///
+/*!
+    Sets the header fields the client needs to include in the PUT (upload)
+    request. All fields other than "Authorization", "Cookie" or "Expires" will
+    be ignored.
+
+    \a putHeaders.
+*/
 void QXmppHttpUploadSlotIq::setPutHeaders(const QMap<QString, QString> &putHeaders)
 {
     d->putHeaders.clear();
@@ -195,7 +187,6 @@ void QXmppHttpUploadSlotIq::setPutHeaders(const QMap<QString, QString> &putHeade
                   });
 }
 
-/// \cond
 void QXmppHttpUploadSlotIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement slot = firstChildElement(element, u"slot");
@@ -237,4 +228,3 @@ void QXmppHttpUploadSlotIq::toXmlElementFromChild(QXmlStreamWriter *writer) cons
         },
     });
 }
-/// \endcond

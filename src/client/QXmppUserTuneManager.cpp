@@ -15,50 +15,51 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
     return client->findExtension<QXmppPubSubManager>();
 }
 
-///
-/// \class QXmppUserTuneManager
-///
-/// The QXmppUserTuneManager implements \xep{0118, User Tune}. You'll receive
-/// tune updates from all presence subscriptions. You can publish tune
-/// information on the user's account (publish()) and request tune information
-/// from specific accounts (request()).
-///
-/// The manager needs to be added to the client first and also requires the
-/// QXmppPubSubManager.
-/// \code
-/// QXmppClient client;
-/// auto *pubSubManager = client.addNewExtension<QXmppPubSubManager>();
-/// auto *tuneManager = client.addNewExtension<QXmppUserTuneManager>();
-/// \endcode
-///
-/// \since QXmpp 1.5
-///
-/// \ingroup Managers
-///
+/*!
+    \class QXmppUserTuneManager
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppUserTuneManager::Item
-///
-/// Used pubsub item type.
-///
+    The QXmppUserTuneManager implements \xep{0118}{User Tune}. You'll receive
+    tune updates from all presence subscriptions. You can publish tune
+    information on the user's account (publish()) and request tune information
+    from specific accounts (request()).
 
-///
-/// \typedef QXmppUserTuneManager::GetResult
-///
-/// Contains the User Tune information or an error.
-///
+    The manager needs to be added to the client first and also requires the
+    QXmppPubSubManager.
+    \code
+    QXmppClient client;
+    auto *pubSubManager = client.addNewExtension<QXmppPubSubManager>();
+    auto *tuneManager = client.addNewExtension<QXmppUserTuneManager>();
+    \endcode
 
-///
-/// \typedef QXmppUserTuneManager::PublishResult
-///
-/// Contains the ID of the published item on success or a stanza error.
-///
+    \since QXmpp 1.5
 
-///
-/// \fn QXmppUserTuneManager::itemReceived()
-///
-/// Emitted whenever a \xep{0118, User Tune} items event arrives.
-///
+    \ingroup Managers
+*/
+
+/*!
+    \typedef QXmppUserTuneManager::Item
+
+    Used pubsub item type.
+*/
+
+/*!
+    \typedef QXmppUserTuneManager::GetResult
+
+    Contains the User Tune information or an error.
+*/
+
+/*!
+    \typedef QXmppUserTuneManager::PublishResult
+
+    Contains the ID of the published item on success or a stanza error.
+*/
+
+/*!
+    \fn void QXmppUserTuneManager::itemReceived(const QString &jid, const QXmppTuneItem &item)
+
+    Emitted whenever a \xep{0118}{User Tune} items event arrives.
+*/
 
 QXmppUserTuneManager::QXmppUserTuneManager()
 {
@@ -72,31 +73,25 @@ QStringList QXmppUserTuneManager::discoveryFeatures() const
     };
 }
 
-///
-/// Request User Tune information from an account.
-///
-/// \param jid The account JID to request.
-///
+/*!
+    Request User Tune information from the account with JID \a jid.
+*/
 auto QXmppUserTuneManager::request(const QString &jid)
     -> QXmppTask<GetResult>
 {
     return Pep::request<Item>(pubSub(client()), jid, staticString(ns_tune), this);
 }
 
-///
-/// Publishes User Tune information on the user's account.
-///
-/// \param item The User Tune item to be published.
-///
+/*!
+    Publishes the User Tune \a item on the user's account.
+*/
 auto QXmppUserTuneManager::publish(const QXmppTuneItem &item)
     -> QXmppTask<PublishResult>
 {
     return pubSub(client())->publishOwnPepItem(staticString(ns_tune), item);
 }
 
-/// \cond
 bool QXmppUserTuneManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
     return Pep::handlePubSubEvent<Item>(element, pubSubService, nodeName, staticString(ns_tune), this, &QXmppUserTuneManager::itemReceived);
 }
-/// \endcond

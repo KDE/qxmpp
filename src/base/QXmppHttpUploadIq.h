@@ -15,14 +15,16 @@ class QMimeType;
 class QXmppHttpUploadRequestIqPrivate;
 class QXmppHttpUploadSlotIqPrivate;
 
-///
-/// \brief Represents an HTTP File Upload IQ for requesting an upload slot as
-/// defined by \xep{0363, HTTP File Upload}.
-///
-/// \since QXmpp 1.1
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an HTTP File Upload IQ for requesting an upload slot as
+    defined by \xep{0363}{HTTP File Upload}.
+
+    \since QXmpp 1.1
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppHttpUploadRequestIq : public QXmppIq
 {
 public:
@@ -43,7 +45,6 @@ public:
     QMimeType contentType() const;
     void setContentType(const QMimeType &type);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"request", QXmpp::Private::ns_http_upload };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isHttpUploadRequestIq(const QDomElement &element);
@@ -51,20 +52,21 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppHttpUploadRequestIqPrivate> d;
 };
 
-///
-/// \brief Represents an HTTP File Upload IQ result for receiving an upload slot as
-/// defined by \xep{0363, HTTP File Upload}.
-///
-/// \since QXmpp 1.1
-///
-/// \ingroup Stanzas
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents an HTTP File Upload IQ result for receiving an upload slot as
+    defined by \xep{0363}{HTTP File Upload}.
+
+    \since QXmpp 1.1
+
+    \ingroup Stanzas
+*/
 class QXMPP_EXPORT QXmppHttpUploadSlotIq : public QXmppIq
 {
 public:
@@ -85,7 +87,6 @@ public:
     QMap<QString, QString> putHeaders() const;
     void setPutHeaders(const QMap<QString, QString> &putHeaders);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"slot", QXmpp::Private::ns_http_upload };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isHttpUploadSlotIq(const QDomElement &element);
@@ -93,7 +94,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppHttpUploadSlotIqPrivate> d;

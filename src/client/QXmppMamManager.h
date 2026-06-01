@@ -19,22 +19,24 @@ class QXmppTask;
 class QXmppMessage;
 class QXmppMamManagerPrivate;
 
-///
-/// \brief The QXmppMamManager class makes it possible to access message
-/// archives as defined by \xep{0313, Message Archive Management}.
-///
-/// To make use of this manager, you need to instantiate it and load it into
-/// the QXmppClient instance as follows:
-///
-/// \code
-/// QXmppMamManager *manager = new QXmppMamManager;
-/// client->addExtension(manager);
-/// \endcode
-///
-/// \ingroup Managers
-///
-/// \since QXmpp 1.0
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppMamManager class makes it possible to access message
+    archives as defined by \xep{0313}{Message Archive Management}.
+
+    To make use of this manager, you need to instantiate it and load it into
+    the QXmppClient instance as follows:
+
+    \code
+    QXmppMamManager *manager = new QXmppMamManager;
+    client->addExtension(manager);
+    \endcode
+
+    \ingroup Managers
+
+    \since QXmpp 1.0
+*/
 class QXMPP_EXPORT QXmppMamManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -63,15 +65,21 @@ public:
                                                const QDateTime &end = QDateTime(),
                                                const QXmppResultSetQuery &resultSetQuery = QXmppResultSetQuery());
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
-    /// \endcond
 
-    /// This signal is emitted when an archived message is received
+    /*!
+        This signal is emitted when an archived \a message is received
+
+        \a queryId.
+    */
     Q_SIGNAL void archivedMessageReceived(const QString &queryId, const QXmppMessage &message);
 
-    /// This signal is emitted when all results for a request have been received
+    /*!
+        This signal is emitted when all results for a request have been received
+
+        \a complete, \a queryId, and \a resultSetReply.
+    */
     Q_SIGNAL void resultsRecieved(const QString &queryId, const QXmppResultSetReply &resultSetReply, bool complete);
 
 private:

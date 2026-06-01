@@ -12,14 +12,15 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppAtmTrustMemoryStorage
-///
-/// \brief The QXmppAtmTrustMemoryStorage class stores trust data for
-/// \xep{0450, Automatic Trust Management (ATM)} in the memory.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppAtmTrustMemoryStorage
+    \inmodule QXmpp
+
+    \brief The QXmppAtmTrustMemoryStorage class stores trust data for
+    \xep{0450}{Automatic Trust Management (ATM)} in the memory.
+
+    \since QXmpp 1.5
+*/
 
 struct UnprocessedKey {
     QByteArray id;
@@ -36,9 +37,7 @@ public:
     QMultiHash<QString, UnprocessedKey> keys;
 };
 
-///
-/// Constructs an ATM trust memory storage.
-///
+/*! Constructs an ATM trust memory storage. */
 QXmppAtmTrustMemoryStorage::QXmppAtmTrustMemoryStorage()
     : d(new QXmppAtmTrustMemoryStoragePrivate)
 {
@@ -46,7 +45,6 @@ QXmppAtmTrustMemoryStorage::QXmppAtmTrustMemoryStorage()
 
 QXmppAtmTrustMemoryStorage::~QXmppAtmTrustMemoryStorage() = default;
 
-/// \cond
 QXmppTask<void> QXmppAtmTrustMemoryStorage::addKeysForPostponedTrustDecisions(const QString &encryption, const QByteArray &senderKeyId, const QList<QXmppTrustMessageKeyOwner> &keyOwners)
 {
     const auto addKeys = [&](const QXmppTrustMessageKeyOwner &keyOwner, bool trust, const QList<QByteArray> &keyIds) {
@@ -139,4 +137,3 @@ QXmppTask<void> QXmppAtmTrustMemoryStorage::resetAll(const QString &encryption)
     d->keys.remove(encryption);
     co_return;
 }
-/// \endcond

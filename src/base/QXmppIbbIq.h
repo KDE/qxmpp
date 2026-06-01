@@ -19,7 +19,6 @@ public:
     QString sid() const;
     void setSid(const QString &sid);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"open", QXmpp::Private::ns_ibb };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isIbbOpenIq(const QDomElement &element);
@@ -27,7 +26,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     long m_block_size;
@@ -42,7 +40,6 @@ public:
     QString sid() const;
     void setSid(const QString &sid);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"close", QXmpp::Private::ns_ibb };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isIbbCloseIq(const QDomElement &element);
@@ -50,7 +47,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QString m_sid;
@@ -70,7 +66,6 @@ public:
     QByteArray payload() const;
     void setPayload(const QByteArray &data);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"data", QXmpp::Private::ns_ibb };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isIbbDataIq(const QDomElement &element);
@@ -78,7 +73,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     quint16 m_seq;

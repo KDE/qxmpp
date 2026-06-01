@@ -20,70 +20,60 @@
 
 using namespace QXmpp::Private;
 
-/// \cond
-///
-/// \class QXmppOmemoDeviceElement
-///
-/// \brief The QXmppOmemoDeviceElement class represents an element of the
-/// OMEMO device list as defined by \xep{0384, OMEMO Encryption}.
-///
+/*!
+    \class QXmppOmemoDeviceElement
+    \inmodule QXmpp
 
-///
-/// Returns true if the IDs of both elements match.
-///
+    \brief The QXmppOmemoDeviceElement class represents an element of the
+    OMEMO device list as defined by \xep{0384}{OMEMO Encryption}.
+*/
+
+/*! Returns true if the IDs of this element and \a other match. */
 bool QXmppOmemoDeviceElement::operator==(const QXmppOmemoDeviceElement &other) const
 {
     return m_id == other.id();
 }
 
-///
-/// Returns the ID of this device element.
-///
-/// The ID is used to identify a device and fetch its bundle.
-/// The ID is 0 if it is unset.
-///
-/// \see QXmppOmemoDeviceBundle
-///
-/// \return this device element's ID
-///
+/*!
+    Returns the ID of this device element.
+
+    The ID is used to identify a device and fetch its bundle.
+    The ID is 0 if it is unset.
+
+    \sa QXmppOmemoDeviceBundle
+*/
 uint32_t QXmppOmemoDeviceElement::id() const
 {
     return m_id;
 }
 
-///
-/// Sets the ID of this device element.
-///
-/// The ID must be at least 1 and at most
-/// \c std::numeric_limits<int32_t>::max().
-///
-/// \param id this device element's ID
-///
+/*!
+    Sets this device element's ID to \a id.
+
+    The ID must be at least 1 and at most
+    \c std::numeric_limits<int32_t>::max().
+*/
 void QXmppOmemoDeviceElement::setId(uint32_t id)
 {
     m_id = id;
 }
 
-///
-/// Returns the label of this device element.
-///
-/// The label is a human-readable string used to identify the device by users.
-/// If no label is set, a default-constructed QString is returned.
-///
-/// \return this device element's label
-///
+/*!
+    Returns the label of this device element.
+
+    The label is a human-readable string used to identify the device by users.
+    If no label is set, a default-constructed QString is returned.
+*/
 QString QXmppOmemoDeviceElement::label() const
 {
     return m_label;
 }
 
-///
-/// Sets the optional label of this device element.
-///
-/// The label should not contain more than 53 characters.
-///
-/// \param label this device element's label
-///
+/*!
+    Sets the optional \a label of this device element.
+
+    The label should not contain more than 53 characters.
+*/
 void QXmppOmemoDeviceElement::setLabel(const QString &label)
 {
     m_label = label;
@@ -104,24 +94,23 @@ void QXmppOmemoDeviceElement::toXml(QXmlStreamWriter *writer) const
     });
 }
 
-///
-/// Determines whether the given DOM element is an OMEMO device element.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is an OMEMO device element, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is an OMEMO device element.
+
+    Returns true if \a element is an OMEMO device element, otherwise false.
+*/
 bool QXmppOmemoDeviceElement::isOmemoDeviceElement(const QDomElement &element)
 {
     return element.tagName() == u"device" && element.namespaceURI() == ns_omemo_2;
 }
 
-///
-/// \class QXmppOmemoDeviceList
-///
-/// \brief The QXmppOmemoDeviceList class represents an OMEMO device list
-/// as defined by \xep{0384, OMEMO Encryption}.
-///
+/*!
+    \class QXmppOmemoDeviceList
+    \inmodule QXmpp
+
+    \brief The QXmppOmemoDeviceList class represents an OMEMO device list
+    as defined by \xep{0384}{OMEMO Encryption}.
+*/
 
 void QXmppOmemoDeviceList::parse(const QDomElement &element)
 {
@@ -140,149 +129,124 @@ void QXmppOmemoDeviceList::toXml(QXmlStreamWriter *writer) const
     });
 }
 
-///
-/// Determines whether the given DOM element is an OMEMO device list.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is an OMEMO device list, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is an OMEMO device list.
+
+    Returns true if \a element is an OMEMO device list, otherwise false.
+*/
 bool QXmppOmemoDeviceList::isOmemoDeviceList(const QDomElement &element)
 {
     return element.tagName() == u"devices" && element.namespaceURI() == ns_omemo_2;
 }
 
-///
-/// \class QXmppOmemoDeviceBundle
-///
-/// \brief The QXmppOmemoDeviceBundle class represents an OMEMO bundle as
-/// defined by \xep{0384, OMEMO Encryption}.
-///
-/// It is a collection of publicly accessible data used by the X3DH key exchange.
-/// The data is used to build an encrypted session with an OMEMO device.
-///
+/*!
+    \class QXmppOmemoDeviceBundle
+    \inmodule QXmpp
 
-///
-/// Returns the public identity key.
-///
-/// The public identity key is the public long-term key which never changes.
-///
-/// \return the public identity key
-///
+    \brief The QXmppOmemoDeviceBundle class represents an OMEMO bundle as
+    defined by \xep{0384}{OMEMO Encryption}.
+
+    It is a collection of publicly accessible data used by the X3DH key exchange.
+    The data is used to build an encrypted session with an OMEMO device.
+*/
+
+/*!
+    Returns the public identity key.
+
+    The public identity key is the public long-term key which never changes.
+*/
 QByteArray QXmppOmemoDeviceBundle::publicIdentityKey() const
 {
     return m_publicIdentityKey;
 }
 
-///
-/// Sets the public identity key.
-///
-/// \param key public identity key
-///
+/*!
+    Sets the public identity key to \a key.
+*/
 void QXmppOmemoDeviceBundle::setPublicIdentityKey(const QByteArray &key)
 {
     m_publicIdentityKey = key;
 }
 
-///
-/// Returns the public pre key that is signed.
-///
-/// \return the signed public pre key
-///
+/*!
+    Returns the public pre key that is signed.
+*/
 QByteArray QXmppOmemoDeviceBundle::signedPublicPreKey() const
 {
     return m_signedPublicPreKey;
 }
 
-///
-/// Sets the public pre key that is signed.
-///
-/// \param key signed public pre key
-///
+/*!
+    Sets the public pre key that is signed to \a key.
+*/
 void QXmppOmemoDeviceBundle::setSignedPublicPreKey(const QByteArray &key)
 {
     m_signedPublicPreKey = key;
 }
 
-///
-/// Returns the ID of the public pre key that is signed.
-///
-/// The ID is 0 if it is unset.
-///
-/// \return the ID of the signed public pre key
-///
+/*!
+    Returns the ID of the public pre key that is signed.
+
+    The ID is 0 if it is unset.
+*/
 uint32_t QXmppOmemoDeviceBundle::signedPublicPreKeyId() const
 {
     return m_signedPublicPreKeyId;
 }
 
-///
-/// Sets the ID of the public pre key that is signed.
-///
-/// The ID must be at least 1 and at most
-/// \c std::numeric_limits<int32_t>::max().
-///
-/// \param id ID of the signed public pre key
-///
+/*!
+    Sets the ID of the public pre key that is signed to \a id.
+
+    The ID must be at least 1 and at most
+    \c std::numeric_limits<int32_t>::max().
+*/
 void QXmppOmemoDeviceBundle::setSignedPublicPreKeyId(uint32_t id)
 {
     m_signedPublicPreKeyId = id;
 }
 
-///
-/// Returns the signature of the public pre key that is signed.
-///
-/// \return the signature of the signed public pre key
-///
+/*!
+    Returns the signature of the public pre key that is signed.
+*/
 QByteArray QXmppOmemoDeviceBundle::signedPublicPreKeySignature() const
 {
     return m_signedPublicPreKeySignature;
 }
 
-///
-/// Sets the signature of the public pre key that is signed.
-///
-/// \param signature signature of the signed public pre key
-///
+/*!
+    Sets the \a signature of the public pre key that is signed.
+*/
 void QXmppOmemoDeviceBundle::setSignedPublicPreKeySignature(const QByteArray &signature)
 {
     m_signedPublicPreKeySignature = signature;
 }
 
-///
-/// Returns the public pre keys.
-///
-/// The key of a key-value pair represents the ID of the corresponding public
-/// pre key.
-/// The value of a key-value pair represents the public pre key.
-///
-/// \return the public pre keys
-///
+/*!
+    Returns the public pre keys.
+
+    The key of a key-value pair represents the ID of the corresponding public
+    pre key.
+    The value of a key-value pair represents the public pre key.
+*/
 QHash<uint32_t, QByteArray> QXmppOmemoDeviceBundle::publicPreKeys() const
 {
     return m_publicPreKeys;
 }
 
-///
-/// Adds a public pre key.
-///
-/// The ID must be at least 1 and at most
-/// \c std::numeric_limits<int32_t>::max().
-///
-/// \param id ID of the public pre key
-/// \param key public pre key
-///
+/*!
+    Adds a public pre key \a key with ID \a id.
+
+    The ID must be at least 1 and at most
+    \c std::numeric_limits<int32_t>::max().
+*/
 void QXmppOmemoDeviceBundle::addPublicPreKey(uint32_t id, const QByteArray &key)
 {
     m_publicPreKeys.insert(id, key);
 }
 
-///
-/// Removes a public pre key.
-///
-/// \param id ID of the public pre key
-/// \param key public pre key
-///
+/*!
+    Removes the public pre key with ID \a id.
+*/
 void QXmppOmemoDeviceBundle::removePublicPreKey(uint32_t id)
 {
     m_publicPreKeys.remove(id);
@@ -336,43 +300,39 @@ void QXmppOmemoDeviceBundle::toXml(QXmlStreamWriter *writer) const
     });
 }
 
-///
-/// Determines whether the given DOM element is an OMEMO device bundle.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is an OMEMO device bundle, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is an OMEMO device bundle.
+
+    Returns true if \a element is an OMEMO device bundle, otherwise false.
+*/
 bool QXmppOmemoDeviceBundle::isOmemoDeviceBundle(const QDomElement &element)
 {
     return element.tagName() == u"bundle" && element.namespaceURI() == ns_omemo_2;
 }
 
-///
-/// \class QXmppOmemoIq
-///
-/// \brief The QXmppOmemoIq class represents an encrypted IQ stanza as defined
-/// by \xep{0384, OMEMO Encryption} and \xep{0420, Stanza Content Encryption}
-/// (SCE).
-///
-/// \ingroup Stanzas
-///
+/*!
+    \class QXmppOmemoIq
+    \inmodule QXmpp
 
-///
-/// Returns the OMEMO element which contains the data used by OMEMO.
-///
-/// \return the OMEMO element
-///
+    \brief The QXmppOmemoIq class represents an encrypted IQ stanza as defined
+    by \xep{0384}{OMEMO Encryption} and \xep{0420}{Stanza Content Encryption}
+    (SCE).
+
+    \ingroup Stanzas
+*/
+
+/*!
+    Returns the OMEMO element which contains the data used by OMEMO.
+*/
 QXmppOmemoElement QXmppOmemoIq::omemoElement()
 {
     return m_omemoElement;
 }
 
-///
-/// Sets the OMEMO element which contains the data used by OMEMO.
-///
-/// \param omemoElement OMEMO element
-///
+/*!
+    Sets the OMEMO element \a omemoElement which contains the data used by
+    OMEMO.
+*/
 void QXmppOmemoIq::setOmemoElement(const QXmppOmemoElement &omemoElement)
 {
     m_omemoElement = omemoElement;
@@ -389,13 +349,11 @@ void QXmppOmemoIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     m_omemoElement.toXml(writer);
 }
 
-///
-/// Determines whether the given DOM element is an OMEMO IQ stanza.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is an OMEMO IQ stanza, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is an OMEMO IQ stanza.
+
+    Returns true if \a element is an OMEMO IQ stanza, otherwise false.
+*/
 bool QXmppOmemoIq::isOmemoIq(const QDomElement &element)
 {
     auto child = element.firstChildElement();
@@ -451,4 +409,3 @@ void QXmppOmemoDeviceListItem::serializePayload(QXmlStreamWriter *writer) const
 {
     m_deviceList.toXml(writer);
 }
-/// \endcond

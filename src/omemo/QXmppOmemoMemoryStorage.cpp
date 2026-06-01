@@ -8,14 +8,15 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppOmemoMemoryStorage
-///
-/// \brief The QXmppOmemoMemoryStorage class stores data used by
-/// \xep{0384, OMEMO Encryption} in the memory.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppOmemoMemoryStorage
+    \inmodule QXmpp
+
+    \brief The QXmppOmemoMemoryStorage class stores data used by
+    \xep{0384}{OMEMO Encryption} in the memory.
+
+    \since QXmpp 1.5
+*/
 
 class QXmppOmemoMemoryStoragePrivate
 {
@@ -34,9 +35,7 @@ public:
     QHash<QString, QHash<uint32_t, QXmppOmemoStorage::Device>> devices;
 };
 
-///
-/// Constructs an OMEMO memory storage.
-///
+/*! Constructs an OMEMO memory storage. */
 QXmppOmemoMemoryStorage::QXmppOmemoMemoryStorage()
     : d(new QXmppOmemoMemoryStoragePrivate)
 {
@@ -44,7 +43,6 @@ QXmppOmemoMemoryStorage::QXmppOmemoMemoryStorage()
 
 QXmppOmemoMemoryStorage::~QXmppOmemoMemoryStorage() = default;
 
-/// \cond
 QXmppTask<QXmppOmemoStorage::OmemoData> QXmppOmemoMemoryStorage::allData()
 {
     return makeReadyTask(std::move(OmemoData { d->ownDevice,
@@ -114,4 +112,3 @@ QXmppTask<void> QXmppOmemoMemoryStorage::resetAll()
     d.reset(new QXmppOmemoMemoryStoragePrivate());
     co_return;
 }
-/// \endcond

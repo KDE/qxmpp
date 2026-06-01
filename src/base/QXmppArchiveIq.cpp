@@ -20,37 +20,41 @@ QXmppArchiveMessage::QXmppArchiveMessage()
 {
 }
 
-/// Returns the archived message's body.
+/*! Returns the archived message's body. */
 QString QXmppArchiveMessage::body() const
 {
     return m_body;
 }
 
-/// Sets the archived message's body.
+/*! Sets the archived message's \a body. */
 void QXmppArchiveMessage::setBody(const QString &body)
 {
     m_body = body;
 }
 
-/// Returns the archived message's date.
+/*! Returns the archived message's date. */
 QDateTime QXmppArchiveMessage::date() const
 {
     return m_date;
 }
 
-/// Sets the archived message's date.
+/*! Sets the archived message's \a date. */
 void QXmppArchiveMessage::setDate(const QDateTime &date)
 {
     m_date = date;
 }
 
-/// Returns true if the archived message was received, false if it was sent.
+/*! Returns true if the archived message was received, false if it was sent. */
 bool QXmppArchiveMessage::isReceived() const
 {
     return m_received;
 }
 
-/// Set to true if the archived message was received, false if it was sent.
+/*!
+    Set to true if the archived message was received, false if it was sent.
+
+    \a isReceived.
+*/
 void QXmppArchiveMessage::setReceived(bool isReceived)
 {
     m_received = isReceived;
@@ -61,7 +65,6 @@ QXmppArchiveChat::QXmppArchiveChat()
 {
 }
 
-/// \cond
 void QXmppArchiveChat::parse(const QDomElement &element)
 {
     m_with = element.attribute(u"with"_s);
@@ -110,113 +113,117 @@ void QXmppArchiveChat::toXml(QXmlStreamWriter *writer, const QXmppResultSetReply
         rsm,
     });
 }
-/// \endcond
 
-/// Returns the conversation's messages.
+/*! Returns the conversation's messages. */
 QList<QXmppArchiveMessage> QXmppArchiveChat::messages() const
 {
     return m_messages;
 }
 
-/// Sets the conversation's messages.
+/*! Sets the conversation's \a messages. */
 void QXmppArchiveChat::setMessages(const QList<QXmppArchiveMessage> &messages)
 {
     m_messages = messages;
 }
 
-/// Returns the start of this conversation.
+/*! Returns the start of this conversation. */
 QDateTime QXmppArchiveChat::start() const
 {
     return m_start;
 }
 
-/// Sets the start of this conversation.
+/*! Sets the \a start of this conversation. */
 void QXmppArchiveChat::setStart(const QDateTime &start)
 {
     m_start = start;
 }
 
-/// Returns the conversation's subject.
+/*! Returns the conversation's subject. */
 QString QXmppArchiveChat::subject() const
 {
     return m_subject;
 }
 
-/// Sets the conversation's subject.
+/*! Sets the conversation's \a subject. */
 void QXmppArchiveChat::setSubject(const QString &subject)
 {
     m_subject = subject;
 }
 
-/// Returns the conversation's thread.
+/*! Returns the conversation's thread. */
 QString QXmppArchiveChat::thread() const
 {
     return m_thread;
 }
 
-/// Sets the conversation's thread.
+/*! Sets the conversation's \a thread. */
 void QXmppArchiveChat::setThread(const QString &thread)
 {
     m_thread = thread;
 }
 
-/// Returns the conversation's version.
+/*! Returns the conversation's version. */
 int QXmppArchiveChat::version() const
 {
     return m_version;
 }
 
-/// Sets the conversation's version.
+/*! Sets the conversation's \a version. */
 void QXmppArchiveChat::setVersion(int version)
 {
     m_version = version;
 }
 
-/// Returns the JID of the remote party.
+/*! Returns the JID of the remote party. */
 QString QXmppArchiveChat::with() const
 {
     return m_with;
 }
 
-/// Sets the JID of the remote party.
+/*!
+    Sets the JID of the remote party.
+
+    \a with.
+*/
 void QXmppArchiveChat::setWith(const QString &with)
 {
     m_with = with;
 }
 
-/// Returns the chat conversation carried by this IQ.
+/*! Returns the chat conversation carried by this IQ. */
 QXmppArchiveChat QXmppArchiveChatIq::chat() const
 {
     return m_chat;
 }
 
-/// Sets the chat conversation carried by this IQ.
+/*! Sets the \a chat conversation carried by this IQ. */
 void QXmppArchiveChatIq::setChat(const QXmppArchiveChat &chat)
 {
     m_chat = chat;
 }
 
-///
-/// Returns the result set management reply.
-///
-/// This is used for paging through messages.
-///
+/*!
+    Returns the result set management reply.
+
+    This is used for paging through messages.
+*/
 QXmppResultSetReply QXmppArchiveChatIq::resultSetReply() const
 {
     return m_rsmReply;
 }
 
-///
-/// Sets the result set management reply.
-///
-/// This is used for paging through messages.
-///
+/*!
+    Sets the result set management reply.
+
+    This is used for paging through messages.
+
+    \a rsm.
+*/
 void QXmppArchiveChatIq::setResultSetReply(const QXmppResultSetReply &rsm)
 {
     m_rsmReply = rsm;
 }
 
-/// \cond
 void QXmppArchiveChatIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement chatElement = firstChildElement(element, u"chat");
@@ -228,103 +235,113 @@ void QXmppArchiveChatIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     m_chat.toXml(writer, m_rsmReply);
 }
-/// \endcond
 
-/// Constructs a QXmppArchiveListIq.
+/*! Constructs a QXmppArchiveListIq. */
 QXmppArchiveListIq::QXmppArchiveListIq()
     : QXmppIq(QXmppIq::Get)
 {
 }
 
-/// Returns the list of chat conversations.
+/*! Returns the list of chat conversations. */
 QList<QXmppArchiveChat> QXmppArchiveListIq::chats() const
 {
     return m_chats;
 }
 
-/// Sets the list of chat conversations.
+/*!
+    Sets the list of chat conversations.
+
+    \a chats.
+*/
 void QXmppArchiveListIq::setChats(const QList<QXmppArchiveChat> &chats)
 {
     m_chats = chats;
 }
 
-/// Returns the JID which archived conversations must match.
+/*! Returns the JID which archived conversations must match. */
 QString QXmppArchiveListIq::with() const
 {
     return m_with;
 }
 
-/// Sets the JID which archived conversations must match.
+/*!
+    Sets the JID which archived conversations must match.
+
+    \a with.
+*/
 void QXmppArchiveListIq::setWith(const QString &with)
 {
     m_with = with;
 }
 
-/// Returns the start date/time for the archived conversations.
+/*! Returns the start date/time for the archived conversations. */
 QDateTime QXmppArchiveListIq::start() const
 {
     return m_start;
 }
 
-/// Sets the start date/time for the archived conversations.
+/*! Sets the \a start date/time for the archived conversations. */
 void QXmppArchiveListIq::setStart(const QDateTime &start)
 {
     m_start = start;
 }
 
-/// Returns the end date/time for the archived conversations.
+/*! Returns the end date/time for the archived conversations. */
 QDateTime QXmppArchiveListIq::end() const
 {
     return m_end;
 }
 
-/// Sets the end date/time for the archived conversations.
+/*! Sets the \a end date/time for the archived conversations. */
 void QXmppArchiveListIq::setEnd(const QDateTime &end)
 {
     m_end = end;
 }
 
-///
-/// Returns the result set management query.
-///
-/// This is used for paging through conversations.
-///
+/*!
+    Returns the result set management query.
+
+    This is used for paging through conversations.
+*/
 QXmppResultSetQuery QXmppArchiveListIq::resultSetQuery() const
 {
     return m_rsmQuery;
 }
 
-///
-/// Sets the result set management query.
-///
-/// This is used for paging through conversations.
-///
+/*!
+    Sets the result set management query.
+
+    This is used for paging through conversations.
+
+    \a rsm.
+*/
 void QXmppArchiveListIq::setResultSetQuery(const QXmppResultSetQuery &rsm)
 {
     m_rsmQuery = rsm;
 }
 
-///
-/// Returns the result set management reply.
-///
-/// This is used for paging through conversations.
-///
+/*!
+    Returns the result set management reply.
+
+    This is used for paging through conversations.
+*/
 QXmppResultSetReply QXmppArchiveListIq::resultSetReply() const
 {
     return m_rsmReply;
 }
 
-///
-/// Sets the result set management reply.
-///
-/// This is used for paging through conversations.
-///
+/*!
+    Sets the result set management reply.
+
+    This is used for paging through conversations.
+
+    \a rsm.
+*/
 void QXmppArchiveListIq::setResultSetReply(const QXmppResultSetReply &rsm)
 {
     m_rsmReply = rsm;
 }
 
-/// \cond
 void QXmppArchiveListIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement listElement = firstChildElement(element, u"list");
@@ -361,45 +378,47 @@ void QXmppArchivePrefIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { { u"pref", ns_archive } });
 }
-/// \endcond
 
-/// Returns the JID which archived conversations must match.
+/*! Returns the JID which archived conversations must match. */
 QString QXmppArchiveRemoveIq::with() const
 {
     return m_with;
 }
 
-/// Sets the JID which archived conversations must match.
+/*!
+    Sets the JID which archived conversations must match.
+
+    \a with.
+*/
 void QXmppArchiveRemoveIq::setWith(const QString &with)
 {
     m_with = with;
 }
 
-/// Returns the start date/time for the archived conversations.
+/*! Returns the start date/time for the archived conversations. */
 QDateTime QXmppArchiveRemoveIq::start() const
 {
     return m_start;
 }
 
-/// Sets the start date/time for the archived conversations.
+/*! Sets the \a start date/time for the archived conversations. */
 void QXmppArchiveRemoveIq::setStart(const QDateTime &start)
 {
     m_start = start;
 }
 
-/// Returns the end date/time for the archived conversations.
+/*! Returns the end date/time for the archived conversations. */
 QDateTime QXmppArchiveRemoveIq::end() const
 {
     return m_end;
 }
 
-/// Sets the end date/time for the archived conversations.
+/*! Sets the \a end date/time for the archived conversations. */
 void QXmppArchiveRemoveIq::setEnd(const QDateTime &end)
 {
     m_end = end;
 }
 
-/// \cond
 void QXmppArchiveRemoveIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement listElement = firstChildElement(element, u"remove");
@@ -417,58 +436,62 @@ void QXmppArchiveRemoveIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         OptionalAttribute { u"end", m_end },
     });
 }
-/// \endcond
 
 QXmppArchiveRetrieveIq::QXmppArchiveRetrieveIq()
     : QXmppIq(QXmppIq::Get)
 {
 }
 
-/// Returns the start date/time for the archived conversations.
+/*! Returns the start date/time for the archived conversations. */
 QDateTime QXmppArchiveRetrieveIq::start() const
 {
     return m_start;
 }
 
-/// Sets the start date/time for the archived conversations.
+/*! Sets the \a start date/time for the archived conversations. */
 void QXmppArchiveRetrieveIq::setStart(const QDateTime &start)
 {
     m_start = start;
 }
 
-/// Returns the JID which archived conversations must match.
+/*! Returns the JID which archived conversations must match. */
 QString QXmppArchiveRetrieveIq::with() const
 {
     return m_with;
 }
 
-/// Sets the JID which archived conversations must match.
+/*!
+    Sets the JID which archived conversations must match.
+
+    \a with.
+*/
 void QXmppArchiveRetrieveIq::setWith(const QString &with)
 {
     m_with = with;
 }
 
-///
-/// Returns the result set management query.
-///
-/// This is used for paging through messages.
-///
+/*!
+    Returns the result set management query.
+
+    This is used for paging through messages.
+*/
 QXmppResultSetQuery QXmppArchiveRetrieveIq::resultSetQuery() const
 {
     return m_rsmQuery;
 }
 
-///
-/// Sets the result set management query.
-///
-/// This is used for paging through messages.
-///
+/*!
+    Sets the result set management query.
+
+    This is used for paging through messages.
+
+    \a rsm.
+*/
 void QXmppArchiveRetrieveIq::setResultSetQuery(const QXmppResultSetQuery &rsm)
 {
     m_rsmQuery = rsm;
 }
 
-/// \cond
 void QXmppArchiveRetrieveIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement retrieveElement = firstChildElement(element, u"retrieve", ns_archive);
@@ -487,4 +510,3 @@ void QXmppArchiveRetrieveIq::toXmlElementFromChild(QXmlStreamWriter *writer) con
         m_rsmQuery,
     });
 }
-/// \endcond

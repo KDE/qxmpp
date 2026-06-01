@@ -23,11 +23,9 @@ public:
     const QUrl &url() const;
     void setUrl(QUrl url);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"url-data", QXmpp::Private::ns_url_data };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     static_assert(sizeof(QUrl) == sizeof(void *));

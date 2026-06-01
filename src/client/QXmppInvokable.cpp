@@ -9,7 +9,7 @@
 #include <QVariant>
 #include <qdebug.h>
 
-/// Constructs a QXmppInvokable with the specified \a parent.
+/*! Constructs a QXmppInvokable with the specified \a parent. */
 QXmppInvokable::QXmppInvokable(QObject *parent)
     : QObject(parent)
 {

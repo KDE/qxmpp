@@ -15,12 +15,14 @@ class QXmppTask;
 class QXmppEntityTimeIq;
 struct QXmppError;
 
-///
-/// \brief The QXmppEntityTimeManager class provided the functionality to get
-/// the local time of an entity as defined by \xep{0202, Entity Time}.
-///
-/// \ingroup Managers
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppEntityTimeManager class provided the functionality to get
+    the local time of an entity as defined by \xep{0202}{Entity Time}.
+
+    \ingroup Managers
+*/
 class QXMPP_EXPORT QXmppEntityTimeManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -31,14 +33,14 @@ public:
     using EntityTimeResult = std::variant<QXmppEntityTimeIq, QXmppError>;
     QXmppTask<EntityTimeResult> requestEntityTime(const QString &jid);
 
-    /// \cond
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
     std::variant<QXmppEntityTimeIq, QXmppStanza::Error> handleIq(QXmppEntityTimeIq iq);
-    /// \endcond
 
-    /// \brief This signal is emitted when a time response is received. It's not
-    /// emitted when the QFuture-based request is used.
+    /*!
+        \brief This signal is emitted when a time response is received. It's not
+        emitted when the QFuture-based request is used.
+    */
     Q_SIGNAL void timeReceived(const QXmppEntityTimeIq &);
 };
 

@@ -59,27 +59,35 @@ namespace QXmpp {
 
 // defined here so that QXmppError is available
 
-///
-/// Returns the error of a result or throws
-///
-/// \since QXmpp 1.13
-///
+/*!
+    \fn template<typename T> const QXmppError &QXmpp::getError(const QXmpp::Result<T> &r)
+
+    Returns the error of a result \a r or throws.
+
+    \since QXmpp 1.13
+*/
 template<typename T>
 const QXmppError &getError(const Result<T> &r) { return std::get<QXmppError>(r); }
 
-///
-/// Returns the error of a result or throws
-///
-/// \since QXmpp 1.13
-///
+/*!
+    \fn template<typename T> QXmppError &QXmpp::getError(QXmpp::Result<T> &r)
+    \overload
+
+    Returns the error of a result \a r or throws.
+
+    \since QXmpp 1.13
+*/
 template<typename T>
 QXmppError &getError(Result<T> &r) { return std::get<QXmppError>(r); }
 
-///
-/// Returns the error of a result or throws
-///
-/// \since QXmpp 1.13
-///
+/*!
+    \fn template<typename T> QXmppError QXmpp::getError(QXmpp::Result<T> &&r)
+    \overload
+
+    Returns the error of a result \a r or throws.
+
+    \since QXmpp 1.13
+*/
 template<typename T>
 QXmppError getError(Result<T> &&r) { return std::get<QXmppError>(std::move(r)); }
 

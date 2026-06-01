@@ -34,7 +34,6 @@ public:
     QString queryId() const;
     void setQueryId(const QString &id);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_mam };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isMamQueryIq(const QDomElement &element);
@@ -42,7 +41,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppMamQueryIqPrivate> d;
@@ -64,7 +62,6 @@ public:
     bool complete() const;
     void setComplete(bool complete);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"fin", QXmpp::Private::ns_mam };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isMamResultIq(const QDomElement &element);
@@ -72,7 +69,6 @@ public:
 protected:
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppMamResultIqPrivate> d;

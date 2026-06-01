@@ -13,7 +13,6 @@
 
 using namespace QXmpp::Private;
 
-/// \cond
 QXmppDataForm QXmppStreamInitiationIq::featureForm() const
 {
     return m_featureForm;
@@ -100,4 +99,3 @@ void QXmppStreamInitiationIq::toXmlElementFromChild(QXmlStreamWriter *writer) co
         },
     });
 }
-/// \endcond

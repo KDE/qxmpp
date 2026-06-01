@@ -15,41 +15,43 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppPubSubEventBase
-///
-/// The QXmppPubSubEventBase class is an abstract class used for parsing of
-/// generic PubSub event notifications as defined by \xep{0060, Publish-
-/// Subscribe}.
-///
-/// This class cannot be used directly. For a full-featured access to the event
-/// notifications, please use the QXmppPubSubEvent class.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppPubSubEventBase
+    \inmodule QXmpp
 
-///
-/// \class QXmppPubSubEvent
-///
-/// \brief The QXmppPubSubEvent class represents a PubSub event notification as
-/// defined by \xep{0060, Publish-Subscribe}.
-///
-/// This class has a template parameter that can be used to define the type of
-/// the contained items.
-///
-/// You can use QXmppPubSubEvent::isPubSubItem() to check whether an DOM element
-/// is a &lt;message/&gt; with a PubSub event notification. If you set a special
-/// type as a template parameter, validity of the items will also be checked. To
-/// check for an event notification with items from \xep{0118, User Tune} for
-/// example, you could use the following:
-/// \code
-/// QXmppPubSubEvent<QXmppTuneItem>::isPubSubEvent(element);
-/// \endcode
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.5
-///
+    The QXmppPubSubEventBase class is an abstract class used for parsing of
+    generic PubSub event notifications as defined by \xep{0060}{Publish-
+    Subscribe}.
+
+    This class cannot be used directly. For a full-featured access to the event
+    notifications, please use the QXmppPubSubEvent class.
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    \class QXmppPubSubEvent
+    \inmodule QXmpp
+
+    \brief The QXmppPubSubEvent class represents a PubSub event notification as
+    defined by \xep{0060}{Publish-Subscribe}.
+
+    This class has a template parameter that can be used to define the type of
+    the contained items.
+
+    You can use QXmppPubSubEvent::isPubSubItem() to check whether an DOM element
+    is a &lt;message/&gt; with a PubSub event notification. If you set a special
+    type as a template parameter, validity of the items will also be checked. To
+    check for an event notification with items from \xep{0118}{User Tune} for
+    example, you could use the following:
+    \code
+    QXmppPubSubEvent<QXmppTuneItem>::isPubSubEvent(element);
+    \endcode
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.5
+*/
 
 template<>
 struct Enums::Data<QXmppPubSubEventBase::EventType> {
@@ -84,144 +86,137 @@ QXmppPubSubEventPrivate::QXmppPubSubEventPrivate(QXmppPubSubEventBase::EventType
 {
 }
 
-///
-/// Constructs a PubSub event.
-///
+/*! Constructs a PubSub event. */
 QXmppPubSubEventBase::QXmppPubSubEventBase(EventType type, const QString &node)
     : d(new QXmppPubSubEventPrivate(type, node))
 {
     setType(QXmppMessage::Normal);
 }
 
-/// Default copy-constructor.
+/*! Default copy-constructor. */
 QXmppPubSubEventBase::QXmppPubSubEventBase(const QXmppPubSubEventBase &other) = default;
-/// Default move-constructor.
+/*! Default move-constructor. */
 QXmppPubSubEventBase::QXmppPubSubEventBase(QXmppPubSubEventBase &&) = default;
 QXmppPubSubEventBase::~QXmppPubSubEventBase() = default;
-/// Default assignment operator.
+/*! Default assignment operator. */
 QXmppPubSubEventBase &QXmppPubSubEventBase::operator=(const QXmppPubSubEventBase &other) = default;
-/// Default move-assignment operator.
+/*! Default move-assignment operator. */
 QXmppPubSubEventBase &QXmppPubSubEventBase::operator=(QXmppPubSubEventBase &&) = default;
 
-///
-/// Returns the event type of the PubSub event.
-///
+/*! Returns the event type of the PubSub event. */
 QXmppPubSubEventBase::EventType QXmppPubSubEventBase::eventType() const
 {
     return d->eventType;
 }
 
-///
-/// Sets the event type of the PubSub event.
-///
+/*! Sets the event \a type of the PubSub event. */
 void QXmppPubSubEventBase::setEventType(EventType type)
 {
     d->eventType = type;
 }
 
-///
-/// Returns the name of the event's node.
-///
-/// This does not work with Subscription events. In those cases you need to get
-/// the node of the subscription.
-///
-/// \sa subscription()
-/// \sa QXmppPubSubSubscription::node()
-///
+/*!
+    Returns the name of the event's node.
+
+    This does not work with Subscription events. In those cases you need to get
+    the node of the subscription.
+
+    \sa subscription()
+    \sa QXmppPubSubSubscription::node()
+*/
 QString QXmppPubSubEventBase::node() const
 {
     return d->node;
 }
 
-///
-/// Sets the name of the event's node.
-///
-/// This does not work with Subscription events. In those cases you need to set
-/// the node of the subscription.
-///
-/// \sa subscription()
-/// \sa QXmppPubSubSubscription::setNode()
-///
+/*!
+    Sets the name of the event's node to \a node.
+
+    This does not work with Subscription events. In those cases you need to set
+    the node of the subscription.
+
+    \sa subscription()
+    \sa QXmppPubSubSubscription::setNode()
+*/
 void QXmppPubSubEventBase::setNode(const QString &node)
 {
     d->node = node;
 }
 
-///
-/// Returns the item IDs that have been retracted.
-///
-/// This is only used for the Items event type.
-///
+/*!
+    Returns the item IDs that have been retracted.
+
+    This is only used for the Items event type.
+*/
 QStringList QXmppPubSubEventBase::retractIds() const
 {
     return d->retractIds;
 }
 
-///
-/// Sets the item IDs that have been retracted.
-///
-/// This is only used for the Items event type.
-///
+/*!
+    Sets the item IDs that have been retracted.
+
+    This is only used for the Items event type.
+
+    \a retractIds.
+*/
 void QXmppPubSubEventBase::setRetractIds(const QStringList &retractIds)
 {
     d->retractIds = retractIds;
 }
 
-///
-/// Returns the redirect URI to the new node.
-///
-/// This can be set for delete notifications to inform subscribers of the new
-/// node. Inclusion of this is of course optional.
-///
+/*!
+    Returns the redirect URI to the new node.
+
+    This can be set for delete notifications to inform subscribers of the new
+    node. Inclusion of this is of course optional.
+*/
 QString QXmppPubSubEventBase::redirectUri() const
 {
     return d->redirectUri;
 }
 
-///
-/// Sets the redirect URI to the new node.
-///
-/// This can be set for delete notifications to inform subscribers of the new
-/// node. Inclusion of this is of course optional.
-///
+/*!
+    Sets the redirect URI to the new node.
+
+    This can be set for delete notifications to inform subscribers of the new
+    node. Inclusion of this is of course optional.
+
+    \a redirectUri.
+*/
 void QXmppPubSubEventBase::setRedirectUri(const QString &redirectUri)
 {
     d->redirectUri = redirectUri;
 }
 
-///
-/// Returns the subscription in case of a Subscription event.
-///
+/*! Returns the subscription in case of a Subscription event. */
 std::optional<QXmppPubSubSubscription> QXmppPubSubEventBase::subscription() const
 {
     return d->subscription;
 }
 
-///
-/// Sets the subscription in case of a Subscription event.
-///
+/*! Sets the \a subscription in case of a Subscription event. */
 void QXmppPubSubEventBase::setSubscription(const std::optional<QXmppPubSubSubscription> &subscription)
 {
     d->subscription = subscription;
 }
 
-///
-/// Returns a configuration data form if the event contains one.
-///
+/*! Returns a configuration data form if the event contains one. */
 std::optional<QXmppDataForm> QXmppPubSubEventBase::configurationForm() const
 {
     return d->configurationForm;
 }
 
-///
-/// Sets a configuration data form (or clears it with std::nullopt).
-///
+/*!
+    Sets a configuration data form (or clears it with std::nullopt).
+
+    \a configurationForm.
+*/
 void QXmppPubSubEventBase::setConfigurationForm(const std::optional<QXmppDataForm> &configurationForm)
 {
     d->configurationForm = configurationForm;
 }
 
-/// \cond
 bool QXmppPubSubEventBase::isPubSubEvent(const QDomElement &stanza, std::function<bool(const QDomElement &)> isItemValid)
 {
     if (stanza.tagName() != u"message") {
@@ -401,4 +396,3 @@ void QXmppPubSubEventBase::serializeExtensions(QXmlStreamWriter *writer, QXmpp::
         });
     }
 }
-/// \endcond

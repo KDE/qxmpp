@@ -21,12 +21,24 @@ class QXmppVCardPhonePrivate;
 class QXmppVCardOrganizationPrivate;
 class QXmppVCardIqPrivate;
 
-/// \brief Represent a vCard address.
+/*!
+    \inmodule QXmpp
+
+    \brief Represent a vCard address.
+*/
 
 class QXMPP_EXPORT QXmppVCardAddress
 {
 public:
-    /// \brief Describes e-mail address types.
+    /*!
+        \brief Describes e-mail address types.
+
+        \value None
+        \value Home
+        \value Work
+        \value Postal
+        \value Preferred
+    */
     enum TypeFlag {
         None = 0x0,
         Home = 0x1,
@@ -62,25 +74,38 @@ public:
     Type type() const;
     void setType(Type type);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"ADR", QXmpp::Private::ns_vcard };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *stream) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppVCardAddressPrivate> d;
 };
 
+/*! \relates QXmppVCardAddress Returns true if the two addresses are equal. */
 QXMPP_EXPORT bool operator==(const QXmppVCardAddress &, const QXmppVCardAddress &);
+/*! \relates QXmppVCardAddress Returns true if the two addresses are not equal. */
 QXMPP_EXPORT bool operator!=(const QXmppVCardAddress &, const QXmppVCardAddress &);
 
-/// \brief Represents a vCard e-mail address.
+/*!
+    \inmodule QXmpp
+
+    \brief Represents a vCard e-mail address.
+*/
 
 class QXMPP_EXPORT QXmppVCardEmail
 {
 public:
-    /// \brief Describes e-mail address types.
+    /*!
+        \brief Describes e-mail address types.
+
+        \value None
+        \value Home
+        \value Work
+        \value Internet
+        \value Preferred
+        \value X400
+    */
     enum TypeFlag {
         None = 0x0,
         Home = 0x1,
@@ -103,25 +128,46 @@ public:
     Type type() const;
     void setType(Type type);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"EMAIL", QXmpp::Private::ns_vcard };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *stream) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppVCardEmailPrivate> d;
 };
 
+/*! \relates QXmppVCardEmail Returns true if the two e-mail addresses are equal. */
 QXMPP_EXPORT bool operator==(const QXmppVCardEmail &, const QXmppVCardEmail &);
+/*! \relates QXmppVCardEmail Returns true if the two e-mail addresses are not equal. */
 QXMPP_EXPORT bool operator!=(const QXmppVCardEmail &, const QXmppVCardEmail &);
 
-/// \brief Represents a vCard phone number.
+/*!
+    \inmodule QXmpp
+
+    \brief Represents a vCard phone number.
+*/
 
 class QXMPP_EXPORT QXmppVCardPhone
 {
 public:
-    /// \brief Describes phone number types.
+    /*!
+        \brief Describes phone number types.
+
+        \value None
+        \value Home
+        \value Work
+        \value Voice
+        \value Fax
+        \value Pager
+        \value Messaging
+        \value Cell
+        \value Video
+        \value BBS
+        \value Modem
+        \value ISDN
+        \value PCS
+        \value Preferred
+    */
     enum TypeFlag {
         None = 0x0,
         Home = 0x1,
@@ -152,23 +198,27 @@ public:
     Type type() const;
     void setType(Type type);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"TEL", QXmpp::Private::ns_vcard };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *stream) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppVCardPhonePrivate> d;
 };
 
+/*! \relates QXmppVCardPhone Returns true if the two phone numbers are equal. */
 QXMPP_EXPORT bool operator==(const QXmppVCardPhone &, const QXmppVCardPhone &);
+/*! \relates QXmppVCardPhone Returns true if the two phone numbers are not equal. */
 QXMPP_EXPORT bool operator!=(const QXmppVCardPhone &, const QXmppVCardPhone &);
 
-/// \brief Represents organization information in XMPP vCards.
-///
-/// This contains both information about organization itself and
-/// information about job position in the organization.
+/*!
+    \inmodule QXmpp
+
+    \brief Represents organization information in XMPP vCards.
+
+    This contains both information about organization itself and
+    information about job position in the organization.
+*/
 
 class QXMPP_EXPORT QXmppVCardOrganization
 {
@@ -191,27 +241,30 @@ public:
     QString role() const;
     void setRole(const QString &);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *stream) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppVCardOrganizationPrivate> d;
 };
 
+/*! \relates QXmppVCardOrganization Returns true if the two organizations are equal. */
 QXMPP_EXPORT bool operator==(const QXmppVCardOrganization &, const QXmppVCardOrganization &);
+/*! \relates QXmppVCardOrganization Returns true if the two organizations are not equal. */
 QXMPP_EXPORT bool operator!=(const QXmppVCardOrganization &, const QXmppVCardOrganization &);
 
-/// \brief Represents the XMPP vCard.
-///
-/// The functions names are self explanatory.
-/// Look at QXmppVCardManager and \xep{0054, vcard-temp} for more details.
-///
-/// There are many field of XMPP vCard which are not present in
-/// this class. File a issue for the same. We will add the requested
-/// field to this class.
-///
+/*!
+    \inmodule QXmpp
+
+    \brief Represents the XMPP vCard.
+
+    The functions names are self explanatory.
+    Look at QXmppVCardManager and \xep{0054}{vcard-temp} for more details.
+
+    There are many field of XMPP vCard which are not present in
+    this class. File a issue for the same. We will add the requested
+    field to this class.
+*/
 
 class QXMPP_EXPORT QXmppVCardIq : public QXmppIq
 {
@@ -267,27 +320,25 @@ public:
     QXmppVCardOrganization organization() const;
     void setOrganization(const QXmppVCardOrganization &);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"vCard", QXmpp::Private::ns_vcard };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isVCard(const QDomElement &element);
     [[deprecated]]
     static bool checkIqType(const QString &tagName, const QString &xmlNamespace);
-    /// \endcond
 
 protected:
     friend struct QXmpp::Private::VCardData;
 
-    /// \cond
     void parseElementFromChild(const QDomElement &) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppVCardIqPrivate> d;
 };
 
+/*! \relates QXmppVCardIq Returns true if the two vCard IQs are equal. */
 QXMPP_EXPORT bool operator==(const QXmppVCardIq &, const QXmppVCardIq &);
+/*! \relates QXmppVCardIq Returns true if the two vCard IQs are not equal. */
 QXMPP_EXPORT bool operator!=(const QXmppVCardIq &, const QXmppVCardIq &);
 
 #endif  // QXMPPVCARDIQ_H

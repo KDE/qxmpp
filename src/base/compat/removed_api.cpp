@@ -64,7 +64,6 @@ static bool isIqType(const QDomElement &element, QStringView tagName, QStringVie
 
 // ArchiveIq
 
-/// \cond
 bool QXmppArchiveChatIq::isArchiveChatIq(const QDomElement &element)
 {
     auto chatEl = firstChildElement(element, u"chat", ns_archive);
@@ -167,7 +166,6 @@ bool QXmppDiscoveryIq::isDiscoveryIq(const QDomElement &element)
 {
     return isIqType(element, u"query", ns_disco_info) || isIqType(element, u"query", ns_disco_items);
 }
-/// \endcond
 
 class QXmppDiscoveryIqPrivate : public QSharedData
 {
@@ -180,25 +178,29 @@ public:
     QXmppDiscoveryIq::QueryType queryType;
 };
 
-///
-/// \class QXmppDiscoveryIq
-///
-/// QXmppDiscoveryIq represents a discovery IQ request or result containing a
-/// list of features and other information about an entity as defined by
-/// \xep{0030, Service Discovery}.
-///
-/// \ingroup Stanzas
-///
-/// \deprecated
-///
+/*!
+    \class QXmppDiscoveryIq
+    \inmodule QXmpp
 
-///
-/// \enum QXmppDiscoveryIq::QueryType
-///
-/// Specifies the type of a service discovery query. An InfoQuery queries
-/// identities and features, an ItemsQuery queries subservices in the form of
-/// items.
-///
+    QXmppDiscoveryIq represents a discovery IQ request or result containing a
+    list of features and other information about an entity as defined by
+    \xep{0030}{Service Discovery}.
+
+    \ingroup Stanzas
+
+    \deprecated
+*/
+
+/*!
+    \enum QXmppDiscoveryIq::QueryType
+
+    Specifies the type of a service discovery query. An InfoQuery queries
+    identities and features, an ItemsQuery queries subservices in the form of
+    items.
+
+    \value InfoQuery
+    \value ItemsQuery
+*/
 
 QXmppDiscoveryIq::QXmppDiscoveryIq()
     : d(new QXmppDiscoveryIqPrivate)
@@ -207,61 +209,49 @@ QXmppDiscoveryIq::QXmppDiscoveryIq()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppDiscoveryIq)
 
-///
-/// Returns the features of the service.
-///
+/*! Returns the features of the service. */
 QStringList QXmppDiscoveryIq::features() const
 {
     return d->features;
 }
 
-///
-/// Sets the features of the service.
-///
+/*! Sets the \a features of the service. */
 void QXmppDiscoveryIq::setFeatures(const QStringList &features)
 {
     d->features = features;
 }
 
-///
-/// Returns the list of identities for this service.
-///
+/*! Returns the list of identities for this service. */
 QList<QXmppDiscoIdentity> QXmppDiscoveryIq::identities() const
 {
     return d->identities;
 }
 
-///
-/// Sets the list of identities for this service.
-///
+/*! Sets the list of \a identities for this service. */
 void QXmppDiscoveryIq::setIdentities(const QList<QXmppDiscoIdentity> &identities)
 {
     d->identities = identities;
 }
 
-///
-/// Returns the list of service discovery items.
-///
+/*! Returns the list of service discovery items. */
 QList<QXmppDiscoItem> QXmppDiscoveryIq::items() const
 {
     return d->items;
 }
 
-///
-/// Sets the list of service discovery items.
-///
+/*! Sets the list of service discovery \a items. */
 void QXmppDiscoveryIq::setItems(const QList<QXmppDiscoItem> &items)
 {
     d->items = items;
 }
 
-///
-/// Returns the first of the included data dataForms as defined by \xep{0128, Service Discovery Extensions}.
-///
-/// Returns empty form if no form is included.
-///
-/// \deprecated Use dataForms() or findForm() instead.
-///
+/*!
+    Returns the first of the included data dataForms as defined by \xep{0128}{Service Discovery Extensions}.
+
+    Returns empty form if no form is included.
+
+    \deprecated Use dataForms() or findForm() instead.
+*/
 QXmppDataForm QXmppDiscoveryIq::form() const
 {
     if (d->dataForms.empty()) {
@@ -285,46 +275,48 @@ QXmppDataForm QXmppDiscoveryIq::form() const
     return mixedForm;
 }
 
-///
-/// Sets included data dataForms as defined by \xep{0128, Service Discovery Extensions}.
-///
-/// \deprecated Use setForms() instead.
-///
+/*!
+    Sets included data dataForms as defined by \xep{0128}{Service Discovery Extensions}.
+
+    \deprecated Use setForms() instead.
+*/
 void QXmppDiscoveryIq::setForm(const QXmppDataForm &form)
 {
     d->dataForms.clear();
     d->dataForms.append(form);
 }
 
-///
-/// Returns included data forms as defined by \xep{0128, Service Discovery Extensions}.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Returns included data forms as defined by \xep{0128}{Service Discovery Extensions}.
+
+    \since QXmpp 1.12
+*/
 const QList<QXmppDataForm> &QXmppDiscoveryIq::dataForms() const
 {
     return d->dataForms;
 }
 
-///
-/// Sets included data forms as defined by \xep{0128, Service Discovery Extensions}.
-///
-/// Each form must have a FORM_TYPE field and each form type MUST occur only once.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Sets included data forms as defined by \xep{0128}{Service Discovery Extensions}.
+
+    Each form must have a FORM_TYPE field and each form type MUST occur only once.
+
+    \since QXmpp 1.12
+
+    \a dataForms.
+*/
 void QXmppDiscoveryIq::setDataForms(const QList<QXmppDataForm> &dataForms)
 {
     d->dataForms = dataForms;
 }
 
-///
-/// Looks for a data form with the given form type and returns it if found.
-///
-/// Data dataForms in service discovery info are defined in \xep{0128, Service Discovery Extensions}.
-///
-/// \since QXmpp 1.12
-///
+/*!
+    Looks for a data form with the given form type and returns it if found.
+
+    Data dataForms in service discovery info are defined in \xep{0128}{Service Discovery Extensions}.
+
+    \since QXmpp 1.12
+*/
 std::optional<QXmppDataForm> QXmppDiscoveryIq::dataForm(QStringView formType) const
 {
     for (const auto &form : d->dataForms) {
@@ -335,41 +327,31 @@ std::optional<QXmppDataForm> QXmppDiscoveryIq::dataForm(QStringView formType) co
     return {};
 }
 
-///
-/// Returns the special node to query.
-///
+/*! Returns the special node to query. */
 QString QXmppDiscoveryIq::queryNode() const
 {
     return d->queryNode;
 }
 
-///
-/// Sets the special node to query.
-///
+/*! Sets the special \a node to query. */
 void QXmppDiscoveryIq::setQueryNode(const QString &node)
 {
     d->queryNode = node;
 }
 
-///
-/// Returns the query type (info query or items query).
-///
+/*! Returns the query type (info query or items query). */
 QXmppDiscoveryIq::QueryType QXmppDiscoveryIq::queryType() const
 {
     return d->queryType;
 }
 
-///
-/// Sets the query type (info query or items query).
-///
+/*! Sets the query \a type (info query or items query). */
 void QXmppDiscoveryIq::setQueryType(enum QXmppDiscoveryIq::QueryType type)
 {
     d->queryType = type;
 }
 
-///
-/// Calculate the verification string for \xep{0115, Entity Capabilities}.
-///
+/*! Calculate the verification string for \xep{0115}{Entity Capabilities}. */
 QByteArray QXmppDiscoveryIq::verificationString() const
 {
     auto entityCapabilities1Compare = [](const QXmppDiscoIdentity &i1, const QXmppDiscoIdentity &i2) {
@@ -425,7 +407,6 @@ QByteArray QXmppDiscoveryIq::verificationString() const
     return hasher.result();
 }
 
-/// \cond
 bool QXmppDiscoveryIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
 {
     return tagName == u"query" &&
@@ -465,11 +446,9 @@ void QXmppDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         d->dataForms,
     });
 }
-/// \endcond
 
 // EntityTimeIq
 
-/// \cond
 bool QXmppEntityTimeIq::isEntityTimeIq(const QDomElement &element)
 {
     return isIqType(element, u"time", ns_entity_time);
@@ -606,11 +585,9 @@ void QXmppSessionIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     writer->writeDefaultNamespace(staticString(ns_session));
     writer->writeEndElement();
 }
-/// \endcond
 
 // PubSubIq
 
-/// \cond
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 
@@ -655,81 +632,77 @@ QXmppPubSubIq::~QXmppPubSubIq() = default;
 
 QXmppPubSubIq &QXmppPubSubIq::operator=(const QXmppPubSubIq &iq) = default;
 
-/// Returns the PubSub queryType for this IQ.
+/*! Returns the PubSub queryType for this IQ. */
 
 QXmppPubSubIq::QueryType QXmppPubSubIq::queryType() const
 {
     return d->queryType;
 }
 
-/// Sets the PubSub queryType for this IQ.
-///
-/// \param queryType
+/*!
+    Sets the PubSub query type for this IQ to \a queryType.
+*/
 
 void QXmppPubSubIq::setQueryType(QXmppPubSubIq::QueryType queryType)
 {
     d->queryType = queryType;
 }
 
-/// Returns the JID being queried.
+/*! Returns the JID being queried. */
 
 QString QXmppPubSubIq::queryJid() const
 {
     return d->queryJid;
 }
 
-/// Sets the JID being queried.
-///
-/// \param queryJid
+/*!
+    Sets the JID being queried to \a queryJid.
+*/
 
 void QXmppPubSubIq::setQueryJid(const QString &queryJid)
 {
     d->queryJid = queryJid;
 }
 
-/// Returns the node being queried.
+/*! Returns the node being queried. */
 
 QString QXmppPubSubIq::queryNode() const
 {
     return d->queryNode;
 }
 
-/// Sets the node being queried.
-///
-/// \param queryNode
+/*!
+    Sets the node being queried to \a queryNode.
+*/
 
 void QXmppPubSubIq::setQueryNode(const QString &queryNode)
 {
     d->queryNode = queryNode;
 }
 
-/// Returns the subscription ID.
+/*! Returns the subscription ID. */
 
 QString QXmppPubSubIq::subscriptionId() const
 {
     return d->subscriptionId;
 }
 
-/// Sets the subscription ID.
-///
-/// \param subscriptionId
+/*!
+    Sets the subscription ID to \a subscriptionId.
+*/
 
 void QXmppPubSubIq::setSubscriptionId(const QString &subscriptionId)
 {
     d->subscriptionId = subscriptionId;
 }
 
-/// Returns the IQ's items.
-
+// Returns the IQ's items.
 QList<QXmppPubSubItem> QXmppPubSubIq::items() const
 {
     return d->items;
 }
 
-/// Sets the IQ's items.
-///
-/// \param items
-
+// Sets the IQ's items.
 void QXmppPubSubIq::setItems(const QList<QXmppPubSubItem> &items)
 {
     d->items = items;
@@ -806,11 +779,9 @@ void QXmppPubSubIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     writer->writeEndElement();
     writer->writeEndElement();
 }
-/// \endcond
 
 // PubSubItem
 
-/// \cond
 class QXmppPubSubItemPrivate : public QSharedData
 {
 public:
@@ -829,32 +800,32 @@ QXmppPubSubItem::~QXmppPubSubItem() = default;
 
 QXmppPubSubItem &QXmppPubSubItem::operator=(const QXmppPubSubItem &iq) = default;
 
-/// Returns the ID of the PubSub item.
+/*! Returns the ID of the PubSub item. */
 
 QString QXmppPubSubItem::id() const
 {
     return d->id;
 }
 
-/// Sets the ID of the PubSub item.
-///
-/// \param id
+/*!
+    Sets the ID of the PubSub item to \a id.
+*/
 
 void QXmppPubSubItem::setId(const QString &id)
 {
     d->id = id;
 }
 
-/// Returns the contents of the PubSub item.
+/*! Returns the contents of the PubSub item. */
 
 QXmppElement QXmppPubSubItem::contents() const
 {
     return d->contents;
 }
 
-/// Sets the contents of the PubSub item.
-///
-/// \param contents
+/*!
+    Sets the contents of the PubSub item to \a contents.
+*/
 
 void QXmppPubSubItem::setContents(const QXmppElement &contents)
 {
@@ -874,7 +845,6 @@ void QXmppPubSubItem::toXml(QXmlStreamWriter *writer) const
     d->contents.toXml(writer);
     writer->writeEndElement();
 }
-/// \endcond
 
 // StarttlsPacket
 
@@ -884,11 +854,9 @@ constexpr std::array<QStringView, 3> STARTTLS_TYPES = {
     u"failure",
 };
 
-///
-/// Constructs a new QXmppStartTlsPacket
-///
-/// \param type The type of the new QXmppStartTlsPacket.
-///
+/*!
+    Constructs a new QXmppStartTlsPacket of the given \a type.
+*/
 QXmppStartTlsPacket::QXmppStartTlsPacket(Type type)
     : m_type(type)
 {
@@ -896,19 +864,18 @@ QXmppStartTlsPacket::QXmppStartTlsPacket(Type type)
 
 QXmppStartTlsPacket::~QXmppStartTlsPacket() = default;
 
-/// Returns the type of the STARTTLS packet
+/*! Returns the type of the STARTTLS packet */
 QXmppStartTlsPacket::Type QXmppStartTlsPacket::type() const
 {
     return m_type;
 }
 
-/// Sets the type of the STARTTLS packet
+/*! Sets the \a type of the STARTTLS packet */
 void QXmppStartTlsPacket::setType(QXmppStartTlsPacket::Type type)
 {
     m_type = type;
 }
 
-/// \cond
 void QXmppStartTlsPacket::parse(const QDomElement &element)
 {
     if (!QXmppStartTlsPacket::isStartTlsPacket(element)) {
@@ -926,32 +893,26 @@ void QXmppStartTlsPacket::toXml(QXmlStreamWriter *writer) const
         writer->writeEndElement();
     }
 }
-/// \endcond
 
-///
-/// Checks whether the given \p element is a STARTTLS packet according to
-/// <a href="https://xmpp.org/rfcs/rfc6120.html#tls-process-initiate">RFC6120</a>.
-///
-/// \param element The element that should be checked for being a STARTTLS packet.
-///
-/// \returns True, if the element is a STARTTLS packet.
-///
+/*!
+    Returns true if the given \a element is a STARTTLS packet according to
+    <a href="https://xmpp.org/rfcs/rfc6120.html#tls-process-initiate">RFC6120</a>.
+
+    Returns true if the element is a STARTTLS packet.
+*/
 bool QXmppStartTlsPacket::isStartTlsPacket(const QDomElement &element)
 {
     return element.namespaceURI() == ns_tls &&
         enumFromString<Type>(STARTTLS_TYPES, element.tagName()).has_value();
 }
 
-///
-/// Checks whether the given \p element is a STARTTLS packet according to
-/// <a href="https://xmpp.org/rfcs/rfc6120.html#tls-process-initiate">RFC6120</a>
-/// and has the correct type.
-///
-/// \param element The element that should be checked for being a STARTTLS packet.
-/// \param type The type the element needs to have.
-///
-/// \returns True, if the element is a STARTTLS packet and has the correct type.
-///
+/*!
+    Returns true if the given \a element is a STARTTLS packet according to
+    <a href="https://xmpp.org/rfcs/rfc6120.html#tls-process-initiate">RFC6120</a>
+    and has the given \a type.
+
+    Returns true if the element is a STARTTLS packet of the correct type.
+*/
 bool QXmppStartTlsPacket::isStartTlsPacket(const QDomElement &element, Type type)
 {
     return element.namespaceURI() == ns_tls && element.tagName() == STARTTLS_TYPES.at(size_t(type));

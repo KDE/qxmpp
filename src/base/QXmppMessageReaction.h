@@ -26,10 +26,8 @@ public:
     QVector<QString> emojis() const;
     void setEmojis(const QVector<QString> &emojis);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isMessageReaction(const QDomElement &element);
 

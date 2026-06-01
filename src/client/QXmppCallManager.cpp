@@ -201,104 +201,105 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
     return fallbackTurnServer;
 }
 
-///
-/// \class QXmppCallManager
-///
-/// \brief The QXmppCallManager class provides support for making and receiving voice calls.
-///
-/// Session initiation is performed as described by \xep{0166, Jingle}, \xep{0167, Jingle RTP
-/// Sessions} and \xep{0176, Jingle ICE-UDP Transport Method}.
-///
-/// The data stream is connected using Interactive Connectivity Establishment (RFC 5245) and data
-/// is transferred using Real Time Protocol (RFC 3550) packets.
-///
-/// To make use of this manager, you need to instantiate it and load it into the QXmppClient
-/// instance as follows:
-/// ```cpp
-/// auto *client = new QXmppClient();
-/// auto *callManager = client->addNewExtension<QXmppCallManager>();
-/// ```
-///
-/// ## Call interaction
-///
-/// Incoming calls are exposed via the callReceived() signal. You can take ownership of the call by
-/// moving the unique_ptr, otherwise the call manager will decline and delete the call. You can
-/// accept or reject (hang up) the call.
-///
-/// Outgoing calls are created using call().
-///
-/// In both cases you are responsible for taking ownership of the call. Note that QXmppCalls in
-/// another state than finished require the QXmppCallManager to be active, though. You must not
-/// delete the QXmppCallManager until all QXmppCalls are in finished state.
-///
-/// ## XEP-0320: Use of DTLS-SRTP in Jingle Sessions
-///
-/// DTLS-SRTP allows to encrypt peer-to-peer calls. Internally, a TLS handshake is done to
-/// negotiate keys for SRTP (Secure RTP). By default DTLS is not enforced, this can be done using
-/// setDtlsRequired(), though.
-///
-/// DTLS-SRTP by default exchanges the fingerprint via unencrypted XMPP packets. This means that
-/// the XMPP server could potentially replace the fingerprint or prevent the clients from using
-/// DTLS at all. However, the actual media connection is typically peer-to-peer, so the XMPP server
-/// does not have access to the transmitted data.
-///
-/// Support for DTLS-SRTP is available since QXmpp 1.11.
-///
-/// \warning THIS API IS NOT FINALIZED YET
-///
-/// \ingroup Managers
-///
+/*!
+    \class QXmppCallManager
+    \inmodule QXmpp
 
-///
-/// \fn QXmppCallManager::callReceived()
-///
-/// This signal is emitted when an incoming call is received.
-///
-/// You can take over ownership of the call by moving out the unique pointer. However, this is
-/// only possible for one slot connected to this signal, all other slots after that will receive a
-/// nullptr.
-/// ```
-/// std::vector<std::unique_ptr<QXmppCall>> myActiveCalls;
-/// connect(manager, &QXmppCallManager::callReceived, this, [&](std::unique_ptr<QXmppCall> &call) {
-///     // take over ownership
-///     myActiveCalls.push_back(std::move(call));
-///     // call is now nullptr
-/// });
-/// ```
-/// Note that you do not need to continue to use a unique pointer for memory management, you can
-/// also use QObject-parent ownership or another ownership model.
-///
-/// \note If you do not take ownership of the call, the call manager will automatically decline
-/// the call.
-///
-/// \note Incoming calls need to be accepted or rejected using QXmppCall::accept() or
-/// QXmppCall::hangUp().
-///
-/// \since QXmpp 1.14, previously this signal had a different signature.
-///
+    \brief The QXmppCallManager class provides support for making and receiving voice calls.
 
-///
-/// Constructs a QXmppCallManager object to handle incoming and outgoing
-/// Voice-Over-IP calls.
-///
+    Session initiation is performed as described by \xep{0166}{Jingle}, \xep{0167}{Jingle RTP
+    Sessions} and \xep{0176}{Jingle ICE-UDP Transport Method}.
+
+    The data stream is connected using Interactive Connectivity Establishment (RFC 5245) and data
+    is transferred using Real Time Protocol (RFC 3550) packets.
+
+    To make use of this manager, you need to instantiate it and load it into the QXmppClient
+    instance as follows:
+    ```cpp
+    auto *client = new QXmppClient();
+    auto *callManager = client->addNewExtension<QXmppCallManager>();
+    ```
+
+    \section1 Call interaction
+
+    Incoming calls are exposed via the callReceived() signal. You can take ownership of the call by
+    moving the unique_ptr, otherwise the call manager will decline and delete the call. You can
+    accept or reject (hang up) the call.
+
+    Outgoing calls are created using call().
+
+    In both cases you are responsible for taking ownership of the call. Note that QXmppCalls in
+    another state than finished require the QXmppCallManager to be active, though. You must not
+    delete the QXmppCallManager until all QXmppCalls are in finished state.
+
+    \section1 XEP-0320: Use of DTLS-SRTP in Jingle Sessions
+
+    DTLS-SRTP allows to encrypt peer-to-peer calls. Internally, a TLS handshake is done to
+    negotiate keys for SRTP (Secure RTP). By default DTLS is not enforced, this can be done using
+    setDtlsRequired(), though.
+
+    DTLS-SRTP by default exchanges the fingerprint via unencrypted XMPP packets. This means that
+    the XMPP server could potentially replace the fingerprint or prevent the clients from using
+    DTLS at all. However, the actual media connection is typically peer-to-peer, so the XMPP server
+    does not have access to the transmitted data.
+
+    Support for DTLS-SRTP is available since QXmpp 1.11.
+
+    \warning THIS API IS NOT FINALIZED YET
+
+    \ingroup Managers
+*/
+
+/*!
+    \fn void QXmppCallManager::callReceived(std::unique_ptr<QXmppCall> &call)
+
+    This signal is emitted when an incoming \a call is received.
+
+    You can take over ownership of the call by moving out the unique pointer. However, this is
+    only possible for one slot connected to this signal, all other slots after that will receive a
+    nullptr.
+    ```
+    std::vector<std::unique_ptr<QXmppCall>> myActiveCalls;
+    connect(manager, &QXmppCallManager::callReceived, this, [&](std::unique_ptr<QXmppCall> &call) {
+    // take over ownership
+    myActiveCalls.push_back(std::move(call));
+    // call is now nullptr
+    });
+    ```
+    Note that you do not need to continue to use a unique pointer for memory management, you can
+    also use QObject-parent ownership or another ownership model.
+
+    \note If you do not take ownership of the call, the call manager will automatically decline
+    the call.
+
+    \note Incoming calls need to be accepted or rejected using QXmppCall::accept() or
+    QXmppCall::hangUp().
+
+    \since QXmpp 1.14, previously this signal had a different signature.
+*/
+
+/*!
+    Constructs a QXmppCallManager object to handle incoming and outgoing
+    Voice-Over-IP calls.
+*/
 QXmppCallManager::QXmppCallManager()
     : d(std::make_unique<QXmppCallManagerPrivate>(this))
 {
 }
 
-///
-/// Destroys the QXmppCallManager object.
-///
+/*! Destroys the QXmppCallManager object. */
 QXmppCallManager::~QXmppCallManager() = default;
 
-///
-/// Sets STUN servers that are used as a fallback, additionally to the ones provided by the XMPP
-/// server via \xep{0215, External Service Discovery}.
-///
-/// STUN is used to determine server-reflexive addresses and ports.
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Sets STUN servers that are used as a fallback, additionally to the ones provided by the XMPP
+    server via \xep{0215}{External Service Discovery}.
+
+    STUN is used to determine server-reflexive addresses and ports.
+
+    \since QXmpp 1.14
+
+    \a servers.
+*/
 void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
 {
     // Check for invalid addresses
@@ -313,14 +314,16 @@ void QXmppCallManager::setFallbackStunServers(const QList<StunServer> &servers)
     d->fallbackStunServers = servers;
 }
 
-///
-/// Set a TURN server that is used as a fallback, if the XMPP server does not provide any TURN
-/// server via \xep{0215, External Service Discovery}.
-///
-/// TURN is used to relay packets in double-NAT configurations.
-///
-/// \since QXmpp 1.14
-///
+/*!
+    Set a TURN server that is used as a fallback, if the XMPP server does not provide any TURN
+    server via \xep{0215}{External Service Discovery}.
+
+    TURN is used to relay packets in double-NAT configurations.
+
+    \since QXmpp 1.14
+
+    \a server.
+*/
 void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &server)
 {
     if (server) {
@@ -331,7 +334,6 @@ void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &se
     d->fallbackTurnServer = server;
 }
 
-/// \cond
 QStringList QXmppCallManager::discoveryFeatures() const
 {
     QStringList features = {
@@ -364,17 +366,16 @@ void QXmppCallManager::onUnregistered(QXmppClient *client)
 {
     disconnect(client, nullptr, this, nullptr);
 }
-/// \endcond
 
-///
-/// Initiates a new outgoing call to the specified recipient.
-///
-/// \param jid Full-JID of the recipient.
-/// \param media whether initiate with audio or audio and video
-/// \param proposedSid Session ID of the call. If empty, a new session ID will be generated. Must be unique.
-///
-/// \since QXmpp 1.14, previously this function had a different signature.
-///
+/*!
+    Initiates a new outgoing call to the specified recipient.
+
+    \a jid is the Full-JID of the recipient. \a media specifies whether to initiate with audio
+    or audio and video. \a proposedSid is the session ID of the call. If empty, a new session
+    ID will be generated. Must be unique.
+
+    \since QXmpp 1.14, previously this function had a different signature.
+*/
 std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media media, const QString &proposedSid)
 {
     auto sid = proposedSid;
@@ -464,23 +465,25 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media medi
     return call;
 }
 
-///
-/// Returns whether the call manager requires encryption using \xep{0320, Use of DTLS-SRTP in
-/// Jingle Sessions} for all calls.
-///
-/// \since QXmpp 1.11
-///
+/*!
+    Returns whether the call manager requires encryption using \xep{0320}{Use of DTLS-SRTP in
+    Jingle Sessions} for all calls.
+
+    \since QXmpp 1.11
+*/
 bool QXmppCallManager::dtlsRequired() const
 {
     return d->dtlsRequired;
 }
 
-///
-/// Sets whether the call manager requires encryption using \xep{0320, Use of DTLS-SRTP in
-/// Jingle Sessions} for all calls.
-///
-/// \since QXmpp 1.11
-///
+/*!
+    Sets whether the call manager requires encryption using \xep{0320}{Use of DTLS-SRTP in
+    Jingle Sessions} for all calls.
+
+    \since QXmpp 1.11
+
+    \a dtlsRequired.
+*/
 void QXmppCallManager::setDtlsRequired(bool dtlsRequired)
 {
     d->dtlsRequired = dtlsRequired;

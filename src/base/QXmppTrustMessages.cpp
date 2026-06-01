@@ -15,14 +15,15 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppTrustMessageElement
-///
-/// \brief The QXmppTrustMessageElement class represents a trust message element
-/// as defined by \xep{0434, Trust Messages (TM)}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppTrustMessageElement
+    \inmodule QXmpp
+
+    \brief The QXmppTrustMessageElement class represents a trust message element
+    as defined by \xep{0434}{Trust Messages (TM)}.
+
+    \since QXmpp 1.5
+*/
 
 class QXmppTrustMessageElementPrivate : public QSharedData
 {
@@ -32,98 +33,81 @@ public:
     QList<QXmppTrustMessageKeyOwner> keyOwners;
 };
 
-///
-/// Constructs a trust message element.
-///
+/*! Constructs a trust message element. */
 QXmppTrustMessageElement::QXmppTrustMessageElement()
     : d(new QXmppTrustMessageElementPrivate)
 {
 }
 
-/// Copy-constructor.
+/*! Copy-constructor. */
 QXmppTrustMessageElement::QXmppTrustMessageElement(const QXmppTrustMessageElement &other) = default;
-/// Move-constructor.
+/*! Move-constructor. */
 QXmppTrustMessageElement::QXmppTrustMessageElement(QXmppTrustMessageElement &&) = default;
 QXmppTrustMessageElement::~QXmppTrustMessageElement() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppTrustMessageElement &QXmppTrustMessageElement::operator=(const QXmppTrustMessageElement &other) = default;
-/// Move-assignment operator.
+/*! Move-assignment operator. */
 QXmppTrustMessageElement &QXmppTrustMessageElement::operator=(QXmppTrustMessageElement &&) = default;
 
-///
-/// Returns the namespace of the trust management protocol.
-///
-/// \return the trust management protocol namespace
-///
+/*!
+    Returns the namespace of the trust management protocol.
+*/
 QString QXmppTrustMessageElement::usage() const
 {
     return d->usage;
 }
 
-///
-/// Sets the namespace of the trust management protocol.
-///
-/// \param usage trust management protocol namespace
-///
+/*!
+    Sets the trust management protocol namespace via \a usage.
+*/
 void QXmppTrustMessageElement::setUsage(const QString &usage)
 {
     d->usage = usage;
 }
 
-///
-/// Returns the namespace of the keys' encryption protocol.
-///
-/// \return the encryption protocol namespace
-///
+/*!
+    Returns the namespace of the keys' encryption protocol.
+*/
 QString QXmppTrustMessageElement::encryption() const
 {
     return d->encryption;
 }
 
-///
-/// Sets the namespace of the keys' encryption protocol.
-///
-/// \param encryption encryption protocol namespace
-///
+/*!
+    Sets the namespace of the keys' \a encryption protocol.
+*/
 void QXmppTrustMessageElement::setEncryption(const QString &encryption)
 {
     d->encryption = encryption;
 }
 
-///
-/// Returns the key owners containing the corresponding information for
-/// trusting or distrusting their keys.
-///
-/// \return the owners of the keys for trusting or distrusting
-///
+/*!
+    Returns the key owners containing the corresponding information for
+    trusting or distrusting their keys.
+*/
 QList<QXmppTrustMessageKeyOwner> QXmppTrustMessageElement::keyOwners() const
 {
     return d->keyOwners;
 }
 
-///
-/// Sets the key owners containing the corresponding information for trusting or
-/// distrusting their keys.
-///
-/// \param keyOwners owners of the keys for trusting or distrusting
-///
+/*!
+    Sets the \a keyOwners containing the corresponding information for trusting
+    or distrusting their keys.
+*/
 void QXmppTrustMessageElement::setKeyOwners(const QList<QXmppTrustMessageKeyOwner> &keyOwners)
 {
     d->keyOwners = keyOwners;
 }
 
-///
-/// Adds a key owner containing the corresponding information for trusting or
-/// distrusting the owners keys.
-///
-/// \param keyOwner owner of the keys for trusting or distrusting
-///
+/*!
+    Adds a \a keyOwner containing the corresponding information for trusting or
+    distrusting the owner's keys.
+*/
 void QXmppTrustMessageElement::addKeyOwner(const QXmppTrustMessageKeyOwner &keyOwner)
 {
     d->keyOwners.append(keyOwner);
 }
 
-/// \cond
 void QXmppTrustMessageElement::parse(const QDomElement &element)
 {
     d->usage = element.attribute(u"usage"_s);
@@ -140,29 +124,27 @@ void QXmppTrustMessageElement::toXml(QXmlStreamWriter *writer) const
         d->keyOwners,
     });
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is a trust message element.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is a trust message element, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is a trust message element.
+
+    Returns true if \a element is a trust message element, otherwise false.
+*/
 bool QXmppTrustMessageElement::isTrustMessageElement(const QDomElement &element)
 {
     return element.tagName() == u"trust-message" &&
         element.namespaceURI() == ns_tm;
 }
 
-///
-/// \class QXmppTrustMessageKeyOwner
-///
-/// \brief The QXmppTrustMessageKeyOwner class represents a key owner of the
-/// trust message as defined by \xep{0434, Trust Messages (TM)}.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppTrustMessageKeyOwner
+    \inmodule QXmpp
+
+    \brief The QXmppTrustMessageKeyOwner class represents a key owner of the
+    trust message as defined by \xep{0434}{Trust Messages (TM)}.
+
+    \since QXmpp 1.5
+*/
 
 class QXmppTrustMessageKeyOwnerPrivate : public QSharedData
 {
@@ -172,87 +154,72 @@ public:
     QList<QByteArray> distrustedKeys;
 };
 
-///
-/// Constructs a trust message key owner.
-///
+/*! Constructs a trust message key owner. */
 QXmppTrustMessageKeyOwner::QXmppTrustMessageKeyOwner()
     : d(new QXmppTrustMessageKeyOwnerPrivate)
 {
 }
 
-/// Copy constructor.
+/*! Copy constructor. */
 QXmppTrustMessageKeyOwner::QXmppTrustMessageKeyOwner(const QXmppTrustMessageKeyOwner &other) = default;
-/// Copy constructor.
+/*! Copy constructor. */
 QXmppTrustMessageKeyOwner::QXmppTrustMessageKeyOwner(QXmppTrustMessageKeyOwner &&) = default;
 QXmppTrustMessageKeyOwner::~QXmppTrustMessageKeyOwner() = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppTrustMessageKeyOwner &QXmppTrustMessageKeyOwner::operator=(const QXmppTrustMessageKeyOwner &other) = default;
-/// Assignment operator.
+/*! Assignment operator. */
 QXmppTrustMessageKeyOwner &QXmppTrustMessageKeyOwner::operator=(QXmppTrustMessageKeyOwner &&) = default;
 
-///
-/// Returns the bare JID of the key owner.
-///
-/// \return the key owner's bare JID
-///
+/*!
+    Returns the bare JID of the key owner.
+*/
 QString QXmppTrustMessageKeyOwner::jid() const
 {
     return d->jid;
 }
 
-///
-/// Sets the bare JID of the key owner.
-///
-/// If a full JID is passed, it is converted into a bare JID.
-///
-/// \param jid key owner's bare JID
-///
+/*!
+    Sets the bare \a jid of the key owner.
+
+    If a full JID is passed, it is converted into a bare JID.
+*/
 void QXmppTrustMessageKeyOwner::setJid(const QString &jid)
 {
     d->jid = QXmppUtils::jidToBareJid(jid);
 }
 
-///
-/// Returns the IDs of the keys that are trusted.
-///
-/// \return the IDs of trusted keys
-///
+/*!
+    Returns the IDs of the keys that are trusted.
+*/
 QList<QByteArray> QXmppTrustMessageKeyOwner::trustedKeys() const
 {
     return d->trustedKeys;
 }
 
-///
-/// Sets the IDs of keys that are trusted.
-///
-/// \param keyIds IDs of trusted keys
-///
+/*!
+    Sets the \a keyIds of keys that are trusted.
+*/
 void QXmppTrustMessageKeyOwner::setTrustedKeys(const QList<QByteArray> &keyIds)
 {
     d->trustedKeys = keyIds;
 }
 
-///
-/// Returns the IDs of the keys that are distrusted.
-///
-/// \return the IDs of distrusted keys
-///
+/*!
+    Returns the IDs of the keys that are distrusted.
+*/
 QList<QByteArray> QXmppTrustMessageKeyOwner::distrustedKeys() const
 {
     return d->distrustedKeys;
 }
 
-///
-/// Sets the IDs of keys that are distrusted.
-///
-/// \param keyIds IDs of distrusted keys
-///
+/*!
+    Sets the \a keyIds of keys that are distrusted.
+*/
 void QXmppTrustMessageKeyOwner::setDistrustedKeys(const QList<QByteArray> &keyIds)
 {
     d->distrustedKeys = keyIds;
 }
 
-/// \cond
 void QXmppTrustMessageKeyOwner::parse(const QDomElement &element)
 {
     d->jid = element.attribute(u"jid"_s);
@@ -276,15 +243,12 @@ void QXmppTrustMessageKeyOwner::toXml(QXmlStreamWriter *writer) const
         TextElements { u"distrust", transform(d->distrustedKeys, &Base64::fromByteArray) },
     });
 }
-/// \endcond
 
-///
-/// Determines whether the given DOM element is a trust message key owner.
-///
-/// \param element DOM element being checked
-///
-/// \return true if element is a trust message key owner, otherwise false
-///
+/*!
+    Determines whether the given DOM \a element is a trust message key owner.
+
+    Returns true if \a element is a trust message key owner, otherwise false.
+*/
 bool QXmppTrustMessageKeyOwner::isTrustMessageKeyOwner(const QDomElement &element)
 {
     return element.tagName() == u"key-owner" &&

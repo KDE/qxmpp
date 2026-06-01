@@ -16,9 +16,7 @@ class QXMPP_EXPORT QXmppE2eeMetadata
 {
 public:
     QXmppE2eeMetadata();
-    /// \cond
     QXmppE2eeMetadata(QSharedDataPointer<QXmppE2eeMetadataPrivate> d);
-    /// \endcond
     QXmppE2eeMetadata(const QXmppE2eeMetadata &other);
     QXmppE2eeMetadata(QXmppE2eeMetadata &&);
     ~QXmppE2eeMetadata();

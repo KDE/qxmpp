@@ -16,28 +16,29 @@ class QXmppRpcErrorIq;
 class QXmppRpcInvokeIq;
 class QXmppRpcResponseIq;
 
-/// \cond
 #if QXMPP_DEPRECATED_SINCE(1, 12)
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 
-///
-/// \brief The QXmppRpcManager class make it possible to invoke remote methods
-/// and to expose local interfaces for remote procedure calls, as specified by
-/// \xep{0009, Jabber-RPC}.
-///
-/// To make use of this manager, you need to instantiate it and load it into
-/// the QXmppClient instance as follows:
-///
-/// \code
-/// QXmppRpcManager *manager = new QXmppRpcManager;
-/// client->addExtension(manager);
-/// \endcode
-///
-/// \ingroup Managers
-///
-/// \deprecated
-///
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppRpcManager class make it possible to invoke remote methods
+    and to expose local interfaces for remote procedure calls, as specified by
+    \xep{0009}{Jabber-RPC}.
+
+    To make use of this manager, you need to instantiate it and load it into
+    the QXmppClient instance as follows:
+
+    \code
+    QXmppRpcManager *manager = new QXmppRpcManager;
+    client->addExtension(manager);
+    \endcode
+
+    \ingroup Managers
+
+    \deprecated
+*/
 class QXMPP_EXPORT Q_DECL_DEPRECATED_X("Removed from public API (unmaintained)") QXmppRpcManager : public QXmppClientExtension
 {
     Q_OBJECT
@@ -74,6 +75,5 @@ private:
 
 QT_WARNING_POP
 #endif
-/// \endcond
 
 #endif

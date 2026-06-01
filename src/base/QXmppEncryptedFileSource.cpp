@@ -42,80 +42,100 @@ public:
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppEncryptedFileSource)
 
-///
-/// \class QXmppEncryptedFileSource
-///
-/// \brief Represents an encrypted file source for file sharing.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppEncryptedFileSource
+    \inmodule QXmpp
+
+    \brief Represents an encrypted file source for file sharing.
+
+    \since QXmpp 1.5
+*/
 
 QXmppEncryptedFileSource::QXmppEncryptedFileSource()
     : d(new QXmppEncryptedFileSourcePrivate())
 {
 }
 
-/// Returns the cipher that was used to encrypt the data in this file source
+/*! Returns the cipher that was used to encrypt the data in this file source */
 Cipher QXmppEncryptedFileSource::cipher() const
 {
     return d->cipher;
 }
 
-/// Sets the cipher that was used to encrypt the data in this file source
+/*!
+    Sets the cipher that was used to encrypt the data in this file source
+
+    \a newCipher.
+*/
 void QXmppEncryptedFileSource::setCipher(Cipher newCipher)
 {
     d->cipher = newCipher;
 }
 
-/// Returns the key that can be used to decrypt the data in this file source
+/*! Returns the key that can be used to decrypt the data in this file source */
 const QByteArray &QXmppEncryptedFileSource::key() const
 {
     return d->key;
 }
 
-/// Sets the key that was used to encrypt the data in this file source
+/*!
+    Sets the key that was used to encrypt the data in this file source
+
+    \a newKey.
+*/
 void QXmppEncryptedFileSource::setKey(const QByteArray &newKey)
 {
     d->key = newKey;
 }
 
-/// Returns the Initialization vector that can be used to decrypt the data in this file source
+/*! Returns the Initialization vector that can be used to decrypt the data in this file source */
 const QByteArray &QXmppEncryptedFileSource::iv() const
 {
     return d->iv;
 }
 
-/// Sets the initialization vector that was used to encrypt the data in this file source
+/*!
+    Sets the initialization vector that was used to encrypt the data in this file source
+
+    \a newIv.
+*/
 void QXmppEncryptedFileSource::setIv(const QByteArray &newIv)
 {
     d->iv = newIv;
 }
 
-/// Returns the hashes of the file contained in this file source
+/*! Returns the hashes of the file contained in this file source */
 const QVector<QXmppHash> &QXmppEncryptedFileSource::hashes() const
 {
     return d->hashes;
 }
 
-/// Sets the hashes of the file contained in this file source
+/*!
+    Sets the hashes of the file contained in this file source
+
+    \a newHashes.
+*/
 void QXmppEncryptedFileSource::setHashes(const QVector<QXmppHash> &newHashes)
 {
     d->hashes = newHashes;
 }
 
-/// Returns the http sources that can be used to retrieve the encrypted data
+/*! Returns the http sources that can be used to retrieve the encrypted data */
 const QVector<QXmppHttpFileSource> &QXmppEncryptedFileSource::httpSources() const
 {
     return d->httpSources;
 }
 
-/// Sets the http sources containing the encrypted data
+/*!
+    Sets the http sources containing the encrypted data
+
+    \a newHttpSources.
+*/
 void QXmppEncryptedFileSource::setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources)
 {
     d->httpSources = newHttpSources;
 }
 
-/// \cond
 bool QXmppEncryptedFileSource::parse(const QDomElement &el)
 {
     if (auto parsedCipher = Enums::fromString<Cipher>(el.attribute(u"cipher"_s))) {
@@ -168,4 +188,3 @@ void QXmppEncryptedFileSource::toXml(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond

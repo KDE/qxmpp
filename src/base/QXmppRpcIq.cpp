@@ -228,7 +228,6 @@ void QXmppRpcErrorIq::setQuery(const QXmppRpcInvokeIq &query)
     m_query = query;
 }
 
-/// \cond
 bool QXmppRpcErrorIq::isRpcErrorIq(const QDomElement &element)
 {
     QString type = element.attribute(u"type"_s);
@@ -248,7 +247,6 @@ void QXmppRpcErrorIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 {
     m_query.toXmlElementFromChild(writer);
 }
-/// \endcond
 
 QXmppRpcResponseIq::QXmppRpcResponseIq()
     : QXmppIq(QXmppIq::Result),
@@ -256,43 +254,50 @@ QXmppRpcResponseIq::QXmppRpcResponseIq()
 {
 }
 
-/// Returns the fault code.
+/*! Returns the fault code. */
 int QXmppRpcResponseIq::faultCode() const
 {
     return m_faultCode;
 }
 
-/// Sets the fault code.
+/*!
+    Sets the fault code.
+
+    \a faultCode.
+*/
 void QXmppRpcResponseIq::setFaultCode(int faultCode)
 {
     m_faultCode = faultCode;
 }
 
-/// Returns the fault string.
+/*! Returns the fault string. */
 QString QXmppRpcResponseIq::faultString() const
 {
     return m_faultString;
 }
 
-/// Sets the fault string.
+/*!
+    Sets the fault string.
+
+    \a faultString.
+*/
 void QXmppRpcResponseIq::setFaultString(const QString &faultString)
 {
     m_faultString = faultString;
 }
 
-/// Returns the response values.
+/*! Returns the response values. */
 QVariantList QXmppRpcResponseIq::values() const
 {
     return m_values;
 }
 
-/// Sets the response values.
+/*! Sets the response \a values. */
 void QXmppRpcResponseIq::setValues(const QVariantList &values)
 {
     m_values = values;
 }
 
-/// \cond
 bool QXmppRpcResponseIq::isRpcResponseIq(const QDomElement &element)
 {
     QString type = element.attribute(u"type"_s);
@@ -349,40 +354,37 @@ void QXmppRpcResponseIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond
 
 QXmppRpcInvokeIq::QXmppRpcInvokeIq()
     : QXmppIq(QXmppIq::Set)
 {
 }
 
-/// Returns the method arguments.
+/*! Returns the method arguments. */
 QVariantList QXmppRpcInvokeIq::arguments() const
 {
     return m_arguments;
 }
 
-/// Sets the method arguments.
+/*! Sets the method \a arguments. */
 void QXmppRpcInvokeIq::setArguments(const QVariantList &arguments)
 {
     m_arguments = arguments;
 }
 
-/// Returns the method name.
-///
+/*! Returns the method name. */
 
 QString QXmppRpcInvokeIq::method() const
 {
     return m_method;
 }
 
-/// Sets the method name.
+/*! Sets the \a method name. */
 void QXmppRpcInvokeIq::setMethod(const QString &method)
 {
     m_method = method;
 }
 
-/// \cond
 bool QXmppRpcInvokeIq::isRpcInvokeIq(const QDomElement &element)
 {
     QString type = element.attribute(u"type"_s);
@@ -425,4 +427,3 @@ void QXmppRpcInvokeIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond

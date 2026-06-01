@@ -11,19 +11,21 @@
 
 namespace QXmpp {
 
-///
-/// \brief TURN server address
-///
-/// \since QXmpp 1.14
-///
+/*!
+    \inmodule QXmpp
+
+    \brief TURN server address.
+
+    \since QXmpp 1.14
+*/
 struct TurnServer {
-    /// host address of the TURN server
+    /*! host address of the TURN server */
     QHostAddress host;
-    /// port of the TURN server (default: 3478)
+    /*! port of the TURN server (default: 3478) */
     quint16 port;
-    /// username for authentication
+    /*! username for authentication */
     QString username;
-    /// password for authentication
+    /*! password for authentication */
     QString password;
 };
 

@@ -29,86 +29,77 @@ QXmppPubSubBaseItemPrivate::QXmppPubSubBaseItemPrivate(const QString &id, const 
 {
 }
 
-///
-/// \class QXmppPubSubBaseItem
-///
-/// The QXmppPubSubBaseItem class represents a publish-subscribe item as defined by
-/// \xep{0060, Publish-Subscribe}.
-///
-/// To access the payload of an item, you need to create a derived class of this
-/// and override QXmppPubSubBaseItem::parsePayload() and
-/// QXmppPubSubBaseItem::serializePayload().
-///
-/// It is also required that you override QXmppPubSubBaseItem::isItem() and also
-/// check for the correct payload of the PubSub item. This can be easily done by
-/// using the protected overload of isItem() with an function that checks the
-/// tag name and namespace of the payload. The function is only called if a
-/// payload exists.
-///
-/// In short, you need to reimplement these methods:
-///  * QXmppPubSubBaseItem::parsePayload()
-///  * QXmppPubSubBaseItem::serializePayload()
-///  * QXmppPubSubBaseItem::isItem()
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppPubSubBaseItem
+    \inmodule QXmpp
 
-///
-/// Constructs an item with \a id and \a publisher.
-///
-/// \param id
-/// \param publisher
-///
+    The QXmppPubSubBaseItem class represents a publish-subscribe item as defined by
+    \xep{0060}{Publish-Subscribe}.
+
+    To access the payload of an item, you need to create a derived class of this
+    and override QXmppPubSubBaseItem::parsePayload() and
+    QXmppPubSubBaseItem::serializePayload().
+
+    It is also required that you override QXmppPubSubBaseItem::isItem() and also
+    check for the correct payload of the PubSub item. This can be easily done by
+    using the protected overload of isItem() with an function that checks the
+    tag name and namespace of the payload. The function is only called if a
+    payload exists.
+
+    In short, you need to reimplement these methods:
+    \list
+        \li QXmppPubSubBaseItem::parsePayload()
+        \li QXmppPubSubBaseItem::serializePayload()
+        \li QXmppPubSubBaseItem::isItem()
+    \endlist
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    Constructs an item with \a id and \a publisher.
+*/
 QXmppPubSubBaseItem::QXmppPubSubBaseItem(const QString &id, const QString &publisher)
     : d(new QXmppPubSubBaseItemPrivate(id, publisher))
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppPubSubBaseItem::QXmppPubSubBaseItem(const QXmppPubSubBaseItem &iq) noexcept = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppPubSubBaseItem::QXmppPubSubBaseItem(QXmppPubSubBaseItem &&) noexcept = default;
 QXmppPubSubBaseItem::~QXmppPubSubBaseItem() noexcept = default;
-/// Default assignment operator
+/*! Default assignment operator, copying \a iq. */
 QXmppPubSubBaseItem &QXmppPubSubBaseItem::operator=(const QXmppPubSubBaseItem &iq) noexcept = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppPubSubBaseItem &QXmppPubSubBaseItem::operator=(QXmppPubSubBaseItem &&iq) noexcept = default;
 
-///
-/// Returns the ID of the PubSub item.
-///
+/*! Returns the ID of the PubSub item. */
 QString QXmppPubSubBaseItem::id() const
 {
     return d->id;
 }
 
-///
-/// Sets the ID of the PubSub item.
-///
-/// \param id
-///
+/*!
+    Sets the ID of the PubSub item to \a id.
+*/
 void QXmppPubSubBaseItem::setId(const QString &id)
 {
     d->id = id;
 }
 
-///
-/// Returns the JID of the publisher of the item.
-///
+/*! Returns the JID of the publisher of the item. */
 QString QXmppPubSubBaseItem::publisher() const
 {
     return d->publisher;
 }
 
-///
-/// Sets the JID of the publisher of the item.
-///
+/*! Sets the JID of the \a publisher of the item. */
 void QXmppPubSubBaseItem::setPublisher(const QString &publisher)
 {
     d->publisher = publisher;
 }
 
-/// \cond
 void QXmppPubSubBaseItem::parse(const QDomElement &element)
 {
     d->id = element.attribute(u"id"_s);
@@ -126,31 +117,28 @@ void QXmppPubSubBaseItem::toXml(QXmlStreamWriter *writer) const
         [&] { serializePayload(writer); },
     });
 }
-/// \endcond
 
-///
-/// Returns true, if the element is possibly a PubSub item.
-///
+/*! Returns true, if the \a element is possibly a PubSub item. */
 bool QXmppPubSubBaseItem::isItem(const QDomElement &element)
 {
     return element.tagName() == u"item";
 }
 
-///
-/// Parses the payload of the item (the child element of the &lt;item/&gt;).
-///
-/// This method needs to be overriden to perform the payload-specific parsing.
-///
+/*! Parses the payload of the item (the child element of the &lt;item/&gt;).
+
+    This method needs to be overriden to perform the payload-specific parsing. Returns true on success. */
 void QXmppPubSubBaseItem::parsePayload(const QDomElement &)
 {
 }
 
-///
-/// Serializes the payload of the item (the child element of the &lt;item/&gt;).
-///
-/// This method needs to be overriden to perform the payload-specific
-/// serialization.
-///
+/*!
+    Serializes the payload of the item (the child element of the &lt;item/&gt;).
+
+    This method needs to be overriden to perform the payload-specific
+    serialization.
+
+    \a writer.
+*/
 void QXmppPubSubBaseItem::serializePayload(QXmlStreamWriter *) const
 {
 }

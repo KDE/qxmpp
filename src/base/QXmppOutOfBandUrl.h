@@ -30,11 +30,9 @@ public:
     const std::optional<QString> &description() const;
     void setDescription(const std::optional<QString> &description);
 
-    /// \cond
     static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_oob };
     bool parse(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppOutOfBandUrlPrivate> d;

@@ -69,21 +69,25 @@ QXmppVCardManager::QXmppVCardManager()
 
 QXmppVCardManager::~QXmppVCardManager() = default;
 
-///
-/// Fetches the VCard of a bare JID.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    Fetches the VCard of a bare JID.
+
+    \since QXmpp 1.8
+
+    \a bareJid.
+*/
 QXmppTask<QXmppVCardManager::VCardIqResult> QXmppVCardManager::fetchVCard(const QString &bareJid)
 {
     co_return parseIq<QXmppVCardIq>(co_await client()->sendIq(QXmppVCardIq(bareJid)));
 }
 
-///
-/// Sets the VCard of the currently connected account.
-///
-/// \since QXmpp 1.8
-///
+/*!
+    Sets the VCard of the currently connected account.
+
+    \since QXmpp 1.8
+
+    \a vCard.
+*/
 QXmppTask<QXmppVCardManager::Result> QXmppVCardManager::setVCard(const QXmppVCardIq &vCard)
 {
     auto vCardIq = vCard;
@@ -93,24 +97,26 @@ QXmppTask<QXmppVCardManager::Result> QXmppVCardManager::setVCard(const QXmppVCar
     return client()->sendGenericIq(std::move(vCardIq));
 }
 
-///
-/// This function requests the server for vCard of the specified jid.
-/// Once received the signal vCardReceived() is emitted.
-///
-/// \param jid Jid of the specific entry in the roster
-///
+/*!
+    This function requests the server for the vCard of the specified \a jid (a JID of a
+    specific entry in the roster). Once received the signal vCardReceived() is emitted.
+*/
 QString QXmppVCardManager::requestVCard(const QString &jid)
 {
     return client()->sendLegacyId(QXmppVCardIq(jid));
 }
 
-/// Returns the vCard of the connected client.
+/*! Returns the vCard of the connected client. */
 const QXmppVCardIq &QXmppVCardManager::clientVCard() const
 {
     return d->clientVCard;
 }
 
-/// Sets the vCard of the connected client.
+/*!
+    Sets the vCard of the connected client.
+
+    \a clientVCard.
+*/
 void QXmppVCardManager::setClientVCard(const QXmppVCardIq &clientVCard)
 {
     d->clientVCard = clientVCard;
@@ -121,23 +127,22 @@ void QXmppVCardManager::setClientVCard(const QXmppVCardIq &clientVCard)
     client()->send(std::move(vcard));
 }
 
-///
-/// This function requests the server for vCard of the connected user itself.
-/// Once received the signal clientVCardReceived() is emitted. Received vCard
-/// can be get using clientVCard().
-///
+/*!
+    This function requests the server for vCard of the connected user itself.
+    Once received the signal clientVCardReceived() is emitted. Received vCard
+    can be get using clientVCard().
+*/
 QString QXmppVCardManager::requestClientVCard()
 {
     return requestVCard();
 }
 
-/// Returns true if vCard of the connected client has been received else false.
+/*! Returns true if vCard of the connected client has been received else false. */
 bool QXmppVCardManager::isClientVCardReceived() const
 {
     return d->isClientVCardReceived;
 }
 
-/// \cond
 QStringList QXmppVCardManager::discoveryFeatures() const
 {
     return {
@@ -191,4 +196,3 @@ void QXmppVCardManager::onUnregistered(QXmppClient *client)
         manager->unregisterExportData<VCardData>();
     }
 }
-/// \endcond

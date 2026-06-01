@@ -12,12 +12,16 @@
 class QXmppBitsOfBinaryDataList;
 class QXmppRegisterIqPrivate;
 
-/// \brief The QXmppRegisterIq class represents a registration IQ
-/// as defined by \xep{0077, In-Band Registration}.
-///
-/// It is used to create an account on the server.
-///
-/// \ingroup Stanzas
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppRegisterIq class represents a registration IQ
+    as defined by \xep{0077}{In-Band Registration}.
+
+    It is used to create an account on the server.
+
+    \ingroup Stanzas
+*/
 
 class QXMPP_EXPORT QXmppRegisterIq : public QXmppIq
 {
@@ -61,17 +65,13 @@ public:
     QString outOfBandUrl() const;
     void setOutOfBandUrl(const QString &outOfBandUrl);
 
-    /// \cond
     static constexpr std::tuple PayloadXmlTag = { u"query", QXmpp::Private::ns_register };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isRegisterIq(const QDomElement &element);
-    /// \endcond
 
 protected:
-    /// \cond
     void parseElementFromChild(const QDomElement &element) override;
     void toXmlElementFromChild(QXmlStreamWriter *writer) const override;
-    /// \endcond
 
 private:
     QSharedDataPointer<QXmppRegisterIqPrivate> d;

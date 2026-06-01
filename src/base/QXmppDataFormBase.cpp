@@ -10,32 +10,31 @@
 
 #include <QDateTime>
 
-///
-/// \class QXmppDataFormBase
-///
-/// QXmppDataFormBase is an abstract class types that can be serialized to data
-/// forms.
-///
-/// QXmppDataFormBase based types can easily be converted to QXmppDataForms, it
-/// is as simple as this:
-/// \code
-/// MyDataFormBase foo;
-/// QXmppDataForm dataForm(foo);
-/// \endcode
-///
-/// To make this work, you will need to at least implement the toDataForm()
-/// method. For parsing your type you should also create a static creator
-/// method, like this:
-/// \code
-/// static std::optional<MyType> fromDataForm(const QXmppDataForm &);
-/// \endcode
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppDataFormBase
+    \inmodule QXmpp
 
-///
-/// Serializes all fields to a QXmppDataForm.
-///
+    QXmppDataFormBase is an abstract class types that can be serialized to data
+    forms.
+
+    QXmppDataFormBase based types can easily be converted to QXmppDataForms, it
+    is as simple as this:
+    \code
+    MyDataFormBase foo;
+    QXmppDataForm dataForm(foo);
+    \endcode
+
+    To make this work, you will need to at least implement the toDataForm()
+    method. For parsing your type you should also create a static creator
+    method, like this:
+    \code
+    static std::optional<MyType> fromDataForm(const QXmppDataForm &);
+    \endcode
+
+    \since QXmpp 1.5
+*/
+
+/*! Serializes all fields to a QXmppDataForm. */
 QXmppDataForm QXmppDataFormBase::toDataForm() const
 {
     QXmppDataForm form(QXmppDataForm::Form);
@@ -49,90 +48,95 @@ QXmppDataForm QXmppDataFormBase::toDataForm() const
     return form;
 }
 
-///
-/// Parses the QXmppDataForm.
-///
+/*!
+    Parses the QXmppDataForm. Returns true on success.
+
+    \a output and \a form.
+*/
 bool QXmppDataFormBase::fromDataForm(const QXmppDataForm &form, QXmppDataFormBase &output)
 {
     output.parseForm(form);
     return true;
 }
 
-///
-/// \fn QXmppDataFormBase::formType
-///
-/// Returns the 'FORM_TYPE' value of the parsed form.
-///
+/*!
+    \fn QString QXmppDataFormBase::formType() const
 
-///
-/// \fn QXmppDataFormBase::parseForm
-///
-/// This is called when a QXmppDataForm is parsed. You can parse all values from
-/// the given form and its fields.
-///
+    Returns the 'FORM_TYPE' value of the parsed form.
+*/
 
-///
-/// \fn QXmppDataFormBase::serializeForm
-///
-/// This is called the object is serialized to a QXmppDataForm. You need to
-/// create a new QXmppDataForm and serialize all fields and values.
-///
+/*!
+    \fn void QXmppDataFormBase::parseForm(const QXmppDataForm &form)
 
-///
-/// \fn QXmppDataFormBase::parseUInt
-///
-/// Parses an unsigned int from a QVariant (QString). Returns std::nullopt if
-/// the no number could be parsed.
-///
+    This is called when a QXmppDataForm is parsed. You can parse all values from
+    the given \a form and its fields.
+*/
 
-///
-/// \fn QXmppDataFormBase::parseULongLong
-///
-/// Parses an unsigned long long from a QVariant (QString). Returns std::nullopt
-/// if the no number could be parsed.
-///
+/*!
+    \fn void QXmppDataFormBase::serializeForm(QXmppDataForm &form) const
 
-///
-/// \fn QXmppDataFormBase::parseBool
-///
-/// Returns the contained boolean value if the QVariant contains a bool.
-///
+    This is called when the object is serialized to a QXmppDataForm. You need to
+    serialize all fields and values into \a form.
+*/
 
-///
-/// \fn QXmppDataFormBase::serializeValue
-///
-/// Adds a new field to the form with the given field type, field name and value.
-///
+/*!
+    \fn std::optional<quint32> QXmppDataFormBase::parseUInt(const QVariant &variant)
 
-///
-/// \fn QXmppDataFormBase::serializeNullable
-///
-/// Adds a new field to the form if \code !value.isNull() \endcode.
-///
+    Parses an unsigned int from a QVariant (QString) \a variant. Returns
+    std::nullopt if no number could be parsed.
+*/
 
-///
-/// \fn QXmppDataFormBase::serializeEmptyable
-///
-/// Adds a new field to the form if \code !value.isEmpty() \endcode.
-///
+/*!
+    \fn std::optional<quint64> QXmppDataFormBase::parseULongLong(const QVariant &variant)
 
-///
-/// \fn QXmppDataFormBase::serializeOptional
-///
-/// Adds a new field to the form if \code optional.has_value() \endcode.
-///
+    Parses an unsigned long long from a QVariant (QString) \a variant. Returns
+    std::nullopt if no number could be parsed.
+*/
 
-///
-/// \fn QXmppDataFormBase::serializeOptionalNumber
-///
-/// Adds a new field to the form if \code optional.has_value() \endcode.
-/// Converts the optional's value to QString using QString::number().
-///
+/*!
+    \fn std::optional<bool> QXmppDataFormBase::parseBool(const QVariant &variant)
 
-///
-/// Adds a new field to the form if the passed QDateTime is valid and formats it
-/// as ISO timestamp and always uses UTC.
-///
+    Returns the contained boolean value if the QVariant \a variant contains a bool.
+*/
+
+/*!
+    \fn template <typename T> void QXmppDataFormBase::serializeValue(QXmppDataForm &form, QXmppDataForm::Field::Type type, const QString &name, const T &value)
+
+    Adds a new field to \a form with the given field \a type, field \a name and \a value.
+*/
+
+/*!
+    \fn template <typename T> void QXmppDataFormBase::serializeNullable(QXmppDataForm &form, QXmppDataForm::Field::Type type, QStringView name, const T &value)
+
+    Adds a new field of \a type and \a name to \a form if \c {!value.isNull()} for \a value.
+*/
+
+/*!
+    \fn template <typename T> void QXmppDataFormBase::serializeEmptyable(QXmppDataForm &form, QXmppDataForm::Field::Type type, QStringView name, const T &value)
+
+    Adds a new field of \a type and \a name to \a form if \c {!value.isEmpty()} for \a value.
+*/
+
+/*!
+    \fn template <typename T, typename ValueConverter> void QXmppDataFormBase::serializeOptional(QXmppDataForm &form, QXmppDataForm::Field::Type type, QStringView name, const std::optional<T> &optional, ValueConverter convert)
+
+    Adds a new field of \a type and \a name to \a form if \c {optional.has_value()} for
+    \a optional, applying \a convert to the contained value first.
+*/
+
+/*!
+    \fn template <typename T> void QXmppDataFormBase::serializeOptionalNumber(QXmppDataForm &form, QXmppDataForm::Field::Type type, QStringView name, std::optional<T> optional)
+
+    Adds a new field of \a type and \a name to \a form if \c {optional.has_value()} for
+    \a optional, converting the contained value to QString using QString::number().
+*/
+
+/*!
+    Adds a new field to the form if the passed QDateTime is valid and formats it
+    as ISO timestamp and always uses UTC.
+
+    \a name, \a type, \a datetime, and \a form.
+*/
 void QXmppDataFormBase::serializeDatetime(QXmppDataForm &form, const QString &name, const QDateTime &datetime, QXmppDataForm::Field::Type type)
 {
     if (datetime.isValid()) {
@@ -140,18 +144,19 @@ void QXmppDataFormBase::serializeDatetime(QXmppDataForm &form, const QString &na
     }
 }
 
-///
-/// \class QXmppExtensibleDataFormBase
-///
-/// This class is used for parsing a QXmppDataForm in an extensible way with
-/// inheritance and keeping additional unknown fields.
-///
-/// When inheriting you need to reimplement parseField(), serializeForm() and
-/// formType(). Also you should add a static parsing function (e.g.
-/// QXmppPubSubMetadata::fromDataForm()).
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \class QXmppExtensibleDataFormBase
+    \inmodule QXmpp
+
+    This class is used for parsing a QXmppDataForm in an extensible way with
+    inheritance and keeping additional unknown fields.
+
+    When inheriting you need to reimplement parseField(), serializeForm() and
+    formType(). Also you should add a static parsing function (e.g.
+    QXmppPubSubMetadata::fromDataForm()).
+
+    \since QXmpp 1.5
+*/
 
 class QXmppExtensibleDataFormBasePrivate : public QSharedData
 {
@@ -164,25 +169,23 @@ QXmppExtensibleDataFormBase::QXmppExtensibleDataFormBase()
 {
 }
 
-/// \cond
 QXmppExtensibleDataFormBase::QXmppExtensibleDataFormBase(const QXmppExtensibleDataFormBase &) = default;
 QXmppExtensibleDataFormBase::QXmppExtensibleDataFormBase(QXmppExtensibleDataFormBase &&) = default;
 QXmppExtensibleDataFormBase::~QXmppExtensibleDataFormBase() = default;
 QXmppExtensibleDataFormBase &QXmppExtensibleDataFormBase::operator=(const QXmppExtensibleDataFormBase &) = default;
 QXmppExtensibleDataFormBase &QXmppExtensibleDataFormBase::operator=(QXmppExtensibleDataFormBase &&) = default;
-/// \endcond
 
-///
-/// Returns all fields that couldn't be parsed.
-///
+/*! Returns all fields that couldn't be parsed. */
 QList<QXmppDataForm::Field> QXmppExtensibleDataFormBase::unknownFields() const
 {
     return d->unknownFields;
 }
 
-///
-/// Sets all additional fields to be serialized.
-///
+/*!
+    Sets all additional fields to be serialized.
+
+    \a unknownFields.
+*/
 void QXmppExtensibleDataFormBase::setUnknownFields(const QList<QXmppDataForm::Field> &unknownFields)
 {
     d->unknownFields = unknownFields;
@@ -206,12 +209,12 @@ void QXmppExtensibleDataFormBase::serializeForm(QXmppDataForm &form) const
     form.setFields(std::as_const(form).fields() + d->unknownFields);
 }
 
-///
-/// Returns true if a field has been parsed.
-///
-/// Should be reimplemented to do actual parsing. All fields that can't be
-/// parsed end up as unknownFields().
-///
+/*!
+    Returns true if a field has been parsed.
+
+    Should be reimplemented to do actual parsing. All fields that can't be
+    parsed end up as unknownFields().
+*/
 bool QXmppExtensibleDataFormBase::parseField(const QXmppDataForm::Field &)
 {
     return false;

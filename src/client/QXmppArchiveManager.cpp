@@ -16,7 +16,6 @@
 
 using namespace QXmpp::Private;
 
-/// \cond
 QStringList QXmppArchiveManager::discoveryFeatures() const
 {
     // XEP-0036: Message Archiving
@@ -46,17 +45,14 @@ bool QXmppArchiveManager::handleStanza(const QDomElement &element)
 
     return false;
 }
-/// \endcond
 
-///
-/// Retrieves the list of available collections. Once the results are
-/// received, the archiveListReceived() signal will be emitted.
-///
-/// \param jid JID you want conversations with.
-/// \param start Optional start time.
-/// \param end Optional end time.
-/// \param rsm Optional Result Set Management query
-///
+/*!
+    Retrieves the list of available collections. Once the results are
+    received, the archiveListReceived() signal will be emitted.
+
+    \a jid is the JID you want conversations with. \a start is an optional start time, \a end
+    an optional end time. \a rsm is an optional Result Set Management query.
+*/
 void QXmppArchiveManager::listCollections(const QString &jid, const QDateTime &start,
                                           const QDateTime &end, const QXmppResultSetQuery &rsm)
 {
@@ -68,16 +64,15 @@ void QXmppArchiveManager::listCollections(const QString &jid, const QDateTime &s
     client()->send(std::move(packet));
 }
 
-/// \overload
-///
-/// Retrieves the list of available collections. Once the results are
-/// received, the archiveListReceived() signal will be emitted.
-///
-/// \param jid JID you want conversations with.
-/// \param start Start time.
-/// \param end End time.
-/// \param max Maximum number of collections to list.
-///
+/*!
+    \overload
+
+    Retrieves the list of available collections. Once the results are
+    received, the archiveListReceived() signal will be emitted.
+
+    \a jid is the JID you want conversations with. \a start is the start time, \a end the end
+    time. \a max is the maximum number of collections to list.
+*/
 void QXmppArchiveManager::listCollections(const QString &jid, const QDateTime &start, const QDateTime &end, int max)
 {
     QXmppResultSetQuery rsm;
@@ -85,13 +80,12 @@ void QXmppArchiveManager::listCollections(const QString &jid, const QDateTime &s
     listCollections(jid, start, end, rsm);
 }
 
-///
-/// Removes the specified collection(s).
-///
-/// \param jid The JID of the collection
-/// \param start Optional start time.
-/// \param end Optional end time.
-///
+/*!
+    Removes the specified collection(s).
+
+    \a jid is the JID of the collection. \a start is an optional start time, \a end an optional
+    end time.
+*/
 void QXmppArchiveManager::removeCollections(const QString &jid, const QDateTime &start, const QDateTime &end)
 {
     QXmppArchiveRemoveIq packet;
@@ -102,14 +96,13 @@ void QXmppArchiveManager::removeCollections(const QString &jid, const QDateTime 
     client()->send(std::move(packet));
 }
 
-///
-/// Retrieves the specified collection. Once the results are received,
-/// the archiveChatReceived() will be emitted.
-///
-/// \param jid The JID of the collection
-/// \param start The start time of the collection.
-/// \param rsm Optional Result Set Management query
-///
+/*!
+    Retrieves the specified collection. Once the results are received,
+    the archiveChatReceived() will be emitted.
+
+    \a jid is the JID of the collection. \a start is the start time of the collection. \a rsm
+    is an optional Result Set Management query.
+*/
 void QXmppArchiveManager::retrieveCollection(const QString &jid, const QDateTime &start, const QXmppResultSetQuery &rsm)
 {
     QXmppArchiveRetrieveIq packet;
@@ -119,15 +112,15 @@ void QXmppArchiveManager::retrieveCollection(const QString &jid, const QDateTime
     client()->send(std::move(packet));
 }
 
-/// \overload
-///
-/// Retrieves the specified collection. Once the results are received,
-/// the archiveChatReceived() will be emitted.
-///
-/// \param jid The JID of the collection
-/// \param start The start time of the collection.
-/// \param max Maximum number of messages to retrieve.
-///
+/*!
+    \overload
+
+    Retrieves the specified collection. Once the results are received,
+    the archiveChatReceived() will be emitted.
+
+    \a jid is the JID of the collection. \a start is the start time of the collection. \a max
+    is the maximum number of messages to retrieve.
+*/
 void QXmppArchiveManager::retrieveCollection(const QString &jid, const QDateTime &start, int max)
 {
     QXmppResultSetQuery rsm;

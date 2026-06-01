@@ -99,318 +99,331 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
 
 }  // namespace QXmpp::Private
 
-///
-/// \class QXmppMixManager
-///
-/// This class manages group chat communication as specified in the following XEPs:
-///     * \xep{0369, Mediated Information eXchange (MIX)}
-///     * \xep{0405, Mediated Information eXchange (MIX): Participant Server Requirements}
-///     * \xep{0406, Mediated Information eXchange (MIX): MIX Administration}
-///     * \xep{0407, Mediated Information eXchange (MIX): Miscellaneous Capabilities}
-///
-/// In order to use this manager, make sure to add all managers needed by this manager:
-/// \code
-/// client->addNewExtension<QXmppDiscoveryManager>();
-/// client->addNewExtension<QXmppPubSubManager>();
-/// \endcode
-///
-/// Afterwards, you need to add this manager to the client:
-/// \code
-/// auto *manager = client->addNewExtension<QXmppMixManager>();
-/// \endcode
-///
-/// If you want to be informed about updates of the channel (e.g., its configuration or allowed
-/// JIDs), make sure to subscribe to the corresponding nodes.
-///
-/// In order to send a message to a MIX channel, you have to set the type QXmppMessage::GroupChat.
-///
-/// Example for an unencrypted message:
-/// \code
-/// message->setType(QXmppMessage::GroupChat);
-/// message->setTo("group@mix.example.org")
-/// client->send(std::move(message));
-/// \endcode
-///
-/// Example for an encrypted message decryptable by Alice and Bob:
-/// \code
-/// message->setType(QXmppMessage::GroupChat);
-/// message->setTo("group@mix.example.org")
-///
-/// QXmppSendStanzaParams params;
-/// params.setEncryptionJids({ "alice@example.org", "bob@example.com" })
-///
-/// client->sendSensitive(std::move(message), params);
-/// \endcode
-///
-/// If you receive a message, you can check whether it contains an invitation to a MIX channel and
-/// use that invitation to join the channel:
-/// \code
-/// if (auto invitation = message.mixInvitation()) {
-///     manager->joinChannel(*invitation, nickname, nodes);
-/// }
-/// \endcode
-///
-/// In order to invite someone to a MIX channel that allows the invitee to participate, you can
-/// create an invitation on your own.
-///
-/// That can be done in the following cases:
-///     * Everybody is allowed to participate in the channel.
-///     * The invitee is explicitly allowed to participate in the channel.
-///       That is particularly relevant if the channel does not support invitations received via
-///       requestInvitation() but the inviter is permitted to allow JIDs via allowJid().
-///       In that case, the invitee's JID has to be allowed before the invitee tries to join the
-///       channel.
-///
-/// Invitations are sent as regular messages.
-/// They are not meant to be read by a human.
-/// Instead, the receiving client needs to support it.
-/// But you can add an appropriate text to the body of the invitation message to enable human users
-/// of clients that do not support that feature to join the channel manually.
-/// For example, you could add the JID of the channel or an XMPP URI to the body.
-///
-/// If the body (i.e., the invitation text) is empty, the message would neither be delivered to all
-/// clients via \xep{0280, Message Carbons} nor delivered to clients which are currently offline via
-/// \xep{0313, Message Archive Management}.
-/// To enforce that behavior, set a corresponding message type and message processing hint:
-/// \code
-/// QXmppMixInvitation invitation;
-///
-/// invitation.setInviterJid(client->configuration().jidBare());
-/// invitation.setInviteeJid(inviteeJid);
-/// invitation.setChannelJid(channelJid);
-///
-/// QXmppMessage message;
-///
-/// message.setTo(inviteeJid);
-/// message.setMixInvitation(invitation);
-///
-/// if (messageBody.isEmpty()) {
-///     message.setType(QXmppMessage::Chat);
-///     message.addHint(QXmppMessage::Store);
-/// } else {
-///     message.setBody(messageBody);
-/// }
-///
-/// client()->sendSensitive(std::move(message));
-/// \endcode
-///
-/// In order to invite someone to a MIX channel that does not yet allow the invitee to participate,
-/// you can request an invitation from the channel (if permitted to do so):
-/// \code
-/// manager->requestInvitation().then(this, [](QXmppMixManager::InvitationResult &&result) mutable {
-///     if (QXmpp::hasError(result)) {
-///         // Handle the error.
-///     } else {
-///         auto invitation = QXmpp::getValue(std::move(result));
-///         // Create and send the invitation.
-///     }
-/// });
-/// \endcode
-///
-/// \ingroup Managers
-///
-/// \since QXmpp 1.7
-///
+/*!
+    \class QXmppMixManager
+    \inmodule QXmpp
 
-///
-/// \property QXmppMixManager::participantSupport
-///
-/// \see QXmppMixManager::participantSupport()
-///
+    This class manages group chat communication as specified in the following XEPs:
+    \list
+        \li \xep{0369}{Mediated Information eXchange (MIX)}
+        \li \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements}
+        \li \xep{0406}{Mediated Information eXchange (MIX): MIX Administration}
+        \li \xep{0407}{Mediated Information eXchange (MIX): Miscellaneous Capabilities}
+    \endlist
 
-///
-/// \property QXmppMixManager::messageArchivingSupport
-///
-/// \see QXmppMixManager::messageArchivingSupport()
-///
+    In order to use this manager, make sure to add all managers needed by this manager:
+    \code
+    client->addNewExtension<QXmppDiscoveryManager>();
+    client->addNewExtension<QXmppPubSubManager>();
+    \endcode
 
-///
-/// \property QXmppMixManager::services
-///
-/// \see QXmppMixManager::services()
-///
+    Afterwards, you need to add this manager to the client:
+    \code
+    auto *manager = client->addNewExtension<QXmppMixManager>();
+    \endcode
 
-///
-/// \enum QXmppMixManager::Support
-///
-/// Server support for a feature.
-///
-/// The information is cached until a new connection is established.
-/// That makes it possible to retrieve the latest state even while the client is disconnected.
-///
-/// \var QXmppMixManager::Support::Unknown
-///
-/// Whether the server supports the feature is not known.
-///
-/// That means, there is no corresponding information from the server (yet).
-///
-/// \var QXmppMixManager::Unsupported
-///
-/// The server does not support the feature.
-///
-/// \var QXmppMixManager::Support::Supported
-///
-/// The server supports the feature.
-///
+    If you want to be informed about updates of the channel (e.g., its configuration or allowed
+    JIDs), make sure to subscribe to the corresponding nodes.
 
-///
-/// \struct QXmppMixManager::Service
-///
-/// Service providing MIX channels and corresponding nodes.
-///
-/// \var QXmppMixManager::Service::jid
-///
-/// JID of the service.
-///
-/// \var QXmppMixManager::Service::channelsSearchable
-///
-/// Whether the service can be searched for channels.
-///
-/// \var QXmppMixManager::Service::channelCreationAllowed
-///
-/// Whether channels can be created on the service.
-///
+    In order to send a message to a MIX channel, you have to set the type QXmppMessage::GroupChat.
 
-/// \cond
+    Example for an unencrypted message:
+    \code
+    message->setType(QXmppMessage::GroupChat);
+    message->setTo("group@mix.example.org")
+    client->send(std::move(message));
+    \endcode
+
+    Example for an encrypted message decryptable by Alice and Bob:
+    \code
+    message->setType(QXmppMessage::GroupChat);
+    message->setTo("group@mix.example.org")
+
+    QXmppSendStanzaParams params;
+    params.setEncryptionJids({ "alice@example.org", "bob@example.com" })
+
+    client->sendSensitive(std::move(message), params);
+    \endcode
+
+    If you receive a message, you can check whether it contains an invitation to a MIX channel and
+    use that invitation to join the channel:
+    \code
+    if (auto invitation = message.mixInvitation()) {
+    manager->joinChannel(*invitation, nickname, nodes);
+    }
+    \endcode
+
+    In order to invite someone to a MIX channel that allows the invitee to participate, you can
+    create an invitation on your own.
+
+    That can be done in the following cases:
+    \list
+        \li Everybody is allowed to participate in the channel.
+        \li The invitee is explicitly allowed to participate in the channel.
+            That is particularly relevant if the channel does not support invitations received via
+            requestInvitation() but the inviter is permitted to allow JIDs via allowJid().
+            In that case, the invitee's JID has to be allowed before the invitee tries to join the
+            channel.
+    \endlist
+
+    Invitations are sent as regular messages.
+    They are not meant to be read by a human.
+    Instead, the receiving client needs to support it.
+    But you can add an appropriate text to the body of the invitation message to enable human users
+    of clients that do not support that feature to join the channel manually.
+    For example, you could add the JID of the channel or an XMPP URI to the body.
+
+    If the body (i.e., the invitation text) is empty, the message would neither be delivered to all
+    clients via \xep{0280}{Message Carbons} nor delivered to clients which are currently offline via
+    \xep{0313}{Message Archive Management}.
+    To enforce that behavior, set a corresponding message type and message processing hint:
+    \code
+    QXmppMixInvitation invitation;
+
+    invitation.setInviterJid(client->configuration().jidBare());
+    invitation.setInviteeJid(inviteeJid);
+    invitation.setChannelJid(channelJid);
+
+    QXmppMessage message;
+
+    message.setTo(inviteeJid);
+    message.setMixInvitation(invitation);
+
+    if (messageBody.isEmpty()) {
+    message.setType(QXmppMessage::Chat);
+    message.addHint(QXmppMessage::Store);
+    } else {
+    message.setBody(messageBody);
+    }
+
+    client()->sendSensitive(std::move(message));
+    \endcode
+
+    In order to invite someone to a MIX channel that does not yet allow the invitee to participate,
+    you can request an invitation from the channel (if permitted to do so):
+    \code
+    manager->requestInvitation().then(this, [](QXmppMixManager::InvitationResult &&result) mutable {
+    if (QXmpp::hasError(result)) {
+    // Handle the error.
+    } else {
+    auto invitation = QXmpp::getValue(std::move(result));
+    // Create and send the invitation.
+    }
+    });
+    \endcode
+
+    \ingroup Managers
+
+    \since QXmpp 1.7
+*/
+
+/*!
+    \property QXmppMixManager::participantSupport
+
+    \sa QXmppMixManager::participantSupport()
+*/
+
+/*!
+    \property QXmppMixManager::messageArchivingSupport
+
+    \sa QXmppMixManager::messageArchivingSupport()
+*/
+
+/*!
+    \property QXmppMixManager::services
+
+    \sa QXmppMixManager::services()
+*/
+
+/*!
+    \enum QXmppMixManager::Support
+
+    Server support for a feature.
+
+    The information is cached until a new connection is established. That makes
+    it possible to retrieve the latest state even while the client is
+    disconnected.
+
+    \value Unknown Whether the server supports the feature is not known.
+    That means, there is no corresponding information from the server (yet).
+    \value Unsupported The server does not support the feature.
+    \value Supported The server supports the feature.
+*/
+
+/*!
+    \struct QXmppMixManager::Service
+    \inmodule QXmpp
+
+    Service providing MIX channels and corresponding nodes.
+*/
+
+/*!
+    \variable QXmppMixManager::Service::jid
+
+    JID of the service.
+*/
+
+/*!
+    \variable QXmppMixManager::Service::channelsSearchable
+
+    Whether the service can be searched for channels.
+*/
+
+/*!
+    \variable QXmppMixManager::Service::channelCreationAllowed
+
+    Whether channels can be created on the service.
+*/
+
 bool QXmppMixManager::Service::operator==(const Service &other) const
 {
     return jid == other.jid &&
         channelsSearchable == other.channelsSearchable &&
         channelCreationAllowed == other.channelCreationAllowed;
 }
-/// \endcond
 
-///
-/// \struct QXmppMixManager::Subscription
-///
-/// Subscription to nodes of a MIX channel.
-///
-/// \var QXmppMixManager::Subscription::additions
-///
-/// Nodes belonging to the channel that are subscribed to.
-///
-/// \var QXmppMixManager::Subscription::removals
-///
-/// Nodes belonging to the channel that are unsubscribed from.
-///
+/*!
+    \struct QXmppMixManager::Subscription
+    \inmodule QXmpp
 
-///
-/// \struct QXmppMixManager::Participation
-///
-/// Participation in a channel.
-///
-/// \var QXmppMixManager::Participation::participantId
-///
-/// ID of the user within the channel.
-///
-/// \var QXmppMixManager::Participation::nickname
-///
-/// Nickname of the user within the channel.
-///
-/// If the server modified the desired nickname, this is the modified one.
-///
-/// \var QXmppMixManager::Participation::subscriptions
-///
-/// Nodes belonging to the joined channel that are subscribed to.
-///
-/// If not all desired nodes could be subscribed, this contains only the subscribed nodes.
-///
+    Subscription to nodes of a MIX channel.
+*/
 
-///
-/// \typedef QXmppMixManager::Jid
-///
-/// JID of a user or domain.
-///
+/*!
+    \variable QXmppMixManager::Subscription::additions
 
-///
-/// \typedef QXmppMixManager::ChannelJid
-///
-/// JID of a MIX channel.
-///
+    Nodes belonging to the channel that are subscribed to.
+*/
 
-///
-/// \typedef QXmppMixManager::Nickname
-///
-/// Nickname of the user within a MIX channel.
-///
-/// If the server modified the desired nickname, this is the modified one.
-///
+/*!
+    \variable QXmppMixManager::Subscription::removals
 
-///
-/// \typedef QXmppMixManager::CreationResult
-///
-/// Contains the JID of the created MIX channel or a QXmppError on failure.
-///
+    Nodes belonging to the channel that are unsubscribed from.
+*/
 
-///
-/// \typedef QXmppMixManager::ChannelJidResult
-///
-/// Contains the JIDs of all discoverable MIX channels of a MIX service or a QXmppError if it
-/// failed.
-///
+/*!
+    \struct QXmppMixManager::Participation
+    \inmodule QXmpp
 
-///
-/// \typedef QXmppMixManager::ChannelNodeResult
-///
-/// Contains all nodes of the requested MIX channel that can be subscribed by the user or a
-/// QXmppError on failure.
-///
+    Participation in a channel.
+*/
 
-///
-/// \typedef QXmppMixManager::ConfigurationResult
-///
-/// Contains the configuration of the MIX channel or a QXmppError on failure.
-///
+/*!
+    \variable QXmppMixManager::Participation::participantId
 
-///
-/// \typedef QXmppMixManager::InformationResult
-///
-/// Contains the information of the MIX channel or a QXmppError on failure.
-///
+    ID of the user within the channel.
+*/
 
-///
-/// \typedef QXmppMixManager::JoiningResult
-///
-/// Contains the result of the joined MIX channel or a QXmppError on failure.
-///
+/*!
+    \variable QXmppMixManager::Participation::nickname
 
-///
-/// \typedef QXmppMixManager::NicknameResult
-///
-/// Contains the new nickname within a joined MIX channel or a QXmppError on failure.
-///
+    Nickname of the user within the channel.
 
-///
-/// \typedef QXmppMixManager::InvitationResult
-///
-/// Contains the requested invitation to a MIX channel or a QXmppError on failure.
-///
+    If the server modified the desired nickname, this is the modified one.
+*/
 
-///
-/// \typedef QXmppMixManager::SubscriptionResult
-///
-/// Contains the result of the subscribed/unsubscribed nodes belonging to a MIX channel or a
-/// QXmppError on failure.
-///
+/*!
+    \variable QXmppMixManager::Participation::subscriptions
 
-///
-/// \typedef QXmppMixManager::JidResult
-///
-/// Contains the JIDs of users or domains that are allowed to participate resp. banned from
-/// participating in a MIX channel or a QXmppError on failure.
-///
+    Nodes belonging to the joined channel that are subscribed to.
 
-///
-/// \typedef QXmppMixManager::ParticipantResult
-///
-/// Contains the participants of a MIX channel or a QXmppError on failure.
-///
+    If not all desired nodes could be subscribed, this contains only the
+    subscribed nodes.
+*/
+
+/*!
+    \typedef QXmppMixManager::Jid
+
+    JID of a user or domain.
+*/
+
+/*!
+    \typedef QXmppMixManager::ChannelJid
+
+    JID of a MIX channel.
+*/
+
+/*!
+    \typedef QXmppMixManager::Nickname
+
+    Nickname of the user within a MIX channel.
+
+    If the server modified the desired nickname, this is the modified one.
+*/
+
+/*!
+    \typedef QXmppMixManager::CreationResult
+
+    Contains the JID of the created MIX channel or a QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::ChannelJidResult
+
+    Contains the JIDs of all discoverable MIX channels of a MIX service or a QXmppError if it
+    failed.
+*/
+
+/*!
+    \typedef QXmppMixManager::ChannelNodeResult
+
+    Contains all nodes of the requested MIX channel that can be subscribed by the user or a
+    QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::ConfigurationResult
+
+    Contains the configuration of the MIX channel or a QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::InformationResult
+
+    Contains the information of the MIX channel or a QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::JoiningResult
+
+    Contains the result of the joined MIX channel or a QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::NicknameResult
+
+    Contains the new nickname within a joined MIX channel or a QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::InvitationResult
+
+    Contains the requested invitation to a MIX channel or a QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::SubscriptionResult
+
+    Contains the result of the subscribed/unsubscribed nodes belonging to a MIX channel or a
+    QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::JidResult
+
+    Contains the JIDs of users or domains that are allowed to participate resp. banned from
+    participating in a MIX channel or a QXmppError on failure.
+*/
+
+/*!
+    \typedef QXmppMixManager::ParticipantResult
+
+    Contains the participants of a MIX channel or a QXmppError on failure.
+*/
 
 constexpr QStringView MIX_SERVICE_DISCOVERY_NODE = u"mix";
 
-///
-/// Constructs a MIX manager.
-///
+/*! Constructs a MIX manager. */
 QXmppMixManager::QXmppMixManager()
     : d(new QXmppMixManagerPrivate())
 {
@@ -424,81 +437,77 @@ QStringList QXmppMixManager::discoveryFeatures() const
     return { staticString(ns_mix) };
 }
 
-///
-/// Returns the server's support for MIX channel participants as specified in
-/// \xep{0405, Mediated Information eXchange (MIX): Participant Server Requirements}.
-///
-/// If the server supports it, the server interacts between a client and a MIX channel that the user
-/// participates in.
-/// E.g., the server adds the MIX channel to the user's roster after joining it.
-///
-/// \return the server support for MIX channel participants
-///
+/*!
+    Returns the server's support for MIX channel participants as specified in
+    \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements}.
+
+    If the server supports it, the server interacts between a client and a MIX channel that the user
+    participates in.
+    E.g., the server adds the MIX channel to the user's roster after joining it.
+
+    Returns the server support for MIX channel participants.
+*/
 QXmppMixManager::Support QXmppMixManager::participantSupport() const
 {
     return d->participantSupport;
 }
 
-///
-/// \fn QXmppMixManager::participantSupportChanged()
-///
-/// Emitted when the server's support for MIX channel participants changed.
-///
+/*!
+    \fn QXmppMixManager::participantSupportChanged()
 
-///
-/// Returns the server's support for archiving messages via \xep{0313, Message Archive Management}
-/// of MIX channels the user participates in as specified in
-/// \xep{0405, Mediated Information eXchange (MIX): Participant Server Requirements}.
-///
-/// \return the server support for archiving MIX messages
-///
+    Emitted when the server's support for MIX channel participants changed.
+*/
+
+/*!
+    Returns the server's support for archiving messages via \xep{0313}{Message Archive Management}
+    of MIX channels the user participates in as specified in
+    \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements}.
+*/
 QXmppMixManager::Support QXmppMixManager::messageArchivingSupport() const
 {
     return d->messageArchivingSupport;
 }
 
-///
-/// \fn QXmppMixManager::messageArchivingSupportChanged()
-///
-/// Emitted when the server's support for archiving MIX messages changed.
-///
+/*!
+    \fn QXmppMixManager::messageArchivingSupportChanged()
 
-///
-/// Returns the services providing MIX on the own server.
-///
-/// Such services provide MIX channels and their nodes.
-/// It interacts directly with clients or with their servers.
-///
-/// \return the provided MIX services
-///
+    Emitted when the server's support for archiving MIX messages changed.
+*/
+
+/*!
+    Returns the services providing MIX on the own server.
+
+    Such services provide MIX channels and their nodes.
+    It interacts directly with clients or with their servers.
+*/
 QList<QXmppMixManager::Service> QXmppMixManager::services() const
 {
     return d->services;
 }
 
-///
-/// \fn QXmppMixManager::servicesChanged()
-///
-/// Emitted when the services providing MIX on the own server changed.
-///
+/*!
+    \fn QXmppMixManager::servicesChanged()
 
-///
-/// Creates a MIX channel.
-///
-/// If no channel ID is passed, the channel is created with an ID provided by the MIX service.
-/// Furthermore, the channel cannot be discovered by anyone.
-/// A channel with the mentioned properties is called an "ad-hoc channel".
-///
-/// The channel ID is the local part of the channel JID.
-/// The MIX service JID is the domain part of the channel JID.
-/// Example: "channel" is the channel ID and "mix.example.org" the service JID of the channel JID
-/// "channel@mix.example.org".
-///
-/// \param serviceJid JID of the service
-/// \param channelId ID of the channel (default: provided by the server)
-///
-/// \return the result of the action
-///
+    Emitted when the services providing MIX on the own server changed.
+*/
+
+/*!
+    Creates a MIX channel.
+
+    If no channel ID is passed, the channel is created with an ID provided by the MIX service.
+    Furthermore, the channel cannot be discovered by anyone.
+    A channel with the mentioned properties is called an "ad-hoc channel".
+
+    The channel ID is the local part of the channel JID.
+    The MIX service JID is the domain part of the channel JID.
+    Example: "channel" is the channel ID and "mix.example.org" the service JID of the channel JID
+    "channel@mix.example.org".
+
+    \a serviceJid is the JID of the service. \a channelId is the ID of the
+    channel (default: provided by the server).
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::CreationResult> QXmppMixManager::createChannel(const QString &serviceJid, const QString &channelId)
 {
     QXmppMixIq iq;
@@ -512,13 +521,13 @@ QXmppTask<QXmppMixManager::CreationResult> QXmppMixManager::createChannel(const 
     });
 }
 
-///
-/// Requests the JIDs of all discoverable MIX channels of a MIX service.
-///
-/// \param serviceJid JID of the service that provides the channels
-///
-/// \return the result of the action
-///
+/*!
+    Requests the JIDs of all discoverable MIX channels of a MIX service.
+
+    \a serviceJid is the JID of the service that provides the channels.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids(const QString &serviceJid)
 {
     co_return map<ChannelJidResult>(
@@ -528,13 +537,12 @@ QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids
         co_await d->discoveryManager->items(serviceJid));
 }
 
-///
-/// Requests all nodes of a MIX channel that can be subscribed by the user.
-///
-/// \param channelJid JID of the channel
-///
-/// \return the result of the action
-///
+/*!
+    Requests all nodes of the MIX channel with JID \a channelJid that can be
+    subscribed by the user.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::ChannelNodeResult> QXmppMixManager::requestChannelNodes(const QString &channelJid)
 {
     co_return mapSuccess(
@@ -546,13 +554,11 @@ QXmppTask<QXmppMixManager::ChannelNodeResult> QXmppMixManager::requestChannelNod
         });
 }
 
-///
-/// Requests the configuration of a MIX channel.
-///
-/// \param channelJid JID of the channel whose configuration is requested
-///
-/// \return the result of the action
-///
+/*!
+    Requests the configuration of the MIX channel with JID \a channelJid.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::ConfigurationResult> QXmppMixManager::requestChannelConfiguration(const QString &channelJid)
 {
     co_return mapSuccess(
@@ -563,18 +569,18 @@ QXmppTask<QXmppMixManager::ConfigurationResult> QXmppMixManager::requestChannelC
         });
 }
 
-///
-/// Updates the configuration of a MIX channel.
-///
-/// In order to use this method, retrieve the current configuration via
-/// requestChannelConfiguration() first, change the desired attributes and pass the configuration to
-/// this method.
-///
-/// \param channelJid JID of the channel whose configuration is to be updated
-/// \param configuration new configuration of the channel
-///
-/// \return the result of the action
-///
+/*!
+    Updates the configuration of a MIX channel.
+
+    In order to use this method, retrieve the current configuration via
+    requestChannelConfiguration() first, change the desired attributes and pass the configuration to
+    this method.
+
+    \a channelJid is the JID of the channel whose configuration is to be
+    updated. \a configuration is the new configuration of the channel.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::updateChannelConfiguration(const QString &channelJid, QXmppMixConfigItem configuration)
 {
     configuration.setFormType(QXmppDataForm::Submit);
@@ -582,22 +588,20 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::updateChannelConfiguration(
                                .withContext(this));
 }
 
-///
-/// \fn QXmppMixManager::channelConfigurationUpdated(const QString &channelJid, const QXmppMixConfigItem &configuration)
-///
-/// Emitted when the configuration of a MIX channel is updated.
-///
-/// \param channelJid JID of the channel whose configuration is updated
-/// \param configuration new channel configuration
-///
+/*!
+    \fn QXmppMixManager::channelConfigurationUpdated(const QString &channelJid, const QXmppMixConfigItem &configuration)
 
-///
-/// Requests the information of a MIX channel.
-///
-/// \param channelJid JID of the channel whose information is requested
-///
-/// \return the result of the action
-///
+    Emitted when the configuration of a MIX channel is updated.
+
+    \a channelJid is the JID of the channel whose configuration is updated.
+    \a configuration is the new channel configuration.
+*/
+
+/*!
+    Requests the information of the MIX channel with JID \a channelJid.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::InformationResult> QXmppMixManager::requestChannelInformation(const QString &channelJid)
 {
     co_return mapSuccess(
@@ -607,59 +611,59 @@ QXmppTask<QXmppMixManager::InformationResult> QXmppMixManager::requestChannelInf
         });
 }
 
-///
-/// Updates the information of a MIX channel.
-///
-/// In order to use this method, retrieve the current information via requestChannelInformation()
-/// first, change the desired attributes and pass the information to this method.
-///
-/// \param channelJid JID of the channel whose information is to be updated
-/// \param information new information of the channel
-///
-/// \return the result of the action
-///
+/*!
+    Updates the information of a MIX channel.
+
+    In order to use this method, retrieve the current information via requestChannelInformation()
+    first, change the desired attributes and pass the information to this method.
+
+    \a channelJid is the JID of the channel whose information is to be updated.
+    \a information is the new information of the channel.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::updateChannelInformation(const QString &channelJid, QXmppMixInfoItem information)
 {
     information.setFormType(QXmppDataForm::Submit);
     co_return mapToSuccess(co_await d->pubSubManager->publishItem(channelJid, ns_mix_node_info.toString(), information).withContext(this));
 }
 
-///
-/// \fn QXmppMixManager::channelInformationUpdated(const QString &channelJid, const QXmppMixInfoItem &information)
-///
-/// Emitted when the information of a MIX channel is updated.
-///
-/// \param channelJid JID of the channel whose information is updated
-/// \param information new channel information
-///
+/*!
+    \fn QXmppMixManager::channelInformationUpdated(const QString &channelJid, const QXmppMixInfoItem &information)
 
-///
-/// Joins a MIX channel to become a participant of it.
-///
-/// \param channelJid JID of the channel being joined
-/// \param nickname nickname of the user which is usually required by the server (default: no
-///        nickname is set)
-/// \param nodes nodes of the channel that are subscribed to for receiving their updates (default:
-///        all nodes are subcribed to)
-///
-/// \return the result of the action
-///
+    Emitted when the information of a MIX channel is updated.
+
+    \a channelJid is the JID of the channel whose information is updated.
+    \a information is the new channel information.
+*/
+
+/*!
+    Joins a MIX channel to become a participant of it.
+
+    \a channelJid is the JID of the channel being joined. \a nickname is the
+    nickname of the user which is usually required by the server (default: no
+    nickname is set). \a nodes are the nodes of the channel that are
+    subscribed to for receiving their updates (default: all nodes are
+    subcribed to).
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::JoiningResult> QXmppMixManager::joinChannel(const QString &channelJid, const QString &nickname, QXmppMixConfigItem::Nodes nodes)
 {
     return joinChannel(prepareJoinIq(channelJid, nickname, nodes));
 }
 
-///
-/// Joins a MIX channel via an invitation to become a participant of it.
-///
-/// \param invitation invitation to the channel
-/// \param nickname nickname of the user which is usually required by the server (default: no
-///        nickname is set)
-/// \param nodes nodes of the channel that are subscribed to for receiving their updates (default:
-///        all nodes are subcribed to)
-///
-/// \return the result of the action
-///
+/*!
+    Joins a MIX channel via an invitation to become a participant of it.
+
+    \a invitation is the invitation to the channel. \a nickname is the
+    nickname of the user which is usually required by the server (default: no
+    nickname is set). \a nodes are the nodes of the channel that are
+    subscribed to for receiving their updates (default: all nodes are
+    subcribed to).
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::JoiningResult> QXmppMixManager::joinChannel(const QXmppMixInvitation &invitation, const QString &nickname, QXmppMixConfigItem::Nodes nodes)
 {
     auto iq = prepareJoinIq(invitation.channelJid(), nickname, nodes);
@@ -672,16 +676,16 @@ QXmppTask<QXmppMixManager::JoiningResult> QXmppMixManager::joinChannel(const QXm
     return joinChannel(std::move(iq));
 }
 
-///
-/// Updates the nickname within a channel.
-///
-/// If the update succeeded, the new nickname is returned which may differ from the requested one.
-///
-/// \param channelJid JID of the channel
-/// \param nickname nickname to be set
-///
-/// \return the result of the action
-///
+/*!
+    Updates the nickname within a channel.
+
+    If the update succeeded, the new nickname is returned which may differ from the requested one.
+
+    \a channelJid is the JID of the channel. \a nickname is the nickname to be
+    set.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::NicknameResult> QXmppMixManager::updateNickname(const QString &channelJid, const QString &nickname)
 {
     QXmppMixIq iq;
@@ -695,15 +699,15 @@ QXmppTask<QXmppMixManager::NicknameResult> QXmppMixManager::updateNickname(const
     });
 }
 
-///
-/// Updates the subscriptions to nodes of a MIX channel.
-///
-/// \param channelJid JID of the channel
-/// \param subscriptionAdditions nodes to subscribe to
-/// \param subscriptionRemovals nodes to unsubscribe from
-///
-/// \return the result of the action
-///
+/*!
+    Updates the subscriptions to nodes of a MIX channel.
+
+    \a channelJid is the JID of the channel. \a subscriptionAdditions are the
+    nodes to subscribe to. \a subscriptionRemovals are the nodes to
+    unsubscribe from.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::SubscriptionResult> QXmppMixManager::updateSubscriptions(const QString &channelJid, QXmppMixConfigItem::Nodes subscriptionAdditions, QXmppMixConfigItem::Nodes subscriptionRemovals)
 {
     QXmppMixSubscriptionUpdateIq iq;
@@ -719,26 +723,28 @@ QXmppTask<QXmppMixManager::SubscriptionResult> QXmppMixManager::updateSubscripti
         });
 }
 
-///
-/// Requests an invitation to a MIX channel that the invitee is not yet allowed to participate in.
-///
-/// The invitee can use the invitation to join the channel.
-///
-/// That invitation mechanism avoids storing allowed JIDs for an indefinite time if the
-/// corresponding user never joins the channel.
-/// By using this method, there is no need to allow the invitee to participate in the channel via
-/// allowJid().
-///
-/// This method can be used in the following cases:
-///     * The inviter is an administrator of the channel.
-///     * The inviter is a participant of the channel and the channel allows all participants to
-///       invite new users.
-///
-/// \param channelJid JID of the channel that the invitee is invited to
-/// \param inviteeJid JID of the invitee
-///
-/// \return the result of the action
-///
+/*!
+    Requests an invitation to a MIX channel that the invitee is not yet allowed to participate in.
+
+    The invitee can use the invitation to join the channel.
+
+    That invitation mechanism avoids storing allowed JIDs for an indefinite time if the
+    corresponding user never joins the channel.
+    By using this method, there is no need to allow the invitee to participate in the channel via
+    allowJid().
+
+    This method can be used in the following cases:
+    \list
+        \li The inviter is an administrator of the channel.
+        \li The inviter is a participant of the channel and the channel allows all participants to
+            invite new users.
+    \endlist
+
+    \a channelJid is the JID of the channel that the invitee is invited to.
+    \a inviteeJid is the JID of the invitee.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::InvitationResult> QXmppMixManager::requestInvitation(const QString &channelJid, const QString &inviteeJid)
 {
     QXmppMixInvitationRequestIq iq;
@@ -753,217 +759,208 @@ QXmppTask<QXmppMixManager::InvitationResult> QXmppMixManager::requestInvitation(
         });
 }
 
-///
-/// Requests all JIDs which are allowed to participate in a MIX channel.
-///
-/// The JIDs can specify users (e.g., "alice@example.org") or groups of users (e.g., "example.org")
-/// for allowing all users to participate that have a JID containing the specified domain.
-///
-/// \param channelJid JID of the channel
-///
-/// \return the result of the action
-///
+/*!
+    Requests all JIDs which are allowed to participate in the MIX channel with
+    JID \a channelJid.
+
+    The JIDs can specify users (e.g., "alice@example.org") or groups of users (e.g., "example.org")
+    for allowing all users to participate that have a JID containing the specified domain.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestAllowedJids(const QString &channelJid)
 {
     return requestJids(channelJid, ns_mix_node_allowed.toString());
 }
 
-///
-/// Allows a JID to participate in a MIX channel.
-///
-/// The JID can specify a user (e.g., "alice@example.org") or a group of users (e.g., "example.org")
-/// for allowing all users to participate that have a JID containing the specified domain.
-///
-/// Allowing a JID is only needed if the channel does not allow anyone to participate.
-/// That is the case when QXmppMixConfigItem::Node::AllowedJids exists for the channel.
-/// Use requestChannelConfiguration() and QXmppMixConfigItem::nodes() to determine that.
-/// Call updateChannelConfiguration() and QXmppMixConfigItem::setNodes() to update it accordingly.
-/// In order to allow all JIDs to participate in a channel, you need to remove
-/// QXmppMixConfigItem::Node::AllowedJids from the channel's nodes.
-///
-/// \param channelJid JID of the channel
-/// \param jid bare JID to be allowed
-///
-/// \return the result of the action
-///
+/*!
+    Allows a JID to participate in a MIX channel.
+
+    The JID can specify a user (e.g., "alice@example.org") or a group of users (e.g., "example.org")
+    for allowing all users to participate that have a JID containing the specified domain.
+
+    Allowing a JID is only needed if the channel does not allow anyone to participate.
+    That is the case when QXmppMixConfigItem::Node::AllowedJids exists for the channel.
+    Use requestChannelConfiguration() and QXmppMixConfigItem::nodes() to determine that.
+    Call updateChannelConfiguration() and QXmppMixConfigItem::setNodes() to update it accordingly.
+    In order to allow all JIDs to participate in a channel, you need to remove
+    QXmppMixConfigItem::Node::AllowedJids from the channel's nodes.
+
+    \a channelJid is the JID of the channel. \a jid is the bare JID to be
+    allowed.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::allowJid(const QString &channelJid, const QString &jid)
 {
     return addJidToNode(channelJid, ns_mix_node_allowed.toString(), jid);
 }
 
-///
-/// \fn QXmppMixManager::jidAllowed(const QString &channelJid, const QString &jid)
-///
-/// Emitted when a JID is allowed to participate in a MIX channel.
-///
-/// That happens if allowJid() was successful or if another resource or user did that.
-///
-/// \param channelJid JID of the channel
-/// \param jid allowed bare JID
-///
+/*!
+    \fn QXmppMixManager::jidAllowed(const QString &channelJid, const QString &jid)
 
-///
-/// \fn QXmppMixManager::allJidsAllowed(const QString &channelJid)
-///
-/// Emitted when all JIDs are allowed to participate in a MIX channel.
-///
-/// That happens if QXmppMixConfigItem::Node::AllowedJids is removed from a channel.
-///
-/// \param channelJid JID of the channel
-///
+    Emitted when a JID is allowed to participate in a MIX channel.
 
-///
-/// Disallows a formerly allowed JID to participate in a MIX channel.
-///
-/// Only allowed JIDs can be disallowed via this method.
-/// In order to disallow other JIDs, use banJid().
-///
-/// \param channelJid JID of the channel
-/// \param jid bare JID to be disallowed
-///
-/// \return the result of the action
-///
+    That happens if allowJid() was successful or if another resource or user did that.
+
+    \a channelJid is the JID of the channel. \a jid is the allowed bare JID.
+*/
+
+/*!
+    \fn QXmppMixManager::allJidsAllowed(const QString &channelJid)
+
+    Emitted when all JIDs are allowed to participate in a MIX channel.
+
+    That happens if QXmppMixConfigItem::Node::AllowedJids is removed from a channel.
+
+    \a channelJid is the JID of the channel.
+*/
+
+/*!
+    Disallows a formerly allowed JID to participate in a MIX channel.
+
+    Only allowed JIDs can be disallowed via this method.
+    In order to disallow other JIDs, use banJid().
+
+    \a channelJid is the JID of the channel. \a jid is the bare JID to be
+    disallowed.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::disallowJid(const QString &channelJid, const QString &jid)
 {
     return d->pubSubManager->retractItem(channelJid, ns_mix_node_allowed.toString(), jid);
 }
 
-///
-/// \fn QXmppMixManager::jidDisallowed(const QString &channelJid, const QString &jid)
-///
-/// Emitted when a fomerly allowed JID is disallowed to participate in a MIX channel anymore.
-///
-/// That happens if disallowJid() was successful or if another resource or user did that.
-///
-/// \param channelJid JID of the channel
-/// \param jid disallowed bare JID
-///
+/*!
+    \fn QXmppMixManager::jidDisallowed(const QString &channelJid, const QString &jid)
 
-///
-/// Disallows all formerly allowed JIDs to participate in a MIX channel.
-///
-/// Only allowed JIDs can be disallowed via this method.
-/// In order to disallow other JIDs, use banJid().
-///
-/// \param channelJid JID of the channel
-///
-/// \return the result of the action
-///
+    Emitted when a fomerly allowed JID is disallowed to participate in a MIX channel anymore.
+
+    That happens if disallowJid() was successful or if another resource or user did that.
+
+    \a channelJid is the JID of the channel. \a jid is the disallowed bare
+    JID.
+*/
+
+/*!
+    Disallows all formerly allowed JIDs to participate in the MIX channel
+    with JID \a channelJid.
+
+    Only allowed JIDs can be disallowed via this method.
+    In order to disallow other JIDs, use banJid().
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::disallowAllJids(const QString &channelJid)
 {
     return d->pubSubManager->purgeItems(channelJid, ns_mix_node_allowed.toString());
 }
 
-///
-/// \fn QXmppMixManager::allJidsDisallowed(const QString &channelJid)
-///
-/// Emitted when no JID is allowed to participate in a MIX channel anymore.
-///
-/// That happens if disallowAllJids() was successful or if another resource or user did that.
-///
-/// \param channelJid JID of the channel
-///
+/*!
+    \fn QXmppMixManager::allJidsDisallowed(const QString &channelJid)
 
-///
-/// Requests all JIDs which are not allowed to participate in a MIX channel.
-///
-/// \param channelJid JID of the corresponding channel
-///
-/// \return the result of the action
-///
+    Emitted when no JID is allowed to participate in a MIX channel anymore.
+
+    That happens if disallowAllJids() was successful or if another resource or user did that.
+
+    \a channelJid is the JID of the channel.
+*/
+
+/*!
+    Requests all JIDs which are not allowed to participate in the MIX channel
+    with JID \a channelJid.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestBannedJids(const QString &channelJid)
 {
     return requestJids(channelJid, ns_mix_node_banned.toString());
 }
 
-///
-/// Bans a JID from participating in a MIX channel.
-///
-/// The JID can specify a user (e.g., "alice@example.org") or a group of users (e.g., "example.org")
-/// for banning all users that have a JID containing the specified domain.
-///
-/// Before calling this, make sure that QXmppMixConfigItem::Node::BannedJids exists for the channel.
-/// Use requestChannelConfiguration() and QXmppMixConfigItem::nodes() to determine that.
-/// Call updateChannelConfiguration() and QXmppMixConfigItem::setNodes() to update it accordingly.
-///
-/// \param channelJid JID of the channel
-/// \param jid bare JID to be banned
-///
-/// \return the result of the action
-///
+/*!
+    Bans a JID from participating in a MIX channel.
+
+    The JID can specify a user (e.g., "alice@example.org") or a group of users (e.g., "example.org")
+    for banning all users that have a JID containing the specified domain.
+
+    Before calling this, make sure that QXmppMixConfigItem::Node::BannedJids exists for the channel.
+    Use requestChannelConfiguration() and QXmppMixConfigItem::nodes() to determine that.
+    Call updateChannelConfiguration() and QXmppMixConfigItem::setNodes() to update it accordingly.
+
+    \a channelJid is the JID of the channel. \a jid is the bare JID to be
+    banned.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::banJid(const QString &channelJid, const QString &jid)
 {
     return addJidToNode(channelJid, ns_mix_node_banned.toString(), jid);
 }
 
-///
-/// \fn QXmppMixManager::jidBanned(const QString &channelJid, const QString &jid)
-///
-/// Emitted when a JID is banned from participating in a MIX channel.
-///
-/// That happens if banJid() was successful or if another resource or user did that.
-///
-/// \param channelJid JID of the channel
-/// \param jid banned bare JID
-///
+/*!
+    \fn QXmppMixManager::jidBanned(const QString &channelJid, const QString &jid)
 
-///
-/// Unbans a formerly banned JID from participating in a MIX channel.
-///
-/// \param channelJid JID of the channel
-/// \param jid bare JID to be unbanned
-///
-/// \return the result of the action
-///
+    Emitted when a JID is banned from participating in a MIX channel.
+
+    That happens if banJid() was successful or if another resource or user did that.
+
+    \a channelJid is the JID of the channel. \a jid is the banned bare JID.
+*/
+
+/*!
+    Unbans a formerly banned JID from participating in a MIX channel.
+
+    \a channelJid is the JID of the channel. \a jid is the bare JID to be
+    unbanned.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::unbanJid(const QString &channelJid, const QString &jid)
 {
     return d->pubSubManager->retractItem(channelJid, ns_mix_node_banned.toString(), jid);
 }
 
-///
-/// \fn QXmppMixManager::jidUnbanned(const QString &channelJid, const QString &jid)
-///
-/// Emitted when a formerly banned JID is unbanned from participating in a MIX channel.
-///
-/// That happens if unbanJid() was successful or if another resource or user did that.
-///
-/// \param channelJid JID of the channel
-/// \param jid unbanned bare JID
-///
+/*!
+    \fn QXmppMixManager::jidUnbanned(const QString &channelJid, const QString &jid)
 
-///
-/// Unbans all formerly banned JIDs from participating in a MIX channel.
-///
-/// \param channelJid JID of the channel
-///
-/// \return the result of the action
-///
+    Emitted when a formerly banned JID is unbanned from participating in a MIX channel.
+
+    That happens if unbanJid() was successful or if another resource or user did that.
+
+    \a channelJid is the JID of the channel. \a jid is the unbanned bare JID.
+*/
+
+/*!
+    Unbans all formerly banned JIDs from participating in the MIX channel
+    with JID \a channelJid.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::unbanAllJids(const QString &channelJid)
 {
     return d->pubSubManager->purgeItems(channelJid, ns_mix_node_banned.toString());
 }
 
-///
-/// \fn QXmppMixManager::allJidsUnbanned(const QString &channelJid)
-///
-/// Emitted when all JIDs are unbanned from participating in a MIX channel.
-///
-/// That happens if unbanAllJids() was successful or if another resource or user did that.
-/// Furthermore, that happens if QXmppMixConfigItem::Node::BannedJids is removed from a channel.
-///
-/// \param channelJid JID of the channel
-///
+/*!
+    \fn QXmppMixManager::allJidsUnbanned(const QString &channelJid)
 
-///
-/// Requests all participants of a MIX channel.
-///
-/// In the case of a channel that not everybody is allowed to participate in, the participants are a
-/// subset of the allowed JIDs.
-///
-/// \param channelJid JID of the channel
-///
-/// \return the result of the action
-///
+    Emitted when all JIDs are unbanned from participating in a MIX channel.
+
+    That happens if unbanAllJids() was successful or if another resource or user did that.
+    Furthermore, that happens if QXmppMixConfigItem::Node::BannedJids is removed from a channel.
+
+    \a channelJid is the JID of the channel.
+*/
+
+/*!
+    Requests all participants of the MIX channel with JID \a channelJid.
+
+    In the case of a channel that not everybody is allowed to participate in, the participants are a
+    subset of the allowed JIDs.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::ParticipantResult> QXmppMixManager::requestParticipants(const QString &channelJid)
 {
     co_return mapSuccess(
@@ -974,31 +971,29 @@ QXmppTask<QXmppMixManager::ParticipantResult> QXmppMixManager::requestParticipan
         });
 }
 
-///
-/// \fn QXmppMixManager::participantReceived(const QString &channelJid, const QXmppMixParticipantItem &participant)
-///
-/// Emitted when a user joined a MIX channel or a participant is updated.
-///
-/// \param channelJid JID of the channel that the user joined or whose participant is updated
-/// \param participant new or updated participant
-///
+/*!
+    \fn QXmppMixManager::participantReceived(const QString &channelJid, const QXmppMixParticipantItem &participant)
 
-///
-/// \fn QXmppMixManager::participantLeft(const QString &channelJid, const QString &participantId)
-///
-/// Emitted when a participant left the MIX channel.
-///
-/// \param channelJid JID of the channel that is left by the participant
-/// \param participantId ID of the left participant
-///
+    Emitted when a user joined a MIX channel or a participant is updated.
 
-///
-/// Leaves a MIX channel.
-///
-/// \param channelJid JID of the channel to be left
-///
-/// \return the result of the action
-///
+    \a channelJid is the JID of the channel that the user joined or whose
+    participant is updated. \a participant is the new or updated participant.
+*/
+
+/*!
+    \fn QXmppMixManager::participantLeft(const QString &channelJid, const QString &participantId)
+
+    Emitted when a participant left the MIX channel.
+
+    \a channelJid is the JID of the channel that is left by the participant.
+    \a participantId is the ID of the left participant.
+*/
+
+/*!
+    Leaves the MIX channel with JID \a channelJid.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::leaveChannel(const QString &channelJid)
 {
     QXmppMixIq iq;
@@ -1010,13 +1005,11 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::leaveChannel(const QString 
     return client()->sendGenericIq(std::move(iq));
 }
 
-///
-/// Deletes a MIX channel.
-///
-/// \param channelJid JID of the channel to be deleted
-///
-/// \return the result of the action
-///
+/*!
+    Deletes the MIX channel with JID \a channelJid.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::deleteChannel(const QString &channelJid)
 {
     QXmppMixIq iq;
@@ -1028,15 +1021,14 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::deleteChannel(const QString
     return client()->sendGenericIq(std::move(iq));
 }
 
-///
-/// \fn QXmppMixManager::channelDeleted(const QString &channelJid)
-///
-/// Emitted when a MIX channel is deleted.
-///
-/// \param channelJid JID of the deleted channel
-///
+/*!
+    \fn QXmppMixManager::channelDeleted(const QString &channelJid)
 
-/// \cond
+    Emitted when a MIX channel is deleted.
+
+    \a channelJid is the JID of the deleted channel.
+*/
+
 void QXmppMixManager::onRegistered(QXmppClient *client)
 {
     d->discoveryManager = client->findExtension<QXmppDiscoveryManager>();
@@ -1305,19 +1297,18 @@ bool QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QStrin
 
     return false;
 }
-/// \endcond
 
-///
-/// Pepares an IQ stanza for joining a MIX channel.
-///
-/// \param channelJid JID of the channel being joined
-/// \param nickname nickname of the user which is usually required by the server (default: no
-///        nickname is set)
-/// \param nodes nodes of the channel that are subscribed to for receiving their updates (default:
-///        all nodes are subcribed to)
-///
-/// \return the prepared MIX join IQ stanza
-///
+/*!
+    Pepares an IQ stanza for joining a MIX channel.
+
+    \a channelJid is the JID of the channel being joined. \a nickname is the
+    nickname of the user which is usually required by the server (default: no
+    nickname is set). \a nodes are the nodes of the channel that are
+    subscribed to for receiving their updates (default: all nodes are
+    subcribed to).
+
+    Returns the prepared MIX join IQ stanza.
+*/
 QXmppMixIq QXmppMixManager::prepareJoinIq(const QString &channelJid, const QString &nickname, QXmppMixConfigItem::Nodes nodes)
 {
     QXmppMixIq iq;
@@ -1331,13 +1322,11 @@ QXmppMixIq QXmppMixManager::prepareJoinIq(const QString &channelJid, const QStri
     return iq;
 }
 
-///
-/// Joins a MIX channel.
-///
-/// \param iq IQ stanza for joining a channel
-///
-/// \return the result of the action
-///
+/*!
+    Joins a MIX channel using the IQ stanza \a iq for joining a channel.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::JoiningResult> QXmppMixManager::joinChannel(QXmppMixIq &&iq)
 {
     co_return mapSuccess(
@@ -1347,16 +1336,16 @@ QXmppTask<QXmppMixManager::JoiningResult> QXmppMixManager::joinChannel(QXmppMixI
         });
 }
 
-///
-/// Requests all JIDs of a node belonging to a MIX.
-///
-/// This is only used for nodes storing items with IDs representing JIDs.
-///
-/// \param channelJid JID of the channel
-/// \param node node to be queried
-///
-/// \return the result of the action
-///
+/*!
+    Requests all JIDs of a node belonging to a MIX.
+
+    This is only used for nodes storing items with IDs representing JIDs.
+
+    \a channelJid is the JID of the channel. \a node is the node to be
+    queried.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestJids(const QString &channelJid, const QString &node)
 {
     co_return mapSuccess(
@@ -1368,17 +1357,16 @@ QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestJids(const QString
         });
 }
 
-///
-/// Adds a JID to a node of a MIX channel.
-///
-/// This is only used for nodes storing items with IDs representing JIDs.
-///
-/// \param channelJid JID of the channel
-/// \param node node to which the JID is added
-/// \param jid JID to be added
-///
-/// \return the result of the action
-///
+/*!
+    Adds a JID to a node of a MIX channel.
+
+    This is only used for nodes storing items with IDs representing JIDs.
+
+    \a channelJid is the JID of the channel. \a node is the node to which the
+    JID is added. \a jid is the JID to be added.
+
+    Returns the result of the action.
+*/
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::addJidToNode(const QString &channelJid, const QString &node, const QString &jid)
 {
     co_return mapToSuccess(co_await d->pubSubManager->publishItem(channelJid, node, QXmppPubSubBaseItem { jid }).withContext(this));
@@ -1400,12 +1388,11 @@ void QXmppMixManager::updateSupport()
     });
 }
 
-///
-/// Sets the server's support for MIX channel participants as specified in
-/// \xep{0405, Mediated Information eXchange (MIX): Participant Server Requirements}.
-///
-/// \param participantSupport server support for MIX channel participants
-///
+/*!
+    Sets the server's support for MIX channel participants to
+    \a participantSupport as specified in \xep{0405}{Mediated Information
+    eXchange (MIX): Participant Server Requirements}.
+*/
 void QXmppMixManager::setParticipantSupport(Support participantSupport)
 {
     if (d->participantSupport != participantSupport) {
@@ -1414,13 +1401,12 @@ void QXmppMixManager::setParticipantSupport(Support participantSupport)
     }
 }
 
-///
-/// Sets the server's support for archiving messages via \xep{0313, Message Archive Management} of
-/// MIX channels the user participates in as specified in
-/// \xep{0405, Mediated Information eXchange (MIX): Participant Server Requirements}.
-///
-/// \param messageArchivingSupport server support for archiving MIX messages
-///
+/*!
+    Sets the server's support for archiving messages via \xep{0313}{Message
+    Archive Management} of MIX channels the user participates in to
+    \a messageArchivingSupport as specified in \xep{0405}{Mediated
+    Information eXchange (MIX): Participant Server Requirements}.
+*/
 void QXmppMixManager::setMessageArchivingSupport(Support messageArchivingSupport)
 {
     if (d->messageArchivingSupport != messageArchivingSupport) {

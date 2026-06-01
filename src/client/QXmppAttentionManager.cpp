@@ -17,49 +17,47 @@
 
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppAttentionManager
-///
-/// \brief The QXmppAttentionManager class manages attention requests as defined
-/// by \xep{0224, Attention}.
-///
-/// The manager also does some checks, including rate limiting and checking
-/// whether the senders are trusted (aka. in the roster).
-///
-/// Rate limited messages are not emitted on the normal attentionRequested()
-/// signal and are sent on the attentionRequestRateLimited() signal instead.
-///
-/// To use this manager you still need to instantiate it and register it with
-/// the QXmppClient:
-///
-/// \code
-/// auto *attentionManager = new QXmppAttentionManager();
-/// client->addExtension(attentionManager);
-/// \endcode
-///
-/// \since QXmpp 1.4
-///
+/*!
+    \class QXmppAttentionManager
+    \inmodule QXmpp
 
-///
-/// \fn QXmppAttentionManager::attentionRequested
-///
-/// This signal is emitted when an attention request was received and it passed
-/// the rate limiter.
-///
-/// \param message The message with the attention request that was received.
-/// \param isTrusted Whether the sender of the message exists in the user's
-/// roster.
-///
+    \brief The QXmppAttentionManager class manages attention requests as defined
+    by \xep{0224}{Attention}.
 
-///
-/// \fn QXmppAttentionManager::attentionRequestRateLimited
-///
-/// This signal is emitted when an attention request did not pass the rate
-/// limiter.
-///
-/// \param message The message with the attention request that did not pass the
-/// rate limiter.
-///
+    The manager also does some checks, including rate limiting and checking
+    whether the senders are trusted (aka. in the roster).
+
+    Rate limited messages are not emitted on the normal attentionRequested()
+    signal and are sent on the attentionRequestRateLimited() signal instead.
+
+    To use this manager you still need to instantiate it and register it with
+    the QXmppClient:
+
+    \code
+    auto *attentionManager = new QXmppAttentionManager();
+    client->addExtension(attentionManager);
+    \endcode
+
+    \since QXmpp 1.4
+*/
+
+/*!
+    \fn void QXmppAttentionManager::attentionRequested(const QXmppMessage &message, bool isTrusted)
+
+    This signal is emitted when an attention request was received and it passed
+    the rate limiter.
+
+    \a message is the message with the attention request that was received.
+    \a isTrusted is whether the sender of the message exists in the user's roster.
+*/
+
+/*!
+    \fn void QXmppAttentionManager::attentionRequestRateLimited(const QXmppMessage &message)
+
+    This signal is emitted when an attention request did not pass the rate
+    limiter. \a message is the message with the attention request that did not pass the rate
+    limiter.
+*/
 
 struct PastRequest {
     QString bareJid;
@@ -82,11 +80,11 @@ public:
     QTimer *cleanUpTimer;
 };
 
-///
-/// \brief QXmppAttentionManager::QXmppAttentionManager
-/// \param allowedAttempts
-/// \param timeFrame
-///
+/*!
+    \brief QXmppAttentionManager::QXmppAttentionManager
+
+    Constructs the manager with the given \a allowedAttempts and \a timeFrame.
+*/
 QXmppAttentionManager::QXmppAttentionManager(quint8 allowedAttempts, QTime timeFrame)
     : d(new QXmppAttentionManagerPrivate(this, allowedAttempts, timeFrame))
 {
@@ -94,9 +92,7 @@ QXmppAttentionManager::QXmppAttentionManager(quint8 allowedAttempts, QTime timeF
 
 QXmppAttentionManager::~QXmppAttentionManager() = default;
 
-///
-/// Returns the \xep{0224, Attention} feature.
-///
+/*! Returns the \xep{0224}{Attention} feature. */
 QStringList QXmppAttentionManager::discoveryFeatures() const
 {
     return {
@@ -104,70 +100,74 @@ QStringList QXmppAttentionManager::discoveryFeatures() const
     };
 }
 
-///
-/// Returns the number of allowed attempts of attentions from a bare JID in the
-/// set time frame.
-///
-/// \sa setAllowedAttempts()
-/// \sa allowedAttemptsTimeInterval()
-/// \sa setAllowedAttemptsTimeInterval()
-///
+/*!
+    Returns the number of allowed attempts of attentions from a bare JID in the
+    set time frame.
+
+    \sa setAllowedAttempts()
+    \sa allowedAttemptsTimeInterval()
+    \sa setAllowedAttemptsTimeInterval()
+*/
 quint8 QXmppAttentionManager::allowedAttempts() const
 {
     return d->allowedAttempts;
 }
 
-///
-/// Sets the number of allowed attempts of attentions from a bare JID in the set
-/// time frame.
-///
-/// \sa allowedAttempts()
-/// \sa allowedAttemptsTimeInterval()
-/// \sa setAllowedAttemptsTimeInterval()
-///
+/*!
+    Sets the number of allowed attempts of attentions from a bare JID in the set
+    time frame.
+
+    \sa allowedAttempts()
+    \sa allowedAttemptsTimeInterval()
+    \sa setAllowedAttemptsTimeInterval()
+
+    \a allowedAttempts.
+*/
 void QXmppAttentionManager::setAllowedAttempts(quint8 allowedAttempts)
 {
     d->allowedAttempts = allowedAttempts;
 }
 
-///
-/// Returns the time interval for the allowed attempts for rate limiting.
-///
-/// \sa setAllowedAttemptsTimeInterval()
-/// \sa allowedAttempts()
-/// \sa setAllowedAttemptsTimeInterval()
-///
+/*!
+    Returns the time interval for the allowed attempts for rate limiting.
+
+    \sa setAllowedAttemptsTimeInterval()
+    \sa allowedAttempts()
+    \sa setAllowedAttemptsTimeInterval()
+*/
 QTime QXmppAttentionManager::allowedAttemptsTimeInterval() const
 {
     return d->allowedAttemptsTimeInterval;
 }
 
-///
-/// Returns the time interval for the allowed attempts for rate limiting.
-///
-/// \sa allowedAttemptsTimeInterval()
-/// \sa allowedAttempts()
-/// \sa setAllowedAttempts()
-///
+/*!
+    Returns the time interval for the allowed attempts for rate limiting.
+
+    \sa allowedAttemptsTimeInterval()
+    \sa allowedAttempts()
+    \sa setAllowedAttempts()
+
+    \a interval.
+*/
 void QXmppAttentionManager::setAllowedAttemptsTimeInterval(QTime interval)
 {
     d->allowedAttemptsTimeInterval = interval;
 }
 
-///
-/// Sends a message of type chat with an attention request to the specified JID.
-///
-/// \xep{0224, Attention} allows to include other elements with an attention request, but
-/// the QXmppAttentionManager has no method for this purpose. However, such a
-/// request can still be made manually.
-///
-/// \param jid The address to which the request should be sent.
-/// \param message The message body to include in the attention request.
-///
-/// \return The ID of the sent message, if sent successfully, a null string
-/// otherwise. In case an ID is returned, it also corresponds to the origin ID
-/// of the message as defined by \xep{0359, Unique and Stable Stanza IDs}.
-///
+/*!
+    Sends a message of type chat with an attention request to the specified JID.
+
+    \xep{0224}{Attention} allows to include other elements with an attention request, but
+    the QXmppAttentionManager has no method for this purpose. However, such a
+    request can still be made manually.
+
+    \a jid is the address to which the request should be sent. \a message is the message body
+    to include in the attention request.
+
+    Returns the ID of the sent message, if sent successfully, a null string
+    otherwise. In case an ID is returned, it also corresponds to the origin ID
+    of the message as defined by \xep{0359}{Unique and Stable Stanza IDs}.
+*/
 QString QXmppAttentionManager::requestAttention(const QString &jid, const QString &message)
 {
     QXmppMessage msg;
@@ -232,9 +232,7 @@ QXmppAttentionManagerPrivate::QXmppAttentionManagerPrivate(QXmppAttentionManager
     });
 }
 
-///
-/// Returns true if the request passes the rate limit.
-///
+// Returns true if the request passes the rate limit.
 bool QXmppAttentionManagerPrivate::checkRateLimit(const QString &bareJid)
 {
     // add to request to cache
@@ -252,9 +250,7 @@ bool QXmppAttentionManagerPrivate::checkRateLimit(const QString &bareJid)
     return count <= allowedAttempts;
 }
 
-///
-/// Removes the first entry and reschedules the timer to remove the next.
-///
+// Removes the first entry and reschedules the timer to remove the next.
 void QXmppAttentionManagerPrivate::cleanUp()
 {
     previousRequests.removeFirst();

@@ -10,7 +10,7 @@
 Core classes include all necessary classes to build a basic client or server
 application. This for example also includes the logging class QXmppLogger.
 
-\generatelist {classesbygroup}
+\annotatedlist {Core}
 */
 
 /*!
@@ -21,7 +21,7 @@ Managers are used to extend the basic QXmppClient. Some of them are loaded by
 default, others need to be added to the client using
 QXmppClient::addExtension().
 
-\generatelist {classesbygroup}
+\annotatedlist {Managers}
 */
 
 /*!
@@ -31,5 +31,5 @@ QXmppClient::addExtension().
 All packets that are sent and received are serialized in Stanzas, so this
 includes IQ stanzas, message stanzas, presence stanzas and other stanzas.
 
-\generatelist {classesbygroup}
+\annotatedlist {Stanzas}
 */

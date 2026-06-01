@@ -23,16 +23,17 @@ public:
     QString queryId;
 };
 
-///
-/// \class QXmppMamQueryIq
-///
-/// The QXmppMamQueryIq class represents the query IQ for \xep{0313, Message
-/// Archive Management}.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.0
-///
+/*!
+    \class QXmppMamQueryIq
+    \inmodule QXmpp
+
+    The QXmppMamQueryIq class represents the query IQ for \xep{0313}{Message
+    Archive Management}.
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.0
+*/
 
 QXmppMamQueryIq::QXmppMamQueryIq()
     : QXmppIq(QXmppIq::Set),
@@ -40,89 +41,72 @@ QXmppMamQueryIq::QXmppMamQueryIq()
 {
 }
 
-/// Default copy constructor
+/*! Default copy constructor */
 QXmppMamQueryIq::QXmppMamQueryIq(const QXmppMamQueryIq &) = default;
-/// Default move constructor
+/*! Default move constructor */
 QXmppMamQueryIq::QXmppMamQueryIq(QXmppMamQueryIq &&) = default;
 QXmppMamQueryIq::~QXmppMamQueryIq() = default;
-/// Default assignemnt operator
+/*! Default assignemnt operator */
 QXmppMamQueryIq &QXmppMamQueryIq::operator=(const QXmppMamQueryIq &) = default;
-/// Default move-assignemnt operator
+/*! Default move-assignemnt operator */
 QXmppMamQueryIq &QXmppMamQueryIq::operator=(QXmppMamQueryIq &&) = default;
 
-///
-/// Returns the form that specifies the query.
-///
+/*! Returns the form that specifies the query. */
 QXmppDataForm QXmppMamQueryIq::form() const
 {
     return d->form;
 }
 
-///
-/// Sets the data form that specifies the query.
-///
-/// \param form The data form.
-///
+/*!
+    Sets the data \a form that specifies the query.
+*/
 void QXmppMamQueryIq::setForm(const QXmppDataForm &form)
 {
     d->form = form;
 }
 
-///
-/// Returns the result set query for result set management.
-///
+/*! Returns the result set query for result set management. */
 QXmppResultSetQuery QXmppMamQueryIq::resultSetQuery() const
 {
     return d->resultSetQuery;
 }
 
-///
-/// Sets the result set query for result set management.
-///
-/// \param resultSetQuery The result set query.
-///
+/*!
+    Sets \a resultSetQuery for result set management.
+*/
 void QXmppMamQueryIq::setResultSetQuery(const QXmppResultSetQuery &resultSetQuery)
 {
     d->resultSetQuery = resultSetQuery;
 }
 
-///
-/// Returns the node to query.
-///
+/*! Returns the node to query. */
 QString QXmppMamQueryIq::node() const
 {
     return d->node;
 }
 
-///
-/// Sets the node to query.
-///
-/// \param node The node to query.
-///
+/*!
+    Sets the \a node to query.
+*/
 void QXmppMamQueryIq::setNode(const QString &node)
 {
     d->node = node;
 }
 
-///
-/// Returns the queryid that will be included in the results.
-///
+/*! Returns the queryid that will be included in the results. */
 QString QXmppMamQueryIq::queryId() const
 {
     return d->queryId;
 }
 
-///
-/// Sets the queryid that will be included in the results.
-///
-/// \param id The query id.
-///
+/*!
+    Sets the query \a id that will be included in the results.
+*/
 void QXmppMamQueryIq::setQueryId(const QString &id)
 {
     d->queryId = id;
 }
 
-/// \cond
 void QXmppMamQueryIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement queryElement = element.firstChildElement(u"query"_s);
@@ -148,7 +132,6 @@ void QXmppMamQueryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         d->resultSetQuery,
     });
 }
-/// \endcond
 
 class QXmppMamResultIqPrivate : public QSharedData
 {
@@ -157,16 +140,17 @@ public:
     bool complete;
 };
 
-///
-/// \class QXmppMamQueryIq
-///
-/// The QXmppMamQueryIq class represents the result IQ for \xep{0313, Message
-/// Archive Management}.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.0
-///
+/*!
+    \class QXmppMamResultIq
+    \inmodule QXmpp
+
+    The QXmppMamResultIq class represents the result IQ for \xep{0313}{Message
+    Archive Management}.
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.0
+*/
 
 QXmppMamResultIq::QXmppMamResultIq()
     : d(new QXmppMamResultIqPrivate)
@@ -174,51 +158,46 @@ QXmppMamResultIq::QXmppMamResultIq()
     d->complete = false;
 }
 
-/// Default move constructor
+/*! Default move constructor */
 QXmppMamResultIq::QXmppMamResultIq(QXmppMamResultIq &&) = default;
-/// Default copy constructor
+/*! Default copy constructor */
 QXmppMamResultIq::QXmppMamResultIq(const QXmppMamResultIq &) = default;
 QXmppMamResultIq::~QXmppMamResultIq() = default;
-/// Default assignemnt operator
+/*! Default assignemnt operator */
 QXmppMamResultIq &QXmppMamResultIq::operator=(const QXmppMamResultIq &) = default;
-/// Default move-assignemnt operator
+/*! Default move-assignemnt operator */
 QXmppMamResultIq &QXmppMamResultIq::operator=(QXmppMamResultIq &&) = default;
 
-///
-/// Returns the result set reply for result set management.
-///
+/*! Returns the result set reply for result set management. */
 QXmppResultSetReply QXmppMamResultIq::resultSetReply() const
 {
     return d->resultSetReply;
 }
 
-///
-/// Sets the result set reply for result set management
-///
+/*! Sets the \a resultSetReply for result set management. */
 void QXmppMamResultIq::setResultSetReply(const QXmppResultSetReply &resultSetReply)
 {
     d->resultSetReply = resultSetReply;
 }
 
-///
-/// Returns true if the results returned by the server are complete (not
-/// limited by the server).
-///
+/*!
+    Returns true if the results returned by the server are complete (not
+    limited by the server).
+*/
 bool QXmppMamResultIq::complete() const
 {
     return d->complete;
 }
 
-///
-/// Sets if the results returned by the server are complete (not limited by the
-/// server).
-///
+/*!
+    Sets whether the results returned by the server are complete (\a complete),
+    i.e. not limited by the server.
+*/
 void QXmppMamResultIq::setComplete(bool complete)
 {
     d->complete = complete;
 }
 
-/// \cond
 void QXmppMamResultIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement finElement = element.firstChildElement(u"fin"_s);
@@ -237,4 +216,3 @@ void QXmppMamResultIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         d->resultSetReply,
     });
 }
-/// \endcond

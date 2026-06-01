@@ -42,11 +42,11 @@ public:
     QXmppTask<QXmpp::SendResult> sendEncryptedIq(QXmppTask<QXmppE2eeExtension::IqEncryptResult> task);
     QXmppTask<QXmppClient::IqResult> sendSensitiveIq(QXmppIq iq, std::optional<QXmppSendStanzaParams> params);
 
-    /// Current presence of the client
+    /*! Current presence of the client */
     QXmppPresence clientPresence;
     QList<QXmppClientExtension *> extensions;
     QXmppLogger *logger;
-    /// Pointer to the XMPP stream
+    /*! Pointer to the XMPP stream */
     QXmppOutgoingClient *stream;
     QVector<QXmpp::StreamError> ignoredStreamErrors;
 

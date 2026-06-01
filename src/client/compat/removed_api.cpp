@@ -26,106 +26,104 @@ using namespace QXmpp::Private;
 
 // Client
 
-///
-/// \brief You need to implement this method to process incoming XMPP
-/// stanzas.
-///
-/// You should return true if the stanza was handled and no further
-/// processing should occur, or false to let other extensions process
-/// the stanza.
-///
-/// End-to-end encrypted stanzas are not passed to this overload, for that
-/// purpose use the new overload instead.
-///
-/// \deprecated This is deprecated since QXmpp 1.5. Please use
-/// QXmppClientExtension::handleStanza(const QDomElement &stanza,
-/// const std::optional<QXmppE2eeMetadata> &e2eeMetadata).
-/// Currently both methods are called by the client, so only implement one!
-///
+/*!
+    \brief You need to implement this method to process incoming XMPP
+    stanzas.
+
+    You should return true if the stanza was handled and no further
+    processing should occur, or false to let other extensions process
+    the stanza.
+
+    End-to-end encrypted stanzas are not passed to this overload, for that
+    purpose use the new overload instead.
+
+    \deprecated This is deprecated since QXmpp 1.5. Please use
+    QXmppClientExtension::handleStanza(const QDomElement &stanza,
+    const std::optional<QXmppE2eeMetadata> &e2eeMetadata).
+    Currently both methods are called by the client, so only implement one!
+*/
 bool QXmppClientExtension::handleStanza(const QDomElement &)
 {
     return false;
 }
 
-///
-/// Returns the reference to QXmppRosterManager object of the client.
-///
-/// \return Reference to the roster object of the connected client. Use this to
-/// get the list of friends in the roster and their presence information.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppClient::findExtension<QXmppRosterManager>() instead.
-///
+/*!
+    Returns the reference to the QXmppRosterManager object of the connected client.
+    Use this to get the list of friends in the roster and their presence information.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppClient::findExtension<QXmppRosterManager>() instead.
+*/
 QXmppRosterManager &QXmppClient::rosterManager()
 {
     return *findExtension<QXmppRosterManager>();
 }
 
-///
-/// Returns the reference to QXmppVCardManager, implementation of \xep{0054, vcard-temp}.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppClient::findExtension<QXmppVCardManager>() instead.
-///
+/*!
+    Returns the reference to QXmppVCardManager, implementation of \xep{0054}{vcard-temp}.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppClient::findExtension<QXmppVCardManager>() instead.
+*/
 QXmppVCardManager &QXmppClient::vCardManager()
 {
     return *findExtension<QXmppVCardManager>();
 }
 
-///
-/// Returns the reference to QXmppVersionManager, implementation of \xep{0092, Software Version}.
-///
-/// \deprecated This method is deprecated since QXmpp 1.1. Use
-/// \c QXmppClient::findExtension<QXmppVersionManager>() instead.
-///
+/*!
+    Returns the reference to QXmppVersionManager, implementation of \xep{0092}{Software Version}.
+
+    \deprecated This method is deprecated since QXmpp 1.1. Use
+    \c QXmppClient::findExtension<QXmppVersionManager>() instead.
+*/
 QXmppVersionManager &QXmppClient::versionManager()
 {
     return *findExtension<QXmppVersionManager>();
 }
 
-///
-/// After successfully connecting to the server use this function to send
-/// stanzas to the server. This function can solely be used to send various kind
-/// of stanzas to the server. QXmppStanza is a parent class of all the stanzas
-/// QXmppMessage, QXmppPresence, QXmppIq, QXmppBind, QXmppRosterIq, QXmppSession
-/// and QXmppVCard.
-///
-/// This function does not end-to-end encrypt the packets.
-///
-/// \return Returns true if the packet was sent, false otherwise.
-///
-/// Following code snippet illustrates how to send a message using this function:
-/// \code
-/// QXmppMessage message(from, to, message);
-/// client.sendPacket(message);
-/// \endcode
-///
-/// \param packet A valid XMPP stanza. It can be an iq, a message or a presence stanza.
-///
-/// \deprecated
-///
+/*!
+    After successfully connecting to the server use this function to send
+    stanzas to the server. This function can solely be used to send various kind
+    of stanzas to the server. QXmppStanza is a parent class of all the stanzas
+    QXmppMessage, QXmppPresence, QXmppIq, QXmppBind, QXmppRosterIq, QXmppSession
+    and QXmppVCard.
+
+    This function does not end-to-end encrypt the packets.
+
+    \a packet is a valid XMPP stanza. It can be an iq, a message or a presence stanza.
+
+    Returns true if the packet was sent, false otherwise.
+
+    Following code snippet illustrates how to send a message using this function:
+    \code
+    QXmppMessage message(from, to, message);
+    client.sendPacket(message);
+    \endcode
+
+    \deprecated
+*/
 bool QXmppClient::sendPacket(const QXmppNonza &packet)
 {
     return d->stream->streamAckManager().sendPacketCompat(packet);
 }
 
-///
-/// Utility function to send message to all the resources associated with the
-/// specified bareJid. If there are no resources available, that is the contact
-/// is offline or not present in the roster, it will still send a message to
-/// the bareJid.
-///
-/// \note Usage of this method is discouraged because most modern clients use
-/// carbon messages (\xep{0280, Message Carbons}) and MAM (\xep{0313, Message
-/// Archive Management}) and so could possibly receive messages multiple times
-/// or not receive them at all.
-/// \c QXmppClient::sendPacket() should be used instead with a \c QXmppMessage.
-///
-/// \param bareJid bareJid of the receiving entity
-/// \param message Message string to be sent.
-///
-/// \deprecated
-///
+/*!
+    Utility function to send message to all the resources associated with the
+    specified bareJid. If there are no resources available, that is the contact
+    is offline or not present in the roster, it will still send a message to
+    the bareJid.
+
+    \note Usage of this method is discouraged because most modern clients use
+    carbon messages (\xep{0280}{Message Carbons}) and MAM (\xep{0313}{Message
+    Archive Management}) and so could possibly receive messages multiple times
+    or not receive them at all.
+    \c QXmppClient::sendPacket() should be used instead with a \c QXmppMessage.
+
+    \a bareJid is the bareJid of the receiving entity. \a message is the message
+    string to be sent.
+
+    \deprecated
+*/
 void QXmppClient::sendMessage(const QString &bareJid, const QString &message)
 {
     QXmppRosterManager *rosterManager = findExtension<QXmppRosterManager>();
@@ -147,14 +145,12 @@ void QXmppClient::sendMessage(const QString &bareJid, const QString &message)
 
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
-///
-/// Requests information from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
-/// \deprecated Use info()
-///
+/*!
+    Requests information from the specified XMPP entity \a jid, optionally
+    restricted to a target node \a node.
+
+    \deprecated Use info()
+*/
 QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &node)
 {
     QXmppDiscoveryIq request;
@@ -167,14 +163,12 @@ QString QXmppDiscoveryManager::requestInfo(const QString &jid, const QString &no
     return client()->sendLegacyId(request);
 }
 
-///
-/// Requests items from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
-/// \deprecated Use items()
-///
+/*!
+    Requests items from the specified XMPP entity \a jid, optionally restricted
+    to a target node \a node.
+
+    \deprecated Use items()
+*/
 QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &node)
 {
     QXmppDiscoveryIq request;
@@ -187,33 +181,31 @@ QString QXmppDiscoveryManager::requestItems(const QString &jid, const QString &n
     return client()->sendLegacyId(request);
 }
 
-///
-/// \typedef QXmppDiscoveryManager::InfoResult
-///
-/// Contains the discovery information result in the form of an QXmppDiscoveryIq
-/// or (in case the request did not succeed) a QXmppStanza::Error.
-///
-/// \since QXmpp 1.5
-///
+/*!
+    \typedef QXmppDiscoveryManager::InfoResult
 
-///
-/// \typedef QXmppDiscoveryManager::ItemsResult
-///
-/// Contains a list of service discovery items or (in case the request did not
-/// succeed) a QXmppStanza::Error.
-///
-/// \since QXmpp 1.5
-///
+    Contains the discovery information result in the form of an QXmppDiscoveryIq
+    or (in case the request did not succeed) a QXmppStanza::Error.
 
-///
-/// Requests information from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
-/// \deprecated Use info()
-/// \since QXmpp 1.5
-///
+    \since QXmpp 1.5
+*/
+
+/*!
+    \typedef QXmppDiscoveryManager::ItemsResult
+
+    Contains a list of service discovery items or (in case the request did not
+    succeed) a QXmppStanza::Error.
+
+    \since QXmpp 1.5
+*/
+
+/*!
+    Requests information from the specified XMPP entity \a jid, optionally
+    restricted to a target node \a node.
+
+    \deprecated Use info()
+    \since QXmpp 1.5
+*/
 QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDiscoInfo(const QString &jid, const QString &node)
 {
     QXmppDiscoveryIq request;
@@ -237,25 +229,23 @@ QXmppTask<QXmppDiscoveryManager::InfoResult> QXmppDiscoveryManager::requestDisco
     co_return iq;
 }
 
-///
-/// Requests items from the specified XMPP entity.
-///
-/// \param jid  The target entity's JID.
-/// \param node The target node (optional).
-///
-/// \deprecated Use items()
-/// \since QXmpp 1.5
-///
+/*!
+    Requests items from the specified XMPP entity \a jid, optionally restricted
+    to a target node \a node.
+
+    \deprecated Use items()
+    \since QXmpp 1.5
+*/
 QXmppTask<QXmppDiscoveryManager::ItemsResult> QXmppDiscoveryManager::requestDiscoItems(const QString &jid, const QString &node)
 {
     return items(jid, node, CachePolicy::Strict);
 }
 
-///
-/// Returns the client's full capabilities.
-///
-/// \deprecated Use buildClientInfo()
-///
+/*!
+    Returns the client's full capabilities.
+
+    \deprecated Use buildClientInfo()
+*/
 QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
 {
     auto info = buildClientInfo();
@@ -270,14 +260,14 @@ QXmppDiscoveryIq QXmppDiscoveryManager::capabilities()
 }
 QT_WARNING_POP
 
-///
-/// Sets the category of the local XMPP client.
-///
-/// You can find a list of valid categories at:
-/// http://xmpp.org/registrar/disco-categories.html
-///
-/// \deprecated Use setIdentities(), this function will remove other identities if set.
-///
+/*!
+    Sets the category of the local XMPP client.
+
+    You can find a list of valid categories at:
+    http://xmpp.org/registrar/disco-categories.html
+
+    \deprecated Use setIdentities(), this function will remove other identities if set.
+*/
 void QXmppDiscoveryManager::setClientCategory(const QString &category)
 {
     if (d->identities.size() != 1) {
@@ -286,14 +276,14 @@ void QXmppDiscoveryManager::setClientCategory(const QString &category)
     d->identities.first().setCategory(category);
 }
 
-///
-/// Sets the type of the local XMPP client.
-///
-/// You can find a list of valid types at:
-/// http://xmpp.org/registrar/disco-categories.html
-///
-/// \deprecated Use setIdentities(), this function will remove other identities if set.
-///
+/*!
+    Sets the type of the local XMPP client.
+
+    You can find a list of valid types at:
+    http://xmpp.org/registrar/disco-categories.html
+
+    \deprecated Use setIdentities(), this function will remove other identities if set.
+*/
 void QXmppDiscoveryManager::setClientType(const QString &type)
 {
     if (d->identities.size() != 1) {
@@ -302,11 +292,11 @@ void QXmppDiscoveryManager::setClientType(const QString &type)
     d->identities.first().setType(type);
 }
 
-///
-/// Sets the name of the local XMPP client.
-///
-/// \deprecated Use setIdentities(), this function will remove other identities if set.
-///
+/*!
+    Sets the name of the local XMPP client.
+
+    \deprecated Use setIdentities(), this function will remove other identities if set.
+*/
 void QXmppDiscoveryManager::setClientName(const QString &name)
 {
     if (d->identities.size() != 1) {
@@ -315,13 +305,13 @@ void QXmppDiscoveryManager::setClientName(const QString &name)
     d->identities.first().setName(name);
 }
 
-///
-/// Returns the category of the local XMPP client.
-///
-/// By default this is "client".
-///
-/// \deprecated Use identities()
-///
+/*!
+    Returns the category of the local XMPP client.
+
+    By default this is "client".
+
+    \deprecated Use identities()
+*/
 QString QXmppDiscoveryManager::clientCategory() const
 {
     if (d->identities.isEmpty()) {
@@ -330,14 +320,14 @@ QString QXmppDiscoveryManager::clientCategory() const
     return d->identities.constFirst().category();
 }
 
-///
-/// Returns the type of the local XMPP client.
-///
-/// With Qt builds for Android, Blackberry, iOS or Windows Phone this is set to
-/// "phone", otherwise it defaults to "pc".
-///
-/// \deprecated Use identities()
-///
+/*!
+    Returns the type of the local XMPP client.
+
+    With Qt builds for Android, Blackberry, iOS or Windows Phone this is set to
+    "phone", otherwise it defaults to "pc".
+
+    \deprecated Use identities()
+*/
 QString QXmppDiscoveryManager::clientType() const
 {
     if (d->identities.isEmpty()) {
@@ -346,13 +336,13 @@ QString QXmppDiscoveryManager::clientType() const
     return d->identities.constFirst().type();
 }
 
-///
-/// Returns the name of the local XMPP client.
-///
-/// By default this is "QXmpp x.y.z".
-///
-/// \deprecated Use identities()
-///
+/*!
+    Returns the name of the local XMPP client.
+
+    By default this is "QXmpp x.y.z".
+
+    \deprecated Use identities()
+*/
 QString QXmppDiscoveryManager::clientApplicationName() const
 {
     if (d->identities.isEmpty()) {
@@ -361,21 +351,21 @@ QString QXmppDiscoveryManager::clientApplicationName() const
     return d->identities.constFirst().name();
 }
 
-///
-/// Returns the client's extended information form, as defined by \xep{0128, Service Discovery Extensions}.
-///
-/// \deprecated Use infoForms()
-///
+/*!
+    Returns the client's extended information form, as defined by \xep{0128}{Service Discovery Extensions}.
+
+    \deprecated Use infoForms()
+*/
 QXmppDataForm QXmppDiscoveryManager::clientInfoForm() const
 {
     return d->dataForms.isEmpty() ? QXmppDataForm() : d->dataForms.constFirst();
 }
 
-///
-/// Sets the client's extended information form, as defined by \xep{0128, Service Discovery Extensions}.
-///
-/// \deprecated Use setInfoForms()
-///
+/*!
+    Sets the client's extended information form, as defined by \xep{0128}{Service Discovery Extensions}.
+
+    \deprecated Use setInfoForms()
+*/
 void QXmppDiscoveryManager::setClientInfoForm(const QXmppDataForm &form)
 {
     d->dataForms = { form };
@@ -383,7 +373,6 @@ void QXmppDiscoveryManager::setClientInfoForm(const QXmppDataForm &form)
 
 // RemoteMethod
 
-/// \cond
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 
@@ -433,18 +422,18 @@ void QXmppRemoteMethod::gotResult(const QXmppRpcResponseIq &iq)
 
 // RpcManager
 
-/// Constructs a QXmppRpcManager.
+/*! Constructs a QXmppRpcManager. */
 QXmppRpcManager::QXmppRpcManager()
 {
 }
 
-/// Adds a local interface which can be queried using RPC.
+/*! Adds a local \a interface which can be queried using RPC. */
 void QXmppRpcManager::addInvokableInterface(QXmppInvokable *interface)
 {
     m_interfaces[QString::fromUtf8(interface->metaObject()->className())] = interface;
 }
 
-/// Invokes a remote interface using RPC.
+/*! Invokes a remote interface using RPC. */
 void QXmppRpcManager::invokeInterfaceMethod(const QXmppRpcInvokeIq &iq)
 {
     QXmppStanza::Error error;
@@ -488,12 +477,15 @@ void QXmppRpcManager::invokeInterfaceMethod(const QXmppRpcInvokeIq &iq)
     client()->send(std::move(errorIq));
 }
 
-///
-/// Calls a remote method using RPC with the specified arguments.
-///
-/// \note This method blocks until the response is received, and it may
-/// cause XMPP stanzas to be lost!
-///
+/*!
+    Calls remote method \a interface on entity \a jid with the supplied
+    arguments \a arg1 through \a arg10.
+
+    \note This method blocks until the response is received, and it may
+    cause XMPP stanzas to be lost!
+
+    \a arg3, \a arg9, \a arg6, \a arg4, \a arg7, \a arg8, \a arg5, and \a arg2.
+*/
 QXmppRemoteMethodResult QXmppRpcManager::callRemoteMethod(const QString &jid,
                                                           const QString &interface,
                                                           const QVariant &arg1,
@@ -592,7 +584,6 @@ bool QXmppRpcManager::handleStanza(const QDomElement &element)
 }
 
 QT_WARNING_POP
-/// \endcond
 
 #include "moc_QXmppRemoteMethod.cpp"
 #include "moc_QXmppRpcManager.cpp"

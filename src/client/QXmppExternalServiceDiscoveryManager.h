@@ -26,9 +26,7 @@ public:
 
     QXmppTask<ServicesResult> requestServices(const QString &jid, const QString &node = {});
 
-    /// \cond
     QStringList discoveryFeatures() const override;
-    /// \endcond
 };
 
 #endif  // QXMPPEXTERNALSERVICEDISCOVERYMANAGER_H

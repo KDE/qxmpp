@@ -14,49 +14,48 @@
 
 using namespace QXmpp::Private;
 
-/// Constructs a QXmppDialback.
+/*! Constructs a QXmppDialback. */
 QXmppDialback::QXmppDialback()
     : m_command(Result)
 {
 }
 
-/// Returns the dialback command.
+/*! Returns the dialback command. */
 QXmppDialback::Command QXmppDialback::command() const
 {
     return m_command;
 }
 
-/// Sets the dialback command.
+/*! Sets the dialback \a command. */
 void QXmppDialback::setCommand(QXmppDialback::Command command)
 {
     m_command = command;
 }
 
-/// Returns the dialback key.
+/*! Returns the dialback key. */
 QString QXmppDialback::key() const
 {
     return m_key;
 }
 
-/// Sets the dialback key.
+/*! Sets the dialback \a key. */
 void QXmppDialback::setKey(const QString &key)
 {
     m_key = key;
 }
 
-/// Returns the dialback type.
+/*! Returns the dialback type. */
 QString QXmppDialback::type() const
 {
     return m_type;
 }
 
-/// Sets the dialback type.
+/*! Sets the dialback \a type. */
 void QXmppDialback::setType(const QString &type)
 {
     m_type = type;
 }
 
-/// \cond
 bool QXmppDialback::isDialback(const QDomElement &element)
 {
     return element.namespaceURI() == ns_server_dialback &&
@@ -87,4 +86,3 @@ void QXmppDialback::toXml(QXmlStreamWriter *xmlWriter) const
         OptionalCharacters { m_key },
     });
 }
-/// \endcond

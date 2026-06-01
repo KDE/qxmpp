@@ -32,97 +32,96 @@ QXmppPushEnableIq::QXmppPushEnableIq()
 {
 }
 
-/// Default copy-constructor
+/*! Default copy-constructor */
 QXmppPushEnableIq::QXmppPushEnableIq(const QXmppPushEnableIq &) = default;
-/// Default move-constructor
+/*! Default move-constructor */
 QXmppPushEnableIq::QXmppPushEnableIq(QXmppPushEnableIq &&) = default;
 QXmppPushEnableIq::~QXmppPushEnableIq() = default;
-/// Default assignment operator
+/*! Default assignment operator */
 QXmppPushEnableIq &QXmppPushEnableIq::operator=(const QXmppPushEnableIq &) = default;
-/// Default move-assignment operator
+/*! Default move-assignment operator */
 QXmppPushEnableIq &QXmppPushEnableIq::operator=(QXmppPushEnableIq &&) = default;
 
-///
-/// \brief Returns the jid of the app server
-///
+/*! \brief Returns the jid of the app server */
 QString QXmppPushEnableIq::jid() const
 {
     return d->jid;
 }
 
-///
-/// \brief Sets the jid of the app server
-///
+/*! \brief Sets the \a jid of the app server */
 void QXmppPushEnableIq::setJid(const QString &jid)
 {
     d->jid = jid;
 }
 
-///
-/// \brief Returns the pubsub node on the app server used by the IQ
-///
+/*! \brief Returns the pubsub node on the app server used by the IQ */
 QString QXmppPushEnableIq::node() const
 {
     return d->node;
 }
 
-///
-/// \brief Set the pubsub note on the app server to be used by the IQ
-///
+/*!
+    \brief Set the pubsub note on the app server to be used by the IQ
+
+    \a node.
+*/
 void QXmppPushEnableIq::setNode(const QString &node)
 {
     d->node = node;
 }
 
-///
-/// \brief Returns the mode
-///
+/*! \brief Returns the mode */
 QXmppPushEnableIq::Mode QXmppPushEnableIq::mode()
 {
     return d->mode;
 }
 
-///
-/// \brief Set whether the IQ should enable or disable push notifications
-///
+/*!
+    \brief Set whether the IQ should enable or disable push notifications
+
+    \a mode.
+*/
 void QXmppPushEnableIq::setMode(QXmppPushEnableIq::Mode mode)
 {
     d->mode = mode;
 }
 
-///
-/// \brief Returns the data form containing the publish options which the user
-/// server Should send to the app server.
-///
-/// It is only available for enable IQs.
-///
+/*!
+    \brief Returns the data form containing the publish options which the user
+    server Should send to the app server.
+
+    It is only available for enable IQs.
+*/
 QXmppDataForm QXmppPushEnableIq::dataForm() const
 {
     return d->dataForm;
 }
 
-///
-/// \brief Sets the data form containing the publish options which the user
-/// server Should send to the app server.
-///
-///  It should only be set for enable IQs.
-///
+/*!
+    \brief Sets the data form containing the publish options which the user
+    server Should send to the app server.
+
+    It should only be set for enable IQs.
+
+    \a form.
+*/
 void QXmppPushEnableIq::setDataForm(const QXmppDataForm &form)
 {
     d->dataForm = form;
 }
 
-///
-/// \brief Checks whether a QDomElement is a push notification enable / disable
-/// IQ.
-///
+/*!
+    \brief Returns true if a QDomElement is a push notification enable / disable
+    IQ.
+
+    \a element.
+*/
 bool QXmppPushEnableIq::isPushEnableIq(const QDomElement &element)
 {
     auto tag = iqPayloadXmlTag(element);
     return tag == std::tuple { u"enable", ns_push } || tag == std::tuple { u"disable", ns_push };
 }
 
-/// \cond
 void QXmppPushEnableIq::parseElementFromChild(const QDomElement &element)
 {
     QDomElement childElement = element.firstChildElement();
@@ -153,4 +152,3 @@ void QXmppPushEnableIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         OptionalContent { d->mode == Enable, d->dataForm },
     });
 }
-/// \endcond

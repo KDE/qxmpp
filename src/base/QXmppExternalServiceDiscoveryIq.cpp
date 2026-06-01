@@ -59,14 +59,14 @@ public:
     QVector<QXmppExternalService> externalServices;
 };
 
-///
-/// \class QXmppExternalService
-///
-/// QXmppExternalService represents a related XMPP entity that can be queried using \xep{0215,
-/// External Service Discovery}.
-///
-/// \since QXmpp 1.6
-///
+/*!
+    \class QXmppExternalService
+    \inmodule QXmpp
+
+    QXmppExternalService represents a related XMPP entity that can be queried using \xep{0215}{External Service Discovery}.
+
+    \since QXmpp 1.6
+*/
 
 QXmppExternalService::QXmppExternalService()
     : d(new QXmppExternalServicePrivate)
@@ -75,160 +75,132 @@ QXmppExternalService::QXmppExternalService()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppExternalService)
 
-///
-/// Returns the host of the external service.
-///
+/*! Returns the host of the external service. */
 QString QXmppExternalService::host() const
 {
     return d->host;
 }
 
-///
-/// Sets the host of the external service.
-///
+/*! Sets the \a host of the external service. */
 void QXmppExternalService::setHost(const QString &host)
 {
     d->host = host;
 }
 
-///
-/// Returns the type of the external service.
-///
+/*! Returns the type of the external service. */
 QString QXmppExternalService::type() const
 {
     return d->type;
 }
 
-///
-/// Sets the type of the external service.
-///
+/*! Sets the \a type of the external service. */
 void QXmppExternalService::setType(const QString &type)
 {
     d->type = type;
 }
 
-///
-/// Returns the action of the external service.
-///
+/*! Returns the action of the external service. */
 std::optional<Action> QXmppExternalService::action() const
 {
     return d->action;
 }
 
-///
-/// Sets the action of the external service.
-///
+/*! Sets the \a action of the external service. */
 void QXmppExternalService::setAction(std::optional<Action> action)
 {
     d->action = action;
 }
 
-///
-/// Returns the expiration date of the external service.
-///
+/*! Returns the expiration date of the external service. */
 std::optional<QDateTime> QXmppExternalService::expires() const
 {
     return d->expires;
 }
 
-///
-/// Sets the expiration date of the external service.
-///
+/*!
+    Sets the expiration date of the external service.
+
+    \a expires.
+*/
 void QXmppExternalService::setExpires(std::optional<QDateTime> expires)
 {
     d->expires = std::move(expires);
 }
 
-///
-/// Returns the name of the external service.
-///
+/*! Returns the name of the external service. */
 std::optional<QString> QXmppExternalService::name() const
 {
     return d->name;
 }
 
-///
-/// Sets the name of the external service.
-///
+/*! Sets the \a name of the external service. */
 void QXmppExternalService::setName(std::optional<QString> name)
 {
     d->name = std::move(name);
 }
 
-///
-/// Returns the password of the external service.
-///
+/*! Returns the password of the external service. */
 std::optional<QString> QXmppExternalService::password() const
 {
     return d->password;
 }
 
-///
-/// Sets the password of the external service.
-///
+/*! Sets the \a password of the external service. */
 void QXmppExternalService::setPassword(std::optional<QString> password)
 {
     d->password = std::move(password);
 }
 
-/// Returns the port of the external service.
-/// \note quint16 since QXmpp 1.11
+/*!
+    Returns the port of the external service.
+    \note quint16 since QXmpp 1.11
+*/
 std::optional<quint16> QXmppExternalService::port() const { return d->port; }
 
-/// Sets the port of the external service.
-/// \note quint16 since QXmpp 1.11
+/*!
+    Sets the port of the external service.
+    \note quint16 since QXmpp 1.11
+
+    \a port.
+*/
 void QXmppExternalService::setPort(std::optional<quint16> port) { d->port = port; }
 
-///
-/// Returns the restricted mode of the external service.
-///
+/*! Returns the restricted mode of the external service. */
 std::optional<bool> QXmppExternalService::restricted() const
 {
     return d->restricted;
 }
-///
-/// Sets the restricted mode of the external service.
-///
+/*! Sets the \a restricted mode of the external service. */
 void QXmppExternalService::setRestricted(std::optional<bool> restricted)
 {
     d->restricted = restricted;
 }
 
-///
-/// Returns the transport type of the external service.
-///
+/*! Returns the transport type of the external service. */
 std::optional<QXmppExternalService::Transport> QXmppExternalService::transport() const
 {
     return d->transport;
 }
 
-///
-/// Sets the transport type of the external service.
-///
+/*! Sets the \a transport type of the external service. */
 void QXmppExternalService::setTransport(std::optional<Transport> transport)
 {
     d->transport = transport;
 }
 
-///
-/// Returns the username of the external service.
-///
+/*! Returns the username of the external service. */
 std::optional<QString> QXmppExternalService::username() const
 {
     return d->username;
 }
 
-///
-/// Sets the username of the external service.
-///
+/*! Sets the \a username of the external service. */
 void QXmppExternalService::setUsername(std::optional<QString> username)
 {
     d->username = std::move(username);
 }
 
-///
-/// Returns true if the element is a valid external service and can be parsed.
-///
+/*! Returns true if the \a element is a valid external service and can be parsed. */
 bool QXmppExternalService::isExternalService(const QDomElement &element)
 {
     if (element.tagName() != u"service") {
@@ -239,9 +211,11 @@ bool QXmppExternalService::isExternalService(const QDomElement &element)
         !element.attribute(u"type"_s).isEmpty();
 }
 
-///
-/// Parses given DOM element as an external service.
-///
+/*!
+    Parses given DOM element as an external service. Returns true on success.
+
+    \a el.
+*/
 void QXmppExternalService::parse(const QDomElement &el)
 {
     QDomNamedNodeMap attributes = el.attributes();
@@ -279,11 +253,13 @@ void QXmppExternalService::parse(const QDomElement &el)
     }
 }
 
-///
-/// \brief QXmppExternalService::toXml
-///
-/// Translates the external service to XML using the provided XML stream writer.
-///
+/*!
+    \brief QXmppExternalService::toXml
+
+    Translates the external service to XML using the provided XML stream writer.
+
+    \a writer.
+*/
 void QXmppExternalService::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
@@ -301,18 +277,19 @@ void QXmppExternalService::toXml(QXmlStreamWriter *writer) const
     });
 }
 
-///
-/// \brief The QXmppExternalServiceDiscoveryIq class represents an IQ used to discover external
-/// services as defined by \xep{0215, External Service Discovery}.
-///
-/// \ingroup Stanzas
-///
-/// \since QXmpp 1.6
-///
+/*!
+    \class QXmppExternalServiceDiscoveryIq
+    \inmodule QXmpp
 
-///
-/// Constructs an external service discovery IQ.
-///
+    \brief The QXmppExternalServiceDiscoveryIq class represents an IQ used to discover external
+    services as defined by \xep{0215}{External Service Discovery}.
+
+    \ingroup Stanzas
+
+    \since QXmpp 1.6
+*/
+
+/*! Constructs an external service discovery IQ. */
 QXmppExternalServiceDiscoveryIq::QXmppExternalServiceDiscoveryIq()
     : d(new QXmppExternalServiceDiscoveryIqPrivate)
 {
@@ -320,39 +297,30 @@ QXmppExternalServiceDiscoveryIq::QXmppExternalServiceDiscoveryIq()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppExternalServiceDiscoveryIq)
 
-///
-/// Returns the external services of the IQ.
-///
+/*! Returns the external services of the IQ. */
 QVector<QXmppExternalService> QXmppExternalServiceDiscoveryIq::externalServices() const
 {
     return d->externalServices;
 }
 
-///
-/// Sets the external services of the IQ.
-///
+/*! Sets the \a externalServices of the IQ. */
 void QXmppExternalServiceDiscoveryIq::setExternalServices(const QVector<QXmppExternalService> &externalServices)
 {
     d->externalServices = externalServices;
 }
 
-///
-/// Adds an external service to the list of external services in the IQ.
-///
+/*! Adds the external service \a externalService to the list of external services in the IQ. */
 void QXmppExternalServiceDiscoveryIq::addExternalService(const QXmppExternalService &externalService)
 {
     d->externalServices.append(externalService);
 }
 
-///
-/// Returns true if the IQ is a valid external service discovery IQ.
-///
+/*! Returns true if the element \a tagName in namespace \a xmlNamespace is a valid external service discovery IQ. */
 bool QXmppExternalServiceDiscoveryIq::checkIqType(const QString &tagName, const QString &xmlNamespace)
 {
     return tagName == u"services" && (xmlNamespace == ns_external_service_discovery);
 }
 
-/// \cond
 void QXmppExternalServiceDiscoveryIq::parseElementFromChild(const QDomElement &element)
 {
     d->externalServices = parseChildElements<QVector<QXmppExternalService>>(element.firstChildElement());
@@ -362,4 +330,3 @@ void QXmppExternalServiceDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *wr
 {
     XmlWriter(writer).write(Element { { u"services", ns_external_service_discovery }, d->externalServices });
 }
-/// \endcond

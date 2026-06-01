@@ -11,13 +11,14 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-///
-/// \class QXmppMucRoomInfo
-///
-/// `muc#roominfo` form as defined in \xep{0045, Multi-User Chat}.
-///
-/// \since QXmpp 1.13
-///
+/*!
+    \class QXmppMucRoomInfo
+    \inmodule QXmpp
+
+    `muc#roominfo` form as defined in \xep{0045}{Multi-User Chat}.
+
+    \since QXmpp 1.13
+*/
 
 struct QXmppMucRoomInfoPrivate : QSharedData {
     std::optional<quint32> maxHistoryFetch;
@@ -30,7 +31,7 @@ struct QXmppMucRoomInfoPrivate : QSharedData {
     QStringList avatarHashes;
 };
 
-/// Tries to parse form into QXmppMucRoomInfo.
+/*! Tries to parse \a form into QXmppMucRoomInfo. */
 std::optional<QXmppMucRoomInfo> QXmppMucRoomInfo::fromDataForm(const QXmppDataForm &form)
 {
     if (auto parsed = QXmppMucRoomInfo();
@@ -98,97 +99,125 @@ void QXmppMucRoomInfo::serializeForm(QXmppDataForm &f) const
     serializeEmptyable(f, Type::TextMultiField, u"muc#roominfo_avatarhash", d->avatarHashes);
 }
 
-/// Returns Maximum Number of History Messages Returned by Room
+/*! Returns Maximum Number of History Messages Returned by Room */
 std::optional<quint32> QXmppMucRoomInfo::maxHistoryFetch() const
 {
     return d->maxHistoryFetch;
 }
 
-/// Sets Maximum Number of History Messages Returned by Room
+/*!
+    Sets Maximum Number of History Messages Returned by Room
+
+    \a newMaxHistoryFetch.
+*/
 void QXmppMucRoomInfo::setMaxHistoryFetch(std::optional<quint32> newMaxHistoryFetch)
 {
     d->maxHistoryFetch = newMaxHistoryFetch;
 }
 
-/// Returns Contact Addresses (normally, room owner or owners)
+/*! Returns Contact Addresses (normally, room owner or owners) */
 QStringList QXmppMucRoomInfo::contactJids() const
 {
     return d->contactJids;
 }
 
-/// Sets Contact Addresses (normally, room owner or owners)
+/*!
+    Sets Contact Addresses (normally, room owner or owners)
+
+    \a newContactJids.
+*/
 void QXmppMucRoomInfo::setContactJids(const QStringList &newContactJids)
 {
     d->contactJids = newContactJids;
 }
 
-/// Returns Short Description of Room
+/*! Returns Short Description of Room */
 QString QXmppMucRoomInfo::description() const
 {
     return d->description;
 }
 
-/// Sets Short Description of Room
+/*!
+    Sets Short Description of Room
+
+    \a newDescription.
+*/
 void QXmppMucRoomInfo::setDescription(const QString &newDescription)
 {
     d->description = newDescription;
 }
 
-/// Returns Natural Language for Room Discussions
+/*! Returns Natural Language for Room Discussions */
 QString QXmppMucRoomInfo::language() const
 {
     return d->language;
 }
 
-/// Sets Natural Language for Room Discussions
+/*!
+    Sets Natural Language for Room Discussions
+
+    \a newLanguage.
+*/
 void QXmppMucRoomInfo::setLanguage(const QString &newLanguage)
 {
     d->language = newLanguage;
 }
 
-/// Returns Current Number of Occupants in Room
+/*! Returns Current Number of Occupants in Room */
 std::optional<quint32> QXmppMucRoomInfo::occupants() const
 {
     return d->occupants;
 }
 
-/// Sets Current Number of Occupants in Room
+/*!
+    Sets Current Number of Occupants in Room
+
+    \a newOccupants.
+*/
 void QXmppMucRoomInfo::setOccupants(std::optional<quint32> newOccupants)
 {
     d->occupants = newOccupants;
 }
 
-/// Returns Current Discussion Topic
+/*! Returns Current Discussion Topic */
 QString QXmppMucRoomInfo::subject() const
 {
     return d->subject;
 }
 
-/// Sets Current Discussion Topic
+/*!
+    Sets Current Discussion Topic
+
+    \a newSubject.
+*/
 void QXmppMucRoomInfo::setSubject(const QString &newSubject)
 {
     d->subject = newSubject;
 }
 
-/// Returns whether the room subject can be modified by participants
+/*! Returns whether the room subject can be modified by participants */
 std::optional<bool> QXmppMucRoomInfo::subjectChangeable() const
 {
     return d->subjectChangeable;
 }
 
-/// Sets whether the room subject can be modified by participants
+/*!
+    Sets whether the room subject can be modified by participants
+
+    \a newSubjectChangeable.
+*/
 void QXmppMucRoomInfo::setSubjectChangeable(std::optional<bool> newSubjectChangeable)
 {
     d->subjectChangeable = newSubjectChangeable;
 }
 
-/// Returns hashes of the vCard-temp avatar of this room.
+/*! Returns hashes of the vCard-temp avatar of this room. */
 QStringList QXmppMucRoomInfo::avatarHashes() const
 {
     return d->avatarHashes;
 }
 
-/// Sets hashes of the vCard-temp avatar of this room.
+/*! Sets \a hashes of the vCard-temp avatar of this room. */
 void QXmppMucRoomInfo::setAvatarHashes(const QStringList &hashes)
 {
     d->avatarHashes = hashes;

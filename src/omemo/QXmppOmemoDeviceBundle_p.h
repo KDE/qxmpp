@@ -32,10 +32,8 @@ public:
     void addPublicPreKey(uint32_t id, const QByteArray &key);
     void removePublicPreKey(uint32_t id);
 
-    /// \cond
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
-    /// \endcond
 
     static bool isOmemoDeviceBundle(const QDomElement &element);
 
