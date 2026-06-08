@@ -14,6 +14,7 @@ platforms:
     - name: iOS
     - name: Windows
     - name: macOS
+qdoc: true
 deprecated: false
 release: true
 libraries:

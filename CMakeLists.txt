@@ -48,7 +48,7 @@ endif()
 
 option(BUILD_SHARED "Build shared library." ON)
 option(BUILD_TESTING "Build tests." ON)
-option(BUILD_DOCUMENTATION "Build HTML API documentation." OFF)
+option(BUILD_DOCUMENTATION "Build HTML API documentation." ON)
 option(BUILD_DOCBOOK "Build DOCBOOK documentation." OFF)
 option(BUILD_EXAMPLES "Build examples." ON)
 option(BUILD_OMEMO "Build the OMEMO module." ${OmemoC_FOUND})
