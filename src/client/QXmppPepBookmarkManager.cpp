@@ -66,47 +66,46 @@ public:
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMucBookmark)
 
-/// Empty constructor.
+/*! Constructs an empty bookmark. */
 QXmppMucBookmark::QXmppMucBookmark()
     : d(new QXmppMucBookmarkPrivate)
 {
 }
 
-/// Constructs with values.
+/*! Constructs with \a jid, \a name, \a autojoin flag, \a nick, and \a password. */
 QXmppMucBookmark::QXmppMucBookmark(const QString &jid, const QString &name, bool autojoin, const QString &nick, const QString &password)
     : d(new QXmppMucBookmarkPrivate { {}, jid, Bookmarks2Conference { autojoin, name, nick, password } })
 {
 }
 
-/// Constructs with values.
 QXmppMucBookmark::QXmppMucBookmark(const QString &jid, QXmpp::Private::Bookmarks2Conference conference)
     : d(new QXmppMucBookmarkPrivate { {}, jid, std::move(conference) })
 {
 }
 
-/// Returns the (bare) JID of the MUC.
+/*! Returns the (bare) JID of the MUC. */
 const QString &QXmppMucBookmark::jid() const { return d->jid; }
-/// Sets the (bare) JID of the MUC.
+/*! Sets the (bare) JID of the MUC. */
 void QXmppMucBookmark::setJid(const QString &jid) { d->jid = jid; }
 
-/// Returns the user-defined display name of the MUC.
+/*! Returns the user-defined display name of the MUC. */
 const QString &QXmppMucBookmark::name() const { return d->payload.name; }
-/// Sets the user-defined display name of the MUC.
+/*! Sets the user-defined display name of the MUC. */
 void QXmppMucBookmark::setName(const QString &name) { d->payload.name = name; }
 
-/// Returns the user's preferred nick for this MUC.
+/*! Returns the user's preferred nick for this MUC. */
 const QString &QXmppMucBookmark::nick() const { return d->payload.nick; }
-/// Sets the user's preferred nick for this MUC.
+/*! Sets the user's preferred nick for this MUC. */
 void QXmppMucBookmark::setNick(const QString &nick) { d->payload.nick = nick; }
 
-/// Returns the required password for the MUC.
+/*! Returns the required password for the MUC. */
 const QString &QXmppMucBookmark::password() const { return d->payload.password; }
-/// Sets the required password for the MUC.
+/*! Sets the required password for the MUC. */
 void QXmppMucBookmark::setPassword(const QString &password) { d->payload.password = password; }
 
-/// Returns whether to automatically join this MUC on connection.
+/*! Returns whether to automatically join this MUC on connection. */
 bool QXmppMucBookmark::autojoin() const { return d->payload.autojoin; }
-/// Sets whether to automatically join this MUC on connection.
+/*! Sets whether to automatically join this MUC on connection. */
 void QXmppMucBookmark::setAutojoin(bool autojoin) { d->payload.autojoin = autojoin; }
 
 //
@@ -115,32 +114,32 @@ void QXmppMucBookmark::setAutojoin(bool autojoin) { d->payload.autojoin = autojo
 
 using EmptyResult = std::variant<Success, QXmppError>;
 
-///
-/// \fn QXmppPepBookmarkManager::bookmarksReset()
-///
-/// Emitted when the total set of bookmarks is reset, e.g. when receiving the initial bookmarks
-/// items query.
-///
+/*!
+    \fn QXmppPepBookmarkManager::bookmarksReset()
 
-///
-/// \fn QXmppPepBookmarkManager::bookmarksAdded()
-///
-/// Emitted when bookmarks have been added. This is triggered by PubSub event notifications.
-///
+    Emitted when the total set of bookmarks is reset, e.g. when receiving the initial bookmarks
+    items query.
+*/
 
-///
-/// \fn QXmppPepBookmarkManager::bookmarksChanged()
-///
-/// Emitted when bookmarks have been changed.
-///
+/*!
+    \fn QXmppPepBookmarkManager::bookmarksAdded(const QList<QXmppMucBookmark> &newBookmarks)
 
-///
-/// \fn QXmppPepBookmarkManager::bookmarksRemoved()
-///
-/// Emitted when bookmarks are retracted.
-///
+    Emitted when bookmarks have been added. This is triggered by PubSub event notifications.
+*/
 
-/// Default constructor.
+/*!
+    \fn QXmppPepBookmarkManager::bookmarksChanged(const QList<QXmppPepBookmarkManager::BookmarkChange> &bookmarkUpdates)
+
+    Emitted when bookmarks have been changed.
+*/
+
+/*!
+    \fn QXmppPepBookmarkManager::bookmarksRemoved(const QList<QString> &removedBookmarkJids)
+
+    Emitted when bookmarks are retracted.
+*/
+
+/*! Default constructor. */
 QXmppPepBookmarkManager::QXmppPepBookmarkManager()
     : d(std::make_unique<QXmppPepBookmarkManagerPrivate>(this))
 {
@@ -148,44 +147,44 @@ QXmppPepBookmarkManager::QXmppPepBookmarkManager()
 
 QXmppPepBookmarkManager::~QXmppPepBookmarkManager() = default;
 
-/// Supported service discovery features.
+/*! Supported service discovery features. */
 QStringList QXmppPepBookmarkManager::discoveryFeatures() const
 {
     return { ns_bookmarks2 + u"+notify" };
 }
 
-///
-/// Returns the currently cached list of bookmarks, or \c std::nullopt if they haven't been
-/// fetched yet. Connect to bookmarksReset() to be notified once the initial fetch completes.
-///
+/*!
+    Returns the currently cached list of bookmarks, or \c std::nullopt if they haven't been
+    fetched yet. Connect to bookmarksReset() to be notified once the initial fetch completes.
+*/
 const std::optional<QList<QXmppMucBookmark>> &QXmppPepBookmarkManager::bookmarks() const { return d->bookmarks; }
 
-///
-/// Publishes or updates a bookmark via \xep{0402, PEP Native Bookmarks}.
-///
-/// If a bookmark for the same JID already exists it is replaced. The change is
-/// propagated to all connected clients via PubSub event notification, which will
-/// trigger bookmarksChanged() on this manager.
-///
-/// \param bookmark Bookmark to publish. The JID must not be empty.
-///
+/*!
+    Publishes or updates a \a bookmark via \xep{0402}{PEP Native Bookmarks}.
+
+    If a bookmark for the same JID already exists it is replaced. The change is
+    propagated to all connected clients via PubSub event notification, which will
+    trigger bookmarksChanged() on this manager.
+
+    The JID of \a bookmark must not be empty.
+*/
 QXmppTask<Result<>> QXmppPepBookmarkManager::setBookmark(QXmppMucBookmark &&bookmark)
 {
     return d->setBookmark(std::move(bookmark));
 }
 
-///
-/// Retracts the bookmark for the room at \a jid via \xep{0402, PEP Native Bookmarks}.
-///
-/// Does nothing if no bookmark for \a jid exists. The retraction is propagated to all connected
-/// clients, which will trigger bookmarksRemoved() on this manager.
-///
+/*!
+    Retracts the bookmark for the room at \a jid via \xep{0402}{PEP Native Bookmarks}.
+
+    Does nothing if no bookmark for \a jid exists. The retraction is propagated to all connected
+    clients, which will trigger bookmarksRemoved() on this manager.
+*/
 QXmppTask<Result<>> QXmppPepBookmarkManager::removeBookmark(const QString &jid)
 {
     return d->removeBookmark(jid);
 }
 
-/// Handles incoming PubSub events.
+/*! Handles incoming PubSub events. */
 bool QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
     if (d->bookmarks && pubSubService == client()->configuration().jidBare() && nodeName == ns_bookmarks2) {

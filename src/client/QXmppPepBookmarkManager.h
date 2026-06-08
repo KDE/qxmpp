@@ -18,17 +18,18 @@ namespace QXmpp::Private {
 struct Bookmarks2Conference;
 }  // namespace QXmpp::Private
 
-///
-/// \class QXmppMucBookmark
-///
-/// \brief Bookmark data for a MUC room stored via \xep{0402, PEP Native Bookmarks}.
-///
-/// A bookmark records the JID of a room together with the user's preferred nickname, an optional
-/// password, a human-readable display name, and an autojoin flag. Bookmarks are managed through
-/// QXmppPepBookmarkManager::setBookmark() and QXmppPepBookmarkManager::removeBookmark().
-///
-/// \since QXmpp 1.13
-///
+/*!
+    \class QXmppMucBookmark
+    \inmodule QXmpp
+
+    \brief Bookmark data for a MUC room stored via \xep{0402}{PEP Native Bookmarks}.
+
+    A bookmark records the JID of a room together with the user's preferred nickname, an optional
+    password, a human-readable display name, and an autojoin flag. Bookmarks are managed through
+    QXmppPepBookmarkManager::setBookmark() and QXmppPepBookmarkManager::removeBookmark().
+
+    \since QXmpp 1.13
+*/
 class QXMPP_EXPORT QXmppMucBookmark
 {
 public:
@@ -59,46 +60,47 @@ Q_DECLARE_METATYPE(QXmppMucBookmark);
 
 struct QXmppPepBookmarkManagerPrivate;
 
-///
-/// \class QXmppPepBookmarkManager
-///
-/// \brief Manages \xep{0402, PEP Native Bookmarks}.
-///
-/// Bookmarks are automatically fetched when the session is established. Changes made from other
-/// clients arrive as PubSub event notifications and trigger the corresponding signals.
-///
-/// \section pepbookmarkmanager-setup Setup
-///
-/// QXmppPepBookmarkManager requires QXmppPubSubManager to be registered with the client:
-///
-/// \code
-/// auto *pubsub = client.addNewExtension<QXmppPubSubManager>();
-/// auto *bookmarks = client.addNewExtension<QXmppPepBookmarkManager>();
-/// \endcode
-///
-/// \section usage Usage
-///
-/// \code
-/// connect(bm, &QXmppPepBookmarkManager::bookmarksReset, this, [bm]() {
-///     for (const auto &bookmark : *bm->bookmarks()) {
-///         qDebug() << bookmark.jid() << bookmark.name();
-///     }
-/// });
-///
-/// QXmppMucBookmark bookmark;
-/// bookmark.setJid(u"room@conference.example.org"_s);
-/// bookmark.setName(u"My Room"_s);
-/// bookmark.setNick(u"alice"_s);
-/// bookmark.setAutojoin(true);
-/// bm->setBookmark(std::move(bookmark)).then(this, [](auto result) {
-///     if (std::holds_alternative<QXmppError>(result)) { /* handle error */ }
-/// });
-/// \endcode
-///
-/// \ingroup Managers
-/// \since QXmpp 1.16
-///
-class QXMPP_EXPORT QXmppPepBookmarkManager : public QXmppClientExtension, public QXmppPubSubEventHandler
+/*!
+    \class QXmppPepBookmarkManager
+    \inmodule QXmpp
+
+    \brief Manages \xep{0402}{PEP Native Bookmarks}.
+
+    Bookmarks are automatically fetched when the session is established. Changes made from other
+    clients arrive as PubSub event notifications and trigger the corresponding signals.
+
+    \section1 Setup
+
+    QXmppPepBookmarkManager requires QXmppPubSubManager to be registered with the client:
+
+    \code
+    auto *pubsub = client.addNewExtension<QXmppPubSubManager>();
+    auto *bookmarks = client.addNewExtension<QXmppPepBookmarkManager>();
+    \endcode
+
+    \section1 Usage
+
+    \code
+    connect(bm, &QXmppPepBookmarkManager::bookmarksReset, this, [bm]() {
+        for (const auto &bookmark : *bm->bookmarks()) {
+            qDebug() << bookmark.jid() << bookmark.name();
+        }
+    });
+
+    QXmppMucBookmark bookmark;
+    bookmark.setJid(u"room@conference.example.org"_s);
+    bookmark.setName(u"My Room"_s);
+    bookmark.setNick(u"alice"_s);
+    bookmark.setAutojoin(true);
+    bm->setBookmark(std::move(bookmark)).then(this, [](auto result) {
+        if (std::holds_alternative<QXmppError>(result)) { /* handle error */ }
+});
+\endcode
+
+    \ingroup Managers
+    \since QXmpp 1.16 * /
+    class QXMPP_EXPORT QXmppPepBookmarkManager : public QXmppClientExtension,
+    public QXmppPubSubEventHandler
 {
     Q_OBJECT
 

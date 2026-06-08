@@ -515,23 +515,24 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     return task;
 }
 
-///
-/// Creates a new reserved (locked) MUC room on \a serviceJid with the given \a nickname.
-///
-/// If \a roomName is set, the room is created at \c roomName@serviceJid. If \a roomName is
-/// unset, createRoom() asks the service for a unique localpart via XEP-0307 (muc\#unique);
-/// if that query fails for any reason (service does not support XEP-0307, IQ error, …), it
-/// falls back to a client-generated UUID localpart so creation still succeeds against any
-/// compliant MUC service.
-///
-/// The room is created in a locked state; no other users can join until the owner submits
-/// the configuration form via QXmppMucRoomV2::setRoomConfig(). The task resolves once the
-/// server has confirmed room creation (XEP-0045 status code 201) and the configuration form
-/// has been fetched. If the local state machine detects that the room is already tracked,
-/// the task fails immediately.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Creates a new reserved (locked) MUC room on \a serviceJid with the given \a nickname.
+
+    If \a roomName is set, the room is created at \c roomName@serviceJid. If \a roomName is
+    unset, createRoom() asks the service for a unique localpart via XEP-0307 (muc\#unique);
+    if that query fails for any reason (service does not support XEP-0307, IQ error, …), it
+    falls back to a client-generated UUID localpart so creation still succeeds against any
+    compliant MUC service.
+
+    The room is created in a locked state; no other users can join until the owner submits
+    the configuration form via QXmppMucRoomV2::setRoomConfig(). The task resolves once the
+    server has confirmed room creation (XEP-0045 status code 201) and the configuration form
+    has been fetched. If the local state machine detects that the room is already tracked,
+    the task fails immediately.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoom(QString serviceJid,
                                                                 QString nickname,
                                                                 std::optional<QString> roomName)
@@ -722,15 +723,16 @@ QXmppTask<SendResult> QXmppMucManagerV2::declineInvitation(const QString &roomJi
     return client()->send(std::move(message));
 }
 
-///
-/// Sends a direct invitation (XEP-0249) to \a to.
-///
-/// Direct invitations are sent peer-to-peer and are not routed through the room.
-/// The optional \a message parameter can be used to set custom extensions on the
-/// message stanza; the \c to, \c type, and invitation fields will be overwritten.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Sends a direct invitation (XEP-0249) to \a to.
+
+    Direct invitations are sent peer-to-peer and are not routed through the room.
+    The optional \a message parameter can be used to set custom extensions on the
+    message stanza; the \c to, \c type, and invitation fields will be overwritten.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<SendResult> QXmppMucManagerV2::sendDirectInvitation(const QString &to, Muc::DirectInvitation invitation, QXmppMessage message)
 {
     message.setTo(to);
@@ -1548,41 +1550,52 @@ static bool isRoomJoined(QXmppMucManagerV2Private *d, const QString &jid)
     return itr != d->activeRooms.end() && itr->second->state == MucRoomState::Joined;
 }
 
-/// Returns the room JID this handle refers to.
+/*!
+    Returns the room JID this handle refers to.
+*/
 QString QXmppMucRoomV2::jid() const
 {
     return m_data->roomJid;
 }
 
-/// Returns the manager that owns this room's state.
+/*!
+    Returns the manager that owns this room's state.
+*/
 QXmppMucManagerV2 *QXmppMucRoomV2::manager() const
 {
     return m_data->manager;
 }
 
-/// Returns the room subject as a bindable property.
+/*!
+    Returns the room subject as a bindable property.
+*/
 QBindable<QString> QXmppMucRoomV2::subject() const
 {
     return &m_data->subject;
 }
 
-/// Returns the user's nickname in the room as a bindable property.
+/*!
+    Returns the user's nickname in the room as a bindable property.
+*/
 QBindable<QString> QXmppMucRoomV2::nickname() const
 {
     return &m_data->nickname;
 }
 
-/// Returns whether the room is currently joined as a bindable property.
+/*!
+    Returns whether the room is currently joined as a bindable property.
+*/
 QBindable<bool> QXmppMucRoomV2::joined() const
 {
     return &m_data->joined;
 }
 
-///
-/// Returns a list of all participants currently in the room.
-///
-/// The returned handles are lightweight and do not own any data.
-///
+/*!
+
+    Returns a list of all participants currently in the room.
+
+    The returned handles are lightweight and do not own any data.
+*/
 QList<QXmppMucParticipant> QXmppMucRoomV2::participants() const
 {
     QList<QXmppMucParticipant> result;
@@ -1593,17 +1606,18 @@ QList<QXmppMucParticipant> QXmppMucRoomV2::participants() const
     return result;
 }
 
-///
-/// Returns a handle to the local user's own participant entry, if joined.
-///
-/// Returns \c std::nullopt before joinRoom() has completed or after leaving the room.
-/// Use the returned handle's role() and affiliation() QBindables to reactively
-/// observe your own permissions — they update automatically when the MUC service
-/// grants or revokes permissions.
-///
-/// \note The participant handle is only valid while the room is joined.
-/// Do not use it after leaving the room or after a non-resumed reconnect.
-///
+/*!
+
+    Returns a handle to the local user's own participant entry, if joined.
+
+    Returns \c std::nullopt before joinRoom() has completed or after leaving the room.
+    Use the returned handle's role() and affiliation() QBindables to reactively
+    observe your own permissions — they update automatically when the MUC service
+    grants or revokes permissions.
+
+    \note The participant handle is only valid while the room is joined.
+    Do not use it after leaving the room or after a non-resumed reconnect.
+*/
 std::optional<QXmppMucParticipant> QXmppMucRoomV2::selfParticipant() const
 {
     if (auto sp = m_data->selfParticipant.value()) {
@@ -1612,209 +1626,228 @@ std::optional<QXmppMucParticipant> QXmppMucRoomV2::selfParticipant() const
     return std::nullopt;
 }
 
-/// Returns whether the local user can send groupchat messages.
-///
-/// True when the user's role is Participant or Moderator.
-/// In unmoderated rooms the server assigns Participant by default.
+/*!
+    Returns whether the local user can send groupchat messages.
+
+    True when the user's role is Participant or Moderator.
+    In unmoderated rooms the server assigns Participant by default.
+*/
 QBindable<bool> QXmppMucRoomV2::canSendMessages() const
 {
     return &m_data->canSendMessages;
 }
 
-/// Returns whether the local user can change the room subject.
-///
-/// True for Moderators, or for Participants when the room allows it
-/// (\c muc#roominfo_subjectmod). Defaults to false until disco\#info arrives.
+/*!
+    Returns whether the local user can change the room subject.
+
+    True for Moderators, or for Participants when the room allows it
+    (\c muc#roominfo_subjectmod). Defaults to false until disco\#info arrives.
+*/
 QBindable<bool> QXmppMucRoomV2::canChangeSubject() const
 {
     return &m_data->canChangeSubject;
 }
 
-/// Returns whether the local user can change other participants' roles (XEP-0045 §8.4–8.6).
-///
-/// True when the user's role is Moderator. This covers role changes including kicking
-/// (setting role to None) and granting/revoking voice.
+/*!
+    Returns whether the local user can change other participants' roles (XEP-0045 §8.4–8.6).
+
+    True when the user's role is Moderator. This covers role changes including kicking
+    (setting role to None) and granting/revoking voice.
+*/
 QBindable<bool> QXmppMucRoomV2::canSetRoles() const
 {
     return &m_data->canSetRoles;
 }
 
-/// Returns whether the local user can change affiliations (XEP-0045 §9).
-///
-/// True when the user's affiliation is Admin or Owner. This covers banning,
-/// granting and revoking membership, and querying affiliation lists.
+/*!
+    Returns whether the local user can change affiliations (XEP-0045 §9).
+
+    True when the user's affiliation is Admin or Owner. This covers banning,
+    granting and revoking membership, and querying affiliation lists.
+*/
 QBindable<bool> QXmppMucRoomV2::canSetAffiliations() const
 {
     return &m_data->canSetAffiliations;
 }
 
-/// Returns whether the local user can configure the room (XEP-0045 §10).
-///
-/// True when the user's affiliation is Owner.
+/*!
+    Returns whether the local user can configure the room (XEP-0045 §10).
+
+    True when the user's affiliation is Owner.
+*/
 QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
 {
     return &m_data->canConfigureRoom;
 }
 
-///
-/// Returns whether the room is non-anonymous (XEP-0045 §4.2).
-///
-/// In a non-anonymous room, all occupants can see each other's real JIDs.
-/// In a semi-anonymous room (the default), only moderators can see real JIDs.
-///
-/// Populated from the \c muc_nonanonymous disco feature on join and re-fetched
-/// on status code 104. Also updated immediately on status codes 172 (now non-anonymous)
-/// and 173 (now semi-anonymous), without a round-trip.
-///
-/// Defaults to \c false (semi-anonymous) until disco\#info arrives.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether the room is non-anonymous (XEP-0045 §4.2).
+
+    In a non-anonymous room, all occupants can see each other's real JIDs.
+    In a semi-anonymous room (the default), only moderators can see real JIDs.
+
+    Populated from the \c muc_nonanonymous disco feature on join and re-fetched
+    on status code 104. Also updated immediately on status codes 172 (now non-anonymous)
+    and 173 (now semi-anonymous), without a round-trip.
+
+    Defaults to \c false (semi-anonymous) until disco\#info arrives.
+
+    \since QXmpp 1.16
+*/
 QBindable<bool> QXmppMucRoomV2::isNonAnonymous() const
 {
     return &m_data->isNonAnonymous;
 }
 
-///
-/// Returns whether the room is publicly listed (XEP-0045 §4.2).
-///
-/// Public rooms (\c muc_public) appear in service discovery results.
-/// Hidden rooms (\c muc_hidden) do not.
-///
-/// Populated from the \c muc_public disco feature on join and re-fetched
-/// on status code 104.
-///
-/// Defaults to \c true until disco\#info arrives.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether the room is publicly listed (XEP-0045 §4.2).
+
+    Public rooms (\c muc_public) appear in service discovery results.
+    Hidden rooms (\c muc_hidden) do not.
+
+    Populated from the \c muc_public disco feature on join and re-fetched
+    on status code 104.
+
+    Defaults to \c true until disco\#info arrives.
+
+    \since QXmpp 1.16
+*/
 QBindable<bool> QXmppMucRoomV2::isPublic() const
 {
     return &m_data->isPublic;
 }
 
-///
-/// Returns whether the room is members-only (XEP-0045 §4.2).
-///
-/// In a members-only room (\c muc_membersonly), users must be on the member
-/// list to enter. Open rooms (\c muc_open) allow any non-banned user to join.
-///
-/// Populated from the \c muc_membersonly disco feature on join and re-fetched
-/// on status code 104.
-///
-/// Defaults to \c false until disco\#info arrives.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether the room is members-only (XEP-0045 §4.2).
+
+    In a members-only room (\c muc_membersonly), users must be on the member
+    list to enter. Open rooms (\c muc_open) allow any non-banned user to join.
+
+    Populated from the \c muc_membersonly disco feature on join and re-fetched
+    on status code 104.
+
+    Defaults to \c false until disco\#info arrives.
+
+    \since QXmpp 1.16
+*/
 QBindable<bool> QXmppMucRoomV2::isMembersOnly() const
 {
     return &m_data->isMembersOnly;
 }
 
-///
-/// Returns whether the room is moderated (XEP-0045 §4.2).
-///
-/// In a moderated room (\c muc_moderated), only occupants with voice
-/// (role Participant or Moderator) can send messages. Visitors cannot.
-///
-/// Populated from the \c muc_moderated disco feature on join and re-fetched
-/// on status code 104.
-///
-/// Defaults to \c false until disco\#info arrives.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether the room is moderated (XEP-0045 §4.2).
+
+    In a moderated room (\c muc_moderated), only occupants with voice
+    (role Participant or Moderator) can send messages. Visitors cannot.
+
+    Populated from the \c muc_moderated disco feature on join and re-fetched
+    on status code 104.
+
+    Defaults to \c false until disco\#info arrives.
+
+    \since QXmpp 1.16
+*/
 QBindable<bool> QXmppMucRoomV2::isModerated() const
 {
     return &m_data->isModerated;
 }
 
-///
-/// Returns whether the room is persistent (XEP-0045 §4.2).
-///
-/// A persistent room (\c muc_persistent) is not destroyed when the last
-/// occupant exits. A temporary room (\c muc_temporary) is destroyed automatically.
-///
-/// Populated from the \c muc_persistent disco feature on join and re-fetched
-/// on status code 104.
-///
-/// Defaults to \c false until disco\#info arrives.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether the room is persistent (XEP-0045 §4.2).
+
+    A persistent room (\c muc_persistent) is not destroyed when the last
+    occupant exits. A temporary room (\c muc_temporary) is destroyed automatically.
+
+    Populated from the \c muc_persistent disco feature on join and re-fetched
+    on status code 104.
+
+    Defaults to \c false until disco\#info arrives.
+
+    \since QXmpp 1.16
+*/
 QBindable<bool> QXmppMucRoomV2::isPersistent() const
 {
     return &m_data->isPersistent;
 }
 
-///
-/// Returns whether the room requires a password to enter (XEP-0045 §4.2).
-///
-/// Password-protected rooms (\c muc_passwordprotected) require the correct
-/// password when joining (XEP-0045 §7.2.5).
-///
-/// Populated from the \c muc_passwordprotected disco feature on join and
-/// re-fetched on status code 104.
-///
-/// Defaults to \c false until disco\#info arrives.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether the room requires a password to enter (XEP-0045 §4.2).
+
+    Password-protected rooms (\c muc_passwordprotected) require the correct
+    password when joining (XEP-0045 §7.2.5).
+
+    Populated from the \c muc_passwordprotected disco feature on join and
+    re-fetched on status code 104.
+
+    Defaults to \c false until disco\#info arrives.
+
+    \since QXmpp 1.16
+*/
 QBindable<bool> QXmppMucRoomV2::isPasswordProtected() const
 {
     return &m_data->isPasswordProtected;
 }
 
-/// Returns the full \c muc#roominfo data form from \xep{0045, Multi-User Chat}.
-///
-/// The form is fetched via \c disco\#info automatically on join and re-fetched whenever
-/// a status code 104 (room configuration changed) is received.
-/// It gives access to all available room info fields in one object, including fields
-/// not individually exposed (e.g. \c muc#roominfo_subject, \c muc#roominfo_occupants,
-/// \c muc#roominfo_avatarhash).
-///
-/// Returns \c std::nullopt until the first \c disco\#info response has arrived or if
-/// the room's disco\#info does not include a \c muc#roominfo form.
-///
-/// \sa description(), language(), contactJids()
-/// \since QXmpp 1.16
-///
+/*!
+    Returns the full \c muc#roominfo data form from \xep{0045}{Multi-User Chat}.
+
+    The form is fetched via \c disco\#info automatically on join and re-fetched whenever
+    a status code 104 (room configuration changed) is received.
+    It gives access to all available room info fields in one object, including fields
+    not individually exposed (e.g. \c muc#roominfo_subject, \c muc#roominfo_occupants,
+    \c muc#roominfo_avatarhash).
+
+    Returns \c std::nullopt until the first \c disco\#info response has arrived or if
+    the room's disco\#info does not include a \c muc#roominfo form.
+
+    \sa description(), language(), contactJids()
+    \since QXmpp 1.16
+*/
 QBindable<std::optional<QXmppMucRoomInfo>> QXmppMucRoomV2::roomInfo() const
 {
     return &m_data->roomInfo;
 }
 
-///
-/// Returns the current room configuration form from \xep{0045, Multi-User Chat}.
-///
-/// The form is populated after requestRoomConfig() or setWatchRoomConfig(true) has been called
-/// and the initial fetch has completed. While watching is active, the form is automatically
-/// re-fetched whenever a status code 104 (room configuration changed) is received.
-///
-/// Returns \c std::nullopt until the first response has arrived.
-///
-/// \sa requestRoomConfig(), setWatchRoomConfig()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns the current room configuration form from \xep{0045}{Multi-User Chat}.
+
+    The form is populated after requestRoomConfig() or setWatchRoomConfig(true) has been called
+    and the initial fetch has completed. While watching is active, the form is automatically
+    re-fetched whenever a status code 104 (room configuration changed) is received.
+
+    Returns \c std::nullopt until the first response has arrived.
+
+    \sa requestRoomConfig(), setWatchRoomConfig()
+    \since QXmpp 1.16
+*/
 QBindable<std::optional<QXmppMucRoomConfig>> QXmppMucRoomV2::roomConfig() const
 {
     return &m_data->roomConfig;
 }
 
-///
-/// Enables or disables automatic room configuration updates.
-///
-/// When set to \c true, status code 104 messages (room configuration changed)
-/// will automatically trigger a re-fetch to keep roomConfig() current. If the
-/// configuration has not been fetched yet, a fetch is triggered immediately
-/// (fire-and-forget; use requestRoomConfig() if you need the result).
-///
-/// When set to \c false, disables auto-refresh. The last fetched configuration
-/// remains available in roomConfig() but is no longer updated automatically.
-///
-/// \sa roomConfig(), requestRoomConfig()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Enables or disables automatic room configuration updates.
+
+    When set to \c true, status code 104 messages (room configuration changed)
+    will automatically trigger a re-fetch to keep roomConfig() current. If the
+    configuration has not been fetched yet, a fetch is triggered immediately
+    (fire-and-forget; use requestRoomConfig() if you need the result).
+
+    When set to \c false, disables auto-refresh. The last fetched configuration
+    remains available in roomConfig() but is no longer updated automatically.
+
+    \sa roomConfig(), requestRoomConfig()
+    \since QXmpp 1.16
+*/
 void QXmppMucRoomV2::setWatchRoomConfig(bool watch)
 {
     const bool needsFetch = watch && !m_data->watchingRoomConfig;
@@ -1824,66 +1857,70 @@ void QXmppMucRoomV2::setWatchRoomConfig(bool watch)
     }
 }
 
-///
-/// Returns whether automatic room configuration updates are enabled.
-///
-/// \sa setWatchRoomConfig()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether automatic room configuration updates are enabled.
+
+    \sa setWatchRoomConfig()
+    \since QXmpp 1.16
+*/
 bool QXmppMucRoomV2::isWatchingRoomConfig() const
 {
     return m_data->watchingRoomConfig;
 }
 
-///
-/// Returns the avatar hashes for the room from \xep{0045, Multi-User Chat} \c muc#roominfo.
-///
-/// The hashes are derived from the \c muc#roominfo_avatarhash field of the \c disco\#info
-/// response. They are automatically updated on join and whenever a status code 104
-/// (room configuration changed) is received.
-///
-/// Returns an empty list until the first \c disco\#info response has arrived or if no avatar
-/// has been published.
-///
-/// \sa avatar(), setWatchAvatar()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns the avatar hashes for the room from \xep{0045}{Multi-User Chat} \c muc#roominfo.
+
+    The hashes are derived from the \c muc#roominfo_avatarhash field of the \c disco\#info
+    response. They are automatically updated on join and whenever a status code 104
+    (room configuration changed) is received.
+
+    Returns an empty list until the first \c disco\#info response has arrived or if no avatar
+    has been published.
+
+    \sa avatar(), setWatchAvatar()
+    \since QXmpp 1.16
+*/
 QBindable<QStringList> QXmppMucRoomV2::avatarHashes() const
 {
     return &m_data->avatarHashes;
 }
 
-///
-/// Returns the cached room avatar.
-///
-/// Populated after setWatchAvatar(true) has been called and the vcard-temp fetch has completed.
-/// Automatically re-fetched whenever a status code 104 (room configuration changed) causes the
-/// avatar hashes to change.
-///
-/// Returns \c std::nullopt until the first fetch completes, or if the room has no avatar or the
-/// MUC service does not support vcard-temp.
-///
-/// \sa avatarHashes(), setWatchAvatar()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns the cached room avatar.
+
+    Populated after setWatchAvatar(true) has been called and the vcard-temp fetch has completed.
+    Automatically re-fetched whenever a status code 104 (room configuration changed) causes the
+    avatar hashes to change.
+
+    Returns \c std::nullopt until the first fetch completes, or if the room has no avatar or the
+    MUC service does not support vcard-temp.
+
+    \sa avatarHashes(), setWatchAvatar()
+    \since QXmpp 1.16
+*/
 QBindable<std::optional<QXmpp::Muc::Avatar>> QXmppMucRoomV2::avatar() const
 {
     return &m_data->avatar;
 }
 
-///
-/// Enables or disables automatic avatar updates.
-///
-/// When set to \c true, the avatar is fetched immediately if the room info is already available
-/// and the hashes have not been fetched yet. Whenever a status code 104 (room configuration
-/// changed) causes the avatar hashes to change, the avatar is re-fetched automatically.
-///
-/// When set to \c false, auto-refresh is disabled. The last fetched avatar remains available in
-/// avatar() but is no longer updated automatically.
-///
-/// \sa avatar(), avatarHashes()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Enables or disables automatic avatar updates.
+
+    When set to \c true, the avatar is fetched immediately if the room info is already available
+    and the hashes have not been fetched yet. Whenever a status code 104 (room configuration
+    changed) causes the avatar hashes to change, the avatar is re-fetched automatically.
+
+    When set to \c false, auto-refresh is disabled. The last fetched avatar remains available in
+    avatar() but is no longer updated automatically.
+
+    \sa avatar(), avatarHashes()
+    \since QXmpp 1.16
+*/
 void QXmppMucRoomV2::setWatchAvatar(bool watch)
 {
     const bool needsFetch = watch && !m_data->watchingAvatar && m_data->roomInfo.value().has_value() && !m_data->fetchingAvatar && m_data->avatarOutdated;
@@ -1893,27 +1930,29 @@ void QXmppMucRoomV2::setWatchAvatar(bool watch)
     }
 }
 
-///
-/// Returns whether automatic avatar updates are enabled.
-///
-/// \sa setWatchAvatar()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns whether automatic avatar updates are enabled.
+
+    \sa setWatchAvatar()
+    \since QXmpp 1.16
+*/
 bool QXmppMucRoomV2::isWatchingAvatar() const
 {
     return m_data->watchingAvatar;
 }
 
-///
-/// Sets or removes the avatar of the room via vcard-temp.
-///
-/// Pass an \c Avatar to publish a new avatar, or \c std::nullopt to remove the current one.
-///
-/// Requires the MUC service to support "vcard-temp" and the local user to be an owner or other
-/// privileged entity of the room.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Sets or removes the avatar of the room via vcard-temp.
+
+    Pass an \c Avatar to publish a new avatar, or \c std::nullopt to remove the current one.
+
+    Requires the MUC service to support "vcard-temp" and the local user to be an owner or other
+    privileged entity of the room.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmpp::Muc::Avatar> newAvatar)
 {
     QXmppVCardIq vCardIq;
@@ -1927,65 +1966,69 @@ QXmppTask<QXmpp::Result<>> QXmppMucRoomV2::setAvatar(std::optional<QXmpp::Muc::A
     return m_data->manager->client()->sendGenericIq(std::move(vCardIq));
 }
 
-///
-/// The description is populated from the \c muc#roominfo_description field of the
-/// \c disco\#info response. It is fetched automatically on join and re-fetched whenever
-/// a status code 104 (room configuration changed) is received.
-///
-/// Returns an empty string until the \c disco\#info response has arrived.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    The description is populated from the \c muc#roominfo_description field of the
+    \c disco\#info response. It is fetched automatically on join and re-fetched whenever
+    a status code 104 (room configuration changed) is received.
+
+    Returns an empty string until the \c disco\#info response has arrived.
+
+    \since QXmpp 1.16
+*/
 QBindable<QString> QXmppMucRoomV2::description() const
 {
     return &m_data->description;
 }
 
-///
-/// Returns the language of the room discussion from \xep{0045, Multi-User Chat} \c muc#roominfo.
-///
-/// The language tag is populated from the \c muc#roominfo_lang field of the
-/// \c disco\#info response, following BCP 47 (e.g. \c "en" or \c "de"). It is fetched
-/// automatically on join and re-fetched whenever a status code 104 is received.
-///
-/// Returns an empty string until the \c disco\#info response has arrived.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns the language of the room discussion from \xep{0045}{Multi-User Chat} \c muc#roominfo.
+
+    The language tag is populated from the \c muc#roominfo_lang field of the
+    \c disco\#info response, following BCP 47 (e.g. \c "en" or \c "de"). It is fetched
+    automatically on join and re-fetched whenever a status code 104 is received.
+
+    Returns an empty string until the \c disco\#info response has arrived.
+
+    \since QXmpp 1.16
+*/
 QBindable<QString> QXmppMucRoomV2::language() const
 {
     return &m_data->language;
 }
 
-///
-/// Returns the list of admin contact JIDs for the room from \xep{0045, Multi-User Chat} \c muc#roominfo.
-///
-/// The JIDs are populated from the \c muc#roominfo_contactjid field of the
-/// \c disco\#info response. They represent real JIDs of people responsible for the
-/// room, which may differ from the room's current affiliations list. The list is fetched
-/// automatically on join and re-fetched whenever a status code 104 is received.
-///
-/// Returns an empty list until the \c disco\#info response has arrived or if the
-/// room has no contact JIDs configured.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Returns the list of admin contact JIDs for the room from \xep{0045}{Multi-User Chat} \c muc#roominfo.
+
+    The JIDs are populated from the \c muc#roominfo_contactjid field of the
+    \c disco\#info response. They represent real JIDs of people responsible for the
+    room, which may differ from the room's current affiliations list. The list is fetched
+    automatically on join and re-fetched whenever a status code 104 is received.
+
+    Returns an empty list until the \c disco\#info response has arrived or if the
+    room has no contact JIDs configured.
+
+    \since QXmpp 1.16
+*/
 QBindable<QStringList> QXmppMucRoomV2::contactJids() const
 {
     return &m_data->contactJids;
 }
 
-///
-/// Sends a groupchat message to the room.
-///
-/// The message's \c to and \c type fields are set automatically. An \c origin-id
-/// (\xep{0359, Unique and Stable Stanza IDs}) is generated if not already set,
-/// and is used to match the server's reflected message.
-///
-/// The returned task completes with success when the message is reflected back
-/// by the MUC service, or with an error if the service responds with an error
-/// or the request times out.
-///
+/*!
+
+    Sends a groupchat message to the room.
+
+    The message's \c to and \c type fields are set automatically. An \c origin-id
+    (\xep{0359}{Unique and Stable Stanza IDs}) is generated if not already set,
+    and is used to match the server's reflected message.
+
+    The returned task completes with success when the message is reflected back
+    by the MUC service, or with an error if the service responds with an error
+    or the request times out.
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
 {
     if (m_data->state != MucRoomState::Joined) {
@@ -2015,12 +2058,13 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
     return task;
 }
 
-///
-/// Sends a private message to a room occupant.
-///
-/// The message is addressed to the occupant's current room JID (room\@service/nick).
-/// The returned task completes when the message has been sent to the server.
-///
+/*!
+
+    Sends a private message to a room occupant.
+
+    The message is addressed to the occupant's current room JID (room\@service/nick).
+    The returned task completes when the message has been sent to the server.
+*/
 QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message)
 {
     if (m_data->state != MucRoomState::Joined) {
@@ -2033,15 +2077,16 @@ QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QXmppMucParticipa
     return m_data->manager->client()->send(std::move(message));
 }
 
-///
-/// Changes the room subject.
-///
-/// Sends a subject-only groupchat message. The returned task completes when
-/// the MUC service reflects the subject change, or with an error if the
-/// service rejects it or the request times out.
-///
-/// \sa subject()
-///
+/*!
+
+    Changes the room subject.
+
+    Sends a subject-only groupchat message. The returned task completes when
+    the MUC service reflects the subject change, or with an error if the
+    service rejects it or the request times out.
+
+    \sa subject()
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::setSubject(const QString &subject)
 {
     QXmppMessage message;
@@ -2049,15 +2094,16 @@ QXmppTask<Result<>> QXmppMucRoomV2::setSubject(const QString &subject)
     return sendMessage(std::move(message));
 }
 
-///
-/// Changes the user's nickname in the room.
-///
-/// Sends a presence to the new occupant JID. The returned task completes
-/// when the MUC service confirms the change (status code 303), or with an
-/// error if it is rejected.
-///
-/// \sa nickname()
-///
+/*!
+
+    Changes the user's nickname in the room.
+
+    Sends a presence to the new occupant JID. The returned task completes
+    when the MUC service confirms the change (status code 303), or with an
+    error if it is rejected.
+
+    \sa nickname()
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
 {
     if (m_data->state != MucRoomState::Joined) {
@@ -2096,12 +2142,13 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
     return task;
 }
 
-///
-/// Changes the user's presence in the room.
-///
-/// The presence is addressed to the user's current occupant JID. The returned
-/// task completes when the presence has been sent to the server.
-///
+/*!
+
+    Changes the user's presence in the room.
+
+    The presence is addressed to the user's current occupant JID. The returned
+    task completes when the presence has been sent to the server.
+*/
 QXmppTask<SendResult> QXmppMucRoomV2::setPresence(QXmppPresence presence)
 {
     if (m_data->state != MucRoomState::Joined) {
@@ -2112,12 +2159,13 @@ QXmppTask<SendResult> QXmppMucRoomV2::setPresence(QXmppPresence presence)
     return m_data->manager->client()->send(std::move(presence));
 }
 
-///
-/// Leaves the room by sending an unavailable presence (XEP-0045 §7.14).
-///
-/// The returned task completes when the server confirms the leave with a
-/// self-unavailable presence containing status code 110.
-///
+/*!
+
+    Leaves the room by sending an unavailable presence (XEP-0045 §7.14).
+
+    The returned task completes when the server confirms the leave with a
+    self-unavailable presence containing status code 110.
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::leave()
 {
     auto itr = m_data->manager->d->activeRooms.find(m_data->roomJid);
@@ -2158,13 +2206,14 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
     return task;
 }
 
-///
-/// Changes the role of a room participant (XEP-0045 §8.4–8.6).
-///
-/// Role changes are transient and apply only for the current session.
-/// The \a participant must still be in the room. Roles are identified by
-/// the participant's current nickname.
-///
+/*!
+
+    Changes the role of a room participant (XEP-0045 §8.4–8.6).
+
+    Role changes are transient and apply only for the current session.
+    The \a participant must still be in the room. Roles are identified by
+    the participant's current nickname.
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason)
 {
     Muc::Item item;
@@ -2175,23 +2224,25 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participa
     return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } });
 }
 
-///
-/// Changes the roles of multiple room participants in a single request (XEP-0045 §8.5).
-///
-/// Each item must have its nick and role set. Role changes are transient
-/// and apply only for the current session.
-///
+/*!
+
+    Changes the roles of multiple room participants in a single request (XEP-0045 §8.5).
+
+    Each item must have its nick and role set. Role changes are transient
+    and apply only for the current session.
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::setRoles(const QList<Muc::Item> &items)
 {
     return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = items });
 }
 
-///
-/// Changes the affiliation of a user by bare JID (XEP-0045 §9).
-///
-/// Affiliation changes are persistent. The \a jid must be a bare JID.
-/// The user does not need to be currently in the room.
-///
+/*!
+
+    Changes the affiliation of a user by bare JID (XEP-0045 §9).
+
+    Affiliation changes are persistent. The \a jid must be a bare JID.
+    The user does not need to be currently in the room.
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Muc::Affiliation affiliation, const QString &reason)
 {
     Muc::Item item;
@@ -2202,25 +2253,27 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
     return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } });
 }
 
-///
-/// Changes the affiliations of multiple users in a single request (XEP-0045 §9).
-///
-/// Each item must have its jid and affiliation set. Affiliation changes are
-/// persistent and the users do not need to be currently in the room.
-///
+/*!
+
+    Changes the affiliations of multiple users in a single request (XEP-0045 §9).
+
+    Each item must have its jid and affiliation set. Affiliation changes are
+    persistent and the users do not need to be currently in the room.
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::setAffiliations(const QList<Muc::Item> &items)
 {
     return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = items });
 }
 
-///
-/// Requests the list of all users with a given \a affiliation (XEP-0045 §9.5–9.8).
-///
-/// Returns a snapshot of the affiliation list. There are no live updates;
-/// call this method again after making changes if you need a fresh list.
-///
-/// Only admins and owners are allowed to retrieve these lists.
-///
+/*!
+
+    Requests the list of all users with a given \a affiliation (XEP-0045 §9.5–9.8).
+
+    Returns a snapshot of the affiliation list. There are no live updates;
+    call this method again after making changes if you need a fresh list.
+
+    Only admins and owners are allowed to retrieve these lists.
+*/
 QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp::Muc::Affiliation affiliation)
 {
     Muc::Item item;
@@ -2233,11 +2286,12 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
     co_return std::get<QXmppError>(std::move(result));
 }
 
-///
-/// Queries the server for the user's reserved nickname in this room (XEP-0045 §7.12).
-///
-/// Returns the reserved nickname, or an empty string if no nickname is reserved.
-///
+/*!
+
+    Queries the server for the user's reserved nickname in this room (XEP-0045 §7.12).
+
+    Returns the reserved nickname, or an empty string if no nickname is reserved.
+*/
 QXmppTask<Result<QString>> QXmppMucRoomV2::requestReservedNickname()
 {
     auto result = co_await m_data->manager->d->disco()->info(m_data->roomJid, u"x-roomuser-item"_s, QXmppDiscoveryManager::CachePolicy::Strict).withContext(m_data->manager);
@@ -2252,11 +2306,12 @@ QXmppTask<Result<QString>> QXmppMucRoomV2::requestReservedNickname()
     co_return std::get<QXmppError>(std::move(result));
 }
 
-///
-/// Requests the registration form for this room (XEP-0045 §7.10).
-///
-/// Returns the data form that needs to be filled in and submitted via submitRegistration().
-///
+/*!
+
+    Requests the registration form for this room (XEP-0045 §7.10).
+
+    Returns the data form that needs to be filled in and submitted via submitRegistration().
+*/
 QXmppTask<Result<QXmppDataForm>> QXmppMucRoomV2::requestRegistrationForm()
 {
     auto result = co_await get<MucRegisterQuery>(m_data->manager->client(), m_data->roomJid, MucRegisterQuery {}).withContext(m_data->manager);
@@ -2269,30 +2324,32 @@ QXmppTask<Result<QXmppDataForm>> QXmppMucRoomV2::requestRegistrationForm()
     co_return std::get<QXmppError>(std::move(result));
 }
 
-///
-/// Submits a filled-in registration form to the room (XEP-0045 §7.10).
-///
-/// The \a form should be the form returned by requestRegistrationForm(), filled in by the user,
-/// with its type set to \c QXmppDataForm::Submit.
-///
+/*!
+
+    Submits a filled-in registration form to the room (XEP-0045 §7.10).
+
+    The \a form should be the form returned by requestRegistrationForm(), filled in by the user,
+    with its type set to \c QXmppDataForm::Submit.
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::submitRegistration(const QXmppDataForm &form)
 {
     return set(m_data->manager->client(), m_data->roomJid, MucRegisterQuery { .form = form });
 }
 
-///
-/// Requests voice in a moderated room as a visitor.
-///
-/// Sends a \c muc#request data form to the room. The MUC service forwards an
-/// approval form to all moderators, who can then call answerVoiceRequest()
-/// to grant or deny voice.
-///
-/// The returned task reflects the stream-management acknowledgement:
-/// QXmpp::SendSuccess::acknowledged is \c true once the server has confirmed
-/// receipt. Returns an error task immediately if the room is not currently joined.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Requests voice in a moderated room as a visitor.
+
+    Sends a \c muc#request data form to the room. The MUC service forwards an
+    approval form to all moderators, who can then call answerVoiceRequest()
+    to grant or deny voice.
+
+    The returned task reflects the stream-management acknowledgement:
+    QXmpp::SendSuccess::acknowledged is \c true once the server has confirmed
+    receipt. Returns an error task immediately if the room is not currently joined.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<SendResult> QXmppMucRoomV2::requestVoice()
 {
     if (!isRoomJoined(m_data->manager->d.get(), m_data->roomJid)) {
@@ -2306,20 +2363,21 @@ QXmppTask<SendResult> QXmppMucRoomV2::requestVoice()
     return m_data->manager->client()->send(std::move(message));
 }
 
-///
-/// Approves or denies a voice request as a moderator.
-///
-/// Sends the \a request form back to the room with \c muc#request_allow set to
-/// \a allow. If \a allow is \c true the MUC service promotes the visitor to
-/// participant; if \c false the request is denied and the visitor remains a
-/// visitor.
-///
-/// The returned task reflects the stream-management acknowledgement:
-/// QXmpp::SendSuccess::acknowledged is \c true once the server has confirmed
-/// receipt. Returns an error task immediately if the room is not currently joined.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Approves or denies a voice request as a moderator.
+
+    Sends the \a request form back to the room with \c muc#request_allow set to
+    \a allow. If \a allow is \c true the MUC service promotes the visitor to
+    participant; if \c false the request is denied and the visitor remains a
+    visitor.
+
+    The returned task reflects the stream-management acknowledgement:
+    QXmpp::SendSuccess::acknowledged is \c true once the server has confirmed
+    receipt. Returns an error task immediately if the room is not currently joined.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequest &request, bool allow)
 {
     if (!isRoomJoined(m_data->manager->d.get(), m_data->roomJid)) {
@@ -2336,14 +2394,15 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
     return m_data->manager->client()->send(std::move(message));
 }
 
-///
-/// Sends a mediated invitation to \a invite.to() via this room.
-///
-/// The room must be currently joined. The room service will forward the invitation to the
-/// specified invitee and add the room password automatically for password-protected rooms.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Sends a mediated invitation to \a invite.to() via this room.
+
+    The room must be currently joined. The room service will forward the invitation to the
+    specified invitee and add the room password automatically for password-protected rooms.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<SendResult> QXmppMucRoomV2::inviteUser(QXmpp::Muc::Invite invite)
 {
     if (!isRoomJoined(m_data->manager->d.get(), m_data->roomJid)) {
@@ -2359,25 +2418,26 @@ QXmppTask<SendResult> QXmppMucRoomV2::inviteUser(QXmpp::Muc::Invite invite)
     return m_data->manager->client()->send(std::move(message));
 }
 
-///
-/// Requests the current room configuration form from the server.
-///
-/// Valid in both the \c Creating and \c Joined states. Returns a
-/// QXmppMucRoomConfig that can be edited and submitted via setRoomConfig().
-/// Also updates the roomConfig() bindable on success.
-///
-/// If watching is active (setWatchRoomConfig(true) or \a watch = \c true) and
-/// the configuration has already been fetched, the cached value is returned
-/// immediately without a network request. When watching is disabled the cached
-/// value may be stale, so a fresh fetch is always performed in that case.
-///
-/// If \a watch is \c true, enables automatic re-fetching on status code 104
-/// (room configuration changed). Equivalent to calling setWatchRoomConfig(true)
-/// before this call.
-///
-/// \sa setRoomConfig(), roomConfig(), setWatchRoomConfig()
-/// \since QXmpp 1.16
-///
+/*!
+
+    Requests the current room configuration form from the server.
+
+    Valid in both the \c Creating and \c Joined states. Returns a
+    QXmppMucRoomConfig that can be edited and submitted via setRoomConfig().
+    Also updates the roomConfig() bindable on success.
+
+    If watching is active (setWatchRoomConfig(true) or \a watch = \c true) and
+    the configuration has already been fetched, the cached value is returned
+    immediately without a network request. When watching is disabled the cached
+    value may be stale, so a fresh fetch is always performed in that case.
+
+    If \a watch is \c true, enables automatic re-fetching on status code 104
+    (room configuration changed). Equivalent to calling setWatchRoomConfig(true)
+    before this call.
+
+    \sa setRoomConfig(), roomConfig(), setWatchRoomConfig()
+    \since QXmpp 1.16
+*/
 QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool watch)
 {
     using enum MucRoomState;
@@ -2420,15 +2480,16 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
     co_return std::move(*config);
 }
 
-///
-/// Submits the room configuration to the server.
-///
-/// In the \c Creating state (after createRoom()) this unlocks the room and
-/// transitions it to the \c Joined state. In the \c Joined state this
-/// updates an existing room's configuration.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Submits the room configuration to the server.
+
+    In the \c Creating state (after createRoom()) this unlocks the room and
+    transitions it to the \c Joined state. In the \c Joined state this
+    updates an existing room's configuration.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &config)
 {
     using enum MucRoomState;
@@ -2454,15 +2515,16 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
     co_return result;
 }
 
-///
-/// Cancels room creation and destroys the locked room on the server.
-///
-/// Only valid in the \c Creating state (i.e. after createRoom() has resolved
-/// but before setRoomConfig() has been called). Sending the cancel form
-/// instructs the server to destroy the still-locked room.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Cancels room creation and destroys the locked room on the server.
+
+    Only valid in the \c Creating state (i.e. after createRoom() has resolved
+    but before setRoomConfig() has been called). Sending the cancel form
+    instructs the server to destroy the still-locked room.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
 {
     if (m_data->state != MucRoomState::Creating) {
@@ -2480,15 +2542,16 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     co_return result;
 }
 
-///
-/// Destroys the MUC room on the server.
-///
-/// Only valid in the \c Joined state. Sends a destroy IQ to the MUC service.
-/// An optional \a reason and an \a alternateJid can be provided; the alternate
-/// JID is sent to occupants so they may join an alternative room.
-///
-/// \since QXmpp 1.16
-///
+/*!
+
+    Destroys the MUC room on the server.
+
+    Only valid in the \c Joined state. Sends a destroy IQ to the MUC service.
+    An optional \a reason and an \a alternateJid can be provided; the alternate
+    JID is sent to occupants so they may join an alternative room.
+
+    \since QXmpp 1.16
+*/
 QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QString &alternateJid)
 {
     if (m_data->state != MucRoomState::Joined) {
