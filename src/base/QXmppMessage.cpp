@@ -16,6 +16,7 @@
 #include "QXmppMessageReaction.h"
 #include "QXmppMessage_p.h"
 #include "QXmppMixInvitation.h"
+#include "QXmppXmlExtensions.h"
 
 #include "Algorithms.h"
 #include "StringLiterals.h"
@@ -220,6 +221,9 @@ public:
 
     // XEP-0482: Call Invites
     std::optional<QXmppCallInviteElement> callInviteElement;
+
+    // Registered and fallback XML extensions
+    QXmpp::Xml::Extensions extensions;
 };
 
 /*!
@@ -1644,6 +1648,26 @@ void QXmppMessage::setCallInviteElement(std::optional<QXmppCallInviteElement> ca
     d->callInviteElement = callInviteElement;
 }
 
+/*!
+    Returns the typed extension container for this message.
+
+    Extensions parsed via QXmpp::Xml::Registry and unknown elements stored as
+    QXmpp::Xml::Element are accessible here. This method hides
+    QXmppStanza::extensions(); application code should migrate to this API.
+
+    \since QXmpp 1.16
+*/
+QXmpp::Xml::Extensions &QXmppMessage::extensions()
+{
+    return d->extensions;
+}
+
+/*! \overload */
+const QXmpp::Xml::Extensions &QXmppMessage::extensions() const
+{
+    return d->extensions;
+}
+
 void QXmppMessage::parse(const QDomElement &element)
 {
     parse(element, QXmpp::SceAll);
@@ -1960,7 +1984,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         return true;
     }
-    return false;
+    return d->extensions.tryParseAndAdd(QXmpp::Xml::Scope::Message, element);
 }
 
 /*!
@@ -2186,6 +2210,8 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
     // fallback markers may be used in the private part (e.g. message replies) but also in the
     // public part (e.g. the fallback body for e2ee messages)
     w.write(d->fallbackMarkers);
+
+    d->extensions.toXml(writer);
 }
 
 struct QXmppFallbackPrivate : QSharedData {

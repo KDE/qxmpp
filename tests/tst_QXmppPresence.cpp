@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppPresence.h"
+#include "QXmppXmlElement.h"
 
 #include "util.h"
 
@@ -139,8 +140,10 @@ void tst_QXmppPresence::testPresenceWithCapability()
     QCOMPARE(presence.capabilityHash(), u"sha-1"_s);
     QCOMPARE(presence.capabilityNode(), u"https://github.com/qxmpp-project/qxmpp"_s);
     QCOMPARE(presence.capabilityVer(), QByteArray::fromBase64("QgayPKawpkPSDYmwT/WM94uAlu0="));
-    QCOMPARE(presence.extensions().first().tagName(), u"x"_s);
-    QCOMPARE(presence.extensions().first().attribute(u"xmlns"_s), u"urn:other:namespace");
+    const auto presenceExts = presence.extensions().getAll<QXmpp::Xml::Element>();
+    QCOMPARE(presenceExts.size(), 1);
+    QCOMPARE(presenceExts.at(0).tag(), u"x"_s);
+    QCOMPARE(presenceExts.at(0).xmlns(), u"urn:other:namespace"_s);
 
     serializePacket(presence, xml);
 

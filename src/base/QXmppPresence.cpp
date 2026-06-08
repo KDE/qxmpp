@@ -10,6 +10,7 @@
 #include "QXmppJingleIq.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
+#include "QXmppXmlExtensions.h"
 
 #include "StringLiterals.h"
 #include "XmlWriter.h"
@@ -95,6 +96,9 @@ public:
 
     // XEP-0421: Occupant identifiers for semi-anonymous MUCs
     QString mucOccupantId;
+
+    // Registered and fallback XML extensions
+    QXmpp::Xml::Extensions extensions;
 };
 
 QXmppPresencePrivate::QXmppPresencePrivate()
@@ -475,6 +479,26 @@ void QXmppPresence::setMucOccupantId(const QString &id)
     d->mucOccupantId = id;
 }
 
+/*!
+    Returns the typed extension container for this presence.
+
+    Extensions parsed via QXmpp::Xml::Registry and unknown elements stored as
+    QXmpp::Xml::Element are accessible here. This method hides
+    QXmppStanza::extensions(); application code should migrate to this API.
+
+    \since QXmpp 1.16
+*/
+QXmpp::Xml::Extensions &QXmppPresence::extensions()
+{
+    return d->extensions;
+}
+
+/*! \overload */
+const QXmpp::Xml::Extensions &QXmppPresence::extensions() const
+{
+    return d->extensions;
+}
+
 void QXmppPresence::parse(const QDomElement &element)
 {
     QXmppStanza::parse(element);
@@ -561,7 +585,7 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
     } else if (isElement<MucOccupantId>(element)) {
         d->mucOccupantId = element.attribute(u"id"_s);
     } else {
-        unknownElements << element;
+        d->extensions.tryParseAndAdd(QXmpp::Xml::Scope::Presence, element);
     }
 }
 
@@ -649,8 +673,10 @@ void QXmppPresence::toXml(QXmlStreamWriter *xmlWriter) const
             !d->mucOccupantId.isEmpty(),
             Element { MucOccupantId::XmlTag, Attribute { u"id", d->mucOccupantId } },
         },
-        // unknown extensions
-        [&] { QXmppStanza::extensionsToXml(xmlWriter); },
+        [&] {
+            QXmppStanza::extensionsToXml(xmlWriter);
+            d->extensions.toXml(xmlWriter);
+        },
     });
 }
 

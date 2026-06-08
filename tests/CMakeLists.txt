@@ -82,6 +82,7 @@ add_simple_test(QXmppVCardManager)
 add_simple_test(QXmppVersionManager)
 add_simple_test(QXmppXmlElement)
 add_simple_test(QXmppXmlFormatter)
+add_simple_test(QXmppXmlRegistry)
 
 if(WITH_ENCRYPTION)
     add_simple_test(QXmppFileEncryption)

@@ -101,7 +101,10 @@ set(INSTALL_HEADER_FILES
     base/QXmppVersionIq.h
     base/QXmppVisitHelper_p.h
     base/QXmppXmlElement.h
+    base/QXmppXmlElementScope.h
+    base/QXmppXmlExtensions.h
     base/QXmppXmlFormatter.h
+    base/QXmppXmlRegistry.h
     base/QXmppXmlTags_p.h
     base/compat/QXmppSessionIq.h
     base/compat/QXmppStartTlsPacket.h
@@ -249,7 +252,9 @@ set(SOURCE_FILES
     base/QXmppVCardIq.cpp
     base/QXmppVersionIq.cpp
     base/QXmppXmlElement.cpp
+    base/QXmppXmlExtensions.cpp
     base/QXmppXmlFormatter.cpp
+    base/QXmppXmlRegistry.cpp
     base/compat/removed_api.cpp
     base/hsluv/hsluv.c
     base/XmlWriter.cpp

@@ -15,6 +15,7 @@
 #include "QXmppMixInvitation.h"
 #include "QXmppOutOfBandUrl.h"
 #include "QXmppTrustMessageElement.h"
+#include "QXmppXmlElement.h"
 
 #include "util.h"
 
@@ -482,9 +483,24 @@ void tst_QXmppMessage::testSubextensions()
 
     QXmppMessage message;
     parsePacket(message, xml);
-    QCOMPARE(message.extensions().size(), 2);
-    QCOMPARE(message.extensions().first().tagName(), QLatin1String("result"));
-    serializePacket(message, xml);
+    const auto elements = message.extensions().getAll<QXmpp::Xml::Element>();
+    QCOMPARE(elements.size(), 2);
+    QCOMPARE(elements.at(0).tag(), u"result"_s);
+    QCOMPARE(elements.at(0).xmlns(), u"urn:xmpp:mam:tmp"_s);
+    QCOMPARE(elements.at(1).tag(), u"x"_s);
+    QCOMPARE(elements.at(1).xmlns(), u"jabber:x:new-fancy-extension"_s);
+
+    // Verify semantic round-trip: re-parsing the serialized output yields the same elements.
+    // Xml::Element may re-declare inherited namespaces so byte-exact comparison is not expected.
+    QByteArray reserialized;
+    QXmlStreamWriter resWriter(&reserialized);
+    message.toXml(&resWriter);
+    QXmppMessage reparsed;
+    reparsed.parse(xmlToDom(reserialized));
+    const auto reparsedElements = reparsed.extensions().getAll<QXmpp::Xml::Element>();
+    QCOMPARE(reparsedElements.size(), 2);
+    QCOMPARE(reparsedElements.at(0).tag(), u"result"_s);
+    QCOMPARE(reparsedElements.at(1).tag(), u"x"_s);
 }
 
 void tst_QXmppMessage::testChatMarkers()

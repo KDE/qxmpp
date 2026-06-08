@@ -10,6 +10,7 @@
 #include "QXmppJingleIq.h"
 #include "QXmppMucIq.h"
 #include "QXmppStanza.h"
+#include "QXmppXmlExtensions.h"
 
 class QXmppPresencePrivate;
 
@@ -158,6 +159,9 @@ public:
     // XEP-0421: Occupant identifiers for semi-anonymous MUCs
     QString mucOccupantId() const;
     void setMucOccupantId(const QString &);
+
+    QXmpp::Xml::Extensions &extensions();
+    const QXmpp::Xml::Extensions &extensions() const;
 
     void parse(const QDomElement &element) override;
     void toXml(QXmlStreamWriter *writer) const override;

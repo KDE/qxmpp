@@ -12,6 +12,7 @@
 #include "QXmppFallback.h"
 #include "QXmppFileShare.h"
 #include "QXmppStanza.h"
+#include "QXmppXmlExtensions.h"
 
 #include <optional>
 
@@ -358,6 +359,9 @@ public:
     // XEP-0482: Call Invites
     std::optional<QXmppCallInviteElement> callInviteElement() const;
     void setCallInviteElement(std::optional<QXmppCallInviteElement> callInviteElement);
+
+    QXmpp::Xml::Extensions &extensions();
+    const QXmpp::Xml::Extensions &extensions() const;
 
 #ifdef BUILD_OMEMO
     // XEP-0384: OMEMO Encryption
