@@ -93,14 +93,15 @@ struct QXmppPepBookmarkManagerPrivate;
     bookmark.setNick(u"alice"_s);
     bookmark.setAutojoin(true);
     bm->setBookmark(std::move(bookmark)).then(this, [](auto result) {
-        if (std::holds_alternative<QXmppError>(result)) { /* handle error */ }
-});
+        if (std::holds_alternative<QXmppError>(result)) { return; }
+    });
 \endcode
 
     \ingroup Managers
-    \since QXmpp 1.16 * /
-    class QXMPP_EXPORT QXmppPepBookmarkManager : public QXmppClientExtension,
-    public QXmppPubSubEventHandler
+    \since QXmpp 1.16
+*/
+class QXMPP_EXPORT QXmppPepBookmarkManager : public QXmppClientExtension,
+                                             public QXmppPubSubEventHandler
 {
     Q_OBJECT
 

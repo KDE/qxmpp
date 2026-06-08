@@ -85,27 +85,27 @@ QXmppMucBookmark::QXmppMucBookmark(const QString &jid, QXmpp::Private::Bookmarks
 
 /*! Returns the (bare) JID of the MUC. */
 const QString &QXmppMucBookmark::jid() const { return d->jid; }
-/*! Sets the (bare) JID of the MUC. */
+/*! Sets the (bare) \a jid of the MUC. */
 void QXmppMucBookmark::setJid(const QString &jid) { d->jid = jid; }
 
 /*! Returns the user-defined display name of the MUC. */
 const QString &QXmppMucBookmark::name() const { return d->payload.name; }
-/*! Sets the user-defined display name of the MUC. */
+/*! Sets the user-defined display \a name of the MUC. */
 void QXmppMucBookmark::setName(const QString &name) { d->payload.name = name; }
 
 /*! Returns the user's preferred nick for this MUC. */
 const QString &QXmppMucBookmark::nick() const { return d->payload.nick; }
-/*! Sets the user's preferred nick for this MUC. */
+/*! Sets the user's preferred \a nick for this MUC. */
 void QXmppMucBookmark::setNick(const QString &nick) { d->payload.nick = nick; }
 
 /*! Returns the required password for the MUC. */
 const QString &QXmppMucBookmark::password() const { return d->payload.password; }
-/*! Sets the required password for the MUC. */
+/*! Sets the required \a password for the MUC. */
 void QXmppMucBookmark::setPassword(const QString &password) { d->payload.password = password; }
 
 /*! Returns whether to automatically join this MUC on connection. */
 bool QXmppMucBookmark::autojoin() const { return d->payload.autojoin; }
-/*! Sets whether to automatically join this MUC on connection. */
+/*! Sets whether to automatically join this MUC on connection to \a autojoin. */
 void QXmppMucBookmark::setAutojoin(bool autojoin) { d->payload.autojoin = autojoin; }
 
 //
