@@ -1870,7 +1870,7 @@ QBindable<std::optional<QXmppMucRoomConfig>> QXmppMucRoomV2::roomConfig() const
 
 /*!
 
-    Enables or disables automatic room configuration updates.
+    Enables or disables automatic room configuration updates based on \a watch.
 
     When set to \c true, status code 104 messages (room configuration changed)
     will automatically trigger a re-fetch to keep roomConfig() current. If the
@@ -1944,7 +1944,7 @@ QBindable<std::optional<QXmpp::Muc::Avatar>> QXmppMucRoomV2::avatar() const
 
 /*!
 
-    Enables or disables automatic avatar updates.
+    Enables or disables automatic avatar updates based on \a watch.
 
     When set to \c true, the avatar is fetched immediately if the room info is already available
     and the hashes have not been fetched yet. Whenever a status code 104 (room configuration
@@ -2114,7 +2114,7 @@ QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QXmppMucParticipa
 
 /*!
 
-    Changes the room subject.
+    Changes the room subject to \a subject.
 
     Sends a subject-only groupchat message. The returned task completes when
     the MUC service reflects the subject change, or with an error if the

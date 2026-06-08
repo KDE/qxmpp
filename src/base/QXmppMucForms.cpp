@@ -275,6 +275,7 @@ bool QXmppMucRoomInfo::operator==(const QXmppMucRoomInfo &other) const
 /*!
 
     \class QXmppMucVoiceRequest
+    \inmodule QXmpp
 
     \brief Represents a voice request data form (muc#request) for moderated rooms.
 
@@ -428,6 +429,7 @@ void QXmppMucVoiceRequest::setRequestAllow(std::optional<bool> allow)
 /*!
 
     \class QXmppMucRoomConfig
+    \inmodule QXmpp
 
     \brief Represents the \c muc#roomconfig data form for configuring a MUC room.
 

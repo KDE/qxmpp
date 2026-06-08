@@ -319,13 +319,19 @@ void QXmppPresence::setMujiContents(const QVector<QXmppJingleIq::Content> &mujiC
     d->mujiContents = mujiContents;
 }
 
-/*! Returns the MUC item. */
+/*!
+    Returns the MUC item.
+    \deprecated Use mucParticipantItem() instead.
+*/
 QXmppMucItem QXmppPresence::mucItem() const
 {
     return d->mucItem;
 }
 
-/*! Sets the MUC \a item. */
+/*!
+    Sets the MUC \a item.
+    \deprecated Use setMucParticipantItem() instead.
+*/
 void QXmppPresence::setMucItem(const QXmppMucItem &item)
 {
     d->mucItem = item;
