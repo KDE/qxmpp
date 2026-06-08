@@ -16,12 +16,8 @@ class QXmlStreamWriter;
 
 namespace QXmpp::Private {
 
-///
-/// \brief IQ payload for muc\#admin requests (XEP-0045 §9).
-///
-/// Used to get or modify role/affiliation lists via \c GetIq or \c SetIq.
-/// Each item carries a JID or nickname, a role or affiliation, and optionally a reason.
-///
+// IQ payload for muc#admin requests (XEP-0045 §9).
+// Used to get or modify role/affiliation lists via GetIq or SetIq.
 struct MucAdminQuery {
     QList<QXmpp::Muc::Item> items;
 
@@ -30,18 +26,11 @@ struct MucAdminQuery {
     void toXml(QXmlStreamWriter *writer) const;
 };
 
-///
-/// \brief IQ payload for muc\#owner requests (XEP-0045 §10).
-///
-/// Used to fetch, submit, or cancel a room configuration form, or to destroy a room.
-/// Exactly one of \e form or the destroy fields should be set at a time.
-///
+// IQ payload for muc#owner requests (XEP-0045 §10).
+// Used to fetch, submit, or cancel a room configuration form, or to destroy a room.
 struct MucOwnerQuery {
-    /// The room configuration data form (Submit or Cancel type for SET; populated on GET result).
     std::optional<QXmppDataForm> form;
-    /// JID of an alternate room when destroying (may be empty).
     QString destroyAlternateJid;
-    /// Human-readable reason when destroying (may be empty).
     QString destroyReason;
 
     static constexpr std::tuple XmlTag = { u"query", ns_muc_owner };
@@ -49,16 +38,9 @@ struct MucOwnerQuery {
     void toXml(QXmlStreamWriter *writer) const;
 };
 
-///
-/// \brief IQ payload for jabber:iq:register queries to a MUC room (XEP-0045 §7.10).
-///
-/// Used to request and submit a room registration form. Registration typically
-/// reserves a nickname or grants membership in a room.
-///
+// IQ payload for jabber:iq:register queries to a MUC room (XEP-0045 §7.10).
 struct MucRegisterQuery {
-    /// The registration data form.
     std::optional<QXmppDataForm> form;
-    /// Whether the user is already registered (\c <registered/> element present).
     bool isRegistered = false;
 
     static constexpr std::tuple XmlTag = { u"query", ns_register };
