@@ -80,6 +80,7 @@ add_simple_test(QXmppUserTuneManager)
 add_simple_test(QXmppUtils resources/extended.qrc)
 add_simple_test(QXmppVCardManager)
 add_simple_test(QXmppVersionManager)
+add_simple_test(QXmppXmlElement)
 add_simple_test(QXmppXmlFormatter)
 
 if(WITH_ENCRYPTION)
