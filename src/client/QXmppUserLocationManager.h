@@ -30,6 +30,9 @@ public:
     QStringList discoveryFeatures() const override;
 
     auto request(const QString &jid) -> QXmppTask<GetResult>;
+    /*!
+        Publishes the User Location \a item on the user's account.
+    */
     auto publish(const Item &item) -> QXmppTask<PublishResult>;
 
     Q_SIGNAL void itemReceived(const QString &jid, const QXmppGeolocItem &);

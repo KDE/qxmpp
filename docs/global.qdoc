@@ -1,0 +1,10 @@
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+/*!
+    \fn QLatin1String QXmppVersion()
+    \relates QXmppClient
+
+    Returns the version of QXmpp used at compile time as a string.
+*/

@@ -26,10 +26,15 @@ class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
-    /*! Media type for starting a call. */
+    /*!
+        Media type for starting a call.
+
+        \value Audio Only contains an audio stream.
+        \value AudioVideo Contains audio and video streams.
+    */
     enum class Media {
-        Audio,       /// only contains an audio stream
-        AudioVideo,  /// contains audio and video streams
+        Audio,
+        AudioVideo,
     };
 
     QXmppCallManager();

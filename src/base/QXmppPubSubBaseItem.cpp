@@ -71,7 +71,7 @@ QXmppPubSubBaseItem::QXmppPubSubBaseItem(QXmppPubSubBaseItem &&) noexcept = defa
 QXmppPubSubBaseItem::~QXmppPubSubBaseItem() noexcept = default;
 /*! Default assignment operator, copying \a iq. */
 QXmppPubSubBaseItem &QXmppPubSubBaseItem::operator=(const QXmppPubSubBaseItem &iq) noexcept = default;
-/*! Default move-assignment operator */
+/*! Default move-assignment operator, moving from \a iq. */
 QXmppPubSubBaseItem &QXmppPubSubBaseItem::operator=(QXmppPubSubBaseItem &&iq) noexcept = default;
 
 /*! Returns the ID of the PubSub item. */
@@ -124,9 +124,11 @@ bool QXmppPubSubBaseItem::isItem(const QDomElement &element)
     return element.tagName() == u"item";
 }
 
-/*! Parses the payload of the item (the child element of the &lt;item/&gt;).
+/*!
+    Parses the payload \a payloadElement of the item (the child element of the &lt;item/&gt;).
 
-    This method needs to be overriden to perform the payload-specific parsing. Returns true on success. */
+    This method needs to be overriden to perform the payload-specific parsing.
+*/
 void QXmppPubSubBaseItem::parsePayload(const QDomElement &)
 {
 }

@@ -26,7 +26,6 @@ struct QXmppError;
 // use the latest QXmpp features where available.
 #define QXMPP_VERSION QT_VERSION_CHECK(QXMPP_VERSION_MAJOR, QXMPP_VERSION_MINOR, QXMPP_VERSION_PATCH)
 
-/*! Returns the version of QXmpp used at compile time as a string. */
 inline QLatin1String QXmppVersion()
 {
     return QLatin1String(

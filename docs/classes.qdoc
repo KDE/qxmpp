@@ -1,0 +1,11 @@
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+/*!
+    \page classes.html
+    \title QXmpp Classes
+    \brief List of all QXmpp classes.
+
+    \generatelist annotatedclasses
+*/

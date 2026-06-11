@@ -418,7 +418,7 @@ QXmppBitsOfBinaryContentId::QXmppBitsOfBinaryContentId(const QXmppBitsOfBinaryCo
 QXmppBitsOfBinaryContentId::QXmppBitsOfBinaryContentId(QXmppBitsOfBinaryContentId &&cid) = default;
 /*! Default assignment operator, copying \a other. */
 QXmppBitsOfBinaryContentId &QXmppBitsOfBinaryContentId::operator=(const QXmppBitsOfBinaryContentId &other) = default;
-/*! Default move-assignment operator */
+/*! Default move-assignment operator, moving from \a other. */
 QXmppBitsOfBinaryContentId &QXmppBitsOfBinaryContentId::operator=(QXmppBitsOfBinaryContentId &&other) = default;
 
 /*! Returns a \xep{0231}{Bits of Binary} content id */

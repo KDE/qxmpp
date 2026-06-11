@@ -59,6 +59,8 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
     \fn void QXmppUserTuneManager::itemReceived(const QString &jid, const QXmppTuneItem &item)
 
     Emitted whenever a \xep{0118}{User Tune} items event arrives.
+
+    \a jid is the JID of the contact. \a item contains the received tune data.
 */
 
 QXmppUserTuneManager::QXmppUserTuneManager()

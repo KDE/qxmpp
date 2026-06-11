@@ -37,7 +37,7 @@ using namespace QXmpp::Private;
 */
 
 /*!
-    \fn QXmppPubSubEventHandler::handlePubSubEvent()
+    \fn bool QXmppPubSubEventHandler::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 
     Handles the PubSub event.
 

@@ -82,10 +82,16 @@ private:
     QSharedDataPointer<QXmppVCardAddressPrivate> d;
 };
 
-/*! \relates QXmppVCardAddress Returns true if the two addresses are equal. */
-QXMPP_EXPORT bool operator==(const QXmppVCardAddress &, const QXmppVCardAddress &);
-/*! \relates QXmppVCardAddress Returns true if the two addresses are not equal. */
-QXMPP_EXPORT bool operator!=(const QXmppVCardAddress &, const QXmppVCardAddress &);
+/*!
+    \relates QXmppVCardAddress
+    Returns \c true if \a left and \a right are equal.
+*/
+QXMPP_EXPORT bool operator==(const QXmppVCardAddress &left, const QXmppVCardAddress &right);
+/*!
+    \relates QXmppVCardAddress
+    Returns \c true if \a left and \a right are not equal.
+*/
+QXMPP_EXPORT bool operator!=(const QXmppVCardAddress &left, const QXmppVCardAddress &right);
 
 /*!
     \inmodule QXmpp
@@ -136,10 +142,16 @@ private:
     QSharedDataPointer<QXmppVCardEmailPrivate> d;
 };
 
-/*! \relates QXmppVCardEmail Returns true if the two e-mail addresses are equal. */
-QXMPP_EXPORT bool operator==(const QXmppVCardEmail &, const QXmppVCardEmail &);
-/*! \relates QXmppVCardEmail Returns true if the two e-mail addresses are not equal. */
-QXMPP_EXPORT bool operator!=(const QXmppVCardEmail &, const QXmppVCardEmail &);
+/*!
+    \relates QXmppVCardEmail
+    Returns \c true if \a left and \a right are equal.
+*/
+QXMPP_EXPORT bool operator==(const QXmppVCardEmail &left, const QXmppVCardEmail &right);
+/*!
+    \relates QXmppVCardEmail
+    Returns \c true if \a left and \a right are not equal.
+*/
+QXMPP_EXPORT bool operator!=(const QXmppVCardEmail &left, const QXmppVCardEmail &right);
 
 /*!
     \inmodule QXmpp
@@ -206,10 +218,16 @@ private:
     QSharedDataPointer<QXmppVCardPhonePrivate> d;
 };
 
-/*! \relates QXmppVCardPhone Returns true if the two phone numbers are equal. */
-QXMPP_EXPORT bool operator==(const QXmppVCardPhone &, const QXmppVCardPhone &);
-/*! \relates QXmppVCardPhone Returns true if the two phone numbers are not equal. */
-QXMPP_EXPORT bool operator!=(const QXmppVCardPhone &, const QXmppVCardPhone &);
+/*!
+    \relates QXmppVCardPhone
+    Returns \c true if \a left and \a right are equal.
+*/
+QXMPP_EXPORT bool operator==(const QXmppVCardPhone &left, const QXmppVCardPhone &right);
+/*!
+    \relates QXmppVCardPhone
+    Returns \c true if \a left and \a right are not equal.
+*/
+QXMPP_EXPORT bool operator!=(const QXmppVCardPhone &left, const QXmppVCardPhone &right);
 
 /*!
     \inmodule QXmpp
@@ -248,10 +266,16 @@ private:
     QSharedDataPointer<QXmppVCardOrganizationPrivate> d;
 };
 
-/*! \relates QXmppVCardOrganization Returns true if the two organizations are equal. */
-QXMPP_EXPORT bool operator==(const QXmppVCardOrganization &, const QXmppVCardOrganization &);
-/*! \relates QXmppVCardOrganization Returns true if the two organizations are not equal. */
-QXMPP_EXPORT bool operator!=(const QXmppVCardOrganization &, const QXmppVCardOrganization &);
+/*!
+    \relates QXmppVCardOrganization
+    Returns \c true if \a left and \a right are equal.
+*/
+QXMPP_EXPORT bool operator==(const QXmppVCardOrganization &left, const QXmppVCardOrganization &right);
+/*!
+    \relates QXmppVCardOrganization
+    Returns \c true if \a left and \a right are not equal.
+*/
+QXMPP_EXPORT bool operator!=(const QXmppVCardOrganization &left, const QXmppVCardOrganization &right);
 
 /*!
     \inmodule QXmpp
@@ -336,9 +360,15 @@ private:
     QSharedDataPointer<QXmppVCardIqPrivate> d;
 };
 
-/*! \relates QXmppVCardIq Returns true if the two vCard IQs are equal. */
-QXMPP_EXPORT bool operator==(const QXmppVCardIq &, const QXmppVCardIq &);
-/*! \relates QXmppVCardIq Returns true if the two vCard IQs are not equal. */
-QXMPP_EXPORT bool operator!=(const QXmppVCardIq &, const QXmppVCardIq &);
+/*!
+    \relates QXmppVCardIq
+    Returns \c true if \a left and \a right are equal.
+*/
+QXMPP_EXPORT bool operator==(const QXmppVCardIq &left, const QXmppVCardIq &right);
+/*!
+    \relates QXmppVCardIq
+    Returns \c true if \a left and \a right are not equal.
+*/
+QXMPP_EXPORT bool operator!=(const QXmppVCardIq &left, const QXmppVCardIq &right);
 
 #endif  // QXMPPVCARDIQ_H

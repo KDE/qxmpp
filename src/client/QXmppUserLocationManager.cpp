@@ -60,6 +60,8 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
     \fn void QXmppUserLocationManager::itemReceived(const QString &jid, const QXmppGeolocItem &item)
 
     Emitted whenever a \xep{0080}{User Location} items event arrives.
+
+    \a jid is the JID of the contact. \a item contains the received location data.
 */
 
 QXmppUserLocationManager::QXmppUserLocationManager() = default;
@@ -81,11 +83,6 @@ auto QXmppUserLocationManager::request(const QString &jid)
     return Pep::request<Item>(pubSub(client()), jid, ns_geoloc.toString(), this);
 }
 
-/*!
-    \fn QXmppUserLocationManager::publish(const QXmppGeolocItem &item)
-
-    Publishes the User Location \a item on the user's account.
-*/
 auto QXmppUserLocationManager::publish(const QXmppGeolocItem &item)
     -> QXmppTask<PublishResult>
 {

@@ -172,18 +172,24 @@ struct QXmppMucManagerV2Private {
     \fn void QXmppMucManagerV2::bookmarksAdded(const QList<QXmppMucBookmark> &newBookmarks)
 
     Emitted when bookmarks have been added. This is triggered by PubSub event notifications.
+
+    \a newBookmarks contains the added bookmarks.
 */
 
 /*!
     \fn void QXmppMucManagerV2::bookmarksChanged(const QList<QXmppMucManagerV2::BookmarkChange> &bookmarkUpdates)
 
     Emitted when bookmarks have been changed.
+
+    \a bookmarkUpdates contains the changed bookmarks.
 */
 
 /*!
     \fn void QXmppMucManagerV2::bookmarksRemoved(const QList<QString> &removedBookmarkJids)
 
     Emitted when bookmarks are retracted.
+
+    \a removedBookmarkJids contains the JIDs of the removed bookmarks.
 */
 
 /*! Default constructor. */

@@ -151,7 +151,7 @@ public:
         }
         return *this;
     }
-    /*! Move assignment operator. */
+    /*! Move assignment operator, moving from \a p. */
     QXmppPromise<T> &operator=(QXmppPromise<T> &&p)
     {
         std::swap(data, p.data);
@@ -365,7 +365,7 @@ public:
         }
     }
 
-    /*! Move assignment operator. */
+    /*! Move assignment operator, moving from \a t. */
     QXmppTask &operator=(QXmppTask &&t) noexcept
     {
         // unregister with old promise

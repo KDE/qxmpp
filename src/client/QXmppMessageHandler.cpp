@@ -14,7 +14,7 @@
 /*!
     \fn bool QXmppMessageHandler::handleMessage(const QXmppMessage &message)
 
-    Handles the message.
+    Handles \a message.
 
     Returns whether the message has been handled and no other extensions should process it.
 */

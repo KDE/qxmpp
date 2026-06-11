@@ -89,7 +89,6 @@ QXmppVCardAddress &QXmppVCardAddress::operator=(const QXmppVCardAddress &other) 
 /*! Move-assignment operator. */
 QXmppVCardAddress &QXmppVCardAddress::operator=(QXmppVCardAddress &&) = default;
 
-/*! \brief Checks if two address objects represent the same address. */
 bool operator==(const QXmppVCardAddress &left, const QXmppVCardAddress &right)
 {
     return left.type() == right.type() &&
@@ -100,7 +99,6 @@ bool operator==(const QXmppVCardAddress &left, const QXmppVCardAddress &right)
         left.street() == right.street();
 }
 
-/*! \brief Checks if two address objects represent different addresses. */
 bool operator!=(const QXmppVCardAddress &left, const QXmppVCardAddress &right)
 {
     return !(left == right);
@@ -239,14 +237,12 @@ QXmppVCardEmail::~QXmppVCardEmail() = default;
 /*! Copy-assignment operator, copying \a other. */
 QXmppVCardEmail &QXmppVCardEmail::operator=(const QXmppVCardEmail &other) = default;
 
-/*! \brief Checks if two email objects represent the same email address. */
 bool operator==(const QXmppVCardEmail &left, const QXmppVCardEmail &right)
 {
     return left.type() == right.type() &&
         left.address() == right.address();
 }
 
-/*! \brief Checks if two email objects represent different email addresses. */
 bool operator!=(const QXmppVCardEmail &left, const QXmppVCardEmail &right)
 {
     return !(left == right);
@@ -337,14 +333,12 @@ QString QXmppVCardPhone::number() const
     return d->number;
 }
 
-/*! \brief Checks if two phone objects represent the same phone number. */
 bool operator==(const QXmppVCardPhone &left, const QXmppVCardPhone &right)
 {
     return left.type() == right.type() &&
         left.number() == right.number();
 }
 
-/*! \brief Checks if two phone objects represent different phone numbers. */
 bool operator!=(const QXmppVCardPhone &left, const QXmppVCardPhone &right)
 {
     return !(left == right);
@@ -463,7 +457,6 @@ QXmppVCardOrganization &QXmppVCardOrganization::operator=(const QXmppVCardOrgani
     return *this;
 }
 
-/*! \brief Checks if two organization objects represent the same organization. */
 bool operator==(const QXmppVCardOrganization &left, const QXmppVCardOrganization &right)
 {
     return left.organization() == right.organization() &&
@@ -472,7 +465,6 @@ bool operator==(const QXmppVCardOrganization &left, const QXmppVCardOrganization
         left.role() == right.role();
 }
 
-/*! \brief Checks if two organization objects represent different organizations. */
 bool operator!=(const QXmppVCardOrganization &left, const QXmppVCardOrganization &right)
 {
     return !(left == right);
@@ -600,7 +592,6 @@ QXmppVCardIq &QXmppVCardIq::operator=(const QXmppVCardIq &other)
     return *this;
 }
 
-/*! \brief Checks if two VCard objects represent the same VCard. */
 bool operator==(const QXmppVCardIq &left, const QXmppVCardIq &right)
 {
     return left.birthday() == right.birthday() &&
@@ -619,7 +610,6 @@ bool operator==(const QXmppVCardIq &left, const QXmppVCardIq &right)
         left.organization() == right.organization();
 }
 
-/*! \brief Checks if two VCard objects represent different VCards. */
 bool operator!=(const QXmppVCardIq &left, const QXmppVCardIq &right)
 {
     return !(left == right);
