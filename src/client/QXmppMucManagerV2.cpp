@@ -976,7 +976,13 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     updated.setFrom(roomJid + u'/' + newNick);
                     node.mapped()->setPresence(updated);
                     node.key() = newNick;
-                    data.participants.insert(std::move(node));
+                    auto result = data.participants.insert(std::move(node));
+                    if (!result.inserted) {
+                        // newNick is already occupied (server should prevent this, but
+                        // guard against it): overwrite the stale entry with the re-keyed
+                        // participant so the live occupant isn't silently dropped.
+                        result.position->second = std::move(result.node.mapped());
+                    }
                 }
             }
         } else if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
