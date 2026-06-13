@@ -240,6 +240,10 @@ struct MucRoomData {
         leaveTimer.reset();
         nickChangeTimer.reset();
         pendingMessages.clear();
+        // roomConfigWaiters are moved out and finished by deactivateRoom() before this
+        // runs; clearing here just resets the (already-empty) vector and fetch flag.
+        roomConfigWaiters.clear();
+        fetchingRoomConfig = false;
         selfPingInFlight = false;
         selfPingRetryCount = 0;
         lastActivity = {};
@@ -1301,6 +1305,11 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     auto data = std::move(itr->second);
     activeRooms.erase(itr);
 
+    // Move out pending room-config waiters before resetting so we can finish them
+    // with an error once the room state is clean. deactivateAllRooms() may have
+    // already drained them, in which case this is empty.
+    auto configWaiters = std::move(data->roomConfigWaiters);
+
     // Reset per-session state (promises, timers, state flags). Participants and
     // permission bindings are intentionally preserved — they serve as a frozen
     // snapshot for caller handles and are cleared on the next join instead.
@@ -1309,6 +1318,12 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     // Register a weak_ptr so subsequent joinRoom()/findRoom() calls can revive the
     // same MucRoomData instance as long as any caller handle is still holding it.
     inactiveRooms[jid] = data;
+
+    // Finish any outstanding room-config requests now that the room state is clean,
+    // so their tasks don't hang forever after a leave/destroy/disconnect.
+    for (auto &p : configWaiters) {
+        p.finish(QXmppError { u"The room session ended before the configuration request completed."_s });
+    }
 
     // data shared_ptr goes out of scope here. If no caller holds a handle, the data
     // is freed and the weak_ptr expires (pruned lazily on next lookup or threshold sweep).
@@ -1324,6 +1339,7 @@ void QXmppMucManagerV2Private::deactivateAllRooms()
     // clean (empty) room state.
     std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
     std::vector<QXmppPromise<Result<>>> otherPromises;
+    std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> configWaiters;
 
     for (auto &[jid, data] : activeRooms) {
         if (data->joinPromise) {
@@ -1341,6 +1357,12 @@ void QXmppMucManagerV2Private::deactivateAllRooms()
         for (auto &[msgId, pending] : data->pendingMessages) {
             otherPromises.push_back(std::move(pending.promise));
         }
+        // Drain here so deactivateRoom() finds an empty vector and we can finish them
+        // below, once every room is clean.
+        for (auto &waiter : data->roomConfigWaiters) {
+            configWaiters.push_back(std::move(waiter));
+        }
+        data->roomConfigWaiters.clear();
     }
 
     // Deactivate every room (demote to inactive, reset session state, keep cache).
@@ -1362,6 +1384,9 @@ void QXmppMucManagerV2Private::deactivateAllRooms()
     }
     for (auto &promise : otherPromises) {
         promise.finish(error);
+    }
+    for (auto &waiter : configWaiters) {
+        waiter.finish(error);
     }
 }
 
@@ -2540,7 +2565,9 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
 
     const bool wasCreating = (m_data->state == Creating);
     auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .form = std::move(form) }).withContext(m_data->manager);
-    if (std::holds_alternative<Success>(result) && wasCreating) {
+    // Re-check the state: a disconnect during the await may have deactivated the room
+    // (state reset to NotJoined), in which case we must not stomp it back to Joined.
+    if (std::holds_alternative<Success>(result) && wasCreating && m_data->state == Creating) {
         // Unlock the room: transition to Joined state
         m_data->state = MucRoomState::Joined;
         m_data->joined = true;
@@ -2573,7 +2600,9 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     cancelForm.setType(QXmppDataForm::Cancel);
 
     auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .form = std::move(cancelForm) }).withContext(m_data->manager);
-    if (std::holds_alternative<Success>(result)) {
+    // Only tear down if still the creating session — a disconnect during the await may
+    // have already deactivated (and a subsequent rejoin revived) the room.
+    if (std::holds_alternative<Success>(result) && m_data->state == MucRoomState::Creating) {
         m_data->manager->d->deactivateRoom(m_data->roomJid);
         m_data->manager->d->rescheduleSelfPing();
     }
@@ -2597,7 +2626,9 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
     }
 
     auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_data->manager);
-    if (std::holds_alternative<Success>(result)) {
+    // Only tear down if still joined — a disconnect during the await may have already
+    // deactivated (and a subsequent rejoin revived) the room.
+    if (std::holds_alternative<Success>(result) && m_data->state == MucRoomState::Joined) {
         m_data->manager->d->deactivateRoom(m_data->roomJid);
         m_data->manager->d->rescheduleSelfPing();
     }
