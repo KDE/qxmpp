@@ -201,6 +201,9 @@ private:
     own the data but the manager owns the signal infrastructure. Accessing a handle after the
     manager is destroyed is undefined behavior.
 
+    \warning THIS API IS NOT FINALIZED YET and may still change in incompatible ways
+    before it is released.
+
     \since QXmpp 1.16
 */
 class QXMPP_EXPORT QXmppMucRoomV2
@@ -319,6 +322,9 @@ private:
     \note QXmppMucManagerV2 must remain alive while participant handles are in use — the handles
     own the data but the manager owns the signal infrastructure. Accessing a handle after the
     manager is destroyed is undefined behavior.
+
+    \warning THIS API IS NOT FINALIZED YET and may still change in incompatible ways
+    before it is released.
 
     \since QXmpp 1.16
 */

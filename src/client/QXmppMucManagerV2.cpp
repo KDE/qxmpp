@@ -364,6 +364,9 @@ struct MucRoomData {
     The capability QBindables (canSendMessages(), canSetRoles(), canConfigureRoom(), …) update
     automatically whenever the MUC service changes your permissions.
 
+    \warning THIS API IS NOT FINALIZED YET and may still change in incompatible ways
+    before it is released.
+
     \ingroup Managers
     \since QXmpp 1.13
 */
