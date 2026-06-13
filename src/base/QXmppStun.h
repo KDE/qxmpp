@@ -36,6 +36,18 @@ struct TurnServer;
 class QXMPP_EXPORT QXmppStunMessage
 {
 public:
+    /*!
+        \brief STUN message method type.
+
+        \value Binding
+        \value SharedSecret
+        \value Allocate
+        \value Refresh
+        \value Send
+        \value Data
+        \value CreatePermission
+        \value ChannelBind
+    */
     enum MethodType {
         Binding = 0x1,
         SharedSecret = 0x2,
@@ -47,6 +59,14 @@ public:
         ChannelBind = 0x9
     };
 
+    /*!
+        \brief STUN message class type.
+
+        \value Request
+        \value Indication
+        \value Response
+        \value Error
+    */
     enum ClassType {
         Request = 0x000,
         Indication = 0x010,

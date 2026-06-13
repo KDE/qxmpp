@@ -19,8 +19,10 @@ xmppClient::xmppClient(QObject *parent)
     connect(m_rosterManager, &QXmppRosterManager::rosterReceived,
             this, &xmppClient::rosterReceived);
 
-    /// Then QXmppRoster::presenceChanged() is emitted whenever presence of
-    /// someone in roster changes
+    /*!
+        Then QXmppRoster::presenceChanged() is emitted whenever presence of
+        someone in roster changes
+    */
     connect(m_rosterManager, &QXmppRosterManager::presenceChanged,
             this, &xmppClient::presenceChanged);
 }

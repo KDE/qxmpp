@@ -284,11 +284,6 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
     }
 }
 
-/*!
-    Returns whether Sent/Received XML stanzas are pretty-printed.
-
-    \since QXmpp 1.16
-*/
 bool QXmppLogger::prettyXml() const
 {
     return d->prettyXml;
@@ -307,11 +302,6 @@ void QXmppLogger::setPrettyXml(bool enable)
     }
 }
 
-/*!
-    Returns the current ANSI color mode used for pretty-printed XML.
-
-    \since QXmpp 1.16
-*/
 QXmppLogger::ColorMode QXmppLogger::colorMode() const
 {
     return d->colorMode;

@@ -41,14 +41,14 @@ void xmppClient::setRecipient(const QString &recipient)
     m_recipient = recipient;
 }
 
-/// A file transfer failed.
+/*! A file transfer failed. */
 
 void xmppClient::slotError(QXmppTransferJob::Error error)
 {
     qDebug() << "Transmission failed:" << error;
 }
 
-/// A file transfer request was received.
+/*! A file transfer request was received. */
 
 void xmppClient::slotFileReceived(QXmppTransferJob *job)
 {
@@ -69,14 +69,14 @@ void xmppClient::slotFileReceived(QXmppTransferJob *job)
     job->accept(buffer);
 }
 
-/// A file transfer finished.
+/*! A file transfer finished. */
 
 void xmppClient::slotFinished()
 {
     qDebug() << "Transmission finished";
 }
 
-/// A presence was received
+/*! A presence was received */
 
 void xmppClient::slotPresenceReceived(const QXmppPresence &presence)
 {
@@ -100,7 +100,7 @@ void xmppClient::slotPresenceReceived(const QXmppPresence &presence)
             this, &xmppClient::slotProgress);
 }
 
-/// A file transfer has made progress.
+/*! A file transfer has made progress. */
 
 void xmppClient::slotProgress(qint64 done, qint64 total)
 {

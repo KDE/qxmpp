@@ -11,8 +11,7 @@ namespace QXmpp {
 
 /*!
     \inmodule QXmpp
-
-    Indicates a resource binding error
+    \brief Indicates a resource binding error.
 
     \since QXmpp 1.7
 */

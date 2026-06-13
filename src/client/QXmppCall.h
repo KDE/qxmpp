@@ -20,6 +20,15 @@ class QXmppCallManager;
 class QXmppCallManagerPrivate;
 class QXmppError;
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppCall class represents a voice or video call using \xep{0166}{Jingle}.
+
+    \note THIS API IS NOT FINALIZED YET
+
+    \sa QXmppCallManager
+*/
 class QXMPP_EXPORT QXmppCall : public QXmppLoggable
 {
     Q_OBJECT

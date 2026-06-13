@@ -11,6 +11,8 @@
 namespace QXmpp {
 
 /*!
+    \inmodule QXmpp
+
     Trust level of public long-term keys used by end-to-end encryption
     protocols
 

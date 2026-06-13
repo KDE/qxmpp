@@ -13,7 +13,7 @@
 
 class passwordChecker : public QXmppPasswordChecker
 {
-    /// Retrieves the password for the given username.
+    /*! Retrieves the password for the given username. */
     QXmppPasswordReply::Error getPassword(const QXmppPasswordRequest &request, QString &password) override
     {
         if (request.username() == USERNAME) {
@@ -24,7 +24,7 @@ class passwordChecker : public QXmppPasswordChecker
         }
     };
 
-    /// Returns true as we implemented getPassword().
+    /*! Returns true as we implemented getPassword(). */
     bool hasGetPassword() const override
     {
         return true;

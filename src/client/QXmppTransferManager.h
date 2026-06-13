@@ -24,6 +24,13 @@ class QXmppTransferJobPrivate;
 class QXmppTransferManager;
 class QXmppTransferManagerPrivate;
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppTransferFileInfo class holds metadata about a file being transferred.
+
+    Contains information about a file that is transferred using QXmppTransferJob.
+*/
 class QXMPP_EXPORT QXmppTransferFileInfo
 {
 public:
@@ -58,6 +65,14 @@ private:
     QSharedDataPointer<QXmppTransferFileInfoPrivate> d;
 };
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppTransferJob class represents a single file transfer job,
+    as defined by \xep{0096}{SI File Transfer}.
+
+    \sa QXmppTransferManager
+*/
 class QXMPP_EXPORT QXmppTransferJob : public QXmppLoggable
 {
     Q_OBJECT
@@ -251,6 +266,27 @@ private:
     friend class QXmppTransferOutgoingJob;
 };
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppTransferManager class provides support for sending and receiving files,
+    as defined by \xep{0096}{SI File Transfer}.
+
+    Stream initiation is performed as described in \xep{0095}{Stream Initiation}
+    and \xep{0096}{SI File Transfer}. The actual file transfer is then performed
+    using either \xep{0065}{SOCKS5 Bytestreams} or \xep{0047}{In-Band
+    Bytestreams}.
+
+    To make use of this manager, you need to instantiate it and load it into the
+    QXmppClient instance as follows:
+
+    \code
+    auto *manager = new QXmppTransferManager;
+    client->addExtension(manager);
+    \endcode
+
+    \ingroup Managers
+*/
 class QXMPP_EXPORT QXmppTransferManager : public QXmppClientExtension
 {
     Q_OBJECT

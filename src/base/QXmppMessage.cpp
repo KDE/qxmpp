@@ -2386,8 +2386,8 @@ struct QXmppFallbackPrivate : QSharedData {
 
     Describes the element of the message stanza this refers to.
 
-    \value Body
-    \value Subject
+    \value Body The fallback refers to the message body.
+    \value Subject The fallback refers to the message subject.
 */
 
 /*!

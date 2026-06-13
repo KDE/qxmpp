@@ -19,6 +19,7 @@
 #include <functional>
 #endif
 
+//! \cond
 namespace QXmpp::Private {
 
 template<typename T>
@@ -62,6 +63,7 @@ template<typename Continuation, typename T>
 using InvokeContinuationResult = InvokeContinuationResultHelper<Continuation, T>::Type;
 
 }  // namespace QXmpp::Private
+//! \endcond
 
 template<typename T>
 class QXmppTask;
@@ -647,6 +649,7 @@ private:
     std::variant<InlineData, SharedDataPtr> data;
 };
 
+//! \cond
 namespace std {
 
 template<typename T, typename... Args>
@@ -688,9 +691,11 @@ struct coroutine_traits<QXmppTask<void>, Args...> {
 };
 
 }  // namespace std
+//! \endcond
 
 namespace QXmpp {
 
+//! \cond
 namespace Private {
 
 template<typename T>
@@ -704,6 +709,7 @@ struct IsTaskHelper<QXmppTask<T>> {
 };
 
 }  // namespace Private
+//! \endcond
 
 // `concept` is not a topic command qdoc 6.9 recognises; documenting the
 // helpers below as plain // comments avoids the "Cannot tie" warning.

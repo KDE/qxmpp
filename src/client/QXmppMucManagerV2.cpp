@@ -375,37 +375,6 @@ struct MucRoomData {
     \since QXmpp 1.13
 */
 
-/*!
-    \fn QXmppMucManagerV2::bookmarksReset()
-
-    Emitted when the total set of bookmarks is reset, e.g. when receiving the initial bookmarks
-    items query.
-*/
-
-/*!
-    \fn void QXmppMucManagerV2::bookmarksAdded(const QList<QXmppMucBookmark> &newBookmarks)
-
-    Emitted when bookmarks have been added. This is triggered by PubSub event notifications.
-
-    \a newBookmarks contains the added bookmarks.
-*/
-
-/*!
-    \fn void QXmppMucManagerV2::bookmarksChanged(const QList<QXmppMucManagerV2::BookmarkChange> &bookmarkUpdates)
-
-    Emitted when bookmarks have been changed.
-
-    \a bookmarkUpdates contains the changed bookmarks.
-*/
-
-/*!
-    \fn void QXmppMucManagerV2::bookmarksRemoved(const QList<QString> &removedBookmarkJids)
-
-    Emitted when bookmarks are retracted.
-
-    \a removedBookmarkJids contains the JIDs of the removed bookmarks.
-*/
-
 /*! Default constructor. */
 QXmppMucManagerV2::QXmppMucManagerV2()
     : d(std::make_unique<QXmppMucManagerV2Private>(this))
@@ -748,7 +717,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
 }
 
 /*!
-    Declines a mediated invitation by sending a \c decline message to \a roomJid.
+    Declines a mediated invitation by sending \a decline as a message to \a roomJid.
 
     Can be called before joining the room. Set \c decline.to() to the inviter's JID.
 
@@ -766,8 +735,7 @@ QXmppTask<SendResult> QXmppMucManagerV2::declineInvitation(const QString &roomJi
 }
 
 /*!
-
-    Sends a direct invitation (XEP-0249) to \a to.
+    Sends a direct \a invitation (XEP-0249) to \a to.
 
     Direct invitations are sent peer-to-peer and are not routed through the room.
     The optional \a message parameter can be used to set custom extensions on the
@@ -2015,7 +1983,7 @@ bool QXmppMucRoomV2::isWatchingAvatar() const
 
     Sets or removes the avatar of the room via vcard-temp.
 
-    Pass an \c Avatar to publish a new avatar, or \c std::nullopt to remove the current one.
+    Pass \a newAvatar to publish a new avatar, or \c std::nullopt to remove the current one.
 
     Requires the MUC service to support "vcard-temp" and the local user to be an owner or other
     privileged entity of the room.
@@ -2088,7 +2056,7 @@ QBindable<QStringList> QXmppMucRoomV2::contactJids() const
 
 /*!
 
-    Sends a groupchat message to the room.
+    Sends the groupchat \a message to the room.
 
     The message's \c to and \c type fields are set automatically. An \c origin-id
     (\xep{0359}{Unique and Stable Stanza IDs}) is generated if not already set,
@@ -2129,7 +2097,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
 
 /*!
 
-    Sends a private message to a room occupant.
+    Sends the private \a message to a room \a participant.
 
     The message is addressed to the occupant's current room JID (room\@service/nick).
     The returned task completes when the message has been sent to the server.
@@ -2165,7 +2133,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setSubject(const QString &subject)
 
 /*!
 
-    Changes the user's nickname in the room.
+    Changes the user's nickname in the room to \a newNick.
 
     Sends a presence to the new occupant JID. The returned task completes
     when the MUC service confirms the change (status code 303), or with an
@@ -2213,7 +2181,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setNickname(const QString &newNick)
 
 /*!
 
-    Changes the user's presence in the room.
+    Changes the user's \a presence in the room.
 
     The presence is addressed to the user's current occupant JID. The returned
     task completes when the presence has been sent to the server.
@@ -2277,7 +2245,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
 
 /*!
 
-    Changes the role of a room participant (XEP-0045 §8.4–8.6).
+    Changes the \a role of a room \a participant for the given \a reason (XEP-0045 §8.4–8.6).
 
     Role changes are transient and apply only for the current session.
     The \a participant must still be in the room. Roles are identified by
@@ -2295,7 +2263,8 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participa
 
 /*!
 
-    Changes the roles of multiple room participants in a single request (XEP-0045 §8.5).
+    Changes the roles of multiple room participants in a single request (XEP-0045 §8.5),
+    described by \a items.
 
     Each item must have its nick and role set. Role changes are transient
     and apply only for the current session.
@@ -2307,7 +2276,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoles(const QList<Muc::Item> &items)
 
 /*!
 
-    Changes the affiliation of a user by bare JID (XEP-0045 §9).
+    Changes the \a affiliation of a user by bare \a jid for the given \a reason (XEP-0045 §9).
 
     Affiliation changes are persistent. The \a jid must be a bare JID.
     The user does not need to be currently in the room.
@@ -2324,7 +2293,8 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
 
 /*!
 
-    Changes the affiliations of multiple users in a single request (XEP-0045 §9).
+    Changes the affiliations of multiple users in a single request (XEP-0045 §9),
+    described by \a items.
 
     Each item must have its jid and affiliation set. Affiliation changes are
     persistent and the users do not need to be currently in the room.
@@ -2465,7 +2435,7 @@ QXmppTask<SendResult> QXmppMucRoomV2::answerVoiceRequest(const QXmppMucVoiceRequ
 
 /*!
 
-    Sends a mediated invitation to \a invite.to() via this room.
+    Sends the mediated \a invite via this room.
 
     The room must be currently joined. The room service will forward the invitation to the
     specified invitee and add the room password automatically for password-protected rooms.
@@ -2551,7 +2521,7 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
 
 /*!
 
-    Submits the room configuration to the server.
+    Submits the room \a config to the server.
 
     In the \c Creating state (after createRoom()) this unlocks the room and
     transitions it to the \c Joined state. In the \c Joined state this

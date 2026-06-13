@@ -21,16 +21,28 @@ class QXMPP_EXPORT QXmppJingleMessageInitiation : public QObject
 {
     Q_OBJECT
 public:
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that the session was rejected by the remote party.
+    */
     struct Rejected {
         std::optional<QXmppJingleReason> reason;
         bool containsTieBreak;
     };
 
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that the session proposal was retracted by the initiator.
+    */
     struct Retracted {
         std::optional<QXmppJingleReason> reason;
         bool containsTieBreak;
     };
 
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that the session has finished.
+    */
     struct Finished {
         std::optional<QXmppJingleReason> reason;
         QString migratedTo;

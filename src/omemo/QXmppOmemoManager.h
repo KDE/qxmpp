@@ -72,6 +72,11 @@ class QXMPPOMEMO_EXPORT QXmppOmemoManager : public QXmppClientExtension, public 
 public:
     using Result = std::variant<QXmpp::Success, QXmppError>;
 
+    /*!
+        \struct QXmppOmemoManager::DevicesResult
+        \inmodule QXmpp
+        \brief Result of a per-JID OMEMO device list operation.
+    */
     struct DevicesResult {
         QString jid;
         Result result;

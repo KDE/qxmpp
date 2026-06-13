@@ -39,7 +39,7 @@ namespace QXmpp {
 /*!
     \inmodule QXmpp
 
-    Message reply as defined in \xep{0461}{Message Replies}.
+    \brief Message reply as defined in \xep{0461}{Message Replies}.
 
     \since QXmpp 1.9
 */

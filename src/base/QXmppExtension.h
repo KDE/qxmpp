@@ -7,6 +7,11 @@
 
 #include "QXmppGlobal.h"
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppExtension class is the base class for XEP implementation classes.
+*/
 class QXMPP_EXPORT QXmppExtension {};
 
 #endif  // QXMPPEXTENSION_H

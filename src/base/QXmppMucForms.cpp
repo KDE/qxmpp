@@ -245,7 +245,7 @@ std::optional<double> QXmppMucRoomInfo::messageActivity() const
 
 /*!
 
-    Sets an approximate measure of messages per hour in the room, as defined
+    Sets an approximate measure of \a messagesPerHour in the room, as defined
     in \xep{0502}{MUC Activity Indicator}.
 
     \since QXmpp 1.16
@@ -257,7 +257,7 @@ void QXmppMucRoomInfo::setMessageActivity(std::optional<double> messagesPerHour)
 }
 
 /*!
-    Equality operator
+    Returns whether this is equal to \a other.
 */
 bool QXmppMucRoomInfo::operator==(const QXmppMucRoomInfo &other) const
 {
@@ -369,7 +369,7 @@ QString QXmppMucVoiceRequest::jid() const
 
 /*!
 
-    Sets the full JID of the user requesting voice.
+    Sets the full \a jid of the user requesting voice.
 
 */
 void QXmppMucVoiceRequest::setJid(const QString &jid)
@@ -391,7 +391,7 @@ QString QXmppMucVoiceRequest::nick() const
 
 /*!
 
-    Sets the room nickname of the user requesting voice.
+    Sets the room \a nick of the user requesting voice.
 
 */
 void QXmppMucVoiceRequest::setNick(const QString &nick)
@@ -415,7 +415,7 @@ std::optional<bool> QXmppMucVoiceRequest::requestAllow() const
 
 /*!
 
-    Sets whether the voice request is approved or denied.
+    Sets whether the voice request is approved or denied via \a allow.
 
     Pass \c true to approve or \c false to deny. This is set internally by
     QXmppMucRoomV2::answerVoiceRequest() before sending the response form.
@@ -604,7 +604,7 @@ QString QXmppMucRoomConfig::name() const
 
 /*!
 
-    Sets the natural-language name of the room.
+    Sets the natural-language \a name of the room.
 
 
 */
@@ -628,7 +628,7 @@ QString QXmppMucRoomConfig::description() const
 
 /*!
 
-    Sets the short description of the room.
+    Sets the short \a description of the room.
 
 
 */
@@ -652,7 +652,7 @@ QString QXmppMucRoomConfig::language() const
 
 /*!
 
-    Sets the natural language for room discussions (BCP 47 language tag).
+    Sets the natural \a language for room discussions (BCP 47 language tag).
 
 
 */
@@ -677,7 +677,7 @@ std::optional<bool> QXmppMucRoomConfig::isPublic() const
 
 /*!
 
-    Sets whether the room is publicly searchable via service discovery.
+    Sets whether the room is publicly searchable via service discovery to \a value.
 
 
 */
@@ -702,7 +702,7 @@ std::optional<bool> QXmppMucRoomConfig::isPersistent() const
 
 /*!
 
-    Sets whether the room persists after the last occupant exits.
+    Sets whether the room persists after the last occupant exits to \a value.
 
 
 */
@@ -726,7 +726,7 @@ std::optional<bool> QXmppMucRoomConfig::isMembersOnly() const
 
 /*!
 
-    Sets whether only members are allowed to enter the room.
+    Sets whether only members are allowed to enter the room to \a value.
 
 
 */
@@ -750,7 +750,7 @@ std::optional<bool> QXmppMucRoomConfig::isModerated() const
 
 /*!
 
-    Sets whether the room is moderated (only voice holders may send messages).
+    Sets whether the room is moderated (only voice holders may send messages) to \a value.
 
 
 */
@@ -774,7 +774,7 @@ std::optional<bool> QXmppMucRoomConfig::isPasswordProtected() const
 
 /*!
 
-    Sets whether a password is required to enter the room.
+    Sets whether a password is required to enter the room to \a value.
 
     If set to \c true, also set password() to a non-empty string.
 
@@ -801,7 +801,7 @@ QString QXmppMucRoomConfig::password() const
 
 /*!
 
-    Sets the room entry password.
+    Sets the room entry \a password.
 
 
 */
@@ -827,7 +827,7 @@ std::optional<QXmppMucRoomConfig::WhoCanDiscoverJids> QXmppMucRoomConfig::whoCan
 
 /*!
 
-    Sets which occupants may discover the real JIDs of other occupants.
+    Sets which occupants may discover the real JIDs of other occupants to \a value.
 
 
 */
@@ -851,7 +851,7 @@ std::optional<bool> QXmppMucRoomConfig::canOccupantsChangeSubject() const
 
 /*!
 
-    Sets whether regular occupants are allowed to change the room subject.
+    Sets whether regular occupants are allowed to change the room subject to \a value.
 
 
 */
@@ -875,7 +875,7 @@ std::optional<bool> QXmppMucRoomConfig::canMembersInvite() const
 
 /*!
 
-    Sets whether members are allowed to invite others to the room.
+    Sets whether members are allowed to invite others to the room to \a value.
 
 
 */
@@ -899,7 +899,7 @@ std::optional<QXmppMucRoomConfig::AllowPrivateMessages> QXmppMucRoomConfig::allo
 
 /*!
 
-    Sets who is allowed to send private messages inside the room.
+    Sets who is allowed to send private messages inside the room to \a value.
 
 
 */
@@ -923,7 +923,7 @@ std::optional<bool> QXmppMucRoomConfig::enableLogging() const
 
 /*!
 
-    Sets whether public logging of the room is enabled.
+    Sets whether public logging of the room is enabled to \a value.
 
 
 */
@@ -948,7 +948,7 @@ std::optional<int> QXmppMucRoomConfig::maxUsers() const
 
 /*!
 
-    Sets the maximum number of occupants allowed in the room.
+    Sets the maximum number of occupants allowed in the room to \a value.
 
     Use 0 for unlimited. Corresponds to \c muc#roomconfig_maxusers.
 
@@ -974,7 +974,7 @@ QStringList QXmppMucRoomConfig::owners() const
 
 /*!
 
-    Sets the list of room owner JIDs.
+    Sets the list of room owner JIDs to \a owners.
 
 
 */
@@ -998,7 +998,7 @@ QStringList QXmppMucRoomConfig::admins() const
 
 /*!
 
-    Sets the list of room admin JIDs.
+    Sets the list of room admin JIDs to \a admins.
 
 
 */

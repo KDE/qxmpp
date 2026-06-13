@@ -59,15 +59,6 @@ public:
     QVector<QXmppExternalService> externalServices;
 };
 
-/*!
-    \class QXmppExternalService
-    \inmodule QXmpp
-
-    QXmppExternalService represents a related XMPP entity that can be queried using \xep{0215}{External Service Discovery}.
-
-    \since QXmpp 1.6
-*/
-
 QXmppExternalService::QXmppExternalService()
     : d(new QXmppExternalServicePrivate)
 {

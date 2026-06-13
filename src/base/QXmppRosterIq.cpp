@@ -85,14 +85,14 @@ QString QXmppRosterIq::version() const
     return d->version.value_or(QString());
 }
 
-///
-/// Returns the roster version of the IQ.
-///
-/// \c std::nullopt means no \c ver attribute was set. An empty string means \c ver="", which
-/// is how clients advertise RFC 6121 §2.6 roster versioning support to the server.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Returns the roster version of the IQ.
+
+    \c std::nullopt means no \c ver attribute was set. An empty string means \c ver="", which
+    is how clients advertise RFC 6121 §2.6 roster versioning support to the server.
+
+    \since QXmpp 1.16
+*/
 std::optional<QString> QXmppRosterIq::versionOpt() const
 {
     return d->version;
@@ -110,25 +110,25 @@ void QXmppRosterIq::setVersion(std::optional<QString> version)
     d->version = std::move(version);
 }
 
-///
-/// Returns whether the IQ contains a \c <query> element.
-///
-/// Roster get/set IQs always have one. An \c <iq type='result'/> from the server in reply to a
-/// versioned roster get with no \c <query> child means "the cached roster is still up to date";
-/// this getter is how the roster manager distinguishes that case from an actually empty roster.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Returns whether the IQ contains a \c <query> element.
+
+    Roster get/set IQs always have one. An \c <iq type='result'/> from the server in reply to a
+    versioned roster get with no \c <query> child means "the cached roster is still up to date";
+    this getter is how the roster manager distinguishes that case from an actually empty roster.
+
+    \since QXmpp 1.16
+*/
 bool QXmppRosterIq::hasQuery() const
 {
     return d->hasQuery;
 }
 
-///
-/// Sets whether the IQ contains a \c <query> element.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    Sets whether the IQ contains a \c <query> element (\a hasQuery).
+
+    \since QXmpp 1.16
+*/
 void QXmppRosterIq::setHasQuery(bool hasQuery)
 {
     d->hasQuery = hasQuery;

@@ -498,7 +498,7 @@ std::optional<QXmpp::Muc::Destroy> QXmppPresence::mucDestroy() const
     return d->mucDestroy;
 }
 
-/*! Sets the MUC room destruction \a info. Pass \c std::nullopt to clear. */
+/*! Sets the MUC room \a destroy info. Pass \c std::nullopt to clear. */
 void QXmppPresence::setMucDestroy(std::optional<QXmpp::Muc::Destroy> destroy)
 {
     d->mucDestroy = std::move(destroy);

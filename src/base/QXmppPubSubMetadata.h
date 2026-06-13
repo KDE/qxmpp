@@ -15,7 +15,23 @@ class QXmppPubSubMetadataPrivate;
 class QXMPP_EXPORT QXmppPubSubMetadata : public QXmppExtensibleDataFormBase
 {
 public:
+    /*!
+        \inmodule QXmpp
+
+        Sentinel type indicating that no item limit has been set.
+
+        \sa ItemLimit
+    */
     struct Unset { };
+
+    /*!
+        \inmodule QXmpp
+
+        Sentinel type indicating that the item limit is set to the maximum
+        value supported by the service.
+
+        \sa ItemLimit
+    */
     struct Max { };
     using ItemLimit = std::variant<Unset, quint64, Max>;
 

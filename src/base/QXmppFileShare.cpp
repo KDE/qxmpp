@@ -183,8 +183,8 @@ public:
     \brief Decides whether to display the file contents (e.g. an image) inline in the chat or as
     a file.
 
-    \value Inline
-    \value Attachment
+    \value Inline The file should be displayed inline in the conversation.
+    \value Attachment The file should be offered as a downloadable attachment.
 */
 
 /*! Default constructor */

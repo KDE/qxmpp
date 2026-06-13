@@ -20,8 +20,20 @@ class QXMPP_EXPORT QXmppCallInvite : public QObject
 {
     Q_OBJECT
 public:
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that the call invite was rejected by the remote party.
+    */
     struct Rejected { };
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that the call invite was retracted by the initiator.
+    */
     struct Retracted { };
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that a participant has left the call.
+    */
     struct Left { };
 
     using Result = std::variant<Rejected, Retracted, Left, QXmppError>;

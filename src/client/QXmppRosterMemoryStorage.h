@@ -11,23 +11,26 @@
 
 class QXmppRosterMemoryStoragePrivate;
 
-///
-/// \brief In-memory default implementation of QXmppRosterStorage.
-///
-/// Used internally by QXmppRosterManager when no external storage has been
-/// configured. Data is kept only for the lifetime of the instance — pass a
-/// custom QXmppRosterStorage to QXmppRosterManager::setStorage() to persist the
-/// roster across sessions.
-///
-/// \since QXmpp 1.16
-///
+/*!
+    \class QXmppRosterMemoryStorage
+    \inmodule QXmpp
+    \brief In-memory default implementation of QXmppRosterStorage.
+
+    Used internally by QXmppRosterManager when no external storage has been
+    configured. Data is kept only for the lifetime of the instance — pass a
+    custom QXmppRosterStorage to QXmppRosterManager::setStorage() to persist the
+    roster across sessions.
+
+    \ingroup Managers
+    \since QXmpp 1.16
+*/
 class QXMPP_EXPORT QXmppRosterMemoryStorage : public QXmppRosterStorage
 {
 public:
     QXmppRosterMemoryStorage();
     ~QXmppRosterMemoryStorage() override;
 
-    /// \cond
+    //! \cond
     QXmppTask<RosterCache> load() override;
     QXmppTask<void> replaceAll(const QString &version,
                                const std::vector<QXmppRosterIq::Item> &items) override;
@@ -36,7 +39,7 @@ public:
     QXmppTask<void> removeItem(const QString &version,
                                const QString &bareJid) override;
     QXmppTask<void> clear() override;
-    /// \endcond
+    //! \endcond
 
 private:
     std::unique_ptr<QXmppRosterMemoryStoragePrivate> d;

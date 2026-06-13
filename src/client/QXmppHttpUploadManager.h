@@ -79,6 +79,16 @@ class QXMPP_EXPORT QXmppHttpUploadManager : public QXmppClientExtension
     Q_PROPERTY(QXmppHttpUploadManager::Support support READ support NOTIFY supportChanged)
 
 public:
+    /*!
+        \enum QXmppHttpUploadManager::Support
+        \brief Describes whether the server supports HTTP file upload.
+
+        \value Unknown Support has not been determined yet.
+        \value Unsupported The server does not support HTTP file upload.
+        \value Supported The server supports HTTP file upload.
+
+        \since QXmpp 1.13
+    */
     enum class Support {
         Unknown,
         Unsupported,

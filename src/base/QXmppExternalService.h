@@ -17,6 +17,14 @@ class QDomElement;
 class QXmlStreamWriter;
 class QXmppExternalServicePrivate;
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppExternalService class represents an external service as
+    defined by \xep{0215}{External Service Discovery}.
+
+    \since QXmpp 1.6
+*/
 class QXMPP_EXPORT QXmppExternalService
 {
 public:

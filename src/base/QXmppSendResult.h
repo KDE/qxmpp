@@ -12,7 +12,9 @@
 namespace QXmpp {
 
 /*!
-    Describes the type of a packet sending error.
+    \inmodule QXmpp
+
+    \brief Describes the type of a packet sending error.
 
     \since QXmpp 1.5
 
@@ -29,7 +31,7 @@ enum class SendError : uint8_t {
 /*!
     \inmodule QXmpp
 
-    A struct indicating success when sending packets
+    \brief A struct indicating success when sending packets.
 
     \since QXmpp 1.5
 */

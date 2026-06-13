@@ -704,6 +704,10 @@ public:
         Left
     };
 
+    /*!
+        \inmodule QXmpp
+        \brief References a Jingle session for a call invite.
+    */
     struct Jingle {
         QString sid;
         std::optional<QString> jid;
@@ -714,6 +718,10 @@ public:
         void toXml(QXmlStreamWriter *writer) const;
     };
 
+    /*!
+        \inmodule QXmpp
+        \brief References an external URI for a call invite.
+    */
     struct External {
         QString uri;
 

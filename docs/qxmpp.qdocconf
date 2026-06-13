@@ -44,7 +44,16 @@ excludefiles           += ../src/base/QXmppCodec.cpp \
                           ../src/base/*_p.h ../src/base/*_p.cpp \
                           ../src/client/*_p.h ../src/client/*_p.cpp \
                           ../src/omemo/*_p.h ../src/omemo/*_p.cpp \
-                          ../src/server/*_p.h ../src/server/*_p.cpp
+                          ../src/server/*_p.h ../src/server/*_p.cpp \
+                          ../src/base/XmlWriter.h \
+                          ../src/base/Stream.h \
+                          ../src/base/StreamError.h \
+                          ../src/base/Async.h \
+                          ../src/base/Crypto.h \
+                          ../src/base/Enums.h \
+                          ../src/base/Iq.h \
+                          ../src/client/GstWrapper.h \
+                          ../src/client/QXmppOutgoingClient.h
 excludedirs             = ../src/base/hsluv
 
 # cross-references to Qt's documentation

@@ -198,8 +198,8 @@ public:
     identities and features, an ItemsQuery queries subservices in the form of
     items.
 
-    \value InfoQuery
-    \value ItemsQuery
+    \value InfoQuery Queries features and identities of an entity.
+    \value ItemsQuery Queries the items hosted by an entity.
 */
 
 QXmppDiscoveryIq::QXmppDiscoveryIq()

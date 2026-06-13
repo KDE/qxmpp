@@ -55,13 +55,6 @@ public:
     qint64 size = 0;
 };
 
-/*!
-    \class QXmppTransferFileInfo
-    \inmodule QXmpp
-
-    Contains information about a file that is transferred using QXmppTransferJob.
-*/
-
 QXmppTransferFileInfo::QXmppTransferFileInfo()
     : d(new QXmppTransferFileInfoPrivate)
 {
@@ -230,15 +223,6 @@ QXmppTransferJobPrivate::QXmppTransferJobPrivate()
       socksSocket(nullptr)
 {
 }
-
-/*!
-    \class QXmppTransferJob
-    \inmodule QXmpp
-
-    The QXmppTransferJob class represents a single file transfer job.
-
-    \sa QXmppTransferManager
-*/
 
 QXmppTransferJob::QXmppTransferJob(const QString &jid, QXmppTransferJob::Direction direction, QXmppClient *client, QObject *parent)
     : QXmppLoggable(parent),
@@ -727,29 +711,6 @@ QXmppTransferOutgoingJob *QXmppTransferManagerPrivate::getOutgoingJobByRequestId
 {
     return static_cast<QXmppTransferOutgoingJob *>(getJobByRequestId(QXmppTransferJob::OutgoingDirection, jid, id));
 }
-
-/*!
-    \class QXmppTransferManager
-    \inmodule QXmpp
-
-    The QXmppTransferManager class provides support for sending and receiving
-    files.
-
-    Stream initiation is performed as described in \xep{0095}{Stream Initiation}
-    and \xep{0096}{SI File Transfer}. The actual file transfer is then performed
-    using either \xep{0065}{SOCKS5 Bytestreams} or \xep{0047}{In-Band
-    Bytestreams}.
-
-    To make use of this manager, you need to instantiate it and load it into the
-    QXmppClient instance as follows:
-
-    \code
-    auto *manager = new QXmppTransferManager;
-    client->addExtension(manager);
-    \endcode
-
-    \ingroup Managers
-*/
 
 /*!
     Constructs a QXmppTransferManager to handle incoming and outgoing

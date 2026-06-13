@@ -15,10 +15,35 @@ class QXmppPubSubNodeConfigPrivate;
 class QXMPP_EXPORT QXmppPubSubNodeConfig : public QXmppExtensibleDataFormBase
 {
 public:
+    /*!
+        \inmodule QXmpp
+
+        Sentinel type indicating that no item limit has been set.
+
+        \sa ItemLimit
+    */
     struct Unset { };
+
+    /*!
+        \inmodule QXmpp
+
+        Sentinel type indicating that the item limit is set to the maximum
+        value supported by the service.
+
+        \sa ItemLimit
+    */
     struct Max { };
     using ItemLimit = std::variant<Unset, uint64_t, Max>;
 
+    /*!
+        Describes who may subscribe to a node and retrieve its items.
+
+        \value Open Anyone may subscribe and retrieve items.
+        \value Presence Only contacts with a presence subscription may subscribe.
+        \value Roster Only contacts in allowed roster groups may subscribe.
+        \value Authorize Subscriptions must be approved by the node owner.
+        \value Allowlist Only users on a whitelist set by the owner may subscribe.
+    */
     enum AccessModel : uint8_t {
         Open,
         Presence,
@@ -27,33 +52,72 @@ public:
         Allowlist
     };
 
+    /*!
+        Describes who is allowed to publish items to a node.
+
+        \value Publishers Only explicitly designated publishers may publish.
+        \value Subscribers Any subscriber may publish.
+        \value Anyone Anyone may publish, including non-subscribers.
+    */
     enum PublishModel : uint8_t {
         Publishers,
         Subscribers,
         Anyone
     };
 
+    /*!
+        Describes the policy for associating child nodes with a collection node.
+
+        \value All Any node may be associated as a child.
+        \value Owners Only node owners may associate child nodes.
+        \value Whitelist Only nodes whose owners are on the whitelist may be associated.
+    */
     enum class ChildAssociationPolicy : uint8_t {
         All,
         Owners,
         Whitelist
     };
 
+    /*!
+        Describes who is shown as the publisher of an item.
+
+        \value NodeOwner The node owner is shown as the publisher.
+        \value Publisher The actual publisher of the item is shown.
+    */
     enum ItemPublisher : uint8_t {
         NodeOwner,
         Publisher
     };
 
+    /*!
+        Describes the type of a PubSub node.
+
+        \value Leaf A leaf node stores and distributes items.
+        \value Collection A collection node contains other nodes.
+    */
     enum NodeType : uint8_t {
         Leaf,
         Collection
     };
 
+    /*!
+        Describes the message type used to deliver event notifications.
+
+        \value Normal Notifications are delivered as normal messages.
+        \value Headline Notifications are delivered as headline messages.
+    */
     enum NotificationType : uint8_t {
         Normal,
         Headline
     };
 
+    /*!
+        Describes when the last published item is sent to a new subscriber.
+
+        \value Never The last item is never sent on subscription.
+        \value OnSubscription The last item is sent when a subscription is created.
+        \value OnSubscriptionAndPresence The last item is sent on subscription and on each presence change.
+    */
     enum SendLastItemType : uint8_t {
         Never,
         OnSubscription,

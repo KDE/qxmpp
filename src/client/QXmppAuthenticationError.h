@@ -13,8 +13,7 @@ namespace QXmpp {
 
 /*!
     \inmodule QXmpp
-
-    Indicates an authentication error
+    \brief Indicates an authentication error.
 
     \since QXmpp 1.7
 */

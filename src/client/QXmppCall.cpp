@@ -642,15 +642,6 @@ bool QXmppCallPrivate::isOwn(QXmppCallStream *stream) const
     return outgoingCall && initiatorsStream || !outgoingCall && !initiatorsStream;
 }
 
-/*!
-    \class QXmppCall
-    \inmodule QXmpp
-
-    The QXmppCall class represents a Voice-Over-IP call to a remote party.
-
-    \note THIS API IS NOT FINALIZED YET
-*/
-
 QXmppCall::QXmppCall(const QString &jid, const QString &sid, Direction direction, QXmppCallManager *manager)
     : QXmppCall(jid, sid, direction, ConnectingState, {}, manager)
 {

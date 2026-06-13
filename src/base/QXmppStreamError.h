@@ -8,7 +8,9 @@
 namespace QXmpp {
 
 /*!
-    All XMPP top-level stream errors
+    \inmodule QXmpp
+
+    \brief All XMPP top-level stream errors.
 
     \since QXmpp 1.7
 

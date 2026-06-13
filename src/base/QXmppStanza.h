@@ -30,7 +30,9 @@ class QXmppExtendedAddressPrivate;
 namespace QXmpp {
 
 /*!
-    \xep{0166}{Jingle}-specific error condition, used in QXmppStanza::Error.
+    \inmodule QXmpp
+
+    \brief \xep{0166}{Jingle}-specific error condition, used in QXmppStanza::Error.
 
     \since QXmpp 1.14
 

@@ -14,6 +14,17 @@ class QFileDevice;
 class QIODevice;
 class QNetworkReply;
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppError struct describes an error with a human-readable description and an
+    optional typed error value.
+
+    Generic error class holding a description and a more specific error object. The specific error
+    usually is something like a QXmppStanza::Error or an enum.
+
+    \since QXmpp 1.5
+*/
 struct QXMPP_EXPORT QXmppError {
     QString description;
     std::any error;

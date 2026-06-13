@@ -17,9 +17,9 @@ class QXMPPOMEMO_EXPORT QXmppOmemoStorage
 {
 public:
     /*!
+        \struct QXmppOmemoStorage::OwnDevice
         \inmodule QXmpp
-
-        Contains the data of this client instance's OMEMO device.
+        \brief Contains the data of this client instance's OMEMO device.
     */
     struct OwnDevice {
         /*!
@@ -61,9 +61,10 @@ public:
     };
 
     /*!
+        \struct QXmppOmemoStorage::Device
         \inmodule QXmpp
+        \brief Contains the data of another OMEMO device.
 
-        Contains the data of another OMEMO device.
         That includes another own device (i.e., not this client instance's one)
         or a contact's device.
     */
@@ -103,9 +104,9 @@ public:
     };
 
     /*!
+        \struct QXmppOmemoStorage::SignedPreKeyPair
         \inmodule QXmpp
-
-        Contains the data needed to manage an OMEMO signed pre key pair.
+        \brief Contains the data needed to manage an OMEMO signed pre key pair.
     */
     struct SignedPreKeyPair {
         /*! Date when the signed pre key pair was created */
@@ -116,9 +117,9 @@ public:
     };
 
     /*!
+        \struct QXmppOmemoStorage::OmemoData
         \inmodule QXmpp
-
-        Contains all OMEMO data.
+        \brief Contains all OMEMO data.
     */
     struct OmemoData {
         /*! Device of this client instance */

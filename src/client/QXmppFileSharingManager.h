@@ -81,8 +81,7 @@ class QXMPP_EXPORT QXmppFileDownload : public QObject
 public:
     /*!
         \enum QXmppFileDownload::HashVerificationResult
-
-        Result of hash verification after a file download.
+        \brief Result of hash verification after a file download.
 
         \value NoStrongHashes File did not contain strong hashes (or no hashes
         at all) and no verification was done. This value is not used when a
@@ -130,6 +129,10 @@ Q_DECLARE_METATYPE(QXmppFileDownload::Result);
 class QXMPP_EXPORT QXmppFileSharingManager : public QXmppClientExtension
 {
 public:
+    /*!
+        \inmodule QXmpp
+        \brief Thumbnail image provided by the metadata generator.
+    */
     struct MetadataThumbnail {
         uint32_t width;
         uint32_t height;
@@ -137,6 +140,10 @@ public:
         QMimeType mimeType;
     };
 
+    /*!
+        \inmodule QXmpp
+        \brief Result produced by the metadata generator for a file to be shared.
+    */
     struct MetadataGeneratorResult {
         std::optional<QSize> dimensions;
         std::optional<uint32_t> length;

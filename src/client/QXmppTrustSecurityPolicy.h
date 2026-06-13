@@ -10,6 +10,8 @@
 namespace QXmpp {
 
 /*!
+    \inmodule QXmpp
+
     Security policy to decide which public long-term keys are used for encryption because they are
     trusted
 

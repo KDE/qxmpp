@@ -117,7 +117,9 @@ enum EncryptionMethod {
 };
 
 /*!
-    Parsing/serialization mode when using Stanza Content Encryption
+    \inmodule QXmpp
+
+    \brief Parsing/serialization mode when using Stanza Content Encryption
     (\xep{0420}{Stanza Content Encryption}).
 
     \since QXmpp 1.5
@@ -146,7 +148,9 @@ inline constexpr bool operator&(SceMode mode1, SceMode mode2)
 }
 
 /*!
-    Cipher for encrypting data streams and files.
+    \inmodule QXmpp
+
+    \brief Cipher for encrypting data streams and files.
 
     \since QXmpp 1.5
 
@@ -163,7 +167,7 @@ enum Cipher {
 /*!
     \inmodule QXmpp
 
-    An empty struct indicating success in results.
+    \brief An empty struct indicating success in results.
 
     \since QXmpp 1.5
 */
@@ -172,7 +176,7 @@ struct Success { };
 /*!
     \inmodule QXmpp
 
-    Unit struct used to indicate that a process has been cancelled.
+    \brief Unit struct used to indicate that a process has been cancelled.
 
     \since QXmpp 1.5
 */
@@ -181,7 +185,7 @@ struct Cancelled { };
 /*!
     \inmodule QXmpp
 
-    Unit struct indicating a client-side timeout (or keep-alive) error.
+    \brief Unit struct indicating a client-side timeout (or keep-alive) error.
 
     It occurs if no response is received from the connected entity within a given timeout.
 

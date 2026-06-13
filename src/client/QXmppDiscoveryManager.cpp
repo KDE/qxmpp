@@ -40,18 +40,6 @@ static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, co
         parseIqResponseFlat<Response>);
 }
 
-/*!
-    \class QXmppDiscoveryManager
-    \inmodule QXmpp
-
-    \brief The QXmppDiscoveryManager class makes it possible to discover information about other
-    entities as defined by \xep{0030}{Service Discovery}.
-
-    Since QXmpp 1.12 info and items queries are cached per session by default.
-
-    \ingroup Managers
-*/
-
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {

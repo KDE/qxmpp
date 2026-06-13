@@ -319,7 +319,7 @@ public:
         m_credentials.insert(user, password);
     };
 
-    /// Retrieves the password for the given username.
+    /*! Retrieves the password for the given username. */
     QXmppPasswordReply::Error getPassword(const QXmppPasswordRequest &request, QString &password) override
     {
         if (m_credentials.contains(request.username())) {
@@ -330,7 +330,7 @@ public:
         }
     };
 
-    /// Returns whether getPassword() is enabled.
+    /*! Returns whether getPassword() is enabled. */
     bool hasGetPassword() const override
     {
         return true;

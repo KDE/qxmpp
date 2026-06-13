@@ -21,6 +21,17 @@ class QXmppPubSubSubscribeOptionsPrivate;
 class QXMPP_EXPORT QXmppPubSubSubscribeOptions : public QXmppExtensibleDataFormBase
 {
 public:
+    /*!
+        Describes a subscriber's presence state for which event notifications
+        should be delivered. Multiple values may be combined as a flag set.
+
+        \value Unset No specific presence state filter is configured.
+        \value Online Deliver notifications when the subscriber is online.
+        \value Away Deliver notifications when the subscriber is away.
+        \value Chat Deliver notifications when the subscriber is available for chat.
+        \value DoNotDisturb Deliver notifications when the subscriber has set do-not-disturb.
+        \value ExtendedAway Deliver notifications when the subscriber is in extended away state.
+    */
     enum PresenceState : uint8_t {
         Unset = 0x00,
         Online = 0x01,
@@ -31,11 +42,23 @@ public:
     };
     Q_DECLARE_FLAGS(PresenceStates, PresenceState)
 
+    /*!
+        Describes what kind of objects a subscription applies to.
+
+        \value Items Subscribe to items published to the node.
+        \value Nodes Subscribe to child nodes of a collection node.
+    */
     enum SubscriptionType : uint8_t {
         Items,
         Nodes
     };
 
+    /*!
+        Describes how deep into a node hierarchy a subscription reaches.
+
+        \value TopLevelOnly Subscribe only to the node itself.
+        \value Recursive Subscribe to the node and all its descendants recursively.
+    */
     enum SubscriptionDepth : uint8_t {
         TopLevelOnly,
         Recursive

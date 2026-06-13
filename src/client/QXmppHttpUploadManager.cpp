@@ -40,23 +40,6 @@ using namespace QXmpp::Private;
     \since QXmpp 1.13
 */
 
-/*!
-    \enum QXmppHttpUploadManager::Support
-
-    Server support for the feature.
-
-    \value Unknown
-        Whether the server supports the feature is not known.
-
-        That means, there is no corresponding information from the server (yet).
-    \value Unsupported
-        The server does not support the feature.
-    \value Supported
-        The server supports the feature.
-
-    \since QXmpp 1.13
-*/
-
 class QXmppHttpUploadServicePrivate : public QSharedData
 {
 public:

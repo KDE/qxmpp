@@ -18,11 +18,23 @@ struct QXmppBlockingManagerPrivate;
 class QXMPP_EXPORT QXmppBlocklist
 {
 public:
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that the queried JID is not blocked.
+    */
     struct NotBlocked { };
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that the queried JID is fully blocked.
+    */
     struct Blocked {
         QVector<QString> blockingEntries;
         QVector<QString> partiallyBlockingEntries;
     };
+    /*!
+        \inmodule QXmpp
+        \brief Indicates that only some resources or nodes of the queried JID are blocked.
+    */
     struct PartiallyBlocked {
         QVector<QString> partiallyBlockingEntries;
     };

@@ -52,6 +52,16 @@ private:
     std::shared_ptr<Data> d;
 };
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppDiscoveryManager class makes it possible to discover information
+    about XMPP entities as defined by \xep{0030}{Service Discovery}.
+
+    Since QXmpp 1.12 info and items queries are cached per session by default.
+
+    \ingroup Managers
+*/
 class QXMPP_EXPORT QXmppDiscoveryManager : public QXmppClientExtension
 {
     Q_OBJECT

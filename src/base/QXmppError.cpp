@@ -12,16 +12,6 @@
 #include <QNetworkReply>
 
 /*!
-    \struct QXmppError
-    \inmodule QXmpp
-
-    Generic error class holding a description and a more specific error object. The specific error
-    usually is something like a QXmppStanza::Error or an enum.
-
-    \since QXmpp 1.5
-*/
-
-/*!
     \variable QXmppError::description
 
     Human readable description of the error.

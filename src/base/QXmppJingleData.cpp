@@ -2626,13 +2626,13 @@ QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleReason)
 
     Possible types of Jingle Message Initiation elements.
 
-    \value None
-    \value Propose
-    \value Ringing
-    \value Proceed
-    \value Reject
-    \value Retract
-    \value Finish
+    \value None No type set.
+    \value Propose Proposes a new Jingle session.
+    \value Ringing Indicates that the callee is alerted.
+    \value Proceed Indicates that the callee accepts the session proposal.
+    \value Reject Indicates that the callee rejects the session proposal.
+    \value Retract Retracts a previously sent session proposal.
+    \value Finish Indicates that the session has ended.
 */
 
 /*!
@@ -2848,12 +2848,12 @@ public:
 
     Possible types of Call Invite elements.
 
-    \value None
-    \value Invite
-    \value Retract
-    \value Accept
-    \value Reject
-    \value Left
+    \value None No type set.
+    \value Invite Invites a contact to a call.
+    \value Retract Retracts a previously sent call invite.
+    \value Accept Accepts an incoming call invite.
+    \value Reject Rejects an incoming call invite.
+    \value Left Indicates that the sender has left the call.
 */
 
 /*!

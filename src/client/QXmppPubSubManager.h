@@ -23,7 +23,8 @@ class QXMPP_EXPORT QXmppPubSubManager : public QXmppClientExtension
 
 public:
     /*!
-        Type of PubSub service
+        \enum QXmppPubSubManager::ServiceType
+        \brief Type of PubSub service.
 
         \value PubSubOrPep PubSub service or PEP service.
         \value PubSub PubSub service only.
@@ -36,7 +37,8 @@ public:
     };
 
     /*!
-        Pre-defined ID of a PubSub item
+        \enum QXmppPubSubManager::StandardItemId
+        \brief Pre-defined ID of a PubSub item.
 
         \value Current Item of a singleton node (i.e., the node's single item).
     */
@@ -46,8 +48,7 @@ public:
 
     /*!
         \inmodule QXmpp
-
-        Used to indicate a service type mismatch.
+        \brief Used to indicate a service type mismatch.
     */
     struct InvalidServiceType { };
 

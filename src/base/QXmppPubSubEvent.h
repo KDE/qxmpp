@@ -21,14 +21,14 @@ class QXMPP_EXPORT QXmppPubSubEventBase : public QXmppMessage
 {
 public:
     /*!
-        Enumeration of different event types
+        Describes the type of a PubSub event.
 
-        \value Configuration
-        \value Delete
-        \value Items
-        \value Retract
-        \value Purge
-        \value Subscription
+        \value Configuration The node configuration has changed.
+        \value Delete The node has been deleted.
+        \value Items New items have been published to the node.
+        \value Retract Previously published items have been retracted.
+        \value Purge All items have been purged from the node.
+        \value Subscription A subscription state has changed.
     */
     enum EventType : uint8_t {
         Configuration,

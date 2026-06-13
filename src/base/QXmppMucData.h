@@ -17,6 +17,14 @@ class QXmlStreamWriter;
 
 namespace QXmpp {
 
+/*!
+    \namespace QXmpp::Muc
+    \inmodule QXmpp
+
+    \brief Contains types for \xep{0045}{Multi-User Chat} used by the V2 API.
+
+    \since QXmpp 1.16
+*/
 namespace Muc {
 
 /*!
@@ -35,22 +43,22 @@ class QXMPP_EXPORT HistoryOptions
 public:
     /*! Returns the maximum number of characters of history to request, or \c std::nullopt if unrestricted. */
     std::optional<int> maxChars() const { return m_maxChars; }
-    /*! Sets the maximum number of characters of history to request. Pass \c std::nullopt for unrestricted. */
+    /*! Sets the maximum number of characters of history to request to \a value. Pass \c std::nullopt for unrestricted. */
     void setMaxChars(std::optional<int> value) { m_maxChars = value; }
 
     /*! Returns the maximum number of history stanzas to request, or \c std::nullopt if unrestricted. */
     std::optional<int> maxStanzas() const { return m_maxStanzas; }
-    /*! Sets the maximum number of history stanzas to request. Pass \c std::nullopt for unrestricted. */
+    /*! Sets the maximum number of history stanzas to request to \a value. Pass \c std::nullopt for unrestricted. */
     void setMaxStanzas(std::optional<int> value) { m_maxStanzas = value; }
 
     /*! Returns the seconds window for history, or \c std::nullopt if unrestricted. */
     std::optional<int> seconds() const { return m_seconds; }
-    /*! Sets the seconds window for history. Pass \c std::nullopt for unrestricted. */
+    /*! Sets the seconds window for history to \a value. Pass \c std::nullopt for unrestricted. */
     void setSeconds(std::optional<int> value) { m_seconds = value; }
 
     /*! Returns the earliest time to include in history, or \c std::nullopt if unrestricted. */
     std::optional<QDateTime> since() const { return m_since; }
-    /*! Sets the earliest time to include in history. Pass \c std::nullopt for unrestricted. */
+    /*! Sets the earliest time to include in history to \a value. Pass \c std::nullopt for unrestricted. */
     void setSince(std::optional<QDateTime> value) { m_since = value; }
 
     static constexpr std::tuple XmlTag = { u"history", QXmpp::Private::ns_muc };
@@ -126,12 +134,12 @@ class QXMPP_EXPORT Destroy
 public:
     /*! Returns the JID of an alternate room, or an empty string if none was provided. */
     QString alternateRoom() const { return m_alternateRoom; }
-    /*! Sets the JID of an alternate room. */
+    /*! Sets the JID of an \a alternateRoom. */
     void setAlternateRoom(const QString &alternateRoom) { m_alternateRoom = alternateRoom; }
 
     /*! Returns the human-readable reason for the room destruction. */
     QString reason() const { return m_reason; }
-    /*! Sets the human-readable reason for the room destruction. */
+    /*! Sets the human-readable \a reason for the room destruction. */
     void setReason(const QString &reason) { m_reason = reason; }
 
     static constexpr std::tuple XmlTag = { u"destroy", QXmpp::Private::ns_muc_user };
@@ -161,32 +169,32 @@ class QXMPP_EXPORT Item
 public:
     /*! Returns the (bare) JID of the user, or an empty string if not set. */
     QString jid() const { return m_jid; }
-    /*! Sets the (bare) JID of the user. */
+    /*! Sets the (bare) \a jid of the user. */
     void setJid(const QString &jid) { m_jid = jid; }
 
     /*! Returns the nickname of the occupant, or an empty string if not set. */
     QString nick() const { return m_nick; }
-    /*! Sets the nickname of the occupant. */
+    /*! Sets the \a nick of the occupant. */
     void setNick(const QString &nick) { m_nick = nick; }
 
     /*! Returns the affiliation, or \c std::nullopt if unspecified. */
     std::optional<Affiliation> affiliation() const { return m_affiliation; }
-    /*! Sets the affiliation. */
+    /*! Sets the \a affiliation. */
     void setAffiliation(std::optional<Affiliation> affiliation) { m_affiliation = affiliation; }
 
     /*! Returns the role, or \c std::nullopt if unspecified. */
     std::optional<Role> role() const { return m_role; }
-    /*! Sets the role. */
+    /*! Sets the \a role. */
     void setRole(std::optional<Role> role) { m_role = role; }
 
     /*! Returns the human-readable reason, or an empty string if not set. */
     QString reason() const { return m_reason; }
-    /*! Sets the human-readable reason. */
+    /*! Sets the human-readable \a reason. */
     void setReason(const QString &reason) { m_reason = reason; }
 
     /*! Returns the JID of the actor who performed the action, or an empty string if not set. */
     QString actor() const { return m_actor; }
-    /*! Sets the JID of the actor. */
+    /*! Sets the JID of the \a actor. */
     void setActor(const QString &actor) { m_actor = actor; }
 
     static constexpr std::tuple XmlTag = { u"item", QXmpp::Private::ns_muc_admin };
@@ -237,27 +245,27 @@ public:
 
     /*! Returns the JID of the MUC room to join (required). */
     QString jid() const { return m_jid; }
-    /*! Sets the JID of the MUC room. */
+    /*! Sets the \a jid of the MUC room. */
     void setJid(const QString &jid) { m_jid = jid; }
 
     /*! Returns the optional room password. */
     QString password() const { return m_password; }
-    /*! Sets the optional room password. */
+    /*! Sets the optional room \a password. */
     void setPassword(const QString &password) { m_password = password; }
 
     /*! Returns the optional human-readable reason for the invitation. */
     QString reason() const { return m_reason; }
-    /*! Sets the optional human-readable reason. */
+    /*! Sets the optional human-readable \a reason. */
     void setReason(const QString &reason) { m_reason = reason; }
 
     /*! Returns whether this invitation indicates a continuation of a 1-to-1 chat. */
     bool isContinue() const { return m_continue; }
-    /*! Sets the continue flag. */
+    /*! Sets the continue flag to \a isContinue. */
     void setIsContinue(bool isContinue) { m_continue = isContinue; }
 
     /*! Returns the thread ID from the original 1-to-1 conversation. */
     QString thread() const { return m_thread; }
-    /*! Sets the thread ID. */
+    /*! Sets the \a thread ID. */
     void setThread(const QString &thread) { m_thread = thread; }
 
     static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_conference };
@@ -288,17 +296,17 @@ class QXMPP_EXPORT Invite
 public:
     /*! Returns the invitee's JID this invitation is addressed to (set when sending). */
     QString to() const { return m_to; }
-    /*! Sets the invitee's JID. */
+    /*! Sets the invitee's \a jid. */
     void setTo(const QString &jid) { m_to = jid; }
 
     /*! Returns the inviter's JID (set by the room when forwarding to the invitee). */
     QString from() const { return m_from; }
-    /*! Sets the from JID. */
+    /*! Sets the from \a jid. */
     void setFrom(const QString &jid) { m_from = jid; }
 
     /*! Returns the optional human-readable reason. */
     QString reason() const { return m_reason; }
-    /*! Sets the optional human-readable reason. */
+    /*! Sets the optional human-readable \a reason. */
     void setReason(const QString &reason) { m_reason = reason; }
 
     static constexpr std::tuple XmlTag = { u"invite", QStringView {} };
@@ -327,17 +335,17 @@ class QXMPP_EXPORT Decline
 public:
     /*! Returns the JID of the inviter this decline is addressed to (set when sending). */
     QString to() const { return m_to; }
-    /*! Sets the JID to send the decline to. */
+    /*! Sets the \a jid to send the decline to. */
     void setTo(const QString &jid) { m_to = jid; }
 
     /*! Returns the JID of the invitee who declined (set by the room when forwarding). */
     QString from() const { return m_from; }
-    /*! Sets the from JID. */
+    /*! Sets the from \a jid. */
     void setFrom(const QString &jid) { m_from = jid; }
 
     /*! Returns the optional human-readable reason. */
     QString reason() const { return m_reason; }
-    /*! Sets the optional human-readable reason. */
+    /*! Sets the optional human-readable \a reason. */
     void setReason(const QString &reason) { m_reason = reason; }
 
     static constexpr std::tuple XmlTag = { u"decline", QStringView {} };
@@ -365,22 +373,22 @@ class QXMPP_EXPORT UserQuery
 public:
     /*! Returns the MUC status codes carried in this element. */
     QList<uint32_t> statusCodes() const { return m_statusCodes; }
-    /*! Sets the MUC status codes. */
+    /*! Sets the MUC status \a codes. */
     void setStatusCodes(QList<uint32_t> codes) { m_statusCodes = std::move(codes); }
 
     /*! Returns the mediated invitation, if present. */
     std::optional<Invite> invite() const { return m_invite; }
-    /*! Sets the mediated invitation. */
+    /*! Sets the mediated \a invite. */
     void setInvite(std::optional<Invite> invite) { m_invite = std::move(invite); }
 
     /*! Returns the room password for password-protected rooms (empty if none). */
     QString password() const { return m_password; }
-    /*! Sets the room password. */
+    /*! Sets the room \a password. */
     void setPassword(const QString &password) { m_password = password; }
 
     /*! Returns the invitation decline, if present. */
     std::optional<Decline> decline() const { return m_decline; }
-    /*! Sets the invitation decline. */
+    /*! Sets the invitation \a decline. */
     void setDecline(std::optional<Decline> decline) { m_decline = std::move(decline); }
 
     static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_muc_user };

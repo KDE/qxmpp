@@ -158,7 +158,9 @@ void QXmppOutgoingClientPrivate::connectToNextAddress()
     connectToHost(serverAddresses.at(nextServerAddressIndex++));
 }
 
-/*! Constructs an outgoing client stream. */
+/*
+    Constructs an outgoing client stream.
+*/
 QXmppOutgoingClient::QXmppOutgoingClient(QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppOutgoingClientPrivate>(this))
@@ -179,49 +181,65 @@ QXmppOutgoingClient::~QXmppOutgoingClient()
     d->iqManager.cancelAll();
 }
 
-/*! Returns a reference to the stream's configuration. */
+/*
+    Returns a reference to the stream's configuration.
+*/
 QXmppConfiguration &QXmppOutgoingClient::configuration()
 {
     return d->config;
 }
 
-/*! Returns access to the XMPP socket. */
+/*
+    Returns access to the XMPP socket.
+*/
 XmppSocket &QXmppOutgoingClient::xmppSocket() const
 {
     return d->socket;
 }
 
-/*! Returns the manager for packet acknowledgements from Stream Management. */
+/*
+    Returns the manager for packet acknowledgements from Stream Management.
+*/
 StreamAckManager &QXmppOutgoingClient::streamAckManager() const
 {
     return d->streamAckManager;
 }
 
-/*! Returns the manager for outgoing IQ request tracking. */
+/*
+    Returns the manager for outgoing IQ request tracking.
+*/
 OutgoingIqManager &QXmppOutgoingClient::iqManager() const
 {
     return d->iqManager;
 }
 
-/*! Returns the manager for C2s Stream Management. */
+/*
+    Returns the manager for C2s Stream Management.
+*/
 C2sStreamManager &QXmppOutgoingClient::c2sStreamManager() const
 {
     return d->c2sStreamManager;
 }
 
-/*! Returns the manager for enabling of message carbons via bind2. */
+/*
+    Returns the manager for enabling of message carbons via bind2.
+*/
 CarbonManager &QXmppOutgoingClient::carbonManager() const
 {
     return d->carbonManager;
 }
 
-/*! Returns the manager for \xep{0352}{Client State Indication}. */
+/*
+    Returns the manager for \xep{0352}{Client State Indication}.
+*/
 CsiManager &QXmppOutgoingClient::csiManager() const
 {
     return d->csiManager;
 }
 
-/*! Attempts to connect to the XMPP server. */
+/*
+    Attempts to connect to the XMPP server.
+*/
 void QXmppOutgoingClient::connectToHost()
 {
     // if a host for resumption is available, connect to it
@@ -290,7 +308,7 @@ void QXmppOutgoingClient::connectToHost()
     });
 }
 
-/*!
+/*
     Disconnects from the server and resets the stream management state.
 
     \since QXmpp 1.0
@@ -301,19 +319,23 @@ void QXmppOutgoingClient::disconnectFromHost()
     d->socket.disconnectFromHost();
 }
 
-/*! Returns true if authentication has succeeded. */
+/*
+    Returns true if authentication has succeeded.
+*/
 bool QXmppOutgoingClient::isAuthenticated() const
 {
     return d->isAuthenticated;
 }
 
-/*! Returns true if the socket is connected and a session has been started. */
+/*
+    Returns true if the socket is connected and a session has been started.
+*/
 bool QXmppOutgoingClient::isConnected() const
 {
     return d->socket.isConnected() && d->sessionStarted;
 }
 
-/*!
+/*
     Sends an IQ and reports the response asynchronously.
 
     It makes sure that the to address is set so the stream can correctly check the reponse's
@@ -933,7 +955,9 @@ bool QXmppOutgoingClient::handleIqResponse(const QDomElement &stanza)
     return d->iqManager.handleStanza(stanza);
 }
 
-/*! Returns the type of the last XMPP stream error that occurred. */
+/*
+    Returns the type of the last XMPP stream error that occurred.
+*/
 QXmppStanza::Error::Condition QXmppOutgoingClient::xmppStreamError()
 {
     if (d->error) {

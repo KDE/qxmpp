@@ -131,6 +131,32 @@ struct CustomQuery {
 
 }  // namespace QXmpp::Uri
 
+/*!
+    \class QXmppUri
+    \inmodule QXmpp
+    \brief Represents an XMPP URI as defined in \xep{0147}{XMPP URI Scheme Query Components}.
+
+    This class represents an XMPP URI as specified by RFC 5122 -  Internationalized Resource
+    Identifiers (IRIs) and Uniform Resource Identifiers (URIs) for the Extensible Messaging and
+    Presence Protocol (XMPP) and XEP-0147: XMPP URI Scheme Query Components.
+
+    A QUrlQuery is used by this class to represent a query (component) of an XMPP URI. A query
+    conisists of query items which can be the query type or a key-value pair.
+
+    A query type is used to perform an action while the key-value pairs are used to define its
+    behavior.
+
+    Example:
+    xmpp:alice@example.org?message;subject=Hello;body=world
+
+    query (component): message;subject=Hello;body=world
+    query items: message, subject=Hello, body=world
+    query type: message
+    key-value pair 1: subject=Hello
+    key-value pair 2: body=world
+
+    \since QXmpp 1.8
+*/
 class QXMPP_EXPORT QXmppUri
 {
 public:

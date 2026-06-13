@@ -55,9 +55,6 @@ public:
     */
     std::optional<QXmppMucRoomV2> findRoom(const QString &jid);
 
-    /*!
-        Joins the MUC room at \a jid with the given \a nickname.
-    */
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname);
     /*!
         \overload
@@ -72,24 +69,25 @@ public:
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoom(QString serviceJid,
                                                         QString nickname,
                                                         std::optional<QString> roomName = std::nullopt);
-    /*! Emitted when a participant joins a room. */
+    /*! Emitted when \a participant joins the room at \a roomJid. */
     Q_SIGNAL void participantJoined(const QString &roomJid, const QXmppMucParticipant &participant);
-    /*! Emitted when a participant leaves a room. */
+    /*! Emitted when \a participant leaves the room at \a roomJid for the given \a reason. */
     Q_SIGNAL void participantLeft(const QString &roomJid, const QXmppMucParticipant &participant, QXmpp::Muc::LeaveReason reason);
     /*!
-        Emitted when we are forcibly removed from a room (kicked, banned, etc.).
+        Emitted when we are forcibly removed from the room at \a roomJid (kicked, banned, etc.)
+        for the given \a reason.
 
         The room state is still accessible during this signal's emission.
         After all handlers return, the room state is cleaned up.
         The \a destroy parameter contains room destruction info if the reason is \c RoomDestroyed.
     */
     Q_SIGNAL void removedFromRoom(const QString &roomJid, QXmpp::Muc::LeaveReason reason, const std::optional<QXmpp::Muc::Destroy> &destroy);
-    /*! Emitted when room history messages are received during joining. */
+    /*! Emitted with the \a messages received for the room at \a roomJid during joining. */
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
-    /*! Emitted when a groupchat message is received in a joined room. */
+    /*! Emitted when a groupchat \a message is received in the joined room at \a roomJid. */
     Q_SIGNAL void messageReceived(const QString &roomJid, const QXmppMessage &message);
     /*!
-        Emitted when a voice request is received in a joined moderated room.
+        Emitted when a voice \a request is received in the joined moderated room at \a roomJid.
 
         This signal is only emitted for moderators. The moderator can approve or
         deny the request by calling QXmppMucRoomV2::answerVoiceRequest().
@@ -98,7 +96,8 @@ public:
     */
     Q_SIGNAL void voiceRequestReceived(const QString &roomJid, const QXmppMucVoiceRequest &request);
     /*!
-        Emitted when a mediated invitation is received from a room.
+        Emitted when a mediated \a invite is received from the room at \a roomJid, protected by
+        the given \a password (if any).
 
         The user is not yet in the room at this point. Call joinRoom() to accept
         or declineInvitation() to decline.
@@ -107,16 +106,18 @@ public:
     */
     Q_SIGNAL void invitationReceived(const QString &roomJid, const QXmpp::Muc::Invite &invite, const QString &password);
     /*!
-        Emitted when a room reports that an invitee declined an invitation.
+        Emitted when the room at \a roomJid reports that an invitee declined an invitation via
+        \a decline.
 
         \since QXmpp 1.16
     */
     Q_SIGNAL void invitationDeclined(const QString &roomJid, const QXmpp::Muc::Decline &decline);
 
     /*!
-        Emitted when a \xep{0249}{Direct MUC Invitations} invitation is received.
+        Emitted when a \xep{0249}{Direct MUC Invitations} \a invitation is received.
 
-        The \a from is the full JID of the user who sent the invitation.
+        The \a from is the full JID of the user who sent the invitation, and \a message is the
+        full message stanza it was received in.
 
         \since QXmpp 1.16
     */
@@ -124,23 +125,8 @@ public:
 
     bool handleMessage(const QXmppMessage &) override;
 
-    /*!
-        Sends a decline for a mediated invitation to \a roomJid.
-
-        Can be called before joining the room. Set \c decline.to() to the inviter's JID.
-
-        \since QXmpp 1.16
-    */
     QXmppTask<QXmpp::SendResult> declineInvitation(const QString &roomJid, QXmpp::Muc::Decline decline);
 
-    /*!
-        Sends a \xep{0249}{Direct MUC Invitations} invitation to \a to.
-
-        The optional \a message parameter can be used to set custom extensions on the
-        message stanza; the \c to, \c type, and invitation fields will be overwritten.
-
-        \since QXmpp 1.16
-    */
     QXmppTask<QXmpp::SendResult> sendDirectInvitation(const QString &to, QXmpp::Muc::DirectInvitation invitation, QXmppMessage message = {});
 
 protected:
@@ -271,7 +257,10 @@ public:
     QXmppTask<QXmpp::Result<>> cancelRoomCreation();
     QXmppTask<QXmpp::Result<>> destroyRoom(const QString &reason = {}, const QString &alternateJid = {});
 
-    /*! Connects to the participantJoined signal, filtered for this room. */
+    /*!
+        Connects \a f to the participantJoined signal, filtered for this room, with the
+        given \a context object.
+    */
     template<typename Func>
     QMetaObject::Connection onParticipantJoined(QObject *context, Func &&f) const
     {
@@ -283,7 +272,10 @@ public:
         });
     }
 
-    /*! Connects to the participantLeft signal, filtered for this room. */
+    /*!
+        Connects \a f to the participantLeft signal, filtered for this room, with the
+        given \a context object.
+    */
     template<typename Func>
     QMetaObject::Connection onParticipantLeft(QObject *context, Func &&f) const
     {

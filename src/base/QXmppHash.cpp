@@ -38,30 +38,6 @@ struct Enums::Data<HashAlgorithm> {
 };
 
 /*!
-    \enum QXmpp::HashAlgorithm
-
-    One of the hash algorithms specified by the IANA registry or \xep{0300}{Use
-    of Cryptographic Hash Functions in XMPP}.
-
-    \since QXmpp 1.5
-
-    \value Unknown
-    \value Md2
-    \value Md5
-    \value Shake128
-    \value Shake256
-    \value Sha1
-    \value Sha224
-    \value Sha256
-    \value Sha384
-    \value Sha512
-    \value Sha3_256
-    \value Sha3_512
-    \value Blake2b_256
-    \value Blake2b_512
-*/
-
-/*!
     \class QXmppHash
     \inmodule QXmpp
 

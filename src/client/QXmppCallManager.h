@@ -21,6 +21,54 @@ struct StunServer;
 struct TurnServer;
 }  // namespace QXmpp
 
+/*!
+    \inmodule QXmpp
+
+    \brief The QXmppCallManager class provides support for making and receiving
+    voice and video calls using \xep{0166}{Jingle}.
+
+    Session initiation is performed as described by \xep{0166}{Jingle}, \xep{0167}{Jingle RTP
+    Sessions} and \xep{0176}{Jingle ICE-UDP Transport Method}.
+
+    The data stream is connected using Interactive Connectivity Establishment (RFC 5245) and data
+    is transferred using Real Time Protocol (RFC 3550) packets.
+
+    To make use of this manager, you need to instantiate it and load it into the QXmppClient
+    instance as follows:
+    ```cpp
+    auto *client = new QXmppClient();
+    auto *callManager = client->addNewExtension<QXmppCallManager>();
+    ```
+
+    \section1 Call interaction
+
+    Incoming calls are exposed via the callReceived() signal. You can take ownership of the call by
+    moving the unique_ptr, otherwise the call manager will decline and delete the call. You can
+    accept or reject (hang up) the call.
+
+    Outgoing calls are created using call().
+
+    In both cases you are responsible for taking ownership of the call. Note that QXmppCalls in
+    another state than finished require the QXmppCallManager to be active, though. You must not
+    delete the QXmppCallManager until all QXmppCalls are in finished state.
+
+    \section1 XEP-0320: Use of DTLS-SRTP in Jingle Sessions
+
+    DTLS-SRTP allows to encrypt peer-to-peer calls. Internally, a TLS handshake is done to
+    negotiate keys for SRTP (Secure RTP). By default DTLS is not enforced, this can be done using
+    setDtlsRequired(), though.
+
+    DTLS-SRTP by default exchanges the fingerprint via unencrypted XMPP packets. This means that
+    the XMPP server could potentially replace the fingerprint or prevent the clients from using
+    DTLS at all. However, the actual media connection is typically peer-to-peer, so the XMPP server
+    does not have access to the transmitted data.
+
+    Support for DTLS-SRTP is available since QXmpp 1.11.
+
+    \warning THIS API IS NOT FINALIZED YET
+
+    \ingroup Managers
+*/
 class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
 {
     Q_OBJECT

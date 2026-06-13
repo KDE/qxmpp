@@ -17,6 +17,28 @@ class QXmlStreamWriter;
 
 namespace QXmpp {
 
+/*!
+    \enum QXmpp::HashAlgorithm
+    \inmodule QXmpp
+    \brief Cryptographic hash algorithm as specified in \xep{0300}{Use of Cryptographic Hash Functions in XMPP}.
+
+    \since QXmpp 1.5
+
+    \value Unknown The algorithm is unknown or not set.
+    \value Md2 MD2 hash algorithm.
+    \value Md5 MD5 hash algorithm.
+    \value Shake128 SHAKE-128 hash algorithm.
+    \value Shake256 SHAKE-256 hash algorithm.
+    \value Sha1 SHA-1 hash algorithm.
+    \value Sha224 SHA-224 hash algorithm.
+    \value Sha256 SHA-256 hash algorithm.
+    \value Sha384 SHA-384 hash algorithm.
+    \value Sha512 SHA-512 hash algorithm.
+    \value Sha3_256 SHA3-256 hash algorithm.
+    \value Sha3_512 SHA3-512 hash algorithm.
+    \value Blake2b_256 BLAKE2b-256 hash algorithm.
+    \value Blake2b_512 BLAKE2b-512 hash algorithm.
+*/
 enum class HashAlgorithm : uint32_t {
     Unknown,
     Md2,
@@ -34,7 +56,7 @@ enum class HashAlgorithm : uint32_t {
     Blake2b_512,
 };
 
-}
+}  // namespace QXmpp
 
 class QXMPP_EXPORT QXmppHash
 {

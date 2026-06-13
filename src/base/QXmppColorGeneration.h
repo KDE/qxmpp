@@ -14,6 +14,11 @@
 class QXmppColorGeneration
 {
 public:
+    /*!
+        \struct QXmppColorGeneration::Rgb
+        \inmodule QXmpp
+        \brief An RGB color generated from a string as specified in \xep{0392}{Consistent Color Generation}.
+    */
     struct QXMPP_EXPORT Rgb {
         quint8 red;
         quint8 green;

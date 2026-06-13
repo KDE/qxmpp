@@ -124,19 +124,20 @@ using EmptyResult = std::variant<Success, QXmppError>;
 /*!
     \fn QXmppPepBookmarkManager::bookmarksAdded(const QList<QXmppMucBookmark> &newBookmarks)
 
-    Emitted when bookmarks have been added. This is triggered by PubSub event notifications.
+    Emitted with the \a newBookmarks that have been added. This is triggered by PubSub event
+    notifications.
 */
 
 /*!
     \fn QXmppPepBookmarkManager::bookmarksChanged(const QList<QXmppPepBookmarkManager::BookmarkChange> &bookmarkUpdates)
 
-    Emitted when bookmarks have been changed.
+    Emitted with the \a bookmarkUpdates describing the bookmarks that have been changed.
 */
 
 /*!
     \fn QXmppPepBookmarkManager::bookmarksRemoved(const QList<QString> &removedBookmarkJids)
 
-    Emitted when bookmarks are retracted.
+    Emitted with the \a removedBookmarkJids of the bookmarks that have been retracted.
 */
 
 /*! Default constructor. */
@@ -184,7 +185,11 @@ QXmppTask<Result<>> QXmppPepBookmarkManager::removeBookmark(const QString &jid)
     return d->removeBookmark(jid);
 }
 
-/*! Handles incoming PubSub events. */
+/*!
+    Handles an incoming PubSub \a element for the given \a pubSubService and \a nodeName.
+
+    Returns \c true if the event was handled.
+*/
 bool QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
     if (d->bookmarks && pubSubService == client()->configuration().jidBare() && nodeName == ns_bookmarks2) {

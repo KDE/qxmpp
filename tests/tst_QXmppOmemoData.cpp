@@ -15,10 +15,10 @@
 
 #include <QObject>
 
-///
-/// Serializes data and compares it to multiple XML representations.
-/// It fails if no comparison succeeds.
-///
+/*!
+    Serializes data and compares it to multiple XML representations.
+    It fails if no comparison succeeds.
+*/
 template<class T>
 static void serializePacket(T &packet, const QVector<QByteArray> &xmls)
 {

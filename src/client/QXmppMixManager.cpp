@@ -237,6 +237,7 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
 
 /*!
     \enum QXmppMixManager::Support
+    \brief Describes whether a feature is supported by the server.
 
     Server support for a feature.
 
