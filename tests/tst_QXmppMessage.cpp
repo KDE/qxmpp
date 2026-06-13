@@ -1356,6 +1356,25 @@ void tst_QXmppMessage::testFileSharing()
     parsePacket(message, xml);
     QVERIFY(!message.sharedFiles().empty());
     QCOMPARE(message.sharedFiles().first().id(), "abc23");
+    QCOMPARE(message.sharedFiles().first().dispositionOpt(), QXmppFileShare::Inline);
+    serializePacket(message, xml);
+
+    // file-sharing element without disposition attribute: must round-trip without
+    // adding a disposition attribute and report std::nullopt
+    xml = "<message id='sharing-a-file' to='juliet@shakespeare.lit' from='romeo@montague.lit/resource' type='normal'>"
+          "<file-sharing xmlns='urn:xmpp:sfs:0' id='abc23'>"
+          "<file xmlns='urn:xmpp:file:metadata:0'>"
+          "<name>summit.jpg</name>"
+          "</file>"
+          "<sources>"
+          "<url-data xmlns='http://jabber.org/protocol/url-data' target='https://download.montague.lit/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/summit.jpg'/>"
+          "</sources>"
+          "</file-sharing>"
+          "</message>";
+    message = {};
+    parsePacket(message, xml);
+    QVERIFY(!message.sharedFiles().empty());
+    QCOMPARE(message.sharedFiles().first().dispositionOpt(), std::nullopt);
     serializePacket(message, xml);
 
     xml = "<message id='adding-photo1' to='juliet@shakespeare.lit' from='romeo@montague.lit/resource' type='normal'>"

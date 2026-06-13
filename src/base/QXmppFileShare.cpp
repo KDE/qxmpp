@@ -162,7 +162,7 @@ public:
     QXmppFileMetadata metadata;
     QString id;
     FileSources sources;
-    QXmppFileShare::Disposition disposition = Disposition::Inline;
+    std::optional<QXmppFileShare::Disposition> disposition;
 };
 
 /*!
@@ -195,8 +195,25 @@ QXmppFileShare::QXmppFileShare()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFileShare)
 
-/*! Returns the disposition setting for this file. */
+/*!
+    Returns the disposition setting for this file.
+
+    \deprecated Use dispositionOpt() instead, which distinguishes "no \c disposition attribute"
+    from an explicit value. This getter returns \c Inline when no disposition was set.
+*/
 QXmppFileShare::Disposition QXmppFileShare::disposition() const
+{
+    return d->disposition.value_or(Disposition::Inline);
+}
+
+/*!
+    Returns the disposition setting for this file.
+
+    \c std::nullopt means no \c disposition attribute was set.
+
+    \since QXmpp 1.16
+*/
+std::optional<QXmppFileShare::Disposition> QXmppFileShare::dispositionOpt() const
 {
     return d->disposition;
 }
@@ -206,7 +223,7 @@ QXmppFileShare::Disposition QXmppFileShare::disposition() const
 
     \a disp.
 */
-void QXmppFileShare::setDisposition(Disposition disp)
+void QXmppFileShare::setDisposition(std::optional<Disposition> disp)
 {
     d->disposition = disp;
 }
@@ -308,8 +325,7 @@ bool QXmppFileShare::parse(const QDomElement &el)
 {
     if (el.tagName() == u"file-sharing" && el.namespaceURI() == ns_sfs) {
         // disposition
-        d->disposition = Enums::fromString<Disposition>(el.attribute(u"disposition"_s))
-                             .value_or(Disposition::Inline);
+        d->disposition = Enums::fromString<Disposition>(el.attribute(u"disposition"_s));
         d->id = el.attribute(u"id"_s);
 
         // file metadata
@@ -332,7 +348,7 @@ void QXmppFileShare::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element {
         XmlTag,
-        Attribute { u"disposition", d->disposition },
+        OptionalAttribute { u"disposition", d->disposition },
         OptionalAttribute { u"id", d->id },
         d->metadata,
         Element { u"sources", d->sources },

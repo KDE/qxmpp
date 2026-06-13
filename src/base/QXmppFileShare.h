@@ -63,8 +63,12 @@ public:
     QXmppFileShare();
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppFileShare)
 
+#if QXMPP_DEPRECATED_SINCE(1, 16)
+    [[deprecated("Use dispositionOpt() instead.")]]
     Disposition disposition() const;
-    void setDisposition(Disposition);
+#endif
+    std::optional<Disposition> dispositionOpt() const;
+    void setDisposition(std::optional<Disposition>);
 
     const QString &id() const;
     void setId(const QString &);
