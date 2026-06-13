@@ -1413,6 +1413,22 @@ void tst_QXmppMessage::testFileSharing()
     QCOMPARE(sources.httpSources().size(), 1);
     QCOMPARE(sources.httpSources().first().url(), QUrl::fromEncoded("https://download.montague.lit/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/photo1.jpg"));
     serializePacket(message, xml);
+
+    // URLs must be serialized percent-encoded (e.g. a space as %20).
+    xml = "<message id='adding-spaced' to='juliet@shakespeare.lit' from='romeo@montague.lit/resource' type='normal'>"
+          "<sources xmlns='urn:xmpp:sfs:0' id='spaced file.jpg'>"
+          "<url-data xmlns='http://jabber.org/protocol/url-data' target='https://download.montague.lit/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/spaced%20file.jpg'/>"
+          "</sources>"
+          "</message>";
+    message = {};
+
+    parsePacket(message, xml);
+    QCOMPARE(message.fileSourcesAttachments().size(), 1);
+    sources = message.fileSourcesAttachments().first();
+    QCOMPARE(sources.httpSources().size(), 1);
+    QCOMPARE(sources.httpSources().first().url(), QUrl::fromEncoded("https://download.montague.lit/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/spaced%20file.jpg"));
+    QCOMPARE(sources.httpSources().first().url().path(), u"/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/spaced file.jpg"_s);
+    serializePacket(message, xml);
 }
 
 void tst_QXmppMessage::testEncryptedFileSource()

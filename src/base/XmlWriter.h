@@ -91,7 +91,7 @@ struct StringSerializer<QUuid> {
 
 template<>
 struct StringSerializer<QUrl> {
-    static auto serialize(const QUrl &url) { return url.toString(); }
+    static auto serialize(const QUrl &url) { return url.toString(QUrl::FullyEncoded); }
     static bool hasValue(const QUrl &url) { return !url.isEmpty(); }
 };
 
