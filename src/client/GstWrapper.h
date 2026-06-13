@@ -5,11 +5,12 @@
 #ifndef GSTWRAPPER_H
 #define GSTWRAPPER_H
 
+// clang-format off
 // Qt includes need to come before gst includes
 // otherwise they interfere and cause errors on MSVC
 #include <QLatin1String>
-
 #include <gst/gst.h>
+// clang-format on
 #include <memory>
 
 namespace QXmpp::Private {
