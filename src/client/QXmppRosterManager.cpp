@@ -541,6 +541,38 @@ QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::renameRosterItem(const
 }
 
 /*!
+    Updates the groups of the roster item with bare JID \a bareJid.
+
+    The given \a groups replace the contact's existing groups entirely; pass the
+    full desired set. The contact's name and other properties are preserved.
+
+    As a result, the server will initiate a roster push, causing the
+    itemChanged() signal to be emitted.
+
+    \since QXmpp 1.16
+*/
+QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::updateRosterGroups(const QString &bareJid, const QSet<QString> &groups)
+{
+    if (!d->entries.contains(bareJid)) {
+        return makeReadyTask<Result>(
+            QXmppError { u"The roster doesn't contain this user."_s, {} });
+    }
+
+    auto item = d->entries.value(bareJid);
+    item.setGroups(groups);
+
+    // If there is a pending subscription, do not include the corresponding attribute in the stanza.
+    if (!item.subscriptionStatus().isEmpty()) {
+        item.setSubscriptionStatus({});
+    }
+
+    QXmppRosterIq iq;
+    iq.setType(QXmppIq::Set);
+    iq.addItem(item);
+    return client()->sendGenericIq(std::move(iq));
+}
+
+/*!
     Requests a subscription to the given contact.
 
     As a result, the server will initiate a roster push, causing the

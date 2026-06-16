@@ -30,6 +30,7 @@ private:
     Q_SLOT void testMovedSubscriptionRequestReceived();
     Q_SLOT void testAddItem();
     Q_SLOT void testRemoveItem();
+    Q_SLOT void testUpdateGroups();
     Q_SLOT void testDefaultStorage();
     Q_SLOT void testSetStorage();
     Q_SLOT void testPushPersistsAdd();
@@ -281,6 +282,51 @@ void tst_QXmppRosterManager::testRemoveItem()
     auto error = err.value<QXmppStanza::Error>().value();
     QCOMPARE(error.type(), QXmppStanza::Error::Cancel);
     QCOMPARE(error.text(), u"Not found"_s);
+}
+
+void tst_QXmppRosterManager::testUpdateGroups()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
+
+    // seed the roster with a contact that has a name (to verify it is preserved);
+    // a roster push (type set) is needed, since handleStanza() only stores those
+    QXmppRosterIq::Item item;
+    item.setBareJid(u"contact@example.org"_s);
+    item.setName(u"Romeo"_s);
+    QXmppRosterIq initialItems;
+    initialItems.setType(QXmppIq::Set);
+    initialItems.addItem(item);
+    QVERIFY(rosterManager->handleStanza(writePacketToDom(initialItems)));
+    // discard the result IQ the manager sends in response to the push
+    test.ignore();
+
+    // success: groups are replaced and the name is preserved
+    auto future = rosterManager->updateRosterGroups(u"contact@example.org"_s, { u"Friends"_s });
+    test.expect("<iq id='qx1' type='set'><query xmlns='jabber:iq:roster'><item jid='contact@example.org' name='Romeo'><group>Friends</group></item></query></iq>");
+    test.inject<QString>("<iq id='qx1' type='result'/>");
+    expectFutureVariant<QXmpp::Success>(future);
+
+    // unknown JID: ready error, no IQ sent
+    auto missing = rosterManager->updateRosterGroups(u"stranger@example.org"_s, { u"Friends"_s });
+    test.expectNoPacket();
+    expectFutureVariant<QXmppError>(missing);
+
+    // error response
+    future = rosterManager->updateRosterGroups(u"contact@example.org"_s, { u"Family"_s });
+    test.expect("<iq id='qx1' type='set'><query xmlns='jabber:iq:roster'><item jid='contact@example.org' name='Romeo'><group>Family</group></item></query></iq>");
+    test.inject<QString>(R"(
+<iq id='qx1' type='error'>
+    <error type='modify'>
+        <not-authorized xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>
+        <text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>This is not allowed</text>
+    </error>
+</iq>)");
+    auto err = expectFutureVariant<QXmppError>(future);
+    auto error = err.value<QXmppStanza::Error>().value();
+    QCOMPARE(error.type(), QXmppStanza::Error::Modify);
+    QCOMPARE(error.text(), u"This is not allowed"_s);
 }
 
 void tst_QXmppRosterManager::testDefaultStorage()

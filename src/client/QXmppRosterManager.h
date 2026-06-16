@@ -115,6 +115,7 @@ public:
     QXmppTask<Result> addRosterItem(const QString &bareJid, const QString &name = {}, const QSet<QString> &groups = {});
     QXmppTask<Result> removeRosterItem(const QString &bareJid);
     QXmppTask<Result> renameRosterItem(const QString &bareJid, const QString &name);
+    QXmppTask<Result> updateRosterGroups(const QString &bareJid, const QSet<QString> &groups);
     QXmppTask<QXmpp::SendResult> subscribeTo(const QString &bareJid, const QString &reason = {});
     QXmppTask<QXmpp::SendResult> unsubscribeFrom(const QString &bareJid, const QString &reason = {});
 
