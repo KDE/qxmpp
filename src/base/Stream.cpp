@@ -384,8 +384,34 @@ void XmppSocket::resetStream()
 {
     m_reader.clear();
     m_domReader.reset();
+    m_buffer.clear();
+    m_bufferStartOffset = 0;
+    m_lastUnitEnd = 0;
+    m_stanzaStartOffset = 0;
     m_streamReceived = false;
     m_acceptInput = true;
+}
+
+QString XmppSocket::slice(qint64 absStart, qint64 absEnd) const
+{
+    qint64 rel = absStart - m_bufferStartOffset;
+    qint64 len = absEnd - absStart;
+    if (rel < 0 || len < 0 || rel + len > m_buffer.size()) {
+        // must never happen; degrade gracefully instead of logging garbage
+        return {};
+    }
+    return m_buffer.mid(rel, len);
+}
+
+// Absolute offset of the '<' that starts the next top-level unit. Between two
+// top-level units the buffer holds only whitespace, so the first '<' at or after
+// the end of the previous unit is the start of the next one. This is robust against
+// the reader's character offset pointing one past '<' after a whitespace token.
+qint64 XmppSocket::unitStart() const
+{
+    qint64 rel = std::max<qint64>(0, m_lastUnitEnd - m_bufferStartOffset);
+    qint64 idx = m_buffer.indexOf(u'<', rel);
+    return idx < 0 ? m_lastUnitEnd : m_bufferStartOffset + idx;
 }
 
 void XmppSocket::throwError(const QString &text, StreamError condition)
@@ -408,13 +434,13 @@ void XmppSocket::processData(const QString &data)
 
     // Check for whitespace pings
     if (data.isEmpty()) {
-        logReceived({});
         Q_EMIT stanzaReceived(QDomElement());
         return;
     }
 
-    // log data received and process
-    logReceived(data);
+    // buffer the raw on-wire text and process; complete units are sliced out of
+    // 'm_buffer' for logging (see slice()), so the exact server-sent XML is logged
+    m_buffer += data;
     m_reader.addData(data);
 
     // 'm_reader' parses the XML stream and 'm_domReader' creates DOM elements with the parsed XML
@@ -425,6 +451,8 @@ void XmppSocket::processData(const QString &data)
             overloaded {
                 [this](const QDomElement &element) {
                     m_domReader.reset();
+                    logReceived(slice(m_stanzaStartOffset, m_reader.characterOffset()));
+                    m_lastUnitEnd = m_reader.characterOffset();
                     Q_EMIT stanzaReceived(element);
                     return true;
                 },
@@ -469,7 +497,8 @@ void XmppSocket::processData(const QString &data)
             }
             break;
         case QXmlStreamReader::StartDocument:
-            // pre-stream open
+            // pre-stream open: the XML declaration is consumed but not logged as a unit
+            m_lastUnitEnd = m_reader.characterOffset();
             break;
         case QXmlStreamReader::EndDocument:
             // post-stream close
@@ -486,13 +515,16 @@ void XmppSocket::processData(const QString &data)
                 }
 
                 m_streamReceived = true;
+                logReceived(slice(unitStart(), m_reader.characterOffset()));
+                m_lastUnitEnd = m_reader.characterOffset();
                 Q_EMIT streamReceived(StreamOpen::fromXml(m_reader));
             } else if (!m_streamReceived) {
                 throwError(
                     u"Invalid element received. Expected 'stream' element qualified by 'http://etherx.jabber.org/streams' namespace."_s,
                     StreamError::BadFormat);
             } else {
-                // parse top-level stream element
+                // parse top-level stream element; remember its '<' for slicing once complete
+                m_stanzaStartOffset = unitStart();
                 m_domReader = DomReader();
                 if (!readDomElement()) {
                     return;
@@ -501,11 +533,12 @@ void XmppSocket::processData(const QString &data)
             break;
         case QXmlStreamReader::EndElement:
             // end of stream
+            logReceived(slice(unitStart(), m_reader.characterOffset()));
+            m_lastUnitEnd = m_reader.characterOffset();
             Q_EMIT streamClosed();
             break;
         case QXmlStreamReader::Characters:
             if (m_reader.isWhitespace()) {
-                logReceived({});
                 Q_EMIT stanzaReceived(QDomElement());
             } else {
                 // invalid: emit error
@@ -525,6 +558,14 @@ void XmppSocket::processData(const QString &data)
             break;
         }
     } while (!m_reader.hasError() && m_acceptInput);
+
+    // discard buffered text up to the end of the last handled top-level unit; anything
+    // after it is still needed (trailing whitespace, or a partially-received next unit)
+    qint64 drop = m_lastUnitEnd - m_bufferStartOffset;
+    if (drop > 0 && drop <= m_buffer.size()) {
+        m_buffer.remove(0, drop);
+        m_bufferStartOffset = m_lastUnitEnd;
+    }
 }
 
 }  // namespace QXmpp::Private

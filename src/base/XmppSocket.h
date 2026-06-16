@@ -96,11 +96,17 @@ private:
     void setSocket(QSslSocket *socket);
     void throwError(const QString &text, StreamError condition);
     void processData(const QString &data);
+    QString slice(qint64 absStart, qint64 absEnd) const;
+    qint64 unitStart() const;
 
     friend class ::tst_QXmppStream;
 
     QXmlStreamReader m_reader;
     std::optional<DomReader> m_domReader;
+    QString m_buffer;                // exact decoded on-wire text not yet discarded
+    qint64 m_bufferStartOffset = 0;  // absolute char offset of m_buffer[0]
+    qint64 m_lastUnitEnd = 0;        // absolute offset just past the last handled top-level unit (or XML declaration)
+    qint64 m_stanzaStartOffset = 0;  // absolute char offset of '<' of the stanza currently being parsed
     bool m_streamReceived = false;
     bool m_directTls = false;
     bool m_acceptInput = true;

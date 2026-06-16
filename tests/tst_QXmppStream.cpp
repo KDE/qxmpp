@@ -4,6 +4,7 @@
 
 #include "QXmppBindIq.h"
 #include "QXmppConstants_p.h"
+#include "QXmppLogger.h"
 
 #include "Stream.h"
 #include "StreamError.h"
@@ -24,6 +25,7 @@ class tst_QXmppStream : public QObject
 private:
     Q_SLOT void initTestCase();
     Q_SLOT void testProcessData();
+    Q_SLOT void testLogReceived();
     Q_SLOT void streamOpen();
     Q_SLOT void testStreamError();
     Q_SLOT void starttlsPackets();
@@ -104,6 +106,104 @@ void tst_QXmppStream::testProcessData()
     QCOMPARE(message.namespaceURI(), u"jabber:client"_s);
 
     socket.processData(R"(</stream:stream>)");
+}
+
+void tst_QXmppStream::testLogReceived()
+{
+    XmppSocket socket(this);
+
+    QSignalSpy onStanzaReceived(&socket, &XmppSocket::stanzaReceived);
+    QSignalSpy onStreamClosed(&socket, &XmppSocket::streamClosed);
+    QSignalSpy onLog(&socket, &XmppSocket::logMessage);
+
+    // collect the text of all 'received' log messages emitted so far
+    auto received = [&onLog]() {
+        QStringList out;
+        for (const auto &args : onLog) {
+            if (args.at(0).toInt() == QXmppLogger::ReceivedMessage) {
+                out << args.at(1).toString();
+            }
+        }
+        return out;
+    };
+
+    // The XML declaration arrives separately, as real servers send it. It is not
+    // logged as a unit; the stream-open header is logged exactly, without it.
+    socket.processData(uR"(<?xml version="1.0" encoding="UTF-8"?>)"_s);
+    socket.processData(uR"(<stream:stream from='juliet@im.example.com' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>)"_s);
+    QCOMPARE(received().size(), 1);
+    QVERIFY(received().constLast().trimmed().startsWith(u"<stream:stream"));
+    QVERIFY(received().constLast().trimmed().endsWith(u">"));
+    QVERIFY(!received().constLast().contains(u"<?xml"));
+
+    // A complete stanza is logged byte-for-byte as received (original namespace
+    // prefixes and indentation preserved, no QDom 'n1'/'n2' normalization).
+    const auto features = uR"(<stream:features>
+            <starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'>
+                <required/>
+            </starttls>
+        </stream:features>)"_s;
+    socket.processData(features);
+    QCOMPARE(received().size(), 2);
+    QCOMPARE(received().constLast(), features);
+
+    // An empty (socket-level) ping is not logged, but still emits an (empty) stanza
+    // so the keepalive/timeout logic keeps reacting to it.
+    auto logsBefore = received().size();
+    auto stanzasBefore = onStanzaReceived.size();
+    socket.processData({});
+    QCOMPARE(received().size(), logsBefore);
+    QCOMPARE(onStanzaReceived.size(), stanzasBefore + 1);
+
+    // A whitespace ping between stanzas is not logged either, but still emits an
+    // (empty) keepalive stanza. The reader only yields the whitespace token once the
+    // following stanza arrives, which is then logged on its own (without the
+    // whitespace), exactly as received.
+    logsBefore = received().size();
+    stanzasBefore = onStanzaReceived.size();
+    socket.processData(u" \n\t "_s);
+    socket.processData(u"<iq id='1'/>"_s);
+    QCOMPARE(received().size(), logsBefore + 1);
+    QCOMPARE(received().constLast(), u"<iq id='1'/>"_s);
+    QCOMPARE(onStanzaReceived.size(), stanzasBefore + 2);  // keepalive + the <iq/>
+
+    // A stanza split across several chunks (including a split inside the start tag
+    // and inside the body) is logged exactly once, as the full reassembled stanza.
+    logsBefore = received().size();
+    socket.processData(uR"(<message from="juliet@im.example.co)"_s);
+    socket.processData(uR"(m" to="stpeter@im.example.com"><body>Mo)"_s);
+    socket.processData(uR"(in</body></message>)"_s);
+    QCOMPARE(received().size(), logsBefore + 1);
+    QCOMPARE(received().constLast(),
+             uR"(<message from="juliet@im.example.com" to="stpeter@im.example.com"><body>Moin</body></message>)"_s);
+
+    // Multibyte (ö) and surrogate-pair (emoji) content stays byte-exact: proves the
+    // character-offset slicing stays aligned with the UTF-16 QString buffer.
+    const auto emojiMsg = u"<message><body>Möin \U0001F600</body></message>"_s;
+    logsBefore = received().size();
+    socket.processData(emojiMsg);
+    QCOMPARE(received().size(), logsBefore + 1);
+    QCOMPARE(received().constLast(), emojiMsg);
+
+    // ... and the same with a chunk boundary before the emoji.
+    logsBefore = received().size();
+    socket.processData(u"<message><body>Mö"_s);
+    socket.processData(u"in \U0001F600</body></message>"_s);
+    QCOMPARE(received().size(), logsBefore + 1);
+    QCOMPARE(received().constLast(), emojiMsg);
+
+    // Self-closing top-level stanza.
+    logsBefore = received().size();
+    socket.processData(u"<presence/>"_s);
+    QCOMPARE(received().size(), logsBefore + 1);
+    QCOMPARE(received().constLast(), u"<presence/>"_s);
+
+    // Stream close is logged and emits streamClosed().
+    logsBefore = received().size();
+    socket.processData(u"</stream:stream>"_s);
+    QCOMPARE(received().size(), logsBefore + 1);
+    QCOMPARE(received().constLast(), u"</stream:stream>"_s);
+    QCOMPARE(onStreamClosed.size(), 1);
 }
 
 void tst_QXmppStream::streamOpen()
