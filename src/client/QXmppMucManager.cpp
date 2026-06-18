@@ -357,7 +357,7 @@ void QXmppMucRoom::setNickName(const QString &nickName)
 QString QXmppMucRoom::participantFullJid(const QString &jid) const
 {
     if (d->participants.contains(jid)) {
-        return d->participants.value(jid).mucItem().jid();
+        return d->participants.value(jid).mucParticipantItem().jid();
     } else {
         return QString();
     }
@@ -577,18 +577,18 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
         // refresh allowed actions
         if (jid == d->ownJid()) {
 
-            QXmppMucItem mucItem = presence.mucItem();
+            auto mucItem = presence.mucParticipantItem();
             Actions newActions = NoAction;
 
             // role
-            if (mucItem.role() == QXmppMucItem::ModeratorRole) {
+            if (mucItem.role() == Muc::Role::Moderator) {
                 newActions |= (KickAction | SubjectAction);
             }
 
             // affiliation
-            if (mucItem.affiliation() == QXmppMucItem::OwnerAffiliation) {
+            if (mucItem.affiliation() == Muc::Affiliation::Owner) {
                 newActions |= (ConfigurationAction | PermissionsAction | SubjectAction);
-            } else if (mucItem.affiliation() == QXmppMucItem::AdminAffiliation) {
+            } else if (mucItem.affiliation() == Muc::Affiliation::Admin) {
                 newActions |= (PermissionsAction | SubjectAction);
             }
 
@@ -640,7 +640,7 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
 
             // check whether this was our own presence
             if (jid == d->ownJid()) {
-                const QString newNick = presence.mucItem().nick();
+                const QString newNick = presence.mucParticipantItem().nick();
                 if (!newNick.isEmpty() && newNick != d->nickName) {
                     d->nickName = newNick;
                     Q_EMIT nickNameChanged(newNick);
@@ -649,8 +649,8 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
 
                 // check whether we were kicked
                 if (presence.mucStatusCodes().contains(307)) {
-                    const QString actor = presence.mucItem().actor();
-                    const QString reason = presence.mucItem().reason();
+                    const QString actor = presence.mucParticipantItem().actor();
+                    const QString reason = presence.mucParticipantItem().reason();
                     Q_EMIT kicked(actor, reason);
                 }
 

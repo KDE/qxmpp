@@ -1682,7 +1682,7 @@ void tst_QXmppIq::rosterVersion()
 
     QXmppRosterIq iq;
     parsePacket(iq, xml);
-    QCOMPARE(iq.version(), version);
+    QCOMPARE(iq.versionOpt().value_or(QString()), version);
     serializePacket(iq, xml);
 }
 

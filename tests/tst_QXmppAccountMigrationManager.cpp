@@ -27,7 +27,7 @@ bool operator==(const QXmppRosterIq::Item &left, const QXmppRosterIq::Item &righ
 
 bool operator==(const QXmppRosterIq &left, const QXmppRosterIq &right)
 {
-    return left.version() == right.version() && left.items() == right.items() &&
+    return left.versionOpt() == right.versionOpt() && left.items() == right.items() &&
         left.mixAnnotate() == right.mixAnnotate();
 }
 

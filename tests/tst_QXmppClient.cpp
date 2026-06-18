@@ -281,11 +281,11 @@ void tst_QXmppClient::testTaskThenChainSuspended()
     QCOMPARE(chainedTask.takeResult(), u"42"_s);
 }
 
-using DiscoResult = std::variant<QXmppDiscoveryIq, QXmppError>;
+using RosterResult = std::variant<QXmppRosterIq, QXmppError>;
 
-static QXmppTask<DiscoResult> parseIqResult(QXmppTask<QXmppClient::IqResult> &&sendTask, QObject *context)
+static QXmppTask<RosterResult> parseIqResult(QXmppTask<QXmppClient::IqResult> &&sendTask, QObject *context)
 {
-    co_return parseIq<QXmppDiscoveryIq>(co_await sendTask);
+    co_return parseIq<QXmppRosterIq>(co_await sendTask);
 }
 
 void tst_QXmppClient::testChainIq()
@@ -299,17 +299,16 @@ void tst_QXmppClient::testChainIq()
 
     iqP.finish(xmlToDom(
         "<iq id='qx1' from='user@example.org' type='result'>"
-        "<query xmlns='http://jabber.org/protocol/disco#info'>"
-        "<identity category='pubsub' type='service'/>"
-        "<feature var='http://jabber.org/protocol/pubsub'/>"
-        "<feature var='urn:xmpp:mix:core:1'/>"
+        "<query xmlns='jabber:iq:roster'>"
+        "<item jid='romeo@example.org'/>"
+        "<item jid='juliet@example.org'/>"
         "</query>"
         "</iq>"));
 
     QVERIFY(parsingTask.isFinished());
     auto result = parsingTask.result();
-    QVERIFY(std::holds_alternative<QXmppDiscoveryIq>(result));
-    QCOMPARE(std::get<QXmppDiscoveryIq>(result).features().size(), 2);
+    QVERIFY(std::holds_alternative<QXmppRosterIq>(result));
+    QCOMPARE(std::get<QXmppRosterIq>(result).items().size(), 2);
 }
 
 void tst_QXmppClient::colorGeneration()
