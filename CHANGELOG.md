@@ -4,6 +4,57 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.16.0 (unreleased)
+-------------------------
+
+ - New MUC implementation `QXmppMucManagerV2` with a modern, reactive,
+   coroutine-based API (API not finalized yet) (@lnj, !746)
+   - Room joining with history options, join timeout and password support
+     (XEP-0045 §7.2)
+   - Message handling: `messageReceived` signal, `sendMessage()` with
+     reflection matching and `sendPrivateMessage()`
+   - Presence/state control: `setPresence()` (§7.7), `setNickname()`,
+     `setSubject()` and `leave()` (§7.14)
+   - `QXmppMucParticipant` handle with `participantJoined`/`Left` signals,
+     nickname-change tracking and `selfParticipant()`
+   - Roles and affiliations: `setRole()`, `setAffiliation()`,
+     `requestAffiliationList()` and batch `setRoles()`/`setAffiliations()`
+     (§8.5) via the new `QXmpp::Muc::Item` type
+   - Reactive room properties (`QBindable`): permissions, description,
+     language, contact JIDs, full `muc#roominfo` form and room type
+   - Room creation, configuration and destruction (`QXmpp::Muc::Destroy`,
+     §10.9) with config caching and `subscribeToRoomConfig()`
+   - Kick/ban handling for status codes 301/307/321/332 with a typed
+     `QXmpp::Muc::LeaveReason`
+   - Mediated (§7.8.2) and direct (XEP-0249) invitations
+   - Voice requests via `QXmppMucVoiceRequest` (§7.13/§8.6)
+   - Reserved nickname discovery (§7.12) and room registration (§7.10)
+   - Self-ping (XEP-0410), occupant ID (XEP-0421), unique room names
+     (XEP-0307) and message activity indicator (XEP-0502)
+   - Reactive avatar API and memory-safe shared-ownership handles
+   - Add `muc_bot` example
+ - Message: Add `hasSubject()`, `setSubject(std::optional<QString>)` and
+   the `mucVoiceRequest()` accessor (@lnj, !746)
+ - DiscoveryManager: Add generic service discovery watch API
+   (`QXmppDiscoServicesWatch`), used by the HTTP upload, MIX and MUC
+   managers (@lnj, !766)
+ - MixManager: Remove ejabberd conference/text identity workaround (@lnj, !766)
+ - RosterManager: Implement roster versioning cache (XEP-0237 / RFC 6121
+   §2.6) (@lnj, !774)
+ - RosterManager: Add method to update roster groups (@lnj, !782)
+ - Add dynamic XML extension support: `QXmpp::Xml::Element` generic element
+   type, `Xml::Registry`/`Xml::Extensions` and stanza hooks (@lnj, !777)
+ - FileSharing: Make the `disposition` attribute optional (@lnj, !779) and
+   serialize QUrls percent-encoded (@lnj, !780)
+ - Logger: Pretty-print and ANSI-syntax-highlight XML debug output and style
+   log headers with a colored type chip, direction arrows and timestamp
+   (@lnj, !773)
+ - XmppSocket: Log received XML per complete stanza and skip whitespace
+   pings (@lnj, !783)
+ - Migrate the API documentation from Doxygen to QDoc and enable
+   documentation generation by default (@lnj, !776)
+ - Examples: Add OMEMO echo client example (@shibe, !750)
+
 QXmpp 1.15.1 (April 10, 2026)
 -----------------------------
 
