@@ -4,8 +4,8 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.16.0 (unreleased)
--------------------------
+QXmpp 1.16.0 (June 23, 2026)
+----------------------------
 
  - New MUC implementation `QXmppMucManagerV2` with a modern, reactive,
    coroutine-based API (API not finalized yet) (@lnj, !746)
