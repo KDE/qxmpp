@@ -10,11 +10,20 @@
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoEnvelope_p.h"
 #include "QXmppOmemoIq_p.h"
+#include "QXmppUtils.h"
 #include "QXmppXmlRegistry.h"
 
+#include "Omemo0Data.h"
 #include "util.h"
 
 #include <QObject>
+
+namespace Omemo0 = QXmpp::Private::Omemo0;
+
+// base64 test vectors for the legacy OMEMO tests
+constexpr auto omemo0Data1 = "Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK";
+constexpr auto omemo0Data2 = "a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK";
+constexpr auto omemo0Data3 = "PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K";
 
 /*!
     Serializes data and compares it to multiple XML representations.
@@ -66,6 +75,26 @@ private:
     Q_SLOT void testOmemoElement();
     Q_SLOT void testMessageOmemoElement();
     Q_SLOT void testOmemoIq();
+
+    // legacy OMEMO (eu.siacs.conversations.axolotl)
+    Q_SLOT void testIsOmemo0Envelope_data();
+    Q_SLOT void testIsOmemo0Envelope();
+    Q_SLOT void testOmemo0Envelope_data();
+    Q_SLOT void testOmemo0Envelope();
+    Q_SLOT void testIsOmemo0Element_data();
+    Q_SLOT void testIsOmemo0Element();
+    Q_SLOT void testOmemo0Element();
+    Q_SLOT void testOmemo0ElementWithoutPayload();
+    Q_SLOT void testMessageOmemo0Element();
+    Q_SLOT void testIsOmemo0DeviceElement_data();
+    Q_SLOT void testIsOmemo0DeviceElement();
+    Q_SLOT void testOmemo0DeviceElement();
+    Q_SLOT void testIsOmemo0DeviceList_data();
+    Q_SLOT void testIsOmemo0DeviceList();
+    Q_SLOT void testOmemo0DeviceList();
+    Q_SLOT void testIsOmemo0DeviceBundle_data();
+    Q_SLOT void testIsOmemo0DeviceBundle();
+    Q_SLOT void testOmemo0DeviceBundle();
 };
 
 void tst_QXmppOmemoData::testIsOmemoDeviceElement_data()
@@ -695,6 +724,346 @@ void tst_QXmppOmemoData::testOmemoIq()
     omemoIq2.setOmemoElement(omemoElement);
     QCOMPARE(omemoIq2.omemoElement().payload(), QByteArray::fromBase64(omemoPayload));
     serializePacket(omemoIq2, xmlOmemoIq);
+}
+
+void tst_QXmppOmemoData::testIsOmemo0Envelope_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isValid");
+
+    QTest::newRow("valid")
+        << QByteArrayLiteral("<key xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << true;
+    QTest::newRow("invalidTag")
+        << QByteArrayLiteral("<invalid xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << false;
+    QTest::newRow("omemo2Namespace")
+        << QByteArrayLiteral("<key xmlns=\"urn:xmpp:omemo:2\"/>")
+        << false;
+}
+
+void tst_QXmppOmemoData::testIsOmemo0Envelope()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isValid);
+    QCOMPARE(QXmpp::isElement<Omemo0::Envelope>(xmlToDom(xml)), isValid);
+}
+
+void tst_QXmppOmemoData::testOmemo0Envelope_data()
+{
+    // The <key/> element inherits its namespace from the <header/> parent and
+    // is serialized without an explicit xmlns. The parse input therefore carries
+    // the namespace while the serialized form omits it.
+    QTest::addColumn<QByteArray>("parseXml");
+    QTest::addColumn<QByteArray>("serializedXml");
+    QTest::addColumn<uint32_t>("recipientDeviceId");
+    QTest::addColumn<bool>("isUsedForKeyExchange");
+    QTest::addColumn<QByteArray>("data");
+
+    QTest::newRow("key")
+        << QByteArrayLiteral("<key xmlns=\"eu.siacs.conversations.axolotl\" rid=\"1337\">PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K</key>")
+        << QByteArrayLiteral("<key rid=\"1337\">PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K</key>")
+        << uint32_t(1337)
+        << false
+        << QByteArrayLiteral("PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K");
+    QTest::newRow("preKey")
+        << QByteArrayLiteral("<key xmlns=\"eu.siacs.conversations.axolotl\" rid=\"12321\" prekey=\"true\">a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK</key>")
+        << QByteArrayLiteral("<key rid=\"12321\" prekey=\"true\">a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK</key>")
+        << uint32_t(12321)
+        << true
+        << QByteArrayLiteral("a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK");
+}
+
+void tst_QXmppOmemoData::testOmemo0Envelope()
+{
+    QFETCH(QByteArray, parseXml);
+    QFETCH(QByteArray, serializedXml);
+    QFETCH(uint32_t, recipientDeviceId);
+    QFETCH(bool, isUsedForKeyExchange);
+    QFETCH(QByteArray, data);
+
+    auto envelope = Omemo0::Envelope::fromDom(xmlToDom(parseXml));
+    QVERIFY(envelope);
+    QCOMPARE(envelope->recipientDeviceId, recipientDeviceId);
+    QCOMPARE(envelope->isUsedForKeyExchange, isUsedForKeyExchange);
+    QCOMPARE(envelope->data.toBase64(), data);
+    serializePacket(*envelope, serializedXml);
+
+    Omemo0::Envelope envelope2 {
+        .recipientDeviceId = recipientDeviceId,
+        .isUsedForKeyExchange = isUsedForKeyExchange,
+        .data = QByteArray::fromBase64(data),
+    };
+    serializePacket(envelope2, serializedXml);
+}
+
+void tst_QXmppOmemoData::testIsOmemo0Element_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isValid");
+
+    QTest::newRow("valid")
+        << QByteArrayLiteral("<encrypted xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << true;
+    QTest::newRow("invalidTag")
+        << QByteArrayLiteral("<invalid xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << false;
+    QTest::newRow("omemo2Namespace")
+        << QByteArrayLiteral("<encrypted xmlns=\"urn:xmpp:omemo:2\"/>")
+        << false;
+}
+
+void tst_QXmppOmemoData::testIsOmemo0Element()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isValid);
+    QCOMPARE(QXmpp::isElement<Omemo0::Element>(xmlToDom(xml)), isValid);
+}
+
+void tst_QXmppOmemoData::testOmemo0Element()
+{
+    const QByteArray xml(QByteArrayLiteral(
+        "<encrypted xmlns=\"eu.siacs.conversations.axolotl\">"
+        "<header sid=\"27183\">"
+        "<key rid=\"31415\">Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK</key>"
+        "<key rid=\"12321\" prekey=\"true\">a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK</key>"
+        "<iv>PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K</iv>"
+        "</header>"
+        "<payload>Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK</payload>"
+        "</encrypted>"));
+
+    auto element = Omemo0::Element::fromDom(xmlToDom(xml));
+    QVERIFY(element);
+    QCOMPARE(element->senderDeviceId, uint32_t(27183));
+
+    // flat key list, order preserved
+    QCOMPARE(element->envelopes.size(), 2);
+    QCOMPARE(element->envelopes.at(0).recipientDeviceId, uint32_t(31415));
+    QVERIFY(!element->envelopes.at(0).isUsedForKeyExchange);
+    QCOMPARE(element->envelopes.at(0).data.toBase64(), QByteArray(omemo0Data1));
+    QCOMPARE(element->envelopes.at(1).recipientDeviceId, uint32_t(12321));
+    QVERIFY(element->envelopes.at(1).isUsedForKeyExchange);
+    QCOMPARE(element->envelopes.at(1).data.toBase64(), QByteArray(omemo0Data2));
+
+    QCOMPARE(element->iv.toBase64(), QByteArray(omemo0Data3));
+    QVERIFY(element->payload);
+    QCOMPARE(element->payload->toBase64(), QByteArray(omemo0Data1));
+
+    serializePacket(*element, xml);
+
+    // build the same element from aggregate initializers
+    Omemo0::Element element2 {
+        .senderDeviceId = 27183,
+        .iv = QByteArray::fromBase64(omemo0Data3),
+        .payload = QByteArray::fromBase64(omemo0Data1),
+        .envelopes = {
+            Omemo0::Envelope { .recipientDeviceId = 31415, .data = QByteArray::fromBase64(omemo0Data1) },
+            Omemo0::Envelope { .recipientDeviceId = 12321, .isUsedForKeyExchange = true, .data = QByteArray::fromBase64(omemo0Data2) },
+        },
+    };
+    serializePacket(element2, xml);
+}
+
+void tst_QXmppOmemoData::testOmemo0ElementWithoutPayload()
+{
+    // KeyTransportElement: no <payload>
+    const QByteArray xml(QByteArrayLiteral(
+        "<encrypted xmlns=\"eu.siacs.conversations.axolotl\">"
+        "<header sid=\"27183\">"
+        "<key rid=\"31415\">Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK</key>"
+        "<iv>PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K</iv>"
+        "</header>"
+        "</encrypted>"));
+
+    auto element = Omemo0::Element::fromDom(xmlToDom(xml));
+    QVERIFY(element);
+    QCOMPARE(element->envelopes.size(), 1);
+    QVERIFY(!element->payload);
+    serializePacket(*element, xml);
+}
+
+void tst_QXmppOmemoData::testMessageOmemo0Element()
+{
+    QXmpp::Xml::Registry::registerElement<Omemo0::Element>(QXmpp::Xml::Scope::Message);
+
+    const QByteArray xml(QByteArrayLiteral(
+        "<message to=\"juliet@capulet.lit\" from=\"romeo@montague.lit\" type=\"chat\">"
+        "<encrypted xmlns=\"eu.siacs.conversations.axolotl\">"
+        "<header sid=\"27183\">"
+        "<key rid=\"31415\">Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK</key>"
+        "<iv>PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K</iv>"
+        "</header>"
+        "<payload>Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK</payload>"
+        "</encrypted>"
+        "</message>"));
+
+    QXmppMessage message;
+    message.parse(xmlToDom(xml));
+
+    auto element = message.extensions().get<Omemo0::Element>();
+    QVERIFY(element.has_value());
+    QCOMPARE(element->senderDeviceId, uint32_t(27183));
+    QCOMPARE(element->envelopes.size(), 1);
+    QCOMPARE(element->envelopes.at(0).recipientDeviceId, uint32_t(31415));
+    QVERIFY(element->payload);
+    QCOMPARE(element->payload->toBase64(), QByteArray(omemo0Data1));
+
+    QXmpp::Xml::Registry::unregisterElement<Omemo0::Element>();
+}
+
+void tst_QXmppOmemoData::testIsOmemo0DeviceElement_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isValid");
+
+    QTest::newRow("valid")
+        << QByteArrayLiteral("<device xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << true;
+    QTest::newRow("invalidTag")
+        << QByteArrayLiteral("<invalid xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << false;
+    QTest::newRow("omemo2Namespace")
+        << QByteArrayLiteral("<device xmlns=\"urn:xmpp:omemo:2\"/>")
+        << false;
+}
+
+void tst_QXmppOmemoData::testIsOmemo0DeviceElement()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isValid);
+    QCOMPARE(QXmpp::isElement<Omemo0::DeviceElement>(xmlToDom(xml)), isValid);
+}
+
+void tst_QXmppOmemoData::testOmemo0DeviceElement()
+{
+    // <device/> inherits the namespace from <list/> and is serialized without
+    // an explicit xmlns.
+    const QByteArray parseXml(QByteArrayLiteral("<device xmlns=\"eu.siacs.conversations.axolotl\" id=\"12345\"/>"));
+    const QByteArray serializedXml(QByteArrayLiteral("<device id=\"12345\"/>"));
+
+    auto deviceElement = Omemo0::DeviceElement::fromDom(xmlToDom(parseXml));
+    QVERIFY(deviceElement);
+    QCOMPARE(deviceElement->id, uint32_t(12345));
+    serializePacket(*deviceElement, serializedXml);
+
+    Omemo0::DeviceElement deviceElement2 { .id = 12345 };
+    serializePacket(deviceElement2, serializedXml);
+}
+
+void tst_QXmppOmemoData::testIsOmemo0DeviceList_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isValid");
+
+    QTest::newRow("valid")
+        << QByteArrayLiteral("<list xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << true;
+    QTest::newRow("omemo2Tag")
+        << QByteArrayLiteral("<devices xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << false;
+    QTest::newRow("omemo2Namespace")
+        << QByteArrayLiteral("<list xmlns=\"urn:xmpp:omemo:2\"/>")
+        << false;
+}
+
+void tst_QXmppOmemoData::testIsOmemo0DeviceList()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isValid);
+    QCOMPARE(QXmpp::isElement<Omemo0::DeviceList>(xmlToDom(xml)), isValid);
+}
+
+void tst_QXmppOmemoData::testOmemo0DeviceList()
+{
+    const QByteArray xml(QByteArrayLiteral(
+        "<list xmlns=\"eu.siacs.conversations.axolotl\">"
+        "<device id=\"12345\"/>"
+        "<device id=\"4223\"/>"
+        "</list>"));
+
+    auto deviceList = Omemo0::DeviceList::fromDom(xmlToDom(xml));
+    QVERIFY(deviceList);
+    QCOMPARE(deviceList->devices.size(), 2);
+    QVERIFY(deviceList->devices.contains(Omemo0::DeviceElement { .id = 12345 }));
+    QVERIFY(deviceList->devices.contains(Omemo0::DeviceElement { .id = 4223 }));
+    serializePacket(*deviceList, xml);
+
+    Omemo0::DeviceList deviceList2 {
+        .devices = { Omemo0::DeviceElement { .id = 12345 }, Omemo0::DeviceElement { .id = 4223 } },
+    };
+    serializePacket(deviceList2, xml);
+}
+
+void tst_QXmppOmemoData::testIsOmemo0DeviceBundle_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isValid");
+
+    QTest::newRow("valid")
+        << QByteArrayLiteral("<bundle xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << true;
+    QTest::newRow("invalidTag")
+        << QByteArrayLiteral("<invalid xmlns=\"eu.siacs.conversations.axolotl\"/>")
+        << false;
+    QTest::newRow("omemo2Namespace")
+        << QByteArrayLiteral("<bundle xmlns=\"urn:xmpp:omemo:2\"/>")
+        << false;
+}
+
+void tst_QXmppOmemoData::testIsOmemo0DeviceBundle()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isValid);
+    QCOMPARE(QXmpp::isElement<Omemo0::DeviceBundle>(xmlToDom(xml)), isValid);
+}
+
+void tst_QXmppOmemoData::testOmemo0DeviceBundle()
+{
+    // The pre keys are stored in a hash, so the order is not fixed. Two
+    // representations are accepted by serializePacket().
+    const QByteArray xml1(QByteArrayLiteral(
+        "<bundle xmlns=\"eu.siacs.conversations.axolotl\">"
+        "<signedPreKeyPublic signedPreKeyId=\"1\">Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK</signedPreKeyPublic>"
+        "<signedPreKeySignature>PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K</signedPreKeySignature>"
+        "<identityKey>a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK</identityKey>"
+        "<prekeys>"
+        "<preKeyPublic preKeyId=\"1\">eDM2cnBiTmo4MmRGQ1RYTkZ0YnVwajJtNWdPdzkxZ0gK</preKeyPublic>"
+        "<preKeyPublic preKeyId=\"2\">aDRHdkcxNDNYUmJSNWVObnNWd0RCSzE1QlVKVGQ1RVEK</preKeyPublic>"
+        "</prekeys>"
+        "</bundle>"));
+    const QByteArray xml2(QByteArrayLiteral(
+        "<bundle xmlns=\"eu.siacs.conversations.axolotl\">"
+        "<signedPreKeyPublic signedPreKeyId=\"1\">Oy5TSG9vVVV4Wz9wUkUvI1lUXiVLIU5bbGIsUV0wRngK</signedPreKeyPublic>"
+        "<signedPreKeySignature>PTEoSk91VnRZSXBzcFlPXy4jZ3NKcGVZZ2d3YVJbVj8K</signedPreKeySignature>"
+        "<identityKey>a012U0R9WixWKUYhYipucnZOWG06akFOR3Q1NGNOOmUK</identityKey>"
+        "<prekeys>"
+        "<preKeyPublic preKeyId=\"2\">aDRHdkcxNDNYUmJSNWVObnNWd0RCSzE1QlVKVGQ1RVEK</preKeyPublic>"
+        "<preKeyPublic preKeyId=\"1\">eDM2cnBiTmo4MmRGQ1RYTkZ0YnVwajJtNWdPdzkxZ0gK</preKeyPublic>"
+        "</prekeys>"
+        "</bundle>"));
+
+    QHash<uint32_t, QByteArray> expectedPreKeys = {
+        { 1, QByteArray::fromBase64(QByteArrayLiteral("eDM2cnBiTmo4MmRGQ1RYTkZ0YnVwajJtNWdPdzkxZ0gK")) },
+        { 2, QByteArray::fromBase64(QByteArrayLiteral("aDRHdkcxNDNYUmJSNWVObnNWd0RCSzE1QlVKVGQ1RVEK")) },
+    };
+
+    auto bundle = Omemo0::DeviceBundle::fromDom(xmlToDom(xml1));
+    QVERIFY(bundle);
+    QCOMPARE(bundle->publicIdentityKey.toBase64(), QByteArray(omemo0Data2));
+    QCOMPARE(bundle->signedPublicPreKeyId, uint32_t(1));
+    QCOMPARE(bundle->signedPublicPreKey.toBase64(), QByteArray(omemo0Data1));
+    QCOMPARE(bundle->signedPublicPreKeySignature.toBase64(), QByteArray(omemo0Data3));
+    QCOMPARE(bundle->publicPreKeys, expectedPreKeys);
+    serializePacket(*bundle, { xml1, xml2 });
+
+    Omemo0::DeviceBundle bundle2 {
+        .publicIdentityKey = QByteArray::fromBase64(omemo0Data2),
+        .signedPublicPreKey = QByteArray::fromBase64(omemo0Data1),
+        .signedPublicPreKeyId = 1,
+        .signedPublicPreKeySignature = QByteArray::fromBase64(omemo0Data3),
+        .publicPreKeys = expectedPreKeys,
+    };
+    serializePacket(bundle2, { xml1, xml2 });
 }
 
 QTEST_MAIN(tst_QXmppOmemoData)
