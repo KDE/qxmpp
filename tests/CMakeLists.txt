@@ -53,6 +53,7 @@ add_simple_test(Sasl)
 add_simple_test(Trust)
 
 if(BUILD_OMEMO)
+    add_simple_test(Omemo0Data)
     add_simple_test(OmemoData)
     add_simple_test(OmemoManager)
 endif()
