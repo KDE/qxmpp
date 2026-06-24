@@ -238,6 +238,8 @@ inline constexpr QStringView ns_mix_node_messages = u"urn:xmpp:mix:nodes:message
 inline constexpr QStringView ns_mix_node_participants = u"urn:xmpp:mix:nodes:participants";
 // XEP-0373: OpenPGP for XMPP
 inline constexpr QStringView ns_ox = u"urn:xmpp:openpgp:0";
+// XEP-0377: Blocking Command Reports
+inline constexpr QStringView ns_reporting = u"urn:xmpp:reporting:1";
 // XEP-0380: Explicit Message Encryption
 inline constexpr QStringView ns_eme = u"urn:xmpp:eme:0";
 // XEP-0382: Spoiler messages

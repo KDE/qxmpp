@@ -83,6 +83,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppSasl2UserAgent.h
     base/QXmppSendResult.h
     base/QXmppSocks.h
+    base/QXmppSpamReport.h
     base/QXmppStanza.h
     base/QXmppStanzaId.h
     base/QXmppStreamError.h
@@ -243,6 +244,7 @@ set(SOURCE_FILES
     base/QXmppRpcIq.cpp
     base/QXmppSasl.cpp
     base/QXmppSocks.cpp
+    base/QXmppSpamReport.cpp
     base/QXmppStanza.cpp
     base/QXmppStreamFeatures.cpp
     base/QXmppStreamInitiationIq.cpp
