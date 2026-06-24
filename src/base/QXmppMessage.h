@@ -13,6 +13,7 @@
 #include "QXmppFileShare.h"
 #include "QXmppMucData.h"
 #include "QXmppStanza.h"
+#include "QXmppStanzaId.h"
 #include "QXmppXmlExtensions.h"
 
 #include <optional>
@@ -54,13 +55,6 @@ struct Reply {
 };
 
 }  // namespace QXmpp
-
-struct QXmppStanzaId {
-    /*! Identifier of the stanza element */
-    QString id;
-    /*! JID of the generating entity */
-    QString by;
-};
 
 /*!
     \inmodule QXmpp

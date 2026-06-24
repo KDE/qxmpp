@@ -47,6 +47,28 @@ using namespace QXmpp;
 using namespace QXmpp::Private;
 namespace views = std::views;
 
+/// \cond
+std::optional<QXmppStanzaId> QXmppStanzaId::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return std::nullopt;
+    }
+    return QXmppStanzaId {
+        el.attribute(u"id"_s),
+        el.attribute(u"by"_s),
+    };
+}
+
+void QXmppStanzaId::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"id", id },
+        OptionalAttribute { u"by", by },
+    });
+}
+/// \endcond
+
 template<>
 struct Enums::Data<QXmppMessage::State> {
     using enum QXmppMessage::State;
@@ -104,15 +126,6 @@ static bool checkElement(const QDomElement &element, QStringView tagName, QStrin
 {
     return element.tagName() == tagName && element.namespaceURI() == xmlns;
 }
-
-/*!
-    \struct QXmppStanzaId
-    \inmodule QXmpp
-
-    \brief Stanza ID element as defined in \xep{0359}{Unique and Stable Stanza IDs}.
-
-    \since QXmpp 1.8
-*/
 
 enum StampType {
     LegacyDelayedDelivery,  // XEP-0091: Legacy Delayed Delivery

@@ -84,6 +84,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppSendResult.h
     base/QXmppSocks.h
     base/QXmppStanza.h
+    base/QXmppStanzaId.h
     base/QXmppStreamError.h
     base/QXmppStreamFeatures.h
     base/QXmppStun.h
