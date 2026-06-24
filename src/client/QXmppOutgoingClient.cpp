@@ -475,7 +475,7 @@ void QXmppOutgoingClient::startNonSaslAuth()
                 return;
             }
 
-            auto task = std::get<NonSaslAuthManager>(d->listener).authenticate(plainText, d->config.user(), d->config.password(), d->config.resource(), d->streamId);
+            auto task = std::get<NonSaslAuthManager>(d->listener).authenticate(plainText, d->config.user(), d->config.password(), chooseResource(d->config), d->streamId);
             task.then(this, [this](auto result) {
                 if (hasValue(result)) {
                     // successful Non-SASL Authentication
@@ -533,9 +533,23 @@ void QXmppOutgoingClient::startSmEnable()
     });
 }
 
+QString QXmpp::Private::chooseResource(const QXmppConfiguration &config)
+{
+    // use the explicitly configured resource if there is one
+    if (!config.resource().isEmpty()) {
+        return config.resource();
+    }
+    // otherwise generate "<resource-prefix>.<random-string>" from the prefix
+    if (!config.resourcePrefix().isEmpty()) {
+        return config.resourcePrefix() + u'.' + QXmppUtils::generateStanzaHash(6);
+    }
+    // no resource and no prefix: let the server assign a resource
+    return {};
+}
+
 void QXmppOutgoingClient::startResourceBinding()
 {
-    d->setListener<BindManager>(&d->socket).bindAddress(d->config.resource()).then(this, [this](BindManager::Result r) {
+    d->setListener<BindManager>(&d->socket).bindAddress(chooseResource(d->config)).then(this, [this](BindManager::Result r) {
         if (auto *addr = std::get_if<BoundAddress>(&r)) {
             d->config.setUser(addr->user);
             d->config.setDomain(addr->domain);

@@ -49,6 +49,12 @@ struct BoundAddress {
     QString resource;
 };
 
+// Determines the resource to request during client-side resource binding (i.e.
+// when Bind 2 is not used). Uses the explicitly configured resource if set,
+// otherwise generates "<resource-prefix>.<random-string>" from the configured
+// resource prefix.
+QString chooseResource(const QXmppConfiguration &config);
+
 // Resource Binding
 class BindManager
 {

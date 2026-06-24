@@ -49,6 +49,7 @@ private:
 #endif
 
     // outgoing client
+    Q_SLOT void chooseResource();
     Q_SLOT void csiManager();
     Q_SLOT void sasl2FastFallbackKeepsListener();
 
@@ -328,6 +329,33 @@ void tst_QXmppClient::colorGenerationQColor()
     QCOMPARE(color.red(), quint8(0.865 * 255));
 }
 #endif
+
+void tst_QXmppClient::chooseResource()
+{
+    QXmppConfiguration config;
+
+    // by default, a resource is generated from the default prefix "QXmpp"
+    QCOMPARE(config.resource(), QString());
+    QCOMPARE(config.resourcePrefix(), u"QXmpp"_s);
+    auto generated = QXmpp::Private::chooseResource(config);
+    QVERIFY(generated.startsWith(u"QXmpp."_s));
+    QVERIFY(generated.size() > QString(u"QXmpp.").size());
+    // a fresh resource is generated on each call
+    QVERIFY(QXmpp::Private::chooseResource(config) != generated);
+
+    // a custom prefix is used to generate the resource
+    config.setResourcePrefix(u"phone"_s);
+    QVERIFY(QXmpp::Private::chooseResource(config).startsWith(u"phone."_s));
+
+    // an explicitly set resource takes precedence over the prefix
+    config.setResource(u"laptop"_s);
+    QCOMPARE(QXmpp::Private::chooseResource(config), u"laptop"_s);
+
+    // without resource and prefix, the resource is left to the server
+    config.setResource({});
+    config.setResourcePrefix({});
+    QCOMPARE(QXmpp::Private::chooseResource(config), QString());
+}
 
 void tst_QXmppClient::csiManager()
 {

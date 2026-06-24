@@ -229,7 +229,7 @@ void tst_QXmppAccountMigrationManager::testRealImportExport()
     QVERIFY(!exportTask.isFinished());
 
     auto id = client->expectPacketRandomOrder(
-        u"<iq from='pasnox@xmpp.example/QXmpp' type='get'>"
+        u"<iq from='pasnox@xmpp.example' type='get'>"
         "<query xmlns='jabber:iq:roster' ver=''>"
         "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
         "</query>"
@@ -237,7 +237,7 @@ void tst_QXmppAccountMigrationManager::testRealImportExport()
     client->inject(packetToXml(newRoster(client.get(), 1, id, QXmppIq::Result)));
 
     id = client->expectPacketRandomOrder(
-        u"<iq from='pasnox@xmpp.example/QXmpp' type='get'>"
+        u"<iq from='pasnox@xmpp.example' type='get'>"
         "<query xmlns='jabber:iq:roster' ver=''>"
         "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
         "</query>"
@@ -350,7 +350,7 @@ void tst_QXmppAccountMigrationManager::testSerialization()
     auto exportTask = manager->exportData();
     QVERIFY(!exportTask.isFinished());
 
-    client->expect(u"<iq id='qx2' from='pasnox@xmpp.example/QXmpp' type='get'>"
+    client->expect(u"<iq id='qx2' from='pasnox@xmpp.example' type='get'>"
                    "<query xmlns='jabber:iq:roster' ver=''>"
                    "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
                    "</query>"
@@ -358,7 +358,7 @@ void tst_QXmppAccountMigrationManager::testSerialization()
     client->inject(packetToXml(newRoster(client.get(), 1, "qx2", QXmppIq::Result)));
 
     auto rosterPacketId = client->expectPacketRandomOrder(
-        u"<iq from='pasnox@xmpp.example/QXmpp' type='get'>"
+        u"<iq from='pasnox@xmpp.example' type='get'>"
         "<query xmlns='jabber:iq:roster' ver=''>"
         "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
         "</query>"

@@ -97,8 +97,8 @@ public:
     int port = XMPP_DEFAULT_PORT;
     QString user;
     QString domain;
-    QString resource = u"QXmpp"_s;
-    QString resourcePrefix;
+    QString resource;
+    QString resourcePrefix = u"QXmpp"_s;
     QXmppCredentials credentials;
 
     bool autoAcceptSubscriptions = false;
@@ -204,7 +204,10 @@ void QXmppConfiguration::setPassword(const QString &password)
     differentiated by the resource identifier of an XMPP address
     (e.g. node\@domain/home vs. node\@domain/work)
 
-    The default value is "QXmpp".
+    If no resource is set, the resource is generated when connecting: the
+    resource prefix (see setResourcePrefix()) is used as the \xep{0386}{Bind 2}
+    tag if Bind 2 is available, otherwise a resource of the form
+    "<resource-prefix>.<random-string>" is generated.
 
     \a resource is the resource identifier of the client in connection.
 */
@@ -214,7 +217,13 @@ void QXmppConfiguration::setResource(const QString &resource)
 }
 
 /*!
-    Returns the resource prefix ('tag' for this client) used when \xep{0386}{Bind 2} is available.
+    Returns the resource prefix ('tag' for this client).
+
+    The prefix is used as the \xep{0386}{Bind 2} tag if Bind 2 is available. If
+    no resource is set and Bind 2 is not available, a resource of the form
+    "<resource-prefix>.<random-string>" is generated from it.
+
+    The default value is "QXmpp".
 
     \since QXmpp 1.8
 */
@@ -224,7 +233,13 @@ QString QXmppConfiguration::resourcePrefix() const
 }
 
 /*!
-    Sets the resource prefix ('tag' for this client) used when \xep{0386}{Bind 2} is available.
+    Sets the resource prefix ('tag' for this client).
+
+    The prefix is used as the \xep{0386}{Bind 2} tag if Bind 2 is available. If
+    no resource is set and Bind 2 is not available, a resource of the form
+    "<resource-prefix>.<random-string>" is generated from it.
+
+    The default value is "QXmpp".
 
     \since QXmpp 1.8
 
@@ -295,7 +310,13 @@ QString QXmppConfiguration::password() const
     return credentialData().password;
 }
 
-/*! Returns the resource identifier. */
+/*!
+    Returns the resource identifier.
+
+    This is empty if no resource has been set explicitly and no connection has
+    been established yet. In that case the resource is generated when
+    connecting (see setResource() and setResourcePrefix()).
+*/
 QString QXmppConfiguration::resource() const
 {
     return d->resource;
@@ -309,9 +330,11 @@ QString QXmppConfiguration::jid() const
 {
     if (d->user.isEmpty()) {
         return d->domain;
-    } else {
-        return jidBare() + u'/' + d->resource;
     }
+    if (d->resource.isEmpty()) {
+        return jidBare();
+    }
+    return jidBare() + u'/' + d->resource;
 }
 
 /*!
