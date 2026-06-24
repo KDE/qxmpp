@@ -675,7 +675,7 @@ void ManagerPrivate::schedulePeriodicTasks()
 //
 void ManagerPrivate::renewSignedPreKeyPairs()
 {
-    const auto currentDate = QDateTime::currentDateTimeUtc().toSecsSinceEpoch() * 1s;
+    const auto currentDate = QDateTime::currentSecsSinceEpoch() * 1s;
     auto isSignedPreKeyPairRemoved = false;
 
     for (auto itr = signedPreKeyPairs.begin(); itr != signedPreKeyPairs.end();) {
@@ -867,7 +867,7 @@ bool ManagerPrivate::updatePreKeyPairs(uint32_t count)
 //
 void ManagerPrivate::removeDevicesRemovedFromServer()
 {
-    const auto currentDate = QDateTime::currentDateTimeUtc().toSecsSinceEpoch() * 1s;
+    const auto currentDate = QDateTime::currentSecsSinceEpoch() * 1s;
 
     for (auto itr = devices.begin(); itr != devices.end(); ++itr) {
         const auto &jid = itr.key();
