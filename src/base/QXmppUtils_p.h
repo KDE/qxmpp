@@ -43,7 +43,7 @@ concept IsStdOptional = requires {
 QXMPP_PRIVATE_EXPORT extern QAtomicInt globalStanzaIdCounter;
 
 // Base64
-std::optional<QByteArray> parseBase64(const QString &);
+QXMPP_EXPORT std::optional<QByteArray> parseBase64(const QString &);
 inline QString serializeBase64(const QByteArray &data) { return QString::fromUtf8(data.toBase64()); }
 
 // Integer parsing
