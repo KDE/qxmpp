@@ -93,6 +93,7 @@ if(WITH_GSTREAMER)
 endif()
 
 if(BUILD_OMEMO)
+    add_simple_test(QXmppOmemo0Data)
     add_simple_test(QXmppOmemoData)
     add_simple_test(QXmppOmemoMemoryStorage)
     add_simple_test(QXmppOmemoManager)
