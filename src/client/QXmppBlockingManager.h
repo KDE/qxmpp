@@ -13,6 +13,7 @@
 
 #include <QVector>
 
+class QXmppSpamReport;
 struct QXmppBlockingManagerPrivate;
 
 class QXMPP_EXPORT QXmppBlocklist
@@ -79,6 +80,8 @@ public:
     QXmppTask<Result> block(QVector<QString> jids);
     QXmppTask<Result> unblock(QString jid) { return unblock(QVector<QString> { std::move(jid) }); }
     QXmppTask<Result> unblock(QVector<QString> jids);
+
+    QXmppTask<Result> reportAndBlock(QString jid, QXmppSpamReport report);
 
     Q_SIGNAL void blocked(const QVector<QString> &jids);
     Q_SIGNAL void unblocked(const QVector<QString> &jids);

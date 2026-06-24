@@ -4,6 +4,7 @@
 
 #include "QXmppBlockingManager.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppSpamReport.h"
 
 #include "TestClient.h"
 
@@ -17,6 +18,8 @@ private:
     Q_SLOT void fetch();
     Q_SLOT void block();
     Q_SLOT void unblock();
+    Q_SLOT void reportAndBlock();
+    Q_SLOT void reportAndBlockFull();
     Q_SLOT void pushBlocked();
     Q_SLOT void blockedState();
 };
@@ -84,6 +87,41 @@ void tst_QXmppBlockingManager::unblock()
 
     auto task = m->unblock("romeo@montague.net");
     t.expect("<iq id='qx1' type='set'><unblock xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></unblock></iq>");
+    t.inject("<iq type='result' id='qx1'/>");
+    expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppBlockingManager::reportAndBlock()
+{
+    TestClient t;
+    t.configuration().setJid("juliet@capulet.com");
+    auto *m = t.addNewExtension<QXmppBlockingManager>();
+
+    auto task = m->reportAndBlock("romeo@montague.net", QXmppSpamReport(QXmppSpamReport::Reason::Spam));
+    t.expect("<iq id='qx1' type='set'><block xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'><report xmlns='urn:xmpp:reporting:1' reason='urn:xmpp:reporting:spam'/></item></block></iq>");
+    t.inject("<iq type='result' id='qx1'/>");
+    expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppBlockingManager::reportAndBlockFull()
+{
+    TestClient t;
+    t.configuration().setJid("juliet@capulet.com");
+    auto *m = t.addNewExtension<QXmppBlockingManager>();
+
+    QXmppSpamReport report(QXmppSpamReport::Reason::Abuse);
+    report.setText("please stop");
+    report.setTextLanguage("en");
+    report.setMessageReferences({ QXmppStanzaId { "28482-98726", "romeo@example.net" } });
+    report.setForwardToOrigin(true);
+    report.setForwardToThirdParty(true);
+
+    auto task = m->reportAndBlock("romeo@montague.net", report);
+    t.expect("<iq id='qx1' type='set'><block xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'>"
+             "<report xmlns='urn:xmpp:reporting:1' reason='urn:xmpp:reporting:abuse'>"
+             "<stanza-id xmlns='urn:xmpp:sid:0' id='28482-98726' by='romeo@example.net'/>"
+             "<text xml:lang='en'>please stop</text>"
+             "<report-origin/><third-party/></report></item></block></iq>");
     t.inject("<iq type='result' id='qx1'/>");
     expectFutureVariant<Success>(task);
 }

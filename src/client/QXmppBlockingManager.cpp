@@ -6,6 +6,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppSpamReport.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -60,6 +61,25 @@ struct Blocking {
     void toXml(XmlWriter &w) const
     {
         w.write(Element { XmlTag, SingleAttributeElements { u"item", u"jid", jids } });
+    }
+};
+
+// XEP-0377: block request carrying a spam report inside the <item/>
+struct BlockReport {
+    QString jid;
+    QXmppSpamReport report;
+
+    static constexpr std::tuple XmlTag = { u"block", ns_blocking };
+
+    // Only ever sent, never received.
+    bool parse(const QDomElement &) { return false; }
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element { XmlTag,
+                          Element {
+                              u"item",
+                              Attribute { u"jid", jid },
+                              report } });
     }
 };
 
@@ -280,6 +300,24 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QVector<QStr
     return client()->sendGenericIq(CompatIq {
         SetIq<Blocking<Block>> {
             generateSequentialStanzaId(), {}, {}, {}, { std::move(jids) } },
+    });
+}
+
+/*!
+    Blocks the JID \a jid and attaches a \xep{0377}{Blocking Command Reports} \a report.
+
+    The JID is blocked just like with block(); the report is only processed if the server
+    advertises the \c urn:xmpp:reporting:1 feature in its service discovery information.
+    Otherwise the JID is still blocked, but the report is silently ignored.
+
+    \since QXmpp 1.17
+    \sa block(), QXmppSpamReport
+*/
+QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::reportAndBlock(QString jid, QXmppSpamReport report)
+{
+    return client()->sendGenericIq(CompatIq {
+        SetIq<BlockReport> {
+            generateSequentialStanzaId(), {}, {}, {}, { std::move(jid), std::move(report) } },
     });
 }
 
