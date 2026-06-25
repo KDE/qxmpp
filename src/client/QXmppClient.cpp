@@ -688,6 +688,7 @@ QXmppOutgoingClient *QXmppClient::stream() const
     return d->stream;
 }
 
+/*! Returns the client's current state. */
 QXmppClient::State QXmppClient::state() const
 {
     if (d->stream->isConnected()) {
@@ -856,6 +857,7 @@ void QXmppClient::_q_streamDisconnected()
     Q_EMIT stateChanged(QXmppClient::DisconnectedState);
 }
 
+/*! Returns the QXmppLogger associated with the current QXmppClient. */
 QXmppLogger *QXmppClient::logger() const
 {
     return d->logger;

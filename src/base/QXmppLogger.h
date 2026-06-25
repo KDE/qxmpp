@@ -120,44 +120,22 @@ public:
 
     static QXmppLogger *getLogger();
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Returns the handler for logging messages. */
     QXmppLogger::LoggingType loggingType();
     void setLoggingType(QXmppLogger::LoggingType type);
     Q_SIGNAL void loggingTypeChanged();
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*!
-        Returns the path to which logging messages should be written.
-
-        \sa loggingType()
-    */
     QString logFilePath();
     void setLogFilePath(const QString &path);
     Q_SIGNAL void logFilePathChanged();
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Returns the types of messages to log. */
     QXmppLogger::MessageTypes messageTypes();
     void setMessageTypes(QXmppLogger::MessageTypes types);
     Q_SIGNAL void messageTypesChanged();
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*!
-        Returns whether Sent/Received XML stanzas should be pretty-printed.
-
-        \since QXmpp 1.16
-    */
     bool prettyXml() const;
     void setPrettyXml(bool enable);
     Q_SIGNAL void prettyXmlChanged();
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*!
-        Returns the current ANSI color mode for pretty-printed XML.
-
-        \since QXmpp 1.16
-    */
     QXmppLogger::ColorMode colorMode() const;
     void setColorMode(QXmppLogger::ColorMode mode);
     Q_SIGNAL void colorModeChanged();

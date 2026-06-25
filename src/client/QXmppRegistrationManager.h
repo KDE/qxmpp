@@ -233,18 +233,6 @@ public:
     void changePassword(const QString &newPassword);
     void deleteAccount();
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*!
-        Returns whether the server supports registration.
-
-        By default this is set to false and only changes, if you request the
-        service discovery info of the connected server using
-        QXmppDiscoveryManager::requestInfo().
-
-        This is only relevant to actions that happen after authentication.
-
-        \sa QXmppRegistrationManager::supportedByServerChanged()
-    */
     bool supportedByServer() const;
 
     void requestRegistrationForm(const QString &service = {});

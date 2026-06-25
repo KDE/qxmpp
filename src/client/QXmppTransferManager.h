@@ -187,14 +187,9 @@ public:
 
     ~QXmppTransferJob() override;
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Returns the job's transfer direction. */
     QXmppTransferJob::Direction direction() const;
-    /*! Returns the remote party's JID. */
     QString jid() const;
-    /*! Returns the job's transfer method. */
     QXmppTransferJob::Method method() const;
-    /*! Returns the job's state. */
     QXmppTransferJob::State state() const;
 
     QXmppTransferJob::Error error() const;
@@ -203,8 +198,6 @@ public:
 
     // XEP-0096 : File transfer
     QXmppTransferFileInfo fileInfo() const;
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Returns the local file URL. */
     QUrl localFileUrl() const;
     void setLocalFileUrl(const QUrl &localFileUrl);
 
@@ -314,25 +307,12 @@ public:
     QXmppTransferManager();
     ~QXmppTransferManager() override;
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Return the JID of the bytestream proxy to use for outgoing transfers. */
     QString proxy() const;
     void setProxy(const QString &proxyJid);
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*!
-        Return whether the proxy will systematically be used for outgoing
-        SOCKS5 bytestream transfers.
-    */
     bool proxyOnly() const;
     void setProxyOnly(bool proxyOnly);
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*!
-        Return the supported stream methods.
-
-        The methods are a combination of zero or more QXmppTransferJob::Method.
-    */
     QXmppTransferJob::Methods supportedMethods() const;
     void setSupportedMethods(QXmppTransferJob::Methods methods);
 

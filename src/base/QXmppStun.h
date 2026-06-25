@@ -316,13 +316,6 @@ public:
     bool bind(const QList<QHostAddress> &addresses);
     bool isConnected() const;
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*!
-        Returns the ICE gathering state, that is the discovery of local
-        candidates.
-
-        \since QXmpp 0.9.3
-    */
     GatheringState gatheringState() const;
 
     /*! \brief This signal is emitted once ICE negotiation succeeds. */

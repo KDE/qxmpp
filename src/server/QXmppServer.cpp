@@ -337,6 +337,7 @@ void QXmppServer::setDomain(const QString &domain)
     d->domain = domain;
 }
 
+/*! Returns the QXmppLogger associated with the server. */
 QXmppLogger *QXmppServer::logger()
 {
     return d->logger;

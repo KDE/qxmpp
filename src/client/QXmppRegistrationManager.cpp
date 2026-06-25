@@ -94,6 +94,17 @@ void QXmppRegistrationManager::deleteAccount()
     client()->send(std::move(iq));
 }
 
+/*!
+    Returns whether the server supports registration.
+
+    By default this is set to false and only changes, if you request the
+    service discovery info of the connected server using
+    QXmppDiscoveryManager::requestInfo().
+
+    This is only relevant to actions that happen after authentication.
+
+    \sa QXmppRegistrationManager::supportedByServerChanged()
+*/
 bool QXmppRegistrationManager::supportedByServer() const
 {
     return d->supportedByServer;

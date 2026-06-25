@@ -212,6 +212,7 @@ QXmppLogger *QXmppLogger::getLogger()
     return m_logger;
 }
 
+/*! Returns the handler for logging messages. */
 QXmppLogger::LoggingType QXmppLogger::loggingType()
 {
     return d->loggingType;
@@ -239,6 +240,7 @@ void QXmppLogger::setLoggingType(QXmppLogger::LoggingType type)
     \since QXmpp 1.7
 */
 
+/*! Returns the types of messages to log. */
 QXmppLogger::MessageTypes QXmppLogger::messageTypes()
 {
     return d->messageTypes;
@@ -320,6 +322,11 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
     }
 }
 
+/*!
+    Returns whether Sent/Received XML stanzas should be pretty-printed.
+
+    \since QXmpp 1.16
+*/
 bool QXmppLogger::prettyXml() const
 {
     return d->prettyXml;
@@ -338,6 +345,11 @@ void QXmppLogger::setPrettyXml(bool enable)
     }
 }
 
+/*!
+    Returns the current ANSI color mode for pretty-printed XML.
+
+    \since QXmpp 1.16
+*/
 QXmppLogger::ColorMode QXmppLogger::colorMode() const
 {
     return d->colorMode;
@@ -420,6 +432,11 @@ void QXmppLogger::updateCounter(const QString &counter, qint64 amount)
     Q_UNUSED(amount)
 }
 
+/*!
+    Returns the path to which logging messages should be written.
+
+    \sa loggingType()
+*/
 QString QXmppLogger::logFilePath()
 {
     return d->logFilePath;

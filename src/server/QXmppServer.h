@@ -59,8 +59,6 @@ public:
     QString domain() const;
     void setDomain(const QString &domain);
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Returns the QXmppLogger associated with the server. */
     QXmppLogger *logger();
     void setLogger(QXmppLogger *logger);
 

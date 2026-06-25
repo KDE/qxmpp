@@ -269,16 +269,12 @@ public:
 
     QXmppConfiguration &configuration();
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Returns the QXmppLogger associated with the current QXmppClient. */
     QXmppLogger *logger() const;
     void setLogger(QXmppLogger *logger);
 
     QAbstractSocket::SocketError socketError();
     QString socketErrorString() const;
 
-    // documentation needs to be here, see https://stackoverflow.com/questions/49192523/
-    /*! Returns the client's current state. */
     State state() const;
     QXmppStanza::Error::Condition xmppStreamError();
 
