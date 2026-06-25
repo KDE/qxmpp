@@ -203,7 +203,7 @@ DomReader::Result DomReader::process(QXmlStreamReader &r)
             }
             return Error { NotWellFormed, r.errorString() };
         case QXmlStreamReader::StartElement: {
-            auto child = r.prefix().isNull()
+            auto child = r.namespaceUri().isEmpty()
                 ? doc.createElement(r.name().toString())
                 : doc.createElementNS(r.namespaceUri().toString(), r.qualifiedName().toString());
 
