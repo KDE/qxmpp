@@ -111,6 +111,11 @@ struct IqDecryptionResult {
     QXmppE2eeMetadata e2eeMetadata;
 };
 
+struct OmemoEnvelopeData {
+    QByteArray data;
+    bool isKeyExchange;
+};
+
 }  // namespace QXmpp::Omemo::Private
 
 using namespace QXmpp::Private;
@@ -191,7 +196,7 @@ public:
     std::optional<PayloadEncryptionResult> encryptPayload(const QByteArray &payload) const;
     template<typename T>
     QByteArray createSceEnvelope(const T &stanza);
-    QByteArray createOmemoEnvelopeData(const signal_protocol_address &address, const SecureByteArray &payloadDecryptionData) const;
+    std::optional<OmemoEnvelopeData> createOmemoEnvelopeData(const signal_protocol_address &address, const SecureByteArray &payloadDecryptionData) const;
 
     QXmppTask<std::optional<QXmppMessage>> decryptMessage(QXmppMessage stanza);
     QXmppTask<std::optional<IqDecryptionResult>> decryptIq(QDomElement iqElement);
@@ -304,7 +309,7 @@ public:
     bool deserializeSignedPublicPreKey(ec_public_key **signedPublicPreKey, const QByteArray &serializedSignedPublicPreKey) const;
     bool deserializePublicPreKey(ec_public_key **publicPreKey, const QByteArray &serializedPublicPreKey) const;
 
-    QXmppTask<QXmpp::SendResult> sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId, bool isKeyExchange = false) const;
+    QXmppTask<QXmpp::SendResult> sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId) const;
     QXmppTask<void> storeOwnKey() const;
     QXmppTask<TrustLevel> storeKeyDependingOnSecurityPolicy(QString keyOwnerJid, QByteArray key);
     QXmppTask<TrustLevel> storeKey(QString keyOwnerJid, QByteArray key, TrustLevel trustLevel = TrustLevel::AutomaticallyDistrusted) const;
