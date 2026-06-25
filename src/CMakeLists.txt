@@ -9,6 +9,18 @@ add_definitions(
     -DQT_NO_CAST_FROM_ASCII
 )
 
+# internal public headers
+set(INSTALL_HEADER_PRIVATE_FILES
+    # Base
+    base/QXmppConstants_p.h
+    base/QXmppAsync_p.h
+    base/QXmppPubSubIq_p.h
+    base/QXmppUtils_p.h
+    base/QXmppVisitHelper_p.h
+    base/QXmppXmlTags_p.h
+)
+
+# public headers
 set(INSTALL_HEADER_FILES
     # Base
     base/QXmppArchiveIq.h
@@ -20,7 +32,6 @@ set(INSTALL_HEADER_FILES
     base/QXmppBookmarkSet.h
     base/QXmppByteStreamIq.h
     base/QXmppColorGeneration.h
-    base/QXmppConstants_p.h
     base/QXmppContactAddresses.h
     base/QXmppDataForm.h
     base/QXmppDataFormBase.h
@@ -36,7 +47,6 @@ set(INSTALL_HEADER_FILES
     base/QXmppFallback.h
     base/QXmppFileMetadata.h
     base/QXmppFileShare.h
-    base/QXmppAsync_p.h
     base/QXmppGeolocItem.h
     base/QXmppGlobal.h
     base/QXmppHash.h
@@ -57,7 +67,6 @@ set(INSTALL_HEADER_FILES
     base/QXmppMixInfoItem.h
     base/QXmppMixInvitation.h
     base/QXmppMixIq.h
-    base/QXmppMixIq_p.h
     base/QXmppMixParticipantItem.h
     base/QXmppMucData.h
     base/QXmppMucIq.h
@@ -71,7 +80,6 @@ set(INSTALL_HEADER_FILES
     base/QXmppPromise.h
     base/QXmppPubSubAffiliation.h
     base/QXmppPubSubEvent.h
-    base/QXmppPubSubIq_p.h
     base/QXmppPubSubBaseItem.h
     base/QXmppPubSubMetadata.h
     base/QXmppPubSubNodeConfig.h
@@ -102,17 +110,14 @@ set(INSTALL_HEADER_FILES
     base/QXmppTurnServer.h
     base/QXmppUserTuneItem.h
     base/QXmppUtils.h
-    base/QXmppUtils_p.h
     base/QXmppUri.h
     base/QXmppVCardIq.h
     base/QXmppVersionIq.h
-    base/QXmppVisitHelper_p.h
     base/QXmppXmlElement.h
     base/QXmppXmlElementScope.h
     base/QXmppXmlExtensions.h
     base/QXmppXmlFormatter.h
     base/QXmppXmlRegistry.h
-    base/QXmppXmlTags_p.h
     base/compat/QXmppSessionIq.h
     base/compat/QXmppStartTlsPacket.h
     base/compat/QXmppPubSubIq.h
@@ -171,7 +176,6 @@ set(INSTALL_HEADER_FILES
     client/QXmppRpcManager.h
     client/QXmppSendStanzaParams.h
     client/QXmppTransferManager.h
-    client/QXmppTransferManager_p.h
     client/QXmppTrustLevel.h
     client/QXmppTrustManager.h
     client/QXmppTrustMemoryStorage.h
@@ -464,7 +468,7 @@ export(
 )
 
 install(
-    FILES ${INSTALL_HEADER_FILES} ${CMAKE_CURRENT_BINARY_DIR}/qxmpp_export.h
+    FILES ${INSTALL_HEADER_FILES} ${INSTALL_HEADER_PRIVATE_FILES} ${CMAKE_CURRENT_BINARY_DIR}/qxmpp_export.h
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${QXMPP_TARGET}"
 )
 
