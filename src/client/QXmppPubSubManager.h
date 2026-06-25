@@ -54,23 +54,23 @@ public:
 
     template<typename T>
     struct Items {
-        QVector<T> items;
+        QList<T> items;
         std::optional<QXmppResultSetReply> continuation;
     };
 
     using Result = std::variant<QXmpp::Success, QXmppError>;
-    using FeaturesResult = std::variant<QVector<QString>, InvalidServiceType, QXmppError>;
-    using NodesResult = std::variant<QVector<QString>, QXmppError>;
+    using FeaturesResult = std::variant<QList<QString>, InvalidServiceType, QXmppError>;
+    using NodesResult = std::variant<QList<QString>, QXmppError>;
     using InstantNodeResult = std::variant<QString, QXmppError>;
     template<typename T>
     using ItemResult = std::variant<T, QXmppError>;
     template<typename T>
     using ItemsResult = std::variant<Items<T>, QXmppError>;
-    using ItemIdsResult = std::variant<QVector<QString>, QXmppError>;
+    using ItemIdsResult = std::variant<QList<QString>, QXmppError>;
     using PublishItemResult = std::variant<QString, QXmppError>;
-    using PublishItemsResult = std::variant<QVector<QString>, QXmppError>;
-    using SubscriptionsResult = std::variant<QVector<QXmppPubSubSubscription>, QXmppError>;
-    using AffiliationsResult = std::variant<QVector<QXmppPubSubAffiliation>, QXmppError>;
+    using PublishItemsResult = std::variant<QList<QString>, QXmppError>;
+    using SubscriptionsResult = std::variant<QList<QXmppPubSubSubscription>, QXmppError>;
+    using AffiliationsResult = std::variant<QList<QXmppPubSubAffiliation>, QXmppError>;
     using OptionsResult = std::variant<QXmppPubSubSubscribeOptions, QXmppError>;
     using NodeConfigResult = std::variant<QXmppPubSubNodeConfig, QXmppError>;
 
@@ -98,9 +98,9 @@ public:
     template<typename T>
     QXmppTask<PublishItemResult> publishItem(const QString &jid, const QString &nodeName, const T &item, const QXmppPubSubPublishOptions &publishOptions);
     template<typename T>
-    QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QVector<T> &items);
+    QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QList<T> &items);
     template<typename T>
-    QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions);
+    QXmppTask<PublishItemsResult> publishItems(const QString &jid, const QString &nodeName, const QList<T> &items, const QXmppPubSubPublishOptions &publishOptions);
     auto retractItem(const QString &jid, const QString &nodeName, const QString &itemId, bool notify = false) -> QXmppTask<Result>;
     auto retractItem(const QString &jid, const QString &nodeName, StandardItemId itemId, bool notify = false) -> QXmppTask<Result>;
     auto purgeItems(const QString &jid, const QString &nodeName) -> QXmppTask<Result>;
@@ -136,9 +136,9 @@ public:
     template<typename T>
     QXmppTask<PublishItemResult> publishOwnPepItem(const QString &nodeName, const T &item);
     template<typename T>
-    QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions);
+    QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QList<T> &items, const QXmppPubSubPublishOptions &publishOptions);
     template<typename T>
-    QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QVector<T> &items);
+    QXmppTask<PublishItemsResult> publishOwnPepItems(const QString &nodeName, const QList<T> &items);
     QXmppTask<Result> retractOwnPepItem(const QString &nodeName, const QString &itemId, bool notify = false) { return retractItem(client()->configuration().jidBare(), nodeName, itemId, notify); }
     QXmppTask<Result> retractOwnPepItem(const QString &nodeName, StandardItemId itemId, bool notify = false) { return retractItem(client()->configuration().jidBare(), nodeName, itemId, notify); }
     QXmppTask<Result> purgeOwnPepItems(const QString &nodeName) { return purgeItems(client()->configuration().jidBare(), nodeName); }
@@ -271,7 +271,7 @@ QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishItem
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishItems(const QString &jid,
                                                                                    const QString &nodeName,
-                                                                                   const QVector<T> &items)
+                                                                                   const QList<T> &items)
 {
     QXmpp::Private::PubSubIq<T> request;
     request.setTo(jid);
@@ -287,7 +287,7 @@ QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishIte
 template<typename T>
 QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishItems(const QString &jid,
                                                                                    const QString &nodeName,
-                                                                                   const QVector<T> &items,
+                                                                                   const QList<T> &items,
                                                                                    const QXmppPubSubPublishOptions &publishOptions)
 {
     QXmpp::Private::PubSubIq<T> request;
@@ -323,7 +323,7 @@ QXmppTask<QXmppPubSubManager::PublishItemResult> QXmppPubSubManager::publishOwnP
     pass an empty form to honor the default options of the PEP node.
 */
 template<typename T>
-QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishOwnPepItems(const QString &nodeName, const QVector<T> &items, const QXmppPubSubPublishOptions &publishOptions)
+QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishOwnPepItems(const QString &nodeName, const QList<T> &items, const QXmppPubSubPublishOptions &publishOptions)
 {
     return publishItems(client()->configuration().jidBare(), nodeName, items, publishOptions);
 }
@@ -332,7 +332,7 @@ QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishOwn
     Publishes the items \a items to the PEP node \a nodeName.
 */
 template<typename T>
-QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishOwnPepItems(const QString &nodeName, const QVector<T> &items)
+QXmppTask<QXmppPubSubManager::PublishItemsResult> QXmppPubSubManager::publishOwnPepItems(const QString &nodeName, const QList<T> &items)
 {
     return publishItems(client()->configuration().jidBare(), nodeName, items);
 }

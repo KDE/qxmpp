@@ -188,7 +188,7 @@ class QXmppFileDownloadPrivate
 public:
     std::shared_ptr<QXmppFileSharingProvider::Download> providerDownload;
     QFuture<HashVerificationResultPtr> hashesFuture;
-    QVector<QXmppHash> hashes;
+    QList<QXmppHash> hashes;
     QXmppFileDownload::Result result;
     quint64 bytesReceived = 0;
     quint64 bytesTotal = 0;
@@ -431,7 +431,7 @@ std::shared_ptr<QXmppFileUpload> QXmppFileSharingManager::uploadFile(std::shared
                 }
 
                 if (!result->thumbnails.empty()) {
-                    QVector<QXmppThumbnail> thumbnails;
+                    QList<QXmppThumbnail> thumbnails;
                     thumbnails.reserve(result->thumbnails.size());
                     upload->d->dataBlobs.reserve(result->thumbnails.size());
 
@@ -454,7 +454,7 @@ std::shared_ptr<QXmppFileUpload> QXmppFileSharingManager::uploadFile(std::shared
                 await(upload->d->hashesFuture, this, [upload](auto hashResult) mutable {
                     auto &hashValue = hashResult->result;
                     if (std::holds_alternative<std::vector<QXmppHash>>(hashValue)) {
-                        auto hashes = transform<QVector<QXmppHash>>(std::get<std::vector<QXmppHash>>(std::move(hashValue)), [](auto &&hash) {
+                        auto hashes = transform<QList<QXmppHash>>(std::get<std::vector<QXmppHash>>(std::move(hashValue)), [](auto &&hash) {
                             return hash;
                         });
                         upload->d->metadata.setHashes(hashes);

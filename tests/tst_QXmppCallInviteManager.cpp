@@ -208,7 +208,7 @@ void tst_QXmppCallInviteManager::testInvite()
     jingle.jid = "mixer@example.com/uuid";
     jingle.sid = "sid1";
 
-    QVector<QXmppCallInviteElement::External> external;
+    QList<QXmppCallInviteElement::External> external;
     external.append({ "https://example.com/uuid" });
     external.append({ "tel:+12345678" });
 

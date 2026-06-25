@@ -149,8 +149,8 @@ public:
     bool isPreparingMujiSession() const;
     void setIsPreparingMujiSession(bool isPreparingMujiSession);
 
-    QVector<QXmppJingleIq::Content> mujiContents() const;
-    void setMujiContents(const QVector<QXmppJingleIq::Content> &mujiContents);
+    QList<QXmppJingleIq::Content> mujiContents() const;
+    void setMujiContents(const QList<QXmppJingleIq::Content> &mujiContents);
 
     // XEP-0283: Moved
     QString oldJid() const;

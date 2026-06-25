@@ -82,8 +82,8 @@ template<typename T = QXmppPubSubBaseItem>
 class QXmppPubSubEvent : public QXmppPubSubEventBase
 {
 public:
-    QVector<T> items() const;
-    void setItems(const QVector<T> &items);
+    QList<T> items() const;
+    void setItems(const QList<T> &items);
 
     static bool isPubSubEvent(const QDomElement &element);
 
@@ -92,27 +92,27 @@ protected:
     void serializeItems(QXmlStreamWriter *writer) const override;
 
 private:
-    QVector<T> m_items;
+    QList<T> m_items;
 };
 
 /*!
-    \fn template <typename T> QVector<T> QXmppPubSubEvent<T>::items() const
+    \fn template <typename T> QList<T> QXmppPubSubEvent<T>::items() const
 
     Returns the PubSub items of the event.
 */
 template<typename T>
-QVector<T> QXmppPubSubEvent<T>::items() const
+QList<T> QXmppPubSubEvent<T>::items() const
 {
     return m_items;
 }
 
 /*!
-    \fn template <typename T> void QXmppPubSubEvent<T>::setItems(const QVector<T> &items)
+    \fn template <typename T> void QXmppPubSubEvent<T>::setItems(const QList<T> &items)
 
     Sets the PubSub \a items of the event.
 */
 template<typename T>
-void QXmppPubSubEvent<T>::setItems(const QVector<T> &items)
+void QXmppPubSubEvent<T>::setItems(const QList<T> &items)
 {
     m_items = items;
 }

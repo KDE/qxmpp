@@ -27,7 +27,7 @@
 
 using namespace QXmpp::Private;
 
-static void helperToXmlAddDomElement(QXmlStreamWriter *stream, const QDomElement &element, const QVector<QStringView> &omitNamespaces)
+static void helperToXmlAddDomElement(QXmlStreamWriter *stream, const QDomElement &element, const QList<QStringView> &omitNamespaces)
 {
     stream->writeStartElement(element.tagName());
 

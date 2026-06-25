@@ -288,7 +288,7 @@ public:
     QXmppDataForm::Field::Type type = QXmppDataForm::Field::TextSingleField;
     QVariant value;
     QSize mediaSize;
-    QVector<QXmppDataForm::MediaSource> mediaSources;
+    QList<QXmppDataForm::MediaSource> mediaSources;
 };
 
 /*!
@@ -462,7 +462,7 @@ void QXmppDataForm::Field::setMediaSize(const QSize &size)
 
     \since QXmpp 1.1
 */
-QVector<QXmppDataForm::MediaSource> QXmppDataForm::Field::mediaSources() const
+QList<QXmppDataForm::MediaSource> QXmppDataForm::Field::mediaSources() const
 {
     return d->mediaSources;
 }
@@ -474,7 +474,7 @@ QVector<QXmppDataForm::MediaSource> QXmppDataForm::Field::mediaSources() const
 
     \a mediaSources.
 */
-void QXmppDataForm::Field::setMediaSources(const QVector<QXmppDataForm::MediaSource> &mediaSources)
+void QXmppDataForm::Field::setMediaSources(const QList<QXmppDataForm::MediaSource> &mediaSources)
 {
     d->mediaSources = mediaSources;
 }
@@ -643,7 +643,7 @@ void QXmppDataForm::Field::setMedia(const QXmppDataForm::Media &media)
     QT_WARNING_DISABLE_DEPRECATED
     const QList<QPair<QString, QString>> &uris = media.uris();
 
-    QVector<QXmppDataForm::MediaSource> sources;
+    QList<QXmppDataForm::MediaSource> sources;
     sources.reserve(uris.size());
 
     for (const auto &pairUri : uris) {
@@ -657,7 +657,7 @@ void QXmppDataForm::Field::setMedia(const QXmppDataForm::Media &media)
     QT_WARNING_POP
 }
 
-QVector<QXmppDataForm::MediaSource> &QXmppDataForm::Field::mediaSources()
+QList<QXmppDataForm::MediaSource> &QXmppDataForm::Field::mediaSources()
 {
     return d->mediaSources;
 }

@@ -51,7 +51,7 @@ void tst_QXmppBlockingManager::fetch()
     QVERIFY(m->isSubscribed());
 
     // check all three results
-    QVector<QString> expected { "romeo@montague.net", "iago@shakespeare.lit" };
+    QList<QString> expected { "romeo@montague.net", "iago@shakespeare.lit" };
     auto blocklist = expectFutureVariant<QXmppBlocklist>(task);
     QCOMPARE(blocklist.entries(), expected);
     blocklist = expectFutureVariant<QXmppBlocklist>(task2);
@@ -146,27 +146,27 @@ void tst_QXmppBlockingManager::pushBlocked()
 
     QCOMPARE(blockedSpy.size(), 0);
     QCOMPARE(unblockedSpy.size(), 1);
-    QCOMPARE(unblockedSpy[0][0].value<QVector<QString>>(), QVector<QString> { "romeo@montague.net" });
+    QCOMPARE(unblockedSpy[0][0].value<QList<QString>>(), QList<QString> { "romeo@montague.net" });
 
     auto blocklist = std::get<QXmppBlocklist>(m->fetchBlocklist().result()).entries();
-    QCOMPARE(blocklist, QVector<QString> { "iago@shakespeare.lit" });
+    QCOMPARE(blocklist, QList<QString> { "iago@shakespeare.lit" });
 
     dom = xmlToDom("<iq to='juliet@capulet.com/balcony' type='set' id='push3'><block xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></block></iq>");
     QVERIFY(m->handleStanza(dom, {}));
 
     QCOMPARE(blockedSpy.size(), 1);
-    QCOMPARE(blockedSpy[0][0].value<QVector<QString>>(), QVector<QString> { "romeo@montague.net" });
+    QCOMPARE(blockedSpy[0][0].value<QList<QString>>(), QList<QString> { "romeo@montague.net" });
     QCOMPARE(unblockedSpy.size(), 1);
 
     blocklist = std::get<QXmppBlocklist>(m->fetchBlocklist().result()).entries();
-    auto expected = QVector<QString> { "iago@shakespeare.lit", "romeo@montague.net" };
+    auto expected = QList<QString> { "iago@shakespeare.lit", "romeo@montague.net" };
     QCOMPARE(blocklist, expected);
 }
 
 void tst_QXmppBlockingManager::blockedState()
 {
     using L = QXmppBlocklist;
-    auto entries = QVector<QString> {
+    auto entries = QList<QString> {
         "iago@shakespeare.lit", "romeo@montague.net"
     };
     QXmppBlocklist l(entries);
@@ -177,17 +177,17 @@ void tst_QXmppBlockingManager::blockedState()
 
     auto state = l.blockingState("iago@shakespeare.lit");
     auto blocked = expectVariant<L::Blocked>(state);
-    QCOMPARE(blocked.blockingEntries, QVector<QString> { "iago@shakespeare.lit" });
+    QCOMPARE(blocked.blockingEntries, QList<QString> { "iago@shakespeare.lit" });
     QVERIFY(blocked.partiallyBlockingEntries.isEmpty());
 
     state = l.blockingState("iago@shakespeare.lit/res");
     blocked = expectVariant<L::Blocked>(state);
-    QCOMPARE(blocked.blockingEntries, QVector<QString> { "iago@shakespeare.lit" });
+    QCOMPARE(blocked.blockingEntries, QList<QString> { "iago@shakespeare.lit" });
     QVERIFY(blocked.partiallyBlockingEntries.isEmpty());
 
     state = l.blockingState("shakespeare.lit");
     auto partially = expectVariant<L::PartiallyBlocked>(state);
-    QCOMPARE(partially.partiallyBlockingEntries, QVector<QString> { "iago@shakespeare.lit" });
+    QCOMPARE(partially.partiallyBlockingEntries, QList<QString> { "iago@shakespeare.lit" });
 
     state = l.blockingState("qxmpp.org");
     expectVariant<L::NotBlocked>(state);

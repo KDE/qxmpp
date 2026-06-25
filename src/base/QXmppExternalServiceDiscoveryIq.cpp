@@ -56,7 +56,7 @@ public:
 class QXmppExternalServiceDiscoveryIqPrivate : public QSharedData
 {
 public:
-    QVector<QXmppExternalService> externalServices;
+    QList<QXmppExternalService> externalServices;
 };
 
 QXmppExternalService::QXmppExternalService()
@@ -289,13 +289,13 @@ QXmppExternalServiceDiscoveryIq::QXmppExternalServiceDiscoveryIq()
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppExternalServiceDiscoveryIq)
 
 /*! Returns the external services of the IQ. */
-QVector<QXmppExternalService> QXmppExternalServiceDiscoveryIq::externalServices() const
+QList<QXmppExternalService> QXmppExternalServiceDiscoveryIq::externalServices() const
 {
     return d->externalServices;
 }
 
 /*! Sets the \a externalServices of the IQ. */
-void QXmppExternalServiceDiscoveryIq::setExternalServices(const QVector<QXmppExternalService> &externalServices)
+void QXmppExternalServiceDiscoveryIq::setExternalServices(const QList<QXmppExternalService> &externalServices)
 {
     d->externalServices = externalServices;
 }
@@ -314,7 +314,7 @@ bool QXmppExternalServiceDiscoveryIq::checkIqType(const QString &tagName, const 
 
 void QXmppExternalServiceDiscoveryIq::parseElementFromChild(const QDomElement &element)
 {
-    d->externalServices = parseChildElements<QVector<QXmppExternalService>>(element.firstChildElement());
+    d->externalServices = parseChildElements<QList<QXmppExternalService>>(element.firstChildElement());
 }
 
 void QXmppExternalServiceDiscoveryIq::toXmlElementFromChild(QXmlStreamWriter *writer) const

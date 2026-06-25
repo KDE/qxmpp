@@ -134,7 +134,7 @@ private:
     bool handleExistingSession(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QString &jmiElementId);
     bool handleNonExistingSession(const std::shared_ptr<QXmppJingleMessageInitiation> &existingJmi, const QString &jmiElementId, const QString &remoteResource);
     std::shared_ptr<QXmppJingleMessageInitiation> addJmi(const QString &id, const QString &remoteJid);
-    const QVector<std::shared_ptr<QXmppJingleMessageInitiation>> &jmis() const;
+    const QList<std::shared_ptr<QXmppJingleMessageInitiation>> &jmis() const;
 
 private:
     std::unique_ptr<QXmppJingleMessageInitiationManagerPrivate> d;

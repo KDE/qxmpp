@@ -36,11 +36,11 @@ public:
     const QString &id() const;
     void setId(const QString &);
 
-    const QVector<QXmppHttpFileSource> &httpSources() const;
-    void setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources);
+    const QList<QXmppHttpFileSource> &httpSources() const;
+    void setHttpSources(const QList<QXmppHttpFileSource> &newHttpSources);
 
-    const QVector<QXmppEncryptedFileSource> &encryptedSources() const;
-    void setEncryptedSources(const QVector<QXmppEncryptedFileSource> &newEncryptedSources);
+    const QList<QXmppEncryptedFileSource> &encryptedSources() const;
+    void setEncryptedSources(const QList<QXmppEncryptedFileSource> &newEncryptedSources);
 
     void toXml(QXmpp::Private::XmlWriter &writer) const;
 
@@ -76,11 +76,11 @@ public:
     const QXmppFileMetadata &metadata() const;
     void setMetadata(const QXmppFileMetadata &);
 
-    const QVector<QXmppHttpFileSource> &httpSources() const;
-    void setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources);
+    const QList<QXmppHttpFileSource> &httpSources() const;
+    void setHttpSources(const QList<QXmppHttpFileSource> &newHttpSources);
 
-    const QVector<QXmppEncryptedFileSource> &encryptedSources() const;
-    void setEncryptedSourecs(const QVector<QXmppEncryptedFileSource> &newEncryptedSources);
+    const QList<QXmppEncryptedFileSource> &encryptedSources() const;
+    void setEncryptedSourecs(const QList<QXmppEncryptedFileSource> &newEncryptedSources);
 
     static constexpr std::tuple XmlTag = { u"file-sharing", QXmpp::Private::ns_sfs };
     bool parse(const QDomElement &el);

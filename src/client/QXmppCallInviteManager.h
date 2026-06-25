@@ -55,7 +55,7 @@ private:
         bool audio = true,
         bool video = false,
         std::optional<QXmppCallInviteElement::Jingle> jingle = std::nullopt,
-        std::optional<QVector<QXmppCallInviteElement::External>> external = std::nullopt);
+        std::optional<QList<QXmppCallInviteElement::External>> external = std::nullopt);
 
     QString id() const;
     void setId(const QString &id);
@@ -86,7 +86,7 @@ public:
         bool audio = true,
         bool video = false,
         std::optional<QXmppCallInviteElement::Jingle> jingle = std::nullopt,
-        std::optional<QVector<QXmppCallInviteElement::External>> external = std::nullopt);
+        std::optional<QList<QXmppCallInviteElement::External>> external = std::nullopt);
 
     Q_SIGNAL void invited(const std::shared_ptr<QXmppCallInvite> &callInvite, const QString &id);
 
@@ -111,7 +111,7 @@ private:
     bool handleInviteCallInviteElement(const QXmppCallInviteElement &callInviteElement, const QString &callPartnerJid);
 
     std::shared_ptr<QXmppCallInvite> addCallInvite(const QString &callPartnerJid);
-    const QVector<std::shared_ptr<QXmppCallInvite>> &callInvites() const;
+    const QList<std::shared_ptr<QXmppCallInvite>> &callInvites() const;
 
 private:
     std::unique_ptr<QXmppCallInviteManagerPrivate> d;

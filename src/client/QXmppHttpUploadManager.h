@@ -75,7 +75,7 @@ Q_DECLARE_METATYPE(QXmppHttpUpload::Result);
 class QXMPP_EXPORT QXmppHttpUploadManager : public QXmppClientExtension
 {
     Q_OBJECT
-    Q_PROPERTY(QVector<QXmppHttpUploadService> services READ services NOTIFY servicesChanged)
+    Q_PROPERTY(QList<QXmppHttpUploadService> services READ services NOTIFY servicesChanged)
     Q_PROPERTY(QXmppHttpUploadManager::Support support READ support NOTIFY supportChanged)
 
 public:
@@ -100,7 +100,7 @@ public:
     explicit QXmppHttpUploadManager(QNetworkAccessManager *netManager);
     ~QXmppHttpUploadManager();
 
-    QVector<QXmppHttpUploadService> services() const;
+    QList<QXmppHttpUploadService> services() const;
     Q_SIGNAL void servicesChanged();
 
     Support support() const;

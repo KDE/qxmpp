@@ -147,7 +147,7 @@ public:
     struct MetadataGeneratorResult {
         std::optional<QSize> dimensions;
         std::optional<uint32_t> length;
-        QVector<MetadataThumbnail> thumbnails;
+        QList<MetadataThumbnail> thumbnails;
         std::unique_ptr<QIODevice> dataDevice;
     };
 

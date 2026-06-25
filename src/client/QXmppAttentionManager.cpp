@@ -77,7 +77,7 @@ public:
     QTime allowedAttemptsTimeInterval;
 
     // map of bare JIDs and time of previous requests
-    QVector<PastRequest> previousRequests;
+    QList<PastRequest> previousRequests;
     QTimer *cleanUpTimer;
 };
 

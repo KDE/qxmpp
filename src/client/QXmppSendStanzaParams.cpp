@@ -4,7 +4,7 @@
 
 #include "QXmppSendStanzaParams.h"
 
-#include <QVector>
+#include <QList>
 
 using namespace QXmpp;
 
@@ -21,7 +21,7 @@ class QXmppSendStanzaParamsPrivate : public QSharedData
 {
 public:
     TrustLevels acceptedTrustLevels;
-    QVector<QString> encryptionJids;
+    QList<QString> encryptionJids;
 };
 
 QXmppSendStanzaParams::QXmppSendStanzaParams()
@@ -45,7 +45,7 @@ QXmppSendStanzaParams &QXmppSendStanzaParams::operator=(QXmppSendStanzaParams &&
     If this is empty, the stanza should be encrypted for the recipient.
     This option is useful for groupchats.
 */
-QVector<QString> QXmppSendStanzaParams::encryptionJids() const
+QList<QString> QXmppSendStanzaParams::encryptionJids() const
 {
     return d->encryptionJids;
 }
@@ -58,7 +58,7 @@ QVector<QString> QXmppSendStanzaParams::encryptionJids() const
 
     \a encryptionJids.
 */
-void QXmppSendStanzaParams::setEncryptionJids(QVector<QString> encryptionJids)
+void QXmppSendStanzaParams::setEncryptionJids(QList<QString> encryptionJids)
 {
     d->encryptionJids = std::move(encryptionJids);
 }

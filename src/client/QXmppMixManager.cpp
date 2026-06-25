@@ -533,7 +533,7 @@ QXmppTask<QXmppMixManager::ChannelJidResult> QXmppMixManager::requestChannelJids
 {
     co_return map<ChannelJidResult>(
         [](QList<QXmppDiscoItem> &&items) {
-            return transform<QVector<ChannelJid>>(items, &QXmppDiscoItem::jid);
+            return transform<QList<ChannelJid>>(items, &QXmppDiscoItem::jid);
         },
         co_await d->discoveryManager->items(serviceJid));
 }
@@ -1117,7 +1117,7 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
                 if (auto *error = std::get_if<QXmppError>(&participantsResult)) {
                     Q_EMIT manager->errorOccurred(*error);
                 } else {
-                    auto &participants = std::get<QVector<QXmppMixParticipantItem>>(participantsResult);
+                    auto &participants = std::get<QList<QXmppMixParticipantItem>>(participantsResult);
 
                     if (auto participant = find(participants, item.mixParticipantId(), &QXmppMixParticipantItem::id)) {
                         result.items.push_back(MixData::Item { item.bareJid(), participant->nick() });
@@ -1352,7 +1352,7 @@ QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestJids(const QString
     co_return mapSuccess(
         co_await d->pubSubManager->requestItems(channelJid, node).withContext(this),
         [](QXmppPubSubManager::Items<QXmppPubSubBaseItem> items) {
-            return transform<QVector<Jid>>(items.items, [](const QXmppPubSubBaseItem &item) {
+            return transform<QList<Jid>>(items.items, [](const QXmppPubSubBaseItem &item) {
                 return item.id();
             });
         });

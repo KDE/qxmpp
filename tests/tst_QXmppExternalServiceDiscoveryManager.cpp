@@ -67,7 +67,7 @@ void tst_QXmppExternalServiceDiscoveryManager::testRequestServices()
                          "</services>"
                          "</iq>");
 
-    const auto items { expectFutureVariant<QVector<QXmppExternalService>>(future.toFuture(this)) };
+    const auto items { expectFutureVariant<QList<QXmppExternalService>>(future.toFuture(this)) };
 
     QCOMPARE(items.size(), 5);
     QCOMPARE(items.at(0).host(), u"stun.shakespeare.lit"_s);

@@ -327,7 +327,7 @@ void tst_QXmppMixManager::testRequestJids()
         "</pubsub>"
         "</iq>");
 
-    auto jids = expectFutureVariant<QVector<QXmppMixManager::Jid>>(task);
+    auto jids = expectFutureVariant<QList<QXmppMixManager::Jid>>(task);
     QCOMPARE(jids.at(0), u"shakespeare.example"_s);
     QCOMPARE(jids.at(1), u"alice@wonderland.example"_s);
 
@@ -433,12 +433,12 @@ void tst_QXmppMixManager::testHandlePubSubEvent()
     const auto participantNode = u"urn:xmpp:mix:nodes:participants"_s;
     const QStringList jids = { u"hag66@shakespeare.example"_s, u"cat@shakespeare.example"_s };
 
-    const QVector<QXmppPubSubEventBase::EventType> eventTypes = { QXmppPubSubEventBase::EventType::Configuration,
-                                                                  QXmppPubSubEventBase::EventType::Delete,
-                                                                  QXmppPubSubEventBase::EventType::Items,
-                                                                  QXmppPubSubEventBase::EventType::Retract,
-                                                                  QXmppPubSubEventBase::EventType::Purge,
-                                                                  QXmppPubSubEventBase::EventType::Subscription };
+    const QList<QXmppPubSubEventBase::EventType> eventTypes = { QXmppPubSubEventBase::EventType::Configuration,
+                                                                QXmppPubSubEventBase::EventType::Delete,
+                                                                QXmppPubSubEventBase::EventType::Items,
+                                                                QXmppPubSubEventBase::EventType::Retract,
+                                                                QXmppPubSubEventBase::EventType::Purge,
+                                                                QXmppPubSubEventBase::EventType::Subscription };
 
     QXmppPubSubBaseItem allowedOrBannedJidsItem1;
     allowedOrBannedJidsItem1.setId(jids.at(0));
@@ -617,7 +617,7 @@ void tst_QXmppMixManager::testRequestChannelJids()
         "</query>"
         "</iq>");
 
-    auto jids = expectFutureVariant<QVector<QXmppMixManager::ChannelJid>>(task);
+    auto jids = expectFutureVariant<QList<QXmppMixManager::ChannelJid>>(task);
     QCOMPARE(jids.size(), 3);
     QCOMPARE(jids.at(0), u"coven@mix.shakespeare.example"_s);
     QCOMPARE(jids.at(1), u"spells@mix.shakespeare.example"_s);
@@ -1317,7 +1317,7 @@ void tst_QXmppMixManager::testRequestAllowedJids()
         "</pubsub>"
         "</iq>");
 
-    auto allowedJids = expectFutureVariant<QVector<QXmppMixManager::Jid>>(task);
+    auto allowedJids = expectFutureVariant<QList<QXmppMixManager::Jid>>(task);
     QCOMPARE(allowedJids.at(0), u"shakespeare.example"_s);
     QCOMPARE(allowedJids.at(1), u"alice@wonderland.example"_s);
 
@@ -1431,7 +1431,7 @@ void tst_QXmppMixManager::testRequestBannedJids()
         "</pubsub>"
         "</iq>");
 
-    auto allowedJids = expectFutureVariant<QVector<QXmppMixManager::Jid>>(task);
+    auto allowedJids = expectFutureVariant<QList<QXmppMixManager::Jid>>(task);
     QCOMPARE(allowedJids.at(0), u"lear@shakespeare.example"_s);
     QCOMPARE(allowedJids.at(1), u"macbeth@shakespeare.example"_s);
 
@@ -1555,7 +1555,7 @@ void tst_QXmppMixManager::testRequestParticipants()
         "</pubsub>"
         "</iq>");
 
-    auto participants = expectFutureVariant<QVector<QXmppMixParticipantItem>>(task);
+    auto participants = expectFutureVariant<QList<QXmppMixParticipantItem>>(task);
     QCOMPARE(participants.at(0).jid(), u"hag66@shakespeare.example"_s);
     QCOMPARE(participants.at(1).jid(), u"hag67@shakespeare.example"_s);
 

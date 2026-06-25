@@ -46,14 +46,14 @@ struct Enums::Data<BlockingAction> {
 
 template<BlockingAction Action>
 struct Blocking {
-    QVector<QString> jids;
+    QList<QString> jids;
 
     static constexpr std::tuple XmlTag = { Enums::toStringView(Action), ns_blocking };
 
     bool parse(const QDomElement &el)
     {
         if (elementXmlTag(el) == XmlTag) {
-            jids = parseSingleAttributeElements<QVector<QString>>(el, u"item", ns_blocking, u"jid"_s);
+            jids = parseSingleAttributeElements<QList<QString>>(el, u"item", ns_blocking, u"jid"_s);
             return true;
         }
         return false;
@@ -85,7 +85,7 @@ struct BlockReport {
 
 // Manager data
 struct QXmppBlockingManagerPrivate {
-    std::optional<QVector<QString>> blocklist;
+    std::optional<QList<QString>> blocklist;
     std::vector<QXmppPromise<QXmppBlockingManager::BlocklistResult>> openFetchBlocklistPromises;
 };
 
@@ -188,7 +188,7 @@ struct QXmppBlockingManagerPrivate {
 */
 
 /*!
-    \fn void QXmppBlockingManager::blocked(const QVector<QString> &jids)
+    \fn void QXmppBlockingManager::blocked(const QList<QString> &jids)
 
     Emitted when a blocklist update with new blocked JIDs \a jids has been received.
 
@@ -196,7 +196,7 @@ struct QXmppBlockingManagerPrivate {
 */
 
 /*!
-    \fn void QXmppBlockingManager::unblocked(const QVector<QString> &jids)
+    \fn void QXmppBlockingManager::unblocked(const QList<QString> &jids)
 
     Emitted when a blocklist update with new unblocked JIDs \a jids has been received.
 
@@ -295,7 +295,7 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
 
     \sa unblock()
 */
-QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QVector<QString> jids)
+QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QList<QString> jids)
 {
     return client()->sendGenericIq(CompatIq {
         SetIq<Blocking<Block>> {
@@ -334,7 +334,7 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::reportAndBlock(QSt
 
     \sa block()
 */
-QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QVector<QString> jids)
+QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QList<QString> jids)
 {
     return client()->sendGenericIq(CompatIq {
         SetIq<Blocking<Unblock>> {
@@ -443,7 +443,7 @@ void QXmppBlockingManager::onConnected()
 QXmppBlocklist::QXmppBlocklist() = default;
 
 /*! Constructs with given entries. */
-QXmppBlocklist::QXmppBlocklist(QVector<QString> entries)
+QXmppBlocklist::QXmppBlocklist(QList<QString> entries)
     : m_blocklist(std::move(entries))
 {
 }
@@ -456,7 +456,7 @@ QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppBlocklist)
     Entries may be full JIDs, bare JIDs, domains or domains with resource, as in
     \xep{0191}{Blocking Command}.
 */
-QVector<QString> QXmppBlocklist::entries() const
+QList<QString> QXmppBlocklist::entries() const
 {
     return m_blocklist;
 }
@@ -514,9 +514,9 @@ QXmppBlocklist::BlockingState QXmppBlocklist::blockingState(const QString &jid) 
     }();
 
     // cause the given jid to be blocked (completely)
-    QVector<QString> blockingJids;
+    QList<QString> blockingJids;
     // cause parts of the given JID to be blocked
-    QVector<QString> partiallyBlockingJids;
+    QList<QString> partiallyBlockingJids;
 
     auto checkBlockingJid = [this, &blockingJids](const QString &jid) {
         if (m_blocklist.contains(jid)) {

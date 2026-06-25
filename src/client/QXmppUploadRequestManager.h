@@ -109,7 +109,7 @@ public:
 
     bool serviceFound() const;
 
-    QVector<QXmppUploadService> uploadServices() const;
+    QList<QXmppUploadService> uploadServices() const;
 
     bool handleStanza(const QDomElement &stanza) override;
 

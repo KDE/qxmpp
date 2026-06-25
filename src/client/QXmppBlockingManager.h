@@ -11,7 +11,7 @@
 
 #include <variant>
 
-#include <QVector>
+#include <QList>
 
 class QXmppSpamReport;
 struct QXmppBlockingManagerPrivate;
@@ -29,29 +29,29 @@ public:
         \brief Indicates that the queried JID is fully blocked.
     */
     struct Blocked {
-        QVector<QString> blockingEntries;
-        QVector<QString> partiallyBlockingEntries;
+        QList<QString> blockingEntries;
+        QList<QString> partiallyBlockingEntries;
     };
     /*!
         \inmodule QXmpp
         \brief Indicates that only some resources or nodes of the queried JID are blocked.
     */
     struct PartiallyBlocked {
-        QVector<QString> partiallyBlockingEntries;
+        QList<QString> partiallyBlockingEntries;
     };
 
     using BlockingState = std::variant<NotBlocked, PartiallyBlocked, Blocked>;
 
     QXmppBlocklist();
-    QXmppBlocklist(QVector<QString> entries);
+    QXmppBlocklist(QList<QString> entries);
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppBlocklist)
 
-    QVector<QString> entries() const;
+    QList<QString> entries() const;
     bool containsEntry(QStringView) const;
     BlockingState blockingState(const QString &jid) const;
 
 private:
-    QVector<QString> m_blocklist;
+    QList<QString> m_blocklist;
 };
 
 class QXMPP_EXPORT QXmppBlockingManager : public QXmppClientExtension
@@ -76,15 +76,15 @@ public:
     Q_SIGNAL void subscribedChanged();
 
     QXmppTask<BlocklistResult> fetchBlocklist();
-    QXmppTask<Result> block(QString jid) { return block(QVector<QString> { std::move(jid) }); }
-    QXmppTask<Result> block(QVector<QString> jids);
-    QXmppTask<Result> unblock(QString jid) { return unblock(QVector<QString> { std::move(jid) }); }
-    QXmppTask<Result> unblock(QVector<QString> jids);
+    QXmppTask<Result> block(QString jid) { return block(QList<QString> { std::move(jid) }); }
+    QXmppTask<Result> block(QList<QString> jids);
+    QXmppTask<Result> unblock(QString jid) { return unblock(QList<QString> { std::move(jid) }); }
+    QXmppTask<Result> unblock(QList<QString> jids);
 
     QXmppTask<Result> reportAndBlock(QString jid, QXmppSpamReport report);
 
-    Q_SIGNAL void blocked(const QVector<QString> &jids);
-    Q_SIGNAL void unblocked(const QVector<QString> &jids);
+    Q_SIGNAL void blocked(const QList<QString> &jids);
+    Q_SIGNAL void unblocked(const QList<QString> &jids);
 
     QStringList discoveryFeatures() const override;
     void onRegistered(QXmppClient *) override;

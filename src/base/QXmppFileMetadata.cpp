@@ -28,13 +28,13 @@ class QXmppFileMetadataPrivate : public QSharedData
 public:
     std::optional<QDateTime> date;
     std::optional<QString> desc;
-    QVector<QXmppHash> hashes;
+    QList<QXmppHash> hashes;
     std::optional<uint32_t> height;
     std::optional<uint32_t> length;
     std::optional<QMimeType> mediaType;
     std::optional<QString> name;
     std::optional<uint64_t> size;
-    QVector<QXmppThumbnail> thumbnails;
+    QList<QXmppThumbnail> thumbnails;
     std::optional<uint32_t> width;
 };
 
@@ -87,7 +87,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
         d->desc = descEl.text();
     }
 
-    d->hashes = parseChildElements<QVector<QXmppHash>>(el);
+    d->hashes = parseChildElements<QList<QXmppHash>>(el);
 
     if (auto heightEl = firstChildElement(el, u"height"); !heightEl.isNull()) {
         d->height = firstChildElement(el, u"height").text().toUInt();
@@ -104,7 +104,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
     if (auto sizeEl = firstChildElement(el, u"size"); !sizeEl.isNull()) {
         d->size = sizeEl.text().toULong();
     }
-    d->thumbnails = parseChildElements<QVector<QXmppThumbnail>>(el);
+    d->thumbnails = parseChildElements<QList<QXmppThumbnail>>(el);
     if (auto widthEl = firstChildElement(el, u"width"); !widthEl.isNull()) {
         d->width = widthEl.text().toUInt();
     }
@@ -157,13 +157,13 @@ void QXmppFileMetadata::setDescription(const std::optional<QString> &description
 }
 
 /*! Returns the hashes of the file */
-const QVector<QXmppHash> &QXmppFileMetadata::hashes() const
+const QList<QXmppHash> &QXmppFileMetadata::hashes() const
 {
     return d->hashes;
 }
 
 /*! Sets the \a hashes of the file */
-void QXmppFileMetadata::setHashes(const QVector<QXmppHash> &hashes)
+void QXmppFileMetadata::setHashes(const QList<QXmppHash> &hashes)
 {
     d->hashes = hashes;
 }
@@ -237,13 +237,13 @@ void QXmppFileMetadata::setSize(std::optional<uint64_t> size)
 }
 
 /*! Returns the thumbnail references. */
-const QVector<QXmppThumbnail> &QXmppFileMetadata::thumbnails() const
+const QList<QXmppThumbnail> &QXmppFileMetadata::thumbnails() const
 {
     return d->thumbnails;
 }
 
 /*! Sets the \a thumbnail references. */
-void QXmppFileMetadata::setThumbnails(const QVector<QXmppThumbnail> &thumbnail)
+void QXmppFileMetadata::setThumbnails(const QList<QXmppThumbnail> &thumbnail)
 {
     d->thumbnails = thumbnail;
 }

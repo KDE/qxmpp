@@ -36,8 +36,8 @@ public:
     Cipher cipher = Aes128GcmNoPad;
     QByteArray key;
     QByteArray iv;
-    QVector<QXmppHash> hashes;
-    QVector<QXmppHttpFileSource> httpSources;
+    QList<QXmppHash> hashes;
+    QList<QXmppHttpFileSource> httpSources;
 };
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppEncryptedFileSource)
@@ -105,7 +105,7 @@ void QXmppEncryptedFileSource::setIv(const QByteArray &newIv)
 }
 
 /*! Returns the hashes of the file contained in this file source */
-const QVector<QXmppHash> &QXmppEncryptedFileSource::hashes() const
+const QList<QXmppHash> &QXmppEncryptedFileSource::hashes() const
 {
     return d->hashes;
 }
@@ -115,13 +115,13 @@ const QVector<QXmppHash> &QXmppEncryptedFileSource::hashes() const
 
     \a newHashes.
 */
-void QXmppEncryptedFileSource::setHashes(const QVector<QXmppHash> &newHashes)
+void QXmppEncryptedFileSource::setHashes(const QList<QXmppHash> &newHashes)
 {
     d->hashes = newHashes;
 }
 
 /*! Returns the http sources that can be used to retrieve the encrypted data */
-const QVector<QXmppHttpFileSource> &QXmppEncryptedFileSource::httpSources() const
+const QList<QXmppHttpFileSource> &QXmppEncryptedFileSource::httpSources() const
 {
     return d->httpSources;
 }
@@ -131,7 +131,7 @@ const QVector<QXmppHttpFileSource> &QXmppEncryptedFileSource::httpSources() cons
 
     \a newHttpSources.
 */
-void QXmppEncryptedFileSource::setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources)
+void QXmppEncryptedFileSource::setHttpSources(const QList<QXmppHttpFileSource> &newHttpSources)
 {
     d->httpSources = newHttpSources;
 }
@@ -163,13 +163,13 @@ bool QXmppEncryptedFileSource::parse(const QDomElement &el)
     } else {
         return false;
     }
-    d->hashes = parseChildElements<QVector<QXmppHash>>(el);
+    d->hashes = parseChildElements<QList<QXmppHash>>(el);
 
     auto sourcesEl = el.firstChildElement(u"sources"_s);
     if (sourcesEl.isNull()) {
         return false;
     }
-    d->httpSources = parseChildElements<QVector<QXmppHttpFileSource>>(sourcesEl);
+    d->httpSources = parseChildElements<QList<QXmppHttpFileSource>>(sourcesEl);
 
     return true;
 }

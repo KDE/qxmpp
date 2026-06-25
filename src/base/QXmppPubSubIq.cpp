@@ -82,8 +82,8 @@ public:
     QString queryJid;
     QString queryNode;
     QString subscriptionId;
-    QVector<QXmppPubSubSubscription> subscriptions;
-    QVector<QXmppPubSubAffiliation> affiliations;
+    QList<QXmppPubSubSubscription> subscriptions;
+    QList<QXmppPubSubAffiliation> affiliations;
     uint32_t maxItems = 0;
     bool retractNotify = false;
     std::optional<QXmppDataForm> dataForm;
@@ -157,13 +157,13 @@ void PubSubIqBase::setSubscriptionId(const QString &subscriptionId)
 }
 
 // Returns the included subscriptions.
-QVector<QXmppPubSubSubscription> PubSubIqBase::subscriptions() const
+QList<QXmppPubSubSubscription> PubSubIqBase::subscriptions() const
 {
     return d->subscriptions;
 }
 
 // Sets the included subscriptions.
-void PubSubIqBase::setSubscriptions(const QVector<QXmppPubSubSubscription> &subscriptions)
+void PubSubIqBase::setSubscriptions(const QList<QXmppPubSubSubscription> &subscriptions)
 {
     d->subscriptions = subscriptions;
 }
@@ -195,13 +195,13 @@ void PubSubIqBase::setSubscription(const std::optional<QXmppPubSubSubscription> 
 }
 
 // Returns the included affiliations.
-QVector<QXmppPubSubAffiliation> PubSubIqBase::affiliations() const
+QList<QXmppPubSubAffiliation> PubSubIqBase::affiliations() const
 {
     return d->affiliations;
 }
 
 // Sets the included affiliations.
-void PubSubIqBase::setAffiliations(const QVector<QXmppPubSubAffiliation> &affiliations)
+void PubSubIqBase::setAffiliations(const QList<QXmppPubSubAffiliation> &affiliations)
 {
     d->affiliations = affiliations;
 }

@@ -162,7 +162,7 @@ void tst_QXmppDataForm::testMedia()
 
     QXmppDataForm::Field mediaField2;
     mediaField2.setMediaSize(QSize(290, 80));
-    QVector<QXmppDataForm::MediaSource> sources;
+    QList<QXmppDataForm::MediaSource> sources;
     sources << QXmppDataForm::MediaSource(
         QUrl(u"http://www.victim.com/challenges/ocr.jpeg?F3A6292C"_s),
         QMimeDatabase().mimeTypeForName(u"image/jpeg"_s));

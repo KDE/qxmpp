@@ -506,10 +506,10 @@ void Manager::setMaximumDevicesPerStanza(int maximum)
 
     Returns the results of the requests for each JID.
 */
-QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QString> jids)
+QXmppTask<QList<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QString> jids)
 {
     Q_ASSERT_X(!jids.contains(d->ownBareJid()), "Requesting contact's device list", "Own JID passed");
-    QVector<Manager::DevicesResult> devicesResults;
+    QList<Manager::DevicesResult> devicesResults;
 
     // Process each JID sequentially to avoid MSVC coroutine ICE with complex template types
     for (const auto &jid : jids) {
@@ -536,9 +536,9 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QSt
 
     Returns the results of the subscription for each JID.
 */
-QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList<QString> jids)
+QXmppTask<QList<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList<QString> jids)
 {
-    QVector<DevicesResult> devicesResults;
+    QList<DevicesResult> devicesResults;
     devicesResults.reserve(jids.size());
 
     // Process each JID sequentially to avoid MSVC coroutine ICE with complex template types
@@ -559,7 +559,7 @@ QXmppTask<QVector<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList
 
     Returns the results of the unsubscription for each JID.
 */
-QXmppTask<QVector<Manager::DevicesResult>> Manager::unsubscribeFromDeviceLists()
+QXmppTask<QList<Manager::DevicesResult>> Manager::unsubscribeFromDeviceLists()
 {
     return d->unsubscribeFromDeviceLists(d->jidsOfManuallySubscribedDevices);
 }
@@ -587,7 +587,7 @@ QXmppOmemoOwnDevice Manager::ownDevice()
 
     You must build sessions before you can get devices with corresponding keys.
 */
-QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices()
+QXmppTask<QList<QXmppOmemoDevice>> Manager::devices()
 {
     return devices(d->devices.keys());
 }
@@ -604,11 +604,11 @@ QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices()
 
     You must build sessions before you can get devices with corresponding keys.
 */
-QXmppTask<QVector<QXmppOmemoDevice>> Manager::devices(QList<QString> jids)
+QXmppTask<QList<QXmppOmemoDevice>> Manager::devices(QList<QString> jids)
 {
     auto keys = co_await this->keys(jids).withContext(this);
 
-    QVector<QXmppOmemoDevice> devices;
+    QList<QXmppOmemoDevice> devices;
     for (const auto &jid : jids) {
         const auto &storedDevices = d->devices.value(jid);
         const auto &storedKeys = keys.value(jid);
@@ -865,7 +865,7 @@ QXmppTask<QXmpp::TrustLevel> Manager::trustLevel(const QString &keyOwnerJid, con
 
 QXmppTask<QXmppE2eeExtension::MessageEncryptResult> Manager::encryptMessage(QXmppMessage &&message, const std::optional<QXmppSendStanzaParams> &params)
 {
-    QVector<QString> recipientJids;
+    QList<QString> recipientJids;
     std::optional<TrustLevels> acceptedTrustLevels;
 
     if (params) {

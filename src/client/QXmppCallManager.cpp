@@ -92,7 +92,7 @@ QXmppTask<StunTurnResult> QXmpp::Private::requestStunTurnConfig(QXmppClient *cli
             return;
         }
 
-        const auto &services = std::get<QVector<QXmppExternalService>>(result);
+        const auto &services = std::get<QList<QXmppExternalService>>(result);
         // STUN (all)
         auto stunServers = transformFilter<QList<StunServerConfig>>(services, [](const auto &service) -> std::optional<StunServerConfig> {
             if (service.type() == u"stun" && service.port()) {

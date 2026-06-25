@@ -84,7 +84,7 @@ void QXmppUploadService::setSizeLimit(qint64 sizeLimit)
 class QXmppUploadRequestManagerPrivate : public QSharedData
 {
 public:
-    QVector<QXmppUploadService> uploadServices;
+    QList<QXmppUploadService> uploadServices;
 };
 
 /*!
@@ -256,7 +256,7 @@ bool QXmppUploadRequestManager::serviceFound() const
 }
 
 /*! Returns all discovered HTTP File Upload services. */
-QVector<QXmppUploadService> QXmppUploadRequestManager::uploadServices() const
+QList<QXmppUploadService> QXmppUploadRequestManager::uploadServices() const
 {
     return d->uploadServices;
 }

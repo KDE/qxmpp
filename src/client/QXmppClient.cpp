@@ -802,7 +802,7 @@ bool QXmppClient::injectMessage(QXmppMessage &&message)
 
     \since QXmpp 1.9
 */
-void QXmppClient::setIgnoredStreamErrors(const QVector<QXmpp::StreamError> &errors)
+void QXmppClient::setIgnoredStreamErrors(const QList<QXmpp::StreamError> &errors)
 {
     d->ignoredStreamErrors = errors;
 }

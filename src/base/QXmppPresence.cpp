@@ -84,7 +84,7 @@ public:
 
     // XEP-0272: Multiparty Jingle (Muji)
     bool isPreparingMujiSession = false;
-    QVector<QXmppJingleIq::Content> mujiContents;
+    QList<QXmppJingleIq::Content> mujiContents;
 
     // XEP-0319: Last User Interaction in Presence
     QDateTime lastUserInteraction;
@@ -304,7 +304,7 @@ void QXmppPresence::setIsPreparingMujiSession(bool isPreparingMujiSession)
 
     \since QXmpp 1.5
 */
-QVector<QXmppJingleIq::Content> QXmppPresence::mujiContents() const
+QList<QXmppJingleIq::Content> QXmppPresence::mujiContents() const
 {
     return d->mujiContents;
 }
@@ -314,7 +314,7 @@ QVector<QXmppJingleIq::Content> QXmppPresence::mujiContents() const
 
     \since QXmpp 1.5
 */
-void QXmppPresence::setMujiContents(const QVector<QXmppJingleIq::Content> &mujiContents)
+void QXmppPresence::setMujiContents(const QList<QXmppJingleIq::Content> &mujiContents)
 {
     d->mujiContents = mujiContents;
 }
@@ -709,7 +709,7 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
 
         // allow any namespace (not just ns_jingle): XEP has no XML schema and examples don't have
         // jingle namespace, but muji namespace
-        d->mujiContents = transformFilter<QVector<QXmppJingleIq::Content>>(iterChildElements(element, u"content"), parseElement<QXmppJingleIq::Content>);
+        d->mujiContents = transformFilter<QList<QXmppJingleIq::Content>>(iterChildElements(element, u"content"), parseElement<QXmppJingleIq::Content>);
         // XEP-0283: Moved
     } else if (element.tagName() == u"moved" && element.namespaceURI() == ns_moved) {
         d->oldJid = element.firstChildElement(u"old-jid"_s).text();

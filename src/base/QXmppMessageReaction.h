@@ -23,8 +23,8 @@ public:
     QString messageId() const;
     void setMessageId(const QString &messageId);
 
-    QVector<QString> emojis() const;
-    void setEmojis(const QVector<QString> &emojis);
+    QList<QString> emojis() const;
+    void setEmojis(const QList<QString> &emojis);
 
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;

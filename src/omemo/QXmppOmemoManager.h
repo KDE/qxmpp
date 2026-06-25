@@ -100,13 +100,13 @@ public:
     int maximumDevicesPerStanza() const;
     void setMaximumDevicesPerStanza(int maximum);
 
-    QXmppTask<QVector<DevicesResult>> requestDeviceLists(QList<QString> jids);
-    QXmppTask<QVector<DevicesResult>> subscribeToDeviceLists(QList<QString> jids);
-    QXmppTask<QVector<DevicesResult>> unsubscribeFromDeviceLists();
+    QXmppTask<QList<DevicesResult>> requestDeviceLists(QList<QString> jids);
+    QXmppTask<QList<DevicesResult>> subscribeToDeviceLists(QList<QString> jids);
+    QXmppTask<QList<DevicesResult>> unsubscribeFromDeviceLists();
 
     QXmppOmemoOwnDevice ownDevice();
-    QXmppTask<QVector<QXmppOmemoDevice>> devices();
-    QXmppTask<QVector<QXmppOmemoDevice>> devices(QList<QString> jids);
+    QXmppTask<QList<QXmppOmemoDevice>> devices();
+    QXmppTask<QList<QXmppOmemoDevice>> devices(QList<QString> jids);
     QXmppTask<Result> removeContactDevices(QString jid);
 
     void setAcceptedSessionBuildingTrustLevels(QXmpp::TrustLevels trustLevels);

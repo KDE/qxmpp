@@ -55,7 +55,7 @@ public:
     using Nickname = QString;
 
     using CreationResult = std::variant<ChannelJid, QXmppError>;
-    using ChannelJidResult = std::variant<QVector<ChannelJid>, QXmppError>;
+    using ChannelJidResult = std::variant<QList<ChannelJid>, QXmppError>;
     using ChannelNodeResult = std::variant<QXmppMixConfigItem::Nodes, QXmppError>;
     using ConfigurationResult = std::variant<QXmppMixConfigItem, QXmppError>;
     using InformationResult = std::variant<QXmppMixInfoItem, QXmppError>;
@@ -63,8 +63,8 @@ public:
     using NicknameResult = std::variant<Nickname, QXmppError>;
     using InvitationResult = std::variant<QXmppMixInvitation, QXmppError>;
     using SubscriptionResult = std::variant<Subscription, QXmppError>;
-    using JidResult = std::variant<QVector<Jid>, QXmppError>;
-    using ParticipantResult = std::variant<QVector<QXmppMixParticipantItem>, QXmppError>;
+    using JidResult = std::variant<QList<Jid>, QXmppError>;
+    using ParticipantResult = std::variant<QList<QXmppMixParticipantItem>, QXmppError>;
 
     QXmppMixManager();
     ~QXmppMixManager() override;

@@ -19,7 +19,7 @@ class QXmppMessageReactionPrivate : public QSharedData
 {
 public:
     QString messageId;
-    QVector<QString> emojis;
+    QList<QString> emojis;
 };
 
 /*!
@@ -70,7 +70,7 @@ void QXmppMessageReaction::setMessageId(const QString &messageId)
 /*!
     Returns the emojis in reaction to a message.
 */
-QVector<QString> QXmppMessageReaction::emojis() const
+QList<QString> QXmppMessageReaction::emojis() const
 {
     return d->emojis;
 }
@@ -81,7 +81,7 @@ QVector<QString> QXmppMessageReaction::emojis() const
     Each reaction should only consist of unicode codepoints that can be displayed as a single emoji.
     Duplicates are not allowed.
 */
-void QXmppMessageReaction::setEmojis(const QVector<QString> &emojis)
+void QXmppMessageReaction::setEmojis(const QList<QString> &emojis)
 {
     d->emojis = emojis;
 }
@@ -89,7 +89,7 @@ void QXmppMessageReaction::setEmojis(const QVector<QString> &emojis)
 void QXmppMessageReaction::parse(const QDomElement &element)
 {
     d->messageId = element.attribute(u"id"_s);
-    d->emojis = parseTextElements<QVector<QString>>(element, u"reaction", ns_reactions);
+    d->emojis = parseTextElements<QList<QString>>(element, u"reaction", ns_reactions);
 
     // Remove duplicate emojis.
     std::sort(d->emojis.begin(), d->emojis.end());

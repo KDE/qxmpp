@@ -89,8 +89,8 @@ public:
     bool isRequired() const;
     void setRequired(bool isRequired);
 
-    QVector<QXmppJingleRtpCryptoElement> cryptoElements() const;
-    void setCryptoElements(const QVector<QXmppJingleRtpCryptoElement> &cryptoElements);
+    QList<QXmppJingleRtpCryptoElement> cryptoElements() const;
+    void setCryptoElements(const QList<QXmppJingleRtpCryptoElement> &cryptoElements);
 
     static constexpr std::tuple XmlTag = { u"encryption", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
@@ -115,8 +115,8 @@ public:
     QString subtype() const;
     void setSubtype(const QString &subtype);
 
-    QVector<QXmppSdpParameter> parameters() const;
-    void setParameters(const QVector<QXmppSdpParameter> &parameters);
+    QList<QXmppSdpParameter> parameters() const;
+    void setParameters(const QList<QXmppSdpParameter> &parameters);
 
     static constexpr std::tuple XmlTag = { u"rtcp-fb", QXmpp::Private::ns_jingle_rtcp_fb };
     void parse(const QDomElement &element);
@@ -170,8 +170,8 @@ public:
     Senders senders() const;
     void setSenders(Senders senders);
 
-    QVector<QXmppSdpParameter> parameters() const;
-    void setParameters(const QVector<QXmppSdpParameter> &parameters);
+    QList<QXmppSdpParameter> parameters() const;
+    void setParameters(const QList<QXmppSdpParameter> &parameters);
 
     static constexpr std::tuple XmlTag = { u"rtp-hdrext", QXmpp::Private::ns_jingle_rtp_hdrext };
     void parse(const QDomElement &element);
@@ -217,11 +217,11 @@ public:
     unsigned int ptime() const;
     void setPtime(unsigned int ptime);
 
-    QVector<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties() const;
-    void setRtpFeedbackProperties(const QVector<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties);
+    QList<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties() const;
+    void setRtpFeedbackProperties(const QList<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties);
 
-    QVector<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals() const;
-    void setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals);
+    QList<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals() const;
+    void setRtpFeedbackIntervals(const QList<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals);
 
     static constexpr std::tuple XmlTag = { u"payload-type", QXmpp::Private::ns_jingle_rtp };
     void parse(const QDomElement &element);
@@ -555,14 +555,14 @@ public:
         QString transportPassword() const;
         void setTransportPassword(const QString &password);
 
-        QVector<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties() const;
-        void setRtpFeedbackProperties(const QVector<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties);
+        QList<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties() const;
+        void setRtpFeedbackProperties(const QList<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties);
 
-        QVector<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals() const;
-        void setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals);
+        QList<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals() const;
+        void setRtpFeedbackIntervals(const QList<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals);
 
-        QVector<QXmppJingleRtpHeaderExtensionProperty> rtpHeaderExtensionProperties() const;
-        void setRtpHeaderExtensionProperties(const QVector<QXmppJingleRtpHeaderExtensionProperty> &rtpHeaderExtensionProperties);
+        QList<QXmppJingleRtpHeaderExtensionProperty> rtpHeaderExtensionProperties() const;
+        void setRtpHeaderExtensionProperties(const QList<QXmppJingleRtpHeaderExtensionProperty> &rtpHeaderExtensionProperties);
 
         bool isRtpHeaderExtensionMixingAllowed() const;
         void setRtpHeaderExtensionMixingAllowed(bool isRtpHeaderExtensionMixingAllowed);
@@ -750,8 +750,8 @@ public:
     std::optional<Jingle> jingle() const;
     void setJingle(std::optional<Jingle> jingle);
 
-    std::optional<QVector<External>> external() const;
-    void setExternal(std::optional<QVector<External>> external);
+    std::optional<QList<External>> external() const;
+    void setExternal(std::optional<QList<External>> external);
 
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;

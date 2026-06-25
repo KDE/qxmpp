@@ -65,14 +65,14 @@ public:
     QString subscriptionId() const;
     void setSubscriptionId(const QString &subscriptionId);
 
-    QVector<QXmppPubSubSubscription> subscriptions() const;
-    void setSubscriptions(const QVector<QXmppPubSubSubscription> &);
+    QList<QXmppPubSubSubscription> subscriptions() const;
+    void setSubscriptions(const QList<QXmppPubSubSubscription> &);
 
     std::optional<QXmppPubSubSubscription> subscription() const;
     void setSubscription(const std::optional<QXmppPubSubSubscription> &);
 
-    QVector<QXmppPubSubAffiliation> affiliations() const;
-    void setAffiliations(const QVector<QXmppPubSubAffiliation> &);
+    QList<QXmppPubSubAffiliation> affiliations() const;
+    void setAffiliations(const QList<QXmppPubSubAffiliation> &);
 
     std::optional<uint32_t> maxItems() const;
     void setMaxItems(std::optional<uint32_t>);
@@ -109,8 +109,8 @@ template<typename T = QXmppPubSubBaseItem>
 class PubSubIq : public PubSubIqBase
 {
 public:
-    QVector<T> items() const;
-    void setItems(const QVector<T> &items);
+    QList<T> items() const;
+    void setItems(const QList<T> &items);
 
     static bool isPubSubIq(const QDomElement &element);
 
@@ -119,17 +119,17 @@ protected:
     void serializeItems(QXmlStreamWriter *writer) const override;
 
 private:
-    QVector<T> m_items;
+    QList<T> m_items;
 };
 
 template<typename T>
-QVector<T> PubSubIq<T>::items() const
+QList<T> PubSubIq<T>::items() const
 {
     return m_items;
 }
 
 template<typename T>
-void PubSubIq<T>::setItems(const QVector<T> &items)
+void PubSubIq<T>::setItems(const QList<T> &items)
 {
     m_items = items;
 }

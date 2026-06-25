@@ -106,7 +106,7 @@ QXmppTask<SendResult> QXmppCallInvite::invite(
     bool audio,
     bool video,
     std::optional<QXmppCallInviteElement::Jingle> jingle,
-    std::optional<QVector<QXmppCallInviteElement::External>> external)
+    std::optional<QList<QXmppCallInviteElement::External>> external)
 {
     QXmppCallInviteElement callInviteElement;
     callInviteElement.setType(CallInviteType::Invite);
@@ -182,7 +182,7 @@ void QXmppCallInvite::setIsAccepted(bool isAccepted)
 class QXmppCallInviteManagerPrivate
 {
 public:
-    QVector<std::shared_ptr<QXmppCallInvite>> callInvites;
+    QList<std::shared_ptr<QXmppCallInvite>> callInvites;
 };
 
 /*!
@@ -225,7 +225,7 @@ QXmppTask<QXmppCallInviteManager::ProposeResult> QXmppCallInviteManager::invite(
     bool audio,
     bool video,
     std::optional<QXmppCallInviteElement::Jingle> jingle,
-    std::optional<QVector<QXmppCallInviteElement::External>> external)
+    std::optional<QList<QXmppCallInviteElement::External>> external)
 {
     QXmppCallInviteElement callInviteElement;
     callInviteElement.setType(CallInviteType::Invite);
@@ -388,7 +388,7 @@ std::shared_ptr<QXmppCallInvite> QXmppCallInviteManager::addCallInvite(const QSt
 }
 
 /*! Returns the Call Invites vector. */
-const QVector<std::shared_ptr<QXmppCallInvite>> &QXmppCallInviteManager::callInvites() const
+const QList<std::shared_ptr<QXmppCallInvite>> &QXmppCallInviteManager::callInvites() const
 {
     return d->callInvites;
 }

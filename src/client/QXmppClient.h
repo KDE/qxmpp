@@ -433,7 +433,7 @@ private:
     void injectIq(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
     bool injectMessage(QXmppMessage &&message);
 
-    void setIgnoredStreamErrors(const QVector<QXmpp::StreamError> &);
+    void setIgnoredStreamErrors(const QList<QXmpp::StreamError> &);
 
     void _q_elementReceived(const QDomElement &element, bool &handled);
     void _q_reconnect();

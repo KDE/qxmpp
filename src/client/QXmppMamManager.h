@@ -44,7 +44,7 @@ class QXMPP_EXPORT QXmppMamManager : public QXmppClientExtension
 public:
     struct QXMPP_EXPORT RetrievedMessages {
         QXmppMamResultIq result;
-        QVector<QXmppMessage> messages;
+        QList<QXmppMessage> messages;
     };
 
     using RetrieveResult = std::variant<RetrievedMessages, QXmppError>;

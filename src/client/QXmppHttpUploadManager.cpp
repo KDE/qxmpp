@@ -293,8 +293,8 @@ struct QXmppHttpUploadManagerPrivate {
             QXmpp::Disco::Type::File,
             { staticString(ns_http_upload) });
 
-        services.setBinding([this]() -> QVector<QXmppHttpUploadService> {
-            QVector<QXmppHttpUploadService> result;
+        services.setBinding([this]() -> QList<QXmppHttpUploadService> {
+            QList<QXmppHttpUploadService> result;
             for (const auto &s : servicesWatch->services().value()) {
                 QXmppHttpUploadService service;
                 service.setJid(s.jid);
@@ -327,7 +327,7 @@ struct QXmppHttpUploadManagerPrivate {
     QXmppHttpUploadManager *q;
     QNetworkAccessManager *netManager;
     QProperty<QXmppHttpUploadManager::Support> support { QXmppHttpUploadManager::Support::Unknown };
-    QProperty<QVector<QXmppHttpUploadService>> services;
+    QProperty<QList<QXmppHttpUploadService>> services;
     std::optional<QXmppDiscoServicesWatch> servicesWatch;
     QPropertyNotifier servicesNotifier;
     QPropertyNotifier supportNotifier;
@@ -359,7 +359,7 @@ QXmppHttpUploadManager::QXmppHttpUploadManager(QNetworkAccessManager *netManager
 
     \since QXmpp 1.13
 */
-QVector<QXmppHttpUploadService> QXmppHttpUploadManager::services() const
+QList<QXmppHttpUploadService> QXmppHttpUploadManager::services() const
 {
     return d->services;
 }
@@ -556,7 +556,7 @@ void QXmppHttpUploadManager::onUnregistered(QXmppClient *)
 {
     d->servicesNotifier = {};
     d->supportNotifier = {};
-    d->services = QVector<QXmppHttpUploadService>();
+    d->services = QList<QXmppHttpUploadService>();
     d->support = Support::Unknown;
     d->servicesWatch = {};
 }

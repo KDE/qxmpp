@@ -9,12 +9,12 @@
 
 #include <optional>
 
-#include <QVector>
+#include <QList>
 
 class QDomElement;
 class QXmlStreamWriter;
 
-class QXMPP_EXPORT QXmppBitsOfBinaryDataList : public QVector<QXmppBitsOfBinaryData>
+class QXMPP_EXPORT QXmppBitsOfBinaryDataList : public QList<QXmppBitsOfBinaryData>
 {
 public:
     QXmppBitsOfBinaryDataList();
@@ -22,8 +22,8 @@ public:
 
     std::optional<QXmppBitsOfBinaryData> find(const QXmppBitsOfBinaryContentId &cid) const;
 
-    QXmppBitsOfBinaryDataList(const QVector<QXmppBitsOfBinaryData> &data) : QVector<QXmppBitsOfBinaryData>(data) { }
-    QXmppBitsOfBinaryDataList(QVector<QXmppBitsOfBinaryData> &&data) : QVector<QXmppBitsOfBinaryData>(std::move(data)) { }
+    QXmppBitsOfBinaryDataList(const QList<QXmppBitsOfBinaryData> &data) : QList<QXmppBitsOfBinaryData>(data) { }
+    QXmppBitsOfBinaryDataList(QList<QXmppBitsOfBinaryData> &&data) : QList<QXmppBitsOfBinaryData>(std::move(data)) { }
 
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;

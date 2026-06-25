@@ -10,9 +10,9 @@
 #include "QXmppHash.h"
 #include "QXmppHttpFileSource.h"
 
+#include <QList>
 #include <QSharedDataPointer>
 #include <QUrl>
-#include <QVector>
 
 class QXmppEncryptedFileSourcePrivate;
 
@@ -32,11 +32,11 @@ public:
     const QByteArray &iv() const;
     void setIv(const QByteArray &newIv);
 
-    const QVector<QXmppHash> &hashes() const;
-    void setHashes(const QVector<QXmppHash> &newHashes);
+    const QList<QXmppHash> &hashes() const;
+    void setHashes(const QList<QXmppHash> &newHashes);
 
-    const QVector<QXmppHttpFileSource> &httpSources() const;
-    void setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources);
+    const QList<QXmppHttpFileSource> &httpSources() const;
+    void setHttpSources(const QList<QXmppHttpFileSource> &newHttpSources);
 
     static constexpr std::tuple XmlTag = { u"encrypted", QXmpp::Private::ns_esfs };
     bool parse(const QDomElement &el);

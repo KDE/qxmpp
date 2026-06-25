@@ -49,7 +49,7 @@ struct StunTurnConfig {
 };
 
 using ServiceResult = std::variant<QXmppExternalService, QXmppError>;
-using ServicesResult = std::variant<QVector<QXmppExternalService>, QXmppError>;
+using ServicesResult = std::variant<QList<QXmppExternalService>, QXmppError>;
 QXmppTask<ServicesResult> requestExternalServices(QXmppClient *client, const QString &jid);
 QXmppTask<ServiceResult> requestCredentials(QXmppClient *client, const QString &jid, const QString &type, const QString &host);
 

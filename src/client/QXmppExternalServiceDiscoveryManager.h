@@ -22,7 +22,7 @@ public:
     QXmppExternalServiceDiscoveryManager();
     ~QXmppExternalServiceDiscoveryManager();
 
-    using ServicesResult = std::variant<QVector<QXmppExternalService>, QXmppError>;
+    using ServicesResult = std::variant<QList<QXmppExternalService>, QXmppError>;
 
     QXmppTask<ServicesResult> requestServices(const QString &jid, const QString &node = {});
 

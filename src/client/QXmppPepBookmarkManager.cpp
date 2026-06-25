@@ -348,7 +348,7 @@ QXmppPubSubManager *QXmppPepBookmarkManagerPrivate::pubsub()
     return nullptr;
 }
 
-void QXmppPepBookmarkManagerPrivate::setBookmarks(QVector<Bookmarks2ConferenceItem> &&items)
+void QXmppPepBookmarkManagerPrivate::setBookmarks(QList<Bookmarks2ConferenceItem> &&items)
 {
     bookmarks = transform<QList<QXmppMucBookmark>>(items, [](auto &&item) {
         return QXmppMucBookmark { item.id(), std::move(item.payload) };

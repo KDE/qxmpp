@@ -149,8 +149,8 @@ void tst_QXmppPubSubManager::testRequestFeatures()
                                 "<feature var='http://jabber.org/protocol/pubsub#auto-create'/>"
                                 "</query></iq>"));
 
-    auto features = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(features, (QVector<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
+    auto features = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(features, (QList<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
 
     future = psManager->requestFeatures("juliet@capulet.lit");
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='get'>"
@@ -163,8 +163,8 @@ void tst_QXmppPubSubManager::testRequestFeatures()
                                 "<feature var='http://jabber.org/protocol/pubsub#auto-create'/>"
                                 "</query></iq>"));
 
-    features = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(features, (QVector<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
+    features = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(features, (QList<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
 
     future = psManager->requestFeatures("juliet2@capulet.lit", QXmppPubSubManager::PubSub);
     test->expect(QStringLiteral("<iq id='qx1' to='juliet2@capulet.lit' type='get'>"
@@ -190,8 +190,8 @@ void tst_QXmppPubSubManager::testRequestFeatures()
                                 "<feature var='http://jabber.org/protocol/pubsub#auto-create'/>"
                                 "</query></iq>"));
 
-    features = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(features, (QVector<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
+    features = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(features, (QList<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
 
     future = psManager->requestFeatures("pubsub4.shakespeare.lit", QXmppPubSubManager::Pep);
     test->expect(QStringLiteral("<iq id='qx1' to='pubsub4.shakespeare.lit' type='get'>"
@@ -217,8 +217,8 @@ void tst_QXmppPubSubManager::testRequestFeatures()
                                 "<feature var='http://jabber.org/protocol/pubsub#auto-create'/>"
                                 "</query></iq>"));
 
-    features = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(features, (QVector<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
+    features = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(features, (QList<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
 }
 
 void tst_QXmppPubSubManager::testRequestPepFeatures()
@@ -237,8 +237,8 @@ void tst_QXmppPubSubManager::testRequestPepFeatures()
                                 "<feature var='http://jabber.org/protocol/pubsub#auto-create'/>"
                                 "</query></iq>"));
 
-    auto features = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(features, (QVector<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
+    auto features = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(features, (QList<QString> { XMLNS_PUBSUB, XMLNS_PUBSUB_AUTO_CREATE }));
 }
 
 void tst_QXmppPubSubManager::testFetchNodes()
@@ -253,8 +253,8 @@ void tst_QXmppPubSubManager::testFetchNodes()
                                 "<item jid='pubsub.shakespeare.lit' node='news' name='News and announcements'/>"
                                 "</query></iq>"));
 
-    const auto nodes = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(nodes, (QVector<QString> { "blogs", "news" }));
+    const auto nodes = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(nodes, (QList<QString> { "blogs", "news" }));
 }
 
 void tst_QXmppPubSubManager::testFetchPepNodes()
@@ -272,8 +272,8 @@ void tst_QXmppPubSubManager::testFetchPepNodes()
                                 "<item jid='juliet@capulet.lit' node='news' name='News and announcements'/>"
                                 "</query></iq>"));
 
-    const auto nodes = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(nodes, (QVector<QString> { "blogs", "news" }));
+    const auto nodes = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(nodes, (QList<QString> { "blogs", "news" }));
 }
 
 void tst_QXmppPubSubManager::testCreateNodes_data()
@@ -423,7 +423,7 @@ void tst_QXmppPubSubManager::testPublishItems_data()
     QTest::addColumn<bool>("isPep");
     QTest::addColumn<QString>("jid");
     QTest::addColumn<QString>("node");
-    QTest::addColumn<QVector<QXmppPubSubBaseItem>>("items");
+    QTest::addColumn<QList<QXmppPubSubBaseItem>>("items");
     QTest::addColumn<OptionsOpt>("publishOptions");
     QTest::addColumn<bool>("returnIds");
 
@@ -436,14 +436,14 @@ void tst_QXmppPubSubManager::testPublishItems_data()
     item2.setArtist("Rick Astley");
     item2.setTitle("Never gonna give you up");
 
-    QVector<QXmppPubSubBaseItem> items1 { item1 };
-    QVector<QXmppPubSubBaseItem> items2 { item1, item2 };
+    QList<QXmppPubSubBaseItem> items1 { item1 };
+    QList<QXmppPubSubBaseItem> items2 { item1, item2 };
 
     QXmppPubSubPublishOptions publishOptions;
     publishOptions.setAccessModel(QXmppPubSubPublishOptions::Presence);
 
     auto addRow = [&](const char *name, bool isPep, QString &&jid,
-                      QString &&node, const QVector<QXmppPubSubBaseItem> &items) {
+                      QString &&node, const QList<QXmppPubSubBaseItem> &items) {
         QTest::addRow("%s", name) << isPep << jid << node << items << OptionsOpt() << false;
         QTest::addRow("%s%s", name, "ReturnIds") << isPep << jid << node << items << OptionsOpt() << true;
         QTest::addRow("%s%s", name, "WithOptions") << isPep << jid << node << items << std::make_optional(publishOptions) << false;
@@ -461,7 +461,7 @@ void tst_QXmppPubSubManager::testPublishItems()
     QFETCH(bool, isPep);
     QFETCH(QString, jid);
     QFETCH(QString, node);
-    QFETCH(QVector<QXmppPubSubBaseItem>, items);
+    QFETCH(QList<QXmppPubSubBaseItem>, items);
     QFETCH(std::optional<QXmppPubSubPublishOptions>, publishOptions);
     QFETCH(bool, returnIds);
 
@@ -490,7 +490,7 @@ void tst_QXmppPubSubManager::testPublishItems()
         return result;
     }();
     const auto itemIds = [&]() {
-        QVector<QString> ids;
+        QList<QString> ids;
         for (const auto &item : std::as_const(items)) {
             ids << item.id();
         }
@@ -561,7 +561,7 @@ void tst_QXmppPubSubManager::testPublishItems()
         }();
 
         injectXml();
-        const auto ids = expectFutureVariant<QVector<QString>>(future);
+        const auto ids = expectFutureVariant<QList<QString>>(future);
         if (returnIds) {
             QCOMPARE(ids, itemIds);
         } else {
@@ -697,8 +697,8 @@ void tst_QXmppPubSubManager::testRequestItemIds()
                                 "<item jid='pubsub.shakespeare.lit' name='3300659945416e274474e469a1f0154c'/>"
                                 "</query></iq>"));
 
-    auto itemIds = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(itemIds, (QVector<QString> { u"368866411b877c30064a5f62b917cffe"_s, u"3300659945416e274474e469a1f0154c"_s }));
+    auto itemIds = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(itemIds, (QList<QString> { u"368866411b877c30064a5f62b917cffe"_s, u"3300659945416e274474e469a1f0154c"_s }));
 }
 
 void tst_QXmppPubSubManager::testRequestPepItemIds()
@@ -716,8 +716,8 @@ void tst_QXmppPubSubManager::testRequestPepItemIds()
                                 "<item jid='juliet@capulet.lit' name='3300659945416e274474e469a1f0154c'/>"
                                 "</query></iq>"));
 
-    auto itemIds = expectFutureVariant<QVector<QString>>(future);
-    QCOMPARE(itemIds, (QVector<QString> { u"368866411b877c30064a5f62b917cffe"_s, u"3300659945416e274474e469a1f0154c"_s }));
+    auto itemIds = expectFutureVariant<QList<QString>>(future);
+    QCOMPARE(itemIds, (QList<QString> { u"368866411b877c30064a5f62b917cffe"_s, u"3300659945416e274474e469a1f0154c"_s }));
 }
 
 void tst_QXmppPubSubManager::testRequestCurrentItem()
@@ -805,7 +805,7 @@ void tst_QXmppPubSubManager::testRequestItems()
     }
 
     auto [test, psManager] = Client();
-    QVector<QXmppTuneItem> returnedItems;
+    QList<QXmppTuneItem> returnedItems;
 
     if (requestIds) {
         QString itemsXml;
@@ -972,7 +972,7 @@ void tst_QXmppPubSubManager::testRequestNodeAffiliations()
                                 "<affiliation jid='hamlet@denmark.lit' affiliation='owner'/>"
                                 "<affiliation jid='polonius@denmark.lit' affiliation='outcast'/>"
                                 "</affiliations></pubsub></iq>"));
-    const auto affiliations = expectFutureVariant<QVector<Affiliation>>(future);
+    const auto affiliations = expectFutureVariant<QList<Affiliation>>(future);
 
     QCOMPARE(affiliations.size(), 2);
     QCOMPARE(affiliations[0].node(), QString());
@@ -997,7 +997,7 @@ void tst_QXmppPubSubManager::testRequestAffiliations()
                                 "<affiliation node='node6' affiliation='owner'/>"
                                 "</affiliations></pubsub></iq>"));
 
-    const auto affiliations = expectFutureVariant<QVector<Affiliation>>(future);
+    const auto affiliations = expectFutureVariant<QList<Affiliation>>(future);
     QCOMPARE(affiliations.size(), 4);
     QCOMPARE(affiliations[3].node(), u"node6"_s);
     QCOMPARE(affiliations[3].jid(), QString());
@@ -1015,7 +1015,7 @@ void tst_QXmppPubSubManager::testRequestAffiliationsNode()
                                 "<affiliation node='node6' affiliation='owner'/>"
                                 "</affiliations></pubsub></iq>"));
 
-    const auto affiliations = expectFutureVariant<QVector<Affiliation>>(future);
+    const auto affiliations = expectFutureVariant<QList<Affiliation>>(future);
     QCOMPARE(affiliations.size(), 1);
     QCOMPARE(affiliations[0].node(), u"node6"_s);
     QCOMPARE(affiliations[0].jid(), QString());

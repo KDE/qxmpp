@@ -24,8 +24,8 @@ public:
     QXmppSendStanzaParams &operator=(const QXmppSendStanzaParams &);
     QXmppSendStanzaParams &operator=(QXmppSendStanzaParams &&);
 
-    QVector<QString> encryptionJids() const;
-    void setEncryptionJids(QVector<QString>);
+    QList<QString> encryptionJids() const;
+    void setEncryptionJids(QList<QString>);
 
     std::optional<QXmpp::TrustLevels> acceptedTrustLevels() const;
     void setAcceptedTrustLevels(std::optional<QXmpp::TrustLevels> trustLevels);

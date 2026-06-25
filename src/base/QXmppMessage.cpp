@@ -143,7 +143,7 @@ public:
     QXmppMessage::Type type = QXmppMessage::Chat;
 
     // XEP-0066: Out of Band Data
-    QVector<QXmppOutOfBandUrl> outOfBandUrls;
+    QList<QXmppOutOfBandUrl> outOfBandUrls;
 
     // XEP-0071: XHTML-IM
     QString xhtml;
@@ -192,7 +192,7 @@ public:
     std::optional<QXmppJingleMessageInitiationElement> jingleMessageInitiationElement;
 
     // XEP-0359: Unique and Stable Stanza IDs
-    QVector<QXmppStanzaId> stanzaIds;
+    QList<QXmppStanzaId> stanzaIds;
     QString originId;
 
     // XEP-0367: Message Attaching
@@ -221,7 +221,7 @@ public:
     QString mucOccupantId;
 
     // XEP-0428: Fallback Indication
-    QVector<QXmppFallback> fallbackMarkers;
+    QList<QXmppFallback> fallbackMarkers;
 
     // XEP-0434: Trust Messages (TM)
     std::optional<QXmppTrustMessageElement> trustMessageElement;
@@ -230,8 +230,8 @@ public:
     std::optional<QXmppMessageReaction> reaction;
 
     // XEP-0447: Stateless file sharing
-    QVector<QXmppFileShare> sharedFiles;
-    QVector<QXmppFileSourcesAttachment> fileSourcesAttachments;
+    QList<QXmppFileShare> sharedFiles;
+    QList<QXmppFileSourcesAttachment> fileSourcesAttachments;
 
     // XEP-0461: Message Replies
     std::optional<Reply> reply;
@@ -431,7 +431,7 @@ void QXmppMessage::setOutOfBandUrl(const QString &url)
 
     \since QXmpp 1.5
 */
-QVector<QXmppOutOfBandUrl> QXmppMessage::outOfBandUrls() const
+QList<QXmppOutOfBandUrl> QXmppMessage::outOfBandUrls() const
 {
     return d->outOfBandUrls;
 }
@@ -443,7 +443,7 @@ QVector<QXmppOutOfBandUrl> QXmppMessage::outOfBandUrls() const
 
     \a urls.
 */
-void QXmppMessage::setOutOfBandUrls(const QVector<QXmppOutOfBandUrl> &urls)
+void QXmppMessage::setOutOfBandUrls(const QList<QXmppOutOfBandUrl> &urls)
 {
     d->outOfBandUrls = urls;
 }
@@ -1143,7 +1143,7 @@ void QXmppMessage::setStanzaIdBy(const QString &by)
 
     \since QXmpp 1.8
 */
-QVector<QXmppStanzaId> QXmppMessage::stanzaIds() const
+QList<QXmppStanzaId> QXmppMessage::stanzaIds() const
 {
     return d->stanzaIds;
 }
@@ -1155,7 +1155,7 @@ QVector<QXmppStanzaId> QXmppMessage::stanzaIds() const
 
     \a ids.
 */
-void QXmppMessage::setStanzaIds(const QVector<QXmppStanzaId> &ids)
+void QXmppMessage::setStanzaIds(const QList<QXmppStanzaId> &ids)
 {
     d->stanzaIds = ids;
 }
@@ -1525,7 +1525,7 @@ void QXmppMessage::setIsFallback(bool isFallback)
 
     \since QXmpp 1.7
 */
-const QVector<QXmppFallback> &QXmppMessage::fallbackMarkers() const
+const QList<QXmppFallback> &QXmppMessage::fallbackMarkers() const
 {
     return d->fallbackMarkers;
 }
@@ -1537,7 +1537,7 @@ const QVector<QXmppFallback> &QXmppMessage::fallbackMarkers() const
 
     \a fallbackMarkers.
 */
-void QXmppMessage::setFallbackMarkers(const QVector<QXmppFallback> &fallbackMarkers)
+void QXmppMessage::setFallbackMarkers(const QList<QXmppFallback> &fallbackMarkers)
 {
     d->fallbackMarkers = fallbackMarkers;
 }
@@ -1552,7 +1552,7 @@ void QXmppMessage::setFallbackMarkers(const QVector<QXmppFallback> &fallbackMark
 
     \since QXmpp 1.9
 */
-QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, const QVector<QString> &supportedNamespaces) const
+QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, const QList<QString> &supportedNamespaces) const
 {
     // filter out all QXmppFallback::Reference s
     auto markers = d->fallbackMarkers |
@@ -1560,7 +1560,7 @@ QString QXmppMessage::readFallbackRemovedText(QXmppFallback::Element element, co
         views::transform([](auto &&marker) { return marker.references(); });
 
     // collect references with correct namespace and element type (body or subject)
-    QVector<QXmppFallback::Range> references;
+    QList<QXmppFallback::Range> references;
     for (const auto &markerReferences : markers) {
         for (const auto &ref : markerReferences) {
             if (ref.element == element) {
@@ -1619,7 +1619,7 @@ QString QXmppMessage::readFallbackText(QXmppFallback::Element element, QStringVi
         views::transform([](auto &&marker) { return marker.references(); });
 
     // collect references with correct namespace and element type (body or subject)
-    QVector<QXmppFallback::Range> references;
+    QList<QXmppFallback::Range> references;
     for (const auto &markerReferences : markers) {
         for (const auto &ref : markerReferences) {
             if (ref.element == element) {
@@ -1698,7 +1698,7 @@ void QXmppMessage::setReaction(const std::optional<QXmppMessageReaction> &reacti
 
     \since QXmpp 1.5
 */
-const QVector<QXmppFileShare> &QXmppMessage::sharedFiles() const
+const QList<QXmppFileShare> &QXmppMessage::sharedFiles() const
 {
     return d->sharedFiles;
 }
@@ -1710,7 +1710,7 @@ const QVector<QXmppFileShare> &QXmppMessage::sharedFiles() const
 
     \a sharedFiles.
 */
-void QXmppMessage::setSharedFiles(const QVector<QXmppFileShare> &sharedFiles)
+void QXmppMessage::setSharedFiles(const QList<QXmppFileShare> &sharedFiles)
 {
     d->sharedFiles = sharedFiles;
 }
@@ -1721,7 +1721,7 @@ void QXmppMessage::setSharedFiles(const QVector<QXmppFileShare> &sharedFiles)
 
     \since QXmpp 1.7
 */
-QVector<QXmppFileSourcesAttachment> QXmppMessage::fileSourcesAttachments() const
+QList<QXmppFileSourcesAttachment> QXmppMessage::fileSourcesAttachments() const
 {
     return d->fileSourcesAttachments;
 }
@@ -1734,7 +1734,7 @@ QVector<QXmppFileSourcesAttachment> QXmppMessage::fileSourcesAttachments() const
 
     \a fileSourcesAttachments.
 */
-void QXmppMessage::setFileSourcesAttachments(const QVector<QXmppFileSourcesAttachment> &fileSourcesAttachments)
+void QXmppMessage::setFileSourcesAttachments(const QList<QXmppFileSourcesAttachment> &fileSourcesAttachments)
 {
     d->fileSourcesAttachments = fileSourcesAttachments;
 }
@@ -2381,7 +2381,7 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
 
 struct QXmppFallbackPrivate : QSharedData {
     QString forNamespace;
-    QVector<QXmppFallback::Reference> references;
+    QList<QXmppFallback::Reference> references;
 };
 
 /*!
@@ -2420,7 +2420,7 @@ struct QXmppFallbackPrivate : QSharedData {
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppFallback)
 
 /*! Creates a fallback marker. */
-QXmppFallback::QXmppFallback(const QString &forNamespace, const QVector<Reference> &references)
+QXmppFallback::QXmppFallback(const QString &forNamespace, const QList<Reference> &references)
     : d(new QXmppFallbackPrivate { {}, forNamespace, references })
 {
 }
@@ -2442,13 +2442,13 @@ void QXmppFallback::setForNamespace(const QString &ns)
 }
 
 /*! Returns the text references of this fallback marker. */
-const QVector<QXmppFallback::Reference> &QXmppFallback::references() const
+const QList<QXmppFallback::Reference> &QXmppFallback::references() const
 {
     return d->references;
 }
 
 /*! Sets the text \a references of this fallback marker. */
-void QXmppFallback::setReferences(const QVector<Reference> &references)
+void QXmppFallback::setReferences(const QList<Reference> &references)
 {
     d->references = references;
 }
@@ -2464,7 +2464,7 @@ std::optional<QXmppFallback> QXmppFallback::fromDom(const QDomElement &el)
         return {};
     }
 
-    QVector<Reference> references;
+    QList<Reference> references;
     for (const auto &subEl : iterChildElements(el, {}, ns_fallback_indication)) {
         auto start = parseInt<uint32_t>(subEl.attribute(u"start"_s));
         auto end = parseInt<uint32_t>(subEl.attribute(u"end"_s));

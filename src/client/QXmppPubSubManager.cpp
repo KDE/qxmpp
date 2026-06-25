@@ -140,14 +140,14 @@ using namespace QXmpp::Private;
 /*!
     \typedef QXmppPubSubManager::ItemsResult
 
-    Contains all items that have been found (QVector<T>) or the returned IQ
+    Contains all items that have been found (QList<T>) or the returned IQ
     error (QXmppStanza::Error).
 */
 
 /*!
     \typedef QXmppPubSubManager::ItemIdsResult
 
-    Contains all item IDs that have been found (QVector<QString>) or the
+    Contains all item IDs that have been found (QList<QString>) or the
     returned IQ error (QXmppStanza::Error).
 */
 
@@ -162,13 +162,13 @@ using namespace QXmpp::Private;
     \typedef QXmppPubSubManager::PublishItemsResult
 
     Contains the IDs of the items, if no IDs were set in the request
-    (QVector<QString>) or the returned IQ error (QXmppStanza::Error).
+    (QList<QString>) or the returned IQ error (QXmppStanza::Error).
 */
 
 /*!
     \typedef QXmppPubSubManager::SubscriptionsResult
 
-    Contains a list of active subscriptions (QVector<QXmppPubSubSubscription>)
+    Contains a list of active subscriptions (QList<QXmppPubSubSubscription>)
     or the returned IQ error (QXmppStanza::Error).
 */
 
@@ -176,7 +176,7 @@ using namespace QXmpp::Private;
     \typedef QXmppPubSubManager::AffiliationsResult
 
     Contains the list of affiliations with the node(s)
-    (QVector<QXmppPubSubAffiliation>) or the returned IQ error
+    (QList<QXmppPubSubAffiliation>) or the returned IQ error
     (QXmppStanza::Error).
 */
 
@@ -269,7 +269,7 @@ QXmppTask<QXmppPubSubManager::NodesResult> QXmppPubSubManager::requestNodes(cons
         co_return getError(std::move(itemsResult));
     }
 
-    QVector<QString> nodes;
+    QList<QString> nodes;
     for (const auto &item : std::as_const(getValue(itemsResult))) {
         // only accept non-empty nodes
         if (const auto node = item.node(); !node.isEmpty()) {
@@ -401,7 +401,7 @@ QXmppTask<QXmppPubSubManager::ItemIdsResult> QXmppPubSubManager::requestItemIds(
         co_return getError(std::move(items));
     }
 
-    co_return transform<QVector<QString>>(getValue(std::move(items)), [](const auto &item) {
+    co_return transform<QList<QString>>(getValue(std::move(items)), [](const auto &item) {
         return item.name();
     });
 }
@@ -904,7 +904,7 @@ PubSubIq<> QXmppPubSubManager::requestItemsIq(const QString &jid, const QString 
     request.setQueryNode(nodeName);
 
     if (!itemIds.isEmpty()) {
-        QVector<QXmppPubSubBaseItem> items;
+        QList<QXmppPubSubBaseItem> items;
         items.reserve(itemIds.size());
         for (const auto &id : itemIds) {
             items << QXmppPubSubBaseItem(id);
@@ -938,6 +938,6 @@ auto QXmppPubSubManager::publishItems(PubSubIqBase &&request) -> QXmppTask<Publi
     co_return parseIq<PubSubIq<>>(
         co_await client()->sendIq(std::move(request)),
         [](auto &&iq) -> PublishItemsResult {
-            return transform<QVector<QString>>(iq.items(), &QXmppPubSubBaseItem::id);
+            return transform<QList<QString>>(iq.items(), &QXmppPubSubBaseItem::id);
         });
 }

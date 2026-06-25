@@ -12,8 +12,8 @@
 #if QXMPP_DEPRECATED_SINCE(1, 1)
 #include <QPair>
 #endif
+#include <QList>
 #include <QVariant>
-#include <QVector>
 
 class QMimeType;
 class QUrl;
@@ -152,8 +152,8 @@ public:
         QVariant value() const;
         void setValue(const QVariant &value);
 
-        QVector<QXmppDataForm::MediaSource> mediaSources() const;
-        void setMediaSources(const QVector<QXmppDataForm::MediaSource> &mediaSources);
+        QList<QXmppDataForm::MediaSource> mediaSources() const;
+        void setMediaSources(const QList<QXmppDataForm::MediaSource> &mediaSources);
 
         QSize mediaSize() const;
         void setMediaSize(const QSize &size);
@@ -172,7 +172,7 @@ public:
 #endif
 #if QXMPP_DEPRECATED_SINCE(1, 12)
         [[deprecated("Use const-getter or setter")]]
-        QVector<QXmppDataForm::MediaSource> &mediaSources();
+        QList<QXmppDataForm::MediaSource> &mediaSources();
         [[deprecated("Use const-getter or setter")]]
         QSize &mediaSize();
 #endif

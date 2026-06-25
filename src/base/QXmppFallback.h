@@ -38,14 +38,14 @@ public:
         std::optional<Range> range;
     };
 
-    QXmppFallback(const QString &forNamespace, const QVector<Reference> &references);
+    QXmppFallback(const QString &forNamespace, const QList<Reference> &references);
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppFallback)
 
     const QString &forNamespace() const;
     void setForNamespace(const QString &);
 
-    const QVector<Reference> &references() const;
-    void setReferences(const QVector<Reference> &);
+    const QList<Reference> &references() const;
+    void setReferences(const QList<Reference> &);
 
     static std::optional<QXmppFallback> fromDom(const QDomElement &);
     void toXml(QXmlStreamWriter *) const;

@@ -20,7 +20,7 @@
     It fails if no comparison succeeds.
 */
 template<class T>
-static void serializePacket(T &packet, const QVector<QByteArray> &xmls)
+static void serializePacket(T &packet, const QList<QByteArray> &xmls)
 {
     auto isSerializationSuccessful = false;
     const auto data = packetToXml(packet);
@@ -264,7 +264,7 @@ void tst_QXmppOmemoData::testOmemoDeviceBundle()
         "</prekeys>"
         "</bundle>"));
 
-    QVector<QByteArray> xmls = { xml1, xml2 };
+    QList<QByteArray> xmls = { xml1, xml2 };
 
     QHash<uint32_t, QByteArray> expectedPublicPreKeys = {
         { 1, QByteArray::fromBase64(QByteArrayLiteral("eDM2cnBiTmo4MmRGQ1RYTkZ0YnVwajJtNWdPdzkxZ0gK")) },

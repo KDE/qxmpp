@@ -179,7 +179,7 @@ public:
 
     QXmppTask<bool> setUpDeviceId();
     std::optional<uint32_t> generateDeviceId();
-    std::optional<uint32_t> generateDeviceId(const QVector<QString> &existingIds);
+    std::optional<uint32_t> generateDeviceId(const QList<QString> &existingIds);
     bool setUpIdentityKeyPair(ratchet_identity_key_pair **identityKeyPair);
     void schedulePeriodicTasks();
     void renewSignedPreKeyPairs();
@@ -189,10 +189,10 @@ public:
     void removeDevicesRemovedFromServer();
 
     QXmppTask<QXmppE2eeExtension::MessageEncryptResult> encryptMessageForRecipients(QXmppMessage &&message,
-                                                                                    QVector<QString> recipientJids,
+                                                                                    QList<QString> recipientJids,
                                                                                     TrustLevels acceptedTrustLevels);
     template<typename T>
-    QXmppTask<std::optional<QXmppOmemoElement>> encryptStanza(const T &stanza, const QVector<QString> &recipientJids, TrustLevels acceptedTrustLevels);
+    QXmppTask<std::optional<QXmppOmemoElement>> encryptStanza(const T &stanza, const QList<QString> &recipientJids, TrustLevels acceptedTrustLevels);
     std::optional<PayloadEncryptionResult> encryptPayload(const QByteArray &payload) const;
     template<typename T>
     QByteArray createSceEnvelope(const T &stanza);
@@ -260,7 +260,7 @@ public:
     QXmppTask<bool> publishDeviceListItemWithOptions();
     QXmppOmemoDeviceListItem deviceListItem(bool addOwnDevice = true);
     QXmppTask<bool> updateOwnDevicesLocally(bool isDeviceListNodeExistent);
-    std::optional<QXmppOmemoDeviceListItem> updateContactDevices(const QString &deviceOwnerJid, const QVector<QXmppOmemoDeviceListItem> &deviceListItems);
+    std::optional<QXmppOmemoDeviceListItem> updateContactDevices(const QString &deviceOwnerJid, const QList<QXmppOmemoDeviceListItem> &deviceListItems);
     void updateDevices(const QString &deviceOwnerJid, const QXmppOmemoDeviceListItem &deviceListItem);
     void handleIrregularDeviceListChanges(const QString &deviceOwnerJid);
     QXmppTask<bool> deleteDeviceElement();
@@ -284,7 +284,7 @@ public:
     QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> requestDeviceList(QString jid);
     void subscribeToNewDeviceLists(const QString &jid, uint32_t deviceId);
     QXmppTask<Result> subscribeToDeviceList(QString jid);
-    QXmppTask<QVector<QXmppOmemoManager::DevicesResult>> unsubscribeFromDeviceLists(const QList<QString> &jids);
+    QXmppTask<QList<QXmppOmemoManager::DevicesResult>> unsubscribeFromDeviceLists(const QList<QString> &jids);
     QXmppTask<Result> unsubscribeFromDeviceList(QString jid);
 
     QXmppTask<bool> resetOwnDevice();

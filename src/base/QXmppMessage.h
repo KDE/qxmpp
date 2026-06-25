@@ -186,8 +186,8 @@ public:
     QString outOfBandUrl() const;
     void setOutOfBandUrl(const QString &);
 
-    QVector<QXmppOutOfBandUrl> outOfBandUrls() const;
-    void setOutOfBandUrls(const QVector<QXmppOutOfBandUrl> &urls);
+    QList<QXmppOutOfBandUrl> outOfBandUrls() const;
+    void setOutOfBandUrls(const QList<QXmppOutOfBandUrl> &urls);
 
     // XEP-0071: XHTML-IM
     QString xhtml() const;
@@ -296,8 +296,8 @@ public:
     void setStanzaIdBy(const QString &id);
 #endif
 
-    QVector<QXmppStanzaId> stanzaIds() const;
-    void setStanzaIds(const QVector<QXmppStanzaId> &);
+    QList<QXmppStanzaId> stanzaIds() const;
+    void setStanzaIds(const QList<QXmppStanzaId> &);
 
     QString originId() const;
     void setOriginId(const QString &id);
@@ -346,9 +346,9 @@ public:
     [[deprecated("Use setFallbackMarkers()")]]
     void setIsFallback(bool isFallback);
 #endif
-    const QVector<QXmppFallback> &fallbackMarkers() const;
-    void setFallbackMarkers(const QVector<QXmppFallback> &);
-    QString readFallbackRemovedText(QXmppFallback::Element element, const QVector<QString> &supportedNamespaces) const;
+    const QList<QXmppFallback> &fallbackMarkers() const;
+    void setFallbackMarkers(const QList<QXmppFallback> &);
+    QString readFallbackRemovedText(QXmppFallback::Element element, const QList<QString> &supportedNamespaces) const;
     QString readFallbackText(QXmppFallback::Element element, QStringView forNamespace) const;
 
     // XEP-0434: Trust Messages (TM)
@@ -360,10 +360,10 @@ public:
     void setReaction(const std::optional<QXmppMessageReaction> &reaction);
 
     // XEP-0447: Stateless file sharing
-    const QVector<QXmppFileShare> &sharedFiles() const;
-    void setSharedFiles(const QVector<QXmppFileShare> &sharedFiles);
-    QVector<QXmppFileSourcesAttachment> fileSourcesAttachments() const;
-    void setFileSourcesAttachments(const QVector<QXmppFileSourcesAttachment> &);
+    const QList<QXmppFileShare> &sharedFiles() const;
+    void setSharedFiles(const QList<QXmppFileShare> &sharedFiles);
+    QList<QXmppFileSourcesAttachment> fileSourcesAttachments() const;
+    void setFileSourcesAttachments(const QList<QXmppFileSourcesAttachment> &);
 
     // XEP-0461: Message Replies
     std::optional<QXmpp::Reply> reply() const;

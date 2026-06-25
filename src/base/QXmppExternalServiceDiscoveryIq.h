@@ -17,8 +17,8 @@ public:
 
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppExternalServiceDiscoveryIq)
 
-    QVector<QXmppExternalService> externalServices() const;
-    void setExternalServices(const QVector<QXmppExternalService> &);
+    QList<QXmppExternalService> externalServices() const;
+    void setExternalServices(const QList<QXmppExternalService> &);
     void addExternalService(const QXmppExternalService &);
 
     static constexpr std::tuple PayloadXmlTag = { u"services", QXmpp::Private::ns_external_service_discovery };

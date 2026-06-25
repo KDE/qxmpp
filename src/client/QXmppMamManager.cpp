@@ -82,8 +82,8 @@ std::optional<std::tuple<MamMessage, QString>> parseMamMessageResult(const QDomE
 struct RetrieveRequestState {
     QXmppPromise<QXmppMamManager::RetrieveResult> promise;
     QXmppMamResultIq iq;
-    QVector<MamMessage> messages;
-    QVector<QXmppMessage> processedMessages;
+    QList<MamMessage> messages;
+    QList<QXmppMessage> processedMessages;
     uint runningDecryptionJobs = 0;
 
     void finish()
@@ -350,7 +350,7 @@ QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(con
             }
         } else {
             // for the case without decryption
-            state.processedMessages = transform<QVector<QXmppMessage>>(state.messages, [](const auto &m) {
+            state.processedMessages = transform<QList<QXmppMessage>>(state.messages, [](const auto &m) {
                 return parseMamMessage(m, Unencrypted);
             });
 

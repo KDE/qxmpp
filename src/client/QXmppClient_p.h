@@ -48,7 +48,7 @@ public:
     QXmppLogger *logger;
     /*! Pointer to the XMPP stream */
     QXmppOutgoingClient *stream;
-    QVector<QXmpp::StreamError> ignoredStreamErrors;
+    QList<QXmpp::StreamError> ignoredStreamErrors;
 
     QXmppE2eeExtension *encryptionExtension;
 

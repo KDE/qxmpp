@@ -579,7 +579,7 @@ QXmppTask<bool> ManagerPrivate::setUpDeviceId()
 
     // The first generated device ID can be used if no device bundle node exists.
     // Otherwise, duplicates must be avoided.
-    auto deviceId = error ? generateDeviceId() : generateDeviceId(std::get<QVector<QString>>(result));
+    auto deviceId = error ? generateDeviceId() : generateDeviceId(std::get<QList<QString>>(result));
     if (deviceId) {
         ownDevice.id = *deviceId;
     }
@@ -606,7 +606,7 @@ std::optional<uint32_t> QXmppOmemoManagerPrivate::generateDeviceId()
 //
 // Returns the device ID or an empty optional on errors.
 //
-std::optional<uint32_t> QXmppOmemoManagerPrivate::generateDeviceId(const QVector<QString> &existingIds)
+std::optional<uint32_t> QXmppOmemoManagerPrivate::generateDeviceId(const QList<QString> &existingIds)
 {
     uint32_t deviceId = 0;
 
@@ -898,7 +898,7 @@ void ManagerPrivate::removeDevicesRemovedFromServer()
 // have to encrypt for them.
 //
 // Returns the result of the encryption.
-QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessageForRecipients(QXmppMessage &&messageRef, QVector<QString> recipientJids, TrustLevels acceptedTrustLevels)
+QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessageForRecipients(QXmppMessage &&messageRef, QList<QString> recipientJids, TrustLevels acceptedTrustLevels)
 {
     // Move into local to prevent use-after-free: rvalue reference parameters
     // dangle after co_await because the coroutine frame only stores the reference.
@@ -969,7 +969,7 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
 // Returns the OMEMO element containing the stanza's encrypted content if the encryption is
 // successful, otherwise none.
 template<typename T>
-QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const T &stanza, const QVector<QString> &recipientJids, TrustLevels acceptedTrustLevels)
+QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const T &stanza, const QList<QString> &recipientJids, TrustLevels acceptedTrustLevels)
 {
     Q_ASSERT_X(!recipientJids.isEmpty(), "Creating OMEMO envelope", "OMEMO element could not be created because no recipient JIDs are passed");
 
@@ -1159,8 +1159,8 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
     return task;
 }
 
-template QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza<QXmppIq>(const QXmppIq &, const QVector<QString> &, TrustLevels);
-template QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza<QXmppMessage>(const QXmppMessage &, const QVector<QString> &, TrustLevels);
+template QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza<QXmppIq>(const QXmppIq &, const QList<QString> &, TrustLevels);
+template QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza<QXmppMessage>(const QXmppMessage &, const QList<QString> &, TrustLevels);
 
 // Encrypts a payload symmetrically.
 //
@@ -1674,7 +1674,7 @@ QXmppTask<bool> ManagerPrivate::publishOmemoData()
         co_return false;
     }
 
-    const auto &pepServiceFeatures = std::get<QVector<QString>>(result);
+    const auto &pepServiceFeatures = std::get<QList<QString>>(result);
 
     // Check if the PEP service supports publishing items at all and also publishing
     // multiple items.
@@ -1691,7 +1691,7 @@ QXmppTask<bool> ManagerPrivate::publishOmemoData()
             warning(u"Device bundle and device list could not be published"_s);
             co_return false;
         } else {
-            const auto &nodes = std::get<QVector<QString>>(result);
+            const auto &nodes = std::get<QList<QString>>(result);
 
             const auto deviceListNodeExists = nodes.contains(toString60(ns_omemo_2_devices));
             const auto arePublishOptionsSupported = pepServiceFeatures.contains(toString60(ns_pubsub_publish_options));
@@ -2289,7 +2289,7 @@ QXmppTask<bool> ManagerPrivate::updateOwnDevicesLocally(bool isDeviceListNodeExi
 // may contain a device list.
 //
 // Returns a found device list item.
-std::optional<QXmppOmemoDeviceListItem> QXmppOmemoManagerPrivate::updateContactDevices(const QString &deviceOwnerJid, const QVector<QXmppOmemoDeviceListItem> &deviceListItems)
+std::optional<QXmppOmemoDeviceListItem> QXmppOmemoManagerPrivate::updateContactDevices(const QString &deviceOwnerJid, const QList<QXmppOmemoDeviceListItem> &deviceListItems)
 {
     if (deviceListItems.size() > 1) {
         const auto itr = std::find_if(deviceListItems.cbegin(), deviceListItems.cend(), [=](const QXmppOmemoDeviceListItem &item) {
@@ -2475,7 +2475,7 @@ void ManagerPrivate::handleIrregularDeviceListChanges(const QString &deviceOwner
                         warning(u"Features of PEP service '" + deviceOwnerJid + u"' could not be retrieved: " + errorToString(*error));
                         warning(u"Device list could not be published"_s);
                     } else {
-                        const auto &pepServiceFeatures = std::get<QVector<QString>>(result);
+                        const auto &pepServiceFeatures = std::get<QList<QString>>(result);
                         const auto arePublishOptionsSupported = pepServiceFeatures.contains(toString60(ns_pubsub_publish_options));
                         const auto isAutomaticCreationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_auto_create));
                         const auto isCreationAndConfigurationSupported = pepServiceFeatures.contains(toString60(ns_pubsub_create_and_configure));
@@ -2729,17 +2729,17 @@ QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(QStr
 // \a jids is JIDs of the contacts whose device lists are being unsubscribed.
 //
 // Returns the results of each unsubscribe request.
-QXmppTask<QVector<Manager::DevicesResult>> ManagerPrivate::unsubscribeFromDeviceLists(const QList<QString> &jids)
+QXmppTask<QList<Manager::DevicesResult>> ManagerPrivate::unsubscribeFromDeviceLists(const QList<QString> &jids)
 {
     if (jids.isEmpty()) {
-        return makeReadyTask(QVector<Manager::DevicesResult>());
+        return makeReadyTask(QList<Manager::DevicesResult>());
     }
 
     struct State {
         int processed = 0;
         int jidsCount = 0;
-        QXmppPromise<QVector<Manager::DevicesResult>> interface;
-        QVector<Manager::DevicesResult> devicesResults;
+        QXmppPromise<QList<Manager::DevicesResult>> interface;
+        QList<Manager::DevicesResult> devicesResults;
     };
 
     auto state = std::make_shared<State>();

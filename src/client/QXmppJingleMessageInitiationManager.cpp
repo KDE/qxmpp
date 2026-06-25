@@ -284,7 +284,7 @@ bool QXmppJingleMessageInitiation::isFinished() const
 class QXmppJingleMessageInitiationManagerPrivate
 {
 public:
-    QVector<std::shared_ptr<Jmi>> jmis;
+    QList<std::shared_ptr<Jmi>> jmis;
 };
 
 /*!
@@ -633,7 +633,7 @@ std::shared_ptr<QXmppJingleMessageInitiation> QXmppJingleMessageInitiationManage
 }
 
 /*! Returns the JMIs vector. */
-const QVector<std::shared_ptr<QXmppJingleMessageInitiation>> &QXmppJingleMessageInitiationManager::jmis() const
+const QList<std::shared_ptr<QXmppJingleMessageInitiation>> &QXmppJingleMessageInitiationManager::jmis() const
 {
     return d->jmis;
 }

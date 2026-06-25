@@ -226,11 +226,11 @@ public:
     std::optional<QXmppJingleRtpEncryption> rtpEncryption;
 
     // XEP-0293: Jingle RTP Feedback Negotiation
-    QVector<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties;
-    QVector<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals;
+    QList<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties;
+    QList<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals;
 
     // XEP-0294: Jingle RTP Header Extensions Negotiation
-    QVector<QXmppJingleRtpHeaderExtensionProperty> rtpHeaderExtensionProperties;
+    QList<QXmppJingleRtpHeaderExtensionProperty> rtpHeaderExtensionProperties;
     bool isRtpHeaderExtensionMixingAllowed = false;
 };
 
@@ -527,7 +527,7 @@ void QXmppJingleIq::Content::setTransportPassword(const QString &password)
 
     \since QXmpp 1.5
 */
-QVector<QXmppJingleRtpFeedbackProperty> QXmppJingleIq::Content::rtpFeedbackProperties() const
+QList<QXmppJingleRtpFeedbackProperty> QXmppJingleIq::Content::rtpFeedbackProperties() const
 {
     return d->rtpFeedbackProperties;
 }
@@ -537,7 +537,7 @@ QVector<QXmppJingleRtpFeedbackProperty> QXmppJingleIq::Content::rtpFeedbackPrope
 
     \since QXmpp 1.5
 */
-void QXmppJingleIq::Content::setRtpFeedbackProperties(const QVector<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties)
+void QXmppJingleIq::Content::setRtpFeedbackProperties(const QList<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties)
 {
     d->rtpFeedbackProperties = rtpFeedbackProperties;
 }
@@ -547,7 +547,7 @@ void QXmppJingleIq::Content::setRtpFeedbackProperties(const QVector<QXmppJingleR
 
     \since QXmpp 1.5
 */
-QVector<QXmppJingleRtpFeedbackInterval> QXmppJingleIq::Content::rtpFeedbackIntervals() const
+QList<QXmppJingleRtpFeedbackInterval> QXmppJingleIq::Content::rtpFeedbackIntervals() const
 {
     return d->rtpFeedbackIntervals;
 }
@@ -557,7 +557,7 @@ QVector<QXmppJingleRtpFeedbackInterval> QXmppJingleIq::Content::rtpFeedbackInter
 
     \since QXmpp 1.5
 */
-void QXmppJingleIq::Content::setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals)
+void QXmppJingleIq::Content::setRtpFeedbackIntervals(const QList<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals)
 {
     d->rtpFeedbackIntervals = rtpFeedbackIntervals;
 }
@@ -567,7 +567,7 @@ void QXmppJingleIq::Content::setRtpFeedbackIntervals(const QVector<QXmppJingleRt
 
     \since QXmpp 1.5
 */
-QVector<QXmppJingleRtpHeaderExtensionProperty> QXmppJingleIq::Content::rtpHeaderExtensionProperties() const
+QList<QXmppJingleRtpHeaderExtensionProperty> QXmppJingleIq::Content::rtpHeaderExtensionProperties() const
 {
     return d->rtpHeaderExtensionProperties;
 }
@@ -577,7 +577,7 @@ QVector<QXmppJingleRtpHeaderExtensionProperty> QXmppJingleIq::Content::rtpHeader
 
     \since QXmpp 1.5
 */
-void QXmppJingleIq::Content::setRtpHeaderExtensionProperties(const QVector<QXmppJingleRtpHeaderExtensionProperty> &rtpHeaderExtensionProperties)
+void QXmppJingleIq::Content::setRtpHeaderExtensionProperties(const QList<QXmppJingleRtpHeaderExtensionProperty> &rtpHeaderExtensionProperties)
 {
     d->rtpHeaderExtensionProperties = rtpHeaderExtensionProperties;
 }
@@ -691,9 +691,9 @@ void QXmppJingleIq::Content::parse(const QDomElement &element)
     d->description.setSsrc(parseInt<uint32_t>(descriptionElement.attribute(u"ssrc"_s)).value_or(0));
     d->isRtpMultiplexingSupported = !descriptionElement.firstChildElement(u"rtcp-mux"_s).isNull();
     d->rtpEncryption = parseElement<QXmppJingleRtpEncryption>(firstChildElement(descriptionElement, u"encryption", ns_jingle_rtp));
-    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(descriptionElement);
-    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(descriptionElement);
-    d->rtpHeaderExtensionProperties = parseChildElements<QVector<QXmppJingleRtpHeaderExtensionProperty>>(descriptionElement);
+    d->rtpFeedbackProperties = parseChildElements<QList<QXmppJingleRtpFeedbackProperty>>(descriptionElement);
+    d->rtpFeedbackIntervals = parseChildElements<QList<QXmppJingleRtpFeedbackInterval>>(descriptionElement);
+    d->rtpHeaderExtensionProperties = parseChildElements<QList<QXmppJingleRtpHeaderExtensionProperty>>(descriptionElement);
     d->isRtpHeaderExtensionMixingAllowed = !firstChildElement(descriptionElement, u"extmap-allow-mixed", ns_jingle_rtp_hdrext).isNull();
     d->description.setPayloadTypes(parseChildElements<QList<QXmppJinglePayloadType>>(descriptionElement));
 
@@ -1642,8 +1642,8 @@ public:
     unsigned int ptime;
 
     // XEP-0293: Jingle RTP Feedback Negotiation
-    QVector<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties;
-    QVector<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals;
+    QList<QXmppJingleRtpFeedbackProperty> rtpFeedbackProperties;
+    QList<QXmppJingleRtpFeedbackInterval> rtpFeedbackIntervals;
 };
 
 QXmppJinglePayloadTypePrivate::QXmppJinglePayloadTypePrivate()
@@ -1768,7 +1768,7 @@ void QXmppJinglePayloadType::setPtime(unsigned int ptime)
 
     \since QXmpp 1.5
 */
-QVector<QXmppJingleRtpFeedbackProperty> QXmppJinglePayloadType::rtpFeedbackProperties() const
+QList<QXmppJingleRtpFeedbackProperty> QXmppJinglePayloadType::rtpFeedbackProperties() const
 {
     return d->rtpFeedbackProperties;
 }
@@ -1778,7 +1778,7 @@ QVector<QXmppJingleRtpFeedbackProperty> QXmppJinglePayloadType::rtpFeedbackPrope
 
     \since QXmpp 1.5
 */
-void QXmppJinglePayloadType::setRtpFeedbackProperties(const QVector<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties)
+void QXmppJinglePayloadType::setRtpFeedbackProperties(const QList<QXmppJingleRtpFeedbackProperty> &rtpFeedbackProperties)
 {
     d->rtpFeedbackProperties = rtpFeedbackProperties;
 }
@@ -1786,7 +1786,7 @@ void QXmppJinglePayloadType::setRtpFeedbackProperties(const QVector<QXmppJingleR
 /*!
     Returns the RTP feedback intervals.
 */
-QVector<QXmppJingleRtpFeedbackInterval> QXmppJinglePayloadType::rtpFeedbackIntervals() const
+QList<QXmppJingleRtpFeedbackInterval> QXmppJinglePayloadType::rtpFeedbackIntervals() const
 {
     return d->rtpFeedbackIntervals;
 }
@@ -1794,7 +1794,7 @@ QVector<QXmppJingleRtpFeedbackInterval> QXmppJinglePayloadType::rtpFeedbackInter
 /*!
     Sets the \a rtpFeedbackIntervals of RTP feedback.
 */
-void QXmppJinglePayloadType::setRtpFeedbackIntervals(const QVector<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals)
+void QXmppJinglePayloadType::setRtpFeedbackIntervals(const QList<QXmppJingleRtpFeedbackInterval> &rtpFeedbackIntervals)
 {
     d->rtpFeedbackIntervals = rtpFeedbackIntervals;
 }
@@ -1812,8 +1812,8 @@ void QXmppJinglePayloadType::parse(const QDomElement &element)
         d->parameters.insert(child.attribute(u"name"_s), child.attribute(u"value"_s));
     }
 
-    d->rtpFeedbackProperties = parseChildElements<QVector<QXmppJingleRtpFeedbackProperty>>(element);
-    d->rtpFeedbackIntervals = parseChildElements<QVector<QXmppJingleRtpFeedbackInterval>>(element);
+    d->rtpFeedbackProperties = parseChildElements<QList<QXmppJingleRtpFeedbackProperty>>(element);
+    d->rtpFeedbackIntervals = parseChildElements<QList<QXmppJingleRtpFeedbackInterval>>(element);
 }
 
 void QXmppJinglePayloadType::toXml(QXmlStreamWriter *writer) const
@@ -2192,7 +2192,7 @@ class QXmppJingleRtpEncryptionPrivate : public QSharedData
 {
 public:
     bool isRequired = false;
-    QVector<QXmppJingleRtpCryptoElement> cryptoElements;
+    QList<QXmppJingleRtpCryptoElement> cryptoElements;
 };
 
 /*!
@@ -2232,7 +2232,7 @@ void QXmppJingleRtpEncryption::setRequired(bool isRequired)
 /*!
     Returns the crypto elements used for encryption via SRTP.
 */
-QVector<QXmppJingleRtpCryptoElement> QXmppJingleRtpEncryption::cryptoElements() const
+QList<QXmppJingleRtpCryptoElement> QXmppJingleRtpEncryption::cryptoElements() const
 {
     return d->cryptoElements;
 }
@@ -2240,7 +2240,7 @@ QVector<QXmppJingleRtpCryptoElement> QXmppJingleRtpEncryption::cryptoElements() 
 /*!
     Sets the \a cryptoElements used for encryption via SRTP.
 */
-void QXmppJingleRtpEncryption::setCryptoElements(const QVector<QXmppJingleRtpCryptoElement> &cryptoElements)
+void QXmppJingleRtpEncryption::setCryptoElements(const QList<QXmppJingleRtpCryptoElement> &cryptoElements)
 {
     d->cryptoElements = cryptoElements;
 }
@@ -2248,7 +2248,7 @@ void QXmppJingleRtpEncryption::setCryptoElements(const QVector<QXmppJingleRtpCry
 void QXmppJingleRtpEncryption::parse(const QDomElement &element)
 {
     d->isRequired = parseBoolean(element.attribute(u"required"_s)).value_or(false);
-    d->cryptoElements = parseChildElements<QVector<QXmppJingleRtpCryptoElement>>(element);
+    d->cryptoElements = parseChildElements<QList<QXmppJingleRtpCryptoElement>>(element);
 }
 
 void QXmppJingleRtpEncryption::toXml(QXmlStreamWriter *writer) const
@@ -2277,7 +2277,7 @@ class QXmppJingleRtpFeedbackPropertyPrivate : public QSharedData
 public:
     QString type;
     QString subtype;
-    QVector<QXmppSdpParameter> parameters;
+    QList<QXmppSdpParameter> parameters;
 };
 
 /*!
@@ -2348,7 +2348,7 @@ void QXmppJingleRtpFeedbackProperty::setSubtype(const QString &subtype)
 /*!
     Returns the parameters of RTP feedback.
 */
-QVector<QXmppSdpParameter> QXmppJingleRtpFeedbackProperty::parameters() const
+QList<QXmppSdpParameter> QXmppJingleRtpFeedbackProperty::parameters() const
 {
     return d->parameters;
 }
@@ -2360,7 +2360,7 @@ QVector<QXmppSdpParameter> QXmppJingleRtpFeedbackProperty::parameters() const
     If there is only one parameter, use QXmppJingleRtpFeedbackProperty::setSubtype()
     instead of this method.
 */
-void QXmppJingleRtpFeedbackProperty::setParameters(const QVector<QXmppSdpParameter> &parameters)
+void QXmppJingleRtpFeedbackProperty::setParameters(const QList<QXmppSdpParameter> &parameters)
 {
     d->parameters = parameters;
 }
@@ -2369,7 +2369,7 @@ void QXmppJingleRtpFeedbackProperty::parse(const QDomElement &element)
 {
     d->type = element.attribute(u"type"_s);
     d->subtype = element.attribute(u"subtype"_s);
-    d->parameters = parseChildElements<QVector<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtcp_fb);
+    d->parameters = parseChildElements<QList<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtcp_fb);
 }
 
 void QXmppJingleRtpFeedbackProperty::toXml(QXmlStreamWriter *writer) const
@@ -2456,7 +2456,7 @@ public:
     uint32_t id = 0;
     QString uri;
     QXmppJingleRtpHeaderExtensionProperty::Senders senders = QXmppJingleRtpHeaderExtensionProperty::Both;
-    QVector<QXmppSdpParameter> parameters;
+    QList<QXmppSdpParameter> parameters;
 };
 
 /*!
@@ -2555,7 +2555,7 @@ void QXmppJingleRtpHeaderExtensionProperty::setSenders(Senders senders)
 /*!
     Returns the parameters of the RTP header extension.
 */
-QVector<QXmppSdpParameter> QXmppJingleRtpHeaderExtensionProperty::parameters() const
+QList<QXmppSdpParameter> QXmppJingleRtpHeaderExtensionProperty::parameters() const
 {
     return d->parameters;
 }
@@ -2565,7 +2565,7 @@ QVector<QXmppSdpParameter> QXmppJingleRtpHeaderExtensionProperty::parameters() c
 
     Additional parameters can be set by this method.
 */
-void QXmppJingleRtpHeaderExtensionProperty::setParameters(const QVector<QXmppSdpParameter> &parameters)
+void QXmppJingleRtpHeaderExtensionProperty::setParameters(const QList<QXmppSdpParameter> &parameters)
 {
     d->parameters = parameters;
 }
@@ -2577,7 +2577,7 @@ void QXmppJingleRtpHeaderExtensionProperty::parse(const QDomElement &element)
         d->uri = element.attribute(u"uri"_s);
         d->senders = Enums::fromString<Senders>(element.attribute(u"senders"_s))
                          .value_or(Both);
-        d->parameters = parseChildElements<QVector<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtp_hdrext);
+        d->parameters = parseChildElements<QList<QXmppSdpParameter>>(element, u"parameter", ns_jingle_rtp_hdrext);
     }
 }
 
@@ -2834,7 +2834,7 @@ public:
     QString id;
 
     std::optional<QXmppCallInviteElement::Jingle> jingle;
-    std::optional<QVector<QXmppCallInviteElement::External>> external;
+    std::optional<QList<QXmppCallInviteElement::External>> external;
 
     bool audio = true;
     bool video = false;
@@ -2932,13 +2932,13 @@ void QXmppCallInviteElement::setJingle(std::optional<Jingle> jingle)
 }
 
 /*! Returns possible Call Invite "external" sub elements. */
-std::optional<QVector<QXmppCallInviteElement::External>> QXmppCallInviteElement::external() const
+std::optional<QList<QXmppCallInviteElement::External>> QXmppCallInviteElement::external() const
 {
     return d->external;
 }
 
 /*! Sets possible Call Invite \a external sub elements. */
-void QXmppCallInviteElement::setExternal(std::optional<QVector<External>> external)
+void QXmppCallInviteElement::setExternal(std::optional<QList<External>> external)
 {
     d->external = external;
 }
@@ -2963,7 +2963,7 @@ void QXmppCallInviteElement::parse(const QDomElement &element)
             d->jingle->parse(jingleElement);
         }
 
-        d->external = parseChildElements<QVector<External>>(element);
+        d->external = parseChildElements<QList<External>>(element);
         if (d->external->isEmpty()) {
             d->external.reset();
         }

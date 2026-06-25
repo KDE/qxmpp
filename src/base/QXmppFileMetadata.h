@@ -37,8 +37,8 @@ public:
     const std::optional<QString> &description() const;
     void setDescription(const std::optional<QString> &description);
 
-    const QVector<QXmppHash> &hashes() const;
-    void setHashes(const QVector<QXmppHash> &hashes);
+    const QList<QXmppHash> &hashes() const;
+    void setHashes(const QList<QXmppHash> &hashes);
 
     std::optional<uint32_t> height() const;
     void setHeight(std::optional<uint32_t> height);
@@ -55,8 +55,8 @@ public:
     std::optional<uint64_t> size() const;
     void setSize(std::optional<uint64_t> size);
 
-    const QVector<QXmppThumbnail> &thumbnails() const;
-    void setThumbnails(const QVector<QXmppThumbnail> &thumbnail);
+    const QList<QXmppThumbnail> &thumbnails() const;
+    void setThumbnails(const QList<QXmppThumbnail> &thumbnail);
 
     std::optional<uint32_t> width() const;
     void setWidth(std::optional<uint32_t> width);

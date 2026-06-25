@@ -38,15 +38,15 @@ struct FileSources {
     static FileSources fromDom(const QDomElement &el);
     void toXml(XmlWriter &writer) const;
 
-    QVector<QXmppHttpFileSource> httpSources;
-    QVector<QXmppEncryptedFileSource> encryptedSources;
+    QList<QXmppHttpFileSource> httpSources;
+    QList<QXmppEncryptedFileSource> encryptedSources;
 };
 
 FileSources FileSources::fromDom(const QDomElement &el)
 {
     return {
-        parseChildElements<QVector<QXmppHttpFileSource>>(el),
-        parseChildElements<QVector<QXmppEncryptedFileSource>>(el),
+        parseChildElements<QList<QXmppHttpFileSource>>(el),
+        parseChildElements<QList<QXmppEncryptedFileSource>>(el),
     };
 }
 
@@ -101,7 +101,7 @@ void QXmppFileSourcesAttachment::setId(const QString &id)
 }
 
 /*! Returns the HTTP sources for this file. */
-const QVector<QXmppHttpFileSource> &QXmppFileSourcesAttachment::httpSources() const
+const QList<QXmppHttpFileSource> &QXmppFileSourcesAttachment::httpSources() const
 {
     return d->sources.httpSources;
 }
@@ -111,13 +111,13 @@ const QVector<QXmppHttpFileSource> &QXmppFileSourcesAttachment::httpSources() co
 
     \a newHttpSources.
 */
-void QXmppFileSourcesAttachment::setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources)
+void QXmppFileSourcesAttachment::setHttpSources(const QList<QXmppHttpFileSource> &newHttpSources)
 {
     d->sources.httpSources = newHttpSources;
 }
 
 /*! Returns the encrypted sources for this file. */
-const QVector<QXmppEncryptedFileSource> &QXmppFileSourcesAttachment::encryptedSources() const
+const QList<QXmppEncryptedFileSource> &QXmppFileSourcesAttachment::encryptedSources() const
 {
     return d->sources.encryptedSources;
 }
@@ -127,7 +127,7 @@ const QVector<QXmppEncryptedFileSource> &QXmppFileSourcesAttachment::encryptedSo
 
     \a newEncryptedSources.
 */
-void QXmppFileSourcesAttachment::setEncryptedSources(const QVector<QXmppEncryptedFileSource> &newEncryptedSources)
+void QXmppFileSourcesAttachment::setEncryptedSources(const QList<QXmppEncryptedFileSource> &newEncryptedSources)
 {
     d->sources.encryptedSources = newEncryptedSources;
 }
@@ -268,7 +268,7 @@ void QXmppFileShare::setMetadata(const QXmppFileMetadata &metadata)
 }
 
 /*! Returns the HTTP sources for this file. */
-const QVector<QXmppHttpFileSource> &QXmppFileShare::httpSources() const
+const QList<QXmppHttpFileSource> &QXmppFileShare::httpSources() const
 {
     return d->sources.httpSources;
 }
@@ -278,13 +278,13 @@ const QVector<QXmppHttpFileSource> &QXmppFileShare::httpSources() const
 
     \a newHttpSources.
 */
-void QXmppFileShare::setHttpSources(const QVector<QXmppHttpFileSource> &newHttpSources)
+void QXmppFileShare::setHttpSources(const QList<QXmppHttpFileSource> &newHttpSources)
 {
     d->sources.httpSources = newHttpSources;
 }
 
 /*! Returns the encrypted sources for this file. */
-const QVector<QXmppEncryptedFileSource> &QXmppFileShare::encryptedSources() const
+const QList<QXmppEncryptedFileSource> &QXmppFileShare::encryptedSources() const
 {
     return d->sources.encryptedSources;
 }
@@ -294,7 +294,7 @@ const QVector<QXmppEncryptedFileSource> &QXmppFileShare::encryptedSources() cons
 
     \a newEncryptedSources.
 */
-void QXmppFileShare::setEncryptedSourecs(const QVector<QXmppEncryptedFileSource> &newEncryptedSources)
+void QXmppFileShare::setEncryptedSourecs(const QList<QXmppEncryptedFileSource> &newEncryptedSources)
 {
     d->sources.encryptedSources = newEncryptedSources;
 }
