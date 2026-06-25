@@ -993,9 +993,20 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
         }
 
         if (devicesCount) {
+            const auto ownJid = ownBareJid();
+
+            // Whether the stanza is encrypted for at least one device of a JID other than the
+            // own one. Encrypting only for the own devices (e.g., a note to self) is still a
+            // success, but if there are actual recipients, the encryption must succeed for at
+            // least one of their devices.
+            const auto hasNonOwnRecipient = std::ranges::any_of(recipientJids, [&](const auto &jid) {
+                return jid != ownJid;
+            });
+
             auto omemoElement = std::make_shared<QXmppOmemoElement>();
             auto processedDevicesCount = std::make_shared<int>(0);
             auto successfullyProcessedDevicesCount = std::make_shared<int>(0);
+            auto successfullyProcessedRecipientDevicesCount = std::make_shared<int>(0);
             auto skippedDevicesCount = std::make_shared<int>(0);
 
             // Add envelopes for all devices of the recipients.
@@ -1009,10 +1020,22 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
                     auto controlDeviceProcessing = [=, this](bool isSuccessful = true) mutable {
                         if (isSuccessful) {
                             ++(*successfullyProcessedDevicesCount);
+
+                            if (jid != ownJid) {
+                                ++(*successfullyProcessedRecipientDevicesCount);
+                            }
                         }
 
                         if (++(*processedDevicesCount) == devicesCount) {
-                            if (*successfullyProcessedDevicesCount == 0) {
+                            // The encryption is only successful if an envelope was created for at
+                            // least one device of an actual recipient (i.e., not only for the own
+                            // devices). Otherwise, the stanza would be sent without the intended
+                            // recipients being able to decrypt it.
+                            const auto noRecipientDeviceEncrypted = hasNonOwnRecipient
+                                ? *successfullyProcessedRecipientDevicesCount == 0
+                                : *successfullyProcessedDevicesCount == 0;
+
+                            if (noRecipientDeviceEncrypted) {
                                 warning(u"OMEMO element could not be created because no recipient "
                                         u"devices with keys having accepted trust levels could be found"_s);
                                 interface->finish(std::nullopt);
