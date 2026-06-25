@@ -73,7 +73,7 @@ namespace Sasl {
 
 std::optional<Auth> Auth::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"auth" || el.namespaceURI() != ns_sasl) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -98,7 +98,7 @@ void Auth::toXml(XmlWriter &writer) const
 
 std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"challenge" || el.namespaceURI() != ns_sasl) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -115,7 +115,7 @@ void Challenge::toXml(XmlWriter &writer) const
 
 std::optional<Failure> Failure::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"failure" || el.namespaceURI() != ns_sasl) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -150,7 +150,7 @@ void Failure::toXml(XmlWriter &writer) const
 
 std::optional<Response> Response::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"response" || el.namespaceURI() != ns_sasl) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -167,7 +167,7 @@ void Response::toXml(XmlWriter &writer) const
 
 std::optional<Success> Success::fromDom(const QDomElement &el)
 {
-    if (el.tagName() == u"success" && el.namespaceURI() == ns_sasl) {
+    if (elementXmlTag(el) == XmlTag) {
         return Success();
     }
     return {};
@@ -182,7 +182,7 @@ void Success::toXml(XmlWriter &writer) const
 
 std::optional<Bind2Feature> Bind2Feature::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"bind" || el.namespaceURI() != ns_bind2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -207,7 +207,7 @@ void Bind2Feature::toXml(XmlWriter &writer) const
 
 std::optional<Bind2Request> Bind2Request::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"bind" || el.namespaceURI() != ns_bind2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -232,7 +232,7 @@ void Bind2Request::toXml(XmlWriter &writer) const
 
 std::optional<Bind2Bound> Bind2Bound::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"bound" || el.namespaceURI() != ns_bind2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -249,7 +249,7 @@ void Bind2Bound::toXml(XmlWriter &writer) const
 
 std::optional<FastFeature> FastFeature::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"fast" || el.namespaceURI() != ns_fast) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -266,7 +266,7 @@ void FastFeature::toXml(XmlWriter &writer) const
 
 std::optional<FastTokenRequest> FastTokenRequest::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"request-token" || el.namespaceURI() != ns_fast) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return FastTokenRequest { el.attribute(QStringLiteral("mechanism")) };
@@ -279,7 +279,7 @@ void FastTokenRequest::toXml(XmlWriter &writer) const
 
 std::optional<FastToken> FastToken::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"token" || el.namespaceURI() != ns_fast) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -300,7 +300,7 @@ void FastToken::toXml(XmlWriter &writer) const
 
 std::optional<FastRequest> FastRequest::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"fast" || el.namespaceURI() != ns_fast) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return FastRequest {
@@ -322,7 +322,7 @@ namespace Sasl2 {
 
 std::optional<StreamFeature> StreamFeature::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"authentication" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -355,7 +355,7 @@ void StreamFeature::toXml(XmlWriter &writer) const
 
 std::optional<UserAgent> UserAgent::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"user-agent" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -378,7 +378,7 @@ void UserAgent::toXml(XmlWriter &writer) const
 
 std::optional<Authenticate> Authenticate::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"authenticate" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return Authenticate {
@@ -408,7 +408,7 @@ void Authenticate::toXml(XmlWriter &writer) const
 
 std::optional<Challenge> Challenge::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"challenge" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -425,7 +425,7 @@ void Challenge::toXml(XmlWriter &writer) const
 
 std::optional<Response> Response::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"response" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -442,7 +442,7 @@ void Response::toXml(XmlWriter &writer) const
 
 std::optional<Success> Success::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"success" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -481,7 +481,7 @@ void Success::toXml(XmlWriter &writer) const
 
 std::optional<Failure> Failure::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"failure" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -508,7 +508,7 @@ void Failure::toXml(XmlWriter &writer) const
 
 std::optional<Continue> Continue::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"continue" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -549,7 +549,7 @@ void Continue::toXml(XmlWriter &writer) const
 
 std::optional<Abort> Abort::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"abort" || el.namespaceURI() != ns_sasl_2) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return Abort { firstChildElement(el, u"text", ns_sasl_2).text() };

@@ -6,6 +6,7 @@
 #include "QXmppJingleData.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -2268,8 +2269,7 @@ void QXmppJingleRtpEncryption::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppJingleRtpEncryption::isJingleRtpEncryption(const QDomElement &element)
 {
-    return element.tagName() == u"encryption" &&
-        element.namespaceURI() == ns_jingle_rtp;
+    return elementXmlTag(element) == XmlTag;
 }
 
 class QXmppJingleRtpFeedbackPropertyPrivate : public QSharedData
@@ -2390,8 +2390,7 @@ void QXmppJingleRtpFeedbackProperty::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppJingleRtpFeedbackProperty::isJingleRtpFeedbackProperty(const QDomElement &element)
 {
-    return element.tagName() == u"rtcp-fb" &&
-        element.namespaceURI() == ns_jingle_rtcp_fb;
+    return elementXmlTag(element) == XmlTag;
 }
 
 /*!
@@ -2448,8 +2447,7 @@ void QXmppJingleRtpFeedbackInterval::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppJingleRtpFeedbackInterval::isJingleRtpFeedbackInterval(const QDomElement &element)
 {
-    return element.tagName() == u"rtcp-fb-trr-int" &&
-        element.namespaceURI() == ns_jingle_rtcp_fb;
+    return elementXmlTag(element) == XmlTag;
 }
 
 class QXmppJingleRtpHeaderExtensionPropertyPrivate : public QSharedData
@@ -2574,7 +2572,7 @@ void QXmppJingleRtpHeaderExtensionProperty::setParameters(const QVector<QXmppSdp
 
 void QXmppJingleRtpHeaderExtensionProperty::parse(const QDomElement &element)
 {
-    if (element.tagName() == u"rtp-hdrext" && element.namespaceURI() == ns_jingle_rtp_hdrext) {
+    if (elementXmlTag(element) == XmlTag) {
         d->id = element.attribute(u"id"_s).toUInt();
         d->uri = element.attribute(u"uri"_s);
         d->senders = Enums::fromString<Senders>(element.attribute(u"senders"_s))
@@ -2602,8 +2600,7 @@ void QXmppJingleRtpHeaderExtensionProperty::toXml(QXmlStreamWriter *writer) cons
 */
 bool QXmppJingleRtpHeaderExtensionProperty::isJingleRtpHeaderExtensionProperty(const QDomElement &element)
 {
-    return element.tagName() == u"rtp-hdrext" &&
-        element.namespaceURI() == ns_jingle_rtp_hdrext;
+    return elementXmlTag(element) == XmlTag;
 }
 
 class QXmppJingleMessageInitiationElementPrivate : public QSharedData

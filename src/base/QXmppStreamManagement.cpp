@@ -18,7 +18,7 @@ namespace QXmpp::Private {
 
 std::optional<SmEnable> SmEnable::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"enable" || el.namespaceURI() != ns_stream_management) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -40,7 +40,7 @@ void SmEnable::toXml(XmlWriter &w) const
 
 std::optional<SmEnabled> SmEnabled::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"enabled" || el.namespaceURI() != ns_stream_management) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 
@@ -66,7 +66,7 @@ void SmEnabled::toXml(XmlWriter &w) const
 
 std::optional<SmResume> SmResume::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"resume" || el.namespaceURI() != ns_stream_management) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return SmResume {
@@ -86,7 +86,7 @@ void SmResume::toXml(XmlWriter &w) const
 
 std::optional<SmResumed> SmResumed::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"resumed" || el.namespaceURI() != ns_stream_management) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return SmResumed {
@@ -106,7 +106,7 @@ void SmResumed::toXml(XmlWriter &w) const
 
 std::optional<SmFailed> SmFailed::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"failed" || el.namespaceURI() != ns_stream_management) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
 

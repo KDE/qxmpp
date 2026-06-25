@@ -5,6 +5,7 @@
 #include "QXmppThumbnail.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -117,7 +118,7 @@ void QXmppThumbnail::setHeight(std::optional<uint32_t> newHeight)
 
 bool QXmppThumbnail::parse(const QDomElement &el)
 {
-    if (el.tagName() == u"thumbnail" && el.namespaceURI() == ns_thumbs) {
+    if (elementXmlTag(el) == XmlTag) {
         if (!el.hasAttribute(u"uri"_s)) {
             return false;
         }

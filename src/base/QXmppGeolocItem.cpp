@@ -5,6 +5,7 @@
 #include "QXmppGeolocItem.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -138,8 +139,7 @@ void QXmppGeolocItem::setLongitude(std::optional<double> lon)
 bool QXmppGeolocItem::isItem(const QDomElement &itemElement)
 {
     auto isPayloadValid = [](const QDomElement &payload) -> bool {
-        return payload.tagName() == u"geoloc" &&
-            payload.namespaceURI() == ns_geoloc;
+        return elementXmlTag(payload) == XmlTag;
     };
 
     return QXmppPubSubBaseItem::isItem(itemElement, isPayloadValid);

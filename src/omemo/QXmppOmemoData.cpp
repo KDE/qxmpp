@@ -10,6 +10,7 @@
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoIq_p.h"
 #include "QXmppOmemoItems_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -101,7 +102,7 @@ void QXmppOmemoDeviceElement::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppOmemoDeviceElement::isOmemoDeviceElement(const QDomElement &element)
 {
-    return element.tagName() == u"device" && element.namespaceURI() == ns_omemo_2;
+    return elementXmlTag(element) == XmlTag;
 }
 
 /*!
@@ -136,7 +137,7 @@ void QXmppOmemoDeviceList::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppOmemoDeviceList::isOmemoDeviceList(const QDomElement &element)
 {
-    return element.tagName() == u"devices" && element.namespaceURI() == ns_omemo_2;
+    return elementXmlTag(element) == XmlTag;
 }
 
 /*!

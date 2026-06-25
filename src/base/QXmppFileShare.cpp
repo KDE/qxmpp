@@ -8,6 +8,7 @@
 #include "QXmppEncryptedFileSource.h"
 #include "QXmppFileMetadata.h"
 #include "QXmppHttpFileSource.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -323,7 +324,7 @@ void QXmppFileShare::addSource(const std::any &source)
 
 bool QXmppFileShare::parse(const QDomElement &el)
 {
-    if (el.tagName() == u"file-sharing" && el.namespaceURI() == ns_sfs) {
+    if (elementXmlTag(el) == XmlTag) {
         // disposition
         d->disposition = Enums::fromString<Disposition>(el.attribute(u"disposition"_s));
         d->id = el.attribute(u"id"_s);

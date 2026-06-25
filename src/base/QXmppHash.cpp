@@ -5,6 +5,7 @@
 #include "QXmppHash.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -50,7 +51,7 @@ QXmppHash::QXmppHash() = default;
 
 bool QXmppHash::parse(const QDomElement &el)
 {
-    if (el.tagName() == u"hash" && el.namespaceURI() == ns_hashes) {
+    if (elementXmlTag(el) == XmlTag) {
         m_algorithm = Enums::fromString<HashAlgorithm>(el.attribute(u"algo"_s))
                           .value_or(HashAlgorithm::Unknown);
         if (auto hashResult = parseBase64(el.text())) {
@@ -91,7 +92,7 @@ QXmppHashUsed::QXmppHashUsed(QXmpp::HashAlgorithm algorithm)
 
 bool QXmppHashUsed::parse(const QDomElement &el)
 {
-    if (el.tagName() != u"hash-used" || el.namespaceURI() != ns_hashes) {
+    if (elementXmlTag(el) != XmlTag) {
         return false;
     }
     m_algorithm = Enums::fromString<HashAlgorithm>(el.attribute(u"algo"_s))

@@ -5,6 +5,7 @@
 #include "QXmppBookmarkSet.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -184,8 +185,7 @@ void QXmppBookmarkSet::setUrls(const QList<QXmppBookmarkUrl> &urls)
 
 bool QXmppBookmarkSet::isBookmarkSet(const QDomElement &element)
 {
-    return element.tagName() == u"storage" &&
-        element.namespaceURI() == ns_bookmarks;
+    return elementXmlTag(element) == XmlTag;
 }
 
 void QXmppBookmarkSet::parse(const QDomElement &element)

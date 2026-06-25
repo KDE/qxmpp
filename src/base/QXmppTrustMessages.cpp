@@ -132,8 +132,7 @@ void QXmppTrustMessageElement::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppTrustMessageElement::isTrustMessageElement(const QDomElement &element)
 {
-    return element.tagName() == u"trust-message" &&
-        element.namespaceURI() == ns_tm;
+    return elementXmlTag(element) == XmlTag;
 }
 
 /*!
@@ -251,6 +250,5 @@ void QXmppTrustMessageKeyOwner::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppTrustMessageKeyOwner::isTrustMessageKeyOwner(const QDomElement &element)
 {
-    return element.tagName() == u"key-owner" &&
-        element.namespaceURI() == ns_tm;
+    return elementXmlTag(element) == XmlTag;
 }

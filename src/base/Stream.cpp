@@ -74,7 +74,7 @@ void StreamOpen::toXml(XmlWriter &w) const
 
 std::optional<StarttlsRequest> StarttlsRequest::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"starttls" || el.namespaceURI() != ns_tls) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return StarttlsRequest {};
@@ -87,7 +87,7 @@ void StarttlsRequest::toXml(XmlWriter &w) const
 
 std::optional<StarttlsProceed> StarttlsProceed::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"proceed" || el.namespaceURI() != ns_tls) {
+    if (elementXmlTag(el) != XmlTag) {
         return {};
     }
     return StarttlsProceed {};

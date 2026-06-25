@@ -6,6 +6,7 @@
 #include "QXmppBitsOfBinaryDataList.h"
 #include "QXmppBitsOfBinaryIq.h"
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
@@ -170,7 +171,7 @@ void QXmppBitsOfBinaryData::setData(const QByteArray &data)
 /*! Returns true if \a element is a \xep{0231}{Bits of Binary} data element. */
 bool QXmppBitsOfBinaryData::isBitsOfBinaryData(const QDomElement &element)
 {
-    return element.tagName() == u"data" && element.namespaceURI() == ns_bob;
+    return elementXmlTag(element) == XmlTag;
 }
 
 void QXmppBitsOfBinaryData::parseElementFromChild(const QDomElement &dataElement)

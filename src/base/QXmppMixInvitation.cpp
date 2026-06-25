@@ -5,6 +5,7 @@
 #include "QXmppMixInvitation.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -145,6 +146,5 @@ void QXmppMixInvitation::toXml(QXmlStreamWriter *writer) const
 */
 bool QXmppMixInvitation::isMixInvitation(const QDomElement &element)
 {
-    return element.tagName() == u"invitation" &&
-        element.namespaceURI() == ns_mix_misc;
+    return elementXmlTag(element) == XmlTag;
 }
