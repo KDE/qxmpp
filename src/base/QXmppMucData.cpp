@@ -43,7 +43,6 @@ struct Enums::Data<QXmpp::Muc::Role> {
 
 namespace QXmpp::Muc {
 
-/// \cond
 std::optional<HistoryOptions> HistoryOptions::fromDom(const QDomElement &el)
 {
     HistoryOptions opts;
@@ -72,9 +71,7 @@ void HistoryOptions::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"since", m_since },
     });
 }
-/// \endcond
 
-/// \cond
 std::optional<Destroy> Destroy::fromDom(const QDomElement &el)
 {
     Destroy d;
@@ -91,9 +88,7 @@ void Destroy::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"reason", m_reason },
     });
 }
-/// \endcond
 
-/// \cond
 std::optional<Item> Item::fromDom(const QDomElement &el)
 {
     Item item;
@@ -119,9 +114,7 @@ void Item::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"reason", m_reason },
     });
 }
-/// \endcond
 
-/// \cond
 std::optional<Invite> Invite::fromDom(const QDomElement &el)
 {
     Invite invite;
@@ -140,9 +133,7 @@ void Invite::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"reason", m_reason },
     });
 }
-/// \endcond
 
-/// \cond
 std::optional<Decline> Decline::fromDom(const QDomElement &el)
 {
     Decline decline;
@@ -161,9 +152,7 @@ void Decline::toXml(QXmlStreamWriter *writer) const
         OptionalTextElement { u"reason", m_reason },
     });
 }
-/// \endcond
 
-/// \cond
 std::optional<UserQuery> UserQuery::fromDom(const QDomElement &el)
 {
     UserQuery ue;
@@ -187,7 +176,6 @@ void UserQuery::toXml(QXmlStreamWriter *writer) const
         m_decline,
     });
 }
-/// \endcond
 
 ///
 /// Constructs a direct invitation for the room at \a jid.
@@ -201,7 +189,6 @@ DirectInvitation::DirectInvitation(QString jid, QString password, QString reason
 {
 }
 
-/// \cond
 std::optional<DirectInvitation> DirectInvitation::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -227,13 +214,11 @@ void DirectInvitation::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"thread", m_thread },
     });
 }
-/// \endcond
 
 }  // namespace QXmpp::Muc
 
 namespace QXmpp::Private {
 
-/// \cond
 std::optional<MucAdminQuery> MucAdminQuery::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -246,9 +231,7 @@ void MucAdminQuery::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { Tag { u"query", ns_muc_admin }, items });
 }
-/// \endcond
 
-/// \cond
 std::optional<MucOwnerQuery> MucOwnerQuery::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -280,9 +263,7 @@ void MucOwnerQuery::toXml(QXmlStreamWriter *writer) const
         },
     });
 }
-/// \endcond
 
-/// \cond
 std::optional<MucRegisterQuery> MucRegisterQuery::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -298,9 +279,7 @@ void MucRegisterQuery::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { Tag { u"query", ns_register }, form });
 }
-/// \endcond
 
-/// \cond
 std::optional<MucUniqueQuery> MucUniqueQuery::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -313,6 +292,5 @@ void MucUniqueQuery::toXml(QXmlStreamWriter *writer) const
 {
     XmlWriter(writer).write(Element { XmlTag, OptionalCharacters { name } });
 }
-/// \endcond
 
 }  // namespace QXmpp::Private

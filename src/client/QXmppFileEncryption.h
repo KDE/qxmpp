@@ -15,7 +15,6 @@ namespace QXmpp::Private::Crypto {
 class CipherContext;
 }
 
-//! \cond
 namespace QXmpp::Private::Encryption {
 
 using CipherContext = Crypto::CipherContext;
@@ -74,6 +73,5 @@ private:
 };
 
 }  // namespace QXmpp::Private::Encryption
-//! \endcond
 
 #endif  // QXMPPFILEENCRYPTION_H

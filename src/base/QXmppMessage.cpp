@@ -47,7 +47,6 @@ using namespace QXmpp;
 using namespace QXmpp::Private;
 namespace views = std::views;
 
-/// \cond
 std::optional<QXmppStanzaId> QXmppStanzaId::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -67,7 +66,6 @@ void QXmppStanzaId::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"by", by },
     });
 }
-/// \endcond
 
 template<>
 struct Enums::Data<QXmppMessage::State> {

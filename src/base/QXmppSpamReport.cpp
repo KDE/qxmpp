@@ -94,7 +94,6 @@ struct Enums::Data<QXmppSpamReport::Reason> {
     Constructs a report with the given \a reason.
 */
 
-/// \cond
 std::optional<QXmppSpamReport> QXmppSpamReport::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -130,4 +129,3 @@ void QXmppSpamReport::toXml(QXmlStreamWriter *writer) const
         OptionalContent { m_forwardToThirdParty, Element { u"third-party" } },
     });
 }
-/// \endcond

@@ -30,7 +30,6 @@ public:
     QXmppRosterMemoryStorage();
     ~QXmppRosterMemoryStorage() override;
 
-    //! \cond
     QXmppTask<RosterCache> load() override;
     QXmppTask<void> replaceAll(const QString &version,
                                const std::vector<QXmppRosterIq::Item> &items) override;
@@ -39,7 +38,6 @@ public:
     QXmppTask<void> removeItem(const QString &version,
                                const QString &bareJid) override;
     QXmppTask<void> clear() override;
-    //! \endcond
 
 private:
     std::unique_ptr<QXmppRosterMemoryStoragePrivate> d;
