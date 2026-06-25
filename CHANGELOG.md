@@ -8,6 +8,8 @@ QXmpp 1.16.1 (Unreleased)
 -------------------------
 
  - OMEMO: Report encryption as failed when no recipient device (other than the own ones) could be encrypted for, instead of silently "succeeding" (@lnj, !794)
+ - OMEMO: Fix undecryptable messages by setting the 'kex' attribute based on the actual ciphertext message type instead of an application-level assumption (@lnj, !789)
+ - Stream: Fix dropped default namespace on incoming stanzas with Qt 6.12, which broke authentication, file transfers and stream parsing (@lnj, !793)
 
 QXmpp 1.16.0 (June 23, 2026)
 ----------------------------
