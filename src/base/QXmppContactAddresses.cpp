@@ -25,12 +25,12 @@ struct QXmppContactAddressesPrivate : QSharedData {
     Data form used in service discovery information for publishing service contact addresses. See
     \xep{0157}{Contact Addresses for XMPP Services} for details.
 
-    ```
+    \code
     QXmppDiscoveryIq iq;
     if (auto contactAddresses = iq.dataForm<QXmppContactAddresses>()) {
     auto abuseAddresses = contactAddresses->abuseAddresses();
     }
-    ```
+    \endcode
 
     \since QXmpp 1.12
 */

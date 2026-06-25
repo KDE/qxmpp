@@ -118,7 +118,7 @@ bool handleIqType(Handler handler,
 
     It is the easiest to explain this function with a few examples.
 
-    ```
+    \code
     auto handled = QXmpp::handleIqElements<QXmppVersionIq>(element, e2eeMetadata, client, [](QXmppVersionIq iq) -> std::variant<QXmppVersionIq, QXmppStanza::Error> {
     if (iq.type() == QXmppIq::Get) {
     QXmppVersionIq response;
@@ -130,18 +130,18 @@ bool handleIqType(Handler handler,
     return QXmppStanza::Error(QXmppStanza::Error::Cancel, QXmppStanza::Error::BadRequest, "IQ must be of type 'get'.");
     }
     });
-    ```
+    \endcode
 
     It is also possible to handle multiple IQ types.
-    ```
+    \code
     auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
     element, e2eeMetadata, client, [](std::variant<QXmppVersionIq, QXmppVCardIq> iqVariant) {
     // ...
     });
-    ```
+    \endcode
     It doesn't need to be a std::variant, it's only important that the object is callable with all
     the IQ types. You can for example use different lambdas per type using this 'overloaded' helper.
-    ```
+    \code
     template<class... Ts>
     struct overloaded : Ts... {
     using Ts::operator()...;
@@ -159,13 +159,13 @@ bool handleIqType(Handler handler,
     // ...
     }
     });
-    ```
+    \endcode
 
-    And another option is to an object with `handleIq()` functions.
-    ```
+    And another option is to an object with \c {handleIq()} functions.
+    \code
     auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(element, e2eeMetadata, client, this);
     // will call this->handleIq(QXmppVersionIq) or this->handleIq(QXmppVCardIq)
-    ```
+    \endcode
 
     The return type of the handler function can be:
     1. an QXmppIq based type
@@ -207,7 +207,7 @@ bool handleIqRequests(const QDomElement &element,
 
     It is the easiest to explain this function with a few examples.
 
-    ```
+    \code
     auto handled = QXmpp::handleIqElements<QXmppVersionIq>(element, client, [](QXmppVersionIq iq) -> std::variant<QXmppVersionIq, QXmppStanza::Error> {
     if (iq.type() == QXmppIq::Get) {
     QXmppVersionIq response;
@@ -219,18 +219,18 @@ bool handleIqRequests(const QDomElement &element,
     return QXmppStanza::Error(QXmppStanza::Error::Cancel, QXmppStanza::Error::BadRequest, "IQ must be of type 'get'.");
     }
     });
-    ```
+    \endcode
 
     It is also possible to handle multiple IQ types.
-    ```
+    \code
     auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(
     element, client, [](std::variant<QXmppVersionIq, QXmppVCardIq> iqVariant) {
     // ...
     });
-    ```
+    \endcode
     It doesn't need to be a std::variant, it's only important that the object is callable with all
     the IQ types. You can for example use different lambdas per type using this 'overloaded' helper.
-    ```
+    \code
     template<class... Ts>
     struct overloaded : Ts... {
     using Ts::operator()...;
@@ -248,13 +248,13 @@ bool handleIqRequests(const QDomElement &element,
     // ...
     }
     });
-    ```
+    \endcode
 
-    And another option is to an object with `handleIq()` functions.
-    ```
+    And another option is to an object with \c {handleIq()} functions.
+    \code
     auto handled = QXmpp::handleIqElements<QXmppVersionIq, QXmppVCardIq>(element, client, this);
     // will call this->handleIq(QXmppVersionIq) or this->handleIq(QXmppVCardIq)
-    ```
+    \endcode
 
     The return type of the handler function can be:
     1. an QXmppIq based type

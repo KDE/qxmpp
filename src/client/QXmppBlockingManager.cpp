@@ -106,7 +106,7 @@ struct QXmppBlockingManagerPrivate {
     \section2 Listing blocked devices
 
     You can receive a list of blocked JIDs by using fetchBlocklist().
-    ```
+    \code
     manager->fetchBlocklist().then(this, [](auto result) {
     if (auto *blocklist = std::get_if<QXmppBlocklist>(&result)) {
     qDebug() << "Blocked JIDs:" << blocklist->entries();
@@ -114,7 +114,7 @@ struct QXmppBlockingManagerPrivate {
     qDebug() << "Error fetching blocklist:" << err->description;
     }
     });
-    ```
+    \endcode
 
     The server will send updates to us for the rest of the stream. You can listen to the updates by
     connecting to blocked() and unblocked().
@@ -124,7 +124,7 @@ struct QXmppBlockingManagerPrivate {
     \section2 Blocking and Unblocking
 
     You can use block() and unblock() for this purpose.
-    ```
+    \code
     manager->block("baduser@spam.im").then(this, [](auto result) {
     if (QXmpp::hasValue(result)) {
     qDebug() << "Blocked baduser@spam.im!";
@@ -132,7 +132,7 @@ struct QXmppBlockingManagerPrivate {
     qDebug() << "Error:" << err->description;
     }
     });
-    ```
+    \endcode
     unblock() works likewise.
 
     \note This will also trigger blocked() or unblocked() if you are subscribed to the blocklist.
@@ -160,9 +160,9 @@ struct QXmppBlockingManagerPrivate {
 
     The blocking manager is not enabled by default and needs to be registered with your
     QXmppClient.
-    ```
+    \code
     auto *blockingManager = client->addNewExtension<QXmppBlockingManager>();
-    ```
+    \endcode
 
     \ingroup Managers
     \sa QXmppBlocklist
@@ -465,7 +465,7 @@ QList<QString> QXmppBlocklist::entries() const
     Returns true if the blocklist contains the entry \a entry.
 
     \note This does not check whether a JID may be blocked or blocked partially by other entries.
-    E.g. `containsEntry("user@domain.tld")` will return false even if `domain.tld` is blocked
+    E.g. \c {containsEntry("user@domain.tld")} will return false even if \c {domain.tld} is blocked
     completely.
 */
 bool QXmppBlocklist::containsEntry(QStringView entry) const

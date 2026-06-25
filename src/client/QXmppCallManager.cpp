@@ -209,14 +209,14 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
     You can take over ownership of the call by moving out the unique pointer. However, this is
     only possible for one slot connected to this signal, all other slots after that will receive a
     nullptr.
-    ```
+    \code
     std::vector<std::unique_ptr<QXmppCall>> myActiveCalls;
     connect(manager, &QXmppCallManager::callReceived, this, [&](std::unique_ptr<QXmppCall> &call) {
     // take over ownership
     myActiveCalls.push_back(std::move(call));
     // call is now nullptr
     });
-    ```
+    \endcode
     Note that you do not need to continue to use a unique pointer for memory management, you can
     also use QObject-parent ownership or another ownership model.
 

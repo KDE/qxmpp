@@ -230,7 +230,7 @@ public:
     /*!
         Returns whether the task has been cancelled.
 
-        If a task is cancelled, no call to `finish()` is needed and no continuation is resumed.
+        If a task is cancelled, no call to \c {finish()} is needed and no continuation is resumed.
 
         \since QXmpp 1.15
     */
@@ -424,10 +424,10 @@ public:
         If the task is already finished when calling this (and still has a result), the function
         will be called immediately.
 
-        `.then()` can only be called once.
+        \c {.then()} can only be called once.
 
         Example usage:
-        ```
+        \code
         QXmppTask<QString> generateSomething();
 
         void Manager::generate()
@@ -442,15 +442,15 @@ public:
         }
 
         // Manager is derived from QObject.
-        ```
+        \endcode
 
         \a context is the QObject used for unregistering the handler function when the object is
         deleted. This way your lambda will never be executed after your object has been deleted.
-        \a continuation is a function accepting a result in the form of `T &&`.
+        \a continuation is a function accepting a result in the form of \c {T &&}.
 
         Returns a new QXmppTask that finishes with the value returned by \a continuation, allowing
-        further chaining via another `.then()` or `co_await`. If \a continuation returns `void`,
-        the returned task is `QXmppTask<void>` which finishes once the continuation has run. Returns true on success. */
+        further chaining via another \c {.then()} or \c co_await. If \a continuation returns \c void,
+        the returned task is \c {QXmppTask<void>} which finishes once the continuation has run. Returns true on success. */
     template<typename Continuation>
     auto then(const QObject *context, Continuation continuation)
         -> QXmppTask<QXmpp::Private::InvokeContinuationResult<Continuation, T>>
@@ -477,7 +477,7 @@ public:
         Sets a context object for co_await.
 
         If this task is co_await'ed, the coroutine will only be resumed if the context object is
-        still alive. This is very helpful for usage in member functions to assure that `this` still
+        still alive. This is very helpful for usage in member functions to assure that \c this still
         exists after an co_await statement.
 
         Returns a reference to this task.

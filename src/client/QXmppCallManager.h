@@ -35,10 +35,10 @@ struct TurnServer;
 
     To make use of this manager, you need to instantiate it and load it into the QXmppClient
     instance as follows:
-    ```cpp
+    \code
     auto *client = new QXmppClient();
     auto *callManager = client->addNewExtension<QXmppCallManager>();
-    ```
+    \endcode
 
     \section1 Call interaction
 

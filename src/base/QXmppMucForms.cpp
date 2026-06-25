@@ -18,7 +18,7 @@ using namespace QXmpp::Private;
     \class QXmppMucRoomInfo
     \inmodule QXmpp
 
-    `muc#roominfo` form as defined in \xep{0045}{Multi-User Chat}.
+    \c {muc#roominfo} form as defined in \xep{0045}{Multi-User Chat}.
 
     \since QXmpp 1.13
 */

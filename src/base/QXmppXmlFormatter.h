@@ -19,7 +19,7 @@ namespace QXmpp {
     inserted for terminal syntax highlighting (tags, attributes, text).
 
     Tolerates XMPP stream fragments that are not standalone documents (such as
-    inner child stanzas without their enclosing `<stream:stream>`). If the
+    inner child stanzas without their enclosing \c {<stream:stream>}). If the
     input cannot be parsed as XML at all, the original string is returned
     unchanged, so non-XML payloads (e.g. STUN packet dumps) pass through.
 
