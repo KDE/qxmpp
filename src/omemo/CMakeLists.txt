@@ -103,3 +103,12 @@ install(
     DESTINATION ${OMEMO_CMAKE_DIR}
     COMPONENT Devel
 )
+
+ecm_add_installed_library_check(${QXMPPOMEMO_TARGET}
+    PACKAGE_NAME "${QXMPPOMEMO_TARGET}"
+    PACKAGE_TARGET_NAMESPACE "QXmpp::"
+)
+
+ecm_installed_library_check_include_strings(${QXMPPOMEMO_TARGET}
+    HEADERS ${OMEMO_INSTALL_HEADER_FILES}
+)

@@ -69,6 +69,9 @@ add_definitions(
     -DQT_NO_KEYWORDS
 )
 
+# temporary for example testing of installed library
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ECMInstalledLibraryCheck.cmake)
+
 # Address sanitizer and undefined behavior sanitizer
 if(ENABLE_ASAN)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
