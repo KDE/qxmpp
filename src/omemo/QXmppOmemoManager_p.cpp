@@ -1039,11 +1039,11 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
 
                     const auto address = Address(jid, deviceId);
 
-                    auto addOmemoEnvelope = [this, payloadEncryptionResult, omemoElement, address, jid, deviceId, controlDeviceProcessing](bool isKeyExchange = false) mutable {
+                    auto addOmemoEnvelope = [this, payloadEncryptionResult, omemoElement, address, jid, deviceId, controlDeviceProcessing]() mutable {
                         // Create and add an OMEMO envelope only if its data could be created
                         // and the corresponding device has not been removed by another method
                         // in the meantime.
-                        if (const auto data = createOmemoEnvelopeData(address.data(), payloadEncryptionResult.decryptionData); data.isEmpty()) {
+                        if (const auto envelopeData = createOmemoEnvelopeData(address.data(), payloadEncryptionResult.decryptionData); !envelopeData) {
                             warning(u"OMEMO envelope for recipient JID '" + jid + u"' and device ID '" + QString::number(deviceId) + u"' could not be created because its data could not be encrypted");
                             controlDeviceProcessing(false);
                         } else if (devices.value(jid).contains(deviceId)) {
@@ -1058,10 +1058,8 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
 
                             QXmppOmemoEnvelope omemoEnvelope;
                             omemoEnvelope.setRecipientDeviceId(deviceId);
-                            if (isKeyExchange) {
-                                omemoEnvelope.setUsedForKeyExchange(true);
-                            }
-                            omemoEnvelope.setData(data);
+                            omemoEnvelope.setUsedForKeyExchange(envelopeData->isKeyExchange);
+                            omemoEnvelope.setData(envelopeData->data);
                             omemoElement->addEnvelope(jid, omemoEnvelope);
                             controlDeviceProcessing();
                         }
@@ -1076,7 +1074,7 @@ QXmppTask<std::optional<QXmppOmemoElement>> ManagerPrivate::encryptStanza(const 
                             warning(u"Session could not be created for JID '" + jid + u"' and device ID '" + QString::number(deviceId) + u"'");
                             controlDeviceProcessing(false);
                         } else {
-                            addOmemoEnvelope(true);
+                            addOmemoEnvelope();
                         }
                     };
 
@@ -1256,15 +1254,15 @@ QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
 // \a address is address of a recipient device. \a payloadDecryptionData is data used for
 // symmetric encryption being asymmetrically encrypted.
 //
-// Returns the encrypted and serialized OMEMO envelope data or a default-constructed byte array
-// on failure.
-QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address &address, const Crypto::SecureByteArray &payloadDecryptionData) const
+// Returns the encrypted and serialized OMEMO envelope data together with whether it is used for
+// key exchange, or std::nullopt on failure.
+std::optional<OmemoEnvelopeData> ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address &address, const Crypto::SecureByteArray &payloadDecryptionData) const
 {
     SessionCipherPtr sessionCipher;
 
     if (session_cipher_create(sessionCipher.ptrRef(), storeContext.get(), &address, globalContext.get()) < 0) {
         warning(u"Session cipher could not be created"_s);
-        return {};
+        return std::nullopt;
     }
 
     session_cipher_set_version(sessionCipher.get(), CIPHERTEXT_OMEMO_VERSION);
@@ -1272,14 +1270,18 @@ QByteArray ManagerPrivate::createOmemoEnvelopeData(const signal_protocol_address
     RefCountedPtr<ciphertext_message> encryptedOmemoEnvelopeData;
     if (session_cipher_encrypt(sessionCipher.get(), reinterpret_cast<const uint8_t *>(payloadDecryptionData.constData()), payloadDecryptionData.size(), encryptedOmemoEnvelopeData.ptrRef()) != SG_SUCCESS) {
         warning(u"Payload decryption data could not be encrypted"_s);
-        return {};
+        return std::nullopt;
     }
 
     signal_buffer *serializedEncryptedOmemoEnvelopeData = ciphertext_message_get_serialized(encryptedOmemoEnvelopeData.get());
 
-    return {
-        reinterpret_cast<const char *>(signal_buffer_data(serializedEncryptedOmemoEnvelopeData)),
-        int(signal_buffer_len(serializedEncryptedOmemoEnvelopeData))
+    // Whether the envelope is used for key exchange (i.e., the 'kex' attribute) must reflect the
+    // actual type of the produced ciphertext message instead of an application-level assumption.
+    // The OMEMO library keeps producing pre key messages until it processes a response from the
+    // recipient, even when a session record already exists locally.
+    return OmemoEnvelopeData {
+        omemoLibBufferToByteArray(serializedEncryptedOmemoEnvelopeData),
+        ciphertext_message_get_type(encryptedOmemoEnvelopeData.get()) == CIPHERTEXT_PREKEY_TYPE,
     };
 }
 
@@ -2891,7 +2893,7 @@ QXmppTask<bool> ManagerPrivate::buildSessionWithDeviceBundle(QString jid, uint32
         co_return false;
     }
 
-    auto result = co_await sendEmptyMessage(jid, deviceId, true).withContext(q);
+    auto result = co_await sendEmptyMessage(jid, deviceId).withContext(q);
     if (std::holds_alternative<QXmppError>(result)) {
         warning(u"Session could be created but empty message could not be sent to JID '" +
                 jid + u"' and device ID '" + QString::number(deviceId) + u"'");
@@ -3124,15 +3126,15 @@ bool ManagerPrivate::deserializePublicPreKey(ec_public_key **publicPreKey, const
 // sessions.
 //
 // \a recipientJid is JID of the message's recipient. \a recipientDeviceId is ID of the
-// recipient's device. \a isKeyExchange indicates whether the message is used to build a new session.
+// recipient's device.
 //
 // Returns the result of the sending.
-QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId, bool isKeyExchange) const
+QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJid, uint32_t recipientDeviceId) const
 {
     const auto address = Address(recipientJid, recipientDeviceId);
     const auto decryptionData = Crypto::SecureByteArray(EMPTY_MESSAGE_DECRYPTION_DATA_SIZE);
 
-    if (const auto data = createOmemoEnvelopeData(address.data(), decryptionData); data.isEmpty()) {
+    if (const auto envelopeData = createOmemoEnvelopeData(address.data(), decryptionData); !envelopeData) {
         warning(u"OMEMO envelope for recipient JID '" + recipientJid + u"' and device ID '" + QString::number(recipientDeviceId) + u"' could not be created because its data could not be encrypted");
         return makeReadyTask<SendResult>(QXmppError {
             u"OMEMO envelope could not be created"_s,
@@ -3141,10 +3143,8 @@ QXmppTask<SendResult> ManagerPrivate::sendEmptyMessage(const QString &recipientJ
     } else {
         QXmppOmemoEnvelope omemoEnvelope;
         omemoEnvelope.setRecipientDeviceId(recipientDeviceId);
-        if (isKeyExchange) {
-            omemoEnvelope.setUsedForKeyExchange(true);
-        }
-        omemoEnvelope.setData(data);
+        omemoEnvelope.setUsedForKeyExchange(envelopeData->isKeyExchange);
+        omemoEnvelope.setData(envelopeData->data);
 
         QXmppOmemoElement omemoElement;
         omemoElement.addEnvelope(recipientJid, omemoEnvelope);
