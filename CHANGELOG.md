@@ -4,8 +4,8 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.16.1 (Unreleased)
--------------------------
+QXmpp 1.16.1 (June 25, 2026)
+----------------------------
 
  - OMEMO: Report encryption as failed when no recipient device (other than the own ones) could be encrypted for, instead of silently "succeeding" (@lnj, !794)
  - OMEMO: Fix undecryptable messages by setting the 'kex' attribute based on the actual ciphertext message type instead of an application-level assumption (@lnj, !789)
