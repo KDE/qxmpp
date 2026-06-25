@@ -5,6 +5,7 @@
 
 #include "QXmppLogger.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppXmlFormatter.h"
 
 #include "StringLiterals.h"
@@ -26,6 +27,33 @@
 #endif
 
 QXmppLogger *QXmppLogger::m_logger = nullptr;
+
+// Detect a bare XEP-0198 ack request/answer (<r/> or <a .../>).
+// Allocation-free: QStringView slicing/contains do not allocate, and the single-char
+// guards reject normal stanzas before the namespace scan runs.
+static bool isStreamManagementAck(QStringView text)
+{
+    // skip leading whitespace without allocating
+    qsizetype i = 0;
+    while (i < text.size() && text.at(i).isSpace()) {
+        ++i;
+    }
+    auto s = text.sliced(i);
+    // element name is a single 'r' or 'a' followed by whitespace, '/', or '>'
+    if (s.size() < 3 || s.at(0) != u'<') {
+        return false;
+    }
+    QChar name = s.at(1);
+    if (name != u'r' && name != u'a') {
+        return false;
+    }
+    QChar after = s.at(2);
+    if (!after.isSpace() && after != u'/' && after != u'>') {
+        return false;
+    }
+    // only reached by genuine <r .../> / <a .../>; confirm the SM namespace
+    return s.contains(QXmpp::Private::ns_stream_management);
+}
 
 static QStringView typeName(QXmppLogger::MessageType type)
 {
@@ -150,6 +178,7 @@ public:
     QXmppLogger::MessageTypes messageTypes;
     bool prettyXml = false;
     QXmppLogger::ColorMode colorMode = QXmppLogger::ColorAuto;
+    bool filterStreamManagementAcks = true;
 };
 
 QXmppLoggerPrivate::QXmppLoggerPrivate()
@@ -244,6 +273,13 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
         return;
     }
 
+    // filter out XEP-0198 Stream Management ack stanzas (very frequent, noisy)
+    if (d->filterStreamManagementAcks &&
+        (type == SentMessage || type == ReceivedMessage) &&
+        isStreamManagementAck(text)) {
+        return;
+    }
+
     bool colorize = false;
     if (d->prettyXml) {
         switch (d->colorMode) {
@@ -318,6 +354,31 @@ void QXmppLogger::setColorMode(QXmppLogger::ColorMode mode)
         d->colorMode = mode;
         Q_EMIT colorModeChanged();
     }
+}
+
+/*!
+    Returns whether \xep{0198}{Stream Management} ack stanzas (\c{<r/>} and \c{<a/>}) are
+    filtered out of Sent/Received logging.
+
+    These tiny stanzas are exchanged very frequently and otherwise flood the log.
+    Enabled by default.
+
+    \since QXmpp 1.17
+*/
+bool QXmppLogger::filterStreamManagementAcks() const
+{
+    return d->filterStreamManagementAcks;
+}
+
+/*!
+    Sets whether \xep{0198}{Stream Management} ack stanzas (\c{<r/>} and \c{<a/>}) are
+    filtered out of Sent/Received logging (\a enable).
+
+    \since QXmpp 1.17
+*/
+void QXmppLogger::setFilterStreamManagementAcks(bool enable)
+{
+    d->filterStreamManagementAcks = enable;
 }
 
 /*!

@@ -162,6 +162,9 @@ public:
     void setColorMode(QXmppLogger::ColorMode mode);
     Q_SIGNAL void colorModeChanged();
 
+    bool filterStreamManagementAcks() const;
+    void setFilterStreamManagementAcks(bool enable);
+
     void enablePrettyXml(bool enable = true);
 
     Q_SLOT virtual void setGauge(const QString &gauge, double value);
