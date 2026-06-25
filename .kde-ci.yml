@@ -9,3 +9,4 @@ Options:
   require-passing-tests-on: ['@all']
   ctest-arguments: '-j8 --progress'
   clang-format-versions: [19]
+  run-installed-library-check: True
