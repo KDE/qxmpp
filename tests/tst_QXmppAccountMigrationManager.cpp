@@ -400,7 +400,7 @@ void tst_QXmppAccountMigrationManager::testSerialization()
     // test serialize
     const auto data = expectFutureVariant<QXmppExportData>(exportTask);
 
-    const auto xml1 = packetToXml(data);
+    const auto xml1 = packetToXml(data, QXmppExportData::Format::QXmpp);
     const QByteArray xml2 =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
         "<account-data xmlns=\"org.qxmpp.export\" jid=\"pasnox@xmpp.example\">"
@@ -429,7 +429,7 @@ void tst_QXmppAccountMigrationManager::testSerialization()
 
     // test parse (and re-serialize)
     auto parsedData = expectVariant<QXmppExportData>(QXmppExportData::fromDom(xmlToDom(xml2)));
-    const auto xml3 = packetToXml(parsedData);
+    const auto xml3 = packetToXml(parsedData, QXmppExportData::Format::QXmpp);
     const QByteArray xml4Mix =
         "<mix>"
         "<item jid=\"mix2@gamer.com\" nick=\"Joe @ Mix 2 Gamer\"/>"

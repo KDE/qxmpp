@@ -156,8 +156,8 @@ std::tuple<QString, QString> rewriteXmlWithoutStanzaId(const String &inputXml)
     return { outputXml, id };
 }
 
-template<typename T>
-static QByteArray packetToXml(const T &packet)
+template<typename T, typename... Args>
+static QByteArray packetToXml(const T &packet, Args &&...args)
 {
     using namespace QXmpp::Private;
 
@@ -165,7 +165,7 @@ static QByteArray packetToXml(const T &packet)
     buffer.open(QIODevice::ReadWrite);
     QXmlStreamWriter writer(&buffer);
     XmlWriter xmlWriter(&writer);
-    packet.toXml(xmlWriter);
+    packet.toXml(xmlWriter, std::forward<Args>(args)...);
     auto data = buffer.data();
     data.replace(u'\'', "&apos;");
     return data;

@@ -9,11 +9,13 @@
 #include "QXmppConstants_p.h"
 #include "QXmppPromise.h"
 #include "QXmppTask.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
-#include "Algorithms.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
+
+#include <array>
 
 #include <QDomElement>
 
@@ -59,23 +61,31 @@ struct std::hash<XmlElementId> {
 
 using AnyParser = QXmppExportData::ExtensionParser<std::any>;
 using AnySerializer = QXmppExportData::ExtensionSerializer<std::any>;
+using Format = QXmppExportData::Format;
 
-static std::unordered_map<std::type_index, XmlElementId> &accountDataMapping()
+// Number of QXmppExportData::Format values; the registries below are indexed by format.
+inline constexpr std::size_t FormatCount = 2;
+inline std::size_t formatIndex(Format format) { return static_cast<std::size_t>(format); }
+
+// Each registry is kept per output format. A C++ type may thus carry one entry for the
+// QXmpp format and another for the XEP-0227 format (e.g. roster serializes as <roster/>
+// vs <query xmlns='jabber:iq:roster'/>).
+static std::unordered_map<std::type_index, XmlElementId> &accountDataMapping(Format format)
 {
-    thread_local static std::unordered_map<std::type_index, XmlElementId> registry;
-    return registry;
+    thread_local static std::array<std::unordered_map<std::type_index, XmlElementId>, FormatCount> registry;
+    return registry[formatIndex(format)];
 }
 
-static std::unordered_map<XmlElementId, AnyParser> &accountDataParsers()
+static std::unordered_map<XmlElementId, AnyParser> &accountDataParsers(Format format)
 {
-    thread_local static std::unordered_map<XmlElementId, AnyParser> registry;
-    return registry;
+    thread_local static std::array<std::unordered_map<XmlElementId, AnyParser>, FormatCount> registry;
+    return registry[formatIndex(format)];
 }
 
-static std::unordered_map<std::type_index, AnySerializer> &accountDataSerializers()
+static std::unordered_map<std::type_index, AnySerializer> &accountDataSerializers(Format format)
 {
-    thread_local static std::unordered_map<std::type_index, AnySerializer> registry;
-    return registry;
+    thread_local static std::array<std::unordered_map<std::type_index, AnySerializer>, FormatCount> registry;
+    return registry[formatIndex(format)];
 }
 
 struct QXmppExportDataPrivate : QSharedData {
@@ -90,73 +100,178 @@ QXmppExportData::QXmppExportData()
 
 QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppExportData)
 
+// Parses all registered child extension elements of `parent` using the parser table for
+// `format`, adding the results to `extensions`. Already present types are kept untouched
+// (so a value parsed from a preferred format is not overwritten). Returns an error if a
+// registered parser fails.
+static std::optional<QXmppError> parseExtensionChildren(const QDomElement &parent, Format format, std::unordered_map<std::type_index, std::any> &extensions)
+{
+    const auto &parsers = accountDataParsers(format);
+    for (const auto &extension : iterChildElements(parent)) {
+        const auto parser = parsers.find(XmlElementId::fromDom(extension));
+        if (parser == parsers.end()) {
+            continue;
+        }
+
+        auto result = parser->second(extension);
+        if (hasError(result)) {
+            return getError(std::move(result));
+        }
+
+        auto value = getValue(std::move(result));
+        extensions.emplace(value.type(), std::move(value));
+    }
+    return {};
+}
+
+/*!
+    Parses account data from \a el.
+
+    Both the QXmpp format (\c {<account-data/>}) and \xep{0227, Portable Import/Export
+    Format for XMPP-IM Servers} (\c {<server-data/>}) are accepted; the format is detected
+    from the root element. When an \xep{0227} document carries the same data both as a
+    native element and as an embedded QXmpp fallback, the native \xep{0227} element is
+    preferred.
+
+    \note \xep{0227} documents may contain multiple hosts and users, but as this is used for
+    single-account client-side migration only the first host and user are read.
+*/
 std::variant<QXmppExportData, QXmppError> QXmppExportData::fromDom(const QDomElement &el)
 {
-    if (el.tagName() != u"account-data" || el.namespaceURI() != ns_qxmpp_export) {
-        return QXmppError { u"Invalid XML document provided."_s, {} };
+    QXmppExportData data;
+
+    // QXmpp's own format.
+    if (el.tagName() == u"account-data" && el.namespaceURI() == ns_qxmpp_export) {
+        data.setAccountJid(el.attribute(u"jid"_s));
+        if (auto error = parseExtensionChildren(el, Format::QXmpp, data.d->extensions)) {
+            return std::move(*error);
+        }
+        return data;
     }
 
-    const auto &parsers = accountDataParsers();
+    // XEP-0227: <server-data><host jid><user name>...</user></host></server-data>.
+    if (el.tagName() == u"server-data" && el.namespaceURI() == ns_pie) {
+        // XEP-0227 documents may contain multiple hosts and users, but as this is used for
+        // single-account client-side migration we only read the first host and user.
+        const auto host = firstChildElement(el, u"host", ns_pie);
+        const auto user = firstChildElement(host, u"user", ns_pie);
 
-    QXmppExportData data;
-    data.setAccountJid(el.attribute(u"jid"_s));
+        const auto hostJid = host.attribute(u"jid"_s);
+        const auto userName = user.attribute(u"name"_s);
+        data.setAccountJid(userName.isEmpty() ? hostJid : userName + u'@' + hostJid);
 
-    for (const auto &extension : iterChildElements(el)) {
-        const auto parser = parsers.find(XmlElementId::fromDom(extension));
-        if (parser != parsers.end()) {
-            const auto &[_, parse] = *parser;
+        // Pass 1: native XEP-0227 elements (preferred).
+        if (auto error = parseExtensionChildren(user, Format::Xep0227, data.d->extensions)) {
+            return std::move(*error);
+        }
+        // Pass 2: QXmpp-only data embedded directly under <user/> as foreign elements.
+        // Types already parsed natively in pass 1 are kept.
+        if (auto error = parseExtensionChildren(user, Format::QXmpp, data.d->extensions)) {
+            return std::move(*error);
+        }
+        return data;
+    }
 
-            auto result = parse(extension);
-            if (hasError(result)) {
-                return getError(std::move(result));
-            }
+    return QXmppError { u"Invalid XML document provided."_s, {} };
+}
 
-            auto extensionValue = getValue(std::move(result));
-            data.d->extensions.emplace(extensionValue.type(), std::move(extensionValue));
+/*!
+    Serializes the account data to \a writer using \a format.
+
+    By default the QXmpp format (\c {<account-data/>}) is written. Pass Format::Xep0227 to
+    write \xep{0227, Portable Import/Export Format for XMPP-IM Servers} instead; data types
+    without a native \xep{0227} representation (e.g. MIX) are then embedded as a
+    QXmpp-specific fallback so no data is lost, and standard servers ignore those elements.
+*/
+void QXmppExportData::toXml(QXmlStreamWriter *writer, Format format) const
+{
+    // Resolves, for each present extension, the element id and serializer to use for the
+    // requested format. A type with no serializer for that format falls back to its QXmpp
+    // serializer, so QXmpp-only data (e.g. MIX) is never dropped.
+    struct ResolvedExtension {
+        XmlElementId id;
+        AnySerializer serialize;
+        const std::any *value;
+    };
+
+    const auto &mapping = accountDataMapping(format);
+    const auto &serializers = accountDataSerializers(format);
+    const auto &qxmppMapping = accountDataMapping(Format::QXmpp);
+    const auto &qxmppSerializers = accountDataSerializers(Format::QXmpp);
+
+    std::vector<ResolvedExtension> nativeExtensions;
+    std::vector<ResolvedExtension> fallbackExtensions;
+
+    for (const auto &[typeIndex, value] : d->extensions) {
+        if (const auto serializer = serializers.find(typeIndex); serializer != serializers.end()) {
+            nativeExtensions.push_back({ mapping.at(typeIndex), serializer->second, &value });
+        } else if (const auto fallback = qxmppSerializers.find(typeIndex); fallback != qxmppSerializers.end()) {
+            fallbackExtensions.push_back({ qxmppMapping.at(typeIndex), fallback->second, &value });
         }
     }
 
-    return data;
-}
-
-void QXmppExportData::toXml(QXmlStreamWriter *writer) const
-{
     // We need to generate the xml file with nodes always in the same order.
     // This is needed for our unit tests which are based on xml generation.
-    const auto sortedExtensionsKeys = [this]() {
-        auto keys = transform<std::vector<std::pair<std::type_index, XmlElementId>>>(accountDataMapping(), [](auto pair) {
-            return pair;
-        });
-        std::ranges::stable_sort(keys, [](const auto &left, const auto &right) {
-            return left.second < right.second;
-        });
-        return keys;
-    }();
+    const auto byId = [](const ResolvedExtension &left, const ResolvedExtension &right) {
+        return left.id < right.id;
+    };
+    std::ranges::stable_sort(nativeExtensions, byId);
+    std::ranges::stable_sort(fallbackExtensions, byId);
+
+    const auto writeExtensions = [writer](const std::vector<ResolvedExtension> &extensions) {
+        for (const auto &extension : extensions) {
+            extension.serialize(*extension.value, *writer);
+        }
+    };
+
+    // Writes the QXmpp-only fallback extensions directly under <user/>. Their serializers
+    // emit elements without an explicit namespace (they rely on the org.qxmpp.export
+    // default namespace of the QXmpp <account-data/> root). Under <user/> the default
+    // namespace is urn:xmpp:pie:0, so we declare org.qxmpp.export as the default namespace
+    // for each fallback element. writeDefaultNamespace() only applies to the next child
+    // element once the <user/> start tag is finalized, hence the empty writeCharacters().
+    const auto writeFallbackExtensions = [&] {
+        if (fallbackExtensions.empty()) {
+            return;
+        }
+        writer->writeCharacters(QString());
+        for (const auto &extension : fallbackExtensions) {
+            writer->writeDefaultNamespace(ns_qxmpp_export.toString());
+            extension.serialize(*extension.value, *writer);
+        }
+    };
 
     XmlWriter w(writer);
-
     writer->writeStartDocument();
-    w.write(Element {
-        { u"account-data", ns_qxmpp_export },
-        Attribute { u"jid", d->accountJid },
-        [&] {
-            const auto &serializers = accountDataSerializers();
-            for (const auto &sortedKey : sortedExtensionsKeys) {
-                const auto &typeIndex = sortedKey.first;
 
-                if (!d->extensions.contains(typeIndex)) {
-                    continue;
-                }
+    switch (format) {
+    case Format::QXmpp:
+        w.write(Element {
+            { u"account-data", ns_qxmpp_export },
+            Attribute { u"jid", d->accountJid },
+            [&] { writeExtensions(nativeExtensions); },
+        });
+        break;
+    case Format::Xep0227:
+        w.write(Element {
+            { u"server-data", ns_pie },
+            Element {
+                u"host",
+                Attribute { u"jid", QXmppUtils::jidToDomain(d->accountJid) },
+                Element {
+                    u"user",
+                    Attribute { u"name", QXmppUtils::jidToUser(d->accountJid) },
+                    [&] { writeExtensions(nativeExtensions); },
+                    // QXmpp-only extensions (e.g. MIX) are embedded directly under <user/>
+                    // as foreign elements; standard servers ignore them, while QXmpp
+                    // re-reads them as a fallback (see fromDom()).
+                    writeFallbackExtensions,
+                },
+            },
+        });
+        break;
+    }
 
-                const auto serializer = serializers.find(typeIndex);
-                if (serializer != serializers.end()) {
-                    const auto &[_, serialize] = *serializer;
-
-                    serialize(d->extensions.at(typeIndex), *writer);
-                }
-            }
-        },
-    });
     writer->writeEndDocument();
 }
 
@@ -180,17 +295,18 @@ void QXmppExportData::setExtension(std::any value)
     d->extensions.emplace(std::type_index(value.type()), std::move(value));
 }
 
-void QXmppExportData::registerExtensionInternal(std::type_index type, ExtensionParser<std::any> parse, ExtensionSerializer<std::any> serialize, QStringView tagName, QStringView xmlns)
+void QXmppExportData::registerExtensionInternal(Format format, std::type_index type, ExtensionParser<std::any> parse, ExtensionSerializer<std::any> serialize, QStringView tagName, QStringView xmlns)
 {
     const auto id = XmlElementId { tagName.toString(), xmlns.toString() };
-    accountDataMapping().emplace(type, id);
-    accountDataParsers().emplace(id, parse);
-    accountDataSerializers().emplace(type, serialize);
+    accountDataMapping(format).emplace(type, id);
+    accountDataParsers(format).emplace(id, parse);
+    accountDataSerializers(format).emplace(type, serialize);
 }
 
 bool QXmppExportData::isExtensionRegistered(std::type_index type)
 {
-    return accountDataSerializers().contains(type);
+    return accountDataSerializers(Format::QXmpp).contains(type) ||
+        accountDataSerializers(Format::Xep0227).contains(type);
 }
 
 struct QXmppAccountMigrationManagerPrivate {

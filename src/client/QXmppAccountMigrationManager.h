@@ -23,11 +23,20 @@ public:
     template<typename T = QXmpp::Success>
     using Result = std::variant<T, QXmppError>;
 
+    //! Output format used when serializing account data.
+    enum class Format {
+        //! QXmpp's own format, rooted at \c {<account-data/>} (\c org.qxmpp.export).
+        QXmpp,
+        //! \xep{0227, Portable Import/Export Format for XMPP-IM Servers}, rooted at
+        //! \c {<server-data/>} (\c urn:xmpp:pie:0).
+        Xep0227,
+    };
+
     QXmppExportData();
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppExportData)
 
     static std::variant<QXmppExportData, QXmppError> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *) const;
+    void toXml(QXmlStreamWriter *, Format format = Format::QXmpp) const;
 
     const QString &accountJid() const;
     void setAccountJid(const QString &jid);
@@ -54,6 +63,12 @@ public:
     template<typename T, ExtensionParser<T> parse, ExtensionSerializer<T> serialize>
     static void registerExtension(QStringView tagName, QStringView xmlns)
     {
+        registerExtension<T, parse, serialize>(Format::QXmpp, tagName, xmlns);
+    }
+
+    template<typename T, ExtensionParser<T> parse, ExtensionSerializer<T> serialize>
+    static void registerExtension(Format format, QStringView tagName, QStringView xmlns)
+    {
         using namespace QXmpp::Private;
         using AnyParser = ExtensionParser<std::any>;
         using AnySerializer = ExtensionSerializer<std::any>;
@@ -70,7 +85,7 @@ public:
             return std::invoke(serialize, std::any_cast<const T &>(data), w);
         };
 
-        registerExtensionInternal(std::type_index(typeid(T)), parseAny, serializeAny, tagName, xmlns);
+        registerExtensionInternal(format, std::type_index(typeid(T)), parseAny, serializeAny, tagName, xmlns);
     }
 
     template<typename T>
@@ -83,7 +98,7 @@ private:
     const std::unordered_map<std::type_index, std::any> &extensions() const;
     void setExtension(std::any value);
 
-    static void registerExtensionInternal(std::type_index, ExtensionParser<std::any>, ExtensionSerializer<std::any>, QStringView tagName, QStringView xmlns);
+    static void registerExtensionInternal(Format, std::type_index, ExtensionParser<std::any>, ExtensionSerializer<std::any>, QStringView tagName, QStringView xmlns);
     static bool isExtensionRegistered(std::type_index);
 
     QSharedDataPointer<QXmppExportDataPrivate> d;

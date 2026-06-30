@@ -30,6 +30,8 @@ inline constexpr QStringView ns_xml = u"http://www.w3.org/XML/1998/namespace";
 // QXmpp
 inline constexpr QStringView ns_qxmpp_credentials = u"org.qxmpp.credentials";
 inline constexpr QStringView ns_qxmpp_export = u"org.qxmpp.export";
+// XEP-0227: Portable Import/Export Format for XMPP-IM Servers
+inline constexpr QStringView ns_pie = u"urn:xmpp:pie:0";
 // XMPP
 inline constexpr QStringView ns_stream = u"http://etherx.jabber.org/streams";
 inline constexpr QStringView ns_client = u"jabber:client";
