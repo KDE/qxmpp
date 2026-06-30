@@ -57,11 +57,43 @@ struct RosterData {
             },
         });
     }
+
+    // XEP-0227 stores the roster as a native RFC 6121 <query xmlns='jabber:iq:roster'/>.
+    static std::variant<RosterData, QXmppError> fromDomPie(const QDomElement &el)
+    {
+        if (el.tagName() != u"query" || el.namespaceURI() != ns_roster) {
+            return QXmppError { u"Invalid element."_s, {} };
+        }
+
+        return RosterData {
+            parseChildElements<QList<QXmppRosterIq::Item>>(el),
+        };
+    }
+
+    void toXmlPie(XmlWriter &w) const
+    {
+        w.write(Element {
+            { u"query", ns_roster },
+            [&] {
+                // The <query/> sets jabber:iq:roster as default namespace, so items are
+                // written without a redundant per-item xmlns.
+                for (const auto &item : items) {
+                    item.toXml(w, false);
+                }
+            },
+        });
+    }
 };
 
 static void serializeRosterData(const RosterData &d, QXmlStreamWriter &writer)
 {
     XmlWriter(&writer).write(d);
+}
+
+static void serializeRosterDataPie(const RosterData &d, QXmlStreamWriter &writer)
+{
+    XmlWriter w(&writer);
+    d.toXmlPie(w);
 }
 
 }  // namespace QXmpp::Private
@@ -196,6 +228,7 @@ QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
     : d(std::make_unique<QXmppRosterManagerPrivate>())
 {
     QXmppExportData::registerExtension<RosterData, RosterData::fromDom, serializeRosterData>(u"roster", ns_qxmpp_export);
+    QXmppExportData::registerExtension<RosterData, RosterData::fromDomPie, serializeRosterDataPie>(QXmppExportData::Format::Xep0227, u"query", ns_roster);
 
     connect(client, &QXmppClient::connected,
             this, &QXmppRosterManager::_q_connected);
