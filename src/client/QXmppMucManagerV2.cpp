@@ -7,6 +7,7 @@
 #include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppMessageRetraction.h"
 #include "QXmppMucForms.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppStanza.h"
@@ -149,6 +150,8 @@ struct MucRoomData {
     QProperty<bool> isModerated;
     QProperty<bool> isPersistent;
     QProperty<bool> isPasswordProtected;
+    // XEP-0425: whether the room supports moderated message retraction (disco feature).
+    QProperty<bool> supportsModeration;
     // Room info fields populated from muc#roominfo (re-fetched on status code 104)
     QProperty<std::optional<QXmppMucRoomInfo>> roomInfo;
     // Room config — populated when subscribeToRoomConfig(true) is called, re-fetched on status 104
@@ -175,6 +178,7 @@ struct MucRoomData {
     QProperty<bool> canSetRoles;
     QProperty<bool> canSetAffiliations;
     QProperty<bool> canConfigureRoom;
+    QProperty<bool> canModerateMessages;
 
     MucRoomData()
     {
@@ -220,6 +224,10 @@ struct MucRoomData {
         });
         canConfigureRoom.setBinding([selfAffil]() {
             return selfAffil() == Muc::Affiliation::Owner;
+        });
+        // XEP-0425: moderating messages requires the Moderator role and room support.
+        canModerateMessages.setBinding([this, selfRole]() {
+            return supportsModeration.value() && selfRole() == Muc::Role::Moderator;
         });
     }
 
@@ -386,7 +394,11 @@ QXmppMucManagerV2::~QXmppMucManagerV2() = default;
 /*! Supported service discovery features. */
 QStringList QXmppMucManagerV2::discoveryFeatures() const
 {
-    return { ns_muc.toString() };
+    return {
+        ns_muc.toString(),
+        // XEP-0424: Message Retraction (the manager handles incoming retractions in joined rooms)
+        ns_message_retract.toString(),
+    };
 }
 
 /*!
@@ -697,6 +709,18 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
             if (auto pendingItr = data.pendingMessages.find(originId); pendingItr != data.pendingMessages.end()) {
                 pendingItr->second.promise.finish(Success());
                 data.pendingMessages.erase(pendingItr);
+            }
+        }
+        // XEP-0424: Message Retraction / XEP-0425: Moderated Message Retraction.
+        // The retraction is signalled separately via messageRetracted(), but the message is
+        // intentionally not consumed here: it still flows through to messageReceived() below so
+        // that clients which want the raw stanza (e.g. for archiving) keep receiving it.
+        if (const auto &retraction = message.retraction()) {
+            // XEP-0425 security rule: moderated retractions are only legitimate when sent by the
+            // room/service itself, i.e. from the bare room JID without an occupant resource.
+            // Spoofed moderated retractions are not signalled via messageRetracted().
+            if (!retraction->moderation() || QXmppUtils::jidToResource(message.from()).isEmpty()) {
+                Q_EMIT messageRetracted(bareFrom, *retraction);
             }
         }
         if (message.hasSubject() && message.body().isEmpty()) {
@@ -1393,6 +1417,7 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
         const auto &features = info.features();
         data.supportsOccupantIds = features.contains(ns_muc_occupant_id);
         data.supportsVCard = features.contains(ns_vcard);
+        data.supportsModeration = features.contains(ns_message_moderate);
         data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
         data.isPublic = features.contains(muc_feat_public);
         data.isMembersOnly = features.contains(muc_feat_membersonly);
@@ -1715,6 +1740,18 @@ QBindable<bool> QXmppMucRoomV2::canSetAffiliations() const
 QBindable<bool> QXmppMucRoomV2::canConfigureRoom() const
 {
     return &m_data->canConfigureRoom;
+}
+
+/*!
+    Returns whether the local user can moderate (retract) messages in this room
+    (\xep{0425}{Moderated Message Retraction}).
+
+    True when the room advertises support for moderated retraction and the user's role is
+    Moderator.
+*/
+QBindable<bool> QXmppMucRoomV2::canModerateMessages() const
+{
+    return &m_data->canModerateMessages;
 }
 
 /*!
@@ -2272,6 +2309,17 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participa
 QXmppTask<Result<>> QXmppMucRoomV2::setRoles(const QList<Muc::Item> &items)
 {
     return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = items });
+}
+
+/*!
+    Retracts the message with \xep{0359}{stanza id} \a stanzaId from this room as a moderator,
+    optionally providing a \a reason (\xep{0425}{Moderated Message Retraction}).
+
+    Requires the Moderator role and room support; see canModerateMessages().
+*/
+QXmppTask<Result<>> QXmppMucRoomV2::moderateMessage(const QString &stanzaId, const QString &reason)
+{
+    return set(m_data->manager->client(), m_data->roomJid, MucModerateQuery { .stanzaId = stanzaId, .reason = reason });
 }
 
 /*!

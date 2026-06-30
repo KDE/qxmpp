@@ -293,4 +293,25 @@ void MucUniqueQuery::toXml(QXmlStreamWriter *writer) const
     XmlWriter(writer).write(Element { XmlTag, OptionalCharacters { name } });
 }
 
+std::optional<MucModerateQuery> MucModerateQuery::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    MucModerateQuery q;
+    q.stanzaId = el.attribute(u"id"_s);
+    q.reason = firstChildElement(el, u"reason", ns_message_moderate).text();
+    return q;
+}
+
+void MucModerateQuery::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        Attribute { u"id", stanzaId },
+        Element { Tag { u"retract", ns_message_retract } },
+        OptionalTextElement { u"reason", reason },
+    });
+}
+
 }  // namespace QXmpp::Private

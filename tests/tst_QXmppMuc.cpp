@@ -5,6 +5,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
+#include "QXmppMessageRetraction.h"
 #include "QXmppMucForms.h"
 #include "QXmppMucIq.h"
 #include "QXmppMucManagerV2.h"
@@ -48,6 +49,10 @@ private:
     Q_SLOT void sendMessage();
     Q_SLOT void sendMessageError();
     Q_SLOT void sendPrivateMessage();
+    Q_SLOT void moderateMessage();
+    Q_SLOT void messageRetractedReceived();
+    Q_SLOT void messageRetractedSpoofed();
+    Q_SLOT void canModerateMessages();
     Q_SLOT void setSubject();
     Q_SLOT void changeNickname();
     Q_SLOT void changeNicknameTimeout();
@@ -669,6 +674,148 @@ void tst_QXmppMuc::receiveMessage()
                 "</message>");
     QVERIFY(muc->handleMessage(liveMsg));
     QCOMPARE(receivedMsg.body(), u"Thrice the brinded cat hath mew'd."_s);
+}
+
+void tst_QXmppMuc::moderateMessage()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    auto task = room.moderateMessage(u"stanza-id-1"_s, u"Spam"_s);
+    QVERIFY(!task.isFinished());
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<moderate xmlns='urn:xmpp:message-moderate:1' id='stanza-id-1'>"
+                "<retract xmlns='urn:xmpp:message-retract:1'/>"
+                "<reason>Spam</reason>"
+                "</moderate></iq>"_s);
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+}
+
+void tst_QXmppMuc::messageRetractedReceived()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    joinedRoom(test, muc);
+
+    std::optional<QXmppMessageRetraction> retracted;
+    QObject::connect(muc, &QXmppMucManagerV2::messageRetracted, muc, [&](const QString &roomJid, const QXmppMessageRetraction &retraction) {
+        QCOMPARE(roomJid, u"coven@chat.shakespeare.lit"_s);
+        retracted = retraction;
+    });
+    // The retraction must also flow through messageReceived().
+    bool gotMessage = false;
+    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &msg) {
+        gotMessage = msg.retraction().has_value();
+    });
+
+    QXmppMessage retractMsg;
+    parsePacket(retractMsg,
+                "<message from='coven@chat.shakespeare.lit' type='groupchat'>"
+                "<retract xmlns='urn:xmpp:message-retract:1' id='stanza-id-1'>"
+                "<moderated xmlns='urn:xmpp:message-moderate:1' by='coven@chat.shakespeare.lit/secondwitch'/>"
+                "<reason>Spam</reason>"
+                "</retract>"
+                "</message>");
+    QVERIFY(muc->handleMessage(retractMsg));
+
+    QVERIFY(retracted.has_value());
+    QCOMPARE(retracted->retractedId(), u"stanza-id-1"_s);
+    QVERIFY(retracted->moderation());
+    QCOMPARE(retracted->moderation()->moderatorJid(), u"coven@chat.shakespeare.lit/secondwitch"_s);
+    QCOMPARE(retracted->moderation()->reason(), u"Spam"_s);
+    QVERIFY(gotMessage);
+}
+
+void tst_QXmppMuc::messageRetractedSpoofed()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    joinedRoom(test, muc);
+
+    bool retractedEmitted = false;
+    QObject::connect(muc, &QXmppMucManagerV2::messageRetracted, muc, [&](const QString &, const QXmppMessageRetraction &) {
+        retractedEmitted = true;
+    });
+    bool gotMessage = false;
+    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &) {
+        gotMessage = true;
+    });
+
+    // A moderated retraction claiming to be from the service but actually sent by an occupant
+    // (full JID with resource) must not trigger messageRetracted().
+    QXmppMessage spoofedMsg;
+    parsePacket(spoofedMsg,
+                "<message from='coven@chat.shakespeare.lit/secondwitch' type='groupchat'>"
+                "<retract xmlns='urn:xmpp:message-retract:1' id='stanza-id-1'>"
+                "<moderated xmlns='urn:xmpp:message-moderate:1' by='coven@chat.shakespeare.lit/secondwitch'/>"
+                "</retract>"
+                "</message>");
+    QVERIFY(muc->handleMessage(spoofedMsg));
+
+    QVERIFY(!retractedEmitted);
+    // The message is still delivered as a normal groupchat message.
+    QVERIFY(gotMessage);
+}
+
+void tst_QXmppMuc::canModerateMessages()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
+    test.ignore();  // presence
+
+    // Join as moderator
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='moderator'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Before disco#info advertises moderation support: false even though we are a moderator
+    QVERIFY(!room.canModerateMessages().value());
+
+    // disco#info advertising moderated retraction support
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='urn:xmpp:message-moderate:1'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(room.canModerateMessages().value());
+
+    // Losing the moderator role disables moderation again
+    QXmppPresence demotion;
+    parsePacket(demotion,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(demotion);
+    QVERIFY(!room.canModerateMessages().value());
 }
 
 void tst_QXmppMuc::sendMessage()

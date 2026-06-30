@@ -25,6 +25,7 @@ struct MucParticipantData;
 }  // namespace QXmpp::Private
 
 class QXmppError;
+class QXmppMessageRetraction;
 
 class QXmppMucRoomV2;
 class QXmppMucParticipant;
@@ -86,6 +87,21 @@ public:
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
     /*! Emitted when a groupchat \a message is received in the joined room at \a roomJid. */
     Q_SIGNAL void messageReceived(const QString &roomJid, const QXmppMessage &message);
+    /*!
+        Emitted when a message in the joined room at \a roomJid is retracted via
+        \xep{0424}{Message Retraction} or \xep{0425}{Moderated Message Retraction}.
+
+        The retracted message is identified by \c {retraction.retractedId()} (the message's
+        \xep{0359}{stanza id}). For moderated retractions, \c {retraction.moderation()} carries
+        the moderator and reason. Spoofed moderated retractions (claiming moderation but not sent
+        by the room itself) never trigger this signal.
+
+        The retraction message is also delivered through messageReceived() (with its
+        QXmppMessage::retraction() set), so clients that need the raw stanza still receive it.
+
+        \since QXmpp 1.17
+    */
+    Q_SIGNAL void messageRetracted(const QString &roomJid, const QXmppMessageRetraction &retraction);
     /*!
         Emitted when a voice \a request is received in the joined moderated room at \a roomJid.
 
@@ -212,6 +228,7 @@ public:
     QBindable<bool> canSetRoles() const;
     QBindable<bool> canSetAffiliations() const;
     QBindable<bool> canConfigureRoom() const;
+    QBindable<bool> canModerateMessages() const;
     QBindable<bool> isNonAnonymous() const;
     QBindable<bool> isPublic() const;
     QBindable<bool> isMembersOnly() const;
@@ -238,6 +255,8 @@ public:
     QXmppTask<QXmpp::Result<>> setNickname(const QString &newNick);
     QXmppTask<QXmpp::SendResult> setPresence(QXmppPresence presence);
     QXmppTask<QXmpp::Result<>> leave();
+
+    QXmppTask<QXmpp::Result<>> moderateMessage(const QString &stanzaId, const QString &reason = {});
 
     QXmppTask<QXmpp::Result<>> setRole(const QXmppMucParticipant &participant, QXmpp::Muc::Role role, const QString &reason = {});
     QXmppTask<QXmpp::Result<>> setRoles(const QList<QXmpp::Muc::Item> &items);

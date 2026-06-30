@@ -56,6 +56,17 @@ struct MucUniqueQuery {
     void toXml(QXmlStreamWriter *writer) const;
 };
 
+// IQ payload for \xep{0425} moderated message retraction requests.
+// Sent by a moderator to the room to retract another occupant's message.
+struct MucModerateQuery {
+    QString stanzaId;  // stanza id of the message to retract
+    QString reason;
+
+    static constexpr std::tuple XmlTag = { u"moderate", ns_message_moderate };
+    static std::optional<MucModerateQuery> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+};
+
 }  // namespace QXmpp::Private
 
 #endif  // QXMPPMUCDATA_P_H
