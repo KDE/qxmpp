@@ -45,11 +45,34 @@ struct VCardData {
     {
         w.write(Element { u"vcard", [&] { vCard.toXmlElementFromChild(w); } });
     }
+
+    // XEP-0227 stores the native <vCard xmlns='vcard-temp'/> element directly.
+    static std::variant<VCardData, QXmppError> fromDomPie(const QDomElement &el)
+    {
+        Q_ASSERT(el.tagName() == u"vCard");
+        Q_ASSERT(el.namespaceURI() == ns_vcard);
+
+        // parseElementFromChild() expects the parent and looks up its <vCard/> child, so
+        // pass the parent of the matched element.
+        VCardData d;
+        d.vCard.parseElementFromChild(el.parentNode().toElement());
+        return d;
+    }
+
+    void toXmlPie(QXmlStreamWriter *writer) const
+    {
+        vCard.toXmlElementFromChild(writer);
+    }
 };
 
 void serializeVCardData(const VCardData &data, QXmlStreamWriter &writer)
 {
     XmlWriter(&writer).write(data);
+}
+
+void serializeVCardDataPie(const VCardData &data, QXmlStreamWriter &writer)
+{
+    data.toXmlPie(&writer);
 }
 
 }  // namespace QXmpp::Private
@@ -65,6 +88,7 @@ QXmppVCardManager::QXmppVCardManager()
     : d(std::make_unique<QXmppVCardManagerPrivate>())
 {
     QXmppExportData::registerExtension<VCardData, VCardData::fromDom, serializeVCardData>(u"vcard", ns_qxmpp_export);
+    QXmppExportData::registerExtension<VCardData, VCardData::fromDomPie, serializeVCardDataPie>(QXmppExportData::Format::Xep0227, u"vCard", ns_vcard);
 }
 
 QXmppVCardManager::~QXmppVCardManager() = default;
