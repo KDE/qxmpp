@@ -146,6 +146,7 @@ private:
     Q_SLOT void testImportExport();
     Q_SLOT void testRealImportExport();
     Q_SLOT void testSerialization();
+    Q_SLOT void testSerializationXep0227();
 };
 
 struct DataExtension {
@@ -454,6 +455,93 @@ void tst_QXmppAccountMigrationManager::testSerialization()
     QVERIFY(xml3.contains(xml4Mix));
     QVERIFY(xml3.contains(xml4Roster));
     QVERIFY(xml3.contains(xml4VCard));
+}
+
+void tst_QXmppAccountMigrationManager::testSerializationXep0227()
+{
+    // Ensure the roster/vCard/mix extensions are registered.
+    auto client = newClient(true, false);
+
+    // Build export data from the QXmpp-format document. It covers a roster and a vCard
+    // (both have a native XEP-0227 representation) plus QXmpp-only MIX data.
+    const QByteArray qxmppXml =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<account-data xmlns=\"org.qxmpp.export\" jid=\"pasnox@xmpp.example\">"
+        "<mix>"
+        "<item jid=\"mix2@gamer.com\" nick=\"Joe @ Mix 2 Gamer\"/>"
+        "</mix>"
+        "<roster>"
+        "<item xmlns=\"jabber:iq:roster\" jid=\"3@gamer.com\" name=\"3 Gamer\"><group>gamers</group></item>"
+        "</roster>"
+        "<vcard>"
+        "<vCard xmlns=\"vcard-temp\">"
+        "<NICKNAME>It is me Bookri</NICKNAME>"
+        "<N><GIVEN>Nox</GIVEN><FAMILY>Bookri</FAMILY></N>"
+        "<TITLE/><ROLE/>"
+        "</vCard>"
+        "</vcard>"
+        "</account-data>\n";
+
+    const auto data = expectVariant<QXmppExportData>(QXmppExportData::fromDom(xmlToDom(qxmppXml)));
+
+    // Serialize as XEP-0227. Roster and vCard use their native elements; MIX has no native
+    // XEP-0227 form, so <mix/> is written as a direct child of <user/> in the foreign
+    // org.qxmpp.export namespace.
+    const auto xml1 = packetToXml(data, QXmppExportData::Format::Xep0227);
+    const QByteArray xml2 =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<server-data xmlns=\"urn:xmpp:pie:0\">"
+        "<host jid=\"xmpp.example\">"
+        "<user name=\"pasnox\">"
+        "<query xmlns=\"jabber:iq:roster\">"
+        "<item jid=\"3@gamer.com\" name=\"3 Gamer\"><group>gamers</group></item>"
+        "</query>"
+        "<vCard xmlns=\"vcard-temp\">"
+        "<NICKNAME>It is me Bookri</NICKNAME>"
+        "<N><GIVEN>Nox</GIVEN><FAMILY>Bookri</FAMILY></N>"
+        "<TITLE/><ROLE/>"
+        "</vCard>"
+        "<mix xmlns=\"org.qxmpp.export\">"
+        "<item jid=\"mix2@gamer.com\" nick=\"Joe @ Mix 2 Gamer\"/>"
+        "</mix>"
+        "</user>"
+        "</host>"
+        "</server-data>\n";
+
+    if (xml1 != xml2) {
+        qDebug() << "Actual:\n"
+                 << xml1.constData();
+        qDebug() << "Expected:\n"
+                 << xml2.constData();
+    }
+    QCOMPARE(xml1, xml2);
+
+    // Round-trip: parse the XEP-0227 document, reconstruct the JID and re-serialize as the
+    // QXmpp format to get back the original document.
+    const auto parsed = expectVariant<QXmppExportData>(QXmppExportData::fromDom(xmlToDom(xml2)));
+    QCOMPARE(parsed.accountJid(), u"pasnox@xmpp.example"_s);
+    QCOMPARE(packetToXml(parsed, QXmppExportData::Format::QXmpp), qxmppXml);
+
+    // "Prefer XEP-0227": when a document carries both a native <query/> and a QXmpp
+    // <roster/> fallback for the same data, the native one wins.
+    const QByteArray bothXml =
+        "<server-data xmlns=\"urn:xmpp:pie:0\">"
+        "<host jid=\"xmpp.example\">"
+        "<user name=\"pasnox\">"
+        "<query xmlns=\"jabber:iq:roster\">"
+        "<item jid=\"native@example\"/>"
+        "</query>"
+        "<roster xmlns=\"org.qxmpp.export\">"
+        "<item xmlns=\"jabber:iq:roster\" jid=\"fallback@example\"/>"
+        "</roster>"
+        "</user>"
+        "</host>"
+        "</server-data>";
+
+    const auto preferred = expectVariant<QXmppExportData>(QXmppExportData::fromDom(xmlToDom(bothXml)));
+    const auto preferredXml = packetToXml(preferred, QXmppExportData::Format::QXmpp);
+    QVERIFY(preferredXml.contains("native@example"));
+    QVERIFY(!preferredXml.contains("fallback@example"));
 }
 
 QTEST_MAIN(tst_QXmppAccountMigrationManager)
