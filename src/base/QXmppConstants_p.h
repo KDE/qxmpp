@@ -276,6 +276,9 @@ inline constexpr QStringView ns_mix_misc = u"urn:xmpp:mix:misc:0";
 inline constexpr QStringView ns_muc_self_ping = u"http://jabber.org/protocol/muc#self-ping-optimization";
 // XEP-0421: Occupant identifiers for semi-anonymous MUCs
 inline constexpr QStringView ns_muc_occupant_id = u"urn:xmpp:occupant-id:0";
+// XEP-0424: Message Retraction
+inline constexpr QStringView ns_message_retract = u"urn:xmpp:message-retract:1";
+inline constexpr QStringView ns_message_retract_tombstone = u"urn:xmpp:message-retract:1#tombstone";
 // XEP-0428: Fallback Indication
 inline constexpr QStringView ns_fallback_indication = u"urn:xmpp:fallback:0";
 // XEP-0434: Trust Messages (TM)

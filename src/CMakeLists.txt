@@ -50,6 +50,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppMamIq.h
     base/QXmppMessage.h
     base/QXmppMessageReaction.h
+    base/QXmppMessageRetraction.h
     base/QXmppMixConfigItem.h
     base/QXmppMixInfoItem.h
     base/QXmppMixInvitation.h
@@ -216,6 +217,7 @@ set(SOURCE_FILES
     base/QXmppMamIq.cpp
     base/QXmppMessage.cpp
     base/QXmppMessageReaction.cpp
+    base/QXmppMessageRetraction.cpp
     base/QXmppMixInvitation.cpp
     base/QXmppMixIq.cpp
     base/QXmppMixItems.cpp
