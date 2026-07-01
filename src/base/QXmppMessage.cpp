@@ -15,6 +15,7 @@
 #include "QXmppFileShare.h"
 #include "QXmppJingleData.h"
 #include "QXmppMessageReaction.h"
+#include "QXmppMessageRetraction.h"
 #include "QXmppMessage_p.h"
 #include "QXmppMixInvitation.h"
 #include "QXmppMucForms.h"
@@ -217,6 +218,10 @@ public:
 
     // XEP-0421: Occupant identifiers for semi-anonymous MUCs
     QString mucOccupantId;
+
+    // XEP-0424: Message Retraction / XEP-0425: Moderated Message Retraction
+    std::optional<QXmppMessageRetraction> retraction;
+    std::optional<QXmppMessageRetracted> retracted;
 
     // XEP-0428: Fallback Indication
     QList<QXmppFallback> fallbackMarkers;
@@ -1485,6 +1490,55 @@ void QXmppMessage::setMucOccupantId(const QString &id)
 }
 
 /*!
+    Returns the message retraction as defined by \xep{0424}{Message Retraction}, if this message
+    retracts a previously sent message.
+
+    For moderated retractions (\xep{0425}{Moderated Message Retraction}), the returned object's
+    QXmppMessageRetraction::moderation() carries information about the moderator and reason.
+
+    \since QXmpp 1.17
+*/
+std::optional<QXmppMessageRetraction> QXmppMessage::retraction() const
+{
+    return d->retraction;
+}
+
+/*!
+    Sets the message \a retraction as defined by \xep{0424}{Message Retraction}.
+
+    When sending a retraction you should also add a \xep{0428}{Fallback Indication} marker (see
+    setFallbackMarkers()), a human-readable fallback body and the \c store hint
+    (\xep{0334}{Message Processing Hints}, see QXmppMessage::Store).
+
+    \since QXmpp 1.17
+*/
+void QXmppMessage::setRetraction(const std::optional<QXmppMessageRetraction> &retraction)
+{
+    d->retraction = retraction;
+}
+
+/*!
+    Returns the retracted-message tombstone as defined by \xep{0424}{Message Retraction}, if this
+    message is a tombstone replacing a retracted message in an archive.
+
+    \since QXmpp 1.17
+*/
+std::optional<QXmppMessageRetracted> QXmppMessage::retracted() const
+{
+    return d->retracted;
+}
+
+/*!
+    Sets the \a retracted tombstone as defined by \xep{0424}{Message Retraction}.
+
+    \since QXmpp 1.17
+*/
+void QXmppMessage::setRetracted(const std::optional<QXmppMessageRetracted> &retracted)
+{
+    d->retracted = retracted;
+}
+
+/*!
     Sets whether this message is only a fallback according to \xep{0428}{Fallback Indication}.
 
     This is useful for clients not supporting end-to-end encryption to indicate
@@ -2111,6 +2165,16 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             d->reaction = parseOptionalElement<QXmppMessageReaction>(element);
             return true;
         }
+        // XEP-0424: Message Retraction
+        if (isElement<QXmppMessageRetraction>(element)) {
+            d->retraction = parseOptionalElement<QXmppMessageRetraction>(element);
+            return true;
+        }
+        // XEP-0424: Message Retraction (tombstone)
+        if (isElement<QXmppMessageRetracted>(element)) {
+            d->retracted = parseOptionalElement<QXmppMessageRetracted>(element);
+            return true;
+        }
         // XEP-0447: Stateless file sharing
         if (checkElement(element, u"file-sharing", ns_sfs)) {
             QXmppFileShare share;
@@ -2349,6 +2413,10 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
 
         // XEP-0444: Message Reactions
         w.write(d->reaction);
+
+        // XEP-0424: Message Retraction / XEP-0425: Moderated Message Retraction
+        w.write(d->retraction);
+        w.write(d->retracted);
 
         // XEP-0447: Stateless file sharing
         w.write(d->sharedFiles);

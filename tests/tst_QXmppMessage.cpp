@@ -12,6 +12,7 @@
 #include "QXmppJingleData.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageReaction.h"
+#include "QXmppMessageRetraction.h"
 #include "QXmppMixInvitation.h"
 #include "QXmppMucForms.h"
 #include "QXmppOutOfBandUrl.h"
@@ -62,6 +63,8 @@ private:
     Q_SLOT void testMixInvitation();
     Q_SLOT void testTrustMessageElement();
     Q_SLOT void testReaction();
+    Q_SLOT void testRetraction();
+    Q_SLOT void testTombstone();
     Q_SLOT void testE2eeFallbackBody();
     Q_SLOT void testFileSharing();
     Q_SLOT void testEncryptedFileSource();
@@ -1303,6 +1306,43 @@ void tst_QXmppMessage::testReaction()
     message2.addHint(QXmppMessage::Store);
     message2.setReaction(QXmppMessageReaction());
     QVERIFY(message2.reaction());
+}
+
+void tst_QXmppMessage::testRetraction()
+{
+    const QByteArray xml(
+        "<message type=\"chat\">"
+        "<retract xmlns=\"urn:xmpp:message-retract:1\" id=\"origin-id-1\"/>"
+        "</message>");
+
+    QXmppMessage message1;
+    QVERIFY(!message1.retraction());
+
+    parsePacket(message1, xml);
+    QVERIFY(message1.retraction());
+    QCOMPARE(message1.retraction()->retractedId(), u"origin-id-1"_s);
+    QVERIFY(!message1.retracted());
+    serializePacket(message1, xml);
+
+    QXmppMessage message2;
+    message2.setRetraction(QXmppMessageRetraction(u"origin-id-1"_s));
+    QVERIFY(message2.retraction());
+    serializePacket(message2, xml);
+}
+
+void tst_QXmppMessage::testTombstone()
+{
+    const QByteArray xml(
+        "<message type=\"groupchat\">"
+        "<retracted xmlns=\"urn:xmpp:message-retract:1\" stamp=\"2019-09-20T23:09:32Z\"/>"
+        "</message>");
+
+    QXmppMessage message;
+    parsePacket(message, xml);
+    QVERIFY(message.retracted());
+    QCOMPARE(message.retracted()->stamp(), QDateTime(QDate(2019, 9, 20), QTime(23, 9, 32), TimeZoneUTC));
+    QVERIFY(!message.retraction());
+    serializePacket(message, xml);
 }
 
 void tst_QXmppMessage::testE2eeFallbackBody()

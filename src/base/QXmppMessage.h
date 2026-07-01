@@ -26,6 +26,8 @@ class QXmppBitsOfBinaryDataList;
 class QXmppFallback;
 class QXmppJingleMessageInitiationElement;
 class QXmppMessageReaction;
+class QXmppMessageRetraction;
+class QXmppMessageRetracted;
 class QXmppMixInvitation;
 class QXmppMucVoiceRequest;
 #ifdef BUILD_OMEMO
@@ -338,6 +340,12 @@ public:
     // XEP-0421: Occupant identifiers for semi-anonymous MUCs
     QString mucOccupantId() const;
     void setMucOccupantId(const QString &occupantId);
+
+    // XEP-0424: Message Retraction / XEP-0425: Moderated Message Retraction
+    std::optional<QXmppMessageRetraction> retraction() const;
+    void setRetraction(const std::optional<QXmppMessageRetraction> &retraction);
+    std::optional<QXmppMessageRetracted> retracted() const;
+    void setRetracted(const std::optional<QXmppMessageRetracted> &retracted);
 
     // XEP-0428: Fallback Indication
 #if QXMPP_DEPRECATED_SINCE(1, 7)
