@@ -279,6 +279,8 @@ inline constexpr QStringView ns_muc_occupant_id = u"urn:xmpp:occupant-id:0";
 // XEP-0424: Message Retraction
 inline constexpr QStringView ns_message_retract = u"urn:xmpp:message-retract:1";
 inline constexpr QStringView ns_message_retract_tombstone = u"urn:xmpp:message-retract:1#tombstone";
+// XEP-0425: Moderated Message Retraction
+inline constexpr QStringView ns_message_moderate = u"urn:xmpp:message-moderate:1";
 // XEP-0428: Fallback Indication
 inline constexpr QStringView ns_fallback_indication = u"urn:xmpp:fallback:0";
 // XEP-0434: Trust Messages (TM)

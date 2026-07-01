@@ -64,6 +64,7 @@ private:
     Q_SLOT void testTrustMessageElement();
     Q_SLOT void testReaction();
     Q_SLOT void testRetraction();
+    Q_SLOT void testModeratedRetraction();
     Q_SLOT void testTombstone();
     Q_SLOT void testE2eeFallbackBody();
     Q_SLOT void testFileSharing();
@@ -1321,6 +1322,7 @@ void tst_QXmppMessage::testRetraction()
     parsePacket(message1, xml);
     QVERIFY(message1.retraction());
     QCOMPARE(message1.retraction()->retractedId(), u"origin-id-1"_s);
+    QVERIFY(!message1.retraction()->moderation());
     QVERIFY(!message1.retracted());
     serializePacket(message1, xml);
 
@@ -1328,6 +1330,29 @@ void tst_QXmppMessage::testRetraction()
     message2.setRetraction(QXmppMessageRetraction(u"origin-id-1"_s));
     QVERIFY(message2.retraction());
     serializePacket(message2, xml);
+}
+
+void tst_QXmppMessage::testModeratedRetraction()
+{
+    const QByteArray xml(
+        "<message type=\"groupchat\">"
+        "<retract xmlns=\"urn:xmpp:message-retract:1\" id=\"stanza-id-1\">"
+        "<moderated xmlns=\"urn:xmpp:message-moderate:1\" by=\"room@muc.example.com/macbeth\">"
+        "<occupant-id xmlns=\"urn:xmpp:occupant-id:0\" id=\"dd72603d\"/>"
+        "</moderated>"
+        "<reason>This message contains inappropriate content.</reason>"
+        "</retract>"
+        "</message>");
+
+    QXmppMessage message;
+    parsePacket(message, xml);
+    QVERIFY(message.retraction());
+    QCOMPARE(message.retraction()->retractedId(), u"stanza-id-1"_s);
+    QVERIFY(message.retraction()->moderation());
+    QCOMPARE(message.retraction()->moderation()->moderatorJid(), u"room@muc.example.com/macbeth"_s);
+    QCOMPARE(message.retraction()->moderation()->moderatorOccupantId(), u"dd72603d"_s);
+    QCOMPARE(message.retraction()->moderation()->reason(), u"This message contains inappropriate content."_s);
+    serializePacket(message, xml);
 }
 
 void tst_QXmppMessage::testTombstone()
@@ -1341,6 +1366,7 @@ void tst_QXmppMessage::testTombstone()
     parsePacket(message, xml);
     QVERIFY(message.retracted());
     QCOMPARE(message.retracted()->stamp(), QDateTime(QDate(2019, 9, 20), QTime(23, 9, 32), TimeZoneUTC));
+    QVERIFY(!message.retracted()->moderation());
     QVERIFY(!message.retraction());
     serializePacket(message, xml);
 }
