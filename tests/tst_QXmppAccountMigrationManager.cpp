@@ -485,8 +485,8 @@ void tst_QXmppAccountMigrationManager::testSerializationXep0227()
     const auto data = expectVariant<QXmppExportData>(QXmppExportData::fromDom(xmlToDom(qxmppXml)));
 
     // Serialize as XEP-0227. Roster and vCard use their native elements; MIX has no native
-    // XEP-0227 form, so <mix/> is written as a direct child of <user/> in the foreign
-    // org.qxmpp.export namespace.
+    // XEP-0227 form, so <mix/> is written inside a foreign <account-data/> element under
+    // <user/> in the org.qxmpp.export namespace.
     const auto xml1 = packetToXml(data, QXmppExportData::Format::Xep0227);
     const QByteArray xml2 =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -501,9 +501,11 @@ void tst_QXmppAccountMigrationManager::testSerializationXep0227()
         "<N><GIVEN>Nox</GIVEN><FAMILY>Bookri</FAMILY></N>"
         "<TITLE/><ROLE/>"
         "</vCard>"
-        "<mix xmlns=\"org.qxmpp.export\">"
+        "<account-data xmlns=\"org.qxmpp.export\">"
+        "<mix>"
         "<item jid=\"mix2@gamer.com\" nick=\"Joe @ Mix 2 Gamer\"/>"
         "</mix>"
+        "</account-data>"
         "</user>"
         "</host>"
         "</server-data>\n";
@@ -531,9 +533,11 @@ void tst_QXmppAccountMigrationManager::testSerializationXep0227()
         "<query xmlns=\"jabber:iq:roster\">"
         "<item jid=\"native@example\"/>"
         "</query>"
-        "<roster xmlns=\"org.qxmpp.export\">"
+        "<account-data xmlns=\"org.qxmpp.export\">"
+        "<roster>"
         "<item xmlns=\"jabber:iq:roster\" jid=\"fallback@example\"/>"
         "</roster>"
+        "</account-data>"
         "</user>"
         "</host>"
         "</server-data>";

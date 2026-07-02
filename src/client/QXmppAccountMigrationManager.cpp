@@ -164,9 +164,10 @@ std::variant<QXmppExportData, QXmppError> QXmppExportData::fromDom(const QDomEle
         if (auto error = parseExtensionChildren(user, Format::Xep0227, data.d->extensions)) {
             return std::move(*error);
         }
-        // Pass 2: QXmpp-only data embedded directly under <user/> as foreign elements.
-        // Types already parsed natively in pass 1 are kept.
-        if (auto error = parseExtensionChildren(user, Format::QXmpp, data.d->extensions)) {
+        // Pass 2: QXmpp-only data embedded under <user/> inside a foreign <account-data/>
+        // element. Types already parsed natively in pass 1 are kept.
+        const auto accountData = firstChildElement(user, u"account-data", ns_qxmpp_export);
+        if (auto error = parseExtensionChildren(accountData, Format::QXmpp, data.d->extensions)) {
             return std::move(*error);
         }
         return data;
@@ -224,21 +225,21 @@ void QXmppExportData::toXml(QXmlStreamWriter *writer, Format format) const
         }
     };
 
-    // Writes the QXmpp-only fallback extensions directly under <user/>. Their serializers
-    // emit elements without an explicit namespace (they rely on the org.qxmpp.export
-    // default namespace of the QXmpp <account-data/> root). Under <user/> the default
-    // namespace is urn:xmpp:pie:0, so we declare org.qxmpp.export as the default namespace
-    // for each fallback element. writeDefaultNamespace() only applies to the next child
-    // element once the <user/> start tag is finalized, hence the empty writeCharacters().
+    // Writes the QXmpp-only fallback extensions inside an <account-data/> element (the QXmpp
+    // export root, in the org.qxmpp.export namespace) nested under <user/>. Their serializers
+    // emit elements without an explicit namespace, relying on org.qxmpp.export being the
+    // default namespace. Wrapping them in a single namespaced container declares that default
+    // namespace once on <account-data/>, so extensions whose serializers write their own
+    // default namespace no longer clash with the per-element declarations we would otherwise
+    // need directly under <user/>.
     const auto writeFallbackExtensions = [&] {
         if (fallbackExtensions.empty()) {
             return;
         }
-        writer->writeCharacters(QString());
-        for (const auto &extension : fallbackExtensions) {
-            writer->writeDefaultNamespace(ns_qxmpp_export.toString());
-            extension.serialize(*extension.value, *writer);
-        }
+        XmlWriter(writer).write(Element {
+            { u"account-data", ns_qxmpp_export },
+            [&] { writeExtensions(fallbackExtensions); },
+        });
     };
 
     XmlWriter w(writer);
@@ -262,9 +263,9 @@ void QXmppExportData::toXml(QXmlStreamWriter *writer, Format format) const
                     u"user",
                     Attribute { u"name", QXmppUtils::jidToUser(d->accountJid) },
                     [&] { writeExtensions(nativeExtensions); },
-                    // QXmpp-only extensions (e.g. MIX) are embedded directly under <user/>
-                    // as foreign elements; standard servers ignore them, while QXmpp
-                    // re-reads them as a fallback (see fromDom()).
+                    // QXmpp-only extensions (e.g. MIX) are embedded under <user/> inside a
+                    // foreign <account-data/> element; standard servers ignore it, while
+                    // QXmpp re-reads it as a fallback (see fromDom()).
                     writeFallbackExtensions,
                 },
             },
