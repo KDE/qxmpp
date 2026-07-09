@@ -36,7 +36,13 @@ public:
     QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppExportData)
 
     static std::variant<QXmppExportData, QXmppError> fromDom(const QDomElement &);
-    void toXml(QXmlStreamWriter *, Format format = Format::QXmpp) const;
+#if QXMPP_DEPRECATED_SINCE(1, 17)
+    [[deprecated("Pass a Format explicitly. This overload writes Format::QXmpp; use "
+                 "toXml(writer, QXmppExportData::Format::QXmpp) to keep that behaviour, or "
+                 "Format::Xep0227 for the portable import/export format.")]]
+    void toXml(QXmlStreamWriter *) const;
+#endif
+    void toXml(QXmlStreamWriter *, Format format) const;
 
     const QString &accountJid() const;
     void setAccountJid(const QString &jid);

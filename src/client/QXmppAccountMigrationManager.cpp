@@ -177,11 +177,23 @@ std::variant<QXmppExportData, QXmppError> QXmppExportData::fromDom(const QDomEle
 }
 
 /*!
+    \deprecated Use toXml(QXmlStreamWriter *, Format) and pass a format explicitly. This
+    overload writes the QXmpp format (\c {<account-data/>}); it is kept only for source
+    compatibility.
+
+    Serializes the account data to \a writer using the QXmpp format.
+*/
+void QXmppExportData::toXml(QXmlStreamWriter *writer) const
+{
+    toXml(writer, Format::QXmpp);
+}
+
+/*!
     Serializes the account data to \a writer using \a format.
 
-    By default the QXmpp format (\c {<account-data/>}) is written. Pass Format::Xep0227 to
-    write \xep{0227, Portable Import/Export Format for XMPP-IM Servers} instead; data types
-    without a native \xep{0227} representation (e.g. MIX) are then embedded as a
+    Pass Format::QXmpp to write QXmpp's own format (\c {<account-data/>}), or Format::Xep0227
+    to write \xep{0227, Portable Import/Export Format for XMPP-IM Servers}; in the latter case
+    data types without a native \xep{0227} representation (e.g. MIX) are embedded as a
     QXmpp-specific fallback so no data is lost, and standard servers ignore those elements.
 */
 void QXmppExportData::toXml(QXmlStreamWriter *writer, Format format) const
