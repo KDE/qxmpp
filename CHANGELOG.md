@@ -4,8 +4,8 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.16.2 (Unreleased)
--------------------------
+QXmpp 1.16.2 (July 11, 2026)
+----------------------------
 
  - Docs: Skip API documentation generation when Qt6::qdoc is unavailable, fixing the build on platforms where Qt ships without qdoc (@lnj)
 
