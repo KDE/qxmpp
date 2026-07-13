@@ -839,6 +839,13 @@ SPDX-License-Identifier: CC0-1.0
     </implements>
     <release>
       <Version>
+        <revision>1.16.2</revision>
+        <created>2026-07-11</created>
+        <file-release rdf:resource='https://download.kde.org/unstable/qxmpp/qxmpp-1.16.2.tar.xz'/>
+      </Version>
+    </release>
+    <release>
+      <Version>
         <revision>1.16.1</revision>
         <created>2026-06-25</created>
         <file-release rdf:resource='https://download.kde.org/unstable/qxmpp/qxmpp-1.16.1.tar.xz'/>

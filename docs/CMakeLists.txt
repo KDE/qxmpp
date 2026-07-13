@@ -35,6 +35,17 @@ else()
 endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Tools)
+
+# Qt6::Tools being present does not guarantee qdoc: it is only built when Qt
+# was compiled with libclang. Some Qt builds ship Tools without qdoc, so skip
+# documentation generation instead of failing.
+if(NOT TARGET Qt6::qdoc)
+    message(WARNING
+        "Qt6::qdoc not available (Qt built without libclang?) — "
+        "skipping API documentation generation.")
+    return()
+endif()
+
 get_target_property(_qdoc_actual Qt6::qdoc LOCATION)
 set(_qdoc_wrapper "${CMAKE_CURRENT_BINARY_DIR}/qdoc-wrapper.sh")
 file(WRITE ${_qdoc_wrapper}
