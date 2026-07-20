@@ -8,6 +8,7 @@
 
 #include "util.h"
 
+#include <QMimeDatabase>
 #include <QMimeType>
 #include <QObject>
 

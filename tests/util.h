@@ -18,8 +18,16 @@
 #include <memory>
 #include <variant>
 
+// Note: do not include <QtTest> here. That umbrella header pulls in all of
+// <QtCore/QtCore> and is included by every test, which costs noticeably more
+// compile time than naming the few headers actually needed.
+#include <QBuffer>
 #include <QDomDocument>
-#include <QtTest>
+#include <QFutureWatcher>
+#include <QSignalSpy>
+#include <QTest>
+#include <QTimeZone>
+#include <QXmlStreamWriter>
 
 struct QXmppError;
 

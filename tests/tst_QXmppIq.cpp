@@ -27,9 +27,10 @@
 
 #include "util.h"
 
-#include <chrono>
-
+#include <QMimeDatabase>
 #include <QObject>
+
+#include <chrono>
 
 // helpers: RpcIq
 static void checkVariant(const QVariant &value, const QByteArray &xml)

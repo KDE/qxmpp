@@ -14,6 +14,7 @@
 #include <gst/gst.h>
 
 #include <QBuffer>
+#include <QTimer>
 
 using namespace QXmpp::Private;
 using Error = QXmppStanza::Error;
