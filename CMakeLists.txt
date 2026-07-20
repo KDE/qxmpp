@@ -72,6 +72,44 @@ add_definitions(
     -DQT_NO_KEYWORDS
 )
 
+# Use a faster linker when one is available. The test executables each statically
+# link all of QXmpp (~150 MB in debug builds), so linking dominates their build time
+# and the default GNU ld is by far the slowest option.
+set(USE_FAST_LINKER "auto" CACHE STRING "Linker to use: auto, mold, lld, gold or default.")
+set_property(CACHE USE_FAST_LINKER PROPERTY STRINGS auto mold lld gold default)
+
+# add_link_options() ends up after CMAKE_<TYPE>_LINKER_FLAGS on the link line, so an
+# automatically picked linker would override one the user already chose via LDFLAGS,
+# CMAKE_<TYPE>_LINKER_FLAGS or CMAKE_LINKER_TYPE. Leave their choice alone; an explicit
+# USE_FAST_LINKER=<linker> still wins, because that is a deliberate override.
+if(USE_FAST_LINKER STREQUAL "auto")
+    if(CMAKE_LINKER_TYPE OR
+       "${CMAKE_EXE_LINKER_FLAGS} ${CMAKE_SHARED_LINKER_FLAGS} ${CMAKE_MODULE_LINKER_FLAGS}" MATCHES "-fuse-ld=|--ld-path=")
+        set(USE_FAST_LINKER "default")
+        message(STATUS "Using linker: from the given linker flags")
+    endif()
+endif()
+
+if(NOT USE_FAST_LINKER STREQUAL "default" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    if(USE_FAST_LINKER STREQUAL "auto")
+        set(_linker_candidates mold lld gold)
+    else()
+        set(_linker_candidates ${USE_FAST_LINKER})
+    endif()
+    include(CheckCXXSourceCompiles)
+    foreach(_linker IN LISTS _linker_candidates)
+        set(CMAKE_REQUIRED_LINK_OPTIONS -fuse-ld=${_linker})
+        unset(_linker_works_${_linker} CACHE)
+        check_cxx_source_compiles("int main() { return 0; }" _linker_works_${_linker})
+        unset(CMAKE_REQUIRED_LINK_OPTIONS)
+        if(_linker_works_${_linker})
+            add_link_options(-fuse-ld=${_linker})
+            message(STATUS "Using linker: ${_linker}")
+            break()
+        endif()
+    endforeach()
+endif()
+
 # Address sanitizer and undefined behavior sanitizer
 if(ENABLE_ASAN)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
