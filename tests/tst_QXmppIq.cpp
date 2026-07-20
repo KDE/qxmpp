@@ -26,6 +26,7 @@
 
 #include "util.h"
 
+#include <QMimeDatabase>
 #include <QObject>
 
 // helpers: RpcIq

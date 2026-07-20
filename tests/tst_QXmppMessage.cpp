@@ -23,6 +23,7 @@
 
 #include <optional>
 
+#include <QMimeDatabase>
 #include <QObject>
 
 class tst_QXmppMessage : public QObject
