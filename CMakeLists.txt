@@ -69,6 +69,30 @@ add_definitions(
     -DQT_NO_KEYWORDS
 )
 
+# Use a faster linker when one is available. The test executables each statically
+# link all of QXmpp (~150 MB in debug builds), so linking dominates their build time
+# and the default GNU ld is by far the slowest option.
+set(USE_FAST_LINKER "auto" CACHE STRING "Linker to use: auto, mold, lld, gold or default.")
+if(NOT USE_FAST_LINKER STREQUAL "default" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    if(USE_FAST_LINKER STREQUAL "auto")
+        set(_linker_candidates mold lld gold)
+    else()
+        set(_linker_candidates ${USE_FAST_LINKER})
+    endif()
+    include(CheckCXXSourceCompiles)
+    foreach(_linker IN LISTS _linker_candidates)
+        set(CMAKE_REQUIRED_LINK_OPTIONS -fuse-ld=${_linker})
+        unset(_linker_works_${_linker} CACHE)
+        check_cxx_source_compiles("int main() { return 0; }" _linker_works_${_linker})
+        unset(CMAKE_REQUIRED_LINK_OPTIONS)
+        if(_linker_works_${_linker})
+            add_link_options(-fuse-ld=${_linker})
+            message(STATUS "Using linker: ${_linker}")
+            break()
+        endif()
+    endforeach()
+endif()
+
 # Address sanitizer and undefined behavior sanitizer
 if(ENABLE_ASAN)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
