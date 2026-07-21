@@ -8,7 +8,6 @@
 #define TESTS_UTIL_H
 
 #include "QXmppError.h"
-#include "QXmppPasswordChecker.h"
 #include "QXmppTask.h"
 
 #include "StringLiterals.h"
@@ -318,34 +317,5 @@ T wait(const QFuture<T> &future)
         return future.result();
     }
 }
-
-class TestPasswordChecker : public QXmppPasswordChecker
-{
-public:
-    void addCredentials(const QString &user, const QString &password)
-    {
-        m_credentials.insert(user, password);
-    };
-
-    /*! Retrieves the password for the given username. */
-    QXmppPasswordReply::Error getPassword(const QXmppPasswordRequest &request, QString &password) override
-    {
-        if (m_credentials.contains(request.username())) {
-            password = m_credentials.value(request.username());
-            return QXmppPasswordReply::NoError;
-        } else {
-            return QXmppPasswordReply::AuthorizationError;
-        }
-    };
-
-    /*! Returns whether getPassword() is enabled. */
-    bool hasGetPassword() const override
-    {
-        return true;
-    };
-
-private:
-    QMap<QString, QString> m_credentials;
-};
 
 #endif  // TESTS_UTIL_H

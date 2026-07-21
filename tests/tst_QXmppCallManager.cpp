@@ -9,6 +9,7 @@
 #include "QXmppServer.h"
 
 #include "TestClient.h"
+#include "TestPasswordChecker.h"
 #include "util.h"
 
 #include <gst/gst.h>

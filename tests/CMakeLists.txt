@@ -9,7 +9,7 @@ find_package(Qt6 REQUIRED COMPONENTS Test)
 # optional QtGui support (for testing header-only usage)
 find_package(Qt6 COMPONENTS Gui QUIET)
 
-add_library(testutils OBJECT util.h TestClient.h)
+add_library(testutils OBJECT util.h TestClient.h TestPasswordChecker.h TestPasswordChecker.cpp)
 target_link_libraries(testutils PUBLIC Qt6::Test ${QXMPP_TARGET}_internal)
 
 macro(add_simple_test TEST_NAME)

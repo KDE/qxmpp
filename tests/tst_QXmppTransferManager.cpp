@@ -7,6 +7,7 @@
 #include "QXmppTransferManager.h"
 
 #include "TestClient.h"
+#include "TestPasswordChecker.h"
 #include "util.h"
 
 #include <QBuffer>
