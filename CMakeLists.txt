@@ -105,6 +105,16 @@ if(REDUCE_BINARY_SIZE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_link_options(-Wl,--gc-sections)
 endif()
 
+# Opt-in line-tables-only debug info (-g1): roughly halves binary size, loses local variable inspection.
+option(REDUCED_DEBUG_INFO "Emit line-tables-only debug info (-g1) to shrink binaries and speed up builds." OFF)
+if(REDUCED_DEBUG_INFO AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    foreach(_cfg DEBUG RELWITHDEBINFO)
+        # Downgrade the full -g (== -g2) that CMake puts in these configurations to -g1.
+        string(REGEX REPLACE "(^| )-g( |$)" "\\1-g1\\2" CMAKE_CXX_FLAGS_${_cfg} "${CMAKE_CXX_FLAGS_${_cfg}}")
+        string(REGEX REPLACE "(^| )-g( |$)" "\\1-g1\\2" CMAKE_C_FLAGS_${_cfg} "${CMAKE_C_FLAGS_${_cfg}}")
+    endforeach()
+endif()
+
 # Address sanitizer and undefined behavior sanitizer
 if(ENABLE_ASAN)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
