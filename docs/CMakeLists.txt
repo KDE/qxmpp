@@ -30,8 +30,10 @@ endif()
 # itself and doesn't accept extra environment variables.
 if(DEFINED ENV{KDE_DOCS})
     set(_KDE_DOCS "$ENV{KDE_DOCS}")
+    set(_QXMPP_STANDALONE_DOCS_BUILD FALSE)
 else()
     ecm_query_qt(_KDE_DOCS QT_INSTALL_DOCS)
+    set(_QXMPP_STANDALONE_DOCS_BUILD TRUE)
 endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Tools)
@@ -81,6 +83,32 @@ add_custom_command(
     COMMENT "Copying DOAP rendering files into QDoc HTML output"
     VERBATIM
 )
+
+# QXmpp's landing page is qxmpp-index.html, not index.html: on api.kde.org,
+# DOC_DESTDIR/html is shared across every KDE project, and index.html there
+# belongs to the site-wide front page (kde-qdoc-common/index.qdoc) — writing
+# our own index.html would silently clobber it depending on build order.
+# For a standalone build (KDE_DOCS unset) DOC_DESTDIR/html is ours alone, so
+# drop a plain redirect there for convenience.
+if(_QXMPP_STANDALONE_DOCS_BUILD)
+    set(_qxmpp_index_redirect "${CMAKE_CURRENT_BINARY_DIR}/index.html")
+    file(WRITE "${_qxmpp_index_redirect}"
+"<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\">
+<meta http-equiv=\"refresh\" content=\"0; url=qxmpp-index.html\">
+<title>QXmpp Documentation</title>
+</head><body>
+<p>Redirecting to <a href=\"qxmpp-index.html\">QXmpp Documentation</a>...</p>
+</body></html>
+")
+    add_custom_command(
+        TARGET generate_docs_${QXMPP_TARGET}
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy "${_qxmpp_index_redirect}" "${DOC_DESTDIR}/html/index.html"
+        COMMENT "Adding index.html redirect to qxmpp-index.html for standalone build"
+        VERBATIM
+    )
+endif()
 
 if(BUILD_DOCUMENTATION)
     install(FILES ${DOAP_FILES} DESTINATION ${CMAKE_INSTALL_DOCDIR}/qxmpp)
