@@ -6,206 +6,54 @@
 #define CLIENTTESTING_H
 
 #include "QXmppClient.h"
-#include "QXmppClientExtension.h"  // needed for qDeleteAll(d->extensions)
-#include "QXmppClient_p.h"
-#include "QXmppOutgoingClient.h"
-#include "QXmppSasl_p.h"
 
 #include "util.h"
+
+class QXmppOutgoingClient;
+class QXmppOutgoingClientPrivate;
+namespace QXmpp::Private::Sasl2 {
+struct StreamFeature;
+}
 
 class TestClient : public QXmppClient
 {
     Q_OBJECT
 public:
-    TestClient(bool enableDebug = false, bool enableAutoReset = true)
-        : QXmppClient(),
-          debugEnabled(enableDebug),
-          autoResetEnabled(enableAutoReset)
-    {
-        // clear extensions
-        qDeleteAll(d->extensions);
-        d->extensions.clear();
-        // enable stream management (so IQ requests are not stopped)
-        d->stream->enableStreamManagement(true);
-        // setup logging (for expect())
-        logger()->setLoggingType(QXmppLogger::SignalLogging);
-        connect(logger(), &QXmppLogger::message, this, &TestClient::onLoggerMessage);
-        // In all case, start with a 0 default id
-        resetIdCount();
-    }
+    TestClient(bool enableDebug = false, bool enableAutoReset = true);
+    ~TestClient() override;
 
-    ~TestClient() override = default;
-
-    QXmppOutgoingClient *stream() const { return d->stream; }
-    QXmppOutgoingClientPrivate *streamPrivate() const { return d->stream->d.get(); }
+    QXmppOutgoingClient *stream() const;
+    QXmppOutgoingClientPrivate *streamPrivate() const;
 
     // Test wrappers for the private outgoing-client entry points exercised by the SASL2 + FAST
     // listener-replacement regression test.
-    void startSasl2Auth(const QXmpp::Private::Sasl2::StreamFeature &feature)
-    {
-        d->stream->startSasl2Auth(feature);
-    }
-    void handlePacketReceived(const QDomElement &el)
-    {
-        d->stream->handlePacketReceived(el);
-    }
+    void startSasl2Auth(const QXmpp::Private::Sasl2::StreamFeature &feature);
+    void handlePacketReceived(const QDomElement &el);
 
     template<typename String>
     void inject(const String &xml) { inject(xmlToDom(xml)); }
 
-    void injectPresence(const QXmppPresence &presence) { Q_EMIT presenceReceived(presence); }
-    void simulateConnected() { Q_EMIT connected(); }
-    void simulateDisconnected() { Q_EMIT disconnected(); }
+    void injectPresence(const QXmppPresence &presence);
+    void simulateConnected();
+    void simulateDisconnected();
 
-    void inject(const QDomElement &element)
-    {
-        if (!d->stream->handleIqResponse(element)) {
-            for (auto *extension : std::as_const(d->extensions)) {
-                if (extension->handleStanza(element)) {
-                    break;
-                }
-            }
-        }
-        if (autoResetEnabled) {
-            resetIdCount();
-        }
-    }
+    void inject(const QDomElement &element);
 
-    void expect(QString &&packet)
-    {
-        QVERIFY2(!m_sentPackets.empty(), "No packet was sent!");
-
-        auto expectedXml = rewriteXml(packet);
-        auto actualXml = rewriteXml(m_sentPackets.takeFirst());
-        QCOMPARE(actualXml, expectedXml);
-
-        if (autoResetEnabled) {
-            resetIdCount();
-        }
-    }
+    void expect(QString &&packet);
     // compares packets, ignoring different IDs and order of sending
     // returns ID of the packet that matched
-    QString expectPacketRandomOrder(QString &&expected)
-    {
-        VERIFY2(!m_sentPackets.empty(), "No packet was sent!");
+    QString expectPacketRandomOrder(QString &&expected);
+    QString takePacket();
+    QString takeLastPacket();
+    void expectNoPacket() const;
+    void ignore();
 
-        auto [expectedXml, _] = rewriteXmlWithoutStanzaId(expected);
-        for (const auto &packet : std::as_const(m_sentPackets)) {
-            auto [packetFormattedXml, stanzaId] = rewriteXmlWithoutStanzaId(packet);
-            if (packetFormattedXml == expectedXml) {
-                []() { QVERIFY(true); }();
-                m_sentPackets.removeOne(packet);
-                return stanzaId;
-            }
-        }
-
-        // Failure
-        qDebug() << "Expected:";
-        qDebug() << expectedXml;
-        qDebug() << "Got:";
-        for (const auto &packet : m_sentPackets) {
-            auto [xml, id] = rewriteXmlWithoutStanzaId(packet);
-            qDebug() << xml;
-        }
-
-        []() { QFAIL("Expected packet was not sent!"); }();
-        return {};
-    }
-    QString takePacket()
-    {
-        [this]() { QVERIFY(!m_sentPackets.isEmpty()); }();
-        return m_sentPackets.takeFirst();
-    }
-    QString takeLastPacket()
-    {
-        [this]() { QVERIFY(!m_sentPackets.isEmpty()); }();
-        return m_sentPackets.takeLast();
-    }
-    void expectNoPacket() const
-    {
-        if (!m_sentPackets.empty()) {
-            qDebug() << "Unexpected:";
-            for (const auto &packet : m_sentPackets) {
-                qDebug().noquote() << " *" << packet;
-            }
-        }
-        VERIFY2(m_sentPackets.empty(), "Unexpected packet sent!");
-    }
-    void ignore()
-    {
-        m_sentPackets.takeFirst();
-        if (autoResetEnabled) {
-            resetIdCount();
-        }
-    }
-
-    void resetIdCount()
-    {
-        QXmpp::Private::globalStanzaIdCounter = 0;
-    }
-
-    void setStreamManagementState(QXmppClient::StreamManagementState state)
-    {
-        switch (state) {
-        case QXmppClient::StreamManagementState::NoStreamManagement:
-            d->stream->c2sStreamManager().setEnabled(false);
-            break;
-        case QXmppClient::StreamManagementState::NewStream:
-            d->stream->c2sStreamManager().setEnabled(true);
-            d->stream->c2sStreamManager().setResumed(false);
-            break;
-        case QXmppClient::StreamManagementState::ResumedStream:
-            d->stream->c2sStreamManager().setEnabled(true);
-            d->stream->c2sStreamManager().setResumed(true);
-            break;
-        }
-    }
-
-    void waitForConnect()
-    {
-        QEventLoop loop;
-        connect(this, &QXmppClient::connected, &loop, &QEventLoop::quit);
-        connect(this, &QXmppClient::disconnected, &loop, &QEventLoop::quit);
-        loop.exec();
-
-        QVERIFY(isConnected());
-    }
+    void resetIdCount();
+    void setStreamManagementState(QXmppClient::StreamManagementState state);
+    void waitForConnect();
 
 private:
-    void onLoggerMessage(QXmppLogger::MessageType type, const QString &text)
-    {
-        if (text == u"<r xmlns=\"urn:xmpp:sm:3\"/>") {
-            return;
-        }
-
-        if (debugEnabled) {
-            QStringView typeString;
-            switch (type) {
-            case QXmppLogger::DebugMessage:
-                typeString = u"DEBUG";
-                break;
-            case QXmppLogger::InformationMessage:
-                typeString = u"INFO";
-                break;
-            case QXmppLogger::WarningMessage:
-                typeString = u"WARNING";
-                break;
-            case QXmppLogger::ReceivedMessage:
-                typeString = u"RECEIVED";
-                break;
-            case QXmppLogger::SentMessage:
-                typeString = u"SENT";
-                break;
-            default:
-                Q_UNREACHABLE();
-            }
-            qDebug().noquote() << typeString << text;
-        }
-
-        if (type == QXmppLogger::SentMessage) {
-            m_sentPackets << text;
-        }
-    }
+    void onLoggerMessage(QXmppLogger::MessageType type, const QString &text);
 
     bool debugEnabled;
     bool autoResetEnabled;
