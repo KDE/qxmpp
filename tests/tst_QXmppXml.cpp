@@ -1,5 +1,4 @@
 // SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
-// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@jahnson.de>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 

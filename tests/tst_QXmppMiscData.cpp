@@ -1,11 +1,9 @@
 // SPDX-FileCopyrightText: 2012 Oliver Goffart <ogoffart@woboq.com>
 // SPDX-FileCopyrightText: 2012 Jeremy Lainé <jeremy.laine@m4x.org>
-// SPDX-FileCopyrightText: 2022 Melvin Keskin <melvo@olomono.de>
-// SPDX-FileCopyrightText: 2019 Linus Jahn <lnj@kaidan.im>
 // SPDX-FileCopyrightText: 2012 Manjeet Dahiya <manjeetdahiya@gmail.com>
 // SPDX-FileCopyrightText: 2012 Andrey Batyiev
-// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
-// SPDX-FileCopyrightText: 2024 Linus Jahn <lnj@kaidan.im>
+// SPDX-FileCopyrightText: 2019 Linus Jahn <lnj@kaidan.im>
+// SPDX-FileCopyrightText: 2022 Melvin Keskin <melvo@olomono.de>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 

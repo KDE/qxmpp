@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2012 Jeremy Lainé <jeremy.laine@m4x.org>
 // SPDX-FileCopyrightText: 2020 Linus Jahn <lnj@kaidan.im>
-// SPDX-FileCopyrightText: 2021 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
