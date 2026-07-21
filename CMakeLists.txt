@@ -72,6 +72,19 @@ add_definitions(
     -DQT_NO_KEYWORDS
 )
 
+# Cache compilation results with ccache when available. Every test recompiles the same
+# Qt and QXmpp headers (the bulk of a test's compile time), so cached rebuilds are far faster.
+option(USE_CCACHE "Use ccache to speed up rebuilds when available." ON)
+if(USE_CCACHE)
+    find_program(CCACHE_PROGRAM ccache)
+    # Leave a launcher the user has set up (another cache, a distributed compiler) alone.
+    if(CCACHE_PROGRAM AND NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+        set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+        message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+    endif()
+endif()
+
 # Use a faster linker when one is available. The test executables each statically
 # link all of QXmpp (~150 MB in debug builds), so linking dominates their build time
 # and the default GNU ld is by far the slowest option.
