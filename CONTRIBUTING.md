@@ -82,6 +82,11 @@ To correctly view the list of supported XEPs, a local webserver is needed, see t
 [ecm]: https://api.kde.org/ecm/
 [apikde]: https://api.kde.org/
 
+## Releasing
+
+Maintainers: see [the release documentation][releasing] for how to cut and
+publish a new QXmpp release.
+
 ## Copyright
 
 QXmpp is [REUSE-compatible][reuse].
@@ -93,5 +98,6 @@ copyright header. This is recommended for large changes.
 If the file does not allow such a header, add a `.license` file for the copyright information.
 
 [doap-rendering]: /doc/doap-rendering/README.md
+[releasing]: /docs/RELEASING.md
 [invent]: https://invent.kde.org/libraries/qxmpp
 [reuse]: https://api.reuse.software/info/github.com/qxmpp-project/qxmpp
