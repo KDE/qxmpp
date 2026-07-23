@@ -9,8 +9,6 @@
 #include "QXmppGlobal.h"
 #include "QXmppXmlTags_p.h"
 
-#include "Algorithms.h"
-
 #include <functional>
 #include <optional>
 #include <stdint.h>
@@ -226,19 +224,37 @@ auto parseChildElements(const QDomElement &parentEl) -> Container
     return elements;
 }
 
+// Append a value to a container regardless of whether it uses push_back() or insert().
+template<typename Container, typename Value>
+inline void appendToContainer(Container &container, Value &&value)
+{
+    if constexpr (requires { container.push_back(std::forward<Value>(value)); }) {
+        container.push_back(std::forward<Value>(value));
+    } else {
+        container.insert(std::forward<Value>(value));
+    }
+}
+
 template<typename Container = QList<QString>>
 auto parseTextElements(const QDomElement &parent, QStringView tagName, QStringView xmlns)
     -> Container
 {
-    return transform<Container>(iterChildElements(parent, tagName, xmlns), &QDomElement::text);
+    Container result;
+    for (const auto &el : iterChildElements(parent, tagName, xmlns)) {
+        appendToContainer(result, el.text());
+    }
+    return result;
 }
 
 template<typename Container = QList<QString>>
 auto parseSingleAttributeElements(const QDomElement &parent, QStringView tagName, QStringView xmlns, const QString &attribute)
+    -> Container
 {
-    return transform<Container>(iterChildElements(parent, tagName, xmlns), [=](const QDomElement &el) {
-        return el.attribute(attribute);
-    });
+    Container result;
+    for (const auto &el : iterChildElements(parent, tagName, xmlns)) {
+        appendToContainer(result, el.attribute(attribute));
+    }
+    return result;
 }
 
 QByteArray serializeXmlWriter(std::function<void(XmlWriter &)>);

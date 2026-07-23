@@ -10,6 +10,7 @@
 #include "QXmppStanza.h"
 #include "QXmppVisitHelper_p.h"
 
+#include "Algorithms.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 

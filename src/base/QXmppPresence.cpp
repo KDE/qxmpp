@@ -12,6 +12,7 @@
 #include "QXmppUtils_p.h"
 #include "QXmppXmlExtensions.h"
 
+#include "Algorithms.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
