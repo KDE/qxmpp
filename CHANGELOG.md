@@ -4,6 +4,11 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.16.3 (Unreleased)
+-------------------------
+
+ - Utils: Fix installed private header QXmppUtils_p.h including the non-installed Algorithms.h, which broke building against the installed QXmpp headers (@lnj)
+
 QXmpp 1.16.2 (July 11, 2026)
 ----------------------------
 
