@@ -20,8 +20,8 @@ SPDX-License-Identifier: CC0-1.0
     <a href="https://invent.kde.org/libraries/qxmpp/-/pipelines">
         <img alt="Build Status" src="https://invent.kde.org/libraries/qxmpp/badges/master/pipeline.svg">
     </a>
-    <a href="https://doc.qxmpp.org/">
-        <img alt="Documentation" src="https://img.shields.io/website?down_message=offline&label=documentation&up_message=online&url=https%3A%2F%2Fdoc.qxmpp.org%2F">
+    <a href="https://api.kde.org/qxmpp-index.html">
+        <img alt="Documentation" src="https://img.shields.io/website?down_message=offline&label=documentation&up_message=online&url=https%3A%2F%2Fapi.kde.org%2Fqxmpp-index.html">
     </a>
     <a href="xmpp:qxmpp@muc.kaidan.im?join">
         <img alt="Development Chat" src="https://search.jabbercat.org/api/1.0/badge?address=qxmpp@muc.kaidan.im">
