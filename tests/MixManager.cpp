@@ -1642,4 +1642,4 @@ void tst_QXmppMixManager::testError(QXmppTask<T> &task, TestClient &client, cons
 }
 
 QTEST_MAIN(tst_QXmppMixManager)
-#include "tst_QXmppMixManager.moc"
+#include "MixManager.moc"

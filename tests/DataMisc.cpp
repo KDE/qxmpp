@@ -1560,4 +1560,4 @@ void tst_QXmppUri::queryOther()
 
 QXMPP_TEST_MAIN(tst_QXmppPresence, tst_QXmppBitsOfBinary, tst_QXmppStreamFeatures, tst_QXmppDataForm, tst_QXmppResultSet, tst_QXmppSpamReport, tst_QXmppSceEnvelope, tst_QXmppUri)
 
-#include "tst_QXmppMiscData.moc"
+#include "DataMisc.moc"

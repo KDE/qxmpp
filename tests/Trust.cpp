@@ -3233,4 +3233,4 @@ void tst_QXmppTrustMessages::testTrustMessageElement()
 
 QXMPP_TEST_MAIN(tst_QXmppTrustManager, tst_QXmppTrustMessages)
 
-#include "tst_QXmppTrust.moc"
+#include "Trust.moc"

@@ -1362,4 +1362,4 @@ void tst_QXmppPubSubManager::testStandardItemToString()
 }
 
 QTEST_MAIN(tst_QXmppPubSubManager)
-#include "tst_QXmppPubSubManager.moc"
+#include "PubSubManager.moc"

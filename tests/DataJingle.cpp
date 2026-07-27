@@ -1648,4 +1648,4 @@ void tst_QXmppJingleData::testJingleMessageInitiationElement()
 }
 
 QTEST_MAIN(tst_QXmppJingleData)
-#include "tst_QXmppJingleData.moc"
+#include "DataJingle.moc"

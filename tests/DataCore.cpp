@@ -866,4 +866,4 @@ void tst_QXmppStream::testSessionIq()
 
 QXMPP_TEST_MAIN(Stanza::tst_QXmppStanza, tst_QXmppStream)
 
-#include "tst_QXmppDataCore.moc"
+#include "DataCore.moc"

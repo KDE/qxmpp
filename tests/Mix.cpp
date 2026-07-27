@@ -1225,4 +1225,4 @@ void tst_QXmppMixItem::testIsParticipantItem()
 
 QXMPP_TEST_MAIN(MixInvitation::tst_QXmppMixInvitation, MixIq::tst_QXmppMixIq, MixItems::tst_QXmppMixItem)
 
-#include "tst_QXmppMix.moc"
+#include "Mix.moc"

@@ -1958,4 +1958,4 @@ void tst_QXmppRosterIq::rosterMixChannel()
 
 QXMPP_TEST_MAIN(Client::tst_QXmppClient, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq)
 
-#include "tst_QXmppClientBase.moc"
+#include "ClientBase.moc"

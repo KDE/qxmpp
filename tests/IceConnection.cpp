@@ -150,4 +150,4 @@ void tst_QXmppIceConnection::testConnect()
 }
 
 QTEST_MAIN(tst_QXmppIceConnection)
-#include "tst_QXmppIceConnection.moc"
+#include "IceConnection.moc"

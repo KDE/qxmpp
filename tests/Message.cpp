@@ -1810,4 +1810,4 @@ void tst_QXmppMessageReaction::testMessageReactionRemoval()
 
 QXMPP_TEST_MAIN(tst_QXmppMessage, tst_QXmppMessageReaction)
 
-#include "tst_QXmppMessage.moc"
+#include "Message.moc"

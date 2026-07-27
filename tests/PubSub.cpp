@@ -1056,4 +1056,4 @@ void tst_QXmppPubSubIq::testCustomItem()
 
 QXMPP_TEST_MAIN(tst_QXmppPubSub, tst_QXmppPubSubEvent, tst_QXmppPubSubForms, tst_QXmppPubSubIq)
 
-#include "tst_QXmppPubSub.moc"
+#include "PubSub.moc"

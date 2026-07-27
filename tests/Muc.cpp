@@ -3844,4 +3844,4 @@ void tst_QXmppMuc::inactiveRoomsPruned()
 }
 
 QTEST_MAIN(tst_QXmppMuc)
-#include "tst_QXmppMuc.moc"
+#include "Muc.moc"
