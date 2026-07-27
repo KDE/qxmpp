@@ -1140,4 +1140,4 @@ void tst_QXmppSasl::sasl2FastTokenRejectedNoPassword()
 }
 
 QTEST_MAIN(tst_QXmppSasl)
-#include "tst_QXmppSasl.moc"
+#include "Sasl.moc"

@@ -1156,4 +1156,4 @@ void tst_QXmppXmlFormatter::elideColorized()
 
 QXMPP_TEST_MAIN(Utils::tst_QXmppUtils, Logger::tst_QXmppLogger, XmlHelpers::tst_QXmppXmlElement, XmlHelpers::tst_QXmppXmlRegistry, XmlHelpers::tst_QXmppXmlFormatter)
 
-#include "tst_QXmppCoreUtils.moc"
+#include "CoreUtils.moc"

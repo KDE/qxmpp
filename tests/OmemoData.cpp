@@ -694,4 +694,4 @@ void tst_QXmppOmemoData::testOmemoIq()
 }
 
 QTEST_MAIN(tst_QXmppOmemoData)
-#include "tst_QXmppOmemoData.moc"
+#include "OmemoData.moc"

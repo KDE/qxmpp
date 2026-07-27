@@ -1219,4 +1219,4 @@ void tst_QXmppArchiveIq::testArchiveRetrieve()
 
 QXMPP_TEST_MAIN(Mam::tst_QXmppMamManager, Carbon::tst_QXmppCarbonManager, Attention::tst_QXmppAttentionManager, MessageReceipt::tst_QXmppMessageReceiptManager, ArchiveIq::tst_QXmppArchiveIq)
 
-#include "tst_QXmppManagersMessages.moc"
+#include "ManagersMessages.moc"

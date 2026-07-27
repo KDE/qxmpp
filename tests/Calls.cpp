@@ -1971,4 +1971,4 @@ int main(int argc, char *argv[])
     return status;
 }
 
-#include "tst_QXmppCalls.moc"
+#include "Calls.moc"

@@ -964,4 +964,4 @@ void tst_QXmppVersionIq::versionResult()
 
 QXMPP_TEST_MAIN(Version::tst_QXmppVersionManager, EntityTime::tst_QXmppEntityTimeManager, UserTune::tst_QXmppUserTuneManager, UserLocation::tst_QXmppUserLocationManager, VCard::tst_QXmppVCardManager, EntityTimeIq::tst_QXmppEntityTimeIq, VCardIq::tst_QXmppVCardIq, VersionIq::tst_QXmppVersionIq)
 
-#include "tst_QXmppManagersUserInfo.moc"
+#include "ManagersUserInfo.moc"

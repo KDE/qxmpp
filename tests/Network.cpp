@@ -473,4 +473,4 @@ void tst_QXmppSocks::testServer()
 
 QXMPP_TEST_MAIN(Server::tst_QXmppServer, StunMessage::tst_QXmppStunMessage, Socks::tst_QXmppSocks)
 
-#include "tst_QXmppNetwork.moc"
+#include "Network.moc"

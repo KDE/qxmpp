@@ -466,4 +466,4 @@ void tst_QXmppIq::rpcResponseFault()
 }
 
 QTEST_MAIN(tst_QXmppIq)
-#include "tst_QXmppIq.moc"
+#include "Iq.moc"

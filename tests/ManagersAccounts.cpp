@@ -2053,4 +2053,4 @@ void tst_QXmppRegisterIq::registerUnregistration()
 
 QXMPP_TEST_MAIN(Registration::tst_QXmppRegistrationManager, tst_QXmppAccountMigrationManager, tst_QXmppMovedManager, Blocking::tst_QXmppBlockingManager, RegisterIq::tst_QXmppRegisterIq)
 
-#include "tst_QXmppManagersAccounts.moc"
+#include "ManagersAccounts.moc"

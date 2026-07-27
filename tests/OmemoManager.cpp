@@ -807,4 +807,4 @@ void tst_QXmppOmemoMemoryStorage::testResetAll()
 
 QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage)
 
-#include "tst_QXmppOmemoManager.moc"
+#include "OmemoManager.moc"
