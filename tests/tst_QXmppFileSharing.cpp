@@ -24,6 +24,8 @@
 #include "QXmppFileEncryption.h"
 #endif
 
+#include "QXmppStreamInitiationIq_p.h"
+
 #include "Algorithms.h"
 #include "IntegrationTesting.h"
 #include "TestClient.h"
@@ -784,10 +786,267 @@ void tst_QXmppFileEncryption::paddingSize()
 
 #endif  // WITH_ENCRYPTION
 
+// ============================================================
+
+namespace HttpUploadIq {
+
+class tst_QXmppHttpUploadIq : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void httpUploadRequest();
+    Q_SLOT void httpUploadIsRequest_data();
+    Q_SLOT void httpUploadIsRequest();
+    Q_SLOT void httpUploadSlot();
+    Q_SLOT void httpUploadIsSlot_data();
+    Q_SLOT void httpUploadIsSlot();
+};
+
+void tst_QXmppHttpUploadIq::httpUploadRequest()
+{
+    const QByteArray xml(
+        "<iq id=\"step_03\" "
+        "to=\"upload.montague.tld\" "
+        "from=\"romeo@montague.tld/garden\" "
+        "type=\"get\">"
+        "<request xmlns=\"urn:xmpp:http:upload:0\" "
+        "filename=\"très cool.jpg\" "
+        "size=\"23456\" "
+        "content-type=\"image/jpeg\"/>"
+        "</iq>");
+
+    QXmppHttpUploadRequestIq iq;
+    parsePacket(iq, xml);
+    QCOMPARE(iq.fileName(), u"très cool.jpg"_s);
+    QCOMPARE(iq.size(), 23456);
+    QCOMPARE(iq.contentType().name(), u"image/jpeg"_s);
+    serializePacket(iq, xml);
+
+    // test setters
+    iq.setFileName("icon.png");
+    QCOMPARE(iq.fileName(), u"icon.png"_s);
+    iq.setSize(23421337);
+    QCOMPARE(iq.size(), 23421337);
+    iq.setContentType(QMimeDatabase().mimeTypeForName("image/png"));
+    QCOMPARE(iq.contentType().name(), u"image/png"_s);
+}
+
+void tst_QXmppHttpUploadIq::httpUploadIsRequest_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isRequest");
+
+    QTest::newRow("empty-iq")
+        << QByteArray("<iq/>")
+        << false;
+    QTest::newRow("wrong-ns")
+        << QByteArray("<iq><request xmlns=\"some:other:request\"/></iq>")
+        << false;
+    QTest::newRow("correct")
+        << QByteArray("<iq><request xmlns=\"urn:xmpp:http:upload:0\"/></iq>")
+        << true;
+}
+
+void tst_QXmppHttpUploadIq::httpUploadIsRequest()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isRequest);
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QCOMPARE(QXmppHttpUploadRequestIq::isHttpUploadRequestIq(xmlToDom(xml)), isRequest);
+    QT_WARNING_POP
+}
+
+void tst_QXmppHttpUploadIq::httpUploadSlot()
+{
+    const QByteArray xml(
+        "<iq id=\"step_03\" "
+        "to=\"romeo@montague.tld/garden\" "
+        "from=\"upload.montague.tld\" "
+        "type=\"result\">"
+        "<slot xmlns=\"urn:xmpp:http:upload:0\">"
+        "<put url=\"https://upload.montague.tld/4a771ac1-f0b2-4a4a-970"
+        "0-f2a26fa2bb67/tr%C3%A8s%20cool.jpg\">"
+        "<header name=\"Authorization\">Basic Base64String==</header>"
+        "<header name=\"Cookie\">foo=bar; user=romeo</header>"
+        "</put>"
+        "<get url=\"https://download.montague.tld/4a771ac1-f0b2-4a4a-9"
+        "700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg\"/>"
+        "</slot>"
+        "</iq>");
+
+    QXmppHttpUploadSlotIq iq;
+    parsePacket(iq, xml);
+    QCOMPARE(iq.putUrl(), QUrl("https://upload.montague.tld/4a771ac1-f0b2-4a4a"
+                               "-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg"));
+    QCOMPARE(iq.getUrl(), QUrl("https://download.montague.tld/4a771ac1-f0b2-4a"
+                               "4a-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg"));
+    QMap<QString, QString> headers;
+    headers["Authorization"] = "Basic Base64String==";
+    headers["Cookie"] = "foo=bar; user=romeo";
+    QCOMPARE(iq.putHeaders(), headers);
+    serializePacket(iq, xml);
+
+    // test setters
+    iq.setGetUrl(QUrl("https://dl.example.org/user/file"));
+    QCOMPARE(iq.getUrl(), QUrl("https://dl.example.org/user/file"));
+    iq.setPutUrl(QUrl("https://ul.example.org/user/file"));
+    QCOMPARE(iq.putUrl(), QUrl("https://ul.example.org/user/file"));
+    QMap<QString, QString> emptyMap;
+    iq.setPutHeaders(emptyMap);
+    QCOMPARE(iq.putHeaders(), emptyMap);
+}
+
+void tst_QXmppHttpUploadIq::httpUploadIsSlot_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isSlot");
+
+    QTest::newRow("empty-iq")
+        << QByteArray("<iq/>")
+        << false;
+    QTest::newRow("wrong-ns")
+        << QByteArray("<iq><slot xmlns=\"some:other:slot\"/></iq>")
+        << false;
+    QTest::newRow("correct")
+        << QByteArray("<iq><slot xmlns=\"urn:xmpp:http:upload:0\"/></iq>")
+        << true;
+}
+
+void tst_QXmppHttpUploadIq::httpUploadIsSlot()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isSlot);
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QCOMPARE(QXmppHttpUploadSlotIq::isHttpUploadSlotIq(xmlToDom(xml)), isSlot);
+    QT_WARNING_POP
+}
+
+}  // namespace HttpUploadIq
+
+// ============================================================
+
+namespace StreamInitiationIq {
+
+class tst_QXmppStreamInitiationIq : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void streamInitiationFileInfo_data();
+    Q_SLOT void streamInitiationFileInfo();
+    Q_SLOT void streamInitiationOffer();
+    Q_SLOT void streamInitiationResult();
+};
+
+void tst_QXmppStreamInitiationIq::streamInitiationFileInfo_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<QDateTime>("date");
+    QTest::addColumn<QString>("description");
+    QTest::addColumn<QByteArray>("hash");
+    QTest::addColumn<QString>("name");
+    QTest::addColumn<qint64>("size");
+
+    QTest::newRow("normal")
+        << QByteArray("<file xmlns=\"http://jabber.org/protocol/si/profile/file-transfer\" name=\"test.txt\" size=\"1022\"/>")
+        << QDateTime().toUTC()
+        << QString()
+        << QByteArray()
+        << u"test.txt"_s
+        << qint64(1022);
+
+    QTest::newRow("full")
+        << QByteArray("<file xmlns=\"http://jabber.org/protocol/si/profile/file-transfer\" "
+                      "date=\"1969-07-21T02:56:15Z\" "
+                      "hash=\"552da749930852c69ae5d2141d3766b1\" "
+                      "name=\"test.txt\" "
+                      "size=\"1022\">"
+                      "<desc>This is a test. If this were a real file...</desc>"
+                      "</file>")
+        << QDateTime(QDate(1969, 7, 21), QTime(2, 56, 15), TimeZoneUTC)
+        << u"This is a test. If this were a real file..."_s
+        << QByteArray::fromHex("552da749930852c69ae5d2141d3766b1")
+        << u"test.txt"_s
+        << qint64(1022);
+}
+
+void tst_QXmppStreamInitiationIq::streamInitiationFileInfo()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(QDateTime, date);
+    QFETCH(QString, description);
+    QFETCH(QByteArray, hash);
+    QFETCH(QString, name);
+    QFETCH(qint64, size);
+
+    QXmppTransferFileInfo info;
+    parsePacket(info, xml);
+    QCOMPARE(info.date(), date);
+    QCOMPARE(info.description(), description);
+    QCOMPARE(info.hash(), hash);
+    QCOMPARE(info.name(), name);
+    QCOMPARE(info.size(), size);
+    serializePacket(info, xml);
+}
+
+void tst_QXmppStreamInitiationIq::streamInitiationOffer()
+{
+    QByteArray xml(
+        "<iq id=\"offer1\" to=\"receiver@jabber.org/resource\" type=\"set\">"
+        "<si xmlns=\"http://jabber.org/protocol/si\" id=\"a0\" mime-type=\"text/plain\" profile=\"http://jabber.org/protocol/si/profile/file-transfer\">"
+        "<file xmlns=\"http://jabber.org/protocol/si/profile/file-transfer\" name=\"test.txt\" size=\"1022\"/>"
+        "<feature xmlns=\"http://jabber.org/protocol/feature-neg\">"
+        "<x xmlns=\"jabber:x:data\" type=\"form\">"
+        "<field type=\"list-single\" var=\"stream-method\">"
+        "<option><value>http://jabber.org/protocol/bytestreams</value></option>"
+        "<option><value>http://jabber.org/protocol/ibb</value></option>"
+        "</field>"
+        "</x>"
+        "</feature>"
+        "</si>"
+        "</iq>");
+
+    QXmppStreamInitiationIq iq;
+    parsePacket(iq, xml);
+    QVERIFY(!iq.featureForm().isNull());
+    QVERIFY(!iq.fileInfo().isNull());
+    QCOMPARE(iq.fileInfo().name(), u"test.txt"_s);
+    QCOMPARE(iq.fileInfo().size(), qint64(1022));
+    serializePacket(iq, xml);
+}
+
+void tst_QXmppStreamInitiationIq::streamInitiationResult()
+{
+    QByteArray xml(
+        "<iq id=\"offer1\" to=\"sender@jabber.org/resource\" type=\"result\">"
+        "<si xmlns=\"http://jabber.org/protocol/si\">"
+        "<feature xmlns=\"http://jabber.org/protocol/feature-neg\">"
+        "<x xmlns=\"jabber:x:data\" type=\"submit\">"
+        "<field type=\"list-single\" var=\"stream-method\">"
+        "<value>http://jabber.org/protocol/bytestreams</value>"
+        "</field>"
+        "</x>"
+        "</feature>"
+        "</si>"
+        "</iq>");
+
+    QXmppStreamInitiationIq iq;
+    parsePacket(iq, xml);
+    QVERIFY(iq.fileInfo().isNull());
+    serializePacket(iq, xml);
+}
+
+}  // namespace StreamInitiationIq
+
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
-    int status = runTests<HttpUpload::tst_QXmppHttpUploadManager, Transfer::tst_QXmppTransferManager>(argc, argv);
+    int status = runTests<HttpUpload::tst_QXmppHttpUploadManager, Transfer::tst_QXmppTransferManager, HttpUploadIq::tst_QXmppHttpUploadIq, StreamInitiationIq::tst_QXmppStreamInitiationIq>(argc, argv);
 #ifdef WITH_ENCRYPTION
     status |= runTests<FileEncryption::tst_QXmppFileEncryption>(argc, argv);
 #endif

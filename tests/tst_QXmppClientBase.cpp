@@ -11,7 +11,9 @@
 #include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppColorGeneration.h"
+#include "QXmppContactAddresses.h"
 #include "QXmppCredentials.h"
+#include "QXmppDataForm.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppLogger.h"
@@ -22,6 +24,7 @@
 #include "QXmppPromise.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRegisterIq.h"
+#include "QXmppRosterIq.h"
 #include "QXmppRosterManager.h"
 #include "QXmppRosterMemoryStorage.h"
 #include "QXmppRosterStorage.h"
@@ -1556,6 +1559,403 @@ void tst_QXmppRosterMemoryStorage::testClear()
 
 }  // namespace RosterMemoryStorage
 
-QXMPP_TEST_MAIN(Client::tst_QXmppClient, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage)
+// ============================================================
+
+namespace DiscoveryIq {
+
+class tst_QXmppDiscoveryIq : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void discovery();
+    Q_SLOT void discoveryWithForm();
+    Q_SLOT void discoInfo();
+    Q_SLOT void discoItems();
+    Q_SLOT void discoContactAddresses();
+};
+
+void tst_QXmppDiscoveryIq::discovery()
+{
+    const QByteArray xml(
+        "<iq id=\"disco1\" from=\"benvolio@capulet.lit/230193\" type=\"result\">"
+        "<query xmlns=\"http://jabber.org/protocol/disco#info\">"
+        "<identity category=\"client\" name=\"Exodus 0.9.1\" type=\"pc\"/>"
+        "<feature var=\"http://jabber.org/protocol/caps\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#info\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#items\"/>"
+        "<feature var=\"http://jabber.org/protocol/muc\"/>"
+        "</query>"
+        "</iq>");
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QXmppDiscoveryIq disco;
+    QT_WARNING_POP
+    parsePacket(disco, xml);
+    QCOMPARE(disco.verificationString(), QByteArray::fromBase64("QgayPKawpkPSDYmwT/WM94uAlu0="));
+    serializePacket(disco, xml);
+}
+
+void tst_QXmppDiscoveryIq::discoveryWithForm()
+{
+    const QByteArray xml(
+        "<iq id=\"disco1\" to=\"juliet@capulet.lit/chamber\" from=\"benvolio@capulet.lit/230193\" type=\"result\">"
+        "<query xmlns=\"http://jabber.org/protocol/disco#info\" node=\"http://psi-im.org#q07IKJEyjvHSyhy//CH0CxmKi8w=\">"
+        "<identity xml:lang=\"en\" category=\"client\" name=\"Psi 0.11\" type=\"pc\"/>"
+        "<identity xml:lang=\"el\" category=\"client\" name=\"Ψ 0.11\" type=\"pc\"/>"
+        "<feature var=\"http://jabber.org/protocol/caps\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#info\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#items\"/>"
+        "<feature var=\"http://jabber.org/protocol/muc\"/>"
+        "<x xmlns=\"jabber:x:data\" type=\"result\">"
+        "<field type=\"hidden\" var=\"FORM_TYPE\">"
+        "<value>urn:xmpp:dataforms:softwareinfo</value>"
+        "</field>"
+        "<field type=\"text-multi\" var=\"ip_version\">"
+        "<value>ipv4</value>"
+        "<value>ipv6</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"os\">"
+        "<value>Mac</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"os_version\">"
+        "<value>10.5.1</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"software\">"
+        "<value>Psi</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"software_version\">"
+        "<value>0.11</value>"
+        "</field>"
+        "</x>"
+        "</query>"
+        "</iq>");
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QXmppDiscoveryIq disco;
+    QT_WARNING_POP
+    parsePacket(disco, xml);
+    QCOMPARE(disco.verificationString(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
+    serializePacket(disco, xml);
+
+    auto softinfoForm = disco.dataForm(u"urn:xmpp:dataforms:softwareinfo");
+    QVERIFY(softinfoForm.has_value());
+}
+
+void tst_QXmppDiscoveryIq::discoInfo()
+{
+    const auto xml = QByteArrayLiteral(
+        "<query xmlns=\"http://jabber.org/protocol/disco#info\" node=\"http://psi-im.org#q07IKJEyjvHSyhy//CH0CxmKi8w=\">"
+        "<identity xml:lang=\"en\" category=\"client\" name=\"Psi 0.11\" type=\"pc\"/>"
+        "<identity xml:lang=\"el\" category=\"client\" name=\"Ψ 0.11\" type=\"pc\"/>"
+        "<feature var=\"http://jabber.org/protocol/caps\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#info\"/>"
+        "<feature var=\"http://jabber.org/protocol/disco#items\"/>"
+        "<feature var=\"http://jabber.org/protocol/muc\"/>"
+        "<x xmlns=\"jabber:x:data\" type=\"result\">"
+        "<field type=\"hidden\" var=\"FORM_TYPE\">"
+        "<value>urn:xmpp:dataforms:softwareinfo</value>"
+        "</field>"
+        "<field type=\"text-multi\" var=\"ip_version\">"
+        "<value>ipv4</value>"
+        "<value>ipv6</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"os\">"
+        "<value>Mac</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"os_version\">"
+        "<value>10.5.1</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"software\">"
+        "<value>Psi</value>"
+        "</field>"
+        "<field type=\"text-single\" var=\"software_version\">"
+        "<value>0.11</value>"
+        "</field>"
+        "</x>"
+        "</query>");
+
+    auto info = unwrap(QXmppDiscoInfo::fromDom(xmlToDom(xml)));
+    QCOMPARE(info.calculateEntityCapabilitiesHash(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
+    serializePacket(info, xml);
+}
+
+void tst_QXmppDiscoveryIq::discoItems()
+{
+    const auto xml = QByteArrayLiteral(
+        "<query xmlns='http://jabber.org/protocol/disco#items'>"
+        "<item jid='368866411b877c30064a5f62b917cffe@test.org'/>"
+        "<item jid='3300659945416e274474e469a1f0154c@test.org'/>"
+        "<item jid='4e30f35051b7b8b42abe083742187228@test.org'/>"
+        "<item jid='ae890ac52d0df67ed7cfdf51b644e901@test.org'/>"
+        "</query>");
+
+    auto items = unwrap(QXmppDiscoItems::fromDom(xmlToDom(xml)));
+    QCOMPARE(items.items().size(), 4);
+    QCOMPARE(items.items().at(0).jid(), u"368866411b877c30064a5f62b917cffe@test.org");
+    serializePacket(items, xml);
+}
+
+void tst_QXmppDiscoveryIq::discoContactAddresses()
+{
+    auto xml = QByteArrayLiteral(
+        "<x xmlns='jabber:x:data' type='result'>"
+        "<field type='hidden' var='FORM_TYPE'>"
+        "<value>http://jabber.org/network/serverinfo</value>"
+        "</field>"
+        "<field type='list-multi' var='abuse-addresses'>"
+        "<value>mailto:abuse@shakespeare.lit</value>"
+        "<value>xmpp:abuse@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='admin-addresses'>"
+        "<value>mailto:xmpp@shakespeare.lit</value>"
+        "<value>xmpp:admins@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='feedback-addresses'>"
+        "<value>http://shakespeare.lit/feedback.php</value>"
+        "<value>mailto:feedback@shakespeare.lit</value>"
+        "<value>xmpp:feedback@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='sales-addresses'>"
+        "<value>xmpp:bard@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='security-addresses'>"
+        "<value>xmpp:security@shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='status-addresses'>"
+        "<value>https://status.shakespeare.lit</value>"
+        "</field>"
+        "<field type='list-multi' var='support-addresses'>"
+        "<value>http://shakespeare.lit/support.php</value>"
+        "<value>xmpp:support@shakespeare.lit</value>"
+        "</field>"
+        "</x>");
+
+    QXmppDataForm form;
+    parsePacket(form, xml);
+
+    auto parsed = QXmppContactAddresses::fromDataForm(form);
+    QVERIFY(parsed.has_value());
+
+    QCOMPARE(parsed->abuseAddresses(), (QStringList { u"mailto:abuse@shakespeare.lit"_s, u"xmpp:abuse@shakespeare.lit"_s }));
+
+    form = parsed->toDataForm();
+    form.setType(QXmppDataForm::Result);
+    QVERIFY(!form.isNull());
+    xml = QString::fromUtf8(xml).remove(QChar('\n')).toUtf8();
+    serializePacket(form, xml);
+
+    // findForm with parsing
+    QXmppDiscoInfo info;
+    info.setDataForms({ parsed->toDataForm() });
+    auto contactAddresses = info.dataForm<QXmppContactAddresses>();
+    QVERIFY(contactAddresses);
+    QCOMPARE(contactAddresses->supportAddresses().constFirst(), u"http://shakespeare.lit/support.php");
+}
+
+}  // namespace DiscoveryIq
+
+// ============================================================
+
+namespace RosterIq {
+
+class tst_QXmppRosterIq : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void rosterItem_data();
+    Q_SLOT void rosterItem();
+    Q_SLOT void rosterApproved_data();
+    Q_SLOT void rosterApproved();
+    Q_SLOT void rosterVersion_data();
+    Q_SLOT void rosterVersion();
+    Q_SLOT void rosterMixAnnotate();
+    Q_SLOT void rosterMixChannel();
+};
+
+void tst_QXmppRosterIq::rosterItem_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<QString>("name");
+    QTest::addColumn<QString>("subscriptionStatus");
+    QTest::addColumn<int>("subscriptionType");
+    QTest::addColumn<bool>("approved");
+
+    QTest::newRow("none")
+        << QByteArray(R"(<item jid="foo@example.com" subscription="none" approved="true"/>)")
+        << ""
+        << ""
+        << int(QXmppRosterIq::Item::None)
+        << true;
+    QTest::newRow("from")
+        << QByteArray(R"(<item jid="foo@example.com" subscription="from"/>)")
+        << ""
+        << ""
+        << int(QXmppRosterIq::Item::From)
+        << false;
+    QTest::newRow("to")
+        << QByteArray(R"(<item jid="foo@example.com" subscription="to"/>)")
+        << ""
+        << ""
+        << int(QXmppRosterIq::Item::To)
+        << false;
+    QTest::newRow("both")
+        << QByteArray(R"(<item jid="foo@example.com" subscription="both"/>)")
+        << ""
+        << ""
+        << int(QXmppRosterIq::Item::Both)
+        << false;
+    QTest::newRow("remove")
+        << QByteArray(R"(<item jid="foo@example.com" subscription="remove"/>)")
+        << ""
+        << ""
+        << int(QXmppRosterIq::Item::Remove)
+        << false;
+    QTest::newRow("notset")
+        << QByteArray("<item jid=\"foo@example.com\"/>")
+        << ""
+        << ""
+        << int(QXmppRosterIq::Item::NotSet)
+        << false;
+
+    QTest::newRow("ask-subscribe")
+        << QByteArray("<item jid=\"foo@example.com\" ask=\"subscribe\"/>")
+        << ""
+        << "subscribe"
+        << int(QXmppRosterIq::Item::NotSet)
+        << false;
+    QTest::newRow("ask-unsubscribe")
+        << QByteArray("<item jid=\"foo@example.com\" ask=\"unsubscribe\"/>")
+        << ""
+        << "unsubscribe"
+        << int(QXmppRosterIq::Item::NotSet)
+        << false;
+
+    QTest::newRow("name")
+        << QByteArray(R"(<item jid="foo@example.com" name="foo bar"/>)")
+        << "foo bar"
+        << ""
+        << int(QXmppRosterIq::Item::NotSet)
+        << false;
+}
+
+void tst_QXmppRosterIq::rosterItem()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(QString, name);
+    QFETCH(QString, subscriptionStatus);
+    QFETCH(int, subscriptionType);
+    QFETCH(bool, approved);
+
+    QXmppRosterIq::Item item;
+    parsePacket(item, xml);
+    QCOMPARE(item.bareJid(), QLatin1String("foo@example.com"));
+    QCOMPARE(item.groups(), QSet<QString>());
+    QCOMPARE(item.name(), name);
+    QCOMPARE(item.subscriptionStatus(), subscriptionStatus);
+    QCOMPARE(int(item.subscriptionType()), subscriptionType);
+    QCOMPARE(item.isApproved(), approved);
+    serializePacket(item, xml);
+
+    item = QXmppRosterIq::Item();
+    item.setBareJid("foo@example.com");
+    item.setName(name);
+    item.setSubscriptionStatus(subscriptionStatus);
+    item.setSubscriptionType(QXmppRosterIq::Item::SubscriptionType(subscriptionType));
+    item.setIsApproved(approved);
+    serializePacket(item, xml);
+}
+
+void tst_QXmppRosterIq::rosterApproved_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("approved");
+
+    QTest::newRow("true") << QByteArray(R"(<item jid="foo@example.com" approved="true"/>)") << true;
+    QTest::newRow("1") << QByteArray(R"(<item jid="foo@example.com" approved="1"/>)") << true;
+    QTest::newRow("false") << QByteArray(R"(<item jid="foo@example.com" approved="false"/>)") << false;
+    QTest::newRow("0") << QByteArray(R"(<item jid="foo@example.com" approved="0"/>)") << false;
+    QTest::newRow("empty") << QByteArray(R"(<item jid="foo@example.com"/>)") << false;
+}
+
+void tst_QXmppRosterIq::rosterApproved()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, approved);
+
+    QXmppRosterIq::Item item;
+    parsePacket(item, xml);
+    QCOMPARE(item.isApproved(), approved);
+}
+
+void tst_QXmppRosterIq::rosterVersion_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<QString>("version");
+
+    QTest::newRow("noversion")
+        << QByteArray(R"(<iq id="woodyisacat" to="woody@zam.tw/cat" type="result"><query xmlns="jabber:iq:roster"/></iq>)")
+        << "";
+
+    QTest::newRow("version")
+        << QByteArray(R"(<iq id="woodyisacat" to="woody@zam.tw/cat" type="result"><query xmlns="jabber:iq:roster" ver="3345678"/></iq>)")
+        << "3345678";
+}
+
+void tst_QXmppRosterIq::rosterVersion()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(QString, version);
+
+    QXmppRosterIq iq;
+    parsePacket(iq, xml);
+    QCOMPARE(iq.versionOpt().value_or(QString()), version);
+    serializePacket(iq, xml);
+}
+
+void tst_QXmppRosterIq::rosterMixAnnotate()
+{
+    const QByteArray xml(
+        "<iq id='1' from=\"juliet@example.com/balcony\" "
+        "type=\"get\">"
+        "<query xmlns=\"jabber:iq:roster\">"
+        "<annotate xmlns=\"urn:xmpp:mix:roster:0\"/>"
+        "</query>"
+        "</iq>");
+
+    QXmppRosterIq iq;
+    parsePacket(iq, xml);
+    QCOMPARE(iq.mixAnnotate(), true);
+    serializePacket(iq, xml);
+
+    iq.setMixAnnotate(false);
+    QCOMPARE(iq.mixAnnotate(), false);
+}
+
+void tst_QXmppRosterIq::rosterMixChannel()
+{
+    const QByteArray xml(
+        "<item jid=\"balcony@example.net\">"
+        "<channel xmlns=\"urn:xmpp:mix:roster:0\" participant-id=\"123456\"/>"
+        "</item>");
+
+    QXmppRosterIq::Item item;
+    parsePacket(item, xml);
+    QCOMPARE(item.isMixChannel(), true);
+    QCOMPARE(item.mixParticipantId(), u"123456"_s);
+    serializePacket(item, xml);
+
+    item.setIsMixChannel(false);
+    QCOMPARE(item.isMixChannel(), false);
+    item.setMixParticipantId("23a7n");
+    QCOMPARE(item.mixParticipantId(), u"23a7n"_s);
+}
+
+}  // namespace RosterIq
+
+QXMPP_TEST_MAIN(Client::tst_QXmppClient, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq)
 
 #include "tst_QXmppClientBase.moc"
