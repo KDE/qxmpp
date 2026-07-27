@@ -1,20 +1,42 @@
+// SPDX-FileCopyrightText: 2015 Jeremy Lainé <jeremy.laine@m4x.org>
 // SPDX-FileCopyrightText: 2019 Yury Gubich <blue@macaw.me>
 // SPDX-FileCopyrightText: 2020 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+// Combined test binary for the file sharing tests. Merging the HTTP upload,
+// transfer manager and file encryption tests into one translation unit parses
+// the shared Qt/QXmpp headers once instead of once per file. Each original
+// test keeps its own namespace; main() runs them in turn.
+//
+// Encrypted file sharing requires OpenSSL, so those tests are guarded by
+// WITH_ENCRYPTION.
+
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppHttpUploadManager.h"
+#include "QXmppServer.h"
+#include "QXmppTransferManager.h"
 #include "QXmppUploadRequestManager.h"
+
+#ifdef WITH_ENCRYPTION
+#include "QXmppFileEncryption.h"
+#endif
 
 #include "Algorithms.h"
 #include "IntegrationTesting.h"
 #include "TestClient.h"
+#include "TestPasswordChecker.h"
 #include "util.h"
 
+#include <QBuffer>
+#include <QCoreApplication>
 #include <QMimeDatabase>
+#include <QObject>
+#include <QTimer>
+
+namespace HttpUpload {
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -467,5 +489,309 @@ void tst_QXmppHttpUploadManager::testUpload()
     qDebug() << "Uploaded file to" << url.toDisplayString();
 }
 
-QTEST_MAIN(tst_QXmppHttpUploadManager)
-#include "tst_QXmppHttpUploadManager.moc"
+}  // namespace HttpUpload
+
+// ============================================================
+
+namespace Transfer {
+
+class tst_QXmppTransferManager : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void init();
+    Q_SLOT void testSendFile_data();
+    Q_SLOT void testSendFile();
+
+    Q_SLOT void acceptFile(QXmppTransferJob *job);
+
+    QBuffer receiverBuffer;
+    QXmppTransferJob *receiverJob;
+};
+
+void tst_QXmppTransferManager::init()
+{
+    receiverBuffer.close();
+    receiverBuffer.setData(QByteArray());
+    receiverJob = nullptr;
+}
+
+void tst_QXmppTransferManager::acceptFile(QXmppTransferJob *job)
+{
+    receiverJob = job;
+    receiverBuffer.open(QIODevice::WriteOnly);
+    job->accept(&receiverBuffer);
+}
+
+void tst_QXmppTransferManager::testSendFile_data()
+{
+    QTest::addColumn<QXmppTransferJob::Method>("senderMethods");
+    QTest::addColumn<QXmppTransferJob::Method>("receiverMethods");
+    QTest::addColumn<bool>("works");
+
+#ifdef Q_OS_WIN
+    // On Windows CI, SOCKS transfers fail due to network interface issues in VM environments.
+    // The discovered IP addresses may not be reachable from within the same machine.
+    // Only test InBand transfers on Windows.
+    QTest::newRow("inband - any") << QXmppTransferJob::InBandMethod << QXmppTransferJob::AnyMethod << true;
+    QTest::newRow("inband - inband") << QXmppTransferJob::InBandMethod << QXmppTransferJob::InBandMethod << true;
+    QTest::newRow("inband - socks") << QXmppTransferJob::InBandMethod << QXmppTransferJob::SocksMethod << false;
+#else
+    QTest::newRow("any - any") << QXmppTransferJob::AnyMethod << QXmppTransferJob::AnyMethod << true;
+    QTest::newRow("any - inband") << QXmppTransferJob::AnyMethod << QXmppTransferJob::InBandMethod << true;
+    QTest::newRow("any - socks") << QXmppTransferJob::AnyMethod << QXmppTransferJob::SocksMethod << true;
+
+    QTest::newRow("inband - any") << QXmppTransferJob::InBandMethod << QXmppTransferJob::AnyMethod << true;
+    QTest::newRow("inband - inband") << QXmppTransferJob::InBandMethod << QXmppTransferJob::InBandMethod << true;
+    QTest::newRow("inband - socks") << QXmppTransferJob::InBandMethod << QXmppTransferJob::SocksMethod << false;
+
+    QTest::newRow("socks - any") << QXmppTransferJob::SocksMethod << QXmppTransferJob::AnyMethod << true;
+    QTest::newRow("socks - inband") << QXmppTransferJob::SocksMethod << QXmppTransferJob::InBandMethod << false;
+    QTest::newRow("socks - socks") << QXmppTransferJob::SocksMethod << QXmppTransferJob::SocksMethod << true;
+#endif
+}
+
+void tst_QXmppTransferManager::testSendFile()
+{
+    QFETCH(QXmppTransferJob::Method, senderMethods);
+    QFETCH(QXmppTransferJob::Method, receiverMethods);
+    QFETCH(bool, works);
+
+    const QString testDomain("localhost");
+    const QHostAddress testHost(QHostAddress::LocalHost);
+    const quint16 testPort = 12003;
+
+    QXmppLogger logger;
+    logger.setLoggingType(QXmppLogger::StdoutLogging);
+
+    // prepare server
+    TestPasswordChecker passwordChecker;
+    passwordChecker.addCredentials("sender", "testpwd");
+    passwordChecker.addCredentials("receiver", "testpwd");
+
+    QXmppServer server;
+    server.setDomain(testDomain);
+    server.setLogger(&logger);
+    server.setPasswordChecker(&passwordChecker);
+    server.listenForClients(testHost, testPort);
+
+    // prepare sender
+    TestClient sender;
+    auto *senderManager = new QXmppTransferManager;
+    senderManager->setSupportedMethods(senderMethods);
+    sender.addExtension(senderManager);
+    sender.setLogger(&logger);
+
+    QXmppConfiguration config;
+    config.setDomain(testDomain);
+    config.setHost(testHost.toString());
+    config.setPort(testPort);
+    config.setUser("sender");
+    config.setPassword("testpwd");
+    sender.connectToServer(config);
+    sender.waitForConnect();
+    QCOMPARE(sender.isConnected(), true);
+
+    // prepare receiver
+    TestClient receiver;
+    auto *receiverManager = new QXmppTransferManager;
+    receiverManager->setSupportedMethods(receiverMethods);
+    connect(receiverManager, &QXmppTransferManager::fileReceived,
+            this, &tst_QXmppTransferManager::acceptFile);
+    receiver.addExtension(receiverManager);
+    receiver.setLogger(&logger);
+
+    config.setUser("receiver");
+    config.setPassword("testpwd");
+    receiver.connectToServer(config);
+    receiver.waitForConnect();
+    QCOMPARE(receiver.isConnected(), true);
+
+    // send file
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+
+    QXmppTransferJob *senderJob = senderManager->sendFile(receiver.configuration().jid(), ":/test.svg");
+    QVERIFY(senderJob);
+    QCOMPARE(senderJob->localFileUrl(), QUrl::fromLocalFile(":/test.svg"));
+    connect(senderJob, &QXmppTransferJob::finished, &loop, &QEventLoop::quit);
+    timeout.start(10000);
+    loop.exec();
+    QVERIFY2(senderJob->state() == QXmppTransferJob::FinishedState, "Sender job timed out");
+
+    if (works) {
+        QCOMPARE(senderJob->error(), QXmppTransferJob::NoError);
+
+        // finish receiving file
+        QVERIFY(receiverJob);
+        connect(receiverJob, &QXmppTransferJob::finished, &loop, &QEventLoop::quit);
+        timeout.start(10000);
+        loop.exec();
+        QVERIFY2(receiverJob->state() == QXmppTransferJob::FinishedState, "Receiver job timed out");
+
+        QCOMPARE(receiverJob->error(), QXmppTransferJob::NoError);
+
+        // check received file
+        QFile expectedFile(":/test.svg");
+        QVERIFY(expectedFile.open(QIODevice::ReadOnly));
+        const QByteArray expectedData = expectedFile.readAll();
+        QCOMPARE(receiverBuffer.data(), expectedData);
+    } else {
+        QCOMPARE(senderJob->error(), QXmppTransferJob::AbortError);
+
+        QVERIFY(!receiverJob);
+
+        QCOMPARE(receiverBuffer.data(), QByteArray());
+    }
+}
+
+}  // namespace Transfer
+
+// ============================================================
+
+#ifdef WITH_ENCRYPTION
+
+namespace FileEncryption {
+
+using namespace QXmpp;
+using namespace QXmpp::Private;
+using namespace QXmpp::Private::Encryption;
+
+class tst_QXmppFileEncryption : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void basic();
+    Q_SLOT void deviceEncrypt();
+    Q_SLOT void deviceDecrypt_data();
+    Q_SLOT void deviceDecrypt();
+    Q_SLOT void paddingSize();
+};
+
+void tst_QXmppFileEncryption::basic()
+{
+    QByteArray data =
+        "This is an example text message";
+    QByteArray key = "12345678901234567890123456789012";
+    QByteArray iv = "data";
+
+    auto encrypted = process(data, Aes256CbcPkcs7, Encode, key, iv);
+    qDebug() << data.size() << "->" << encrypted.size();
+    auto decrypted = process(encrypted, Aes256CbcPkcs7, Decode, key, iv);
+    QCOMPARE(decrypted, data);
+}
+
+void tst_QXmppFileEncryption::deviceEncrypt()
+{
+    QByteArray data =
+        "v2qtI8tx5DxM6axUAZ+xsEwrtb0VYafAPlMWqpVMG+5PBE5wbZ7MZhDUEIdFkxchOIJqt";
+    QByteArray key = "12345678901234567890123456789012";
+    QByteArray iv = "12345678901234567890123456789012";
+
+    auto buffer = std::make_unique<QBuffer>(&data);
+    buffer->open(QIODevice::ReadOnly);
+
+    EncryptionDevice encDev(std::move(buffer), Aes256CbcPkcs7, key, iv);
+
+    auto encrypted = encDev.readAll();
+
+    auto decrypted = process(encrypted, Aes256CbcPkcs7, Decode, key, iv);
+    QCOMPARE(decrypted, data);
+}
+
+void tst_QXmppFileEncryption::deviceDecrypt_data()
+{
+    QTest::addColumn<int>("cipherId");
+    QTest::addColumn<QByteArray>("key");
+
+    QTest::newRow("aes128-gcm")
+        << int(Aes128GcmNoPad)
+        << QByteArray("1234567890123456");
+    QTest::newRow("aes256-gcm")
+        << int(Aes256GcmNoPad)
+        << QByteArray("12345678901234567890123456789012");
+    QTest::newRow("aes256-cbc-pkcs7")
+        << int(Aes256CbcPkcs7)
+        << QByteArray("12345678901234567890123456789012");
+}
+
+void tst_QXmppFileEncryption::deviceDecrypt()
+{
+    QFETCH(int, cipherId);
+    QFETCH(QByteArray, key);
+    auto cipher = Cipher(cipherId);
+
+    QByteArray data =
+        "v2qtI8tx5DxM6axUAZ+xsEwrtb0VYafAPlMWqpVMG+5PBE5wbZ7MZhDUEIdFkxchOIJqt";
+    QByteArray iv = "12345678901234567890123456789012";
+
+    // setup input io device
+    auto buffer = std::make_unique<QBuffer>(&data);
+    buffer->open(QIODevice::ReadOnly);
+
+    // encrypt data
+    EncryptionDevice encDevice(std::move(buffer), cipher, key, iv);
+    auto encrypted = encDevice.readAll();
+    QVERIFY(!encrypted.isEmpty());
+
+    // compare with process() function
+    QCOMPARE(encrypted, process(data, cipher, Encode, key, iv));
+
+    qDebug() << "Encrypted:" << data.size() << "->" << encrypted.size();
+
+    // decrypt data with decryption device
+    QByteArray decrypted;
+    buffer = std::make_unique<QBuffer>(&decrypted);
+    buffer->open(QIODevice::WriteOnly);
+
+    DecryptionDevice decDev(std::move(buffer), cipher, key, iv);
+    decDev.write(encrypted);
+    decDev.close();
+
+    qDebug() << "Decrypted:" << encrypted.size() << "->" << decrypted.size();
+    QCOMPARE(decrypted, process(encrypted, cipher, Decode, key, iv));
+    QCOMPARE(decrypted, data);
+}
+
+void tst_QXmppFileEncryption::paddingSize()
+{
+    constexpr auto MAX_BYTES_TEST = 1024;
+
+    QByteArray key = "12345678901234567890123456789012";
+    QByteArray iv = "12345678901234567890123456789012";
+
+    for (int i = 1; i <= MAX_BYTES_TEST; i++) {
+        QByteArray data(i, 'a');
+        auto buffer = std::make_unique<QBuffer>(&data);
+        buffer->open(QIODevice::ReadOnly);
+
+        EncryptionDevice encDev(std::move(buffer), Aes256CbcPkcs7, key, iv);
+        auto reportedSize = encDev.size();
+        auto encryptedData = encDev.readAll();
+
+        QCOMPARE(reportedSize, encryptedData.size());
+
+        auto decryptedData = process(encryptedData, Aes256CbcPkcs7, Decode, key, iv);
+        QCOMPARE(decryptedData, data);
+    }
+}
+
+}  // namespace FileEncryption
+
+#endif  // WITH_ENCRYPTION
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication app(argc, argv);
+    int status = runTests<HttpUpload::tst_QXmppHttpUploadManager, Transfer::tst_QXmppTransferManager>(argc, argv);
+#ifdef WITH_ENCRYPTION
+    status |= runTests<FileEncryption::tst_QXmppFileEncryption>(argc, argv);
+#endif
+    return status;
+}
+
+#include "tst_QXmppFileSharing.moc"

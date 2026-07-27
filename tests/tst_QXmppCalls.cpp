@@ -1,21 +1,47 @@
+// SPDX-FileCopyrightText: 2015 Jeremy Lainé <jeremy.laine@m4x.org>
 // SPDX-FileCopyrightText: 2023 Tibor Csötönyi <work@taibsu.de>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+// Combined test binary for the managers involved in setting up calls. Merging
+// the Jingle message initiation, call invite, call and external service
+// discovery manager tests into one translation unit parses the shared Qt/QXmpp
+// headers once instead of once per file. Each original test keeps its own
+// namespace; main() runs them in turn.
+//
+// The call manager only exists with GStreamer support, so its tests are
+// guarded by WITH_GSTREAMER.
+
+#include "QXmppCallInviteManager.h"
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
+#include "QXmppExternalServiceDiscoveryManager.h"
 #include "QXmppJingleMessageInitiationManager.h"
 #include "QXmppMessage.h"
+#include "QXmppServer.h"
 #include "QXmppUtils.h"
 
 #include "IntegrationTesting.h"
 #include "TestClient.h"
+#include "TestPasswordChecker.h"
 #include "util.h"
 
+#ifdef WITH_GSTREAMER
+#include "QXmppCall.h"
+#include "QXmppCallManager.h"
+
+#include <gst/gst.h>
+#endif
+
+#include <QBuffer>
+#include <QCoreApplication>
+#include <QObject>
 #include <QTest>
+#include <QTimer>
 
 using Jmi = QXmppJingleMessageInitiation;
 using JmiType = QXmppJingleMessageInitiationElement::Type;
-using Result = QXmppJingleMessageInitiation::Result;
+using JmiResult = QXmppJingleMessageInitiation::Result;
 
 constexpr QStringView ns_jingle_rtp = u"urn:xmpp:jingle:apps:rtp:1";
 
@@ -571,7 +597,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
     jmiElement.setType(JmiType::Reject);
     jmiElement.setReason(reason);
 
-    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [jmiElement](const Result &result) {
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [jmiElement](const JmiResult &result) {
         using ResultType = QXmppJingleMessageInitiation::Rejected;
 
         QVERIFY(std::holds_alternative<ResultType>(result));
@@ -596,7 +622,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
     jmiElement.setType(JmiType::Retract);
     jmiElement.setReason(reason);
 
-    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [jmiElement](const Result &result) {
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [jmiElement](const JmiResult &result) {
         using ResultType = QXmppJingleMessageInitiation::Retracted;
 
         QVERIFY(std::holds_alternative<ResultType>(result));
@@ -622,7 +648,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleExistingJmi()
     jmiElement.setReason(reason);
     jmiElement.setMigratedTo("ca3cf894-5325-482f-a412-a6e9f832298d");
 
-    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [jmiElement](const Result &result) {
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [jmiElement](const JmiResult &result) {
         using ResultType = QXmppJingleMessageInitiation::Finished;
 
         QVERIFY(std::holds_alternative<ResultType>(result));
@@ -783,7 +809,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedRejected()
 
     auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "juliet@capulet.example");
 
-    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const Result &result) {
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const JmiResult &result) {
         using ResultType = QXmppJingleMessageInitiation::Rejected;
 
         QVERIFY(std::holds_alternative<ResultType>(result));
@@ -816,7 +842,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedRetracted()
 
     auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "romeo@montague.example");
 
-    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const Result &result) {
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const JmiResult &result) {
         using ResultType = QXmppJingleMessageInitiation::Retracted;
 
         QVERIFY(std::holds_alternative<ResultType>(result));
@@ -850,7 +876,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedFinished()
 
     auto jmi = m_manager.addJmi("ca3cf894-5325-482f-a412-a6e9f832298d", "romeo@montague.example");
 
-    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const Result &result) {
+    connect(jmi.get(), &QXmppJingleMessageInitiation::closed, this, [](const JmiResult &result) {
         using ResultType = QXmppJingleMessageInitiation::Finished;
 
         QVERIFY(std::holds_alternative<ResultType>(result));
@@ -887,5 +913,833 @@ void tst_QXmppJingleMessageInitiationManager::testHandleMessageClosedFinished()
     m_manager.clearAll();
 }
 
-QTEST_MAIN(tst_QXmppJingleMessageInitiationManager)
-#include "tst_QXmppJingleMessageInitiationManager.moc"
+// ============================================================
+
+using CallInviteType = QXmppCallInviteElement::Type;
+using CallInviteResult = QXmppCallInvite::Result;
+
+class tst_QXmppCallInviteManager : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void initTestCase();
+
+    Q_SLOT void testClear();
+    Q_SLOT void testClearAll();
+
+    Q_SLOT void testAccept();
+    Q_SLOT void testReject();
+    Q_SLOT void testRetract();
+    Q_SLOT void testLeft();
+
+    Q_SLOT void testInvite();
+    Q_SLOT void testSendMessage();
+
+    Q_SLOT void testHandleExistingCallInvite();
+    Q_SLOT void testHandleCallInviteElement();
+    Q_SLOT void testHandleMessage_data();
+    Q_SLOT void testHandleMessage();
+    Q_SLOT void testHandleMessageAccepted();
+    Q_SLOT void testHandleMessageRejected();
+    Q_SLOT void testHandleMessageRetracted();
+    Q_SLOT void testHandleMessageLeft();
+
+    QXmppClient m_client;
+    QXmppLogger m_logger;
+    QXmppCallInviteManager m_manager;
+};
+
+void tst_QXmppCallInviteManager::initTestCase()
+{
+    m_client.addExtension(&m_manager);
+
+    m_logger.setLoggingType(QXmppLogger::SignalLogging);
+    m_client.setLogger(&m_logger);
+
+    m_client.connectToServer(IntegrationTests::clientConfiguration());
+    m_client.configuration().setJid("mixer@example.com");
+
+    qRegisterMetaType<QXmppCallInvite::Result>();
+    qRegisterMetaType<std::shared_ptr<QXmppCallInvite>>();
+}
+
+void tst_QXmppCallInviteManager::testClear()
+{
+    QCOMPARE(m_manager.callInvites().size(), 0);
+    auto callInvite1 { m_manager.addCallInvite("test1") };
+    auto callInvite2 { m_manager.addCallInvite("test2") };
+    QCOMPARE(m_manager.callInvites().size(), 2);
+
+    m_manager.clear(callInvite1);
+    m_manager.clear(callInvite2);
+    QCOMPARE(m_manager.callInvites().size(), 0);
+}
+
+void tst_QXmppCallInviteManager::testClearAll()
+{
+    QCOMPARE(m_manager.callInvites().size(), 0);
+    m_manager.addCallInvite("test1");
+    m_manager.addCallInvite("test2");
+    m_manager.addCallInvite("test3");
+    m_manager.addCallInvite("test4");
+    m_manager.addCallInvite("test5");
+    QCOMPARE(m_manager.callInvites().size(), 5);
+
+    m_manager.clearAll();
+    QCOMPARE(m_manager.callInvites().size(), 0);
+}
+
+void tst_QXmppCallInviteManager::testAccept()
+{
+    auto callInvite { m_manager.addCallInvite("maraTestAccept@example.com") };
+    callInvite->setId("id1_testAccept");
+
+    connect(&m_logger, &QXmppLogger::message, this, [callInviteCallPartnerJid = callInvite->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            QXmppMessage message;
+            parsePacket(message, text.toUtf8());
+
+            if (message.to() == callInviteCallPartnerJid) {
+                QVERIFY(message.callInviteElement());
+                QCOMPARE(message.callInviteElement()->type(), CallInviteType::Accept);
+            }
+        }
+    });
+
+    auto future = callInvite->accept();
+
+    while (!future.isFinished()) {
+        QCoreApplication::processEvents();
+    }
+
+    QVERIFY(future.isFinished());
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testReject()
+{
+    auto callInvite { m_manager.addCallInvite("maraTestReject@example.com") };
+    callInvite->setId("id1_testReject");
+
+    connect(&m_logger, &QXmppLogger::message, this, [callInviteCallPartnerJid = callInvite->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            QXmppMessage message;
+            parsePacket(message, text.toUtf8());
+
+            if (message.to() == callInviteCallPartnerJid) {
+                QVERIFY(message.callInviteElement());
+                QCOMPARE(message.callInviteElement()->id(), u"id1_testReject"_s);
+                QCOMPARE(message.callInviteElement()->type(), CallInviteType::Reject);
+            }
+        }
+    });
+
+    auto future = callInvite->reject();
+
+    while (!future.isFinished()) {
+        QCoreApplication::processEvents();
+    }
+
+    QVERIFY(future.isFinished());
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testRetract()
+{
+    auto callInvite { m_manager.addCallInvite("maraTestRetract@example.com") };
+    callInvite->setId("id1_testRetract");
+
+    connect(&m_logger, &QXmppLogger::message, this, [callInviteCallPartnerJid = callInvite->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            QXmppMessage message;
+            parsePacket(message, text.toUtf8());
+
+            if (message.to() == callInviteCallPartnerJid) {
+                QVERIFY(message.callInviteElement());
+                QCOMPARE(message.callInviteElement()->id(), u"id1_testRetract"_s);
+                QCOMPARE(message.callInviteElement()->type(), CallInviteType::Retract);
+            }
+        }
+    });
+
+    auto future = callInvite->retract();
+
+    while (!future.isFinished()) {
+        QCoreApplication::processEvents();
+    }
+
+    QVERIFY(future.isFinished());
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testLeft()
+{
+    auto callInvite { m_manager.addCallInvite("maraTestLeft@example.com") };
+    callInvite->setId("id1_testLeft");
+
+    connect(&m_logger, &QXmppLogger::message, this, [callInviteCallPartnerJid = callInvite->callPartnerJid()](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            QXmppMessage message;
+            parsePacket(message, text.toUtf8());
+
+            if (message.to() == callInviteCallPartnerJid) {
+                QVERIFY(message.callInviteElement());
+                QCOMPARE(message.callInviteElement()->id(), u"id1_testLeft"_s);
+                QCOMPARE(message.callInviteElement()->type(), CallInviteType::Left);
+            }
+        }
+    });
+
+    auto future = callInvite->leave();
+
+    while (!future.isFinished()) {
+        QCoreApplication::processEvents();
+    }
+
+    QVERIFY(future.isFinished());
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testInvite()
+{
+    QString jid { "maraTestInvite@example.com" };
+    bool video { true };
+    bool audio { false };
+
+    QXmppCallInviteElement::Jingle jingle;
+    jingle.jid = "mixer@example.com/uuid";
+    jingle.sid = "sid1";
+
+    QList<QXmppCallInviteElement::External> external;
+    external.append({ "https://example.com/uuid" });
+    external.append({ "tel:+12345678" });
+
+    connect(&m_logger, &QXmppLogger::message, this, [&, jid, video, audio, jingle, external](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            QXmppMessage message;
+            parsePacket(message, text.toUtf8());
+
+            if (message.to() == jid) {
+                const auto &callInviteElement { message.callInviteElement() };
+                QVERIFY(callInviteElement);
+
+                QCOMPARE(callInviteElement->type(), CallInviteType::Invite);
+                QVERIFY(!callInviteElement->id().isEmpty());
+                QCOMPARE(callInviteElement->video(), video);
+                QCOMPARE(callInviteElement->audio(), audio);
+                QVERIFY(callInviteElement->jingle());
+                QCOMPARE(callInviteElement->jingle().value(), jingle);
+                QVERIFY(callInviteElement->external());
+                QCOMPARE(callInviteElement->external().value(), external);
+            }
+        }
+    });
+
+    auto future = m_manager.invite(jid, audio, video, jingle, external);
+
+    while (!future.isFinished()) {
+        QCoreApplication::processEvents();
+    }
+
+    QVERIFY(future.isFinished());
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testSendMessage()
+{
+    QString jid { "maraSendMessage@example.com" };
+
+    QXmppCallInviteElement callInviteElement;
+    callInviteElement.setType(CallInviteType::Invite);
+    callInviteElement.setId(u"id1_testSendMessage"_s);
+
+    connect(&m_logger, &QXmppLogger::message, this, [jid, callInviteElement](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            QXmppMessage message;
+            parsePacket(message, text.toUtf8());
+
+            if (message.to() == jid) {
+                QVERIFY(message.callInviteElement());
+                QCOMPARE(message.callInviteElement()->type(), callInviteElement.type());
+                QCOMPARE(message.callInviteElement()->id(), callInviteElement.id());
+            }
+        }
+    });
+
+    auto future = m_manager.sendMessage(callInviteElement, jid);
+
+    while (!future.isFinished()) {
+        QCoreApplication::processEvents();
+    }
+
+    QVERIFY(future.isFinished());
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testHandleExistingCallInvite()
+{
+    QString callPartnerJid { "maraTestHandleExistingCallInvite@example.com" };
+    QString callInviteId { "id1_testHandleExistingCallInvite" };
+
+    auto callInvite { m_manager.addCallInvite(callPartnerJid) };
+    callInvite->setId(callInviteId);
+
+    QXmppCallInviteElement callInviteElement;
+    callInviteElement.setId(callInviteId);
+
+    // --- closed: rejected ---
+
+    callInvite = m_manager.addCallInvite(callPartnerJid);
+    callInvite->setId(callInviteId);
+
+    callInviteElement.setType(CallInviteType::Reject);
+
+    connect(callInvite.get(), &QXmppCallInvite::closed, this, [callInviteElement](const CallInviteResult &result) {
+        QVERIFY(std::holds_alternative<QXmppCallInvite::Rejected>(result));
+    });
+
+    QVERIFY(m_manager.handleExistingCallInvite(callInvite, callInviteElement, callPartnerJid));
+    m_manager.clearAll();
+
+    // --- closed: retracted ---
+
+    callInvite = m_manager.addCallInvite(callPartnerJid);
+    callInvite->setId(callInviteId);
+
+    callInviteElement.setType(CallInviteType::Retract);
+
+    connect(callInvite.get(), &QXmppCallInvite::closed, this, [callInviteElement](const CallInviteResult &result) {
+        QVERIFY(std::holds_alternative<QXmppCallInvite::Retracted>(result));
+    });
+
+    QVERIFY(m_manager.handleExistingCallInvite(callInvite, callInviteElement, callPartnerJid));
+    m_manager.clearAll();
+
+    // --- closed: left ---
+
+    callInvite = m_manager.addCallInvite(callPartnerJid);
+    callInvite->setId(callInviteId);
+
+    callInviteElement.setType(CallInviteType::Left);
+
+    connect(callInvite.get(), &QXmppCallInvite::closed, this, [callInviteElement](const CallInviteResult &result) {
+        QVERIFY(std::holds_alternative<QXmppCallInvite::Left>(result));
+    });
+
+    QVERIFY(m_manager.handleExistingCallInvite(callInvite, callInviteElement, callPartnerJid));
+    m_manager.clearAll();
+
+    // --- none ---
+
+    callInvite = m_manager.addCallInvite(callPartnerJid);
+    callInvite->setId(callInviteId);
+
+    callInviteElement.setType(CallInviteType::None);
+
+    QCOMPARE(m_manager.handleExistingCallInvite(callInvite, callInviteElement, callPartnerJid), false);
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testHandleCallInviteElement()
+{
+    QString callPartnerJid { "maraTestHandleCallInviteElement@example.com/orchard" };
+    QString callInviteId { "id1_HandleCallInviteElement" };
+
+    // case 1: no Call Invite element found in Call Invites vector and callInviteElement is not an invite element
+    QXmppCallInviteElement callInviteElement;
+    callInviteElement.setType(CallInviteType::None);
+
+    QCOMPARE(m_manager.handleCallInviteElement(std::move(callInviteElement), {}), false);
+
+    // case 2: no Call Invite found in Call Invites vector and callInviteElement is an invite element
+    callInviteElement = {};
+    callInviteElement.setType(CallInviteType::Invite);
+    callInviteElement.setId(callInviteId);
+
+    QSignalSpy invitedSpy(&m_manager, &QXmppCallInviteManager::invited);
+    QVERIFY(m_manager.handleCallInviteElement(std::move(callInviteElement), callPartnerJid));
+    QCOMPARE(invitedSpy.count(), 1);
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testHandleMessage_data()
+{
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<bool>("isValid");
+
+    QTest::newRow("xmlValid")
+        << QByteArray(
+               "<message id='id1' to='mara@example.com' type='chat'>"
+               "<invite xmlns='urn:xmpp:call-invites:0' video='true'>"
+               "<jingle sid='sid1'/>"
+               "</invite>"
+               "</message>")
+        << true;
+
+    QTest::newRow("xmlValidWithJingleJid")
+        << QByteArray(
+               "<message id='id1' to='mara@example.com' type='chat'>"
+               "<invite xmlns='urn:xmpp:call-invites:0' video='true'>"
+               "<jingle sid='sid1' jid='mixer@example.com/uuid'/>"
+               "</invite>"
+               "</message>")
+        << true;
+
+    QTest::newRow("xmlValidWithExternal")
+        << QByteArray(
+               "<message id='id1' to='mara@example.com' type='chat'>"
+               "<invite xmlns='urn:xmpp:call-invites:0' video='true'>"
+               "<jingle sid='sid1'/>"
+               "<external uri='https://example.com/uuid'/>"
+               "<external uri='tel:+12345678'/>"
+               "</invite>"
+               "</message>")
+        << true;
+
+    QTest::newRow("xmlInvalidNoJingle")
+        << QByteArray(
+               "<message id='id1' to='mara@example.com' type='chat'>"
+               "<invite xmlns='urn:xmpp:call-invites:0' video='true'/>"
+               "</message>")
+        << true;
+
+    QTest::newRow("xmlInvalidTypeNotChat")
+        << QByteArray(
+               "<message id='id1' to='mara@example.com' type='normal'>"
+               "<invite xmlns='urn:xmpp:call-invites:0' video='true'>"
+               "<jingle sid='sid1'/>"
+               "</invite>"
+               "</message>")
+        << false;
+
+    QTest::newRow("xmlInvalidNoCallInviteElement")
+        << QByteArray("<message id='id1' to='mara@example.com' type='chat'/>")
+        << false;
+}
+
+void tst_QXmppCallInviteManager::testHandleMessage()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(bool, isValid);
+
+    QXmppMessage message;
+
+    parsePacket(message, xml);
+    QCOMPARE(m_manager.handleMessage(message), isValid);
+    serializePacket(message, xml);
+
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testHandleMessageAccepted()
+{
+    QXmppMessage message;
+    QByteArray xmlAccept {
+        "<message to='maraTestHandleMessageAccepted@example.com' type='chat'>"
+        "<accept id='id1_testHandleMessageAccepted' xmlns='urn:xmpp:call-invites:0'>"
+        "<jingle sid='sid1' jid='mixer@example.com/uuid'/>"
+        "</accept>"
+        "</message>"
+    };
+
+    auto callInvite { m_manager.addCallInvite("mixer@example.com") };
+    callInvite->setId("id1_testHandleMessageAccepted");
+
+    QSignalSpy acceptedSpy(callInvite.get(), &QXmppCallInvite::accepted);
+
+    message.parse(xmlToDom(xmlAccept));
+
+    QVERIFY(m_manager.handleMessage(message));
+    QCOMPARE(acceptedSpy.count(), 1);
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testHandleMessageRejected()
+{
+    QXmppMessage message;
+    QByteArray xmlReject {
+        "<message to='maraTestHandleMessageRejected@example.com' type='chat'>"
+        "<reject xmlns='urn:xmpp:call-invites:0' id='id1_testHandleMessageRejected'/>"
+        "</message>"
+    };
+
+    auto callInvite { m_manager.addCallInvite("mixer@example.com") };
+    callInvite->setId("id1_testHandleMessageRejected");
+
+    connect(callInvite.get(), &QXmppCallInvite::closed, this, [](const CallInviteResult &result) {
+        QVERIFY(std::holds_alternative<QXmppCallInvite::Rejected>(result));
+    });
+
+    message.parse(xmlToDom(xmlReject));
+
+    QVERIFY(m_manager.handleMessage(message));
+    serializePacket(message, xmlReject);
+
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testHandleMessageRetracted()
+{
+    QXmppMessage message;
+    QByteArray xmlRetract {
+        "<message to='maraTestHandleMessageRetracted@example.com' type='chat'>"
+        "<retract xmlns='urn:xmpp:call-invites:0' id='id1_testHandleMessageRetracted'/>"
+        "</message>"
+    };
+
+    auto callInvite { m_manager.addCallInvite("mixer@example.com") };
+    callInvite->setId("id1_testHandleMessageRetracted");
+
+    connect(callInvite.get(), &QXmppCallInvite::closed, this, [](const CallInviteResult &result) {
+        QVERIFY(std::holds_alternative<QXmppCallInvite::Retracted>(result));
+    });
+
+    message.parse(xmlToDom(xmlRetract));
+
+    QVERIFY(m_manager.handleMessage(message));
+    serializePacket(message, xmlRetract);
+    m_manager.clearAll();
+}
+
+void tst_QXmppCallInviteManager::testHandleMessageLeft()
+{
+    QXmppMessage message;
+    QByteArray xmlLeft {
+        "<message to='maraTestHandleMessageLeft@example.com' type='chat'>"
+        "<left xmlns='urn:xmpp:call-invites:0' id='id1_testHandleMessageLeft'/>"
+        "</message>"
+    };
+
+    auto callInvite { m_manager.addCallInvite("mixer@example.com") };
+    callInvite->setId("id1_testHandleMessageLeft");
+
+    connect(callInvite.get(), &QXmppCallInvite::closed, this, [](const CallInviteResult &result) {
+        QVERIFY(std::holds_alternative<QXmppCallInvite::Left>(result));
+    });
+
+    message.parse(xmlToDom(xmlLeft));
+
+    QVERIFY(m_manager.handleMessage(message));
+    serializePacket(message, xmlLeft);
+    m_manager.clearAll();
+}
+
+// ============================================================
+
+#ifdef WITH_GSTREAMER
+
+using namespace QXmpp::Private;
+using Error = QXmppStanza::Error;
+
+class tst_QXmppCallManager : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void initTestCase();
+    Q_SLOT void callInvalidJid();
+    Q_SLOT void invalidSid();
+    Q_SLOT void senderImpersonation();
+    Q_SLOT void testCall();
+};
+
+void tst_QXmppCallManager::initTestCase()
+{
+    auto *rtpBin = gst_element_factory_make("rtpbin", nullptr);
+    if (!rtpBin) {
+        QSKIP("GStreamer rtpbin element not available (install gstreamer-good plugins)");
+    }
+    gst_object_unref(rtpBin);
+}
+
+void tst_QXmppCallManager::callInvalidJid()
+{
+    TestClient client;
+    client.addNewExtension<QXmppDiscoveryManager>();
+    auto *manager = client.addNewExtension<QXmppCallManager>();
+
+    auto call = manager->call(QString());
+    QCOMPARE(call->state(), QXmppCall::FinishedState);
+    QVERIFY(call->error().has_value());
+
+    call = manager->call("test@localhost/r1");
+    QVERIFY(call);
+    QCOMPARE(call->sid().size(), 36);
+    QCOMPARE(call->jid(), u"test@localhost/r1");
+    QCOMPARE(call->direction(), QXmppCall::OutgoingDirection);
+}
+
+void tst_QXmppCallManager::invalidSid()
+{
+    const auto xml =
+        u"<iq from='romeo@montague.lit/orchard' id='ph37a419' to='juliet@capulet.lit/balcony' type='set'>"
+        "<jingle xmlns='urn:xmpp:jingle:1' action='session-initiate' initiator='romeo@montague.lit/orchard' sid='%1'>"
+        "<content creator='initiator' name='voice'>"
+        "<description xmlns='urn:xmpp:jingle:apps:rtp:1' media='audio'>"
+        "<payload-type id='96' name='speex' clockrate='16000' />"
+        "<payload-type id='97' name='speex' clockrate='8000' />"
+        "<payload-type id='18' name='G729' />"
+        "<payload-type id='0' name='PCMU' clockrate='8000'/>"
+        "<payload-type id='103' name='L16' clockrate='16000' channels='2' />"
+        "<payload-type id='98' name='x-ISAC' clockrate='8000' />"
+        "</description>"
+        "<transport xmlns='urn:xmpp:jingle:transports:ice-udp:1' pwd='asd88fgpdd777uzjYhagZg' ufrag='8hhy'>"
+        "<candidate component='1' foundation='1' generation='0' id='el0747fg11' ip='10.0.1.1' network='1' port='8998' priority='2130706431' protocol='udp' type='host' />"
+        "<candidate component='1' foundation='2' generation='0' id='y3s2b30v3r' ip='192.0.2.3' network='1' port='45664' priority='1694498815' protocol='udp' rel-addr='10.0.1.1' rel-port='8998' type='srflx' />"
+        "</transport>"
+        "</content>"
+        "</jingle></iq>"_s;
+
+    TestClient client;
+    auto *manager = client.addNewExtension<QXmppCallManager>();
+    client.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+
+    // take over ownership of all incoming calls (so they are not deleted)
+    std::vector<std::unique_ptr<QXmppCall>> calls;
+    connect(manager, &QXmppCallManager::callReceived, this, [&](std::unique_ptr<QXmppCall> &call) {
+        calls.push_back(std::move(call));
+    });
+
+    // start first call
+    QVERIFY(manager->handleStanza(xmlToDom(xml.arg("abc1"))));
+    QCoreApplication::processEvents();
+    client.expect(u"<iq id='ph37a419' to='romeo@montague.lit/orchard' type='result'/>"_s);
+    client.expect(u"<iq id=\"qx3\" to=\"capulet.lit\" type=\"get\"><services xmlns=\"urn:xmpp:extdisco:2\"/></iq>"_s);
+    client.inject(u"<iq id='qx3' from='capulet.lit' type='result'><services xmlns='urn:xmpp:extdisco:2'/></iq>"_s);
+    QCoreApplication::processEvents();
+    client.expect(u"<iq id=\"qx2\" to=\"romeo@montague.lit/orchard\" from=\"juliet@capulet.lit/balcony\" type=\"set\"><jingle xmlns=\"urn:xmpp:jingle:1\" action=\"session-info\" sid=\"abc1\"><ringing xmlns=\"urn:xmpp:jingle:apps:rtp:info:1\"/></jingle></iq>"_s);
+
+    // same sid
+    auto error = expectVariant<Error>(manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml.arg("abc1")))));
+    QCOMPARE(error.type(), Error::Cancel);
+    QCOMPARE(error.condition(), Error::Conflict);
+}
+
+void tst_QXmppCallManager::senderImpersonation()
+{
+    const auto xml =
+        u"<iq from='romeo@montague.lit/orchard' id='ph37a419' to='juliet@capulet.lit/balcony' type='set'>"
+        "<jingle xmlns='urn:xmpp:jingle:1' action='session-initiate' initiator='romeo@montague.lit/orchard' sid='%1'>"
+        "<content creator='initiator' name='voice'>"
+        "<description xmlns='urn:xmpp:jingle:apps:rtp:1' media='audio'>"
+        "<payload-type id='96' name='speex' clockrate='16000' />"
+        "<payload-type id='97' name='speex' clockrate='8000' />"
+        "<payload-type id='18' name='G729' />"
+        "<payload-type id='0' name='PCMU' clockrate='8000'/>"
+        "<payload-type id='103' name='L16' clockrate='16000' channels='2' />"
+        "<payload-type id='98' name='x-ISAC' clockrate='8000' />"
+        "</description>"
+        "<transport xmlns='urn:xmpp:jingle:transports:ice-udp:1' pwd='asd88fgpdd777uzjYhagZg' ufrag='8hhy'>"
+        "<candidate component='1' foundation='1' generation='0' id='el0747fg11' ip='10.0.1.1' network='1' port='8998' priority='2130706431' protocol='udp' type='host' />"
+        "<candidate component='1' foundation='2' generation='0' id='y3s2b30v3r' ip='192.0.2.3' network='1' port='45664' priority='1694498815' protocol='udp' rel-addr='10.0.1.1' rel-port='8998' type='srflx' />"
+        "</transport>"
+        "</content>"
+        "</jingle></iq>"_s;
+
+    TestClient client;
+    auto *manager = client.addNewExtension<QXmppCallManager>();
+    client.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+
+    // session initiate
+    auto result = manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml.arg("abc1"))));
+    QVERIFY(std::holds_alternative<QXmppIq>(result));
+
+    // other JID trying to inject IQs into our call (different 'from')
+    const auto xml2 =
+        u"<iq from='r0me0@m0ntagu3.lit/orchard' id='ph37a419' to='juliet@capulet.lit/balcony' type='set'>"
+        "<jingle xmlns='urn:xmpp:jingle:1' action='content-add' initiator='romeo@montague.lit/orchard' sid='%1'>"
+        "<content creator='initiator' name='voice'>"
+        "<description xmlns='urn:xmpp:jingle:apps:rtp:1' media='audio'>"
+        "<payload-type id='0' name='PCMU' clockrate='8000'/>"
+        "</description>"
+        "<transport xmlns='urn:xmpp:jingle:transports:ice-udp:1' pwd='asd88fgpdd777uzjYhagZg' ufrag='8hhy'>"
+        "<candidate component='1' foundation='1' generation='0' id='el0747fg11' ip='10.0.1.1' network='1' port='8998' priority='2130706431' protocol='udp' type='host' />"
+        "<candidate component='1' foundation='2' generation='0' id='y3s2b30v3r' ip='192.0.2.3' network='1' port='45664' priority='1694498815' protocol='udp' rel-addr='10.0.1.1' rel-port='8998' type='srflx' />"
+        "</transport>"
+        "</content>"
+        "</jingle></iq>"_s;
+    result = manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml2.arg("abc1"))));
+    auto error = expectVariant<Error>(std::move(result));
+    QCOMPARE(error.type(), Error::Cancel);
+    QCOMPARE(error.condition(), Error::ItemNotFound);
+
+    // manager makes use of later() calls
+    QCoreApplication::processEvents();
+}
+
+void tst_QXmppCallManager::testCall()
+{
+    if (!qEnvironmentVariableIsEmpty("QXMPP_TESTS_SKIP_CALL_MANAGER")) {
+        QSKIP("Skipping because 'QXMPP_TESTS_SKIP_CALL_MANAGER' was set.");
+    }
+
+    std::unique_ptr<QXmppCall> receiverCall;
+
+    const QString testDomain("localhost");
+    const QHostAddress testHost(QHostAddress::LocalHost);
+    const quint16 testPort = 12002;
+
+    // prepare server
+    TestPasswordChecker passwordChecker;
+    passwordChecker.addCredentials("sender", "testpwd");
+    passwordChecker.addCredentials("receiver", "testpwd");
+
+    QXmppServer server;
+    server.setDomain(testDomain);
+    server.setPasswordChecker(&passwordChecker);
+    server.listenForClients(testHost, testPort);
+
+    // prepare sender
+    TestClient sender;
+    sender.addNewExtension<QXmppDiscoveryManager>();
+    auto *senderManager = sender.addNewExtension<QXmppCallManager>();
+
+    QXmppConfiguration config;
+    config.setDomain(testDomain);
+    config.setHost(testHost.toString());
+    config.setPort(testPort);
+    config.setUser("sender");
+    config.setPassword("testpwd");
+    sender.connectToServer(config);
+    sender.waitForConnect();
+    QCOMPARE(sender.isConnected(), true);
+
+    // prepare receiver
+    TestClient receiver;
+    receiver.addNewExtension<QXmppDiscoveryManager>();
+    auto *receiverManager = receiver.addNewExtension<QXmppCallManager>();
+    connect(receiverManager, &QXmppCallManager::callReceived, this, [&receiverCall](std::unique_ptr<QXmppCall> &call) {
+        receiverCall = std::move(call);
+        receiverCall->accept();
+    });
+
+    config.setUser("receiver");
+    config.setPassword("testpwd");
+    receiver.connectToServer(config);
+    receiver.waitForConnect();
+    QCOMPARE(receiver.isConnected(), true);
+
+    // connect call
+    qDebug() << "======== CONNECT ========";
+    QEventLoop loop;
+    auto senderCall = senderManager->call(receiver.configuration().jid());
+    QVERIFY(senderCall);
+    connect(senderCall.get(), &QXmppCall::connected, &loop, &QEventLoop::quit);
+    loop.exec();
+    QVERIFY(receiverCall);
+
+    QCOMPARE(senderCall->direction(), QXmppCall::OutgoingDirection);
+    QCOMPARE(senderCall->state(), QXmppCall::ActiveState);
+
+    QCOMPARE(receiverCall->direction(), QXmppCall::IncomingDirection);
+    QCOMPARE(receiverCall->state(), QXmppCall::ActiveState);
+
+    // exchange some media
+    qDebug() << "======== TALK ========";
+    QTimer::singleShot(2000, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    // hangup call
+    qDebug() << "======== HANGUP ========";
+    connect(senderCall.get(), &QXmppCall::finished, &loop, &QEventLoop::quit);
+    senderCall->hangUp();
+    loop.exec();
+
+    QCOMPARE(senderCall->direction(), QXmppCall::OutgoingDirection);
+    QCOMPARE(senderCall->state(), QXmppCall::FinishedState);
+
+    QCOMPARE(receiverCall->direction(), QXmppCall::IncomingDirection);
+    QCOMPARE(receiverCall->state(), QXmppCall::FinishedState);
+}
+
+#endif  // WITH_GSTREAMER
+
+// ============================================================
+
+class tst_QXmppExternalServiceDiscoveryManager : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void testRequestServices();
+    Q_SLOT void testDiscoveryFeatures();
+};
+
+void tst_QXmppExternalServiceDiscoveryManager::testRequestServices()
+{
+    TestClient test;
+    auto *extDiscoManager { test.addNewExtension<QXmppExternalServiceDiscoveryManager>() };
+
+    auto future { extDiscoManager->requestServices("shakespeare.lit") };
+
+    test.expect("<iq"
+                " id='qx1'"
+                " to='shakespeare.lit'"
+                " type='get'>"
+                "<services xmlns='urn:xmpp:extdisco:2'/>"
+                "</iq>");
+
+    test.inject<QString>("<iq"
+                         " id='qx1'"
+                         " from='shakespeare.lit'"
+                         " type='result'>"
+                         "<services xmlns='urn:xmpp:extdisco:2'>"
+                         "<service host='stun.shakespeare.lit'"
+                         " port='9998'"
+                         " transport='udp'"
+                         " type='stun'/>"
+                         "<service host='relay.shakespeare.lit'"
+                         " password='jj929jkj5sadjfj93v3n'"
+                         " port='9999'"
+                         " transport='udp'"
+                         " type='turn'"
+                         " username='nb78932lkjlskjfdb7g8'/>"
+                         "<service host='192.0.2.1'"
+                         " port='8888'"
+                         " transport='udp'"
+                         " type='stun'/>"
+                         "<service host='192.0.2.1'"
+                         " port='8889'"
+                         " password='93jn3bakj9s832lrjbbz'"
+                         " transport='udp'"
+                         " type='turn'"
+                         " username='auu98sjl2wk3e9fjdsl7'/>"
+                         "<service host='ftp.shakespeare.lit'"
+                         " name='Shakespearean File Server'"
+                         " password='guest'"
+                         " port='20'"
+                         " transport='tcp'"
+                         " type='ftp'"
+                         " username='guest'/>"
+                         "</services>"
+                         "</iq>");
+
+    const auto items { expectFutureVariant<QList<QXmppExternalService>>(future.toFuture(this)) };
+
+    QCOMPARE(items.size(), 5);
+    QCOMPARE(items.at(0).host(), u"stun.shakespeare.lit"_s);
+    QCOMPARE(items.at(4).host(), u"ftp.shakespeare.lit"_s);
+}
+
+void tst_QXmppExternalServiceDiscoveryManager::testDiscoveryFeatures()
+{
+    TestClient test;
+    auto *m = test.addNewExtension<QXmppExternalServiceDiscoveryManager>();
+
+    QVERIFY(m->discoveryFeatures().contains(u"urn:xmpp:extdisco:2"));
+}
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication app(argc, argv);
+    int status = runTests<tst_QXmppJingleMessageInitiationManager,
+                          tst_QXmppCallInviteManager,
+                          tst_QXmppExternalServiceDiscoveryManager>(argc, argv);
+#ifdef WITH_GSTREAMER
+    status |= runTests<tst_QXmppCallManager>(argc, argv);
+#endif
+    return status;
+}
+
+#include "tst_QXmppCalls.moc"
