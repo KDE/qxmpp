@@ -1054,27 +1054,6 @@ void tst_QXmppPubSubIq::testCustomItem()
 
 // ============================================================
 
-int main(int argc, char *argv[])
-{
-    QCoreApplication app(argc, argv);
-    int status = 0;
-    {
-        tst_QXmppPubSub tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppPubSubEvent tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppPubSubForms tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppPubSubIq tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    return status;
-}
+QXMPP_TEST_MAIN(tst_QXmppPubSub, tst_QXmppPubSubEvent, tst_QXmppPubSubForms, tst_QXmppPubSubIq)
 
 #include "tst_QXmppPubSub.moc"

@@ -601,23 +601,6 @@ void tst_QXmppXmlFormatter::streamOpenWithXmlDecl()
 
 // ============================================================
 
-int main(int argc, char *argv[])
-{
-    QCoreApplication app(argc, argv);
-    int status = 0;
-    {
-        tst_QXmppXmlElement tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppXmlRegistry tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppXmlFormatter tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    return status;
-}
+QXMPP_TEST_MAIN(tst_QXmppXmlElement, tst_QXmppXmlRegistry, tst_QXmppXmlFormatter)
 
 #include "tst_QXmppXml.moc"

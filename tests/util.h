@@ -318,4 +318,31 @@ T wait(const QFuture<T> &future)
     }
 }
 
+// Runs each of the given test classes in turn and returns a non-zero exit
+// status if any of them failed.
+template<typename... TestClasses>
+int runTests(int argc, char *argv[])
+{
+    int status = 0;
+    // each test object is destroyed before the next one is created
+    ([&] {
+        TestClasses testCase;
+        status |= QTest::qExec(&testCase, argc, argv);
+    }(),
+     ...);
+    return status;
+}
+
+// main() for test files that contain more than one test class; QTEST_MAIN()
+// only handles a single one. Pass the test classes in the order they should
+// run, e.g.:
+//
+//     QXMPP_TEST_MAIN(tst_QXmppFoo, Bar::tst_QXmppBar)
+#define QXMPP_TEST_MAIN(...)                      \
+    int main(int argc, char *argv[])              \
+    {                                             \
+        QCoreApplication app(argc, argv);         \
+        return runTests<__VA_ARGS__>(argc, argv); \
+    }
+
 #endif  // TESTS_UTIL_H

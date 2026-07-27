@@ -3231,19 +3231,6 @@ void tst_QXmppTrustMessages::testTrustMessageElement()
 
 // ============================================================
 
-int main(int argc, char *argv[])
-{
-    QCoreApplication app(argc, argv);
-    int status = 0;
-    {
-        tst_QXmppTrustManager tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppTrustMessages tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    return status;
-}
+QXMPP_TEST_MAIN(tst_QXmppTrustManager, tst_QXmppTrustMessages)
 
 #include "tst_QXmppTrust.moc"
