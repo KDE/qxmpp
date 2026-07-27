@@ -1556,43 +1556,6 @@ void tst_QXmppUri::queryOther()
 
 // ============================================================
 
-int main(int argc, char *argv[])
-{
-    QCoreApplication app(argc, argv);
-    int status = 0;
-    {
-        tst_QXmppPresence tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppBitsOfBinary tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppStreamFeatures tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppDataForm tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppResultSet tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppSpamReport tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppSceEnvelope tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppUri tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    return status;
-}
+QXMPP_TEST_MAIN(tst_QXmppPresence, tst_QXmppBitsOfBinary, tst_QXmppStreamFeatures, tst_QXmppDataForm, tst_QXmppResultSet, tst_QXmppSpamReport, tst_QXmppSceEnvelope, tst_QXmppUri)
 
 #include "tst_QXmppMiscData.moc"

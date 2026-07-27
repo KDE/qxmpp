@@ -1223,23 +1223,6 @@ void tst_QXmppMixItem::testIsParticipantItem()
 
 }  // namespace MixItems
 
-int main(int argc, char *argv[])
-{
-    QCoreApplication app(argc, argv);
-    int status = 0;
-    {
-        MixInvitation::tst_QXmppMixInvitation tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        MixIq::tst_QXmppMixIq tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        MixItems::tst_QXmppMixItem tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    return status;
-}
+QXMPP_TEST_MAIN(MixInvitation::tst_QXmppMixInvitation, MixIq::tst_QXmppMixIq, MixItems::tst_QXmppMixItem)
 
 #include "tst_QXmppMix.moc"

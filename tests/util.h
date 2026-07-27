@@ -13,9 +13,11 @@
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
+#include <algorithm>
 #include <any>
 #include <memory>
 #include <variant>
+#include <vector>
 
 // Note: do not include <QtTest> here. That umbrella header pulls in all of
 // <QtCore/QtCore> and is included by every test, which costs noticeably more
@@ -23,6 +25,7 @@
 #include <QBuffer>
 #include <QDomDocument>
 #include <QFutureWatcher>
+#include <QMetaMethod>
 #include <QSignalSpy>
 #include <QTest>
 #include <QTimeZone>
@@ -317,5 +320,95 @@ T wait(const QFuture<T> &future)
         return future.result();
     }
 }
+
+// Names of the test functions QTest::qExec() can select in the given class.
+inline QStringList testFunctionNames(const QMetaObject &metaObject)
+{
+    QStringList names;
+    for (int i = metaObject.methodOffset(); i < metaObject.methodCount(); ++i) {
+        auto method = metaObject.method(i);
+        if (method.methodType() != QMetaMethod::Slot || method.access() != QMetaMethod::Private ||
+            method.parameterCount() != 0) {
+            continue;
+        }
+        auto name = QString::fromUtf8(method.name());
+        // data functions and the fixture slots cannot be selected on the command line
+        if (name.endsWith(u"_data") || name == u"initTestCase" || name == u"cleanupTestCase" ||
+            name == u"init" || name == u"cleanup") {
+            continue;
+        }
+        names.append(name);
+    }
+    return names;
+}
+
+// Runs each of the given test classes in turn and returns a non-zero exit
+// status if any of them failed.
+//
+// A test function name on the command line only exists in one of the classes,
+// so the classes that do not have it are skipped and the names that select a
+// function of another class are removed from their arguments. Without that,
+// running a single function would make every other class in the binary fail
+// with "Unknown test function".
+template<typename... TestClasses>
+int runTests(int argc, char *argv[])
+{
+    const QList<QStringList> testFunctions { testFunctionNames(TestClasses::staticMetaObject)... };
+
+    QStringList allTestFunctions;
+    for (const auto &names : testFunctions) {
+        allTestFunctions += names;
+    }
+
+    // Arguments that select a test function, optionally with a ":datatag" suffix.
+    // Options and their values never match a test function name and are passed through.
+    QStringList selectors;
+    for (int i = 1; i < argc; ++i) {
+        auto arg = QString::fromLocal8Bit(argv[i]);
+        if (!arg.startsWith(u'-') && allTestFunctions.contains(arg.split(u':').first())) {
+            selectors.append(arg);
+        }
+    }
+
+    int status = 0;
+    qsizetype index = 0;
+    // each test object is destroyed before the next one is created
+    ([&] {
+        const auto &names = testFunctions[index++];
+
+        auto selectsThisClass = [&](const QString &selector) {
+            return names.contains(selector.split(u':').first());
+        };
+        if (!selectors.isEmpty() && std::none_of(selectors.cbegin(), selectors.cend(), selectsThisClass)) {
+            return;
+        }
+
+        std::vector<char *> args { argv[0] };
+        for (int i = 1; i < argc; ++i) {
+            auto arg = QString::fromLocal8Bit(argv[i]);
+            if (selectors.contains(arg) && !selectsThisClass(arg)) {
+                continue;
+            }
+            args.push_back(argv[i]);
+        }
+
+        TestClasses testCase;
+        status |= QTest::qExec(&testCase, int(args.size()), args.data());
+    }(),
+     ...);
+    return status;
+}
+
+// main() for test files that contain more than one test class; QTEST_MAIN()
+// only handles a single one. Pass the test classes in the order they should
+// run, e.g.:
+//
+//     QXMPP_TEST_MAIN(tst_QXmppFoo, Bar::tst_QXmppBar)
+#define QXMPP_TEST_MAIN(...)                      \
+    int main(int argc, char *argv[])              \
+    {                                             \
+        QCoreApplication app(argc, argv);         \
+        return runTests<__VA_ARGS__>(argc, argv); \
+    }
 
 #endif  // TESTS_UTIL_H

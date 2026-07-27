@@ -1808,19 +1808,6 @@ void tst_QXmppMessageReaction::testMessageReactionRemoval()
 
 // ============================================================
 
-int main(int argc, char *argv[])
-{
-    QCoreApplication app(argc, argv);
-    int status = 0;
-    {
-        tst_QXmppMessage tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    {
-        tst_QXmppMessageReaction tc;
-        status |= QTest::qExec(&tc, argc, argv);
-    }
-    return status;
-}
+QXMPP_TEST_MAIN(tst_QXmppMessage, tst_QXmppMessageReaction)
 
 #include "tst_QXmppMessage.moc"
