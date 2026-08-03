@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2009 Manjeet Dahiya <manjeetdahiya@gmail.com>
 // SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppLogger.h"
 
 #include "QXmppConstants_p.h"
-#include "QXmppXmlFormatter.h"
+#include "QXmppXmlFormatter_p.h"
 
 #include "StringLiterals.h"
 
@@ -179,6 +180,8 @@ public:
     bool prettyXml = false;
     QXmppLogger::ColorMode colorMode = QXmppLogger::ColorAuto;
     bool filterStreamManagementAcks = true;
+    std::optional<qsizetype> elideXmlTextAbove;
+    std::optional<qsizetype> elideLogMessagesAbove;
 };
 
 QXmppLoggerPrivate::QXmppLoggerPrivate()
@@ -298,8 +301,13 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
     }
 
     QString payload = text;
-    if (d->prettyXml && (type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
-        payload = QXmpp::formatXmlForDebug(text, true, 2, colorize);
+    if ((type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
+        if (d->prettyXml) {
+            payload = QXmpp::Private::formatXmlForDebug(text, { true, 2, colorize, d->elideXmlTextAbove });
+        }
+        if (d->elideLogMessagesAbove) {
+            payload = QXmpp::Private::elideMiddle(payload, *d->elideLogMessagesAbove, colorize, true);
+        }
     }
 
     switch (d->loggingType) {
@@ -394,11 +402,95 @@ void QXmppLogger::setFilterStreamManagementAcks(bool enable)
 }
 
 /*!
-    Enables (\a enable) pretty-printing of Sent/Received XML stanzas and sets ColorAuto so
-    ANSI escapes appear on a TTY.
+    Returns the maximum length of an XML text node in logged stanzas, or std::nullopt if
+    text nodes are never elided.
 
-    Equivalent to calling setPrettyXml(enable) and, if enabling,
-    setColorMode(ColorAuto).
+    \sa setElideXmlTextAbove()
+    \since QXmpp 1.17
+*/
+std::optional<qsizetype> QXmppLogger::elideXmlTextAbove() const
+{
+    return d->elideXmlTextAbove;
+}
+
+/*!
+    Sets the maximum \a length of an XML text node in logged stanzas.
+
+    Text nodes longer than \a length are elided in the middle, so the beginning and the end of
+    the content stay visible while the XML structure around them is preserved. This is useful
+    for large base64 payloads (avatars, file previews, encrypted content).
+
+    Only applies to Sent/Received messages with prettyXml() enabled. Pass std::nullopt to never
+    elide text nodes; that is the default unless eliding was enabled via enableEliding() or
+    enablePrettyXml().
+
+    \sa setElideLogMessagesAbove(), enableEliding()
+    \since QXmpp 1.17
+*/
+void QXmppLogger::setElideXmlTextAbove(std::optional<qsizetype> length)
+{
+    d->elideXmlTextAbove = length;
+}
+
+/*!
+    Returns the maximum length of a logged message, or std::nullopt if messages are never
+    elided.
+
+    \sa setElideLogMessagesAbove()
+    \since QXmpp 1.17
+*/
+std::optional<qsizetype> QXmppLogger::elideLogMessagesAbove() const
+{
+    return d->elideLogMessagesAbove;
+}
+
+/*!
+    Sets the maximum \a length of a logged message.
+
+    Messages longer than \a length are elided in the middle, so the beginning and the end stay
+    visible. Unlike setElideXmlTextAbove() this also shortens stanzas that are large because of
+    the sheer number of elements they contain, as well as payloads that are not valid XML.
+
+    Only applies to Sent/Received messages. Pass std::nullopt to never elide messages; that is
+    the default unless eliding was enabled via enableEliding() or enablePrettyXml().
+
+    \sa setElideXmlTextAbove(), enableEliding()
+    \since QXmpp 1.17
+*/
+void QXmppLogger::setElideLogMessagesAbove(std::optional<qsizetype> length)
+{
+    d->elideLogMessagesAbove = length;
+}
+
+/*!
+    Enables (\a enable) eliding of overly long Sent/Received messages using default limits.
+
+    Equivalent to calling setElideXmlTextAbove(DefaultElideXmlTextAbove) and
+    setElideLogMessagesAbove(DefaultElideLogMessagesAbove), or, if disabling, setting both to
+    std::nullopt. Use those setters directly to pick your own limits.
+
+    enablePrettyXml() already turns this on.
+
+    \sa setElideXmlTextAbove(), setElideLogMessagesAbove()
+    \since QXmpp 1.17
+*/
+void QXmppLogger::enableEliding(bool enable)
+{
+    if (enable) {
+        setElideXmlTextAbove(DefaultElideXmlTextAbove);
+        setElideLogMessagesAbove(DefaultElideLogMessagesAbove);
+    } else {
+        setElideXmlTextAbove(std::nullopt);
+        setElideLogMessagesAbove(std::nullopt);
+    }
+}
+
+/*!
+    Enables (\a enable) pretty-printing of Sent/Received XML stanzas, sets ColorAuto so ANSI
+    escapes appear on a TTY and elides overly long messages.
+
+    Equivalent to calling setPrettyXml(enable) and, if enabling, setColorMode(ColorAuto) and
+    enableEliding(). Call enableEliding(false) afterwards to keep full stanzas.
 
     \since QXmpp 1.16
 */
@@ -407,6 +499,7 @@ void QXmppLogger::enablePrettyXml(bool enable)
     setPrettyXml(enable);
     if (enable) {
         setColorMode(ColorAuto);
+        enableEliding();
     }
 }
 

@@ -2,9 +2,11 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#include "QXmppXmlFormatter.h"
+#include "QXmppXmlFormatter_p.h"
 
 #include "StringLiterals.h"
+
+#include <algorithm>
 
 #include <QStringBuilder>
 #include <QXmlStreamReader>
@@ -248,12 +250,65 @@ std::optional<QString> tryFormatSoloEndTag(QStringView trimmed, bool colorize)
     return out;
 }
 
+// Longest ANSI escape sequence emitted by this file ("\x1b[90m" and friends).
+constexpr qsizetype MaxEscapeLength = 8;
+
+// Moves a cut position back so that it does not fall inside an ANSI escape
+// sequence (ESC '[' … 'm'), which would leave a stray "[90m" in the output.
+qsizetype ansiSafeCut(QStringView text, qsizetype pos)
+{
+    auto begin = std::max(qsizetype(0), pos - MaxEscapeLength);
+    for (auto i = pos - 1; i >= begin; --i) {
+        auto c = text.at(i);
+        if (c == u'm') {
+            break;
+        }
+        if (c == u'\x1b') {
+            return i;
+        }
+    }
+    return pos;
+}
+
 }  // namespace
 
-namespace QXmpp {
+namespace QXmpp::Private {
 
-QString formatXmlForDebug(QStringView raw, bool indent, int indentWidth, bool colorize)
+QString elideMiddle(QStringView text, qsizetype maxLength, bool colorize, bool ownLine)
 {
+    if (maxLength <= 0 || text.size() <= maxLength) {
+        return text.toString();
+    }
+
+    auto leftEnd = maxLength / 2;
+    auto rightBegin = text.size() - (maxLength - leftEnd);
+    if (colorize) {
+        leftEnd = ansiSafeCut(text, leftEnd);
+        rightBegin = ansiSafeCut(text, rightBegin);
+    }
+
+    QString marker = u"…["_s + QString::number(rightBegin - leftEnd) + u" characters elided]…"_s;
+    if (colorize) {
+        // terminate a color span the cut may have left open, then dim the marker
+        marker = CReset.toString() + CComment.toString() + marker + CReset.toString();
+    }
+    if (ownLine) {
+        marker = u'\n' + marker + u'\n';
+    }
+
+    // only elide if that actually shortens the output
+    if (leftEnd + marker.size() + (text.size() - rightBegin) >= text.size()) {
+        return text.toString();
+    }
+    return text.left(leftEnd).toString() + marker + text.sliced(rightBegin).toString();
+}
+
+QString formatXmlForDebug(QStringView raw, const XmlFormatOptions &options)
+{
+    const bool indent = options.indent;
+    const int indentWidth = options.indentWidth;
+    const bool colorize = options.colorize;
+
     if (raw.isEmpty()) {
         return raw.toString();
     }
@@ -401,7 +456,12 @@ QString formatXmlForDebug(QStringView raw, bool indent, int indentWidth, bool co
                 emitOpenClose(out, colorize);
                 stack.last().tagOpen = false;
             }
-            out += escapeText(text);
+            if (options.elideTextAbove) {
+                // elide before escaping, so the reported count refers to the original text
+                out += escapeText(elideMiddle(text, *options.elideTextAbove, colorize));
+            } else {
+                out += escapeText(text);
+            }
             if (!whitespaceOnly) {
                 stack.last().hadText = true;
             }
@@ -457,6 +517,15 @@ QString formatXmlForDebug(QStringView raw, bool indent, int indentWidth, bool co
     }
 
     return out;
+}
+
+}  // namespace QXmpp::Private
+
+namespace QXmpp {
+
+QString formatXmlForDebug(QStringView raw, bool indent, int indentWidth, bool colorize)
+{
+    return Private::formatXmlForDebug(raw, { indent, indentWidth, colorize, {} });
 }
 
 }  // namespace QXmpp

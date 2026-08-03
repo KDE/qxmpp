@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2009 Manjeet Dahiya <manjeetdahiya@gmail.com>
 // SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -9,6 +10,7 @@
 #include "QXmppGlobal.h"
 
 #include <memory>
+#include <optional>
 
 #include <QObject>
 
@@ -115,6 +117,19 @@ public:
     };
     Q_ENUM(ColorMode)
 
+    /*!
+        Default maximum length of an XML text node used by enableEliding().
+
+        \since QXmpp 1.17
+    */
+    static constexpr qsizetype DefaultElideXmlTextAbove = 512;
+    /*!
+        Default maximum length of a logged message used by enableEliding().
+
+        \since QXmpp 1.17
+    */
+    static constexpr qsizetype DefaultElideLogMessagesAbove = 8192;
+
     QXmppLogger(QObject *parent = nullptr);
     ~QXmppLogger() override;
 
@@ -142,6 +157,14 @@ public:
 
     bool filterStreamManagementAcks() const;
     void setFilterStreamManagementAcks(bool enable);
+
+    std::optional<qsizetype> elideXmlTextAbove() const;
+    void setElideXmlTextAbove(std::optional<qsizetype> length);
+
+    std::optional<qsizetype> elideLogMessagesAbove() const;
+    void setElideLogMessagesAbove(std::optional<qsizetype> length);
+
+    void enableEliding(bool enable = true);
 
     void enablePrettyXml(bool enable = true);
 

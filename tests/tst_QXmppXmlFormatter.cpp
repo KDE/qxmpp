@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppLogger.h"
-#include "QXmppXmlFormatter.h"
+#include "QXmppXmlFormatter_p.h"
 
 #include "util.h"
 
@@ -30,6 +30,9 @@ private:
     Q_SLOT void streamOpenFragment();
     Q_SLOT void streamCloseFragment();
     Q_SLOT void streamOpenWithXmlDecl();
+    Q_SLOT void elideLongTextNode();
+    Q_SLOT void elideKeepsShortTextAndAttributes();
+    Q_SLOT void elideColorized();
 };
 
 void tst_QXmppXmlFormatter::roundTripIq()
@@ -168,6 +171,51 @@ void tst_QXmppXmlFormatter::streamOpenWithXmlDecl()
     QCOMPARE(out,
              u"<?xml version='1.0'?>\n"
              u"<stream:stream xmlns=\"jabber:client\" xmlns:stream=\"http://etherx.jabber.org/streams\" from=\"x@y\">"_s);
+}
+
+void tst_QXmppXmlFormatter::elideLongTextNode()
+{
+    using namespace QXmpp::Private;
+
+    QString in = u"<message><data>"_s + QString(1000, u'A') + u"</data><thread>x</thread></message>"_s;
+    auto out = formatXmlForDebug(in, { true, 2, false, 100 });
+
+    QVERIFY(out.startsWith(u"<message>\n  <data>"));
+    QVERIFY(out.endsWith(u"</data>\n  <thread>x</thread>\n</message>"));
+    QVERIFY(out.contains(QString(50, u'A') + u"…[900 characters elided]…"_s + QString(50, u'A')));
+    QVERIFY(out.size() < in.size());
+
+    QCOMPARE(formatXmlForDebug(in, { true, 2, false, {} }), QXmpp::formatXmlForDebug(in));
+}
+
+void tst_QXmppXmlFormatter::elideKeepsShortTextAndAttributes()
+{
+    using namespace QXmpp::Private;
+
+    // text shorter than the limit is left alone
+    auto out = formatXmlForDebug(u"<body>hello world</body>"_s, { true, 2, false, 100 });
+    QCOMPARE(out, u"<body>hello world</body>"_s);
+
+    // attribute values are not elided
+    auto value = QString(1000, u'A');
+    QString withAttr = u"<data value=\""_s + value + u"\"/>"_s;
+    QVERIFY(formatXmlForDebug(withAttr, { true, 2, false, 100 }).contains(value));
+}
+
+void tst_QXmppXmlFormatter::elideColorized()
+{
+    using namespace QXmpp::Private;
+
+    QString in = u"<data>"_s + QString(1000, u'A') + u"</data>"_s;
+    auto out = formatXmlForDebug(in, { true, 2, true, 100 });
+
+    QVERIFY(out.contains(u"characters elided"));
+    // no escape sequence was cut in half
+    static const QRegularExpression ansiRe(u"\x1b\\[[0-9;]*m"_s);
+    auto stripped = out;
+    stripped.remove(ansiRe);
+    QVERIFY(!stripped.contains(QChar(0x1b)));
+    QVERIFY(stripped.contains(u"…[900 characters elided]…"));
 }
 
 QTEST_MAIN(tst_QXmppXmlFormatter)
