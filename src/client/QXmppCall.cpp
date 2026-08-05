@@ -42,8 +42,6 @@ QXmppCallPrivate::QXmppCallPrivate(const QString &jid, const QString &sid, QXmpp
       error(std::move(error)),
       q(qq)
 {
-    qRegisterMetaType<QXmppCall::State>();
-
     // Skip GStreamer setup for calls that are already in an error state
     if (state == QXmppCall::FinishedState) {
         return;
