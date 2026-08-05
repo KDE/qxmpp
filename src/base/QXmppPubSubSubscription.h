@@ -93,8 +93,5 @@ private:
 };
 
 Q_DECLARE_TYPEINFO(QXmppPubSubSubscription, Q_MOVABLE_TYPE);
-Q_DECLARE_METATYPE(QXmppPubSubSubscription)
-Q_DECLARE_METATYPE(QXmppPubSubSubscription::State)
-Q_DECLARE_METATYPE(QXmppPubSubSubscription::ConfigurationSupport)
 
 #endif  // QXMPPPUBSUBSUBSCRIPTION_H

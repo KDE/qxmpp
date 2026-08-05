@@ -86,6 +86,4 @@ private:
     QSharedDataPointer<QXmppTuneItemPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppTuneItem)
-
 #endif  // QXMPPUSERTUNEITEM_H

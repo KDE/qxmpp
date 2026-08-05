@@ -124,7 +124,4 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(QXmppMixConfigItem::Nodes)
 // Scoped enums (enum class) are not implicitly converted to int.
 inline auto qHash(QXmppMixConfigItem::Node key, uint seed) noexcept { return qHash(std::underlying_type_t<QXmppMixConfigItem::Node>(key), seed); }
 
-Q_DECLARE_METATYPE(QXmppMixConfigItem)
-Q_DECLARE_METATYPE(QXmppMixConfigItem::Nodes)
-
 #endif  // QXMPPMIXCONFIGITEM_H

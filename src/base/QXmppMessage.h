@@ -405,6 +405,5 @@ private:
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QXmppMessage::Hints)
-Q_DECLARE_METATYPE(QXmppMessage)
 
 #endif  // QXMPPMESSAGE_H

@@ -11,9 +11,6 @@
 
 #include <QObject>
 
-Q_DECLARE_METATYPE(std::optional<QXmppPubSubSubscription>)
-Q_DECLARE_METATYPE(std::optional<QXmppDataForm>)
-
 class tst_QXmppPubSubEvent : public QObject
 {
     Q_OBJECT

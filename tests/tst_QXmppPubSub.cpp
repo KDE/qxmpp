@@ -21,7 +21,6 @@ enum PubSubNamespace {
     PubSubEventNs,
     PubSubOwnerNs,
 };
-Q_DECLARE_METATYPE(PubSubNamespace)
 
 template<typename T>
 void parsePacket(T &packet, const QByteArray &xml, PubSubNamespace xmlns)

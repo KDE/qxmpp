@@ -89,8 +89,6 @@ private:
     QSharedDataPointer<QXmppMucVoiceRequestPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppMucVoiceRequest)
-
 struct QXmppMucRoomConfigPrivate;
 
 ///

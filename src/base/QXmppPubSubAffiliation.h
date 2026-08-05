@@ -65,7 +65,4 @@ private:
     QSharedDataPointer<QXmppPubSubAffiliationPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppPubSubAffiliation)
-Q_DECLARE_METATYPE(QXmppPubSubAffiliation::Affiliation)
-
 #endif  // QXMPPPUBSUBAFFILIATION_H

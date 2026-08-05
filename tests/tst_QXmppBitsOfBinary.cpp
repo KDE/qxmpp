@@ -11,8 +11,6 @@
 #include <QMimeType>
 #include <QObject>
 
-Q_DECLARE_METATYPE(QCryptographicHash::Algorithm)
-
 class tst_QXmppBitsOfBinary : public QObject
 {
     Q_OBJECT

@@ -128,6 +128,4 @@ private:
     friend class QXmppCallPrivate;
 };
 
-Q_DECLARE_METATYPE(QXmppCall::State)
-
 #endif

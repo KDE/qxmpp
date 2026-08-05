@@ -44,6 +44,4 @@ private:
     QSharedDataPointer<QXmppMixInfoItemPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppMixInfoItem)
-
 #endif  // QXMPPMIXINFOITEM_H

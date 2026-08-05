@@ -119,7 +119,5 @@ private:
     friend class QXmppCallInvitePrivate;
     friend class tst_QXmppCallInviteManager;
 };
-Q_DECLARE_METATYPE(QXmppCallInvite::Result)
-Q_DECLARE_METATYPE(std::shared_ptr<QXmppCallInvite>)
 
 #endif  // QXMPPJINGLEMESSAGEINITIATIONMANAGER_H

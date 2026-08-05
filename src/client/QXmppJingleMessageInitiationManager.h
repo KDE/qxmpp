@@ -143,6 +143,4 @@ private:
     friend class tst_QXmppJingleMessageInitiationManager;
 };
 
-Q_DECLARE_METATYPE(QXmppJingleMessageInitiation::Result)
-
 #endif  // QXMPPJINGLEMESSAGEINITIATIONMANAGER_H

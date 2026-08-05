@@ -83,6 +83,4 @@ bool QXmppPubSubBaseItem::isItem(const QDomElement &element, PayloadChecker isPa
     return true;
 }
 
-Q_DECLARE_METATYPE(QXmppPubSubBaseItem)
-
 #endif  // QXMPPPUBSUBBASEITEM_H

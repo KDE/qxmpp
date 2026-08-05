@@ -294,7 +294,4 @@ private:
     friend class TestClient;
 };
 
-Q_DECLARE_METATYPE(QXmppStanza::Error::Type);
-Q_DECLARE_METATYPE(QXmppStanza::Error::Condition);
-
 #endif  // QXMPPSTANZA_H

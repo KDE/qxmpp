@@ -252,7 +252,4 @@ protected:
     QString formType() const override;
 };
 
-Q_DECLARE_METATYPE(QXmppPubSubNodeConfig);
-Q_DECLARE_METATYPE(QXmppPubSubPublishOptions);
-
 #endif  // QXMPPPUBSUBNODECONFIG_H

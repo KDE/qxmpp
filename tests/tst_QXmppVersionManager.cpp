@@ -7,8 +7,6 @@
 
 #include "TestClient.h"
 
-Q_DECLARE_METATYPE(QXmppVersionIq);
-
 class tst_QXmppVersionManager : public QObject
 {
     Q_OBJECT

@@ -65,6 +65,4 @@ struct CsiInactive {
 
 }  // namespace QXmpp::Private
 
-Q_DECLARE_METATYPE(QXmpp::Private::StreamOpen)
-
 #endif  // STREAM_H

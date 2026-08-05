@@ -51,6 +51,4 @@ private:
     QSharedDataPointer<QXmppGeolocItemPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppGeolocItem)
-
 #endif  // QXMPPGEOLOCITEM_H

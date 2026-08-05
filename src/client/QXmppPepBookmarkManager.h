@@ -56,8 +56,6 @@ private:
     QSharedDataPointer<QXmppMucBookmarkPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppMucBookmark);
-
 struct QXmppPepBookmarkManagerPrivate;
 
 /*!
@@ -138,7 +136,5 @@ private:
     friend class tst_QXmppMuc;
     const std::unique_ptr<QXmppPepBookmarkManagerPrivate> d;
 };
-
-Q_DECLARE_METATYPE(QXmppPepBookmarkManager::BookmarkChange);
 
 #endif  // QXMPPPEPBOOKMARKMANAGER_H

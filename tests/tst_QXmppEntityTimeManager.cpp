@@ -7,8 +7,6 @@
 
 #include "TestClient.h"
 
-Q_DECLARE_METATYPE(QXmppEntityTimeIq)
-
 class tst_QXmppEntityTimeManager : public QObject
 {
     Q_OBJECT

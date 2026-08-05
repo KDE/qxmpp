@@ -54,6 +54,4 @@ private:
     Type m_type;
 };
 
-Q_DECLARE_METATYPE(QXmppStartTlsPacket::Type);
-
 #endif  // QXMPPSTARTTLSPACKET_H

@@ -70,8 +70,6 @@ private:
     std::unique_ptr<QXmppHttpUploadPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppHttpUpload::Result);
-
 class QXMPP_EXPORT QXmppHttpUploadManager : public QXmppClientExtension
 {
     Q_OBJECT

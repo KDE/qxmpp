@@ -64,6 +64,4 @@ private:
     QSharedDataPointer<QXmppIqPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppIq::Type)
-
 #endif  // QXMPPIQ_H

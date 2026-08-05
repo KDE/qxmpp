@@ -762,6 +762,4 @@ private:
     QSharedDataPointer<QXmppCallInviteElementPrivate> d;
 };
 
-Q_DECLARE_METATYPE(QXmppJingleReason::RtpErrorCondition)
-
 #endif

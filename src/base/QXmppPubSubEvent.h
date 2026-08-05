@@ -152,6 +152,4 @@ void QXmppPubSubEvent<T>::serializeItems(QXmlStreamWriter *writer) const
     }
 }
 
-Q_DECLARE_METATYPE(QXmppPubSubEventBase::EventType)
-
 #endif  // QXMPPPUBSUBEVENT_H

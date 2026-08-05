@@ -19,8 +19,6 @@
 
 using namespace QXmpp;
 
-Q_DECLARE_METATYPE(QList<QXmppTrustMessageKeyOwner>)
-
 // time period (in ms) to wait for a trust message that should not be sent.
 constexpr int UNEXPECTED_TRUST_MESSAGE_WAITING_TIMEOUT = 1000;
 

@@ -17,8 +17,6 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-Q_DECLARE_METATYPE(QXmpp::HashAlgorithm);
-
 class tst_QXmppUtils : public QObject
 {
     Q_OBJECT

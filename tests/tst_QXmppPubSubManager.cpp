@@ -20,9 +20,6 @@
 
 #include <QObject>
 
-Q_DECLARE_METATYPE(QXmpp::Private::PubSubIq<>);
-Q_DECLARE_METATYPE(std::optional<QXmppPubSubPublishOptions>);
-
 using PSManager = QXmppPubSubManager;
 using Affiliation = QXmppPubSubAffiliation;
 using AffiliationType = QXmppPubSubAffiliation::Affiliation;

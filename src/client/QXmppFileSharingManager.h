@@ -67,8 +67,6 @@ private:
     friend class QXmppFileSharingManager;
 };
 
-Q_DECLARE_METATYPE(QXmppFileUpload::Result);
-
 class QXMPP_EXPORT QXmppFileDownload : public QObject
 {
     Q_OBJECT
@@ -123,8 +121,6 @@ private:
     std::unique_ptr<QXmppFileDownloadPrivate> d;
     friend class QXmppFileSharingManager;
 };
-
-Q_DECLARE_METATYPE(QXmppFileDownload::Result);
 
 class QXMPP_EXPORT QXmppFileSharingManager : public QXmppClientExtension
 {

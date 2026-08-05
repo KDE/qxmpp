@@ -15,8 +15,6 @@
 
 #include <QObject>
 
-Q_DECLARE_METATYPE(QXmppVCardIq);
-
 using namespace QXmpp;
 
 class tst_QXmppVCardManager : public QObject

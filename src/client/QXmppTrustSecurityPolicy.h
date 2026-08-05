@@ -27,6 +27,4 @@ enum TrustSecurityPolicy {
 
 }  // namespace QXmpp
 
-Q_DECLARE_METATYPE(QXmpp::TrustSecurityPolicy)
-
 #endif  // QXMPPTRUSTSECURITYPOLICY_H

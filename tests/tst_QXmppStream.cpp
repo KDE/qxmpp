@@ -16,8 +16,6 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-Q_DECLARE_METATYPE(QDomElement)
-
 class tst_QXmppStream : public QObject
 {
     Q_OBJECT
