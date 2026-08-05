@@ -14,17 +14,21 @@
 
 #include <QList>
 #include <QString>
+// for Q_GADGET
+#include <QtCore/qobjectdefs.h>
 
 class QDomElement;
 class QXmlStreamWriter;
 
 class QXMPP_EXPORT QXmppSpamReport
 {
+    Q_GADGET
 public:
     enum class Reason {
         Spam,
         Abuse,
     };
+    Q_ENUM(Reason)
 
     QXmppSpamReport() = default;
     explicit QXmppSpamReport(Reason reason) : m_reason(reason) { }
