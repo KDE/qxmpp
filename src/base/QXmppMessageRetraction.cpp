@@ -295,3 +295,96 @@ void QXmppMessageRetracted::toXml(QXmlStreamWriter *writer) const
         },
     });
 }
+
+struct QXmppMessageRetractionLimitsPrivate : QSharedData {
+    std::optional<std::chrono::seconds> maxAge;
+};
+
+/*!
+    \class QXmppMessageRetractionLimits
+    \inmodule QXmpp
+
+    Data form used in service discovery information for advertising the limits an entity enforces on
+    message retractions. See \xep{0424, Message Retraction} for details.
+
+    ```
+    QXmppDiscoInfo info;
+    if (auto limits = info.dataForm<QXmppMessageRetractionLimits>()) {
+        auto maxAge = limits->maxAge();
+    }
+    ```
+
+    \since QXmpp 1.17
+*/
+
+/*! Tries to parse \a form into QXmppMessageRetractionLimits. */
+std::optional<QXmppMessageRetractionLimits> QXmppMessageRetractionLimits::fromDataForm(const QXmppDataForm &form)
+{
+    if (auto parsed = QXmppMessageRetractionLimits();
+        QXmppDataFormBase::fromDataForm(form, parsed)) {
+        return parsed;
+    }
+    return std::nullopt;
+}
+
+QXmppMessageRetractionLimits::QXmppMessageRetractionLimits()
+    : d(new QXmppMessageRetractionLimitsPrivate)
+{
+}
+
+QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppMessageRetractionLimits)
+
+/*!
+    Returns the maximum age of a message for which a retraction request is honoured.
+
+    An entity that does not advertise a limit honours retraction requests regardless of the age of
+    the retracted message.
+*/
+std::optional<std::chrono::seconds> QXmppMessageRetractionLimits::maxAge() const
+{
+    return d->maxAge;
+}
+
+/*!
+    Sets the maximum age of a message for which a retraction request is honoured.
+
+    \a maxAge
+*/
+void QXmppMessageRetractionLimits::setMaxAge(std::optional<std::chrono::seconds> maxAge)
+{
+    d->maxAge = maxAge;
+}
+
+/// \cond
+QString QXmppMessageRetractionLimits::formType() const
+{
+    return ns_message_retract.toString();
+}
+
+bool QXmppMessageRetractionLimits::parseField(const QXmppDataForm::Field &field)
+{
+    // ignore hidden fields
+    if (field.type() == QXmppDataForm::Field::HiddenField) {
+        return false;
+    }
+
+    if (field.key() == u"max-age") {
+        if (const auto seconds = parseUInt(field.value())) {
+            d->maxAge = std::chrono::seconds(*seconds);
+        }
+        return true;
+    }
+    return false;
+}
+
+void QXmppMessageRetractionLimits::serializeForm(QXmppDataForm &form) const
+{
+    std::optional<quint32> maxAge;
+
+    if (d->maxAge) {
+        maxAge = quint32(d->maxAge->count());
+    }
+
+    serializeOptionalNumber(form, QXmppDataForm::Field::TextSingleField, u"max-age", maxAge);
+}
+/// \endcond

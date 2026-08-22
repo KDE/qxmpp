@@ -6,8 +6,10 @@
 #define QXMPPMESSAGERETRACTION_H
 
 #include "QXmppConstants_p.h"
+#include "QXmppDataFormBase.h"
 #include "QXmppGlobal.h"
 
+#include <chrono>
 #include <optional>
 #include <tuple>
 
@@ -84,6 +86,30 @@ private:
     QDateTime m_stamp;
     QString m_by;
     std::optional<QXmppMessageModeration> m_moderation;
+};
+
+struct QXmppMessageRetractionLimitsPrivate;
+
+class QXMPP_EXPORT QXmppMessageRetractionLimits : public QXmppExtensibleDataFormBase
+{
+public:
+    /*! FORM_TYPE of this data form */
+    static constexpr auto DataFormType = QXmpp::Private::ns_message_retract;
+    static std::optional<QXmppMessageRetractionLimits> fromDataForm(const QXmppDataForm &form);
+
+    QXmppMessageRetractionLimits();
+    QXMPP_PRIVATE_DECLARE_RULE_OF_SIX(QXmppMessageRetractionLimits)
+
+    std::optional<std::chrono::seconds> maxAge() const;
+    void setMaxAge(std::optional<std::chrono::seconds> maxAge);
+
+protected:
+    QString formType() const override;
+    bool parseField(const QXmppDataForm::Field &) override;
+    void serializeForm(QXmppDataForm &) const override;
+
+private:
+    QSharedDataPointer<QXmppMessageRetractionLimitsPrivate> d;
 };
 
 #endif  // QXMPPMESSAGERETRACTION_H

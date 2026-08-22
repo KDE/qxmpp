@@ -15,6 +15,7 @@
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppIq.h"
+#include "QXmppMessageRetraction.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppPushEnableIq.h"
 #include "QXmppRegisterIq.h"
@@ -25,6 +26,8 @@
 #include "QXmppVersionIq.h"
 
 #include "util.h"
+
+#include <chrono>
 
 #include <QObject>
 
@@ -75,6 +78,7 @@ private:
     Q_SLOT void discoInfo();
     Q_SLOT void discoItems();
     Q_SLOT void discoContactAddresses();
+    Q_SLOT void discoMessageRetractionLimits();
 
     // EntityTimeIq
     Q_SLOT void testEntityTimeGet();
@@ -543,6 +547,44 @@ void tst_QXmppIq::discoContactAddresses()
     auto contactAddresses = info.dataForm<QXmppContactAddresses>();
     QVERIFY(contactAddresses);
     QCOMPARE(contactAddresses->supportAddresses().constFirst(), u"http://shakespeare.lit/support.php");
+}
+
+void tst_QXmppIq::discoMessageRetractionLimits()
+{
+    auto xml = QByteArrayLiteral(
+        "<x xmlns='jabber:x:data' type='result'>"
+        "<field type='hidden' var='FORM_TYPE'>"
+        "<value>urn:xmpp:message-retract:1</value>"
+        "</field>"
+        "<field type='text-single' var='max-age'>"
+        "<value>1800</value>"
+        "</field>"
+        "</x>");
+
+    QXmppDataForm form;
+    parsePacket(form, xml);
+
+    auto parsed = QXmppMessageRetractionLimits::fromDataForm(form);
+    QVERIFY(parsed.has_value());
+    QCOMPARE(parsed->maxAge(), std::optional<std::chrono::seconds>(std::chrono::minutes(30)));
+
+    form = parsed->toDataForm();
+    form.setType(QXmppDataForm::Result);
+    QVERIFY(!form.isNull());
+    xml = QString::fromUtf8(xml).remove(QChar('\n')).toUtf8();
+    serializePacket(form, xml);
+
+    // findForm with parsing
+    QXmppDiscoInfo info;
+    info.setDataForms({ parsed->toDataForm() });
+    auto limits = info.dataForm<QXmppMessageRetractionLimits>();
+    QVERIFY(limits);
+    QCOMPARE(limits->maxAge(), std::optional<std::chrono::seconds>(std::chrono::minutes(30)));
+
+    // An entity that does not enforce a limit does not advertise one.
+    QXmppMessageRetractionLimits empty;
+    QVERIFY(!empty.maxAge().has_value());
+    QCOMPARE(empty.toDataForm().fields().size(), 1);
 }
 
 void tst_QXmppIq::testEntityTimeGet()
