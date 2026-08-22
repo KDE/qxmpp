@@ -119,9 +119,8 @@ using EmptyResult = std::variant<Success, QXmppError>;
     \fn QXmppPepBookmarkManager::bookmarksReset()
 
     Emitted when the total set of bookmarks is replaced, i.e. when the bookmarks have been
-    fetched after connecting, when previously fetched bookmarks have been discarded because
-    fetching them failed on a later connection and when the bookmarks node has been purged or
-    deleted.
+    fetched after connecting, when fetching them failed and when the bookmarks node has been
+    purged or deleted.
 
     bookmarks() may be \c std::nullopt when this is emitted (the bookmarks could not be
     fetched). It must be checked before dereferencing it.
@@ -169,8 +168,7 @@ QStringList QXmppPepBookmarkManager::discoveryFeatures() const
 
     A failed fetch also discards previously fetched bookmarks, so this can switch back to
     \c std::nullopt on a later connection. Connect to bookmarksReset() to be notified whenever
-    this changes. Note that no signal is emitted when the bookmarks have never been fetched
-    successfully and the fetch fails again.
+    the fetch completes, successfully or not.
 */
 const std::optional<QList<QXmppMucBookmark>> &QXmppPepBookmarkManager::bookmarks() const { return d->bookmarks; }
 
@@ -372,8 +370,6 @@ void QXmppPepBookmarkManagerPrivate::setBookmarks(QList<Bookmarks2ConferenceItem
 
 void QXmppPepBookmarkManagerPrivate::resetBookmarks()
 {
-    if (bookmarks) {
-        bookmarks.reset();
-        Q_EMIT q->bookmarksReset();
-    }
+    bookmarks.reset();
+    Q_EMIT q->bookmarksReset();
 }

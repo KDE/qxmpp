@@ -70,7 +70,7 @@ struct QXmppPepBookmarkManagerPrivate;
 
     If the fetch fails, the bookmarks are unknown: bookmarks() returns \c std::nullopt. Bookmarks
     fetched on an earlier connection are discarded in that case, because they may be outdated by
-    now, and bookmarksReset() is emitted.
+    now. bookmarksReset() is emitted in both cases, so it also signals a failed fetch.
 
     \section1 Setup
 

@@ -29,6 +29,7 @@ class tst_QXmppMuc : public QObject
 private:
     // PEP bookmarks
     Q_SLOT void bookmarks2Updates();
+    Q_SLOT void bookmarks2FetchError();
     Q_SLOT void bookmarks2Set();
     Q_SLOT void bookmarks2SetUpdate();
     Q_SLOT void bookmarks2Remove();
@@ -224,6 +225,44 @@ void tst_QXmppMuc::bookmarks2Updates()
                 "</message>"_s);
     QCOMPARE(addedSignal.size(), 1);
     QCOMPARE(changedSignal.size(), 1);
+}
+
+void tst_QXmppMuc::bookmarks2FetchError()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.addNewExtension<QXmppPubSubManager>();
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
+
+    QSignalSpy resetSignal(bm, &QXmppPepBookmarkManager::bookmarksReset);
+
+    auto fetchFails = [&]() {
+        bm->onConnected();
+        test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
+        test.inject(u"<iq id='qx1' type='error'>"
+                    "<error type='cancel'><internal-server-error xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                    "</iq>"_s);
+    };
+
+    // a failing initial fetch is reported, even though nothing was cached before
+    fetchFails();
+    QCOMPARE(resetSignal.size(), 1);
+    QVERIFY(!bm->bookmarks().has_value());
+
+    // a successful fetch caches the bookmarks
+    bm->onConnected();
+    test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'>"
+                u"<item id='theplay@conference.shakespeare.lit'><conference xmlns='urn:xmpp:bookmarks:1' name='The Play&apos;s the Thing' autojoin='true'><nick>JC</nick></conference></item>"
+                u"</items></pubsub></iq>"_s);
+    QCOMPARE(resetSignal.size(), 2);
+    QCOMPARE(bm->bookmarks()->size(), 1);
+
+    // a later failing fetch discards them again
+    fetchFails();
+    QCOMPARE(resetSignal.size(), 3);
+    QVERIFY(!bm->bookmarks().has_value());
 }
 
 void tst_QXmppMuc::bookmarks2Set()
