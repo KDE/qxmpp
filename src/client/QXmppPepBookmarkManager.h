@@ -64,8 +64,13 @@ struct QXmppPepBookmarkManagerPrivate;
 
     \brief Manages \xep{0402}{PEP Native Bookmarks}.
 
-    Bookmarks are automatically fetched when the session is established. Changes made from other
-    clients arrive as PubSub event notifications and trigger the corresponding signals.
+    Bookmarks are automatically fetched when the session is established (unless the stream has
+    been resumed, in which case the cached bookmarks are still up to date). Changes made from
+    other clients arrive as PubSub event notifications and trigger the corresponding signals.
+
+    If the fetch fails, the bookmarks are unknown: bookmarks() returns \c std::nullopt. Bookmarks
+    fetched on an earlier connection are discarded in that case, because they may be outdated by
+    now, and bookmarksReset() is emitted.
 
     \section1 Setup
 
@@ -80,7 +85,12 @@ struct QXmppPepBookmarkManagerPrivate;
 
     \code
     connect(bm, &QXmppPepBookmarkManager::bookmarksReset, this, [bm]() {
-        for (const auto &bookmark : *bm->bookmarks()) {
+        const auto &bookmarks = bm->bookmarks();
+        if (!bookmarks) {
+            // the bookmarks could not be fetched and are unknown now
+            return;
+        }
+        for (const auto &bookmark : *bookmarks) {
             qDebug() << bookmark.jid() << bookmark.name();
         }
     });
