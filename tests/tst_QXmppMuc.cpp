@@ -241,8 +241,8 @@ void tst_QXmppMuc::bookmarks2FetchError()
         bm->onConnected();
         test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
         test.inject(u"<iq id='qx1' type='error'>"
-                    "<error type='cancel'><internal-server-error xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
-                    "</iq>"_s);
+                    u"<error type='cancel'><internal-server-error xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                    u"</iq>"_s);
     };
 
     // a failing initial fetch is reported, even though nothing was cached before
