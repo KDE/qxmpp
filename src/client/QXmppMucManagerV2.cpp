@@ -1494,6 +1494,15 @@ void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
             return;
         }
 
+        // Publish the form so roomConfig() is set when the createRoom() task resolves. An
+        // unusable form leaves it unset; creation succeeded, so the promise resolves anyway.
+        const auto &ownerQuery = std::get<MucOwnerQuery>(result);
+        if (ownerQuery.form) {
+            if (auto config = QXmppMucRoomConfig::fromDataForm(*ownerQuery.form)) {
+                data.roomConfig = std::move(*config);
+            }
+        }
+
         // Resolve the createPromise — room is locked, owner can now configure it
         auto promise = std::move(*data.createPromise);
         data.createPromise.reset();

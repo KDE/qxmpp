@@ -2438,6 +2438,10 @@ void tst_QXmppMuc::createRoom()
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QVERIFY(!room.joined().value());  // still locked
     QVERIFY(room.canConfigureRoom().value());
+
+    const auto &config = room.roomConfig().value();
+    QVERIFY(config.has_value());
+    QCOMPARE(config->name(), u"New Room"_s);
 }
 
 void tst_QXmppMuc::createRoomAlreadyExists()
