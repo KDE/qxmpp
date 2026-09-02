@@ -24,6 +24,9 @@ target_link_libraries(9_vCard Qt6::Gui)
 add_executable(muc_bot muc_bot/muc_bot.cpp)
 target_link_libraries(muc_bot ${QXMPP_TARGET})
 
+add_executable(muc_create muc_create/muc_create.cpp)
+target_link_libraries(muc_create ${QXMPP_TARGET})
+
 # AV Calls
 if(WITH_GSTREAMER)
     add_executable(audio_call audio_call/AudioCall.cpp)
