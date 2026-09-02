@@ -6,6 +6,7 @@
 #define QXMPPMUCMANAGERV2_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryIq.h"
 #include "QXmppMessageHandler.h"
 #include "QXmppMucData.h"
 #include "QXmppMucForms.h"
@@ -42,6 +43,7 @@ public:
     QStringList discoveryFeatures() const override;
 
     QBindable<QStringList> mucServices() const;
+    QBindable<QList<QXmppDiscoService>> mucServiceInfos() const;
     QBindable<bool> mucServicesLoaded() const;
 
     std::chrono::milliseconds selfPingSilenceThreshold() const;

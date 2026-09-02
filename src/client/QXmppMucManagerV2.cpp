@@ -414,6 +414,30 @@ QBindable<QStringList> QXmppMucManagerV2::mucServices() const
 }
 
 /*!
+    Returns the discovered MUC services on the server, including their full
+    \xep{0030}{Service Discovery} info.
+
+    This is the same set of services as mucServices(), but with the identities, features and
+    data forms each service advertises. Use it when the plain JIDs are not enough, for example
+    to check whether a service supports \xep{0307}{Unique Room Names} before creating a room
+    without an explicit name.
+
+    \code
+    for (const auto &service : muc->mucServiceInfos().value()) {
+        qDebug() << service.jid << service.info.features();
+    }
+    \endcode
+
+    \sa mucServices(), mucServicesLoaded()
+
+    \since QXmpp 1.17
+*/
+QBindable<QList<QXmppDiscoService>> QXmppMucManagerV2::mucServiceInfos() const
+{
+    return &d->mucServiceInfos;
+}
+
+/*!
     Returns whether MUC service discovery has completed.
 
     \since QXmpp 1.16
@@ -785,8 +809,11 @@ void QXmppMucManagerV2::onRegistered(QXmppClient *client)
         QXmpp::Disco::Type::Text,
         { ns_muc.toString() });
 
+    d->mucServiceInfos.setBinding([this]() {
+        return d->servicesWatch->services().value();
+    });
     d->mucServices.setBinding([this]() -> QStringList {
-        return transform<QStringList>(d->servicesWatch->services().value(), &QXmppDiscoService::jid);
+        return transform<QStringList>(d->mucServiceInfos.value(), &QXmppDiscoService::jid);
     });
     d->mucServicesLoaded.setBinding([this]() {
         return d->servicesWatch->loaded().value();
@@ -800,6 +827,7 @@ void QXmppMucManagerV2::onRegistered(QXmppClient *client)
 void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 {
     d->mucServices = QStringList();
+    d->mucServiceInfos = QList<QXmppDiscoService>();
     d->mucServicesLoaded = false;
     d->servicesWatch = {};
     disconnect(client, nullptr, this, nullptr);

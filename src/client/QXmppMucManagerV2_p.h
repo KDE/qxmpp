@@ -35,6 +35,7 @@ struct QXmppMucManagerV2Private {
 
     // MUC service discovery
     std::optional<QXmppDiscoServicesWatch> servicesWatch;
+    QProperty<QList<QXmppDiscoService>> mucServiceInfos;
     QProperty<QStringList> mucServices;
     QProperty<bool> mucServicesLoaded { false };
 

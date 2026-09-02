@@ -37,6 +37,10 @@ private:
     // MUC avatars
     Q_SLOT void avatarFetch();
 
+    // MUC service discovery
+    Q_SLOT void mucServiceDiscovery();
+    Q_SLOT void mucServicesResetOnReconnect();
+
     // MUC joining
     Q_SLOT void joinRoom();
     Q_SLOT void joinRoomWithHistory();
@@ -430,6 +434,97 @@ void tst_QXmppMuc::avatarFetch()
 
     QVERIFY(room.avatar().value().has_value());
     QCOMPARE(room.avatar().value()->contentType, u"image/svg+xml"_s);
+}
+
+void tst_QXmppMuc::mucServiceDiscovery()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit"_s);
+    test.configuration().setDomain(u"shakespeare.lit"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    QVERIFY(!muc->mucServicesLoaded().value());
+    QVERIFY(muc->mucServices().value().isEmpty());
+    QVERIFY(muc->mucServiceInfos().value().isEmpty());
+
+    int servicesChanged = 0;
+    int loadedChanged = 0;
+    auto servicesNotifier = muc->mucServices().addNotifier([&servicesChanged]() { servicesChanged++; });
+    auto loadedNotifier = muc->mucServicesLoaded().addNotifier([&loadedChanged]() { loadedChanged++; });
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+
+    test.expect(u"<iq id='qx1' to='shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='shakespeare.lit' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#items'>"
+                "<item jid='chat.shakespeare.lit'/>"
+                "<item jid='upload.shakespeare.lit'/>"
+                "</query></iq>"_s);
+
+    auto mucId = test.expectPacketRandomOrder(u"<iq id='qx1' to='chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    auto uploadId = test.expectPacketRandomOrder(u"<iq id='qx1' to='upload.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+
+    test.inject(u"<iq id='" + mucId + u"' from='chat.shakespeare.lit' type='result'>"
+                                      "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                      "<identity category='conference' type='text' name='Chatrooms'/>"
+                                      "<feature var='http://jabber.org/protocol/muc'/>"
+                                      "<feature var='http://jabber.org/protocol/muc#unique'/>"
+                                      "</query></iq>");
+
+    // The upload service is not a MUC service and must be filtered out.
+    test.inject(u"<iq id='" + uploadId + u"' from='upload.shakespeare.lit' type='result'>"
+                                         "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                         "<identity category='store' type='file'/>"
+                                         "<feature var='urn:xmpp:http:upload:0'/>"
+                                         "</query></iq>");
+
+    QVERIFY(muc->mucServicesLoaded().value());
+    QCOMPARE(muc->mucServices().value(), QStringList { u"chat.shakespeare.lit"_s });
+    QVERIFY(servicesChanged > 0);
+    QVERIFY(loadedChanged > 0);
+
+    const auto infos = muc->mucServiceInfos().value();
+    QCOMPARE(infos.size(), 1);
+    QCOMPARE(infos.at(0).jid, u"chat.shakespeare.lit"_s);
+    QCOMPARE(infos.at(0).info.identities().size(), 1);
+    QCOMPARE(infos.at(0).info.identities().at(0).name(), u"Chatrooms"_s);
+    QVERIFY(infos.at(0).info.features().contains(u"http://jabber.org/protocol/muc#unique"_s));
+}
+
+void tst_QXmppMuc::mucServicesResetOnReconnect()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit"_s);
+    test.configuration().setDomain(u"shakespeare.lit"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+
+    test.expect(u"<iq id='qx1' to='shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='shakespeare.lit' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#items'>"
+                "<item jid='chat.shakespeare.lit'/>"
+                "</query></iq>"_s);
+    test.expect(u"<iq id='qx1' to='chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='chat.shakespeare.lit' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='http://jabber.org/protocol/muc'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(muc->mucServicesLoaded().value());
+    QCOMPARE(muc->mucServices().value().size(), 1);
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+
+    QVERIFY(!muc->mucServicesLoaded().value());
+    QVERIFY(muc->mucServices().value().isEmpty());
+    QVERIFY(muc->mucServiceInfos().value().isEmpty());
 }
 
 void tst_QXmppMuc::joinRoom()
