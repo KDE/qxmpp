@@ -479,6 +479,64 @@ void QXmppMucManagerV2::setSelfPingSilenceThreshold(std::chrono::milliseconds th
 }
 
 /*!
+    Determines whether \a jid hosts a \xep{0045}{Multi-User Chat} room.
+
+    Sends a \xep{0030}{Service Discovery} info query and inspects the response. The task
+    resolves to \c true if the JID is a MUC room, and to \c false if it is anything else — a
+    MIX channel, a MUC service, an ordinary account — or if no such room exists
+    (\c item-not-found). Any other failure, such as a timeout, resolves to a QXmppError.
+
+    Use this to tell a MUC room from a MIX channel before joining. For the room's details,
+    query QXmppDiscoveryManager::info() directly; the same response carries the
+    \c muc\#roominfo form and the \c muc_* feature flags.
+
+    \code
+    muc->isMucRoom(u"room@conference.example.org"_s).then(this, [](auto result) {
+        if (auto *isRoom = std::get_if<bool>(&result); isRoom && *isRoom) {
+            // ... join it
+        }
+    });
+    \endcode
+
+    \since QXmpp 1.17
+*/
+QXmppTask<Result<bool>> QXmppMucManagerV2::isMucRoom(const QString &jid)
+{
+    auto *disco = client()->findExtension<QXmppDiscoveryManager>();
+    if (!disco) {
+        co_return QXmppError { u"QXmppDiscoveryManager is not registered."_s };
+    }
+
+    // A MUC service advertises the same identity and feature as a room, so require a localpart
+    // to tell a room from the service hosting it (XEP-0045 §6.2 vs §6.4).
+    if (QXmppUtils::jidToUser(jid).isEmpty()) {
+        co_return false;
+    }
+
+    auto result = co_await disco->info(jid).withContext(this);
+    if (auto *error = std::get_if<QXmppError>(&result)) {
+        // A non-existent room is a normal answer, not a failure.
+        if (auto stanzaError = error->value<QXmppStanza::Error>();
+            stanzaError && stanzaError->condition() == QXmppStanza::Error::ItemNotFound) {
+            co_return false;
+        }
+        co_return std::move(*error);
+    }
+
+    const auto &info = std::get<QXmppDiscoInfo>(result);
+    if (!info.features().contains(ns_muc)) {
+        co_return false;
+    }
+    const auto identities = info.identities();
+    for (const auto &identity : identities) {
+        if (identity.category() == u"conference") {
+            co_return true;
+        }
+    }
+    co_return false;
+}
+
+/*!
     Requests a unique room localpart from the MUC \a serviceJid (\xep{0307}{Unique Room Names for Multi-User Chat}).
 
     Returns the full room JID (\c localpart@serviceJid) which can be passed to createRoom().

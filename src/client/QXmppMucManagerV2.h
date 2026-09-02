@@ -68,6 +68,7 @@ public:
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> joinRoom(const QString &jid, const QString &nickname,
                                                       std::optional<QXmpp::Muc::HistoryOptions> history,
                                                       const QString &password = {});
+    QXmppTask<QXmpp::Result<bool>> isMucRoom(const QString &jid);
     QXmppTask<QXmpp::Result<QString>> requestUniqueRoomName(QString serviceJid);
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoom(QString serviceJid,
                                                         QString nickname,

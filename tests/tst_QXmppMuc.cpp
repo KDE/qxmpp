@@ -41,6 +41,13 @@ private:
     Q_SLOT void mucServiceDiscovery();
     Q_SLOT void mucServicesResetOnReconnect();
 
+    // Room probing
+    Q_SLOT void isMucRoomTrue();
+    Q_SLOT void isMucRoomWithoutRoomInfoForm();
+    Q_SLOT void isMucRoomNotFound();
+    Q_SLOT void isMucRoomMixChannel();
+    Q_SLOT void isMucRoomService();
+
     // MUC joining
     Q_SLOT void joinRoom();
     Q_SLOT void joinRoomWithHistory();
@@ -525,6 +532,94 @@ void tst_QXmppMuc::mucServicesResetOnReconnect()
     QVERIFY(!muc->mucServicesLoaded().value());
     QVERIFY(muc->mucServices().value().isEmpty());
     QVERIFY(muc->mucServiceInfos().value().isEmpty());
+}
+
+void tst_QXmppMuc::isMucRoomTrue()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->isMucRoom(u"coven@chat.shakespeare.lit"_s);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='coven@chat.shakespeare.lit' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text' name='A Dark Cave'/>"
+                "<feature var='http://jabber.org/protocol/muc'/>"
+                "<feature var='muc_public'/>"
+                "<x xmlns='jabber:x:data' type='result'>"
+                "<field var='FORM_TYPE' type='hidden'><value>http://jabber.org/protocol/muc#roominfo</value></field>"
+                "<field var='muc#roominfo_description'><value>The place for all good witches!</value></field>"
+                "</x>"
+                "</query></iq>"_s);
+
+    QVERIFY(expectFutureVariant<bool>(task));
+}
+
+void tst_QXmppMuc::isMucRoomWithoutRoomInfoForm()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->isMucRoom(u"coven@chat.shakespeare.lit"_s);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='coven@chat.shakespeare.lit' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='http://jabber.org/protocol/muc'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(expectFutureVariant<bool>(task));
+}
+
+void tst_QXmppMuc::isMucRoomNotFound()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->isMucRoom(u"nonexistent@chat.shakespeare.lit"_s);
+    test.expect(u"<iq id='qx1' to='nonexistent@chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='nonexistent@chat.shakespeare.lit' type='error'>"
+                "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    QVERIFY(!expectFutureVariant<bool>(task));
+}
+
+void tst_QXmppMuc::isMucRoomMixChannel()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->isMucRoom(u"coven@mix.shakespeare.lit"_s);
+    test.expect(u"<iq id='qx1' to='coven@mix.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='coven@mix.shakespeare.lit' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='mix'/>"
+                "<feature var='urn:xmpp:mix:core:1'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(!expectFutureVariant<bool>(task));
+}
+
+void tst_QXmppMuc::isMucRoomService()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    // A MUC service has no localpart, so this is answered without querying the server.
+    auto task = muc->isMucRoom(u"chat.shakespeare.lit"_s);
+    test.expectNoPacket();
+    QVERIFY(!expectFutureVariant<bool>(task));
 }
 
 void tst_QXmppMuc::joinRoom()
