@@ -21,6 +21,8 @@
 
 using namespace QXmpp;
 
+using DiscoveryState = QXmppDiscoveryManagerPrivate::DiscoveryState;
+
 template<typename... Ts>
 inline uint qHash(const std::tuple<Ts...> &t, uint seed = 0) noexcept
 {
@@ -263,7 +265,7 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category
     entry.requiredFeatures = std::move(requiredFeatures);
 
     // If discovery already completed, populate from cached results
-    if (d->discoveryComplete) {
+    if (d->discoveryState == DiscoveryState::Complete) {
         QList<QXmppDiscoService> matching;
         for (const auto &service : std::as_const(d->discoveredServices)) {
             if (d->matchesFilter(entry, service.info)) {
@@ -278,6 +280,13 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category
 
     QXmppDiscoServicesWatch watch;
     watch.d = std::move(data);
+
+    // Discovery runs on QXmppClient::connected and is skipped while no watch exists, so a
+    // watch added after that point would stay empty until the next reconnect.
+    if (d->clientConnected && d->discoveryState == DiscoveryState::NotStarted) {
+        d->discoverServices();
+    }
+
     return watch;
 }
 
@@ -345,16 +354,28 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
 void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
 {
     connect(client, &QXmppClient::connected, this, [this, client]() {
+        d->clientConnected = true;
         if (client->streamManagementState() != QXmppClient::ResumedStream) {
             d->itemsCache.clear();
             d->infoCache.clear();
             d->discoverServices();
         }
     });
+    connect(client, &QXmppClient::disconnected, this, [this]() {
+        d->clientConnected = false;
+        // Queries still in flight will never complete; let a later watch restart discovery.
+        if (d->discoveryState == DiscoveryState::Running) {
+            d->discoveryState = DiscoveryState::NotStarted;
+        }
+    });
 }
 
 void QXmppDiscoveryManager::onUnregistered(QXmppClient *client)
 {
+    // Drop the results with the client they belong to; a later registration rediscovers.
+    d->clientConnected = false;
+    d->discoveryState = DiscoveryState::NotStarted;
+    d->discoveredServices.clear();
     disconnect(client, nullptr, this, nullptr);
 }
 
@@ -408,7 +429,7 @@ void QXmppDiscoveryManagerPrivate::discoverServices()
         return;
     }
 
-    discoveryComplete = false;
+    discoveryState = DiscoveryState::Running;
     discoveredServices.clear();
 
     // Reset all live watches
@@ -465,7 +486,7 @@ void QXmppDiscoveryManagerPrivate::processServiceInfo(const QString &jid, const 
 
 void QXmppDiscoveryManagerPrivate::finalizeDiscovery()
 {
-    discoveryComplete = true;
+    discoveryState = DiscoveryState::Complete;
     for (auto &watch : watches) {
         if (auto data = watch.data.lock()) {
             data->loaded = true;

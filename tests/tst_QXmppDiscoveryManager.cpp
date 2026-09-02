@@ -24,6 +24,7 @@ private:
     Q_SLOT void discoverServicesLifetime();
     Q_SLOT void discoverServicesReconnect();
     Q_SLOT void discoverServicesAfterDiscovery();
+    Q_SLOT void discoverServicesWatchAddedWhileConnected();
 };
 
 void tst_QXmppDiscoveryManager::testInfo()
@@ -446,6 +447,44 @@ void tst_QXmppDiscoveryManager::discoverServicesAfterDiscovery()
     QVERIFY(watch3.services().value().isEmpty());
 
     // No new IQ should be sent
+    test.expectNoPacket();
+}
+
+void tst_QXmppDiscoveryManager::discoverServicesWatchAddedWhileConnected()
+{
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+
+    // Connect without any watch registered: discovery is skipped entirely.
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expectNoPacket();
+
+    // A watch created afterwards must start discovery, not wait for the next reconnect.
+    auto watch = disco->discoverServices(Disco::Category::Conference);
+    QVERIFY(!watch.loaded().value());
+
+    test.expect(u"<iq id='qx1' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='example.org' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#items'>"
+                "<item jid='muc.example.org'/>"
+                "</query></iq>"_s);
+
+    test.expect(u"<iq id='qx1' to='muc.example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='muc.example.org' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='http://jabber.org/protocol/muc'/>"
+                "</query></iq>"_s);
+
+    QVERIFY(watch.loaded().value());
+    QCOMPARE(watch.services().value().size(), 1);
+    QCOMPARE(watch.services().value().at(0).jid, u"muc.example.org"_s);
+
+    auto watch2 = disco->discoverServices(Disco::Category::Conference);
+    QVERIFY(watch2.loaded().value());
+    QCOMPARE(watch2.services().value().size(), 1);
     test.expectNoPacket();
 }
 

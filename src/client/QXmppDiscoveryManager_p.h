@@ -43,7 +43,17 @@ public:
     // service watches
     QList<WatchEntry> watches;
     QList<QXmppDiscoService> discoveredServices;
-    bool discoveryComplete = false;
+
+    // Service discovery is a per-connection state machine: it starts on connect, or when the
+    // first watch appears on an already connected client, and ends once every info query has
+    // been answered.
+    enum class DiscoveryState {
+        NotStarted,
+        Running,
+        Complete,
+    };
+    DiscoveryState discoveryState = DiscoveryState::NotStarted;
+    bool clientConnected = false;
 
     explicit QXmppDiscoveryManagerPrivate(QXmppDiscoveryManager *q) : q(q) { }
 
