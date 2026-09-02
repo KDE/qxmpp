@@ -185,14 +185,22 @@ private:
     \section1 Bindable properties
 
     Most observable state (subject(), nickname(), joined(), canSendMessages(), …) is exposed as
-    \c QBindable<T>. You can connect them to QProperty observers or read them directly:
+    \c QBindable<T>. You can read them directly or observe them:
 
     \code
-    auto canSend = room.canSendMessages();
-    canSend.addNotifier([canSend]() {
-        qDebug() << "canSendMessages changed:" << canSend.value();
+    // Member variables — both handles must outlive the observation.
+    QXmppMucRoomV2 m_room = ...;
+    QPropertyNotifier m_canSendNotifier;
+
+    m_canSendNotifier = m_room.canSendMessages().addNotifier([this]() {
+        qDebug() << "canSendMessages changed:" << m_room.canSendMessages().value();
     });
     \endcode
+
+    Two rules matter here. \c addNotifier() returns a QPropertyNotifier that unsubscribes in its
+    destructor, so the returned handle must be stored; discarding it silently disables the
+    callback. And the QBindable itself does not keep the room alive, so the QXmppMucRoomV2 handle
+    must be kept as well. See \l{Reactive Properties} for the full picture.
 
     \section1 Participants
 

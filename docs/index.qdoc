@@ -72,15 +72,19 @@ QXmppMucRoomV2 is the primary example — room info, config, and participant sta
 as bindable properties that update automatically when the server reports changes:
 
 \code
-auto room = muc->room("room@conference.example.org");
+auto room = *muc->findRoom("room@conference.example.org");
 room.setWatchAvatar(true);
 
-auto avatar = room.avatar();
-avatar.addNotifier([avatar]() {
+// m_avatarNotifier is a QPropertyNotifier member: discarding the handle
+// returned by addNotifier() unsubscribes the callback immediately.
+m_avatarNotifier = room.avatar().addNotifier([room]() {
     // called whenever the room avatar changes
-    auto val = avatar.value();
+    auto val = room.avatar().value();
 });
 \endcode
+
+Observer lifetime, \c addNotifier() versus \c subscribe(), and how to bridge bindable state
+into classic signals are covered in \l{Reactive Properties}.
 
 \section1 Managers
 

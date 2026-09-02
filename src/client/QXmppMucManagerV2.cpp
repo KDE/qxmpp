@@ -374,10 +374,16 @@ struct MucRoomData {
     your own participant entry, which exposes your current role and affiliation as QBindables.
 
     The capability QBindables (canSendMessages(), canSetRoles(), canConfigureRoom(), …) update
-    automatically whenever the MUC service changes your permissions.
+    automatically whenever the MUC service changes your permissions. Observer lifetime and the
+    other pitfalls of bindable state are covered in \l{Reactive Properties}.
+
+    The \c muc_bot and \c muc_create programs in the \c examples directory show the manager in
+    use, from joining and echoing messages to discovering services and creating a room.
 
     \warning THIS API IS NOT FINALIZED YET and may still change in incompatible ways
     before it is released.
+
+    \sa {Reactive Properties}
 
     \ingroup Managers
     \since QXmpp 1.13
@@ -404,7 +410,15 @@ QStringList QXmppMucManagerV2::discoveryFeatures() const
 /*!
     Returns the JIDs of discovered MUC services on the server.
 
-    The list is populated automatically after connecting and updated reactively.
+    The list is populated automatically after connecting and updated reactively. It is empty
+    before service discovery has run, so an empty list on its own does not mean the server has
+    no MUC service — check mucServicesLoaded() to tell the two apart.
+
+    A server with no MUC service cannot host group chats at all. Whether a particular user may
+    create rooms on a service is server policy and is not advertised anywhere in
+    \xep{0045}{Multi-User Chat}, so that only becomes visible when createRoom() fails.
+
+    \sa mucServiceInfos(), mucServicesLoaded(), {Reactive Properties}
 
     \since QXmpp 1.16
 */

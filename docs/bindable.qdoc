@@ -1,0 +1,133 @@
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+/*!
+\page qxmpp-bindable.html
+\title Reactive Properties
+
+Selected QXmpp APIs expose observable state via QBindable<T>, backed by the Qt bindable
+property system around QProperty. Instead of a signal per value, the state is a property you
+can read, observe, or use as an input to another property.
+
+QXmppMucManagerV2 and QXmppMucRoomV2 are the primary examples: discovered MUC services, room
+subject, room info, room configuration, participant roles and derived permissions such as
+\c canSendMessages() are all bindable.
+
+\section1 Reading a value
+
+The simplest use is a plain read. This is always safe and never needs any bookkeeping:
+
+\code
+auto room = *muc->findRoom(u"room@conference.example.org"_s);
+qDebug() << room.subject().value();
+\endcode
+
+\section1 Observing changes
+
+\c addNotifier() registers a callback that runs whenever the value changes.
+
+\warning \c addNotifier() returns a QPropertyNotifier that \e unsubscribes in its destructor.
+Discarding the return value disables the callback immediately, and the compiler does not warn
+about it. Store the handle for as long as you want the callback to run.
+
+\badcode
+// WRONG — the notifier is destroyed at the end of this statement and never fires.
+room.subject().addNotifier([]() { qDebug() << "subject changed"; });
+\endcode
+
+\code
+// Right — the handle is a member of the observing object.
+class MyController : public QObject
+{
+    // ...
+    QXmppMucRoomV2 m_room;
+    QPropertyNotifier m_subjectNotifier;
+};
+
+m_subjectNotifier = m_room.subject().addNotifier([this]() {
+    qDebug() << "subject changed:" << m_room.subject().value();
+});
+\endcode
+
+\section1 addNotifier() versus subscribe()
+
+\c addNotifier() only fires on \e future changes. It does not report the value the property
+already has. That matters whenever the interesting transition happens before you get a chance to
+observe it — for example QXmppMucRoomV2::joined(), which is already \c true by the time the
+QXmppMucManagerV2::joinRoom() task resolves.
+
+The straightforward fix is to read the value once yourself and let the notifier report every
+later change:
+
+\code
+onJoinedChanged();
+m_joinedNotifier = m_room.joined().addNotifier([this]() { onJoinedChanged(); });
+\endcode
+
+\c subscribe() does both in one call, but its return type QPropertyChangeHandler<Functor>
+depends on the callable and has no default constructor, which makes it awkward to hold in a
+member. Use it where the handle can be initialised in place, for instance in a member
+initialiser list or a local scope that outlives the observation.
+
+\section1 Chaining into your own properties
+
+A binding recomputes automatically whenever any property it reads changes. This is usually
+cleaner than a notifier when the goal is a derived value rather than a side effect:
+
+\code
+// Member of the observing class
+QProperty<QString> m_windowTitle;
+
+m_windowTitle.setBinding([this] {
+    const auto subject = m_room.subject().value();
+    return subject.isEmpty() ? m_room.jid() : subject;
+});
+\endcode
+
+To bridge into classic Qt signals — for instance to feed a QML property — bind a QProperty and
+attach a single notifier to it:
+
+\code
+m_services.setBinding([this] { return m_mucManager->mucServices().value(); });
+m_servicesNotifier = m_services.addNotifier([this] {
+    Q_EMIT servicesChanged();
+});
+\endcode
+
+\section1 Lifetime
+
+A QBindable is a non-owning pointer to the underlying QProperty. It does not keep the object
+that holds the property alive.
+
+For MUC this means the QXmppMucRoomV2 handle must outlive every QBindable and notifier taken
+from it. The handle owns a strong reference to the room state, so keeping the handle is enough;
+keeping only the QBindable is not. The same applies to QXmppMucParticipant.
+
+QXmppMucManagerV2 must stay alive as well, because it owns the signal infrastructure the handles
+delegate to.
+
+\section1 When a property is populated
+
+Bindable state is filled in from the server, so it is empty until the relevant data arrives.
+
+Service discovery in particular runs after the client has connected and authenticated, so
+QXmppMucManagerV2::mucServices() is empty before that. Use
+QXmppMucManagerV2::mucServicesLoaded() to tell "no services discovered yet" apart from "this
+server has no MUC service":
+
+\code
+m_loadedNotifier = muc->mucServicesLoaded().addNotifier([muc]() {
+    if (!muc->mucServicesLoaded().value()) {
+        return;
+    }
+    if (muc->mucServices().value().isEmpty()) {
+        qDebug() << "This server offers no MUC service.";
+    }
+});
+\endcode
+
+The \c muc_create and \c muc_bot programs in the \c examples directory apply all of this.
+
+\sa QXmppMucManagerV2, QXmppMucRoomV2
+*/
