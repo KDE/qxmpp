@@ -160,9 +160,15 @@ std::tuple<QString, QString> rewriteXmlWithoutStanzaId(const String &inputXml)
 template<typename T, typename... Args>
 static QByteArray packetToXml(const T &packet, Args &&...args)
 {
-    auto data = QXmpp::Private::serializeXmlWriter([&](QXmpp::Private::XmlWriter &w) {
-        packet.toXml(w, std::forward<Args>(args)...);
-    });
+    auto data = [&] {
+        if constexpr (sizeof...(Args) == 0) {
+            return QXmpp::Private::serializeXml(packet);
+        } else {
+            return QXmpp::Private::serializeXmlWriter([&](QXmpp::Private::XmlWriter &w) {
+                packet.toXml(w, std::forward<Args>(args)...);
+            });
+        }
+    }();
     data.replace(u'\'', "&apos;");
     return data;
 }

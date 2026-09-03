@@ -172,7 +172,7 @@ void QXmppOutgoingServer::handleStanza(const QDomElement &stanza)
         // send dialback if needed
         d->dialbackTimer->stop();
         sendDialback();
-    } else if (isElementType<StarttlsProceed>(stanza)) {
+    } else if (isElement<StarttlsProceed>(stanza)) {
         debug(u"Starting encryption"_s);
         d->socket.internalSocket()->startClientEncryption();
         return;

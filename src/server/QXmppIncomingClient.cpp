@@ -16,6 +16,7 @@
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
+#include "packets/Bind.h"
 #include "packets/Sasl2.h"
 #include "packets/Starttls.h"
 
@@ -261,7 +262,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
         d->idleTimer->start();
     }
 
-    if (isElementType<StarttlsRequest>(nodeRecv)) {
+    if (isElement<StarttlsRequest>(nodeRecv)) {
         sendData(serializeXml(StarttlsProceed()));
         d->socket.internalSocket()->flush();
         d->socket.internalSocket()->startServerEncryption();
@@ -393,20 +394,20 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
             const QString type = nodeRecv.attribute(u"type"_s);
             const auto id = nodeRecv.attribute(u"id"_s);
 
-            if (isElement<BindElement>(nodeRecv.firstChildElement())) {
-                if (auto bindSet = SetIq<BindElement>::fromDom(nodeRecv)) {
+            if (isElement<Bind>(nodeRecv.firstChildElement())) {
+                if (auto bindSet = SetIq<Bind>::fromDom(nodeRecv)) {
                     d->resource = bindSet->payload.resource.trimmed();
                     if (d->resource.isEmpty()) {
                         d->resource = QXmppUtils::generateStanzaHash();
                     }
                     d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
 
-                    sendData(serializeXml(ResultIq<BindElement> {
+                    sendData(serializeXml(ResultIq<Bind> {
                         bindSet->id,
                         {},
                         {},
                         {},
-                        BindElement { d->jid, {} },
+                        Bind { d->jid, {} },
                     }));
 
                     // bound

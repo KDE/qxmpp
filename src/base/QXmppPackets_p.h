@@ -8,7 +8,11 @@
 #include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 
+#include <optional>
+
 #include <QUrl>
+
+class QDomElement;
 
 //
 //  W A R N I N G
@@ -29,11 +33,17 @@
 
 namespace QXmpp::Private {
 
+class XmlWriter;
+
 struct Bind {
     static constexpr std::tuple XmlTag = { u"bind", ns_bind };
     // XML schema actually says variant<Jid, Resource>
     QString jid;
     QString resource;
+
+    // defined in packets/Bind.h
+    static std::optional<Bind> fromDom(const QDomElement &el);
+    void toXml(XmlWriter &w) const;
 };
 
 struct BookmarkConference {

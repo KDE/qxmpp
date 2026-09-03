@@ -9,6 +9,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
+#include "Algorithms.h"
 #include "XmlWriter.h"
 
 namespace QXmpp::Private {
@@ -288,7 +289,7 @@ struct XmlSpecParser {
     template<typename Struct>
     static std::optional<Struct> fromDomImpl(const QDomElement &el)
     {
-        if (!isElementType<Struct>(el)) {
+        if (!isElement<Struct>(el)) {
             return {};
         }
 
@@ -739,10 +740,9 @@ template<typename T>
 inline QByteArray serializeXml(const T &packet)
     requires(HasXmlSpec<T> && !QXmlStreamSerializeable<T> && !XmlWriterSerializeable<T>)
 {
-    return serializeXml(std::function<void(QXmlStreamWriter *)> {
-        [&](QXmlStreamWriter *w) {
-            XmlSpecSerializer::serialize(w, packet);
-        } });
+    return serializeQXmlStream([&](QXmlStreamWriter *w) {
+        XmlSpecSerializer::serialize(w, packet);
+    });
 }
 
 // TODO: Merge into parseElement() in Utils_p.h
