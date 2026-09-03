@@ -967,7 +967,7 @@ void tst_QXmppSasl::sasl2Fast()
     Sasl2::StreamFeature sasl2Feature {
         { "PLAIN" },
         {},
-        FastFeature { false, { "HT-SHA-256-NONE", "HT-SHA3-512-NONE" } },
+        FastFeature { { "HT-SHA-256-NONE", "HT-SHA3-512-NONE" }, false },
         false
     };
 

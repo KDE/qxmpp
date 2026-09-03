@@ -4,6 +4,9 @@
 
 #include "QXmppBookmarkSet.h"
 
+#include "QXmppUtils_p.h"
+
+#include "Algorithms.h"
 #include "packets/Bookmarks.h"
 
 using namespace QXmpp::Private;

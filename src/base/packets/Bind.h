@@ -21,6 +21,9 @@ struct XmlSpec<Bind> {
     };
 };
 
+inline std::optional<Bind> Bind::fromDom(const QDomElement &el) { return XmlSpecParser::fromDomImpl<Bind>(el); }
+inline void Bind::toXml(XmlWriter &w) const { XmlSpecSerializer::serialize(w, *this); }
+
 }  // namespace QXmpp::Private
 
 #endif  // BIND_H
