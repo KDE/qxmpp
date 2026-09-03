@@ -35,7 +35,7 @@ public:
         : QObject(parent), m_probeJid(probeJid)
     {
         m_client.logger()->setLoggingType(QXmppLogger::StdoutLogging);
-        m_client.logger()->enablePrettyXml();
+        m_client.logger()->setOutputMode(QXmppLogger::OutputMode::Pretty);
 
         m_client.addNewExtension<QXmppDiscoveryManager>();
         m_muc = m_client.addNewExtension<QXmppMucManagerV2>();

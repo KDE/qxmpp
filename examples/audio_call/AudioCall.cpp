@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
     auto *callManager = client.addNewExtension<QXmppCallManager>();
     client.logger()->setLoggingType(QXmppLogger::StdoutLogging);
     client.logger()->setMessageTypes(QXmppLogger::MessageType::AnyMessage);
-    client.logger()->enablePrettyXml();
+    client.logger()->setOutputMode(QXmppLogger::OutputMode::Pretty);
 
     // client config
     QXmppConfiguration config;

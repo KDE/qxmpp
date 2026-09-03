@@ -177,11 +177,24 @@ public:
     QFile *logFile;
     QString logFilePath;
     QXmppLogger::MessageTypes messageTypes;
-    bool prettyXml = false;
+    QXmppLogger::OutputMode outputMode = QXmppLogger::OutputMode::Auto;
     QXmppLogger::ColorMode colorMode = QXmppLogger::ColorAuto;
     bool filterStreamManagementAcks = true;
-    std::optional<qsizetype> elideXmlTextAbove;
-    std::optional<qsizetype> elideLogMessagesAbove;
+    std::optional<qsizetype> elideXmlTextAbove = QXmppLogger::DefaultElideXmlTextAbove;
+    std::optional<qsizetype> elideLogMessagesAbove = QXmppLogger::DefaultElideLogMessagesAbove;
+
+    bool prettyOutput() const
+    {
+        switch (outputMode) {
+        case QXmppLogger::OutputMode::Auto:
+            return loggingType == QXmppLogger::StdoutLogging;
+        case QXmppLogger::OutputMode::Raw:
+            return false;
+        case QXmppLogger::OutputMode::Pretty:
+            return true;
+        }
+        return false;
+    }
 };
 
 QXmppLoggerPrivate::QXmppLoggerPrivate()
@@ -285,8 +298,10 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
         return;
     }
 
+    const bool pretty = d->prettyOutput();
+
     bool colorize = false;
-    if (d->prettyXml) {
+    if (pretty) {
         switch (d->colorMode) {
         case ColorOn:
             colorize = true;
@@ -301,10 +316,8 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
     }
 
     QString payload = text;
-    if ((type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
-        if (d->prettyXml) {
-            payload = QXmpp::Private::formatXmlForDebug(text, { true, 2, colorize, d->elideXmlTextAbove });
-        }
+    if (pretty && (type == SentMessage || type == ReceivedMessage) && !text.isEmpty()) {
+        payload = QXmpp::Private::formatXmlForDebug(text, { true, 2, colorize, d->elideXmlTextAbove });
         if (d->elideLogMessagesAbove) {
             payload = QXmpp::Private::elideMiddle(payload, *d->elideLogMessagesAbove, colorize, true);
         }
@@ -331,26 +344,58 @@ void QXmppLogger::log(QXmppLogger::MessageType type, const QString &text)
 }
 
 /*!
+    Returns how logged Sent/Received XML is formatted. See OutputMode.
+
+    \since QXmpp 1.17
+*/
+QXmppLogger::OutputMode QXmppLogger::outputMode() const
+{
+    return d->outputMode;
+}
+
+/*!
+    Sets how logged Sent/Received XML is formatted (\a mode). See OutputMode.
+
+    Formatting for humans is only enabled by default for StdoutLogging. Set OutputMode::Pretty
+    to format the output of the other logging types too, e.g. when logging via signals and
+    printing the messages yourself.
+
+    \since QXmpp 1.17
+*/
+void QXmppLogger::setOutputMode(OutputMode mode)
+{
+    if (d->outputMode != mode) {
+        const auto pretty = prettyXml();
+        d->outputMode = mode;
+        Q_EMIT outputModeChanged();
+        if (prettyXml() != pretty) {
+            Q_EMIT prettyXmlChanged();
+        }
+    }
+}
+
+/*!
     Returns whether Sent/Received XML stanzas should be pretty-printed.
+
+    \deprecated This method is deprecated since QXmpp 1.17. Use outputMode() instead.
 
     \since QXmpp 1.16
 */
 bool QXmppLogger::prettyXml() const
 {
-    return d->prettyXml;
+    return d->outputMode == OutputMode::Pretty;
 }
 
 /*!
     Sets whether Sent/Received XML stanzas should be pretty-printed (\a enable).
 
+    \deprecated This method is deprecated since QXmpp 1.17. Use setOutputMode() instead.
+
     \since QXmpp 1.16
 */
 void QXmppLogger::setPrettyXml(bool enable)
 {
-    if (d->prettyXml != enable) {
-        d->prettyXml = enable;
-        Q_EMIT prettyXmlChanged();
-    }
+    setOutputMode(enable ? OutputMode::Pretty : OutputMode::Raw);
 }
 
 /*!
@@ -420,9 +465,8 @@ std::optional<qsizetype> QXmppLogger::elideXmlTextAbove() const
     the content stay visible while the XML structure around them is preserved. This is useful
     for large base64 payloads (avatars, file previews, encrypted content).
 
-    Only applies to Sent/Received messages with prettyXml() enabled. Pass std::nullopt to never
-    elide text nodes; that is the default unless eliding was enabled via enableEliding() or
-    enablePrettyXml().
+    Only applies to Sent/Received messages. Pass std::nullopt to never elide text nodes. Only
+    has an effect in OutputMode::Pretty.
 
     \sa setElideLogMessagesAbove(), enableEliding()
     \since QXmpp 1.17
@@ -451,8 +495,8 @@ std::optional<qsizetype> QXmppLogger::elideLogMessagesAbove() const
     visible. Unlike setElideXmlTextAbove() this also shortens stanzas that are large because of
     the sheer number of elements they contain, as well as payloads that are not valid XML.
 
-    Only applies to Sent/Received messages. Pass std::nullopt to never elide messages; that is
-    the default unless eliding was enabled via enableEliding() or enablePrettyXml().
+    Only applies to Sent/Received messages. Pass std::nullopt to never elide messages. Only has
+    an effect in OutputMode::Pretty.
 
     \sa setElideXmlTextAbove(), enableEliding()
     \since QXmpp 1.17
@@ -469,7 +513,8 @@ void QXmppLogger::setElideLogMessagesAbove(std::optional<qsizetype> length)
     setElideLogMessagesAbove(DefaultElideLogMessagesAbove), or, if disabling, setting both to
     std::nullopt. Use those setters directly to pick your own limits.
 
-    enablePrettyXml() already turns this on.
+    Eliding is enabled by default, so this is mainly useful as enableEliding(false) to log full
+    stanzas in OutputMode::Pretty. It has no effect in OutputMode::Raw.
 
     \sa setElideXmlTextAbove(), setElideLogMessagesAbove()
     \since QXmpp 1.17
@@ -489,14 +534,14 @@ void QXmppLogger::enableEliding(bool enable)
     Enables (\a enable) pretty-printing of Sent/Received XML stanzas, sets ColorAuto so ANSI
     escapes appear on a TTY and elides overly long messages.
 
-    Equivalent to calling setPrettyXml(enable) and, if enabling, setColorMode(ColorAuto) and
-    enableEliding(). Call enableEliding(false) afterwards to keep full stanzas.
+    \deprecated This method is deprecated since QXmpp 1.17. Use
+    setOutputMode(OutputMode::Pretty) instead, which does the same.
 
     \since QXmpp 1.16
 */
 void QXmppLogger::enablePrettyXml(bool enable)
 {
-    setPrettyXml(enable);
+    setOutputMode(enable ? OutputMode::Pretty : OutputMode::Raw);
     if (enable) {
         setColorMode(ColorAuto);
         enableEliding();

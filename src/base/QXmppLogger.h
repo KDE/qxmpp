@@ -53,9 +53,17 @@ class QXMPP_EXPORT QXmppLogger : public QObject
     */
     Q_PROPERTY(MessageTypes messageTypes READ messageTypes WRITE setMessageTypes NOTIFY messageTypesChanged)
     /*!
+        \property QXmppLogger::outputMode
+
+        How logged Sent/Received XML is formatted
+    */
+    Q_PROPERTY(OutputMode outputMode READ outputMode WRITE setOutputMode NOTIFY outputModeChanged)
+    /*!
         \property QXmppLogger::prettyXml
 
         Whether to pretty-print Sent/Received XML stanzas with indentation
+
+        \deprecated This property is deprecated since QXmpp 1.17. Use outputMode instead.
     */
     Q_PROPERTY(bool prettyXml READ prettyXml WRITE setPrettyXml NOTIFY prettyXmlChanged)
     /*!
@@ -118,13 +126,31 @@ public:
     Q_ENUM(ColorMode)
 
     /*!
-        Default maximum length of an XML text node used by enableEliding().
+        This enum describes how logged Sent/Received XML is formatted.
+
+        \value Auto Format for humans if loggingType is StdoutLogging, pass XML through
+        unchanged otherwise. This is the default.
+        \value Raw Pass logged XML through unchanged, so it can be reparsed.
+        \value Pretty Pretty-print XML, colorize it according to colorMode and elide overly
+        long messages.
+
+        \since QXmpp 1.17
+    */
+    enum class OutputMode {
+        Auto,
+        Raw,
+        Pretty,
+    };
+    Q_ENUM(OutputMode)
+
+    /*!
+        Default maximum length of an XML text node in OutputMode::Pretty.
 
         \since QXmpp 1.17
     */
     static constexpr qsizetype DefaultElideXmlTextAbove = 512;
     /*!
-        Default maximum length of a logged message used by enableEliding().
+        Default maximum length of a logged message in OutputMode::Pretty.
 
         \since QXmpp 1.17
     */
@@ -147,6 +173,10 @@ public:
     void setMessageTypes(QXmppLogger::MessageTypes types);
     Q_SIGNAL void messageTypesChanged();
 
+    OutputMode outputMode() const;
+    void setOutputMode(OutputMode mode);
+    Q_SIGNAL void outputModeChanged();
+
     bool prettyXml() const;
     void setPrettyXml(bool enable);
     Q_SIGNAL void prettyXmlChanged();
@@ -166,7 +196,10 @@ public:
 
     void enableEliding(bool enable = true);
 
+#if QXMPP_DEPRECATED_SINCE(1, 17)
+    [[deprecated("Use setOutputMode() instead.")]]
     void enablePrettyXml(bool enable = true);
+#endif
 
     Q_SLOT virtual void setGauge(const QString &gauge, double value);
     Q_SLOT virtual void updateCounter(const QString &counter, qint64 amount);

@@ -129,7 +129,7 @@ void tst_QXmppXmlFormatter::loggerPrettyXmlAppliesToSentReceivedOnly()
 {
     QXmppLogger logger;
     logger.setLoggingType(QXmppLogger::SignalLogging);
-    logger.setPrettyXml(true);
+    logger.setOutputMode(QXmppLogger::OutputMode::Pretty);
     logger.setColorMode(QXmppLogger::ColorOff);
 
     QSignalSpy spy(&logger, &QXmppLogger::message);
