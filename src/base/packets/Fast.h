@@ -14,8 +14,8 @@ namespace QXmpp::Private {
 struct FastFeature {
     static constexpr std::tuple XmlTag = { u"fast", ns_fast };
 
-    bool tls0rtt = false;
     std::vector<QString> mechanisms;
+    bool tls0rtt = false;
 };
 
 struct FastTokenRequest {
@@ -41,8 +41,8 @@ struct FastRequest {
 template<>
 struct XmlSpec<FastFeature> {
     static constexpr std::tuple Spec = {
-        XmlOptionalAttribute { &FastFeature::tls0rtt, u"tls-0rtt", BoolDefaultSerializer(false) },
         XmlTextElements { &FastFeature::mechanisms, u"mechanism" },
+        XmlOptionalAttribute { &FastFeature::tls0rtt, u"tls-0rtt", BoolDefaultSerializer(false) },
     };
 };
 

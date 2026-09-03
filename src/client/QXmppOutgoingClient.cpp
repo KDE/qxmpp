@@ -21,6 +21,7 @@
 #include "Algorithms.h"
 #include "Stream.h"
 #include "StringLiterals.h"
+#include "packets/Bind.h"
 #include "packets/Csi.h"
 #include "packets/Starttls.h"
 
@@ -1082,7 +1083,7 @@ namespace QXmpp::Private {
 
 HandleElementResult StarttlsManager::handleElement(const QDomElement &el)
 {
-    if (isElementType<StarttlsProceed>(el)) {
+    if (isElement<StarttlsProceed>(el)) {
         m_promise.finish();
         return Finished;
     }
@@ -1096,9 +1097,9 @@ QXmppTask<BindManager::Result> BindManager::bindAddress(const QString &resource)
 
     m_promise = QXmppPromise<Result>();
     m_iqId = generateSequentialStanzaId();
-    m_socket->sendData(serializeXml(Iq::Set<BindElement> {
+    m_socket->sendData(serializeXml(Iq::Set<Bind> {
         .id = m_iqId,
-        .payload = BindElement { {}, resource },
+        .payload = Bind { {}, resource },
     }));
 
     return m_promise->task();
@@ -1106,7 +1107,7 @@ QXmppTask<BindManager::Result> BindManager::bindAddress(const QString &resource)
 
 HandleElementResult BindManager::handleElement(const QDomElement &el)
 {
-    if (el.tagName() == u"iq" && isElement<BindElement>(el.firstChildElement()) && el.attribute(u"id"_s) == m_iqId) {
+    if (el.tagName() == u"iq" && isElement<Bind>(el.firstChildElement()) && el.attribute(u"id"_s) == m_iqId) {
         Q_ASSERT(m_promise.has_value());
 
         auto p = std::move(*m_promise);
@@ -1115,7 +1116,7 @@ HandleElementResult BindManager::handleElement(const QDomElement &el)
 
         p.finish(map<Result>(
             overloaded {
-                [](BindElement &&bind) -> Result {
+                [](Bind &&bind) -> Result {
                     if (bind.jid.isEmpty()) {
                         return ProtocolError { u"Server did not return JID upon resource binding."_s };
                     }
@@ -1135,7 +1136,7 @@ HandleElementResult BindManager::handleElement(const QDomElement &el)
                     return ProtocolError { error.description };
                 },
             },
-            parseIqResult<BindElement>(el)));
+            parseIqResult<Bind>(el)));
         return Finished;
     }
     return Rejected;

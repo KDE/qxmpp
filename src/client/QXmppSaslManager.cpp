@@ -172,7 +172,7 @@ HandleElementResult SaslManager::handleElement(const QDomElement &el)
         return Rejected;
     }
 
-    if (isElementType<Success>(el)) {
+    if (isElement<Success>(el)) {
         finish(QXmpp::Success());
         return Finished;
     } else if (auto challenge = elementFromDom<Challenge>(el)) {
