@@ -55,6 +55,12 @@ private:
     Q_SLOT void joinRoomTimeout();
     Q_SLOT void joinRoomTimerStopped();
     Q_SLOT void joinRoomAlreadyInProgress();
+    Q_SLOT void joinRoomWithHistoryMessages();
+    Q_SLOT void joinRoomPresenceError();
+    Q_SLOT void joinRoomDuplicateNickname();
+    Q_SLOT void joinRoomDuplicateOccupantId();
+    Q_SLOT void joinRoomNicknameModifiedByService();
+    Q_SLOT void joinRoomNicknameModifiedWithoutStatus210();
 
     // MUC messages
     Q_SLOT void receiveMessage();
@@ -68,6 +74,7 @@ private:
     Q_SLOT void setSubject();
     Q_SLOT void changeNickname();
     Q_SLOT void changeNicknameTimeout();
+    Q_SLOT void changeNicknamePresenceError();
     Q_SLOT void participantNicknameChange();
     Q_SLOT void participantJoinLeave();
     Q_SLOT void participantsList();
@@ -80,6 +87,7 @@ private:
     Q_SLOT void changePresence();
     Q_SLOT void leaveRoom();
     Q_SLOT void leaveRoomTimeout();
+    Q_SLOT void leaveRoomPresenceError();
 
     // Disconnect state management
     Q_SLOT void disconnectNoStreamManagement();
@@ -138,6 +146,8 @@ private:
     Q_SLOT void selfPingStillJoinedItemNotFound();
     Q_SLOT void selfPingGhosted();
     Q_SLOT void selfPingInconclusiveRetry();
+    Q_SLOT void selfPingInconclusiveRetriesExhausted();
+    Q_SLOT void selfPingUnknownErrorCondition();
     Q_SLOT void selfPingSkippedDuringNickChange();
     Q_SLOT void selfPingDisabledWhenZeroThreshold();
     Q_SLOT void selfPingMultipleRoomsSingleTimer();
@@ -820,6 +830,247 @@ void tst_QXmppMuc::joinRoomAlreadyInProgress()
     expectVariant<QXmppMucRoomV2>(task3.result());
 }
 
+void tst_QXmppMuc::joinRoomWithHistoryMessages()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    QString historyRoomJid;
+    QStringList historyBodies;
+    QObject::connect(muc, &QXmppMucManagerV2::roomHistoryReceived, muc, [&](const QString &roomJid, const QList<QXmppMessage> &messages) {
+        historyRoomJid = roomJid;
+        for (const auto &message : messages) {
+            historyBodies.append(message.body());
+        }
+    });
+    int liveMessages = 0;
+    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &) {
+        liveMessages++;
+    });
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    // Discussion history is replayed before the subject.
+    QXmppMessage firstHistoryMsg;
+    parsePacket(firstHistoryMsg,
+                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                "<body>Thrice the brinded cat hath mew'd.</body>"
+                "</message>");
+    QVERIFY(muc->handleMessage(firstHistoryMsg));
+    QXmppMessage secondHistoryMsg;
+    parsePacket(secondHistoryMsg,
+                "<message from='coven@chat.shakespeare.lit/secondwitch' type='groupchat'>"
+                "<body>Thrice and once the hedge-pig whined.</body>"
+                "</message>");
+    QVERIFY(muc->handleMessage(secondHistoryMsg));
+
+    // Nothing is delivered while the join is still running.
+    QVERIFY(historyBodies.isEmpty());
+    QVERIFY(!task.isFinished());
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task);
+    QCOMPARE(room.subject().value(), u"Cauldron"_s);
+    QCOMPARE(historyRoomJid, u"coven@chat.shakespeare.lit"_s);
+    QCOMPARE(historyBodies, QStringList({ u"Thrice the brinded cat hath mew'd."_s, u"Thrice and once the hedge-pig whined."_s }));
+    // History is not replayed a second time through messageReceived().
+    QCOMPARE(liveMessages, 0);
+}
+
+void tst_QXmppMuc::joinRoomPresenceError()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // The service rejects the join, e.g. because a password is required.
+    QXmppPresence errorPresence;
+    parsePacket(errorPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='error'>"
+                "<x xmlns='http://jabber.org/protocol/muc'/>"
+                "<error by='coven@chat.shakespeare.lit' type='auth'>"
+                "<not-authorized xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>Password required</text>"
+                "</error>"
+                "</presence>");
+    test.injectPresence(errorPresence);
+
+    QVERIFY(task.isFinished());
+    auto error = expectVariant<QXmppError>(task.result());
+    QCOMPARE(error.description, u"Cannot join MUC: Password required"_s);
+    // The stanza error is preserved for callers that need the condition.
+    auto stanzaError = error.value<QXmppStanza::Error>();
+    QVERIFY(stanzaError.has_value());
+    QCOMPARE(stanzaError->condition(), QXmppStanza::Error::NotAuthorized);
+    QVERIFY(!muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+}
+
+void tst_QXmppMuc::joinRoomDuplicateNickname()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    auto injectFirstWitch = [&]() {
+        QXmppPresence presence;
+        parsePacket(presence,
+                    "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                    "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                    "<item affiliation='member' role='participant'/>"
+                    "</x>"
+                    "</presence>");
+        test.injectPresence(presence);
+    };
+
+    injectFirstWitch();
+    QVERIFY(!task.isFinished());
+
+    // Nicknames are unique per XEP-0045: a second presence for the same one
+    // means the service is misbehaving, so the join fails.
+    injectFirstWitch();
+
+    QVERIFY(task.isFinished());
+    auto error = expectVariant<QXmppError>(task.result());
+    QCOMPARE(error.description, u"MUC reported two presences for the same nickname"_s);
+    QVERIFY(!muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+}
+
+void tst_QXmppMuc::joinRoomDuplicateOccupantId()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // Occupant IDs are only honoured once the room advertises XEP-0421.
+    test.inject(u"<iq id='qx1' from='coven@chat.shakespeare.lit' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                "<identity category='conference' type='text'/>"
+                "<feature var='http://jabber.org/protocol/muc'/>"
+                "<feature var='urn:xmpp:occupant-id:0'/>"
+                "</query></iq>"_s);
+
+    QXmppPresence firstWitch;
+    parsePacket(firstWitch,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='shared-occupant-id'/>"
+                "</presence>");
+    test.injectPresence(firstWitch);
+    QVERIFY(!task.isFinished());
+
+    // Same occupant ID under a different nickname — the service is misbehaving.
+    QXmppPresence secondWitch;
+    parsePacket(secondWitch,
+                "<presence from='coven@chat.shakespeare.lit/secondwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='shared-occupant-id'/>"
+                "</presence>");
+    test.injectPresence(secondWitch);
+
+    QVERIFY(task.isFinished());
+    auto error = expectVariant<QXmppError>(task.result());
+    QCOMPARE(error.description, u"MUC reported two presences for the same occupant ID"_s);
+    QVERIFY(!muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+}
+
+void tst_QXmppMuc::joinRoomNicknameModifiedByService()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // Status 210 announces that the service assigned a different nickname.
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch-2'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "<status code='210'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
+    muc->handleMessage(subjectMsg);
+
+    auto room = expectFutureVariant<QXmppMucRoomV2>(task);
+    QCOMPARE(room.nickname().value(), u"thirdwitch-2"_s);
+    auto self = room.selfParticipant();
+    QVERIFY(self.has_value());
+    QCOMPARE(self->nickname().value(), u"thirdwitch-2"_s);
+}
+
+void tst_QXmppMuc::joinRoomNicknameModifiedWithoutStatus210()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info IQ
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // Same as above but without status 210 — an unannounced rename is rejected.
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch-2'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QVERIFY(task.isFinished());
+    auto error = expectVariant<QXmppError>(task.result());
+    QCOMPARE(error.description, u"MUC modified nickname without sending status 210."_s);
+    QVERIFY(!muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+}
+
 static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
                                  const QString &roomJid = u"coven@chat.shakespeare.lit"_s,
                                  const QString &nick = u"thirdwitch"_s)
@@ -1278,6 +1529,48 @@ void tst_QXmppMuc::changeNicknameTimeout()
     auto error = expectVariant<QXmppError>(nickTask.result());
     QVERIFY(error.description.contains(u"timed out"_s));
     // Room should still be valid after a nick-change timeout
+}
+
+void tst_QXmppMuc::changeNicknamePresenceError()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    auto nickTask = room.setNickname(u"oldhag"_s);
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/oldhag'/>"_s);
+    QVERIFY(!nickTask.isFinished());
+
+    // The service rejects the new nickname because someone else already uses it.
+    QXmppPresence errorPresence;
+    parsePacket(errorPresence,
+                "<presence from='coven@chat.shakespeare.lit/oldhag' type='error'>"
+                "<x xmlns='http://jabber.org/protocol/muc'/>"
+                "<error by='coven@chat.shakespeare.lit' type='cancel'>"
+                "<conflict xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>Nickname is taken</text>"
+                "</error>"
+                "</presence>");
+    test.injectPresence(errorPresence);
+
+    QVERIFY(nickTask.isFinished());
+    auto error = expectVariant<QXmppError>(nickTask.result());
+    QCOMPARE(error.description, u"Nickname is taken"_s);
+    // The room keeps the old nickname and stays joined.
+    QCOMPARE(room.nickname().value(), u"thirdwitch"_s);
+    QVERIFY(muc->d->testHasRoom(roomJid));
+
+    // With no nick change pending any more, self-pings resume for the room.
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+    test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit/thirdwitch'/>"_s);
 }
 
 void tst_QXmppMuc::participantNicknameChange()
@@ -1748,6 +2041,44 @@ void tst_QXmppMuc::leaveRoomTimeout()
     QVERIFY(leaveTask.isFinished());
     auto error = expectVariant<QXmppError>(leaveTask.result());
     QVERIFY(error.description.contains(u"timed out"_s));
+}
+
+void tst_QXmppMuc::leaveRoomPresenceError()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    auto leaveTask = room.leave();
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'/>"_s);
+    QVERIFY(!leaveTask.isFinished());
+
+    // The service answers the unavailable presence with an error instead of
+    // echoing it back.
+    QXmppPresence errorPresence;
+    parsePacket(errorPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='error'>"
+                "<error by='coven@chat.shakespeare.lit' type='wait'>"
+                "<internal-server-error xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>Backend unavailable</text>"
+                "</error>"
+                "</presence>");
+    test.injectPresence(errorPresence);
+
+    QVERIFY(leaveTask.isFinished());
+    auto error = expectVariant<QXmppError>(leaveTask.result());
+    QCOMPARE(error.description, u"Backend unavailable"_s);
+    // Only the leave request failed; the room is still tracked.
+    QVERIFY(muc->d->testHasRoom(roomJid));
+
+    // The failed attempt released the promise slot, so leaving can be retried.
+    auto retryTask = room.leave();
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'/>"_s);
+    QVERIFY(!retryTask.isFinished());
 }
 
 void tst_QXmppMuc::roomInfoForm()
@@ -3013,6 +3344,73 @@ void tst_QXmppMuc::selfPingInconclusiveRetry()
     auto now = std::chrono::steady_clock::now();
     auto sinceActivity = std::chrono::duration_cast<std::chrono::milliseconds>(now - muc->d->testLastActivity(roomJid));
     QVERIFY(sinceActivity > std::chrono::seconds(0));
+}
+
+void tst_QXmppMuc::selfPingInconclusiveRetriesExhausted()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    for (int attempt = 1; attempt <= MucSelfPingMaxRetries; ++attempt) {
+        muc->d->testForceDueForSelfPing(roomJid);
+        muc->d->onSelfPingTick();
+        test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                    "<ping xmlns='urn:xmpp:ping'/>"
+                    "</iq>"_s);
+        test.inject(u"<iq id='qx1' type='error' from='coven@chat.shakespeare.lit/thirdwitch'>"
+                    "<error type='wait'><remote-server-timeout xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                    "</iq>"_s);
+
+        // Each inconclusive answer bumps the counter until the last attempt,
+        // which gives up on retrying and starts over.
+        QCOMPARE(muc->d->testSelfPingRetryCount(roomJid), attempt < MucSelfPingMaxRetries ? attempt : 0);
+    }
+
+    // Exhausting the retries never removes the room — inconclusive is not a ghost.
+    QVERIFY(muc->d->testHasRoom(roomJid));
+    // lastActivity was reset to now rather than pushed back for another backoff.
+    auto sinceActivity = std::chrono::steady_clock::now() - muc->d->testLastActivity(roomJid);
+    QVERIFY(sinceActivity < std::chrono::seconds(1));
+}
+
+void tst_QXmppMuc::selfPingUnknownErrorCondition()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+    auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    Muc::LeaveReason seenReason = Muc::LeaveReason::Left;
+    QString seenRoomJid;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                     [&](const QString &jid, Muc::LeaveReason reason, const std::optional<Muc::Destroy> &) {
+                         seenRoomJid = jid;
+                         seenReason = reason;
+                     });
+
+    muc->d->testForceDueForSelfPing(roomJid);
+    muc->d->onSelfPingTick();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit/thirdwitch' type='get'>"
+                "<ping xmlns='urn:xmpp:ping'/>"
+                "</iq>"_s);
+
+    // 'forbidden' is not one of the conditions XEP-0410 assigns a meaning to;
+    // anything unrecognised counts as no longer being in the room.
+    test.inject(u"<iq id='qx1' type='error' from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    QCOMPARE(seenRoomJid, roomJid);
+    QCOMPARE(seenReason, Muc::LeaveReason::ConnectionLost);
+    QVERIFY(!muc->d->testHasRoom(roomJid));
 }
 
 void tst_QXmppMuc::selfPingSkippedDuringNickChange()
