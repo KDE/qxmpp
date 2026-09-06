@@ -8,4 +8,6 @@ Dependencies:
 Options:
   require-passing-tests-on: ['@all']
   ctest-arguments: '-j8 --progress'
+  # only report coverage of the library itself
+  gcovr-arguments: '--exclude "tests/.*" --exclude "examples/.*"'
   clang-format-versions: [19]

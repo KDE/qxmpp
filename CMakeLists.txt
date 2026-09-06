@@ -159,6 +159,11 @@ if(ENABLE_ASAN)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
+# Code coverage (adds the BUILD_COVERAGE option, enabled by the KDE CI)
+if(ECM_FOUND)
+    include(ECMCoverageOption)
+endif()
+
 if(BUILD_OMEMO)
     add_definitions(-DBUILD_OMEMO)
     if(NOT OmemoC_FOUND)
