@@ -116,6 +116,25 @@ void QXmppMucBookmark::setAutojoin(bool autojoin) { d->payload.autojoin = autojo
 using EmptyResult = std::variant<Success, QXmppError>;
 
 /*!
+    \struct QXmppPepBookmarkManager::BookmarkChange
+    \inmodule QXmpp
+
+    Change of an existing bookmark as reported by bookmarksChanged().
+*/
+
+/*!
+    \variable QXmppPepBookmarkManager::BookmarkChange::oldBookmark
+
+    Bookmark before the change.
+*/
+
+/*!
+    \variable QXmppPepBookmarkManager::BookmarkChange::newBookmark
+
+    Bookmark after the change.
+*/
+
+/*!
     \fn QXmppPepBookmarkManager::bookmarksReset()
 
     Emitted when the total set of bookmarks is replaced, i.e. when the bookmarks have been
