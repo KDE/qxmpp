@@ -10,6 +10,7 @@
 
 #include "QXmppAsync_p.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppColorGeneration.h"
 #include "QXmppContactAddresses.h"
 #include "QXmppCredentials.h"
@@ -77,6 +78,7 @@ private:
     Q_SLOT void sasl2FastFallbackKeepsListener();
 
     Q_SLOT void credentialsSerialization();
+    Q_SLOT void reconnectionDelays();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -518,6 +520,18 @@ void tst_QXmppClient::credentialsSerialization()
     QXmlStreamWriter w(&output);
     credentials.toXml(w);
     QCOMPARE(output, xml);
+}
+
+void tst_QXmppClient::reconnectionDelays()
+{
+    using namespace std::chrono_literals;
+
+    QCOMPARE(reconnectionDelay(0), 10s);
+    QCOMPARE(reconnectionDelay(1), 10s);
+    QCOMPARE(reconnectionDelay(2), 15s);
+    QCOMPARE(reconnectionDelay(3), 30s);
+    QCOMPARE(reconnectionDelay(4), 60s);
+    QCOMPARE(reconnectionDelay(100), 60s);
 }
 
 }  // namespace Client

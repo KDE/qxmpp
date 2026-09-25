@@ -35,6 +35,7 @@
 #include <chrono>
 
 #include <QDomElement>
+#include <QRandomGenerator>
 #include <QSslSocket>
 #include <QTimer>
 
@@ -77,17 +78,31 @@ void QXmppClientPrivate::addProperCapability(QXmppPresence &presence)
     }
 }
 
-std::chrono::milliseconds QXmppClientPrivate::getNextReconnectTime() const
+namespace QXmpp::Private {
+
+std::chrono::milliseconds reconnectionDelay(int tries)
 {
-    if (reconnectionTries < 5) {
+    switch (tries) {
+    case 0:
+    case 1:
         return 10s;
-    } else if (reconnectionTries < 10) {
-        return 20s;
-    } else if (reconnectionTries < 15) {
-        return 40s;
-    } else {
+    case 2:
+        return 15s;
+    case 3:
+        return 30s;
+    default:
         return 60s;
     }
+}
+
+}  // namespace QXmpp::Private
+
+std::chrono::milliseconds QXmppClientPrivate::getNextReconnectTime() const
+{
+    // ±20 % jitter, so that not all clients of a server reconnect at the same time after an outage
+    auto delay = reconnectionDelay(reconnectionTries);
+    auto jitter = QRandomGenerator::global()->bounded(0.4) - 0.2;
+    return std::chrono::duration_cast<std::chrono::milliseconds>(delay * (1.0 + jitter));
 }
 
 QStringList QXmppClientPrivate::discoveryFeatures()
@@ -144,8 +159,15 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
                 receivedConflict = true;
             }
         } else if (oldError == QXmppClient::SocketError && !receivedConflict) {
-            // schedule reconnect
+            // only start the backoff from the beginning if the last connection was stable,
+            // so that a flapping server does not defeat it
+            if (connectedSince.isValid() && std::chrono::milliseconds(connectedSince.elapsed()) >= StableConnectionDuration) {
+                reconnectionTries = 0;
+            }
+            connectedSince.invalidate();
+
             reconnectionTimer->start(getNextReconnectTime());
+            reconnectionTries++;
         } else if (oldError == QXmppClient::KeepAliveError) {
             // if we got a keepalive error, reconnect in one second
             reconnectionTimer->start(1s);
@@ -404,6 +426,7 @@ void QXmppClient::connectToServer(const QXmppConfiguration &config,
     d->stream->configuration() = config;
     d->clientPresence = initialPresence;
     d->addProperCapability(d->clientPresence);
+    d->reconnectionTries = 0;
 
     d->stream->connectToHost();
 }
@@ -835,7 +858,7 @@ void QXmppClient::onInternalSocketStateChanged()
 void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session)
 {
     d->receivedConflict = false;
-    d->reconnectionTries = 0;
+    d->connectedSince.start();
 
     // notify managers
     if (session.fastTokenChanged) {

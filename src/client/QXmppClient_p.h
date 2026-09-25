@@ -26,10 +26,21 @@
 
 #include <chrono>
 
+#include <QElapsedTimer>
+
 class QXmppClient;
 class QXmppClientExtension;
 class QXmppLogger;
 class QTimer;
+
+namespace QXmpp::Private {
+
+// Minimum duration a connection needs to have lasted for the reconnection backoff to be reset
+constexpr auto StableConnectionDuration = std::chrono::seconds(30);
+
+QXMPP_PRIVATE_EXPORT std::chrono::milliseconds reconnectionDelay(int tries);
+
+}  // namespace QXmpp::Private
 
 class QXmppClientPrivate
 {
@@ -56,6 +67,7 @@ public:
     bool receivedConflict;
     int reconnectionTries;
     QTimer *reconnectionTimer;
+    QElapsedTimer connectedSince;
 
     void addProperCapability(QXmppPresence &presence);
     std::chrono::milliseconds getNextReconnectTime() const;
