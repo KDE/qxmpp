@@ -333,6 +333,15 @@ void QXmppOutgoingClient::disconnectForResumption()
 }
 
 /*
+    Sends a ping immediately (unless one is already waiting for a response), to check whether the
+    connection is still alive.
+*/
+void QXmppOutgoingClient::pingNow()
+{
+    d->pingManager.pingNow();
+}
+
+/*
     Returns true if authentication has succeeded.
 */
 bool QXmppOutgoingClient::isAuthenticated() const
@@ -1164,7 +1173,7 @@ PingManager::PingManager(QXmppOutgoingClient *q)
       timeoutTimer(new QTimer(q))
 {
     // send ping timer
-    pingTimer->callOnTimeout(q, [this]() { sendPing(); });
+    pingTimer->callOnTimeout(q, [this]() { sendPing(keepAliveTimeout()); });
 
     // timeout triggers connection error
     timeoutTimer->setSingleShot(true);
@@ -1193,7 +1202,32 @@ void PingManager::onDataReceived()
     timeoutTimer->stop();
 }
 
-void PingManager::sendPing()
+void PingManager::pingNow()
+{
+    const auto configuredTimeout = keepAliveTimeout();
+    const auto timeout = configuredTimeout > 0s ? std::min<std::chrono::milliseconds>(configuredTimeout, PingNowTimeout) : PingNowTimeout;
+
+    // a ping is already pending: do not send another one, but let it time out as soon
+    if (timeoutTimer->isActive()) {
+        if (timeoutTimer->remainingTimeAsDuration() > timeout) {
+            timeoutTimer->start(timeout);
+        }
+        return;
+    }
+
+    sendPing(timeout);
+    // the next regular ping is due one interval from now
+    if (pingTimer->isActive()) {
+        pingTimer->start();
+    }
+}
+
+std::chrono::milliseconds PingManager::keepAliveTimeout() const
+{
+    return std::max(q->configuration().keepAliveTimeout(), 0) * 1s;
+}
+
+void PingManager::sendPing(std::chrono::milliseconds timeout)
 {
     // use smaller stream management ack requests if possible
     if (q->streamAckManager().enabled()) {
@@ -1206,10 +1240,8 @@ void PingManager::sendPing()
     }
 
     // start timeout timer
-    const int timeout = q->configuration().keepAliveTimeout();
-    if (timeout > 0) {
-        timeoutTimer->setInterval(timeout * 1s);
-        timeoutTimer->start();
+    if (timeout > 0s) {
+        timeoutTimer->start(timeout);
     }
 }
 

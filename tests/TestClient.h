@@ -56,6 +56,9 @@ public:
     void simulateKeepAliveTimeout();
     void simulateSocketError();
     std::chrono::milliseconds reconnectionInterval() const;
+    bool isReconnectionScheduled() const;
+    void sendRegularPing();
+    std::chrono::milliseconds pingTimeout() const;
     void waitForConnect();
 
 private:

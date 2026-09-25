@@ -95,6 +95,7 @@ public:
     void connectToHost();
     void disconnectFromHost();
     void disconnectForResumption();
+    void pingNow();
     bool isAuthenticated() const;
     bool isConnected() const;
     QXmppTask<IqResult> sendIq(QXmppIq &&);

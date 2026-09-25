@@ -7,6 +7,7 @@
 #include "QXmppClientExtension.h"  // needed for qDeleteAll(d->extensions)
 #include "QXmppClient_p.h"
 #include "QXmppOutgoingClient.h"
+#include "QXmppOutgoingClient_p.h"
 #include "QXmppSasl_p.h"
 #include "QXmppUtils_p.h"
 
@@ -174,6 +175,24 @@ void TestClient::simulateSocketError()
 std::chrono::milliseconds TestClient::reconnectionInterval() const
 {
     return d->reconnectionTimer->intervalAsDuration();
+}
+
+bool TestClient::isReconnectionScheduled() const
+{
+    return d->reconnectionTimer->isActive();
+}
+
+void TestClient::sendRegularPing()
+{
+    auto &pingManager = streamPrivate()->pingManager;
+    pingManager.sendPing(pingManager.keepAliveTimeout());
+}
+
+// Returns the timeout of the pending ping, or zero if no ping is pending.
+std::chrono::milliseconds TestClient::pingTimeout() const
+{
+    const auto *timer = streamPrivate()->pingManager.timeoutTimer;
+    return timer->isActive() ? timer->intervalAsDuration() : std::chrono::milliseconds::zero();
 }
 
 void TestClient::waitForConnect()
