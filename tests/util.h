@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <any>
 #include <memory>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -373,7 +374,7 @@ int runTests(int argc, char *argv[])
     int status = 0;
     qsizetype index = 0;
     // each test object is destroyed before the next one is created
-    ([&] {
+    ([&]<typename TestClass>(std::type_identity<TestClass>) {
         const auto &names = testFunctions[index++];
 
         auto selectsThisClass = [&](const QString &selector) {
@@ -392,9 +393,9 @@ int runTests(int argc, char *argv[])
             args.push_back(argv[i]);
         }
 
-        TestClasses testCase;
+        TestClass testCase;
         status |= QTest::qExec(&testCase, int(args.size()), args.data());
-    }(),
+    }(std::type_identity<TestClasses>()),
      ...);
     return status;
 }
