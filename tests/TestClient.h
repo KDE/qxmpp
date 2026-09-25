@@ -9,6 +9,8 @@
 
 #include "util.h"
 
+#include <chrono>
+
 class QXmppOutgoingClient;
 class QXmppOutgoingClientPrivate;
 namespace QXmpp::Private::Sasl2 {
@@ -52,6 +54,8 @@ public:
     void setStreamManagementState(QXmppClient::StreamManagementState state);
     void setStreamResumable(bool resumable);
     void simulateKeepAliveTimeout();
+    void simulateSocketError();
+    std::chrono::milliseconds reconnectionInterval() const;
     void waitForConnect();
 
 private:

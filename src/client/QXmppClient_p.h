@@ -38,7 +38,7 @@ namespace QXmpp::Private {
 // Minimum duration a connection needs to have lasted for the reconnection backoff to be reset
 constexpr auto StableConnectionDuration = std::chrono::seconds(30);
 
-QXMPP_PRIVATE_EXPORT std::chrono::milliseconds reconnectionDelay(int tries);
+QXMPP_PRIVATE_EXPORT std::chrono::milliseconds reconnectionDelay(int tries, bool resumable);
 
 }  // namespace QXmpp::Private
 

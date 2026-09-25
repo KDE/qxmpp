@@ -14,7 +14,10 @@
 #include "QXmppStanza.h"
 #include "QXmppStreamError.h"
 
+#include <chrono>
+
 #include <QAbstractSocket>
+#include <QElapsedTimer>
 
 class QDomElement;
 class QSslError;
@@ -178,6 +181,8 @@ class C2sStreamManager
 public:
     using Result = std::variant<Success, QXmppError>;
     static constexpr QStringView TaskName = u"stream management";
+    // Resumption window assumed if the server does not announce one
+    static constexpr auto DefaultResumptionWindow = std::chrono::seconds(300);
 
     explicit C2sStreamManager(QXmppOutgoingClient *q);
 
@@ -191,7 +196,9 @@ public:
     void onSasl2Success(const Sasl2::Success &success);
     void onBind2Request(Bind2Request &request, const std::vector<QString> &bind2Features);
     void onBind2Bound(const Bind2Bound &);
+    void onDataReceived() { m_lastDataReceived.start(); }
     bool canResume() const { return m_canResume; }
+    std::chrono::milliseconds resumptionTimeRemaining() const;
     bool enabled() const { return m_enabled; }
     bool streamResumed() const { return m_streamResumed; }
     bool canRequestResume() const { return m_smAvailable && !m_enabled && m_canResume; }
@@ -226,6 +233,8 @@ private:
     bool m_smAvailable = false;
     QString m_smId;
     bool m_canResume = false;
+    std::chrono::seconds m_resumptionWindow = DefaultResumptionWindow;
+    QElapsedTimer m_lastDataReceived;
     QString m_resumeHost;
     quint16 m_resumePort = 0;
     bool m_enabled = false;

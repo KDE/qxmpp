@@ -80,8 +80,25 @@ void QXmppClientPrivate::addProperCapability(QXmppPresence &presence)
 
 namespace QXmpp::Private {
 
-std::chrono::milliseconds reconnectionDelay(int tries)
+std::chrono::milliseconds reconnectionDelay(int tries, bool resumable)
 {
+    // While the server keeps the session, reconnecting is cheap and missing the resumption window
+    // is expensive (full resync of roster, presence, PEP, etc.), so retry more often.
+    if (resumable) {
+        switch (tries) {
+        case 0:
+            return 2s;
+        case 1:
+            return 5s;
+        case 2:
+            return 10s;
+        case 3:
+            return 15s;
+        default:
+            return 30s;
+        }
+    }
+
     switch (tries) {
     case 0:
     case 1:
@@ -100,7 +117,8 @@ std::chrono::milliseconds reconnectionDelay(int tries)
 std::chrono::milliseconds QXmppClientPrivate::getNextReconnectTime() const
 {
     // ±20 % jitter, so that not all clients of a server reconnect at the same time after an outage
-    auto delay = reconnectionDelay(reconnectionTries);
+    const auto resumable = stream->c2sStreamManager().resumptionTimeRemaining() > 0ms;
+    auto delay = reconnectionDelay(reconnectionTries, resumable);
     auto jitter = QRandomGenerator::global()->bounded(0.4) - 0.2;
     return std::chrono::duration_cast<std::chrono::milliseconds>(delay * (1.0 + jitter));
 }

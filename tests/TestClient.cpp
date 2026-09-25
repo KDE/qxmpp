@@ -11,6 +11,7 @@
 #include "QXmppUtils_p.h"
 
 #include <QEventLoop>
+#include <QTimer>
 
 TestClient::TestClient(bool enableDebug, bool enableAutoReset)
     : QXmppClient(),
@@ -163,6 +164,16 @@ void TestClient::setStreamResumable(bool resumable)
 void TestClient::simulateKeepAliveTimeout()
 {
     d->stream->throwKeepAliveError();
+}
+
+void TestClient::simulateSocketError()
+{
+    d->stream->setError(u"Connection reset"_s, QAbstractSocket::RemoteHostClosedError);
+}
+
+std::chrono::milliseconds TestClient::reconnectionInterval() const
+{
+    return d->reconnectionTimer->intervalAsDuration();
 }
 
 void TestClient::waitForConnect()

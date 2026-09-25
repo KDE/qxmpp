@@ -731,6 +731,7 @@ void QXmppOutgoingClient::handlePacketReceived(const QDomElement &nodeRecv)
 {
     // if we receive any kind of data, stop the timeout timer
     d->pingManager.onDataReceived();
+    d->c2sStreamManager.onDataReceived();
 
     // Remember the listener generation so we can tell whether a synchronous task continuation
     // inside handleElement() installed a replacement listener. std::variant::index() is not
@@ -1384,6 +1385,20 @@ C2sStreamManager::C2sStreamManager(QXmppOutgoingClient *q)
 {
 }
 
+// Returns an estimate of the time left until the server discards the session, or zero if the
+// stream cannot be resumed.
+// The server starts its resumption window when it notices the disconnect, which is never before we
+// last received data from it. The estimate is thus a lower bound: resumption may still succeed
+// after it ran out.
+std::chrono::milliseconds C2sStreamManager::resumptionTimeRemaining() const
+{
+    if (!m_canResume || !m_lastDataReceived.isValid()) {
+        return {};
+    }
+    const auto elapsed = std::chrono::milliseconds(m_lastDataReceived.elapsed());
+    return std::max(std::chrono::milliseconds(m_resumptionWindow) - elapsed, std::chrono::milliseconds::zero());
+}
+
 HandleElementResult C2sStreamManager::handleElement(const QDomElement &el)
 {
     // resume
@@ -1503,6 +1518,8 @@ void C2sStreamManager::onEnabled(const SmEnabled &enabled)
     q->debug(u"Stream management enabled"_s);
     m_smId = enabled.id;
     m_canResume = enabled.resume;
+    m_resumptionWindow = enabled.max > 0 ? std::chrono::seconds(enabled.max) : DefaultResumptionWindow;
+    m_lastDataReceived.start();
     if (enabled.resume && !enabled.location.isEmpty()) {
         setResumeAddress(enabled.location);
     }

@@ -82,6 +82,8 @@ private:
     Q_SLOT void reconnectionDelays();
     Q_SLOT void keepAliveTimeoutKeepsResumption();
     Q_SLOT void failedResumption();
+    Q_SLOT void resumptionWindow();
+    Q_SLOT void reconnectionDelayWhileResumable();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -529,12 +531,19 @@ void tst_QXmppClient::reconnectionDelays()
 {
     using namespace std::chrono_literals;
 
-    QCOMPARE(reconnectionDelay(0), 10s);
-    QCOMPARE(reconnectionDelay(1), 10s);
-    QCOMPARE(reconnectionDelay(2), 15s);
-    QCOMPARE(reconnectionDelay(3), 30s);
-    QCOMPARE(reconnectionDelay(4), 60s);
-    QCOMPARE(reconnectionDelay(100), 60s);
+    QCOMPARE(reconnectionDelay(0, false), 10s);
+    QCOMPARE(reconnectionDelay(1, false), 10s);
+    QCOMPARE(reconnectionDelay(2, false), 15s);
+    QCOMPARE(reconnectionDelay(3, false), 30s);
+    QCOMPARE(reconnectionDelay(4, false), 60s);
+    QCOMPARE(reconnectionDelay(100, false), 60s);
+
+    QCOMPARE(reconnectionDelay(0, true), 2s);
+    QCOMPARE(reconnectionDelay(1, true), 5s);
+    QCOMPARE(reconnectionDelay(2, true), 10s);
+    QCOMPARE(reconnectionDelay(3, true), 15s);
+    QCOMPARE(reconnectionDelay(4, true), 30s);
+    QCOMPARE(reconnectionDelay(100, true), 30s);
 }
 
 void tst_QXmppClient::keepAliveTimeoutKeepsResumption()
@@ -588,6 +597,8 @@ static void enableStreamManagement(TestClient &client, const char *enabledXml)
 
 void tst_QXmppClient::failedResumption()
 {
+    using namespace std::chrono_literals;
+
     TestClient client;
     auto &sm = client.stream()->c2sStreamManager();
     enableStreamManagement(client, "<enabled xmlns='urn:xmpp:sm:3' id='sm-1' resume='true'/>");
@@ -600,6 +611,61 @@ void tst_QXmppClient::failedResumption()
     // the session is gone on the server
     QVERIFY(!sm.canResume());
     QVERIFY(!sm.hasResumeAddress());
+    QCOMPARE(sm.resumptionTimeRemaining(), 0ms);
+}
+
+void tst_QXmppClient::resumptionWindow()
+{
+    using namespace std::chrono_literals;
+
+    TestClient client;
+    auto &sm = client.stream()->c2sStreamManager();
+    QCOMPARE(sm.resumptionTimeRemaining(), 0ms);
+
+    // no resumption
+    enableStreamManagement(client, "<enabled xmlns='urn:xmpp:sm:3' id='sm-1'/>");
+    QCOMPARE(sm.resumptionTimeRemaining(), 0ms);
+
+    // no max announced
+    enableStreamManagement(client, "<enabled xmlns='urn:xmpp:sm:3' id='sm-2' resume='true'/>");
+    QVERIFY(sm.resumptionTimeRemaining() > 290s);
+    QVERIFY(sm.resumptionTimeRemaining() <= 300s);
+
+    // announced max
+    enableStreamManagement(client, "<enabled xmlns='urn:xmpp:sm:3' id='sm-3' resume='true' max='1'/>");
+    QVERIFY(sm.resumptionTimeRemaining() > 0ms);
+    QVERIFY(sm.resumptionTimeRemaining() <= 1s);
+
+    // received data restarts the window
+    QTest::qWait(500);
+    QVERIFY(sm.resumptionTimeRemaining() < 600ms);
+    client.streamPrivate()->listener = client.stream();
+    client.handlePacketReceived(xmlToDom("<presence xmlns='jabber:client' from='juliet@capulet.lit/balcony'/>"));
+    QVERIFY(sm.resumptionTimeRemaining() > 900ms);
+
+    // window runs out
+    QTRY_COMPARE(sm.resumptionTimeRemaining(), 0ms);
+}
+
+void tst_QXmppClient::reconnectionDelayWhileResumable()
+{
+    using namespace std::chrono_literals;
+
+    // ±20 % jitter
+    auto inRange = [](std::chrono::milliseconds delay, std::chrono::milliseconds expected) {
+        return delay >= expected * 0.8 && delay <= expected * 1.2;
+    };
+
+    TestClient client;
+    client.simulateSocketError();
+    QVERIFY(inRange(client.reconnectionInterval(), 10s));
+
+    TestClient resumableClient;
+    enableStreamManagement(resumableClient, "<enabled xmlns='urn:xmpp:sm:3' id='sm-1' resume='true'/>");
+    resumableClient.simulateSocketError();
+    QVERIFY(inRange(resumableClient.reconnectionInterval(), 2s));
+    resumableClient.simulateSocketError();
+    QVERIFY(inRange(resumableClient.reconnectionInterval(), 5s));
 }
 
 }  // namespace Client
