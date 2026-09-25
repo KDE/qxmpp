@@ -1528,6 +1528,8 @@ void C2sStreamManager::onResumed(const SmResumed &resumed)
 void C2sStreamManager::onResumeFailed(const SmFailed &)
 {
     q->debug(u"Stream resumption failed"_s);
+    // the previous session is gone on the server
+    m_canResume = false;
 }
 
 bool C2sStreamManager::setResumeAddress(const QString &address)

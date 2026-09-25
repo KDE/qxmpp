@@ -81,6 +81,7 @@ private:
     Q_SLOT void credentialsSerialization();
     Q_SLOT void reconnectionDelays();
     Q_SLOT void keepAliveTimeoutKeepsResumption();
+    Q_SLOT void failedResumption();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -575,6 +576,30 @@ void tst_QXmppClient::keepAliveTimeoutKeepsResumption()
     QVERIFY(sessionEnd);
     QVERIFY(sessionEnd->smCanResume);
     QVERIFY(stream->c2sStreamManager().canResume());
+}
+
+static void enableStreamManagement(TestClient &client, const char *enabledXml)
+{
+    auto &sm = client.stream()->c2sStreamManager();
+    sm.requestEnable();
+    client.expect(u"<enable xmlns=\"urn:xmpp:sm:3\" resume=\"true\"/>"_s);
+    QCOMPARE(sm.handleElement(xmlToDom(enabledXml)), Finished);
+}
+
+void tst_QXmppClient::failedResumption()
+{
+    TestClient client;
+    auto &sm = client.stream()->c2sStreamManager();
+    enableStreamManagement(client, "<enabled xmlns='urn:xmpp:sm:3' id='sm-1' resume='true'/>");
+    QVERIFY(sm.canResume());
+
+    sm.requestResume();
+    client.expect(u"<resume xmlns=\"urn:xmpp:sm:3\" h=\"0\" previd=\"sm-1\"/>"_s);
+    QCOMPARE(sm.handleElement(xmlToDom("<failed xmlns='urn:xmpp:sm:3'/>")), Finished);
+
+    // the session is gone on the server
+    QVERIFY(!sm.canResume());
+    QVERIFY(!sm.hasResumeAddress());
 }
 
 }  // namespace Client
