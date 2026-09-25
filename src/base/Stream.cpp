@@ -371,6 +371,16 @@ void XmppSocket::disconnectFromHost()
     m_acceptInput = false;
 }
 
+// Closes the connection immediately, without closing the stream and without waiting for pending
+// data to be written. The server does not see the stream end, so the session can be resumed.
+void XmppSocket::abort()
+{
+    m_acceptInput = false;
+    if (m_socket) {
+        m_socket->abort();
+    }
+}
+
 bool XmppSocket::sendData(const QByteArray &data)
 {
     logSent(QString::fromUtf8(data));

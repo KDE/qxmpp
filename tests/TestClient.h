@@ -50,6 +50,8 @@ public:
 
     void resetIdCount();
     void setStreamManagementState(QXmppClient::StreamManagementState state);
+    void setStreamResumable(bool resumable);
+    void simulateKeepAliveTimeout();
     void waitForConnect();
 
 private:

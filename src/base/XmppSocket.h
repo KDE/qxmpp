@@ -78,6 +78,7 @@ public:
     bool isConnected() const;
     void connectToHost(const ServerAddress &);
     void disconnectFromHost();
+    void abort();
     bool sendData(const QByteArray &) override;
     void resetStream();
     bool isStreamReceived() const { return m_streamReceived; }

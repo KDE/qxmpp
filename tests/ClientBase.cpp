@@ -49,6 +49,7 @@
 
 #include <QCoreApplication>
 #include <QObject>
+#include <QTcpServer>
 
 namespace Client {
 
@@ -79,6 +80,7 @@ private:
 
     Q_SLOT void credentialsSerialization();
     Q_SLOT void reconnectionDelays();
+    Q_SLOT void keepAliveTimeoutKeepsResumption();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -532,6 +534,47 @@ void tst_QXmppClient::reconnectionDelays()
     QCOMPARE(reconnectionDelay(3), 30s);
     QCOMPARE(reconnectionDelay(4), 60s);
     QCOMPARE(reconnectionDelay(100), 60s);
+}
+
+void tst_QXmppClient::keepAliveTimeoutKeepsResumption()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    auto *stream = client.stream();
+    stream->xmppSocket().connectToHost({ ServerAddress::Tcp, u"127.0.0.1"_s, server.serverPort() });
+
+    QVERIFY(server.waitForNewConnection(5000));
+    auto *serverSocket = server.nextPendingConnection();
+    QVERIFY(serverSocket);
+    QTRY_VERIFY(stream->xmppSocket().isConnected());
+
+    // stream header
+    QTRY_VERIFY(serverSocket->bytesAvailable() > 0);
+    serverSocket->readAll();
+
+    std::optional<SessionEnd> sessionEnd;
+    connect(stream, &QXmppOutgoingClient::disconnected, this, [&](const SessionEnd &end) {
+        sessionEnd = end;
+    });
+    QSignalSpy errorSpy(&client, &QXmppClient::errorOccurred);
+
+    client.setStreamResumable(true);
+    client.simulateKeepAliveTimeout();
+
+    QCOMPARE(errorSpy.size(), 1);
+    QVERIFY(errorSpy.constFirst().constFirst().value<QXmppError>().holdsType<QXmpp::TimeoutError>());
+
+    // the socket is closed without ending the stream, so the server keeps the session
+    QVERIFY(!stream->xmppSocket().isConnected());
+    QTRY_COMPARE(serverSocket->state(), QAbstractSocket::UnconnectedState);
+    QVERIFY(!serverSocket->readAll().contains("</stream:stream>"));
+
+    // and the client can still resume it
+    QVERIFY(sessionEnd);
+    QVERIFY(sessionEnd->smCanResume);
+    QVERIFY(stream->c2sStreamManager().canResume());
 }
 
 }  // namespace Client

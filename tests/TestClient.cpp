@@ -155,6 +155,16 @@ void TestClient::setStreamManagementState(QXmppClient::StreamManagementState sta
     }
 }
 
+void TestClient::setStreamResumable(bool resumable)
+{
+    d->stream->c2sStreamManager().setCanResume(resumable);
+}
+
+void TestClient::simulateKeepAliveTimeout()
+{
+    d->stream->throwKeepAliveError();
+}
+
 void TestClient::waitForConnect()
 {
     QEventLoop loop;

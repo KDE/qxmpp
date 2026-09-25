@@ -320,6 +320,19 @@ void QXmppOutgoingClient::disconnectFromHost()
 }
 
 /*
+    Closes the connection without ending the stream, so that the session can be resumed on the
+    next connect (if stream management resumption is available).
+
+    Unlike disconnectFromHost(), this does not send a closing stream tag (which would end the
+    session on the server) and does not wait for pending data to be written (which may never
+    happen on a dead connection).
+*/
+void QXmppOutgoingClient::disconnectForResumption()
+{
+    d->socket.abort();
+}
+
+/*
     Returns true if authentication has succeeded.
 */
 bool QXmppOutgoingClient::isAuthenticated() const
@@ -956,7 +969,7 @@ bool QXmppOutgoingClient::handleStarttls(const QXmppStreamFeatures &features)
 void QXmppOutgoingClient::throwKeepAliveError()
 {
     setError(u"Ping timeout"_s, TimeoutError());
-    disconnectFromHost();
+    disconnectForResumption();
 }
 
 void QXmppOutgoingClient::enableStreamManagement(bool resetSequenceNumber)

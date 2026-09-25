@@ -91,6 +91,7 @@ public:
 
     void connectToHost();
     void disconnectFromHost();
+    void disconnectForResumption();
     bool isAuthenticated() const;
     bool isConnected() const;
     QXmppTask<IqResult> sendIq(QXmppIq &&);
@@ -209,6 +210,7 @@ private:
     bool setResumeAddress(const QString &address);
     void setEnabled(bool enabled) { m_enabled = enabled; }
     void setResumed(bool resumed) { m_streamResumed = resumed; }
+    void setCanResume(bool canResume) { m_canResume = canResume; }
 
     struct NoRequest { };
     struct ResumeRequest {
