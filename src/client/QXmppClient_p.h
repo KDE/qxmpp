@@ -68,9 +68,14 @@ public:
     int reconnectionTries;
     QTimer *reconnectionTimer;
     QElapsedTimer connectedSince;
+    bool networkAvailable;
+    // a reconnection is due, but was held back because the network is unavailable
+    bool reconnectionDeferred;
 
     void addProperCapability(QXmppPresence &presence);
     std::chrono::milliseconds getNextReconnectTime() const;
+    void scheduleReconnect(std::chrono::milliseconds delay);
+    void cancelReconnect();
 
     static QStringList discoveryFeatures();
     void onErrorOccurred(const QString &text, const QXmppOutgoingClient::ConnectionError &err, QXmppClient::Error oldError);

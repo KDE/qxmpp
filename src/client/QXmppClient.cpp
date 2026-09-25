@@ -59,6 +59,8 @@ QXmppClientPrivate::QXmppClientPrivate(QXmppClient *qq)
       receivedConflict(false),
       reconnectionTries(0),
       reconnectionTimer(nullptr),
+      networkAvailable(true),
+      reconnectionDeferred(false),
       q(qq)
 {
 }
@@ -123,6 +125,22 @@ std::chrono::milliseconds QXmppClientPrivate::getNextReconnectTime() const
     return std::chrono::duration_cast<std::chrono::milliseconds>(delay * (1.0 + jitter));
 }
 
+void QXmppClientPrivate::scheduleReconnect(std::chrono::milliseconds delay)
+{
+    // without network, wait until it is available again (see QXmppClient::setNetworkAvailable())
+    if (!networkAvailable) {
+        reconnectionDeferred = true;
+        return;
+    }
+    reconnectionTimer->start(delay);
+}
+
+void QXmppClientPrivate::cancelReconnect()
+{
+    reconnectionTimer->stop();
+    reconnectionDeferred = false;
+}
+
 QStringList QXmppClientPrivate::discoveryFeatures()
 {
     return {
@@ -184,11 +202,11 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
             }
             connectedSince.invalidate();
 
-            reconnectionTimer->start(getNextReconnectTime());
+            scheduleReconnect(getNextReconnectTime());
             reconnectionTries++;
         } else if (oldError == QXmppClient::KeepAliveError) {
             // if we got a keepalive error, reconnect in one second
-            reconnectionTimer->start(1s);
+            scheduleReconnect(1s);
         }
     }
 
@@ -444,6 +462,7 @@ void QXmppClient::connectToServer(const QXmppConfiguration &config,
     d->stream->configuration() = config;
     d->clientPresence = initialPresence;
     d->addProperCapability(d->clientPresence);
+    d->cancelReconnect();
     d->reconnectionTries = 0;
 
     d->stream->connectToHost();
@@ -655,8 +674,7 @@ QXmppClient::sendGenericIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaPara
 */
 void QXmppClient::disconnectFromServer()
 {
-    // cancel reconnection
-    d->reconnectionTimer->stop();
+    d->cancelReconnect();
 
     d->clientPresence.setType(QXmppPresence::Unavailable);
     d->clientPresence.setStatusText(u"Logged out"_s);
@@ -665,6 +683,107 @@ void QXmppClient::disconnectFromServer()
     }
 
     d->stream->disconnectFromHost();
+}
+
+/*!
+    Reconnects immediately if the client is waiting to reconnect and resets the reconnection
+    backoff.
+
+    Use this when reconnecting is likely to succeed now, for example when the application returns
+    to the foreground or the user explicitly asks to retry.
+
+    Does nothing if the client is connected or connecting, or if it is not going to reconnect
+    (automatic reconnection is disabled, disconnectFromServer() was called or another client took
+    over the resource).
+
+    \since QXmpp 1.17
+*/
+void QXmppClient::reconnectNow()
+{
+    if (!d->reconnectionTimer->isActive() && !d->reconnectionDeferred) {
+        return;
+    }
+
+    d->cancelReconnect();
+    d->reconnectionTries = 0;
+    _q_reconnect();
+}
+
+/*!
+    Tells the client whether a network connection is \a available.
+
+    Applications that monitor the network (e.g. using QNetworkInformation, NetworkManager or
+    Android's ConnectivityManager) can use this to reconnect based on network changes instead of
+    only a timer:
+
+    \list
+    \li When the network becomes unavailable, the connection is closed immediately (without ending
+    the stream, so it can be resumed later) instead of waiting for the ping to time out, and no
+    reconnection attempts are made.
+    \li When the network becomes available, the client reconnects immediately (see
+    reconnectNow()).
+    \endlist
+
+    An available network does not guarantee that the server can be reached (e.g. behind captive
+    portals), so the reconnection timer is still used as a fallback.
+
+    The network is considered available by default.
+
+    \sa checkConnection()
+    \since QXmpp 1.17
+*/
+void QXmppClient::setNetworkAvailable(bool available)
+{
+    d->networkAvailable = available;
+
+    if (available) {
+        reconnectNow();
+        return;
+    }
+
+    if (d->reconnectionTimer->isActive()) {
+        d->reconnectionTimer->stop();
+        d->reconnectionDeferred = true;
+    }
+
+    if (state() != DisconnectedState) {
+        info(u"Network unavailable, closing connection"_s);
+        d->stream->disconnectForResumption();
+        d->reconnectionDeferred = configuration().autoReconnectionEnabled() && !d->receivedConflict;
+    }
+}
+
+/*!
+    Returns whether a network connection is available, as set with setNetworkAvailable().
+
+    \since QXmpp 1.17
+*/
+bool QXmppClient::isNetworkAvailable() const
+{
+    return d->networkAvailable;
+}
+
+/*!
+    Checks whether the connection is still alive.
+
+    If the client is connected, a ping is sent immediately. If it is not answered within five
+    seconds (or QXmppConfiguration::keepAliveTimeout() if that is shorter), the connection is
+    closed (without ending the stream, so it can be resumed) and the client reconnects. If a ping
+    is already pending, no other one is sent, but it times out just as soon. If the client is waiting to reconnect, it
+    reconnects immediately (see reconnectNow()).
+
+    Use this when the network changed in a way that may have broken the connection without the
+    socket noticing, for example when switching from Wi-Fi to mobile data.
+
+    \since QXmpp 1.17
+*/
+void QXmppClient::checkConnection()
+{
+    if (d->stream->isConnected()) {
+        d->stream->pingNow();
+    } else {
+        reconnectNow();
+    }
 }
 
 /*! Returns true if the client has authenticated with the XMPP server. */
@@ -769,8 +888,7 @@ void QXmppClient::setClientPresence(const QXmppPresence &presence)
     d->addProperCapability(d->clientPresence);
 
     if (presence.type() == QXmppPresence::Unavailable) {
-        // cancel reconnection
-        d->reconnectionTimer->stop();
+        d->cancelReconnect();
 
         // NOTE: we can't call disconnect() because it alters
         // the client presence

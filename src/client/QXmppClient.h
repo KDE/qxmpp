@@ -397,6 +397,11 @@ public:
     Q_SLOT void connectToServer(const QXmppConfiguration &, const QXmppPresence &initialPresence = {});
     Q_SLOT void connectToServer(const QString &jid, const QString &password);
     Q_SLOT void disconnectFromServer();
+    void reconnectNow();
+    void checkConnection();
+
+    void setNetworkAvailable(bool available);
+    bool isNetworkAvailable() const;
 
 #if QXMPP_DEPRECATED_SINCE(1, 1)
     [[deprecated("Use findExtension<QXmppRosterManager>() instead")]]

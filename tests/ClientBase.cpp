@@ -12,6 +12,7 @@
 #include "QXmppClient.h"
 #include "QXmppClient_p.h"
 #include "QXmppColorGeneration.h"
+#include "QXmppConfiguration.h"
 #include "QXmppContactAddresses.h"
 #include "QXmppCredentials.h"
 #include "QXmppDataForm.h"
@@ -50,6 +51,7 @@
 #include <QCoreApplication>
 #include <QObject>
 #include <QTcpServer>
+#include <QTcpSocket>
 
 namespace Client {
 
@@ -84,6 +86,10 @@ private:
     Q_SLOT void failedResumption();
     Q_SLOT void resumptionWindow();
     Q_SLOT void reconnectionDelayWhileResumable();
+    Q_SLOT void networkUnavailableClosesConnection();
+    Q_SLOT void reconnectionDeferredWhileNetworkUnavailable();
+    Q_SLOT void reconnectNow();
+    Q_SLOT void checkConnection();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -666,6 +672,174 @@ void tst_QXmppClient::reconnectionDelayWhileResumable()
     QVERIFY(inRange(resumableClient.reconnectionInterval(), 2s));
     resumableClient.simulateSocketError();
     QVERIFY(inRange(resumableClient.reconnectionInterval(), 5s));
+}
+
+// Lets the client connect to a local TCP server (no XMPP server behind it).
+static void useLocalServer(TestClient &client, const QTcpServer &server)
+{
+    client.configuration().setHost(u"127.0.0.1"_s);
+    client.configuration().setPort(server.serverPort());
+    client.configuration().setStreamSecurityMode(QXmppConfiguration::TLSDisabled);
+}
+
+// Accepts the client's connection and reads the stream header.
+static QTcpSocket *acceptConnection(QTcpServer &server)
+{
+    if (!QTest::qWaitFor([&] { return server.hasPendingConnections(); })) {
+        return nullptr;
+    }
+    auto *socket = server.nextPendingConnection();
+    if (!QTest::qWaitFor([&] { return socket->bytesAvailable() > 0; })) {
+        return nullptr;
+    }
+    socket->readAll();
+    return socket;
+}
+
+void tst_QXmppClient::networkUnavailableClosesConnection()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+    client.stream()->connectToHost();
+    auto *serverSocket = acceptConnection(server);
+    QVERIFY(serverSocket);
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+
+    QSignalSpy disconnectedSpy(&client, &QXmppClient::disconnected);
+    QSignalSpy errorSpy(&client, &QXmppClient::errorOccurred);
+
+    client.setStreamResumable(true);
+    client.setNetworkAvailable(false);
+    QVERIFY(!client.isNetworkAvailable());
+
+    // the connection is closed without ending the stream and without reporting an error
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+    QCOMPARE(disconnectedSpy.size(), 1);
+    QCOMPARE(errorSpy.size(), 0);
+    QVERIFY(client.stream()->c2sStreamManager().canResume());
+    QTRY_COMPARE(serverSocket->state(), QAbstractSocket::UnconnectedState);
+    QVERIFY(!serverSocket->readAll().contains("</stream:stream>"));
+
+    // no reconnection attempts without network
+    QVERIFY(!client.isReconnectionScheduled());
+    QVERIFY(!server.hasPendingConnections());
+
+    // reconnect as soon as the network is back
+    client.setNetworkAvailable(true);
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QVERIFY(acceptConnection(server));
+}
+
+void tst_QXmppClient::reconnectionDeferredWhileNetworkUnavailable()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+    client.setNetworkAvailable(false);
+
+    // a connection error does not schedule a reconnection without network
+    client.simulateSocketError();
+    QVERIFY(!client.isReconnectionScheduled());
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+
+    // but it is done immediately once the network is back
+    client.setNetworkAvailable(true);
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QVERIFY(acceptConnection(server));
+
+    // an explicit disconnect cancels the deferred reconnection
+    client.disconnectFromServer();
+    QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+    client.setNetworkAvailable(false);
+    client.simulateSocketError();
+    client.disconnectFromServer();
+    client.setNetworkAvailable(true);
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+}
+
+void tst_QXmppClient::reconnectNow()
+{
+    using namespace std::chrono_literals;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+
+    // nothing to do if no reconnection is pending
+    client.reconnectNow();
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+
+    for (int i = 0; i < 5; i++) {
+        client.simulateSocketError();
+    }
+    QVERIFY(client.reconnectionInterval() > 40s);
+
+    client.reconnectNow();
+    QVERIFY(!client.isReconnectionScheduled());
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QVERIFY(acceptConnection(server));
+
+    // the backoff starts from the beginning
+    client.simulateSocketError();
+    QVERIFY(client.reconnectionInterval() <= 12s);
+
+    // an explicit connect cancels a pending reconnection
+    TestClient otherClient;
+    useLocalServer(otherClient, server);
+    otherClient.simulateSocketError();
+    QVERIFY(otherClient.isReconnectionScheduled());
+    otherClient.connectToServer(otherClient.configuration());
+    QVERIFY(!otherClient.isReconnectionScheduled());
+}
+
+void tst_QXmppClient::checkConnection()
+{
+    using namespace std::chrono_literals;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+    client.stream()->connectToHost();
+    auto *serverSocket = acceptConnection(server);
+    QVERIFY(serverSocket);
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+    client.streamPrivate()->sessionStarted = true;
+    client.setStreamResumable(true);
+
+    // a pending regular ping (20 s timeout by default) is not repeated, but times out sooner
+    client.sendRegularPing();
+    QCOMPARE(client.pingTimeout(), 20s);
+    client.checkConnection();
+    QCOMPARE(client.pingTimeout(), 5s);
+    QTRY_VERIFY(serverSocket->bytesAvailable() > 0);
+    QCOMPARE(serverSocket->readAll(), QByteArray("<r xmlns=\"urn:xmpp:sm:3\"/>"));
+
+    // a response (any data) ends the ping
+    client.handlePacketReceived(xmlToDom("<a xmlns='urn:xmpp:sm:3' h='0'/>"));
+    QCOMPARE(client.pingTimeout(), 0ms);
+
+    // an even shorter configured timeout is kept; a second check does not send another ping
+    client.configuration().setKeepAliveTimeout(1);
+    client.checkConnection();
+    QCOMPARE(client.pingTimeout(), 1s);
+    client.checkConnection();
+    QTRY_VERIFY(serverSocket->bytesAvailable() > 0);
+    QCOMPARE(serverSocket->readAll(), QByteArray("<r xmlns=\"urn:xmpp:sm:3\"/>"));
+
+    // no response: the connection is closed for resumption and a reconnection is scheduled
+    QTRY_COMPARE(serverSocket->state(), QAbstractSocket::UnconnectedState);
+    QVERIFY(!serverSocket->readAll().contains("</stream:stream>"));
+    QVERIFY(client.stream()->c2sStreamManager().canResume());
+    QVERIFY(client.isReconnectionScheduled());
 }
 
 }  // namespace Client

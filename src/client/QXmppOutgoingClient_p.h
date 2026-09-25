@@ -111,12 +111,19 @@ private:
 class PingManager
 {
 public:
+    // Maximum timeout of pings sent by pingNow(), as the connection is already suspected to be broken
+    static constexpr auto PingNowTimeout = std::chrono::seconds(5);
+
     explicit PingManager(QXmppOutgoingClient *q);
 
     void onDataReceived();
+    void pingNow();
 
 private:
-    void sendPing();
+    friend class ::TestClient;
+
+    std::chrono::milliseconds keepAliveTimeout() const;
+    void sendPing(std::chrono::milliseconds timeout);
 
     QXmppOutgoingClient *q;
     QTimer *pingTimer;
