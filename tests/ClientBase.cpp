@@ -51,6 +51,9 @@
 
 #include <QCoreApplication>
 #include <QObject>
+#include <QSslCertificate>
+#include <QSslKey>
+#include <QSslSocket>
 #include <QTcpServer>
 #include <QTcpSocket>
 
@@ -97,6 +100,7 @@ private:
     Q_SLOT void noReconnectAfterPermanentStreamError();
     Q_SLOT void noReconnectAfterOwnDisconnect();
     Q_SLOT void keepAliveTimeoutBackoff();
+    Q_SLOT void noRetryAfterTlsFailure();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -990,6 +994,83 @@ void tst_QXmppClient::keepAliveTimeoutBackoff()
     QVERIFY(inRange(client.reconnectionInterval(), 2s));
     client.simulateKeepAliveTimeout();
     QVERIFY(inRange(client.reconnectionInterval(), 5s));
+}
+
+// Self-signed certificate for example.org (valid until 2126), not trusted by the client.
+// Test-only key pair generated for these tests, not a secret.
+static constexpr QByteArrayView UntrustedCertificate =
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIBmzCCAUGgAwIBAgIUEa+5pX8B2W8gBEPghT6d5NHpgHMwCgYIKoZIzj0EAwIw\n"
+    "FjEUMBIGA1UEAwwLZXhhbXBsZS5vcmcwIBcNMjYwOTI4MTYwMDQ2WhgPMjEyNjA5\n"
+    "MDQxNjAwNDZaMBYxFDASBgNVBAMMC2V4YW1wbGUub3JnMFkwEwYHKoZIzj0CAQYI\n"
+    "KoZIzj0DAQcDQgAEqVLKkZ0dO6UdwPBII2WW9Cg8BJyTZmY7p2k/vHqCTaV3mW5q\n"
+    "UC+y2yOfTMNuDccYsMC2J9GoPJXLYzfbe+ByvqNrMGkwHQYDVR0OBBYEFP85tXLp\n"
+    "DWl/pojVhrIae8CnMZ1CMB8GA1UdIwQYMBaAFP85tXLpDWl/pojVhrIae8CnMZ1C\n"
+    "MA8GA1UdEwEB/wQFMAMBAf8wFgYDVR0RBA8wDYILZXhhbXBsZS5vcmcwCgYIKoZI\n"
+    "zj0EAwIDSAAwRQIhAK9VxnJWJpwwHwfAcJcfx4dk5E5MI2YgZnmvPQ8fLq4IAiAE\n"
+    "PCjW5cKRMutJBQ/WUB1DCXPPqnWTqjhi8TzbS9c48g==\n"
+    "-----END CERTIFICATE-----\n";
+static constexpr QByteArrayView UntrustedCertificateKey =
+    "-----BEGIN PRIVATE KEY-----\n"
+    "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgVSDWElPwggpbyzhN\n"
+    "3rKvyJZKivtQv/c1a+SXoIKIymahRANCAASpUsqRnR07pR3A8EgjZZb0KDwEnJNm\n"
+    "ZjunaT+8eoJNpXeZbmpQL7LbI59Mw24NxxiwwLYn0ag8lctjN9t74HK+\n"
+    "-----END PRIVATE KEY-----\n";
+
+// Server that can upgrade its connections to TLS (STARTTLS) using UntrustedCertificate
+class StarttlsServer : public QTcpServer
+{
+protected:
+    void incomingConnection(qintptr socketDescriptor) override
+    {
+        auto *socket = new QSslSocket(this);
+        socket->setSocketDescriptor(socketDescriptor);
+        socket->setLocalCertificate(QSslCertificate(UntrustedCertificate.toByteArray()));
+        socket->setPrivateKey(QSslKey(UntrustedCertificateKey.toByteArray(), QSsl::Ec));
+        addPendingConnection(socket);
+    }
+};
+
+void tst_QXmppClient::noRetryAfterTlsFailure()
+{
+    if (!QSslSocket::supportsSsl()) {
+        QSKIP("TLS is not supported");
+    }
+
+    StarttlsServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+    client.configuration().setJid(u"alice@example.org"_s);
+    client.configuration().setStreamSecurityMode(QXmppConfiguration::TLSRequired);
+    QSignalSpy errorSpy(&client, &QXmppClient::errorOccurred);
+
+    client.stream()->connectToHost();
+    auto *serverSocket = qobject_cast<QSslSocket *>(acceptConnection(server));
+    QVERIFY(serverSocket);
+    serverSocket->write("<?xml version='1.0'?><stream:stream xmlns='jabber:client' "
+                        "xmlns:stream='http://etherx.jabber.org/streams' from='example.org' "
+                        "id='stream-1' version='1.0'>"
+                        "<stream:features><starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'><required/></starttls></stream:features>");
+    QTRY_VERIFY(serverSocket->bytesAvailable() > 0);
+    QVERIFY(serverSocket->readAll().contains("<starttls"));
+    serverSocket->write("<proceed xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>");
+    serverSocket->startServerEncryption();
+
+    // the certificate is not trusted
+    QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+    QCOMPARE(errorSpy.size(), 1);
+    QCOMPARE(errorSpy.constFirst().constFirst().value<QXmppError>().value<QAbstractSocket::SocketError>(),
+             QAbstractSocket::SslHandshakeFailedError);
+
+    // retrying on a timer would fail the same way
+    QVERIFY(!client.isReconnectionScheduled());
+
+    // but events can trigger a retry, e.g. the user decided to trust the certificate
+    client.reconnectNow();
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QVERIFY(acceptConnection(server));
 }
 
 }  // namespace Client

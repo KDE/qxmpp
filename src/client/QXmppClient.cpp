@@ -245,7 +245,15 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
                        streamError && isTemporaryStreamError(*streamError)) {
                 scheduleBackoffReconnect();
             }
-        } else if ((oldError == QXmppClient::SocketError || oldError == QXmppClient::KeepAliveError) && !receivedConflict) {
+        } else if (receivedConflict) {
+            // another client took over the resource
+        } else if (auto *socketError = std::get_if<QAbstractSocket::SocketError>(&err);
+                   socketError && *socketError == QAbstractSocket::SslHandshakeFailedError) {
+            // Retrying does not help until something changes (e.g. the certificate is trusted or
+            // a captive portal intercepting TLS has been passed), so only reconnect on
+            // reconnectNow() or network changes.
+            reconnectionDeferred = true;
+        } else if (oldError == QXmppClient::SocketError || oldError == QXmppClient::KeepAliveError) {
             scheduleBackoffReconnect();
         }
     }
@@ -740,9 +748,14 @@ void QXmppClient::disconnectFromServer()
     Use this when reconnecting is likely to succeed now, for example when the application returns
     to the foreground or the user explicitly asks to retry.
 
+    After a failed TLS handshake (e.g. because of an untrusted certificate), the client does not
+    retry on its own, as the same error would occur again. It only reconnects when this is called
+    (e.g. after the user decided to trust the certificate) or when the network changes (see
+    setNetworkAvailable() and checkConnection()).
+
     Does nothing if the client is connected or connecting, or if it is not going to reconnect
-    (automatic reconnection is disabled, disconnectFromServer() was called or another client took
-    over the resource).
+    (automatic reconnection is disabled, disconnectFromServer() was called, another client took
+    over the resource or the server reported a permanent stream error).
 
     \since QXmpp 1.17
 */
