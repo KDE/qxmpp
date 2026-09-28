@@ -152,6 +152,7 @@ QXmppClient and extend QXmppClient by subclassing QXmppClientExtension. See the
 \li QXmppRegistrationManager — In-band registration (\xepn{0077})
 \li QXmppAccountMigrationManager — Account data migration (\xepn{0227})
 \li QXmppMovedManager — Account migration hints (\xepn{0283})
+\li QXmppNetworkMonitor — Reconnection on network changes (QNetworkInformation)
 \endlist
 
 \section2 Legacy (deprecated)

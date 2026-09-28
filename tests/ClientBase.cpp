@@ -23,6 +23,7 @@
 #include "QXmppMessage.h"
 #include "QXmppMessageRetraction.h"
 #include "QXmppMovedManager.h"
+#include "QXmppNetworkMonitor.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppOutgoingClient_p.h"
 #include "QXmppPromise.h"
@@ -843,6 +844,207 @@ void tst_QXmppClient::checkConnection()
 }
 
 }  // namespace Client
+
+// ============================================================
+
+// The QNetworkInformation backend cannot be controlled from tests (and may be missing, e.g. in
+// CI containers), so the handlers are called directly.
+class tst_QXmppNetworkMonitor : public QObject
+{
+    Q_OBJECT
+private:
+    Q_SLOT void registration();
+    Q_SLOT void reachability();
+    Q_SLOT void internetLossReconnects();
+    Q_SLOT void internetLossWithoutAutoReconnect();
+    Q_SLOT void unregisterRestoresNetwork();
+    Q_SLOT void transportMediumChanged();
+    Q_SLOT void captivePortal();
+};
+
+void tst_QXmppNetworkMonitor::registration()
+{
+    // works with whatever backend is available (or none)
+    TestClient client;
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    QVERIFY(client.findExtension<QXmppNetworkMonitor>());
+    if (!monitor->isActive()) {
+        QVERIFY(client.isNetworkAvailable());
+    }
+
+    client.removeExtension(monitor);
+    QVERIFY(client.isNetworkAvailable());
+}
+
+void tst_QXmppNetworkMonitor::reachability()
+{
+    using Reachability = QNetworkInformation::Reachability;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    Client::useLocalServer(client, server);
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    monitor->setReachability(Reachability::Online);
+
+    client.stream()->connectToHost();
+    QVERIFY(Client::acceptConnection(server));
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+    client.setStreamResumable(true);
+
+    // without network, the connection is closed for resumption
+    monitor->setReachability(Reachability::Disconnected);
+    QVERIFY(!client.isNetworkAvailable());
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+    QVERIFY(client.stream()->c2sStreamManager().canResume());
+    QVERIFY(!client.isReconnectionScheduled());
+
+    // any other reachability counts as available (the server may be in the local network)
+    monitor->setReachability(Reachability::Local);
+    QVERIFY(client.isNetworkAvailable());
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QVERIFY(Client::acceptConnection(server));
+
+    // becoming fully online triggers a pending reconnection
+    client.disconnectFromServer();
+    QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+    client.simulateSocketError();
+    QVERIFY(client.isReconnectionScheduled());
+    monitor->setReachability(Reachability::Online);
+    QVERIFY(!client.isReconnectionScheduled());
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QVERIFY(Client::acceptConnection(server));
+
+    // staying online does not
+    client.disconnectFromServer();
+    QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+    client.simulateSocketError();
+    monitor->setReachability(Reachability::Online);
+    QVERIFY(client.isReconnectionScheduled());
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+}
+
+void tst_QXmppNetworkMonitor::internetLossReconnects()
+{
+    using Reachability = QNetworkInformation::Reachability;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    Client::useLocalServer(client, server);
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    monitor->setReachability(Reachability::Online);
+
+    client.stream()->connectToHost();
+    auto *serverSocket = Client::acceptConnection(server);
+    QVERIFY(serverSocket);
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+    client.setStreamResumable(true);
+    QSignalSpy disconnectedSpy(&client, &QXmppClient::disconnected);
+
+    // e.g. Wi-Fi turned off, but a VPN interface is still up: the connection is closed for
+    // resumption and the client reconnects right away, as the server may still be reachable
+    monitor->setReachability(Reachability::Local);
+    QVERIFY(client.isNetworkAvailable());
+    QCOMPARE(disconnectedSpy.size(), 1);
+    QVERIFY(client.stream()->c2sStreamManager().canResume());
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QTRY_COMPARE(serverSocket->state(), QAbstractSocket::UnconnectedState);
+    QVERIFY(!serverSocket->readAll().contains("</stream:stream>"));
+    QVERIFY(Client::acceptConnection(server));
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+
+    // if only the connectivity check fails, the connection may still work, so it is only checked
+    using namespace std::chrono_literals;
+    client.streamPrivate()->sessionStarted = true;
+    monitor->setReachability(Reachability::Online);
+    monitor->setReachability(Reachability::Site);
+    QCOMPARE(disconnectedSpy.size(), 1);
+    QVERIFY(client.stream()->xmppSocket().isConnected());
+    QCOMPARE(client.pingTimeout(), 5s);
+}
+
+void tst_QXmppNetworkMonitor::internetLossWithoutAutoReconnect()
+{
+    using namespace std::chrono_literals;
+    using Reachability = QNetworkInformation::Reachability;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    Client::useLocalServer(client, server);
+    client.configuration().setAutoReconnectionEnabled(false);
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    monitor->setReachability(Reachability::Online);
+
+    client.stream()->connectToHost();
+    QVERIFY(Client::acceptConnection(server));
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+    client.streamPrivate()->sessionStarted = true;
+
+    // the connection would not come back, so it is only checked, as it may still work
+    monitor->setReachability(Reachability::Local);
+    QVERIFY(client.stream()->xmppSocket().isConnected());
+    QCOMPARE(client.pingTimeout(), 5s);
+}
+
+void tst_QXmppNetworkMonitor::unregisterRestoresNetwork()
+{
+    TestClient client;
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    monitor->setReachability(QNetworkInformation::Reachability::Disconnected);
+    QVERIFY(!client.isNetworkAvailable());
+
+    client.removeExtension(monitor);
+    QVERIFY(client.isNetworkAvailable());
+}
+
+void tst_QXmppNetworkMonitor::transportMediumChanged()
+{
+    using namespace std::chrono_literals;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    Client::useLocalServer(client, server);
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    monitor->setReachability(QNetworkInformation::Reachability::Online);
+
+    client.stream()->connectToHost();
+    QVERIFY(Client::acceptConnection(server));
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+    client.streamPrivate()->sessionStarted = true;
+
+    // the connection is checked with a ping
+    QCOMPARE(client.pingTimeout(), 0ms);
+    monitor->onTransportMediumChanged();
+    QCOMPARE(client.pingTimeout(), 5s);
+}
+
+void tst_QXmppNetworkMonitor::captivePortal()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    Client::useLocalServer(client, server);
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    monitor->setReachability(QNetworkInformation::Reachability::Online);
+    monitor->setBehindCaptivePortal(true);
+
+    client.simulateSocketError();
+    QVERIFY(client.isReconnectionScheduled());
+
+    // passing the captive portal triggers a pending reconnection
+    monitor->setBehindCaptivePortal(false);
+    QVERIFY(!client.isReconnectionScheduled());
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+    QVERIFY(Client::acceptConnection(server));
+}
 
 // ============================================================
 
@@ -2361,6 +2563,6 @@ void tst_QXmppRosterIq::rosterMixChannel()
 
 }  // namespace RosterIq
 
-QXMPP_TEST_MAIN(Client::tst_QXmppClient, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq)
+QXMPP_TEST_MAIN(Client::tst_QXmppClient, tst_QXmppNetworkMonitor, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq)
 
 #include "ClientBase.moc"

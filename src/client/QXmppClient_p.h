@@ -75,6 +75,7 @@ public:
     void addProperCapability(QXmppPresence &presence);
     std::chrono::milliseconds getNextReconnectTime() const;
     void scheduleReconnect(std::chrono::milliseconds delay);
+    void reconnectForResumption();
     void cancelReconnect();
 
     static QStringList discoveryFeatures();

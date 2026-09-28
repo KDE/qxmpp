@@ -151,6 +151,7 @@ set(INSTALL_HEADER_FILES
     client/QXmppMovedManager.h
     client/QXmppMucManager.h
     client/QXmppMucManagerV2.h
+    client/QXmppNetworkMonitor.h
     client/QXmppOutgoingClient.h
     client/QXmppRegistrationManager.h
     client/QXmppPepBookmarkManager.h
@@ -301,6 +302,7 @@ set(SOURCE_FILES
     client/QXmppMovedManager.cpp
     client/QXmppMucManager.cpp
     client/QXmppMucManagerV2.cpp
+    client/QXmppNetworkMonitor.cpp
     client/QXmppOutgoingClient.cpp
     client/QXmppRosterManager.cpp
     client/QXmppRegistrationManager.cpp

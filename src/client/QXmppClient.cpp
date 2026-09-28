@@ -135,6 +135,23 @@ void QXmppClientPrivate::scheduleReconnect(std::chrono::milliseconds delay)
     reconnectionTimer->start(delay);
 }
 
+// Closes the connection without ending the stream and reconnects immediately, for network changes
+// that most likely broke the connection.
+void QXmppClientPrivate::reconnectForResumption()
+{
+    // without automatic reconnection, the connection would not come back, but it may still work
+    if (!q->configuration().autoReconnectionEnabled() || receivedConflict) {
+        q->checkConnection();
+        return;
+    }
+
+    if (q->state() != QXmppClient::DisconnectedState) {
+        stream->disconnectForResumption();
+        reconnectionDeferred = true;
+    }
+    q->reconnectNow();
+}
+
 void QXmppClientPrivate::cancelReconnect()
 {
     reconnectionTimer->stop();
@@ -712,9 +729,8 @@ void QXmppClient::reconnectNow()
 /*!
     Tells the client whether a network connection is \a available.
 
-    Applications that monitor the network (e.g. using QNetworkInformation, NetworkManager or
-    Android's ConnectivityManager) can use this to reconnect based on network changes instead of
-    only a timer:
+    Applications that monitor the network themselves (e.g. using NetworkManager directly) can use
+    this to reconnect based on network changes instead of only a timer:
 
     \list
     \li When the network becomes unavailable, the connection is closed immediately (without ending
@@ -728,6 +744,8 @@ void QXmppClient::reconnectNow()
     portals), so the reconnection timer is still used as a fallback.
 
     The network is considered available by default.
+
+    To use QNetworkInformation for this, add a QXmppNetworkMonitor to the client instead.
 
     \sa checkConnection()
     \since QXmpp 1.17
