@@ -83,6 +83,7 @@ private:
     Q_SLOT void chooseResource();
     Q_SLOT void csiManager();
     Q_SLOT void sasl2FastFallbackKeepsListener();
+    Q_SLOT void sasl2ResumptionIgnoresStreamFeatures();
 
     Q_SLOT void credentialsSerialization();
     Q_SLOT void reconnectionDelays();
@@ -101,6 +102,8 @@ private:
     Q_SLOT void noReconnectAfterOwnDisconnect();
     Q_SLOT void keepAliveTimeoutBackoff();
     Q_SLOT void noRetryAfterTlsFailure();
+    Q_SLOT void networkLossEndsSession_data();
+    Q_SLOT void networkLossEndsSession();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -526,6 +529,40 @@ void tst_QXmppClient::sasl2FastFallbackKeepsListener()
     QVERIFY(client.streamPrivate()->isAuthenticated);
     QVERIFY(config.credentialData().htToken.has_value());
     QCOMPARE(config.credentialData().htToken->secret, u"new-valid-token"_s);
+}
+
+void tst_QXmppClient::sasl2ResumptionIgnoresStreamFeatures()
+{
+    TestClient client;
+    auto &config = client.stream()->configuration();
+    config.setUser(u"bowman"_s);
+    config.setPassword(u"1234"_s);
+    config.setDomain(u"example.org"_s);
+    config.setDisabledSaslMechanisms({});
+
+    // previous session, then a new connection
+    auto &sm = client.stream()->c2sStreamManager();
+    sm.requestEnable();
+    client.expect(u"<enable xmlns=\"urn:xmpp:sm:3\" resume=\"true\"/>"_s);
+    QCOMPARE(sm.handleElement(xmlToDom("<enabled xmlns='urn:xmpp:sm:3' id='sm-1' resume='true'/>")), Finished);
+    sm.onStreamStart();
+
+    client.startSasl2Auth(Sasl2::StreamFeature { { u"PLAIN"_s }, {}, {}, true });
+    QVERIFY(client.takePacket().contains(u"<resume xmlns=\"urn:xmpp:sm:3\""_s));
+
+    QSignalSpy connectedSpy(&client, &QXmppClient::connected);
+    client.handlePacketReceived(xmlToDom(
+        "<success xmlns='urn:xmpp:sasl:2'>"
+        "<authorization-identifier>bowman@example.org/HAL</authorization-identifier>"
+        "<resumed xmlns='urn:xmpp:sm:3' h='0' previd='sm-1'/>"
+        "</success>"));
+    QCOMPARE(connectedSpy.size(), 1);
+    QCOMPARE(client.streamManagementState(), QXmppClient::ResumedStream);
+
+    // servers may still send stream features, the session must not be opened again
+    client.handlePacketReceived(xmlToDom("<stream:features xmlns:stream='http://etherx.jabber.org/streams'/>"));
+    QCOMPARE(connectedSpy.size(), 1);
+    QCOMPARE(client.streamManagementState(), QXmppClient::ResumedStream);
 }
 
 void tst_QXmppClient::credentialsSerialization()
@@ -1071,6 +1108,59 @@ void tst_QXmppClient::noRetryAfterTlsFailure()
     client.reconnectNow();
     QCOMPARE(client.state(), QXmppClient::ConnectingState);
     QVERIFY(acceptConnection(server));
+}
+
+void tst_QXmppClient::networkLossEndsSession_data()
+{
+    QTest::addColumn<bool>("tls");
+    QTest::newRow("plain") << false;
+    QTest::newRow("tls") << true;
+}
+
+void tst_QXmppClient::networkLossEndsSession()
+{
+    QFETCH(bool, tls);
+    if (tls && !QSslSocket::supportsSsl()) {
+        QSKIP("TLS is not supported");
+    }
+
+    StarttlsServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+    client.configuration().setJid(u"alice@example.org"_s);
+    if (tls) {
+        client.configuration().setStreamSecurityMode(QXmppConfiguration::TLSRequired);
+        client.configuration().setIgnoreSslErrors(true);
+    }
+
+    client.stream()->connectToHost();
+    auto *serverSocket = qobject_cast<QSslSocket *>(acceptConnection(server));
+    QVERIFY(serverSocket);
+    serverSocket->write("<?xml version='1.0'?><stream:stream xmlns='jabber:client' "
+                        "xmlns:stream='http://etherx.jabber.org/streams' from='example.org' "
+                        "id='stream-1' version='1.0'>");
+    if (tls) {
+        serverSocket->write("<stream:features><starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'><required/></starttls></stream:features>");
+        QTRY_VERIFY(serverSocket->bytesAvailable() > 0);
+        QVERIFY(serverSocket->readAll().contains("<starttls"));
+        serverSocket->write("<proceed xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>");
+        serverSocket->startServerEncryption();
+        QTRY_VERIFY(client.stream()->xmppSocket().internalSocket()->isEncrypted());
+    } else {
+        QTRY_VERIFY(client.stream()->xmppSocket().isStreamReceived());
+    }
+    client.streamPrivate()->sessionStarted = true;
+    client.setStreamResumable(true);
+
+    QSignalSpy disconnectedSpy(&client, &QXmppClient::disconnected);
+    client.setNetworkAvailable(false);
+
+    // the session must be closed, so that the next connection can open a new one
+    QTRY_COMPARE(disconnectedSpy.size(), 1);
+    QVERIFY(!client.streamPrivate()->sessionStarted);
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
 }
 
 }  // namespace Client

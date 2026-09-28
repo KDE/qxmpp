@@ -817,6 +817,13 @@ HandleElementResult QXmppOutgoingClient::handleElement(const QDomElement &nodeRe
 
 void QXmppOutgoingClient::handleStreamFeatures(const QXmppStreamFeatures &features)
 {
+    // Some servers send stream features after the stream has been resumed inline with SASL 2,
+    // although there is nothing left to negotiate.
+    if (d->sessionStarted) {
+        debug(u"Ignoring stream features received after the session has been established"_s);
+        return;
+    }
+
     // STARTTLS
     if (handleStarttls(features)) {
         return;
