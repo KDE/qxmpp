@@ -92,6 +92,10 @@ private:
     Q_SLOT void reconnectNow();
     Q_SLOT void checkConnection();
     Q_SLOT void pingOnlyWhenIdle();
+    Q_SLOT void reconnectAfterTemporaryStreamError();
+    Q_SLOT void reconnectAfterServerClosedStream();
+    Q_SLOT void noReconnectAfterPermanentStreamError();
+    Q_SLOT void noReconnectAfterOwnDisconnect();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -878,6 +882,95 @@ void tst_QXmppClient::pingOnlyWhenIdle()
     QCOMPARE(client.pingTimeout(), 5s);
     client.expirePingTimer();
     QCOMPARE(client.pingTimeout(), 5s);
+}
+
+// Connects the client to a local server that opens the stream, and returns the server's socket.
+static QTcpSocket *openStream(TestClient &client, QTcpServer &server)
+{
+    useLocalServer(client, server);
+    client.configuration().setJid(u"alice@example.org"_s);
+    client.stream()->connectToHost();
+    auto *serverSocket = acceptConnection(server);
+    if (!serverSocket) {
+        return nullptr;
+    }
+    serverSocket->write("<?xml version='1.0'?><stream:stream xmlns='jabber:client' "
+                        "xmlns:stream='http://etherx.jabber.org/streams' from='example.org' "
+                        "id='stream-1' version='1.0'>");
+    if (!QTest::qWaitFor([&] { return client.stream()->xmppSocket().isStreamReceived(); })) {
+        return nullptr;
+    }
+    client.streamPrivate()->sessionStarted = true;
+    return serverSocket;
+}
+
+void tst_QXmppClient::reconnectAfterTemporaryStreamError()
+{
+    using namespace std::chrono_literals;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    auto *serverSocket = openStream(client, server);
+    QVERIFY(serverSocket);
+    client.setStreamResumable(true);
+
+    serverSocket->write("<stream:error><system-shutdown xmlns='urn:ietf:params:xml:ns:xmpp-streams'/></stream:error></stream:stream>");
+    QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+
+    // the server ended the session, so the regular (not the resumption) backoff is used
+    QVERIFY(client.isReconnectionScheduled());
+    QVERIFY(!client.stream()->c2sStreamManager().canResume());
+    QVERIFY(client.reconnectionInterval() >= 8s);
+}
+
+void tst_QXmppClient::reconnectAfterServerClosedStream()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    auto *serverSocket = openStream(client, server);
+    QVERIFY(serverSocket);
+
+    serverSocket->write("</stream:stream>");
+    QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+    QVERIFY(client.isReconnectionScheduled());
+}
+
+void tst_QXmppClient::noReconnectAfterPermanentStreamError()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    for (const auto *condition : { "conflict", "not-authorized", "host-unknown", "policy-violation" }) {
+        TestClient client;
+        auto *serverSocket = openStream(client, server);
+        QVERIFY(serverSocket);
+
+        serverSocket->write(QByteArray("<stream:error><") + condition + " xmlns='urn:ietf:params:xml:ns:xmpp-streams'/></stream:error></stream:stream>");
+        serverSocket->disconnectFromHost();
+        QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+        QVERIFY2(!client.isReconnectionScheduled(), condition);
+    }
+}
+
+void tst_QXmppClient::noReconnectAfterOwnDisconnect()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    auto *serverSocket = openStream(client, server);
+    QVERIFY(serverSocket);
+
+    client.disconnectFromServer();
+    serverSocket->write("</stream:stream>");
+    serverSocket->disconnectFromHost();
+    QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
+    QTest::qWait(50);
+    QVERIFY(!client.isReconnectionScheduled());
 }
 
 }  // namespace Client

@@ -70,6 +70,8 @@ struct SessionBegin {
 
 struct SessionEnd {
     bool smCanResume;
+    // the server closed the stream without a stream error (e.g. on shutdown)
+    bool closedByServer;
 };
 }  // namespace QXmpp::Private
 
@@ -145,6 +147,7 @@ private:
     QXmpp::Private::HandleElementResult handleElement(const QDomElement &nodeRecv);
     void handleStreamFeatures(const QXmppStreamFeatures &features);
     void handleStreamError(const QXmpp::Private::StreamErrorElement &streamError);
+    void handleStreamClosed();
     bool handleStanza(const QDomElement &);
     bool handleStarttls(const QXmppStreamFeatures &features);
 

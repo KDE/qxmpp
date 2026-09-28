@@ -114,6 +114,24 @@ std::chrono::milliseconds reconnectionDelay(int tries, bool resumable)
     }
 }
 
+// Whether a stream error is caused by a (probably) temporary condition on the server, so that
+// reconnecting later is likely to succeed. Other errors indicate a problem with the client or the
+// account that reconnecting would not fix.
+static bool isTemporaryStreamError(StreamError error)
+{
+    switch (error) {
+    case StreamError::ConnectionTimeout:
+    case StreamError::InternalServerError:
+    case StreamError::RemoteConnectionFailed:
+    case StreamError::Reset:
+    case StreamError::ResourceConstraint:
+    case StreamError::SystemShutdown:
+        return true;
+    default:
+        return false;
+    }
+}
+
 }  // namespace QXmpp::Private
 
 std::chrono::milliseconds QXmppClientPrivate::getNextReconnectTime() const
@@ -133,6 +151,19 @@ void QXmppClientPrivate::scheduleReconnect(std::chrono::milliseconds delay)
         return;
     }
     reconnectionTimer->start(delay);
+}
+
+void QXmppClientPrivate::scheduleBackoffReconnect()
+{
+    // only start the backoff from the beginning if the last connection was stable,
+    // so that a flapping server does not defeat it
+    if (connectedSince.isValid() && std::chrono::milliseconds(connectedSince.elapsed()) >= StableConnectionDuration) {
+        reconnectionTries = 0;
+    }
+    connectedSince.invalidate();
+
+    scheduleReconnect(getNextReconnectTime());
+    reconnectionTries++;
 }
 
 // Closes the connection without ending the stream and reconnects immediately, for network changes
@@ -210,17 +241,12 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
             // if we receive a resource conflict, inhibit reconnection
             if (stream->xmppStreamError() == QXmppStanza::Error::Conflict) {
                 receivedConflict = true;
+            } else if (auto *streamError = std::get_if<QXmpp::StreamError>(&err);
+                       streamError && isTemporaryStreamError(*streamError)) {
+                scheduleBackoffReconnect();
             }
         } else if (oldError == QXmppClient::SocketError && !receivedConflict) {
-            // only start the backoff from the beginning if the last connection was stable,
-            // so that a flapping server does not defeat it
-            if (connectedSince.isValid() && std::chrono::milliseconds(connectedSince.elapsed()) >= StableConnectionDuration) {
-                reconnectionTries = 0;
-            }
-            connectedSince.invalidate();
-
-            scheduleReconnect(getNextReconnectTime());
-            reconnectionTries++;
+            scheduleBackoffReconnect();
         } else if (oldError == QXmppClient::KeepAliveError) {
             // if we got a keepalive error, reconnect in one second
             scheduleReconnect(1s);
@@ -336,6 +362,12 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
 
     connect(d->stream, &QXmppOutgoingClient::disconnected,
             this, &QXmppClient::_q_streamDisconnected);
+    connect(d->stream, &QXmppOutgoingClient::disconnected, this, [this](const SessionEnd &end) {
+        // e.g. the server shut down without sending a stream error
+        if (end.closedByServer && configuration().autoReconnectionEnabled() && !d->receivedConflict) {
+            d->scheduleBackoffReconnect();
+        }
+    });
 
     connect(d->stream, &QXmppOutgoingClient::errorOccurred, this, [this](const auto &text, const auto &error, auto oldError) {
         d->onErrorOccurred(text, error, oldError);

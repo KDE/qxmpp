@@ -169,7 +169,7 @@ QXmppOutgoingClient::QXmppOutgoingClient(QObject *parent)
     connect(&d->socket, &XmppSocket::disconnected, this, &QXmppOutgoingClient::handleSocketDisconnected);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingClient::handlePacketReceived);
     connect(&d->socket, &XmppSocket::streamReceived, this, &QXmppOutgoingClient::handleStream);
-    connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppOutgoingClient::disconnectFromHost);
+    connect(&d->socket, &XmppSocket::streamClosed, this, &QXmppOutgoingClient::handleStreamClosed);
     connect(&d->socket, &XmppSocket::errorOccurred, this, &QXmppOutgoingClient::handleSocketError);
     connect(&d->socket, &XmppSocket::sslErrorsOccurred, this, &QXmppOutgoingClient::handleSocketSslErrors);
 }
@@ -622,6 +622,7 @@ void QXmppOutgoingClient::closeSession()
 
     SessionEnd session {
         d->c2sStreamManager.canResume(),
+        std::exchange(d->streamClosedByServer, false),
     };
 
     d->streamAckManager.onSessionClosed();
@@ -686,6 +687,8 @@ void QXmppOutgoingClient::handleSocketError(const QString &text, std::variant<St
 void QXmppOutgoingClient::handleStart()
 {
     d->streamId.clear();
+    d->streamErrorReceived = false;
+    d->streamClosedByServer = false;
 
     // reset active manager (e.g. authentication)
     d->listener = this;
@@ -892,8 +895,19 @@ void QXmppOutgoingClient::handleStreamError(const QXmpp::Private::StreamErrorEle
         auto text = u"Received stream error (%1): %2"_s
                         .arg(Enums::toString(condition), streamError.text);
 
+        // stream errors are unrecoverable, the server ends the session
+        d->streamErrorReceived = true;
+        d->c2sStreamManager.onStreamClosed();
+
         setError(text, condition);
     }
+}
+
+void QXmppOutgoingClient::handleStreamClosed()
+{
+    // after a stream error, the error decides about reconnection
+    d->streamClosedByServer = !d->streamErrorReceived;
+    disconnectFromHost();
 }
 
 bool QXmppOutgoingClient::handleStanza(const QDomElement &stanza)

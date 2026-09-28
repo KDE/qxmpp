@@ -214,6 +214,10 @@ public:
     // Redirection
     std::optional<StreamErrorElement::SeeOtherHost> redirect;
 
+    // How the server ended the current stream
+    bool streamErrorReceived = false;
+    bool streamClosedByServer = false;
+
     // Authentication & Session
     bool isAuthenticated = false;
     bool bindModeAvailable = false;
