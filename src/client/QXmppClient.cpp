@@ -245,11 +245,8 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
                        streamError && isTemporaryStreamError(*streamError)) {
                 scheduleBackoffReconnect();
             }
-        } else if (oldError == QXmppClient::SocketError && !receivedConflict) {
+        } else if ((oldError == QXmppClient::SocketError || oldError == QXmppClient::KeepAliveError) && !receivedConflict) {
             scheduleBackoffReconnect();
-        } else if (oldError == QXmppClient::KeepAliveError) {
-            // if we got a keepalive error, reconnect in one second
-            scheduleReconnect(1s);
         }
     }
 

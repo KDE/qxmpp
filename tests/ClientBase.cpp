@@ -96,6 +96,7 @@ private:
     Q_SLOT void reconnectAfterServerClosedStream();
     Q_SLOT void noReconnectAfterPermanentStreamError();
     Q_SLOT void noReconnectAfterOwnDisconnect();
+    Q_SLOT void keepAliveTimeoutBackoff();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -971,6 +972,24 @@ void tst_QXmppClient::noReconnectAfterOwnDisconnect()
     QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
     QTest::qWait(50);
     QVERIFY(!client.isReconnectionScheduled());
+}
+
+void tst_QXmppClient::keepAliveTimeoutBackoff()
+{
+    using namespace std::chrono_literals;
+
+    auto inRange = [](std::chrono::milliseconds delay, std::chrono::milliseconds expected) {
+        return delay >= expected * 0.8 && delay <= expected * 1.2;
+    };
+
+    TestClient client;
+    enableStreamManagement(client, "<enabled xmlns='urn:xmpp:sm:3' id='sm-1' resume='true'/>");
+
+    // like other connection losses: jittered and backing off
+    client.simulateKeepAliveTimeout();
+    QVERIFY(inRange(client.reconnectionInterval(), 2s));
+    client.simulateKeepAliveTimeout();
+    QVERIFY(inRange(client.reconnectionInterval(), 5s));
 }
 
 }  // namespace Client
