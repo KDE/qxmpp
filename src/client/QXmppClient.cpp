@@ -35,6 +35,8 @@
 #include <chrono>
 
 #include <QDomElement>
+#include <QHostAddress>
+#include <QNetworkProxy>
 #include <QRandomGenerator>
 #include <QSslSocket>
 #include <QTimer>
@@ -146,7 +148,7 @@ std::chrono::milliseconds QXmppClientPrivate::getNextReconnectTime() const
 void QXmppClientPrivate::scheduleReconnect(std::chrono::milliseconds delay)
 {
     // without network, wait until it is available again (see QXmppClient::setNetworkAvailable())
-    if (!networkAvailable) {
+    if (!networkAvailable && !isServerLoopback()) {
         reconnectionDeferred = true;
         return;
     }
@@ -170,6 +172,10 @@ void QXmppClientPrivate::scheduleBackoffReconnect()
 // that most likely broke the connection.
 void QXmppClientPrivate::reconnectForResumption()
 {
+    if (isServerLoopback()) {
+        return;
+    }
+
     // without automatic reconnection, the connection would not come back, but it may still work
     if (!q->configuration().autoReconnectionEnabled() || receivedConflict) {
         q->checkConnection();
@@ -181,6 +187,44 @@ void QXmppClientPrivate::reconnectForResumption()
         reconnectionDeferred = true;
     }
     q->reconnectNow();
+}
+
+static bool isLoopbackHost(const QString &host)
+{
+    return host.compare(u"localhost", Qt::CaseInsensitive) == 0 ||
+        host.endsWith(u".localhost", Qt::CaseInsensitive) ||
+        QHostAddress(host).isLoopback();
+}
+
+static bool usesProxy(const QXmppConfiguration &config, const QString &host)
+{
+    auto proxy = config.networkProxy();
+    if (proxy.type() == QNetworkProxy::DefaultProxy) {
+        // application-wide or system proxy
+        proxy = QNetworkProxyFactory::proxyForQuery(QNetworkProxyQuery(host, config.port())).value(0);
+    }
+    return proxy.type() != QNetworkProxy::NoProxy && proxy.type() != QNetworkProxy::DefaultProxy;
+}
+
+// Whether the server is on the local machine, so that it can be reached without network.
+bool QXmppClientPrivate::isServerLoopback() const
+{
+    if (!loopbackIgnoresNetwork) {
+        return false;
+    }
+
+    // with a proxy, the connection may go to a local proxy, but the server is elsewhere
+    const auto &config = stream->configuration();
+    const auto host = config.host().isEmpty() ? config.domain() : config.host();
+    if (usesProxy(config, host)) {
+        return false;
+    }
+
+    const auto *socket = stream->xmppSocket().internalSocket();
+    if (socket->state() == QAbstractSocket::ConnectedState) {
+        return socket->peerAddress().isLoopback();
+    }
+    return lastServerWasLoopback || isLoopbackHost(host);
 }
 
 void QXmppClientPrivate::cancelReconnect()
@@ -520,6 +564,7 @@ void QXmppClient::connectToServer(const QXmppConfiguration &config,
     d->addProperCapability(d->clientPresence);
     d->cancelReconnect();
     d->reconnectionTries = 0;
+    d->lastServerWasLoopback = false;
 
     d->stream->connectToHost();
 }
@@ -789,6 +834,9 @@ void QXmppClient::reconnectNow()
 
     The network is considered available by default.
 
+    Connections to a server on the local machine (\c localhost or a loopback address) are not
+    affected, as they work without network, unless a proxy is used.
+
     To use QNetworkInformation for this, add a QXmppNetworkMonitor to the client instead.
 
     \sa checkConnection()
@@ -800,6 +848,11 @@ void QXmppClient::setNetworkAvailable(bool available)
 
     if (available) {
         reconnectNow();
+        return;
+    }
+
+    // a server on the local machine can still be reached
+    if (d->isServerLoopback()) {
         return;
     }
 
@@ -1057,6 +1110,7 @@ void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session
 {
     d->receivedConflict = false;
     d->connectedSince.start();
+    d->lastServerWasLoopback = d->stream->xmppSocket().internalSocket()->peerAddress().isLoopback();
 
     // notify managers
     if (session.fastTokenChanged) {

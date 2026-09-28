@@ -24,6 +24,8 @@ TestClient::TestClient(bool enableDebug, bool enableAutoReset)
     d->extensions.clear();
     // enable stream management (so IQ requests are not stopped)
     d->stream->enableStreamManagement(true);
+    // tests use local servers in place of remote ones
+    d->loopbackIgnoresNetwork = false;
     // setup logging (for expect())
     logger()->setLoggingType(QXmppLogger::SignalLogging);
     connect(logger(), &QXmppLogger::message, this, &TestClient::onLoggerMessage);
@@ -155,6 +157,11 @@ void TestClient::setStreamManagementState(QXmppClient::StreamManagementState sta
         d->stream->c2sStreamManager().setResumed(true);
         break;
     }
+}
+
+void TestClient::setLoopbackIgnoresNetwork(bool ignores)
+{
+    d->loopbackIgnoresNetwork = ignores;
 }
 
 void TestClient::setStreamResumable(bool resumable)

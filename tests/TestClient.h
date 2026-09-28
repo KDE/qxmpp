@@ -53,6 +53,7 @@ public:
     void resetIdCount();
     void setStreamManagementState(QXmppClient::StreamManagementState state);
     void setStreamResumable(bool resumable);
+    void setLoopbackIgnoresNetwork(bool ignores);
     void simulateKeepAliveTimeout();
     void simulateSocketError();
     std::chrono::milliseconds reconnectionInterval() const;

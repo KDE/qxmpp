@@ -50,6 +50,7 @@
 #include <chrono>
 
 #include <QCoreApplication>
+#include <QNetworkProxy>
 #include <QObject>
 #include <QSslCertificate>
 #include <QSslKey>
@@ -1176,6 +1177,7 @@ private:
     Q_SLOT void registration();
     Q_SLOT void reachability();
     Q_SLOT void internetLossReconnects();
+    Q_SLOT void localServer();
     Q_SLOT void internetLossWithoutAutoReconnect();
     Q_SLOT void unregisterRestoresNetwork();
     Q_SLOT void transportMediumChanged();
@@ -1284,6 +1286,55 @@ void tst_QXmppNetworkMonitor::internetLossReconnects()
     QCOMPARE(disconnectedSpy.size(), 1);
     QVERIFY(client.stream()->xmppSocket().isConnected());
     QCOMPARE(client.pingTimeout(), 5s);
+}
+
+void tst_QXmppNetworkMonitor::localServer()
+{
+    using Reachability = QNetworkInformation::Reachability;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    client.setLoopbackIgnoresNetwork(true);
+    Client::useLocalServer(client, server);
+    auto *monitor = client.addNewExtension<QXmppNetworkMonitor>();
+    monitor->setReachability(Reachability::Online);
+
+    client.stream()->connectToHost();
+    QVERIFY(Client::acceptConnection(server));
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+    QSignalSpy disconnectedSpy(&client, &QXmppClient::disconnected);
+
+    // a server on the local machine works without network, so the connection is kept
+    monitor->setReachability(Reachability::Local);
+    monitor->setReachability(Reachability::Disconnected);
+    QVERIFY(!client.isNetworkAvailable());
+    QVERIFY(client.stream()->xmppSocket().isConnected());
+    QCOMPARE(disconnectedSpy.size(), 0);
+
+    // and reconnections are not held back
+    client.simulateSocketError();
+    QVERIFY(client.isReconnectionScheduled());
+
+    // also before the first connection, based on the configured host
+    TestClient otherClient;
+    otherClient.setLoopbackIgnoresNetwork(true);
+    otherClient.configuration().setHost(u"localhost"_s);
+    otherClient.configuration().setPort(server.serverPort());
+    otherClient.setNetworkAvailable(false);
+    otherClient.simulateSocketError();
+    QVERIFY(otherClient.isReconnectionScheduled());
+
+    // not with a proxy, which may be local while the server is not
+    TestClient proxyClient;
+    proxyClient.setLoopbackIgnoresNetwork(true);
+    proxyClient.configuration().setHost(u"localhost"_s);
+    proxyClient.configuration().setPort(server.serverPort());
+    proxyClient.configuration().setNetworkProxy(QNetworkProxy(QNetworkProxy::Socks5Proxy, u"127.0.0.1"_s, 9050));
+    proxyClient.setNetworkAvailable(false);
+    proxyClient.simulateSocketError();
+    QVERIFY(!proxyClient.isReconnectionScheduled());
 }
 
 void tst_QXmppNetworkMonitor::internetLossWithoutAutoReconnect()

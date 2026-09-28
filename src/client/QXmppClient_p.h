@@ -71,12 +71,18 @@ public:
     bool networkAvailable;
     // a reconnection is due, but was held back because the network is unavailable
     bool reconnectionDeferred;
+    // Servers on the local machine can be reached without network, so the network availability
+    // does not affect them. Disabled in tests, which use loopback servers in place of remote ones.
+    bool loopbackIgnoresNetwork = true;
+    // the last established connection went to a loopback address
+    bool lastServerWasLoopback = false;
 
     void addProperCapability(QXmppPresence &presence);
     std::chrono::milliseconds getNextReconnectTime() const;
     void scheduleReconnect(std::chrono::milliseconds delay);
     void scheduleBackoffReconnect();
     void reconnectForResumption();
+    bool isServerLoopback() const;
     void cancelReconnect();
 
     static QStringList discoveryFeatures();
