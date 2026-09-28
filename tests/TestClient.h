@@ -58,7 +58,9 @@ public:
     std::chrono::milliseconds reconnectionInterval() const;
     bool isReconnectionScheduled() const;
     void sendRegularPing();
+    void expirePingTimer();
     std::chrono::milliseconds pingTimeout() const;
+    std::chrono::milliseconds nextPingCheck() const;
     void waitForConnect();
 
 private:

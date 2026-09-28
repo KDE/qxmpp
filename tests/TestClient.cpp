@@ -189,9 +189,20 @@ void TestClient::sendRegularPing()
 }
 
 // Returns the timeout of the pending ping, or zero if no ping is pending.
+void TestClient::expirePingTimer()
+{
+    streamPrivate()->pingManager.onPingTimerExpired();
+}
+
 std::chrono::milliseconds TestClient::pingTimeout() const
 {
     const auto *timer = streamPrivate()->pingManager.timeoutTimer;
+    return timer->isActive() ? timer->intervalAsDuration() : std::chrono::milliseconds::zero();
+}
+
+std::chrono::milliseconds TestClient::nextPingCheck() const
+{
+    const auto *timer = streamPrivate()->pingManager.pingTimer;
     return timer->isActive() ? timer->intervalAsDuration() : std::chrono::milliseconds::zero();
 }
 

@@ -91,6 +91,7 @@ private:
     Q_SLOT void reconnectionDeferredWhileNetworkUnavailable();
     Q_SLOT void reconnectNow();
     Q_SLOT void checkConnection();
+    Q_SLOT void pingOnlyWhenIdle();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -841,6 +842,42 @@ void tst_QXmppClient::checkConnection()
     QVERIFY(!serverSocket->readAll().contains("</stream:stream>"));
     QVERIFY(client.stream()->c2sStreamManager().canResume());
     QVERIFY(client.isReconnectionScheduled());
+}
+
+void tst_QXmppClient::pingOnlyWhenIdle()
+{
+    using namespace std::chrono_literals;
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+    client.stream()->connectToHost();
+    auto *serverSocket = acceptConnection(server);
+    QVERIFY(serverSocket);
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+    client.streamPrivate()->sessionStarted = true;
+    client.configuration().setKeepAliveInterval(1);
+
+    // data was received recently: no ping, the check is postponed by the rest of the interval
+    client.handlePacketReceived(xmlToDom("<a xmlns='urn:xmpp:sm:3' h='0'/>"));
+    client.expirePingTimer();
+    QCOMPARE(client.pingTimeout(), 0ms);
+    QVERIFY(client.nextPingCheck() > 0ms);
+    QVERIFY(client.nextPingCheck() <= 1s);
+
+    // idle for a whole interval: a ping is sent
+    QTRY_VERIFY(client.pingTimeout() > 0ms);
+    QCOMPARE(client.pingTimeout(), 20s);
+    QCOMPARE(client.nextPingCheck(), 1s);
+    QTRY_VERIFY(serverSocket->bytesAvailable() > 0);
+
+    // a pending ping from checkConnection() keeps its shorter timeout
+    client.checkConnection();
+    QCOMPARE(client.pingTimeout(), 5s);
+    client.expirePingTimer();
+    QCOMPARE(client.pingTimeout(), 5s);
 }
 
 }  // namespace Client

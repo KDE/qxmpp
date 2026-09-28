@@ -122,12 +122,15 @@ public:
 private:
     friend class ::TestClient;
 
+    std::chrono::milliseconds keepAliveInterval() const;
     std::chrono::milliseconds keepAliveTimeout() const;
+    void onPingTimerExpired();
     void sendPing(std::chrono::milliseconds timeout);
 
     QXmppOutgoingClient *q;
     QTimer *pingTimer;
     QTimer *timeoutTimer;
+    QElapsedTimer lastDataReceived;
 };
 
 using IqResult = QXmppOutgoingClient::IqResult;

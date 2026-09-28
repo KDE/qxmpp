@@ -1173,7 +1173,8 @@ PingManager::PingManager(QXmppOutgoingClient *q)
       timeoutTimer(new QTimer(q))
 {
     // send ping timer
-    pingTimer->callOnTimeout(q, [this]() { sendPing(keepAliveTimeout()); });
+    pingTimer->setSingleShot(true);
+    pingTimer->callOnTimeout(q, [this]() { onPingTimerExpired(); });
 
     // timeout triggers connection error
     timeoutTimer->setSingleShot(true);
@@ -1181,12 +1182,9 @@ PingManager::PingManager(QXmppOutgoingClient *q)
 
     // on connect: start ping timer
     QObject::connect(q, &QXmppOutgoingClient::connected, q, [this]() {
-        const auto interval = this->q->configuration().keepAliveInterval();
-
-        // start ping timer
-        if (interval > 0) {
-            pingTimer->setInterval(interval * 1s);
-            pingTimer->start();
+        if (const auto interval = keepAliveInterval(); interval > 0s) {
+            lastDataReceived.start();
+            pingTimer->start(interval);
         }
     });
 
@@ -1200,6 +1198,30 @@ PingManager::PingManager(QXmppOutgoingClient *q)
 void PingManager::onDataReceived()
 {
     timeoutTimer->stop();
+    lastDataReceived.start();
+}
+
+// Pings are only sent if no data has been received for keepAliveInterval(). Instead of restarting
+// the ping timer on every received packet, it is rescheduled when it expires.
+void PingManager::onPingTimerExpired()
+{
+    const auto interval = keepAliveInterval();
+    if (interval <= 0s) {
+        return;
+    }
+
+    if (lastDataReceived.isValid()) {
+        if (const auto idle = std::chrono::milliseconds(lastDataReceived.elapsed()); idle < interval) {
+            pingTimer->start(interval - idle);
+            return;
+        }
+    }
+
+    // do not replace the shorter timeout of a ping sent by pingNow()
+    if (!timeoutTimer->isActive()) {
+        sendPing(keepAliveTimeout());
+    }
+    pingTimer->start(interval);
 }
 
 void PingManager::pingNow()
@@ -1216,10 +1238,11 @@ void PingManager::pingNow()
     }
 
     sendPing(timeout);
-    // the next regular ping is due one interval from now
-    if (pingTimer->isActive()) {
-        pingTimer->start();
-    }
+}
+
+std::chrono::milliseconds PingManager::keepAliveInterval() const
+{
+    return std::max(q->configuration().keepAliveInterval(), 0) * 1s;
 }
 
 std::chrono::milliseconds PingManager::keepAliveTimeout() const
