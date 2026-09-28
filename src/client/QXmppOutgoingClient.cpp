@@ -1172,6 +1172,10 @@ PingManager::PingManager(QXmppOutgoingClient *q)
       pingTimer(new QTimer(q)),
       timeoutTimer(new QTimer(q))
 {
+    // second precision is enough and lets the system coalesce wakeups
+    pingTimer->setTimerType(Qt::VeryCoarseTimer);
+    timeoutTimer->setTimerType(Qt::VeryCoarseTimer);
+
     // send ping timer
     pingTimer->setSingleShot(true);
     pingTimer->callOnTimeout(q, [this]() { onPingTimerExpired(); });

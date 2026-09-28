@@ -346,6 +346,8 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     // reconnection
     d->reconnectionTimer = new QTimer(this);
     d->reconnectionTimer->setSingleShot(true);
+    // the delays are jittered anyway, second precision lets the system coalesce wakeups
+    d->reconnectionTimer->setTimerType(Qt::VeryCoarseTimer);
     connect(d->reconnectionTimer, &QTimer::timeout,
             this, &QXmppClient::_q_reconnect);
 
