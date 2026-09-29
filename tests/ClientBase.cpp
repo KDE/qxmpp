@@ -1514,6 +1514,7 @@ private:
     Q_SLOT void watchInfoConnectionLost();
     Q_SLOT void watchInfoRefresh();
     Q_SLOT void watchInfoFromCache();
+    Q_SLOT void watchInfoCached();
     Q_SLOT void watchInfoTracked();
     Q_SLOT void watchInfoTrackingEnds();
     Q_SLOT void watchInfoInvalidate();
@@ -2290,6 +2291,58 @@ void tst_QXmppDiscoveryManager::watchInfoFromCache()
     test.expectNoPacket();
 }
 
+void tst_QXmppDiscoveryManager::watchInfoCached()
+{
+    TestClient test;
+    test.configuration().setJid(u"alice@example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto cachedInfo = [&](const QString &jid) {
+        auto task = disco->info(jid);
+        if (!task.isFinished()) {
+            test.expect(infoRequest(jid));
+            test.inject(infoResponse(jid, u"muc_public"_s));
+            return false;
+        }
+        return true;
+    };
+
+    // the info of a watch is cached after the watch has been destroyed
+    {
+        auto watch = disco->watchInfo(u"room@muc.example.org"_s);
+        test.expect(infoRequest(u"room@muc.example.org"_s));
+        test.inject(infoResponse(u"room@muc.example.org"_s, u"muc_public"_s));
+        QVERIFY(cachedInfo(u"room@muc.example.org"_s));
+    }
+    QVERIFY(cachedInfo(u"room@muc.example.org"_s));
+
+    // invalidated info is not used anymore
+    DiscoInfoTracking::invalidate(&test, u"room@muc.example.org"_s);
+    QVERIFY(!cachedInfo(u"room@muc.example.org"_s));
+    QVERIFY(cachedInfo(u"room@muc.example.org"_s));
+
+    // stale info of a watch is not used
+    auto watch = disco->watchInfo(u"other@muc.example.org"_s);
+    test.expect(infoRequest(u"other@muc.example.org"_s));
+    test.inject(infoResponse(u"other@muc.example.org"_s, u"muc_public"_s));
+    watch.refresh();
+    test.expect(infoRequest(u"other@muc.example.org"_s));
+    disco->info(u"other@muc.example.org"_s);
+    test.expectNoPacket();
+    test.inject(infoResponse(u"other@muc.example.org"_s, u"muc_public"_s));
+    QVERIFY(cachedInfo(u"other@muc.example.org"_s));
+
+    // unwatched info is dropped on new streams
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expect(infoRequest(u"other@muc.example.org"_s));
+    test.inject(infoResponse(u"other@muc.example.org"_s, u"muc_public"_s));
+    QVERIFY(!cachedInfo(u"room@muc.example.org"_s));
+    QVERIFY(cachedInfo(u"other@muc.example.org"_s));
+}
+
 void tst_QXmppDiscoveryManager::watchInfoTracked()
 {
     TestClient test;
@@ -2693,6 +2746,16 @@ void tst_QXmppDiscoveryManager::infoCaps()
     task = disco->info(u"benvolio@montague.lit/garden"_s, {}, QXmppDiscoveryManager::CachePolicy::Strict);
     QVERIFY(task.isFinished());
     QVERIFY(expectFutureVariant<QXmppDiscoInfo>(task).features().contains(u"http://jabber.org/protocol/muc"_s));
+    test.expectNoPacket();
+
+    // unverified info is only requested once, too
+    test.injectPresence(capsPresence(u"mercutio@verona.lit/street"_s, u"sha-1"_s, "66/0NaeaBKkwk85efJTGmU47vXI="));
+    task = disco->info(u"mercutio@verona.lit/street"_s);
+    test.expect(capsRequest(u"mercutio@verona.lit/street"_s, u"66/0NaeaBKkwk85efJTGmU47vXI="_s));
+    test.inject(capsResponse(u"mercutio@verona.lit/street"_s));
+    QVERIFY(expectFutureVariant<QXmppDiscoInfo>(task).features().contains(u"http://jabber.org/protocol/muc"_s));
+    task = disco->info(u"mercutio@verona.lit/street"_s, {}, QXmppDiscoveryManager::CachePolicy::Strict);
+    QVERIFY(task.isFinished());
     test.expectNoPacket();
 }
 
