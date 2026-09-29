@@ -8,7 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
-#include "QXmppDiscoveryManager.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppGlobal.h"
 #include "QXmppMessage.h"
 #include "QXmppMixInfoItem.h"
@@ -39,12 +39,30 @@ class QXmppMixManagerPrivate
 public:
     QXmppPubSubManager *pubSubManager = nullptr;
     QXmppDiscoveryManager *discoveryManager = nullptr;
-    QXmppMixManager::Support participantSupport;
-    QXmppMixManager::Support messageArchivingSupport;
+    QXmppDiscoFeatureWatch participantSupportWatch;
+    QXmppDiscoFeatureWatch messageArchivingSupportWatch;
+    QProperty<QXmppMixManager::Support> participantSupport { QXmppMixManager::Support::Unknown };
+    QProperty<QXmppMixManager::Support> messageArchivingSupport { QXmppMixManager::Support::Unknown };
+    QPropertyNotifier participantSupportNotifier;
+    QPropertyNotifier messageArchivingSupportNotifier;
     QProperty<QList<QXmppMixManager::Service>> services;
     std::optional<QXmppDiscoServicesWatch> servicesWatch;
     QPropertyNotifier servicesNotifier;
 };
+
+static QXmppMixManager::Support toSupport(const QXmppDiscoFeatureWatch &watch)
+{
+    if (watch.supported().value()) {
+        return Supported;
+    }
+    switch (watch.state().value()) {
+    case QXmppDiscoInfoWatch::State::Loaded:
+    case QXmppDiscoInfoWatch::State::Stale:
+        return Unsupported;
+    default:
+        return Unknown;
+    }
+}
 
 namespace QXmpp::Private {
 
@@ -239,11 +257,11 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
     \enum QXmppMixManager::Support
     \brief Describes whether a feature is supported by the server.
 
-    Server support for a feature.
+    Server support for a feature, used by the deprecated participantSupport() and
+    messageArchivingSupport().
 
-    The information is cached until a new connection is established. That makes
-    it possible to retrieve the latest state even while the client is
-    disconnected.
+    The information is kept while the client is disconnected and until it has been updated after
+    a new connection has been established.
 
     \value Unknown Whether the server supports the feature is not known.
     That means, there is no corresponding information from the server (yet).
@@ -439,14 +457,45 @@ QStringList QXmppMixManager::discoveryFeatures() const
 }
 
 /*!
-    Returns the server's support for MIX channel participants as specified in
+    Returns a watch on whether the server supports MIX channel participants as specified in
     \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements}.
 
     If the server supports it, the server interacts between a client and a MIX channel that the user
     participates in.
     E.g., the server adds the MIX channel to the user's roster after joining it.
 
-    Returns the server support for MIX channel participants.
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the account information. If the manager is not registered with a client, a watch
+    that never loads is returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppMixManager::watchParticipantSupport() const
+{
+    return watchAccountFeature(client(), QXmpp::Namespace::MixPam2);
+}
+
+/*!
+    Returns a watch on whether the server supports archiving messages via
+    \xep{0313}{Message Archive Management} of MIX channels the user participates in as specified
+    in \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements}.
+
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the account information. If the manager is not registered with a client, a watch
+    that never loads is returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppMixManager::watchMessageArchivingSupport() const
+{
+    return watchAccountFeature(client(), QXmpp::Namespace::MixPam2Archive);
+}
+
+/*!
+    Returns the server's support for MIX channel participants as specified in
+    \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements}.
+
+    \deprecated since QXmpp 1.17, use watchParticipantSupport() instead.
 */
 QXmppMixManager::Support QXmppMixManager::participantSupport() const
 {
@@ -457,12 +506,16 @@ QXmppMixManager::Support QXmppMixManager::participantSupport() const
     \fn QXmppMixManager::participantSupportChanged()
 
     Emitted when the server's support for MIX channel participants changed.
+
+    \deprecated since QXmpp 1.17, use watchParticipantSupport() instead.
 */
 
 /*!
     Returns the server's support for archiving messages via \xep{0313}{Message Archive Management}
     of MIX channels the user participates in as specified in
     \xep{0405}{Mediated Information eXchange (MIX): Participant Server Requirements}.
+
+    \deprecated since QXmpp 1.17, use watchMessageArchivingSupport() instead.
 */
 QXmppMixManager::Support QXmppMixManager::messageArchivingSupport() const
 {
@@ -473,6 +526,8 @@ QXmppMixManager::Support QXmppMixManager::messageArchivingSupport() const
     \fn QXmppMixManager::messageArchivingSupportChanged()
 
     Emitted when the server's support for archiving MIX messages changed.
+
+    \deprecated since QXmpp 1.17, use watchMessageArchivingSupport() instead.
 */
 
 /*!
@@ -1057,13 +1112,20 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
         Q_EMIT servicesChanged();
     });
 
-    connect(client, &QXmppClient::connected, this, [this, client]() {
-        if (client->streamManagementState() == QXmppClient::NewStream) {
-            setParticipantSupport(Unknown);
-            setMessageArchivingSupport(Unknown);
-            updateSupport();
-        }
+    d->participantSupportWatch = watchParticipantSupport();
+    d->messageArchivingSupportWatch = watchMessageArchivingSupport();
+    d->participantSupport.setBinding([this] { return toSupport(d->participantSupportWatch); });
+    d->messageArchivingSupport.setBinding([this] { return toSupport(d->messageArchivingSupportWatch); });
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    d->participantSupportNotifier = d->participantSupport.addNotifier([this] {
+        Q_EMIT participantSupportChanged();
     });
+    d->messageArchivingSupportNotifier = d->messageArchivingSupport.addNotifier([this] {
+        Q_EMIT messageArchivingSupportChanged();
+    });
+    QT_WARNING_POP
 
     d->pubSubManager = client->findExtension<QXmppPubSubManager>();
     Q_ASSERT_X(d->pubSubManager, "QXmppMixManager", "QXmppPubSubManager is missing");
@@ -1136,9 +1198,12 @@ void QXmppMixManager::onUnregistered(QXmppClient *client)
     d->servicesNotifier = {};
     d->services = QList<Service>();
     d->servicesWatch = {};
-    setParticipantSupport(Unknown);
-    setMessageArchivingSupport(Unknown);
-    disconnect(client, &QXmppClient::connected, this, nullptr);
+    d->participantSupport = Unknown;
+    d->messageArchivingSupport = Unknown;
+    d->participantSupportNotifier = {};
+    d->messageArchivingSupportNotifier = {};
+    d->participantSupportWatch = {};
+    d->messageArchivingSupportWatch = {};
 
     if (auto manager = client->findExtension<QXmppAccountMigrationManager>()) {
         manager->unregisterExportData<MixData>();
@@ -1371,47 +1436,4 @@ QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestJids(const QString
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::addJidToNode(const QString &channelJid, const QString &node, const QString &jid)
 {
     co_return mapToSuccess(co_await d->pubSubManager->publishItem(channelJid, node, QXmppPubSubBaseItem { jid }).withContext(this));
-}
-
-void QXmppMixManager::updateSupport()
-{
-    const auto ownJid = client()->configuration().jidBare();
-
-    d->discoveryManager->info(ownJid).then(this, [this, ownJid](Result<QXmppDiscoInfo> &&result) {
-        if (hasError(result)) {
-            warning(u"Could not retrieve discovery info for %1: %2"_s.arg(ownJid, getError(result).description));
-        } else {
-            const auto &features = getValue(result).features();
-
-            setParticipantSupport(contains(features, ns_mix_pam) ? Supported : Unsupported);
-            setMessageArchivingSupport(contains(features, ns_mix_pam_archiving) ? Supported : Unsupported);
-        }
-    });
-}
-
-/*!
-    Sets the server's support for MIX channel participants to
-    \a participantSupport as specified in \xep{0405}{Mediated Information
-    eXchange (MIX): Participant Server Requirements}.
-*/
-void QXmppMixManager::setParticipantSupport(Support participantSupport)
-{
-    if (d->participantSupport != participantSupport) {
-        d->participantSupport = participantSupport;
-        Q_EMIT participantSupportChanged();
-    }
-}
-
-/*!
-    Sets the server's support for archiving messages via \xep{0313}{Message
-    Archive Management} of MIX channels the user participates in to
-    \a messageArchivingSupport as specified in \xep{0405}{Mediated
-    Information eXchange (MIX): Participant Server Requirements}.
-*/
-void QXmppMixManager::setMessageArchivingSupport(Support messageArchivingSupport)
-{
-    if (d->messageArchivingSupport != messageArchivingSupport) {
-        d->messageArchivingSupport = messageArchivingSupport;
-        Q_EMIT messageArchivingSupportChanged();
-    }
 }

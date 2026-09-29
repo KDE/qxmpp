@@ -7,6 +7,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMixConfigItem.h"
 #include "QXmppMixInfoItem.h"
 #include "QXmppMixParticipantItem.h"
@@ -71,11 +72,20 @@ public:
 
     QStringList discoveryFeatures() const override;
 
+    QXmppDiscoFeatureWatch watchParticipantSupport() const;
+    QXmppDiscoFeatureWatch watchMessageArchivingSupport() const;
+
+#if QXMPP_DEPRECATED_SINCE(1, 17)
+    [[deprecated("Use watchParticipantSupport()")]]
     Support participantSupport() const;
+    [[deprecated("Use watchParticipantSupport()")]]
     Q_SIGNAL void participantSupportChanged();
 
+    [[deprecated("Use watchMessageArchivingSupport()")]]
     Support messageArchivingSupport() const;
+    [[deprecated("Use watchMessageArchivingSupport()")]]
     Q_SIGNAL void messageArchivingSupportChanged();
+#endif
 
     QList<Service> services() const;
     Q_SIGNAL void servicesChanged();
@@ -139,10 +149,6 @@ private:
     QXmppTask<JoiningResult> joinChannel(QXmppMixIq &&iq);
     QXmppTask<JidResult> requestJids(const QString &channelJid, const QString &node);
     QXmppTask<QXmppClient::EmptyResult> addJidToNode(const QString &channelJid, const QString &node, const QString &jid);
-
-    void updateSupport();
-    void setParticipantSupport(Support participantSupport);
-    void setMessageArchivingSupport(Support messageArchivingSupport);
 
     const std::unique_ptr<QXmppMixManagerPrivate> d;
 
