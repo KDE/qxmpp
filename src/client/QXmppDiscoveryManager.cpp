@@ -406,6 +406,22 @@ QBindable<QXmppDiscoInfoWatch::State> QXmppDiscoFeatureWatch::state() const
     return d->infoWatch.state();
 }
 
+QXmppDiscoFeatureWatch QXmpp::Private::watchServerFeature(QXmppClient *client, QXmpp::Namespace feature)
+{
+    if (auto *disco = client ? client->findExtension<QXmppDiscoveryManager>() : nullptr) {
+        return disco->watchServerInfo().watchFeature(feature);
+    }
+    return {};
+}
+
+QXmppDiscoFeatureWatch QXmpp::Private::watchAccountFeature(QXmppClient *client, QXmpp::Namespace feature)
+{
+    if (auto *disco = client ? client->findExtension<QXmppDiscoveryManager>() : nullptr) {
+        return disco->watchAccountInfo().watchFeature(feature);
+    }
+    return {};
+}
+
 // QXmppDiscoServicesWatch
 
 /*! Returns whether all discovery queries have completed. */

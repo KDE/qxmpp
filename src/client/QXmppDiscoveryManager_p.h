@@ -122,4 +122,13 @@ public:
     bool matchesFilter(const WatchEntry &watch, const QXmppDiscoInfo &info) const;
 };
 
+namespace QXmpp::Private {
+
+// Feature watches for managers. Return a watch that never loads if the client is null or has no
+// QXmppDiscoveryManager.
+QXmppDiscoFeatureWatch watchServerFeature(QXmppClient *client, QXmpp::Namespace feature);
+QXmppDiscoFeatureWatch watchAccountFeature(QXmppClient *client, QXmpp::Namespace feature);
+
+}  // namespace QXmpp::Private
+
 #endif  // QXMPPDISCOVERYMANAGER_P_H

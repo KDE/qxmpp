@@ -1112,9 +1112,9 @@ private:
     Q_SLOT void testMovedPresence();
     Q_SLOT void testDiscoveryFeatures();
     Q_SLOT void testSupportedByServer();
-    Q_SLOT void testResetCachedData();
-    Q_SLOT void testHandleDiscoInfo();
-    Q_SLOT void testOnRegistered();
+    Q_SLOT void testSupportedByServerError();
+    Q_SLOT void testSupportedByServerDiscoveryManagerAddedLater();
+    Q_SLOT void testWatchServerSupport();
     Q_SLOT void testOnUnregistered();
     Q_SLOT void testPublishMoved();
     Q_SLOT void testVerifyMoved();
@@ -1176,103 +1176,132 @@ void tst_QXmppMovedManager::testDiscoveryFeatures()
     QCOMPARE(manager.discoveryFeatures(), QStringList { ns_moved.toString() });
 }
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+static QString movedInfoRequest()
+{
+    return u"<iq id='qx1' to='shakespeare.example' type='get'>"
+           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
+           "</iq>"_s;
+}
+
+static QString movedInfoResponse(const QStringList &features)
+{
+    QString xml = u"<iq id='qx1' from='shakespeare.example' type='result'>"
+                  "<query xmlns='http://jabber.org/protocol/disco#info'>"_s;
+    for (const auto &feature : features) {
+        xml += u"<feature var='" + feature + u"'/>";
+    }
+    return xml + u"</query></iq>";
+}
+
 void tst_QXmppMovedManager::testSupportedByServer()
 {
-    QXmppMovedManager manager;
-    QSignalSpy spy(&manager, &QXmppMovedManager::supportedByServerChanged);
-
-    QVERIFY(!manager.supportedByServer());
-
-    manager.setSupportedByServer(true);
-
-    QVERIFY(manager.supportedByServer());
-    QCOMPARE(spy.size(), 1);
-}
-
-void tst_QXmppMovedManager::testResetCachedData()
-{
-    QXmppMovedManager manager;
-
-    manager.setSupportedByServer(true);
-    manager.resetCachedData();
-
-    QVERIFY(!manager.supportedByServer());
-}
-
-void tst_QXmppMovedManager::testHandleDiscoInfo()
-{
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
-    client.setStreamManagementState(QXmppClient::NewStream);
+    QSignalSpy spy(manager, &QXmppMovedManager::supportedByServerChanged);
 
-    ResultIq<QXmppDiscoInfo> iq {
-        u"qx1"_s,
-        u"shakespeare.example"_s,
-        u"hag66@shakespeare.example"_s,
-        {},
-        QXmppDiscoInfo { {}, {}, QStringList { u"urn:xmpp:moved:1"_s } },
-    };
+    QVERIFY(!manager->supportedByServer());
+
+    client.setStreamManagementState(QXmppClient::NewStream);
     Q_EMIT client.connected();
-    client.inject(writePacketToDom(iq));
+    client.expect(movedInfoRequest());
+    client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
 
     QVERIFY(manager->supportedByServer());
+    QCOMPARE(spy.size(), 1);
 
+    // the value is kept until the new information arrives
+    Q_EMIT client.disconnected();
+    client.setStreamManagementState(QXmppClient::NewStream);
     Q_EMIT client.connected();
-    iq.payload.setFeatures({});
-    client.inject(writePacketToDom(iq));
+
+    QVERIFY(manager->supportedByServer());
+    QCOMPARE(spy.size(), 1);
+
+    client.expect(movedInfoRequest());
+    client.inject(movedInfoResponse({}));
+
+    QVERIFY(!manager->supportedByServer());
+    QCOMPARE(spy.size(), 2);
+}
+
+void tst_QXmppMovedManager::testSupportedByServerError()
+{
+    auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
+
+    client.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT client.connected();
+    client.expect(movedInfoRequest());
+    client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
+    QVERIFY(manager->supportedByServer());
+
+    Q_EMIT client.disconnected();
+    client.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT client.connected();
+    client.expect(movedInfoRequest());
+    client.inject(u"<iq id='qx1' from='shakespeare.example' type='error'>"
+                  "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                  "</iq>"_s);
 
     QVERIFY(!manager->supportedByServer());
 }
 
-void tst_QXmppMovedManager::testOnRegistered()
+void tst_QXmppMovedManager::testSupportedByServerDiscoveryManagerAddedLater()
 {
     TestClient client;
-    QXmppMovedManager manager;
-
-    client.addNewExtension<QXmppDiscoveryManager>();
-    client.addNewExtension<QXmppPubSubManager>();
     client.configuration().setJid(u"hag66@shakespeare.example"_s);
-    client.addExtension(&manager);
+    client.addNewExtension<QXmppPubSubManager>();
+    auto *manager = client.addNewExtension<QXmppMovedManager>();
+    client.addNewExtension<QXmppDiscoveryManager>();
+    QSignalSpy spy(manager, &QXmppMovedManager::supportedByServerChanged);
 
-    manager.setSupportedByServer(true);
+    // the support is watched once the client is connected
+    client.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT client.connected();
+    client.expect(movedInfoRequest());
+    client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
 
+    QVERIFY(manager->supportedByServer());
+    QCOMPARE(spy.size(), 1);
+}
+
+void tst_QXmppMovedManager::testWatchServerSupport()
+{
+    QVERIFY(!QXmppMovedManager().watchServerSupport().supported().value());
+
+    auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
     client.setStreamManagementState(QXmppClient::NewStream);
     Q_EMIT client.connected();
 
-    QVERIFY(!manager.supportedByServer());
+    auto watch = manager->watchServerSupport();
+    QCOMPARE(watch.state().value(), QXmppDiscoInfoWatch::State::Loading);
 
-    ResultIq<QXmppDiscoInfo> iq {
-        u"qx1"_s,
-        u"shakespeare.example"_s,
-        u"hag66@shakespeare.example"_s,
-        {},
-        QXmppDiscoInfo { {}, {}, QStringList { u"urn:xmpp:moved:1"_s } },
-    };
-    Q_EMIT client.connected();
-    client.inject(writePacketToDom(iq));
+    client.expect(movedInfoRequest());
+    client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
 
-    QVERIFY(manager.supportedByServer());
+    QCOMPARE(watch.state().value(), QXmppDiscoInfoWatch::State::Loaded);
+    QVERIFY(watch.supported().value());
 }
 
 void tst_QXmppMovedManager::testOnUnregistered()
 {
-    QXmppClient client;
-    QXmppMovedManager manager;
+    auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
 
-    client.addNewExtension<QXmppDiscoveryManager>();
-    client.addNewExtension<QXmppPubSubManager>();
-    client.configuration().setJid(u"hag66@shakespeare.example"_s);
-    client.addExtension(&manager);
-
-    manager.setSupportedByServer(true);
-    manager.onUnregistered(&client);
-
-    QVERIFY(!manager.supportedByServer());
-
-    manager.setSupportedByServer(true);
+    client.setStreamManagementState(QXmppClient::NewStream);
     Q_EMIT client.connected();
+    client.expect(movedInfoRequest());
+    client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
+    QVERIFY(manager->supportedByServer());
 
-    QVERIFY(manager.supportedByServer());
+    QSignalSpy spy(manager, &QXmppMovedManager::supportedByServerChanged);
+    manager->onUnregistered(&client);
+
+    QVERIFY(!manager->supportedByServer());
+    QCOMPARE(spy.size(), 1);
 }
+
+QT_WARNING_POP
 
 void tst_QXmppMovedManager::testPublishMoved()
 {

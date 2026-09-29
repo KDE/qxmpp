@@ -6,6 +6,7 @@
 #define QXMPPMOVEDMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppSendResult.h"
 #include "QXmppTask.h"
 
@@ -26,8 +27,14 @@ public:
 
     QStringList discoveryFeatures() const override;
 
+    QXmppDiscoFeatureWatch watchServerSupport() const;
+
+#if QXMPP_DEPRECATED_SINCE(1, 17)
+    [[deprecated("Use watchServerSupport()")]]
     bool supportedByServer() const;
+    [[deprecated("Use watchServerSupport()")]]
     Q_SIGNAL void supportedByServerChanged();
+#endif
 
     QXmppTask<Result> publishStatement(QString newBareJid);
     QXmppTask<Result> verifyStatement(QString oldBareJid, QString newBareJid);
@@ -40,9 +47,6 @@ protected:
 
 private:
     QXmppTask<QXmppPresence> processSubscriptionRequest(QXmppPresence presence);
-
-    void setSupportedByServer(bool supportedByServer);
-    void resetCachedData();
 
     const std::unique_ptr<QXmppMovedManagerPrivate> d;
 
