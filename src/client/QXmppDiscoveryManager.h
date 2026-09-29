@@ -23,6 +23,10 @@ class QXmppDiscoveryIq;
 class QXmppDiscoveryManagerPrivate;
 struct QXmppError;
 
+namespace QXmpp::Private {
+struct DiscoInfoTracking;
+}
+
 /*!
     \inmodule QXmpp
 
@@ -70,6 +74,7 @@ public:
 
     QBindable<State> state() const;
     QBindable<std::optional<QXmppDiscoInfo>> info() const;
+    QBindable<bool> changesTracked() const;
 
     void refresh();
 
@@ -222,6 +227,7 @@ protected:
 private:
     friend class QXmppDiscoInfoWatch;
     friend class QXmppDiscoveryManagerPrivate;
+    friend struct QXmpp::Private::DiscoInfoTracking;
     const std::unique_ptr<QXmppDiscoveryManagerPrivate> d;
 };
 

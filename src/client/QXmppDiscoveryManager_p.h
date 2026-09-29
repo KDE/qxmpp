@@ -51,6 +51,7 @@ struct QXmppDiscoInfoWatch::Data {
 
     QProperty<State> state { State::Unknown };
     QProperty<std::optional<QXmppDiscoInfo>> info;
+    QProperty<bool> changesTracked;
 
     // finished once the state is Loaded, Stale or Error
     std::vector<QXmppPromise<void>> knownPromises;
@@ -90,6 +91,8 @@ public:
 
     // info watches
     std::unordered_map<QXmppDiscoInfoWatch::Data::Key, std::weak_ptr<QXmppDiscoInfoWatch::Data>, QXmppDiscoInfoWatch::Data::KeyHash> infoWatches;
+    // JIDs whose changes are reported by other managers, e.g. joined MUC rooms
+    QSet<QString> trackedJids;
 
     // service watches
     QList<WatchEntry> watches;
@@ -115,6 +118,10 @@ public:
     std::variant<CompatIq<QXmppDiscoItems>, StanzaError> handleIq(GetIq<QXmppDiscoItems> &&iq);
 
     QXmppDiscoInfoWatch watchInfo(QXmppDiscoInfoWatch::Data::Key &&key);
+    std::shared_ptr<QXmppDiscoInfoWatch::Data> findJidWatch(const QString &jid) const;
+    void setTracked(const QString &jid, bool tracked);
+    void clearTracked();
+    void invalidate(const QString &jid);
     std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> lockInfoWatches() const;
     QString resolveJid(const QXmppDiscoInfoWatch::Data &data) const;
     void fetchInfo(const std::shared_ptr<QXmppDiscoInfoWatch::Data> &data, QXmppDiscoveryManager::CachePolicy cachePolicy);
@@ -134,6 +141,16 @@ namespace QXmpp::Private {
 // QXmppDiscoveryManager.
 QXmppDiscoFeatureWatch watchServerFeature(QXmppClient *client, QXmpp::Namespace feature);
 QXmppDiscoFeatureWatch watchAccountFeature(QXmppClient *client, QXmpp::Namespace feature);
+
+// Used by managers that know when the info of an entity changes.
+struct DiscoInfoTracking {
+    // Marks the info of \a jid as tracked, i.e. the caller reports all changes, e.g. using
+    // invalidate(). This does not request the info, the caller is responsible for fetching it
+    // when tracking starts. Tracking ends automatically on new streams.
+    static void setTracked(QXmppClient *client, const QString &jid, bool tracked);
+    // Drops the cached info of \a jid and requests it again if it is watched.
+    static void invalidate(QXmppClient *client, const QString &jid);
+};
 
 }  // namespace QXmpp::Private
 

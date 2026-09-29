@@ -18,6 +18,7 @@
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
@@ -1511,6 +1512,9 @@ private:
     Q_SLOT void watchInfoError();
     Q_SLOT void watchInfoConnectionLost();
     Q_SLOT void watchInfoRefresh();
+    Q_SLOT void watchInfoTracked();
+    Q_SLOT void watchInfoTrackingEnds();
+    Q_SLOT void watchInfoInvalidate();
     Q_SLOT void watchAccountInfoAccountChange();
     Q_SLOT void watchInfoLifetime();
     Q_SLOT void watchInfoModifiedByNotifier();
@@ -2226,6 +2230,98 @@ void tst_QXmppDiscoveryManager::watchInfoRefresh()
     test.expect(infoRequest(u"upload.example.org"_s));
     test.inject(infoResponse(u"upload.example.org"_s, u"urn:xmpp:http:upload:1"_s));
     QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+void tst_QXmppDiscoveryManager::watchInfoTracked()
+{
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"room@muc.example.org"_s);
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+    QVERIFY(!watch.changesTracked().value());
+
+    DiscoInfoTracking::setTracked(&test, u"room@muc.example.org"_s, true);
+    QVERIFY(watch.changesTracked().value());
+    test.expectNoPacket();
+
+    // only the entity itself is tracked
+    auto nodeWatch = disco->watchInfo(u"room@muc.example.org"_s, u"node"_s);
+    QVERIFY(!nodeWatch.changesTracked().value());
+    auto otherWatch = disco->watchInfo(u"other@muc.example.org"_s);
+    QVERIFY(!otherWatch.changesTracked().value());
+
+    // new watches are tracked from the start
+    watch = {};
+    watch = disco->watchInfo(u"room@muc.example.org"_s);
+    QVERIFY(watch.changesTracked().value());
+
+    DiscoInfoTracking::setTracked(&test, u"room@muc.example.org"_s, false);
+    QVERIFY(!watch.changesTracked().value());
+}
+
+void tst_QXmppDiscoveryManager::watchInfoTrackingEnds()
+{
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"room@muc.example.org"_s);
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+    test.inject(infoResponse(u"room@muc.example.org"_s, u"muc_public"_s));
+    DiscoInfoTracking::setTracked(&test, u"room@muc.example.org"_s, true);
+
+    // tracking continues on stream resumption
+    Q_EMIT test.disconnected();
+    QVERIFY(watch.changesTracked().value());
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    Q_EMIT test.connected();
+    QVERIFY(watch.changesTracked().value());
+
+    // and ends with a new stream
+    Q_EMIT test.disconnected();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    QVERIFY(!watch.changesTracked().value());
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+
+    // without stream management it ends on disconnection
+    DiscoInfoTracking::setTracked(&test, u"room@muc.example.org"_s, true);
+    test.setStreamManagementState(QXmppClient::NoStreamManagement);
+    Q_EMIT test.disconnected();
+    QVERIFY(!watch.changesTracked().value());
+}
+
+void tst_QXmppDiscoveryManager::watchInfoInvalidate()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"room@muc.example.org"_s);
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+    test.inject(infoResponse(u"room@muc.example.org"_s, u"muc_public"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    DiscoInfoTracking::invalidate(&test, u"room@muc.example.org"_s);
+    QCOMPARE(watch.state().value(), State::Stale);
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+    test.inject(infoResponse(u"room@muc.example.org"_s, u"muc_hidden"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"muc_hidden"_s });
+
+    // without a watch only the cache is cleared
+    watch = {};
+    DiscoInfoTracking::invalidate(&test, u"room@muc.example.org"_s);
+    test.expectNoPacket();
+    disco->info(u"room@muc.example.org"_s);
+    test.expect(infoRequest(u"room@muc.example.org"_s));
 }
 
 void tst_QXmppDiscoveryManager::watchAccountInfoAccountChange()
