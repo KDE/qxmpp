@@ -393,6 +393,7 @@ class tst_QXmppVCardManager : public QObject
     Q_OBJECT
 
 private:
+    Q_SLOT void watchServerSupport();
     Q_SLOT void testHandleStanza_data();
     Q_SLOT void testHandleStanza();
     Q_SLOT void fetchVCard();
@@ -403,6 +404,11 @@ private:
 
     QXmppClient m_client;
 };
+
+void tst_QXmppVCardManager::watchServerSupport()
+{
+    checkWatchSupport<QXmppVCardManager>(&QXmppVCardManager::watchServerSupport, u"capulet.example"_s, u"vcard-temp"_s);
+}
 
 void tst_QXmppVCardManager::testHandleStanza_data()
 {

@@ -6,6 +6,7 @@
 #define QXMPPCARBONMANAGERV2_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 
 #include <QProperty>
 
@@ -17,6 +18,7 @@ public:
     ~QXmppCarbonManagerV2();
 
     QBindable<bool> enabled() const;
+    QXmppDiscoFeatureWatch watchServerSupport() const;
 
     bool handleStanza(const QDomElement &, const std::optional<QXmppE2eeMetadata> &) override;
 

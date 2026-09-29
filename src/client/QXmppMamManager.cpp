@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppMamIq.h"
 #include "QXmppMessage.h"
@@ -138,6 +139,21 @@ QXmppMamManager::QXmppMamManager()
 }
 
 QXmppMamManager::~QXmppMamManager() = default;
+
+/*!
+    Returns a watch on whether the own account supports \xep{0313}{Message Archive Management}.
+
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the account information. This requires the QXmppDiscoveryManager to be registered
+    with the client. If the manager is not registered with a client, a watch that never loads is
+    returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppMamManager::watchAccountSupport() const
+{
+    return watchAccountFeature(client(), QXmpp::Namespace::Mam2);
+}
 
 QStringList QXmppMamManager::discoveryFeatures() const
 {

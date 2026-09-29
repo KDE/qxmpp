@@ -6,6 +6,7 @@
 #define QXMPPBLOCKINGMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppError.h"
 #include "QXmppTask.h"
 
@@ -71,6 +72,8 @@ public:
 
     QXmppBlockingManager();
     ~QXmppBlockingManager() override;
+
+    QXmppDiscoFeatureWatch watchServerSupport() const;
 
     bool isSubscribed() const;
     Q_SIGNAL void subscribedChanged();

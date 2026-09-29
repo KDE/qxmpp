@@ -1422,6 +1422,7 @@ class tst_QXmppBlockingManager : public QObject
 {
     Q_OBJECT
 private:
+    Q_SLOT void watchServerSupport();
     Q_SLOT void basic();
     Q_SLOT void fetch();
     Q_SLOT void block();
@@ -1431,6 +1432,11 @@ private:
     Q_SLOT void pushBlocked();
     Q_SLOT void blockedState();
 };
+
+void tst_QXmppBlockingManager::watchServerSupport()
+{
+    checkWatchSupport<QXmppBlockingManager>(&QXmppBlockingManager::watchServerSupport, u"capulet.example"_s, u"urn:xmpp:blocking"_s);
+}
 
 void tst_QXmppBlockingManager::basic()
 {

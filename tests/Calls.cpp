@@ -1663,9 +1663,15 @@ class tst_QXmppExternalServiceDiscoveryManager : public QObject
     Q_OBJECT
 
 private:
+    Q_SLOT void watchServerSupport();
     Q_SLOT void testRequestServices();
     Q_SLOT void testDiscoveryFeatures();
 };
+
+void tst_QXmppExternalServiceDiscoveryManager::watchServerSupport()
+{
+    checkWatchSupport<QXmppExternalServiceDiscoveryManager>(&QXmppExternalServiceDiscoveryManager::watchServerSupport, u"capulet.example"_s, u"urn:xmpp:extdisco:2"_s);
+}
 
 void tst_QXmppExternalServiceDiscoveryManager::testRequestServices()
 {
