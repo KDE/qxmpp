@@ -54,8 +54,14 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
 
 QXmppDiscoveryManager::~QXmppDiscoveryManager()
 {
-    for (const auto &data : d->lockInfoWatches()) {
+    const auto infoWatches = d->lockInfoWatches();
+    for (const auto &data : infoWatches) {
         data->manager = nullptr;
+    }
+    // the information will never be known, cancel the tasks waiting for it
+    for (const auto &data : infoWatches) {
+        auto promises = std::move(data->knownPromises);
+        data->knownPromises.clear();
     }
 }
 
@@ -216,6 +222,12 @@ QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
 
 // QXmppDiscoInfoWatch
 
+static bool isKnown(QXmppDiscoInfoWatch::State state)
+{
+    using enum QXmppDiscoInfoWatch::State;
+    return state == Loaded || state == Stale || state == Error;
+}
+
 /*!
     \class QXmppDiscoInfoWatch
     \inmodule QXmpp
@@ -260,6 +272,28 @@ QXmppDiscoInfoWatch::QXmppDiscoInfoWatch()
 QXmppDiscoInfoWatch::QXmppDiscoInfoWatch(std::shared_ptr<Data> d)
     : d(std::move(d))
 {
+}
+
+QXmppTask<void> QXmppDiscoInfoWatch::Data::waitUntilKnown()
+{
+    if (!knownNotifier) {
+        knownNotifier = state.addNotifier([this] {
+            if (!isKnown(state.value())) {
+                return;
+            }
+            // finishing resumes user code, which may destroy this
+            auto promises = std::move(knownPromises);
+            knownPromises.clear();
+            for (auto &promise : promises) {
+                promise.finish();
+            }
+        });
+    }
+
+    QXmppPromise<void> promise;
+    auto task = promise.task();
+    knownPromises.push_back(std::move(promise));
+    return task;
 }
 
 QXmppDiscoInfoWatch::Data::~Data()
@@ -404,6 +438,36 @@ QBindable<bool> QXmppDiscoFeatureWatch::supported() const
 QBindable<QXmppDiscoInfoWatch::State> QXmppDiscoFeatureWatch::state() const
 {
     return d->infoWatch.state();
+}
+
+/*!
+    Returns whether the entity supports all watched features, as soon as that is known.
+
+    If the information is Loaded or Stale, the task finishes immediately with the current value.
+    Otherwise it finishes once the information has been received, with \c false if the entity
+    responded with an error. Until then the information is requested, also after reconnections,
+    even if no other copy of the watch exists anymore.
+
+    If the watch is not connected to a QXmppDiscoveryManager, the task finishes immediately with
+    \c false. If the manager is destroyed before the information is known, the task is cancelled.
+
+    \code
+    if (co_await manager->watchServerSupport().resolve()) {
+        // use the feature
+    }
+    \endcode
+
+    \since QXmpp 1.17
+*/
+QXmppTask<bool> QXmppDiscoFeatureWatch::resolve() const
+{
+    // keeps the information requested until the task has finished
+    auto watch = *this;
+    auto &info = *watch.d->infoWatch.d;
+    if (info.manager && !isKnown(info.state.value())) {
+        co_await info.waitUntilKnown();
+    }
+    co_return watch.d->supported.value();
 }
 
 QXmppDiscoFeatureWatch QXmpp::Private::watchServerFeature(QXmppClient *client, QXmpp::Namespace feature)
