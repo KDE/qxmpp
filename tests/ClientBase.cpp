@@ -1512,6 +1512,7 @@ private:
     Q_SLOT void watchInfoError();
     Q_SLOT void watchInfoConnectionLost();
     Q_SLOT void watchInfoRefresh();
+    Q_SLOT void watchInfoFromCache();
     Q_SLOT void watchInfoTracked();
     Q_SLOT void watchInfoTrackingEnds();
     Q_SLOT void watchInfoInvalidate();
@@ -2230,6 +2231,53 @@ void tst_QXmppDiscoveryManager::watchInfoRefresh()
     test.expect(infoRequest(u"upload.example.org"_s));
     test.inject(infoResponse(u"upload.example.org"_s, u"urn:xmpp:http:upload:1"_s));
     QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+void tst_QXmppDiscoveryManager::watchInfoFromCache()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setJid(u"alice@example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto fillCache = [&](const QString &jid) {
+        disco->info(jid);
+        test.expect(infoRequest(jid));
+        test.inject(infoResponse(jid, u"muc_public"_s));
+    };
+
+    // cached info of untracked entities is shown as stale and requested again
+    fillCache(u"room@muc.example.org"_s);
+    auto watch = disco->watchInfo(u"room@muc.example.org"_s);
+    QCOMPARE(watch.state().value(), State::Stale);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"muc_public"_s });
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+
+    // further watches share the running request
+    auto watch2 = disco->watchInfo(u"room@muc.example.org"_s);
+    test.expectNoPacket();
+    test.inject(infoResponse(u"room@muc.example.org"_s, u"muc_hidden"_s));
+    QCOMPARE(watch2.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch2), QStringList { u"muc_hidden"_s });
+
+    // cached info of tracked entities is up to date
+    fillCache(u"tracked@muc.example.org"_s);
+    DiscoInfoTracking::setTracked(&test, u"tracked@muc.example.org"_s, true);
+    auto trackedWatch = disco->watchInfo(u"tracked@muc.example.org"_s);
+    QCOMPARE(trackedWatch.state().value(), State::Loaded);
+    test.expectNoPacket();
+
+    // server and account info are only requested on new streams
+    fillCache(u"example.org"_s);
+    fillCache(u"alice@example.org"_s);
+    auto serverWatch = disco->watchServerInfo();
+    auto accountWatch = disco->watchAccountInfo();
+    QCOMPARE(serverWatch.state().value(), State::Loaded);
+    QCOMPARE(accountWatch.state().value(), State::Loaded);
+    test.expectNoPacket();
 }
 
 void tst_QXmppDiscoveryManager::watchInfoTracked()

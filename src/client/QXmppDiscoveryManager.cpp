@@ -607,7 +607,10 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category
 
     The information is requested when the first watch is created and again on every new
     stream. Until the new response arrives, the previous information stays available with
-    the state QXmppDiscoInfoWatch::State::Stale.
+    the state QXmppDiscoInfoWatch::State::Stale. If no other watch on the entity exists, but
+    the information has been requested before, e.g. using info(), it is used with the state
+    Stale while it is requested again, unless changes of the entity are tracked (see
+    QXmppDiscoInfoWatch::changesTracked()).
 
     Keep the handle alive as long as you need updates.
 
@@ -802,7 +805,18 @@ QXmppDiscoInfoWatch QXmppDiscoveryManagerPrivate::watchInfo(QXmppDiscoInfoWatch:
         data->key.node.isEmpty() && trackedJids.contains(data->key.jid);
     infoWatches.insert_or_assign(data->key, data);
 
-    fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Relaxed);
+    // Cached info of untracked entities may be outdated. Server and account info are only
+    // requested on new streams.
+    if (data->key.target == QXmppDiscoInfoWatch::Data::Target::Jid && !data->changesTracked.value()) {
+        if (auto *cachedInfo = infoCache[{ data->key.jid, data->key.node }]) {
+            data->infoJid = data->key.jid;
+            data->info = *cachedInfo;
+            data->state = QXmppDiscoInfoWatch::State::Stale;
+        }
+        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+    } else {
+        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Relaxed);
+    }
     return QXmppDiscoInfoWatch(std::move(data));
 }
 
