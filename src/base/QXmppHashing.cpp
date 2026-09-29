@@ -70,7 +70,7 @@ static HashAlgorithm toHashAlgorithm(QCryptographicHash::Algorithm algorithm)
     return HashAlgorithm::Unknown;
 }
 
-static std::optional<QCryptographicHash::Algorithm> toCryptograhicHashAlgorithm(HashAlgorithm algorithm)
+std::optional<QCryptographicHash::Algorithm> QXmpp::Private::toQCryptographicHashAlgorithm(HashAlgorithm algorithm)
 {
     switch (algorithm) {
     case HashAlgorithm::Unknown:
@@ -249,7 +249,7 @@ public:
     {
         // convert to QCryptographicHash::Algorithm for hashing
         auto qtAlgorithms = transform<std::vector<QCryptographicHash::Algorithm>>(algorithms, [](auto algorithm) {
-            auto converted = toCryptograhicHashAlgorithm(algorithm);
+            auto converted = toQCryptographicHashAlgorithm(algorithm);
             Q_ASSERT_X(converted.has_value(), "calculate hashes", "Must only be called with algorithms supported by QCryptographicHash");
             return *converted;
         });

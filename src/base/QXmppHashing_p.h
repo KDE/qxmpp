@@ -9,6 +9,8 @@
 #include "QXmppGlobal.h"
 #include "QXmppHash.h"
 
+#include "Enums.h"
+
 #include <memory>
 #include <variant>
 #include <vector>
@@ -20,6 +22,28 @@ class QFuture;
 class QXmppHash;
 
 namespace QXmpp::Private {
+
+// XEP-0300 names, which include the IANA Hash Function Textual Names
+template<>
+struct Enums::Data<HashAlgorithm> {
+    using enum HashAlgorithm;
+    static inline constexpr auto Values = makeValues<HashAlgorithm>({
+        { Unknown, {} },
+        { Md2, u"md2" },
+        { Md5, u"md5" },
+        { Shake128, u"shake128" },
+        { Shake256, u"shake256" },
+        { Sha1, u"sha-1" },
+        { Sha224, u"sha-224" },
+        { Sha256, u"sha-256" },
+        { Sha384, u"sha-384" },
+        { Sha512, u"sha-512" },
+        { Sha3_256, u"sha3-256" },
+        { Sha3_512, u"sha3-512" },
+        { Blake2b_256, u"blake2b-256" },
+        { Blake2b_512, u"blake2b-512" },
+    });
+};
 
 struct HashingResult {
     using Result = std::variant<std::vector<QXmppHash>, Cancelled, QXmppError>;
@@ -51,6 +75,7 @@ struct HashVerificationResult {
 using HashingResultPtr = std::shared_ptr<HashingResult>;
 using HashVerificationResultPtr = std::shared_ptr<HashVerificationResult>;
 
+std::optional<QCryptographicHash::Algorithm> toQCryptographicHashAlgorithm(HashAlgorithm algorithm);
 bool isHashingAlgorithmSecure(HashAlgorithm algorithm);
 uint16_t hashPriority(HashAlgorithm algorithm);
 

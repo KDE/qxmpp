@@ -6,8 +6,11 @@
 #define QXMPPDISCOVERYIQ_P_H
 
 #include "QXmppDiscoveryIq.h"
+#include "QXmppHash.h"
 
 #include "Enums.h"
+
+class QDomElement;
 
 namespace QXmpp::Private {
 
@@ -58,6 +61,14 @@ struct Enums::Data<Disco::Type> {
         { File, u"file" },
     });
 };
+
+// XEP-0115: Entity Capabilities
+// Returns the algorithm of a 'hash' attribute if it can be used to verify the information.
+QXMPP_EXPORT std::optional<HashAlgorithm> capsHashAlgorithm(QStringView hash);
+// Generates the verification string from a disco#info query element, which unlike
+// QXmppDiscoInfo keeps the values exactly as received. Returns nothing if the response is
+// ill-formed or the algorithm is not supported.
+QXMPP_EXPORT std::optional<QByteArray> capsVerificationString(const QDomElement &query, HashAlgorithm algorithm);
 
 }  // namespace QXmpp::Private
 

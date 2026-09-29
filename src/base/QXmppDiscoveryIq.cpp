@@ -6,6 +6,8 @@
 #include "QXmppDiscoveryIq.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryIq_p.h"
+#include "QXmppHashing_p.h"
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
@@ -180,6 +182,116 @@ QByteArray QXmppDiscoInfo::calculateEntityCapabilitiesHash() const
     }
 
     return QCryptographicHash::hash(S.toUtf8(), QCryptographicHash::Sha1);
+}
+
+std::optional<QXmpp::HashAlgorithm> QXmpp::Private::capsHashAlgorithm(QStringView hash)
+{
+    // IANA Hash Function Textual Names, only algorithms considered secure enough for caps
+    switch (auto algorithm = Enums::fromString<HashAlgorithm>(hash).value_or(HashAlgorithm::Unknown)) {
+    case HashAlgorithm::Sha1:
+    case HashAlgorithm::Sha224:
+    case HashAlgorithm::Sha256:
+    case HashAlgorithm::Sha384:
+    case HashAlgorithm::Sha512:
+        return algorithm;
+    default:
+        return {};
+    }
+}
+
+std::optional<QByteArray> QXmpp::Private::capsVerificationString(const QDomElement &query, HashAlgorithm algorithm)
+{
+    const auto qtAlgorithm = toQCryptographicHashAlgorithm(algorithm);
+    if (!qtAlgorithm) {
+        return {};
+    }
+
+    // strings are compared as UTF-8 ("i;octet" collation)
+    using Identity = std::tuple<QByteArray, QByteArray, QByteArray, QByteArray>;
+    using Field = std::pair<QByteArray, QList<QByteArray>>;
+    using Form = std::pair<QByteArray, std::vector<Field>>;
+
+    auto hasDuplicates = [](const auto &sorted) {
+        return std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end();
+    };
+    auto values = [](const QDomElement &field) {
+        QList<QByteArray> values;
+        for (const auto &value : iterChildElements(field, u"value", ns_data)) {
+            values.push_back(value.text().toUtf8());
+        }
+        return values;
+    };
+
+    std::vector<Identity> identities;
+    for (const auto &el : iterChildElements(query, u"identity", ns_disco_info)) {
+        identities.emplace_back(el.attribute(u"category"_s).toUtf8(),
+                                el.attribute(u"type"_s).toUtf8(),
+                                el.attributeNS(ns_xml.toString(), u"lang"_s).toUtf8(),
+                                el.attribute(u"name"_s).toUtf8());
+    }
+    std::ranges::sort(identities);
+    if (hasDuplicates(identities)) {
+        return {};
+    }
+
+    QList<QByteArray> features;
+    for (const auto &el : iterChildElements(query, u"feature", ns_disco_info)) {
+        features.push_back(el.attribute(u"var"_s).toUtf8());
+    }
+    std::ranges::sort(features);
+    if (hasDuplicates(features)) {
+        return {};
+    }
+
+    std::vector<Form> forms;
+    for (const auto &formEl : iterChildElements(query, u"x", ns_data)) {
+        std::optional<QByteArray> formType;
+        std::vector<Field> fields;
+        for (const auto &fieldEl : iterChildElements(formEl, u"field", ns_data)) {
+            if (fieldEl.attribute(u"var"_s) == u"FORM_TYPE") {
+                auto formTypes = values(fieldEl);
+                std::ranges::sort(formTypes);
+                formTypes.erase(std::unique(formTypes.begin(), formTypes.end()), formTypes.end());
+                if (formTypes.size() > 1) {
+                    return {};
+                }
+                if (fieldEl.attribute(u"type"_s) == u"hidden" && formTypes.size() == 1) {
+                    formType = formTypes.constFirst();
+                }
+            } else {
+                auto fieldValues = values(fieldEl);
+                std::ranges::sort(fieldValues);
+                fields.emplace_back(fieldEl.attribute(u"var"_s).toUtf8(), std::move(fieldValues));
+            }
+        }
+        // forms without a valid FORM_TYPE are ignored
+        if (formType) {
+            std::ranges::sort(fields, {}, &Field::first);
+            forms.emplace_back(std::move(*formType), std::move(fields));
+        }
+    }
+    std::ranges::sort(forms, {}, &Form::first);
+    if (std::ranges::adjacent_find(forms, {}, &Form::first) != forms.end()) {
+        return {};
+    }
+
+    QByteArray s;
+    for (const auto &[category, type, lang, name] : identities) {
+        s += category + '/' + type + '/' + lang + '/' + name + '<';
+    }
+    for (const auto &feature : std::as_const(features)) {
+        s += feature + '<';
+    }
+    for (const auto &[formType, fields] : forms) {
+        s += formType + '<';
+        for (const auto &[var, fieldValues] : fields) {
+            s += var + '<';
+            for (const auto &value : fieldValues) {
+                s += value + '<';
+            }
+        }
+    }
+    return QCryptographicHash::hash(s, *qtAlgorithm);
 }
 
 std::optional<QXmppDiscoInfo> QXmppDiscoInfo::fromDom(const QDomElement &el)
