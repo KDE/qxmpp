@@ -503,14 +503,14 @@ QXmppDiscoFeatureWatch QXmpp::Private::watchAccountFeature(QXmppClient *client, 
 
 void QXmpp::Private::DiscoInfoTracking::setTracked(QXmppClient *client, const QString &jid, bool tracked)
 {
-    if (auto *disco = client->findExtension<QXmppDiscoveryManager>()) {
+    if (auto *disco = client ? client->findExtension<QXmppDiscoveryManager>() : nullptr) {
         disco->d->setTracked(jid, tracked);
     }
 }
 
 void QXmpp::Private::DiscoInfoTracking::invalidate(QXmppClient *client, const QString &jid)
 {
-    if (auto *disco = client->findExtension<QXmppDiscoveryManager>()) {
+    if (auto *disco = client ? client->findExtension<QXmppDiscoveryManager>() : nullptr) {
         disco->d->invalidate(jid);
     }
 }
