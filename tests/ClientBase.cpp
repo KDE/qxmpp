@@ -17,6 +17,7 @@
 #include "QXmppCredentials.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryIq.h"
+#include "QXmppDiscoveryIq_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
@@ -3426,6 +3427,8 @@ private:
     Q_SLOT void discovery();
     Q_SLOT void discoveryWithForm();
     Q_SLOT void discoInfo();
+    Q_SLOT void capsVerificationString_data();
+    Q_SLOT void capsVerificationString();
     Q_SLOT void discoItems();
     Q_SLOT void discoContactAddresses();
     Q_SLOT void discoMessageRetractionLimits();
@@ -3536,6 +3539,88 @@ void tst_QXmppDiscoveryIq::discoInfo()
     auto info = unwrap(QXmppDiscoInfo::fromDom(xmlToDom(xml)));
     QCOMPARE(info.calculateEntityCapabilitiesHash(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
     serializePacket(info, xml);
+}
+
+void tst_QXmppDiscoveryIq::capsVerificationString_data()
+{
+    QTest::addColumn<QString>("xml");
+    QTest::addColumn<QString>("hash");
+    QTest::addColumn<QByteArray>("ver");
+
+    const auto exodus =
+        u"<identity category='client' name='Exodus 0.9.1' type='pc'/>"
+        "<feature var='http://jabber.org/protocol/disco#info'/>"
+        "<feature var='http://jabber.org/protocol/caps'/>"
+        "<feature var='http://jabber.org/protocol/muc'/>"
+        "<feature var='http://jabber.org/protocol/disco#items'/>"_s;
+    auto form = [](const QString &fields) {
+        return u"<x xmlns='jabber:x:data' type='result'>"_s + fields + u"</x>";
+    };
+    const auto formType = u"<field var='FORM_TYPE' type='hidden'><value>urn:y</value></field>"_s;
+    const auto client = u"<identity category='client' type='pc'/><feature var='urn:x'/>"_s;
+
+    QTest::newRow("simple")
+        << exodus << u"sha-1"_s << QByteArray("QgayPKawpkPSDYmwT/WM94uAlu0=");
+    QTest::newRow("sha-256")
+        << exodus << u"sha-256"_s << QByteArray("Wr6IGEKhx6b9627gBmi/cCmpxXBc/GYq5zWuYfWGWoc=");
+    QTest::newRow("complex")
+        << u"<identity xml:lang='en' category='client' name='Psi 0.11' type='pc'/>"
+           "<identity xml:lang='el' category='client' name='Ψ 0.11' type='pc'/>"
+           "<feature var='http://jabber.org/protocol/caps'/>"
+           "<feature var='http://jabber.org/protocol/disco#info'/>"
+           "<feature var='http://jabber.org/protocol/disco#items'/>"
+           "<feature var='http://jabber.org/protocol/muc'/>"
+           "<x xmlns='jabber:x:data' type='result'>"
+           "<field var='FORM_TYPE' type='hidden'><value>urn:xmpp:dataforms:softwareinfo</value></field>"
+           "<field var='ip_version' type='text-multi'><value>ipv6</value><value>ipv4</value></field>"
+           "<field var='os'><value>Mac</value></field>"
+           "<field var='os_version'><value>10.5.1</value></field>"
+           "<field var='software'><value>Psi</value></field>"
+           "<field var='software_version'><value>0.11</value></field>"
+           "</x>"_s
+        << u"sha-1"_s << QByteArray("q07IKJEyjvHSyhy//CH0CxmKi8w=");
+    QTest::newRow("boolean-field")
+        << client + form(formType + u"<field var='muc#roomconfig_x' type='boolean'><value>1</value></field>")
+        << u"sha-1"_s << QByteArray("nM4WmnHGbjDJenp7gpC+CEWGYfM=");
+    QTest::newRow("empty-field")
+        << client + form(formType + u"<field var='empty'/>")
+        << u"sha-1"_s << QByteArray("sEn1/xVCL3IF5ZBC5DBBfAEvLlg=");
+    QTest::newRow("octet-collation")
+        << u"<identity category='client' type='pc'/><feature var='urn:😀'/><feature var='urn:�'/>"_s
+        << u"sha-1"_s << QByteArray("TzzjVtUlAIRxjzuIC/9D8arqVLk=");
+    QTest::newRow("form-without-form-type")
+        << exodus + form(u"<field var='os'><value>Mac</value></field>"_s)
+        << u"sha-1"_s << QByteArray("QgayPKawpkPSDYmwT/WM94uAlu0=");
+    QTest::newRow("form-type-not-hidden")
+        << exodus + form(u"<field var='FORM_TYPE'><value>urn:y</value></field>"_s)
+        << u"sha-1"_s << QByteArray("QgayPKawpkPSDYmwT/WM94uAlu0=");
+    QTest::newRow("duplicate-identity")
+        << exodus + u"<identity category='client' name='Exodus 0.9.1' type='pc'/>"
+        << u"sha-1"_s << QByteArray();
+    QTest::newRow("duplicate-feature")
+        << exodus + u"<feature var='http://jabber.org/protocol/muc'/>"
+        << u"sha-1"_s << QByteArray();
+    QTest::newRow("duplicate-form-type")
+        << client + form(formType) + form(formType)
+        << u"sha-1"_s << QByteArray();
+    QTest::newRow("ambiguous-form-type")
+        << client + form(u"<field var='FORM_TYPE' type='hidden'><value>urn:y</value><value>urn:z</value></field>"_s)
+        << u"sha-1"_s << QByteArray();
+}
+
+void tst_QXmppDiscoveryIq::capsVerificationString()
+{
+    QFETCH(QString, xml);
+    QFETCH(QString, hash);
+    QFETCH(QByteArray, ver);
+
+    const auto query = xmlToDom(u"<query xmlns='http://jabber.org/protocol/disco#info'>" + xml + u"</query>");
+    const auto result = QXmpp::Private::capsVerificationString(query, unwrap(capsHashAlgorithm(hash)));
+    if (ver.isEmpty()) {
+        QVERIFY(!result);
+    } else {
+        QCOMPARE(result->toBase64(), ver);
+    }
 }
 
 void tst_QXmppDiscoveryIq::discoItems()
