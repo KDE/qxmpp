@@ -1504,6 +1504,17 @@ private:
     Q_SLOT void discoverServicesReconnect();
     Q_SLOT void discoverServicesAfterDiscovery();
     Q_SLOT void discoverServicesWatchAddedWhileConnected();
+
+    Q_SLOT void watchInfo();
+    Q_SLOT void watchInfoShared();
+    Q_SLOT void watchInfoStale();
+    Q_SLOT void watchInfoError();
+    Q_SLOT void watchInfoConnectionLost();
+    Q_SLOT void watchInfoRefresh();
+    Q_SLOT void watchAccountInfoAccountChange();
+    Q_SLOT void watchInfoLifetime();
+    Q_SLOT void watchInfoModifiedByNotifier();
+    Q_SLOT void watchInfoDefault();
 };
 
 void tst_QXmppDiscoveryManager::testInfo()
@@ -1969,6 +1980,368 @@ void tst_QXmppDiscoveryManager::discoverServicesWatchAddedWhileConnected()
     QVERIFY(watch2.loaded().value());
     QCOMPARE(watch2.services().value().size(), 1);
     test.expectNoPacket();
+}
+
+static QString infoRequest(const QString &to)
+{
+    return u"<iq id='qx1' to='" + to + u"' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>";
+}
+
+static QString infoResponse(const QString &from, const QString &feature)
+{
+    return u"<iq id='qx1' from='%1' type='result'>"
+           "<query xmlns='http://jabber.org/protocol/disco#info'><feature var='%2'/></query>"
+           "</iq>"_s.arg(from, feature);
+}
+
+static QStringList watchedFeatures(const QXmppDiscoInfoWatch &watch)
+{
+    const auto info = watch.info().value();
+    return info ? info->features() : QStringList {};
+}
+
+void tst_QXmppDiscoveryManager::watchInfo()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+
+    // nothing is requested while disconnected
+    auto watch = disco->watchServerInfo();
+    QCOMPARE(watch.state().value(), State::Unknown);
+    QVERIFY(!watch.info().value());
+    test.expectNoPacket();
+
+    QList<State> states;
+    auto notifier = watch.state().addNotifier([&] { states.append(watch.state().value()); });
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    QCOMPARE(watch.state().value(), State::Loading);
+
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:mam:2"_s });
+    QCOMPARE(states, (QList { State::Loading, State::Loaded }));
+
+    // a resumed stream keeps the information
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    Q_EMIT test.connected();
+    test.expectNoPacket();
+    QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+void tst_QXmppDiscoveryManager::watchInfoShared()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // watches on the same entity only cause one request
+    auto watch1 = disco->watchServerInfo();
+    auto watch2 = disco->watchServerInfo();
+    auto watch3 = disco->watchInfo(u"example.org"_s);
+    QCOMPARE(watch3.state().value(), State::Loading);
+
+    test.expect(infoRequest(u"example.org"_s));
+    test.expectNoPacket();
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+
+    for (const auto &watch : { watch1, watch2, watch3 }) {
+        QCOMPARE(watch.state().value(), State::Loaded);
+        QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:mam:2"_s });
+    }
+
+    // a new watch uses the existing information
+    auto watch4 = disco->watchInfo(u"example.org"_s);
+    QCOMPARE(watch4.state().value(), State::Loaded);
+    test.expectNoPacket();
+
+    // responses to direct requests update the watches
+    disco->info(u"example.org"_s, {}, QXmppDiscoveryManager::CachePolicy::Strict);
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:blocking"_s));
+    QCOMPARE(watchedFeatures(watch4), QStringList { u"urn:xmpp:blocking"_s });
+    QCOMPARE(watchedFeatures(watch1), QStringList { u"urn:xmpp:blocking"_s });
+
+    // other nodes are watched independently
+    auto nodeWatch = disco->watchInfo(u"example.org"_s, u"node"_s);
+    QCOMPARE(nodeWatch.state().value(), State::Loading);
+    test.expect(u"<iq id='qx1' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info' node='node'/></iq>"_s);
+}
+
+void tst_QXmppDiscoveryManager::watchInfoStale()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"muc.example.org"_s);
+    test.expect(infoRequest(u"muc.example.org"_s));
+    test.inject(infoResponse(u"muc.example.org"_s, u"http://jabber.org/protocol/muc"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    QList<State> states;
+    auto notifier = watch.state().addNotifier([&] { states.append(watch.state().value()); });
+
+    // the old information stays available until the new response arrives
+    Q_EMIT test.disconnected();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    QCOMPARE(watch.state().value(), State::Stale);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"http://jabber.org/protocol/muc"_s });
+
+    test.expect(infoRequest(u"muc.example.org"_s));
+    test.inject(infoResponse(u"muc.example.org"_s, u"urn:xmpp:mix:core:1"_s));
+
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:mix:core:1"_s });
+    QCOMPARE(states, (QList { State::Stale, State::Loaded }));
+}
+
+void tst_QXmppDiscoveryManager::watchInfoError()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"room@muc.example.org"_s);
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+    test.inject(u"<iq id='qx1' from='room@muc.example.org' type='error'>"
+                "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    QCOMPARE(watch.state().value(), State::Error);
+    QVERIFY(!watch.info().value());
+
+    // the error is an answer and is kept on resumption
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    Q_EMIT test.connected();
+    test.expectNoPacket();
+
+    // the entity is asked again on a new stream
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    QCOMPARE(watch.state().value(), State::Loading);
+
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+    test.inject(infoResponse(u"room@muc.example.org"_s, u"http://jabber.org/protocol/muc"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+void tst_QXmppDiscoveryManager::watchInfoConnectionLost()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchServerInfo();
+    test.expect(infoRequest(u"example.org"_s));
+    QCOMPARE(watch.state().value(), State::Loading);
+
+    // a cancelled request is no answer from the entity
+    Q_EMIT test.disconnected();
+    test.streamPrivate()->iqManager.cancelAll();
+    QCOMPARE(watch.state().value(), State::Unknown);
+
+    // the request is repeated after resumption
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    Q_EMIT test.connected();
+    QCOMPARE(watch.state().value(), State::Loading);
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    // failed refreshes keep the stale information
+    watch.refresh();
+    test.expect(infoRequest(u"example.org"_s));
+    test.streamPrivate()->iqManager.cancelAll();
+    QCOMPARE(watch.state().value(), State::Stale);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:mam:2"_s });
+}
+
+void tst_QXmppDiscoveryManager::watchInfoRefresh()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"upload.example.org"_s);
+    test.expect(infoRequest(u"upload.example.org"_s));
+    test.inject(infoResponse(u"upload.example.org"_s, u"urn:xmpp:http:upload:0"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    watch.refresh();
+    QCOMPARE(watch.state().value(), State::Stale);
+    test.expect(infoRequest(u"upload.example.org"_s));
+    test.inject(infoResponse(u"upload.example.org"_s, u"urn:xmpp:http:upload:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:http:upload:1"_s });
+
+    // refreshing while disconnected marks the information as stale and requests it on resumption
+    Q_EMIT test.disconnected();
+    watch.refresh();
+    test.expectNoPacket();
+    QCOMPARE(watch.state().value(), State::Stale);
+
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    Q_EMIT test.connected();
+    test.expect(infoRequest(u"upload.example.org"_s));
+    test.inject(infoResponse(u"upload.example.org"_s, u"urn:xmpp:http:upload:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+void tst_QXmppDiscoveryManager::watchAccountInfoAccountChange()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setJid(u"alice@example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchAccountInfo();
+    test.expect(infoRequest(u"alice@example.org"_s));
+    test.inject(infoResponse(u"alice@example.org"_s, u"urn:xmpp:mam:2"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    // information of another account is not shown as stale information
+    Q_EMIT test.disconnected();
+    test.configuration().setJid(u"bob@example.net"_s);
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+
+    test.expect(infoRequest(u"bob@example.net"_s));
+    test.inject(infoResponse(u"bob@example.net"_s, u"urn:xmpp:mix:pam:2"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:mix:pam:2"_s });
+}
+
+void tst_QXmppDiscoveryManager::watchInfoLifetime()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // an unwatched entity is not requested again on a new stream
+    {
+        auto watch = disco->watchServerInfo();
+        test.expect(infoRequest(u"example.org"_s));
+    }
+    // done by the stream when a new stream is opened
+    test.streamPrivate()->iqManager.cancelAll();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expectNoPacket();
+
+    auto watch = disco->watchServerInfo();
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+
+    // watches stay usable after the manager has been deleted
+    test.removeExtension(disco);
+
+    watch.refresh();
+    test.expectNoPacket();
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:mam:2"_s });
+}
+
+void tst_QXmppDiscoveryManager::watchInfoModifiedByNotifier()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // user code destroys the notified watch and creates new ones while being notified
+    constexpr qsizetype createdCount = 32;
+    std::optional<QXmppDiscoInfoWatch> watch;
+    std::vector<QXmppDiscoInfoWatch> createdWatches;
+    QList<State> states;
+    QPropertyNotifier notifier;
+    auto watchServer = [&] {
+        watch = disco->watchServerInfo();
+        notifier = watch->state().addNotifier([&] {
+            states.append(watch->state().value());
+            watch.reset();
+            for (auto i = qsizetype(createdWatches.size()); i < createdCount; i++) {
+                createdWatches.push_back(disco->watchInfo(u"service%1.example.org"_s.arg(i)));
+            }
+        });
+    };
+
+    // notified by a response
+    watchServer();
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+
+    QCOMPARE(states, QList { State::Loaded });
+    QVERIFY(!watch);
+    QCOMPARE(qsizetype(createdWatches.size()), createdCount);
+
+    // notified on a new stream
+    watchServer();
+    QCOMPARE(watch->state().value(), State::Loaded);
+    createdWatches.clear();
+
+    test.streamPrivate()->iqManager.cancelAll();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    QCOMPARE(states, (QList { State::Loaded, State::Stale }));
+    QVERIFY(!watch);
+    QCOMPARE(qsizetype(createdWatches.size()), createdCount);
+
+    // the map is still consistent
+    auto serverWatch = disco->watchServerInfo();
+    QCOMPARE(serverWatch.state().value(), State::Loading);
+}
+
+void tst_QXmppDiscoveryManager::watchInfoDefault()
+{
+    QXmppDiscoInfoWatch watch;
+    QCOMPARE(watch.state().value(), QXmppDiscoInfoWatch::State::Unknown);
+    QVERIFY(!watch.info().value());
+
+    watch.refresh();
+    QCOMPARE(watch.state().value(), QXmppDiscoInfoWatch::State::Unknown);
 }
 
 }  // namespace Discovery
