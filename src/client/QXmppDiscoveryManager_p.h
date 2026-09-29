@@ -11,9 +11,12 @@
 #include "Async.h"
 #include "Iq.h"
 
+#include <map>
 #include <unordered_map>
 
 #include <QCache>
+
+class QXmppPresence;
 
 using namespace QXmpp::Private;
 
@@ -76,6 +79,21 @@ public:
         QStringList requiredFeatures;
     };
 
+    // XEP-0115: Entity Capabilities
+    struct Caps {
+        QString hash;
+        QString node;
+        QByteArray ver;
+
+        bool operator==(const Caps &) const = default;
+    };
+    using CapsKey = std::tuple<QString, QByteArray>;
+    struct CapsWaiter {
+        QString jid;
+        Caps caps;
+        QXmppPromise<QXmpp::Result<QXmppDiscoInfo>> promise;
+    };
+
     QXmppDiscoveryManager *q = nullptr;
     QString clientCapabilitiesNode;
     QList<QXmppDiscoIdentity> identities;
@@ -93,6 +111,12 @@ public:
     std::unordered_map<QXmppDiscoInfoWatch::Data::Key, std::weak_ptr<QXmppDiscoInfoWatch::Data>, QXmppDiscoInfoWatch::Data::KeyHash> infoWatches;
     // JIDs whose changes are reported by other managers, e.g. joined MUC rooms
     QSet<QString> trackedJids;
+    // available full JIDs with their caps; the info of JIDs with caps is tracked
+    QHash<QString, std::optional<Caps>> availableJids;
+    // verified info by hash algorithm and verification string
+    QCache<CapsKey, QXmppDiscoInfo> capsCache;
+    // entities with the same caps waiting for a verification in progress
+    std::map<CapsKey, std::vector<CapsWaiter>> capsRequests;
 
     // service watches
     QList<WatchEntry> watches;
@@ -119,10 +143,19 @@ public:
 
     QXmppDiscoInfoWatch watchInfo(QXmppDiscoInfoWatch::Data::Key &&key);
     std::shared_ptr<QXmppDiscoInfoWatch::Data> findJidWatch(const QString &jid) const;
+    bool isTracked(const QString &jid) const;
     void setTracked(const QString &jid, bool tracked);
     void clearTracked();
     void invalidate(const QString &jid);
     void reset(const QString &jid);
+    void dropInfo(const QString &jid);
+
+    void handlePresence(const QXmppPresence &presence);
+    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> capsInfo(const QString &jid, const Caps &caps);
+    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> startCapsRequest(const QString &jid, const Caps &caps);
+    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> requestCapsInfo(const QString &jid, const Caps &caps);
+    void finishCapsRequest(const CapsKey &key, const std::optional<QXmppDiscoInfo> &info);
+    void applyCapsInfo(const QString &jid, const Caps &caps, const QXmppDiscoInfo &info);
     std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> lockInfoWatches() const;
     QString resolveJid(const QXmppDiscoInfoWatch::Data &data) const;
     void fetchInfo(const std::shared_ptr<QXmppDiscoInfoWatch::Data> &data, QXmppDiscoveryManager::CachePolicy cachePolicy);
