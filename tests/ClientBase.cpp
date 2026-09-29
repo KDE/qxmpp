@@ -1516,6 +1516,7 @@ private:
     Q_SLOT void watchInfoTracked();
     Q_SLOT void watchInfoTrackingEnds();
     Q_SLOT void watchInfoInvalidate();
+    Q_SLOT void watchInfoReset();
     Q_SLOT void watchAccountInfoAccountChange();
     Q_SLOT void watchInfoLifetime();
     Q_SLOT void watchInfoModifiedByNotifier();
@@ -2370,6 +2371,37 @@ void tst_QXmppDiscoveryManager::watchInfoInvalidate()
     test.expectNoPacket();
     disco->info(u"room@muc.example.org"_s);
     test.expect(infoRequest(u"room@muc.example.org"_s));
+}
+
+void tst_QXmppDiscoveryManager::watchInfoReset()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"room@muc.example.org/nick"_s);
+    test.expect(infoRequest(u"room@muc.example.org/nick"_s));
+    test.inject(infoResponse(u"room@muc.example.org/nick"_s, u"urn:xmpp:jingle:1"_s));
+    DiscoInfoTracking::setTracked(&test, u"room@muc.example.org/nick"_s, true);
+
+    QList<State> states;
+    auto notifier = watch.state().addNotifier([&] { states.append(watch.state().value()); });
+
+    // the old info is not kept
+    DiscoInfoTracking::reset(&test, u"room@muc.example.org/nick"_s);
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+    QVERIFY(!watch.changesTracked().value());
+    QCOMPARE(states, QList { State::Loading });
+    test.expect(infoRequest(u"room@muc.example.org/nick"_s));
+
+    // without a watch only the cache is cleared
+    watch = {};
+    DiscoInfoTracking::reset(&test, u"room@muc.example.org/nick"_s);
+    test.expectNoPacket();
 }
 
 void tst_QXmppDiscoveryManager::watchAccountInfoAccountChange()

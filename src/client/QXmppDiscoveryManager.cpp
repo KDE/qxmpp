@@ -515,6 +515,13 @@ void QXmpp::Private::DiscoInfoTracking::invalidate(QXmppClient *client, const QS
     }
 }
 
+void QXmpp::Private::DiscoInfoTracking::reset(QXmppClient *client, const QString &jid)
+{
+    if (auto *disco = client ? client->findExtension<QXmppDiscoveryManager>() : nullptr) {
+        disco->d->reset(jid);
+    }
+}
+
 // QXmppDiscoServicesWatch
 
 /*! Returns whether all discovery queries have completed. */
@@ -857,6 +864,21 @@ void QXmppDiscoveryManagerPrivate::invalidate(const QString &jid)
     infoCache.remove({ jid, {} });
     if (auto data = findJidWatch(jid)) {
         fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+    }
+}
+
+void QXmppDiscoveryManagerPrivate::reset(const QString &jid)
+{
+    trackedJids.remove(jid);
+    infoCache.remove({ jid, {} });
+    if (auto data = findJidWatch(jid)) {
+        Qt::beginPropertyUpdateGroup();
+        data->changesTracked = false;
+        data->infoJid.clear();
+        data->info = std::nullopt;
+        data->state = QXmppDiscoInfoWatch::State::Unknown;
+        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+        Qt::endPropertyUpdateGroup();
     }
 }
 

@@ -122,6 +122,7 @@ public:
     void setTracked(const QString &jid, bool tracked);
     void clearTracked();
     void invalidate(const QString &jid);
+    void reset(const QString &jid);
     std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> lockInfoWatches() const;
     QString resolveJid(const QXmppDiscoInfoWatch::Data &data) const;
     void fetchInfo(const std::shared_ptr<QXmppDiscoInfoWatch::Data> &data, QXmppDiscoveryManager::CachePolicy cachePolicy);
@@ -150,6 +151,9 @@ struct DiscoInfoTracking {
     static void setTracked(QXmppClient *client, const QString &jid, bool tracked);
     // Drops the cached info of \a jid and requests it again if it is watched.
     static void invalidate(QXmppClient *client, const QString &jid);
+    // Like invalidate(), but for JIDs that may now refer to another entity, e.g. MUC occupants.
+    // Watches do not keep the old info and changes are no longer tracked.
+    static void reset(QXmppClient *client, const QString &jid);
 };
 
 }  // namespace QXmpp::Private

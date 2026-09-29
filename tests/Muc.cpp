@@ -109,6 +109,9 @@ private:
     Q_SLOT void roomInfoWatchTracked();
     Q_SLOT void roomInfoWatchDestroyed();
     Q_SLOT void roomInfoWatchCreated();
+    Q_SLOT void occupantInfoWatch();
+    Q_SLOT void occupantInfoWatchNickChange();
+    Q_SLOT void occupantInfoWatchLeave();
     Q_SLOT void roomInfoBindable();
     Q_SLOT void roomFeatureProperties();
     Q_SLOT void roomFeatureStatus172_173();
@@ -2714,6 +2717,122 @@ void tst_QXmppMuc::roomInfoWatchCreated()
                                    "<feature var='http://jabber.org/protocol/muc'/>"
                                    "</query></iq>");
     QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+static void injectOccupantPresence(TestClient &test, const QString &nick, const QString &type = {})
+{
+    QXmppPresence presence;
+    parsePacket(presence,
+                QStringLiteral("<presence from='coven@chat.shakespeare.lit/%1'%2>"
+                               "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                               "<item affiliation='none' role='participant'/>"
+                               "</x>"
+                               "</presence>")
+                    .arg(nick, type.isEmpty() ? QString() : u" type='" + type + u"'")
+                    .toUtf8());
+    test.injectPresence(presence);
+}
+
+// Returns a loaded watch on the occupant with the nickname firstwitch
+static QXmppDiscoInfoWatch occupantWatch(TestClient &test, QXmppDiscoveryManager *disco)
+{
+    auto watch = disco->watchInfo(u"coven@chat.shakespeare.lit/firstwitch"_s);
+    auto id = test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
+    test.inject(u"<iq id='" + id + u"' from='coven@chat.shakespeare.lit/firstwitch' type='result'>"
+                                   "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                   "<feature var='urn:xmpp:jingle:1'/>"
+                                   "</query></iq>");
+    return watch;
+}
+
+void tst_QXmppMuc::occupantInfoWatch()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
+
+    joinedRoom(test, muc);
+    injectOccupantPresence(test, u"firstwitch"_s);
+    auto watch = occupantWatch(test, disco);
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    // the nickname may be used by another user after the occupant has left
+    injectOccupantPresence(test, u"firstwitch"_s, u"unavailable"_s);
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+    auto id = test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
+    test.inject(roomNotFound(id, u"coven@chat.shakespeare.lit/firstwitch"_s));
+    QCOMPARE(watch.state().value(), State::Error);
+
+    // and the info is requested again when someone joins with the nickname
+    injectOccupantPresence(test, u"firstwitch"_s);
+    QCOMPARE(watch.state().value(), State::Loading);
+    test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
+}
+
+void tst_QXmppMuc::occupantInfoWatchNickChange()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
+
+    joinedRoom(test, muc);
+    injectOccupantPresence(test, u"firstwitch"_s);
+    auto watch = occupantWatch(test, disco);
+
+    QXmppPresence nickChange;
+    parsePacket(nickChange,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='participant' nick='oldhag'/>"
+                "<status code='303'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(nickChange);
+
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+    test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
+}
+
+void tst_QXmppMuc::occupantInfoWatchLeave()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
+
+    auto room = joinedRoom(test, muc);
+    injectOccupantPresence(test, u"firstwitch"_s);
+    auto watch = occupantWatch(test, disco);
+
+    // no presences of the occupants are received after leaving
+    room.leave();
+    test.ignore();  // unavailable presence
+    QXmppPresence leavePresence;
+    parsePacket(leavePresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(leavePresence);
+
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+    test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
 }
 
 void tst_QXmppMuc::roomInfoBindable()
