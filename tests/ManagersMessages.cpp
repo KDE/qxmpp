@@ -487,6 +487,11 @@ class tst_QXmppCarbonManager : public QObject
 
 private:
     Q_SLOT void watchServerSupport();
+    Q_SLOT void enableCarbons();
+    Q_SLOT void enableCarbonsUnsupported();
+    Q_SLOT void enableCarbonsWithoutDiscoveryManager();
+    Q_SLOT void enableCarbonsDiscoveryManagerAddedLater();
+    Q_SLOT void enableCarbonsOncePerStream();
     Q_SLOT void initTestCase();
 
     Q_SLOT void testHandleStanza_data();
@@ -502,6 +507,95 @@ private:
 void tst_QXmppCarbonManager::watchServerSupport()
 {
     checkWatchSupport<QXmppCarbonManagerV2>(&QXmppCarbonManagerV2::watchServerSupport, u"capulet.example"_s, u"urn:xmpp:carbons:2"_s);
+}
+
+static const auto carbonsEnableRequest = u"<iq id='qx1' type='set'><enable xmlns='urn:xmpp:carbons:2'/></iq>"_s;
+
+void tst_QXmppCarbonManager::enableCarbons()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
+
+    // the support is checked first
+    test.connectAndAnswerDiscoInfo(u"capulet.example"_s, { u"urn:xmpp:carbons:2"_s });
+    auto id = test.expectPacketRandomOrder(QString(carbonsEnableRequest));
+    test.inject(u"<iq id='" + id + u"' type='result'/>");
+    QVERIFY(manager->enabled().value());
+
+    // on reconnection the known support is used, carbons are enabled without waiting
+    Q_EMIT test.disconnected();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    QVERIFY(!manager->enabled().value());
+
+    id = test.expectPacketRandomOrder(QString(carbonsEnableRequest));
+    test.inject(u"<iq id='" + id + u"' type='result'/>");
+    QVERIFY(manager->enabled().value());
+}
+
+void tst_QXmppCarbonManager::enableCarbonsUnsupported()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
+
+    test.connectAndAnswerDiscoInfo(u"capulet.example"_s, {});
+    test.expectNoPacket();
+    QVERIFY(!manager->enabled().value());
+}
+
+void tst_QXmppCarbonManager::enableCarbonsWithoutDiscoveryManager()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.example"_s);
+    auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
+
+    // the support cannot be checked, so carbons are enabled anyway
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expect(QString(carbonsEnableRequest));
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(manager->enabled().value());
+}
+
+void tst_QXmppCarbonManager::enableCarbonsDiscoveryManagerAddedLater()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.example"_s);
+    auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
+    test.addNewExtension<QXmppDiscoveryManager>();
+
+    test.connectAndAnswerDiscoInfo(u"capulet.example"_s, { u"urn:xmpp:carbons:2"_s });
+    auto id = test.expectPacketRandomOrder(QString(carbonsEnableRequest));
+    test.inject(u"<iq id='" + id + u"' type='result'/>");
+    QVERIFY(manager->enabled().value());
+}
+
+void tst_QXmppCarbonManager::enableCarbonsOncePerStream()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    test.addNewExtension<QXmppCarbonManagerV2>();
+
+    // the support is not known before the next stream
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    auto id = test.expectPacketRandomOrder(
+        u"<iq id='qx1' to='capulet.example' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    Q_EMIT test.disconnected();
+    Q_EMIT test.connected();
+    test.expectNoPacket();
+
+    // only the attempt of the new stream enables carbons
+    test.inject(u"<iq id='" + id + u"' from='capulet.example' type='result'>"
+                                   "<query xmlns='http://jabber.org/protocol/disco#info'><feature var='urn:xmpp:carbons:2'/></query>"
+                                   "</iq>");
+    test.expectPacketRandomOrder(QString(carbonsEnableRequest));
+    test.expectNoPacket();
 }
 
 void tst_QXmppCarbonManager::initTestCase()

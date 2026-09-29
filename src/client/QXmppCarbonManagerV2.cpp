@@ -66,7 +66,9 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
     \brief The QXmppCarbonManagerV2 class handles message carbons as described in \xep{0280}{Message Carbons}.
 
     The manager automatically enables carbons when a connection is established. Either by using
-    \xep{0386}{Bind 2} if available or by sending a normal IQ request on connection.
+    \xep{0386}{Bind 2} if available or by sending a normal IQ request on connection, if the server
+    supports carbons. The server support is checked using the QXmppDiscoveryManager. If it is not
+    registered with the client, carbons are enabled without checking the support.
     Carbon copied messages from other devices of the same account and carbon copied messages from
     other accounts are injected into the QXmppClient. This way you can handle them like any other
     incoming message by implementing QXmppMessageHandler or using QXmppClient::messageReceived().
@@ -145,40 +147,67 @@ bool QXmppCarbonManagerV2::handleStanza(const QDomElement &element, const std::o
     return true;
 }
 
+// Kept by the connection to QXmppClient::connected.
+struct QXmppCarbonManagerV2::ConnectionState {
+    // Keeps the support known on reconnection. Created on connection, since the
+    // QXmppDiscoveryManager may be registered after this manager.
+    std::optional<QXmppDiscoFeatureWatch> serverSupport;
+    // Counts the new streams, so that attempts of previous streams can be dropped.
+    uint64_t streamCount = 0;
+};
+
 void QXmppCarbonManagerV2::onRegistered(QXmppClient *client)
 {
     client->stream()->carbonManager().setEnableViaBind2(true);
-    connect(client, &QXmppClient::connected, this, &QXmppCarbonManagerV2::enableCarbons);
+    connect(client, &QXmppClient::connected, this, [this, state = std::make_shared<ConnectionState>()] {
+        enableCarbons(state);
+    });
 }
 
 void QXmppCarbonManagerV2::onUnregistered(QXmppClient *client)
 {
     client->stream()->carbonManager().setEnableViaBind2(false);
-    disconnect(client, &QXmppClient::connected, this, &QXmppCarbonManagerV2::enableCarbons);
+    disconnect(client, &QXmppClient::connected, this, nullptr);
 }
 
-void QXmppCarbonManagerV2::enableCarbons()
+QXmppTask<void> QXmppCarbonManagerV2::enableCarbons(std::shared_ptr<ConnectionState> state)
 {
     // stream resumed: carbons state is preserved from the previous session
     if (client()->streamManagementState() == QXmppClient::ResumedStream) {
-        return;
+        co_return;
     }
+    const auto stream = ++state->streamCount;
 
     // carbons enabled via bind2 already
     if (client()->stream()->carbonManager().enabled()) {
         m_enabled = true;
-        return;
+        co_return;
     }
 
     // new session: reset until IQ succeeds
     m_enabled = false;
 
-    client()->sendIq(CarbonEnableIq()).then(this, [this](QXmppClient::IqResult domResult) {
-        if (auto err = parseIq(std::move(domResult))) {
-            warning(u"Could not enable message carbons: " + err->description);
-        } else {
-            m_enabled = true;
-            info(u"Message Carbons enabled."_s);
+    if (!state->serverSupport && client()->findExtension<QXmppDiscoveryManager>()) {
+        state->serverSupport = watchServerSupport();
+    }
+    // without QXmppDiscoveryManager, carbons are enabled without checking the support
+    if (state->serverSupport) {
+        const auto supported = co_await state->serverSupport->resolve().withContext(this);
+        // a new stream has been started while waiting
+        if (stream != state->streamCount) {
+            co_return;
         }
-    });
+        if (!supported) {
+            info(u"Message Carbons are not supported by the server."_s);
+            co_return;
+        }
+    }
+
+    auto result = co_await client()->sendIq(CarbonEnableIq()).withContext(this);
+    if (auto err = parseIq(std::move(result))) {
+        warning(u"Could not enable message carbons: " + err->description);
+    } else {
+        m_enabled = true;
+        info(u"Message Carbons enabled."_s);
+    }
 }

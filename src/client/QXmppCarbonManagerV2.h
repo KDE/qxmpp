@@ -27,7 +27,8 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    void enableCarbons();
+    struct ConnectionState;
+    QXmppTask<void> enableCarbons(std::shared_ptr<ConnectionState> state);
 
     QProperty<bool> m_enabled = QProperty<bool> { false };
 };
