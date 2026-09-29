@@ -25,6 +25,9 @@ constexpr quint16 XMPP_DEFAULT_PORT = 5222;
 constexpr quint16 XMPPS_DEFAULT_PORT = 5223;
 constexpr quint16 XMPP_SERVER_DEFAULT_PORT = 5269;
 
+// All namespaces except QXmpp's own are also public via QXmpp::Namespace (QXmppNamespaces.cpp).
+// Add new namespaces there too, at the end of the enum.
+
 // XML
 inline constexpr QStringView ns_xml = u"http://www.w3.org/XML/1998/namespace";
 // QXmpp
@@ -126,6 +129,7 @@ inline constexpr QStringView ns_chat_states = u"http://jabber.org/protocol/chats
 inline constexpr QStringView ns_legacy_delayed_delivery = u"jabber:x:delay";
 // XEP-0092: Software Version
 inline constexpr QStringView ns_version = u"jabber:iq:version";
+// XEP-0004: Data Forms
 inline constexpr QStringView ns_data = u"jabber:x:data";
 // XEP-0095: Stream Initiation
 inline constexpr QStringView ns_stream_initiation = u"http://jabber.org/protocol/si";
@@ -165,7 +169,7 @@ inline constexpr QStringView ns_jingle_rtp_info = u"urn:xmpp:jingle:apps:rtp:inf
 inline constexpr QStringView ns_jingle_rtp_errors = u"urn:xmpp:jingle:apps:rtp:errors:1";
 // XEP-0184: Message Receipts
 inline constexpr QStringView ns_message_receipts = u"urn:xmpp:receipts";
-// XEP-0191 Blocking Command
+// XEP-0191: Blocking Command
 inline constexpr QStringView ns_blocking = u"urn:xmpp:blocking";
 // XEP-0198: Stream Management
 inline constexpr QStringView ns_stream_management = u"urn:xmpp:sm:3";
