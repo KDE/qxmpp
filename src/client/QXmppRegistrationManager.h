@@ -7,6 +7,7 @@
 #define QXMPPREGISTRATIONMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppRegisterIq.h"
 
 class QXmppRegistrationManagerPrivate;
@@ -30,10 +31,10 @@ class QXmppRegistrationManagerPrivate;
 
     <h3>Setting up service discovery correctly for this manager</h3>
 
-    This manager automatically recognizes whether the local server supports
-    \xep{0077}{In-Band Registration}. As soon as the result is retrieved, the supportedByServer() property should be
-    correct and could be used to display the user whether account management tasks can be
-    performed on this server.
+    Whether the local server supports \xep{0077}{In-Band Registration} is available via
+    watchServerSupport(). This can be used to display the user whether account management tasks
+    can be performed on this server. This requires the QXmppDiscoveryManager to be registered
+    with the client.
 
     However, this is not relevant if you only want to
     <a href="#register-account">register a new account on a server</a>.
@@ -233,7 +234,11 @@ public:
     void changePassword(const QString &newPassword);
     void deleteAccount();
 
+    QXmppDiscoFeatureWatch watchServerSupport() const;
+#if QXMPP_DEPRECATED_SINCE(1, 17)
+    [[deprecated("Use watchServerSupport()")]]
     bool supportedByServer() const;
+#endif
 
     void requestRegistrationForm(const QString &service = {});
 
@@ -246,13 +251,17 @@ public:
 
     bool handleStanza(const QDomElement &stanza) override;
 
+#if QXMPP_DEPRECATED_SINCE(1, 17)
     /*!
-        Emitted, when registrationSupported() changed.
+        Emitted, when supportedByServer() changed.
 
-        This can happen after the service discovery info of the server was
-        retrieved using QXmppDiscoveryManager::requestInfo() or on disconnect.
+        This can happen after the service discovery info of the server was retrieved.
+
+        \deprecated since QXmpp 1.17, use watchServerSupport() instead.
     */
+    [[deprecated("Use watchServerSupport()")]]
     Q_SIGNAL void supportedByServerChanged();
+#endif
 
     /*!
         Emitted, when the password of the account was changed successfully.
@@ -320,8 +329,6 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    void onConnected();
-    void setSupportedByServer(bool supportedByServer);
     void handleAccountDeleted();
 
     const std::unique_ptr<QXmppRegistrationManagerPrivate> d;

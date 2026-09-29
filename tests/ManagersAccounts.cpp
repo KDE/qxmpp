@@ -221,6 +221,8 @@ void tst_QXmppRegistrationManager::testServiceDiscovery()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *localManager = test.addNewExtension<QXmppRegistrationManager>();
 
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     bool signalEmitted = false;
     auto context = std::make_unique<QObject>(this);
     connect(localManager, &QXmppRegistrationManager::supportedByServerChanged, context.get(), [&]() {
@@ -228,23 +230,24 @@ void tst_QXmppRegistrationManager::testServiceDiscovery()
         QCOMPARE(localManager->supportedByServer(), true);
     });
 
-    ResultIq<QXmppDiscoInfo> iq {
-        u"qx2"_s,
-        u"example.org"_s,
-        u"bob@example.org"_s,
-        {},
-        QXmppDiscoInfo { {}, {}, QStringList { u"jabber:iq:register"_s } },
-    };
+    auto watch = localManager->watchServerSupport();
+
+    test.setStreamManagementState(QXmppClient::NewStream);
     Q_EMIT test.connected();
-    test.inject(writePacketToDom(iq));
+    test.expect(u"<iq id='qx2' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='qx2' from='example.org' type='result'>"
+                "<query xmlns='http://jabber.org/protocol/disco#info'><feature var='jabber:iq:register'/></query>"
+                "</iq>"_s);
 
     QVERIFY(signalEmitted);
     QVERIFY(localManager->supportedByServer());
+    QVERIFY(watch.supported().value());
     context.reset();
 
-    // on disconnect, supportedByServer needs to be reset
+    // the value is kept until the information is updated on the next connection
     Q_EMIT test.disconnected();
-    QVERIFY(!localManager->supportedByServer());
+    QVERIFY(localManager->supportedByServer());
+    QT_WARNING_POP
 }
 
 void tst_QXmppRegistrationManager::testSendCachedRegistrationForm_data()

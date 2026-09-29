@@ -7,7 +7,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
-#include "QXmppDiscoveryManager.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppRegisterIq.h"
 #include "QXmppStreamFeatures.h"
@@ -28,8 +28,10 @@ public:
 
     // whether to block login and request the registration form on connect
     bool registerOnConnectEnabled;
-    // whether the server supports registration (after login)
-    bool supportedByServer;
+    // Created on the first connection, since the QXmppDiscoveryManager may be registered after
+    // this manager. Kept afterwards, so the support stays known on reconnection.
+    std::optional<QXmppDiscoFeatureWatch> serverSupport;
+    QPropertyNotifier serverSupportNotifier;
 
     // caching
     QString changePasswordIqId;
@@ -42,8 +44,7 @@ public:
 };
 
 QXmppRegistrationManagerPrivate::QXmppRegistrationManagerPrivate()
-    : registerOnConnectEnabled(false),
-      supportedByServer(false)
+    : registerOnConnectEnabled(false)
 {
 }
 
@@ -95,19 +96,37 @@ void QXmppRegistrationManager::deleteAccount()
 }
 
 /*!
-    Returns whether the server supports registration.
-
-    By default this is set to false and only changes, if you request the
-    service discovery info of the connected server using
-    QXmppDiscoveryManager::requestInfo().
+    Returns a watch on whether the own server supports \xep{0077}{In-Band Registration}.
 
     This is only relevant to actions that happen after authentication.
+
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the server information.
+
+    This requires the QXmppDiscoveryManager to be registered with the client. If the manager is
+    not registered with a client, a watch that never loads is returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppRegistrationManager::watchServerSupport() const
+{
+    return watchServerFeature(client(), QXmpp::Namespace::Register);
+}
+
+/*!
+    Returns whether the server supports registration.
+
+    This is only relevant to actions that happen after authentication. This requires the
+    QXmppDiscoveryManager to be registered with the client. The information is requested once
+    the client is connected and kept while it is updated on reconnection.
+
+    \deprecated since QXmpp 1.17, use watchServerSupport() instead.
 
     \sa QXmppRegistrationManager::supportedByServerChanged()
 */
 bool QXmppRegistrationManager::supportedByServer() const
 {
-    return d->supportedByServer;
+    return d->serverSupport && d->serverSupport->supported().value();
 }
 
 /*!
@@ -309,9 +328,20 @@ bool QXmppRegistrationManager::handleStanza(const QDomElement &stanza)
 
 void QXmppRegistrationManager::onRegistered(QXmppClient *client)
 {
-    connect(client, &QXmppClient::connected, this, &QXmppRegistrationManager::onConnected);
+    connect(client, &QXmppClient::connected, this, [this] {
+        if (d->serverSupport || !this->client()->findExtension<QXmppDiscoveryManager>()) {
+            return;
+        }
+        d->serverSupport = watchServerSupport();
+        d->serverSupportNotifier = d->serverSupport->supported().addNotifier([this] {
+            QT_WARNING_PUSH
+            QT_WARNING_DISABLE_DEPRECATED
+            Q_EMIT supportedByServerChanged();
+            QT_WARNING_POP
+        });
+    });
+
     connect(client, &QXmppClient::disconnected, this, [this, client]() {
-        setSupportedByServer(false);
         client->setIgnoredStreamErrors({});
 
         if (!d->deleteAccountIqId.isEmpty()) {
@@ -324,26 +354,15 @@ void QXmppRegistrationManager::onRegistered(QXmppClient *client)
 void QXmppRegistrationManager::onUnregistered(QXmppClient *client)
 {
     disconnect(client, nullptr, this, nullptr);
-}
 
-void QXmppRegistrationManager::onConnected()
-{
-    if (auto *disco = client()->findExtension<QXmppDiscoveryManager>()) {
-        disco->info(client()->configuration().domain()).then(this, [this](auto result) {
-            if (hasValue(result)) {
-                setSupportedByServer(contains(getValue(result).features(), ns_register));
-            } else {
-                warning(u"RegistrationManager: Error fetching server's features: %1"_s.arg(getError(result).description));
-            }
-        });
-    }
-}
-
-void QXmppRegistrationManager::setSupportedByServer(bool registrationSupported)
-{
-    if (d->supportedByServer != registrationSupported) {
-        d->supportedByServer = registrationSupported;
+    const auto wasSupported = d->serverSupport && d->serverSupport->supported().value();
+    d->serverSupportNotifier = {};
+    d->serverSupport = {};
+    if (wasSupported) {
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
         Q_EMIT supportedByServerChanged();
+        QT_WARNING_POP
     }
 }
 
