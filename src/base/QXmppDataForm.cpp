@@ -722,6 +722,19 @@ QXmppDataForm &QXmppDataForm::operator=(const QXmppDataForm &other) = default;
 /*! Default move-assignment operator. */
 QXmppDataForm &QXmppDataForm::operator=(QXmppDataForm &&) = default;
 
+/*!
+    Returns true if \a other is identical to this form.
+
+    \since QXmpp 1.17
+*/
+bool QXmppDataForm::operator==(const QXmppDataForm &other) const
+{
+    return d->type == other.d->type &&
+        d->title == other.d->title &&
+        d->instructions == other.d->instructions &&
+        d->fields == other.d->fields;
+}
+
 /*! Returns all fields. */
 QList<QXmppDataForm::Field> QXmppDataForm::fields() const
 {

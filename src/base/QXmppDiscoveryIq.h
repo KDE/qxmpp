@@ -258,6 +258,13 @@ public:
     */
     void setLanguage(const QString &newLanguage) { m_language = newLanguage; }
 
+    /*!
+        Returns true if the two objects are equal (default comparison).
+
+        \since QXmpp 1.17
+    */
+    bool operator==(const QXmppDiscoIdentity &) const = default;
+
     static constexpr std::tuple XmlTag = { u"identity", QXmpp::Private::ns_disco_info };
     static std::optional<QXmppDiscoIdentity> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
@@ -329,6 +336,13 @@ public:
 
     QByteArray calculateEntityCapabilitiesHash() const;
 
+    /*!
+        Returns true if the two objects are equal (default comparison).
+
+        \since QXmpp 1.17
+    */
+    bool operator==(const QXmppDiscoInfo &) const = default;
+
     static constexpr std::tuple XmlTag = { u"query", QXmpp::Private::ns_disco_info };
     static std::optional<QXmppDiscoInfo> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
@@ -354,6 +368,13 @@ struct QXMPP_EXPORT QXmppDiscoService {
     QString jid;
     /*! Service discovery information of the service. */
     QXmppDiscoInfo info;
+
+    /*!
+        Returns true if the two objects are equal (default comparison).
+
+        \since QXmpp 1.17
+    */
+    bool operator==(const QXmppDiscoService &) const = default;
 };
 
 #if QXMPP_DEPRECATED_SINCE(1, 12)

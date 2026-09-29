@@ -3843,6 +3843,22 @@ void tst_QXmppDiscoveryIq::discoInfo()
         "</x>"
         "</query>"_s)));
     QCOMPARE(info.calculateEntityCapabilitiesHash(), QByteArray::fromBase64("rK7XqKVrZPXCIej/ajYkMLFoEzA="));
+
+    // comparison
+    auto parse = [](const QString &field) {
+        return unwrap(QXmppDiscoInfo::fromDom(xmlToDom(
+            u"<query xmlns='http://jabber.org/protocol/disco#info'>"
+            "<identity category='client' type='pc'/>"
+            "<feature var='urn:x'/>"
+            "<x xmlns='jabber:x:data' type='result'>"
+            "<field var='FORM_TYPE' type='hidden'><value>urn:y</value></field>" +
+            field + u"</x></query>")));
+    };
+    const auto a = parse(u"<field var='os'><value>Mac</value></field>"_s);
+    QVERIFY(a == parse(u"<field var='os'><value>Mac</value></field>"_s));
+    QVERIFY(a != parse(u"<field var='os'><value>Linux</value></field>"_s));
+    QVERIFY((QXmppDiscoService { u"a.example.org"_s, a }) == (QXmppDiscoService { u"a.example.org"_s, a }));
+    QVERIFY((QXmppDiscoService { u"a.example.org"_s, a }) != (QXmppDiscoService { u"b.example.org"_s, a }));
 }
 
 void tst_QXmppDiscoveryIq::capsVerificationString_data()
