@@ -6,7 +6,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
-#include "QXmppDiscoveryManager.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppMovedItem_p.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
@@ -74,7 +74,10 @@ static QXmppMovedManager::Result movedJidsMatch(const QString &newBareJid, const
 class QXmppMovedManagerPrivate
 {
 public:
-    bool supportedByServer = false;
+    // Created on the first connection, since the QXmppDiscoveryManager may be registered after
+    // this manager. Kept afterwards, so the support stays known on reconnection.
+    std::optional<QXmppDiscoFeatureWatch> serverSupport;
+    QPropertyNotifier serverSupportNotifier;
 };
 
 /*!
@@ -136,6 +139,22 @@ QStringList QXmppMovedManager::discoveryFeatures() const
 }
 
 /*!
+    Returns a watch on whether the own server supports \xep{0283}{Moved}.
+
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the server information.
+
+    This requires the QXmppDiscoveryManager to be registered with the client. If the manager is
+    not registered with a client, a watch that never loads is returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppMovedManager::watchServerSupport() const
+{
+    return watchServerFeature(client(), QXmpp::Namespace::Moved1);
+}
+
+/*!
     \property QXmppMovedManager::supportedByServer
 
     \sa QXmppMovedManager::supportedByServer()
@@ -143,16 +162,23 @@ QStringList QXmppMovedManager::discoveryFeatures() const
 
 /*!
     Returns whether the own server supports the \xep{0283}{Moved} feature.
+
+    This requires the QXmppDiscoveryManager to be registered with the client. The information is
+    requested once the client is connected and kept while it is updated on reconnection.
+
+    \deprecated since QXmpp 1.17, use watchServerSupport() instead.
 */
 bool QXmppMovedManager::supportedByServer() const
 {
-    return d->supportedByServer;
+    return d->serverSupport && d->serverSupport->supported().value();
 }
 
 /*!
     \fn QXmppMovedManager::supportedByServerChanged()
 
     Emitted when the server enabled or disabled support for \xep{0283}{Moved}.
+
+    \deprecated since QXmpp 1.17, use watchServerSupport() instead.
 */
 
 /*!
@@ -238,22 +264,21 @@ QXmppTask<QXmpp::SendResult> QXmppMovedManager::notifyContact(const QString &con
 
 void QXmppMovedManager::onRegistered(QXmppClient *client)
 {
-    connect(client, &QXmppClient::connected, this, [this]() {
-        if (this->client()->streamManagementState() == QXmppClient::NewStream) {
-            resetCachedData();
-
-            if (auto *disco = this->client()->findExtension<QXmppDiscoveryManager>()) {
-                disco->info(this->client()->configuration().domain()).then(this, [this](auto &&result) {
-                    if (hasValue(result)) {
-                        setSupportedByServer(contains(getValue(result).features(), ns_moved));
-                    } else {
-                        warning(u"MovedManager: Could not fetch server features: %1"_s.arg(getError(result).description));
-                    }
-                });
-            } else {
-                warning(u"MovedManager: Missing recommended QXmppDiscoveryManager"_s);
-            }
+    connect(client, &QXmppClient::connected, this, [this] {
+        if (d->serverSupport) {
+            return;
         }
+        if (!this->client()->findExtension<QXmppDiscoveryManager>()) {
+            warning(u"MovedManager: Missing recommended QXmppDiscoveryManager"_s);
+            return;
+        }
+        d->serverSupport = watchServerSupport();
+        d->serverSupportNotifier = d->serverSupport->supported().addNotifier([this] {
+            QT_WARNING_PUSH
+            QT_WARNING_DISABLE_DEPRECATED
+            Q_EMIT supportedByServerChanged();
+            QT_WARNING_POP
+        });
     });
 
     Q_ASSERT_X(client->findExtension<QXmppPubSubManager>(), "QXmppMovedManager", "QXmppPubSubManager is missing");
@@ -261,8 +286,17 @@ void QXmppMovedManager::onRegistered(QXmppClient *client)
 
 void QXmppMovedManager::onUnregistered(QXmppClient *client)
 {
-    resetCachedData();
     disconnect(client, &QXmppClient::connected, this, nullptr);
+
+    const auto wasSupported = d->serverSupport && d->serverSupport->supported().value();
+    d->serverSupportNotifier = {};
+    d->serverSupport = {};
+    if (wasSupported) {
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
+        Q_EMIT supportedByServerChanged();
+        QT_WARNING_POP
+    }
 }
 
 /*!
@@ -300,21 +334,4 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
         presence.setOldJid({});
         co_return presence;
     }
-}
-
-/*!
-    Sets whether the own server supports \xep{0283}{Moved} via \a supportedByServer.
-*/
-void QXmppMovedManager::setSupportedByServer(bool supportedByServer)
-{
-    if (d->supportedByServer != supportedByServer) {
-        d->supportedByServer = supportedByServer;
-        Q_EMIT supportedByServerChanged();
-    }
-}
-
-/*! Resets the cached data. */
-void QXmppMovedManager::resetCachedData()
-{
-    setSupportedByServer(false);
 }
