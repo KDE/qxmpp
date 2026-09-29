@@ -362,7 +362,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media medi
 
     auto *discoManager = client()->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(discoManager != nullptr, "call", "QXmppCallManager requires QXmppDiscoveryManager to be registered.");
-    discoManager->info(jid).then(call.get(), [this, call = call.get(), media](auto result) {
+    discoManager->info(jid, {}, QXmppDiscoveryManager::CachePolicy::Strict).then(call.get(), [this, call = call.get(), media](auto result) {
         auto failure = [&](QString &&text) {
             warning(text);
             call->d->error = QXmppError { std::move(text), {} };
