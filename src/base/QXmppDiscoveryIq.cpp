@@ -20,12 +20,6 @@
 
 using namespace QXmpp::Private;
 
-static bool entityCapabilities1Compare(const QXmppDiscoIdentity &i1, const QXmppDiscoIdentity &i2)
-{
-    return std::tuple { i1.category(), i1.type(), i1.language(), i1.name() } <
-        std::tuple { i2.category(), i2.type(), i2.language(), i2.name() };
-}
-
 /*!
     \class QXmppDiscoItem
     \inmodule QXmpp
@@ -129,59 +123,31 @@ std::optional<QXmppDataForm> QXmppDiscoInfo::dataForm(QStringView formType) cons
     return find(m_dataForms, formType, &QXmppDataForm::formType);
 }
 
-/*! Calculates an \xep{0115}{Entity Capabilities} hash value of this service discovery data object. */
+/*!
+    Calculates an \xep{0115}{Entity Capabilities} hash value of this service discovery data object.
+
+    The hash is generated from the XML this object is serialized to. Duplicate features are
+    ignored. Returns an empty byte array if the information is ill-formed according to
+    \xep{0115}{Entity Capabilities}, e.g. if it contains duplicate identities.
+*/
 QByteArray QXmppDiscoInfo::calculateEntityCapabilitiesHash() const
 {
-    QString S;
-
-    // identities
-    auto identities = m_identities;
-    std::sort(identities.begin(), identities.end(), entityCapabilities1Compare);
-
-    for (const auto &identity : std::as_const(identities)) {
-        S += identity.category() + u'/' + identity.type() + u'/' + identity.language() + u'/' + identity.name() + u'<';
-    }
-
-    // features
+    auto info = *this;
     auto features = m_features;
-    std::sort(features.begin(), features.end());
     features.removeDuplicates();
+    info.setFeatures(features);
 
-    for (const auto &feature : std::as_const(features)) {
-        S += feature + u'<';
-    }
+    QByteArray xml;
+    QXmlStreamWriter writer(&xml);
+    info.toXml(&writer);
 
-    // data forms
-    auto forms = m_dataForms;
-    std::sort(forms.begin(), forms.end(), [](const auto &a, const auto &b) {
-        return a.formType() < b.formType();
-    });
-
-    for (auto &form : std::as_const(forms)) {
-        S += form.formType();
-        S += u'<';
-
-        auto fields = form.constFields();
-        std::sort(fields.begin(), fields.end(), [](const auto &a, const auto &b) {
-            return a.key() < b.key();
-        });
-
-        for (const auto &field : std::as_const(fields)) {
-            if (field.key() != u"FORM_TYPE") {
-                S += field.key() + u'<';
-                if (field.value().canConvert<QStringList>()) {
-                    QStringList list = field.value().toStringList();
-                    list.sort();
-                    S += list.join(u'<');
-                } else {
-                    S += field.value().toString();
-                }
-                S += u'<';
-            }
-        }
-    }
-
-    return QCryptographicHash::hash(S.toUtf8(), QCryptographicHash::Sha1);
+    QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    doc.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing);
+#else
+    doc.setContent(xml, true);
+#endif
+    return capsVerificationString(doc.documentElement(), QXmpp::HashAlgorithm::Sha1).value_or(QByteArray());
 }
 
 std::optional<QXmpp::HashAlgorithm> QXmpp::Private::capsHashAlgorithm(QStringView hash)
