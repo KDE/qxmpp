@@ -11,7 +11,9 @@
 #include "QXmppDiscoveryIq_p.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppPresence.h"
 #include "QXmppUtils.h"
+#include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
 #include "Async.h"
@@ -48,6 +50,7 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
 {
     d->infoCache.setMaxCost(50);
     d->itemsCache.setMaxCost(50);
+    d->capsCache.setMaxCost(200);
     d->clientCapabilitiesNode = u"org.qxmpp.caps"_s;
     d->identities = { d->defaultIdentity() };
 }
@@ -71,9 +74,20 @@ QXmppDiscoveryManager::~QXmppDiscoveryManager()
     \since QXmpp 1.12
 
     \a cachePolicy, \a node, and \a jid.
+
+    For available entities that announce \xep{0115}{Entity Capabilities} in their presence, the
+    info is requested using the caps and cached for all entities with the same caps. Such cached
+    info is always up to date and is also used with CachePolicy::Strict.
 */
 QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
+    // XEP-0115: Entity Capabilities, the info is up to date with both policies
+    if (node.isEmpty()) {
+        if (auto itr = d->availableJids.constFind(jid); itr != d->availableJids.cend() && itr->has_value()) {
+            return d->capsInfo(jid, **itr);
+        }
+    }
+
     if (cachePolicy == CachePolicy::Relaxed) {
         if (auto *cachedInfo = d->infoCache[{ jid, node }]) {
             return makeReadyTask<Result<QXmppDiscoInfo>>(*cachedInfo);
@@ -328,7 +342,11 @@ QBindable<std::optional<QXmppDiscoInfo>> QXmppDiscoInfoWatch::info() const
 
     If changes are tracked, the information is requested again whenever it changes, so
     information in the state Loaded stays up to date. This is the case for MUC rooms that have
-    been joined using QXmppMucManagerV2.
+    been joined using QXmppMucManagerV2 and for available entities that announce
+    \xep{0115}{Entity Capabilities} in their presence.
+
+    The information of full JIDs is dropped when the entity becomes unavailable or available
+    again, as the JID may refer to another entity then, e.g. a MUC occupant.
 
     Otherwise the information is a snapshot from the time it has been requested. Use refresh()
     to request it again.
@@ -720,6 +738,9 @@ bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
 
 void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
 {
+    connect(client, &QXmppClient::presenceReceived, this, [this](const QXmppPresence &presence) {
+        d->handlePresence(presence);
+    });
     connect(client, &QXmppClient::connected, this, [this, client]() {
         d->clientConnected = true;
         const auto newStream = client->streamManagementState() != QXmppClient::ResumedStream;
@@ -809,7 +830,7 @@ QXmppDiscoInfoWatch QXmppDiscoveryManagerPrivate::watchInfo(QXmppDiscoInfoWatch:
     data->manager = q;
     data->key = std::move(key);
     data->changesTracked = data->key.target == QXmppDiscoInfoWatch::Data::Target::Jid &&
-        data->key.node.isEmpty() && trackedJids.contains(data->key.jid);
+        data->key.node.isEmpty() && isTracked(data->key.jid);
     infoWatches.insert_or_assign(data->key, data);
 
     // Cached info of untracked entities may be outdated. Server and account info are only
@@ -835,6 +856,16 @@ std::shared_ptr<QXmppDiscoInfoWatch::Data> QXmppDiscoveryManagerPrivate::findJid
     return {};
 }
 
+bool QXmppDiscoveryManagerPrivate::isTracked(const QString &jid) const
+{
+    if (trackedJids.contains(jid)) {
+        return true;
+    }
+    // changes of the caps are announced by presence
+    auto itr = availableJids.constFind(jid);
+    return itr != availableJids.cend() && itr->has_value();
+}
+
 void QXmppDiscoveryManagerPrivate::setTracked(const QString &jid, bool tracked)
 {
     if (tracked) {
@@ -843,20 +874,26 @@ void QXmppDiscoveryManagerPrivate::setTracked(const QString &jid, bool tracked)
         trackedJids.remove(jid);
     }
     if (auto data = findJidWatch(jid)) {
-        data->changesTracked = tracked;
+        data->changesTracked = isTracked(jid);
     }
 }
 
 void QXmppDiscoveryManagerPrivate::clearTracked()
 {
+    auto jids = trackedJids;
+    for (auto itr = availableJids.cbegin(); itr != availableJids.cend(); ++itr) {
+        jids.insert(itr.key());
+    }
+    trackedJids.clear();
+    availableJids.clear();
+
     Qt::beginPropertyUpdateGroup();
-    for (const auto &jid : std::as_const(trackedJids)) {
+    for (const auto &jid : std::as_const(jids)) {
         if (auto data = findJidWatch(jid)) {
             data->changesTracked = false;
         }
     }
     Qt::endPropertyUpdateGroup();
-    trackedJids.clear();
 }
 
 void QXmppDiscoveryManagerPrivate::invalidate(const QString &jid)
@@ -870,15 +907,155 @@ void QXmppDiscoveryManagerPrivate::invalidate(const QString &jid)
 void QXmppDiscoveryManagerPrivate::reset(const QString &jid)
 {
     trackedJids.remove(jid);
+    availableJids.remove(jid);
+    dropInfo(jid);
+}
+
+void QXmppDiscoveryManagerPrivate::dropInfo(const QString &jid)
+{
     infoCache.remove({ jid, {} });
     if (auto data = findJidWatch(jid)) {
         Qt::beginPropertyUpdateGroup();
-        data->changesTracked = false;
+        data->changesTracked = isTracked(jid);
         data->infoJid.clear();
         data->info = std::nullopt;
         data->state = QXmppDiscoInfoWatch::State::Unknown;
         fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
         Qt::endPropertyUpdateGroup();
+    }
+}
+
+void QXmppDiscoveryManagerPrivate::handlePresence(const QXmppPresence &presence)
+{
+    const auto jid = presence.from();
+    if (QXmppUtils::jidToResource(jid).isEmpty()) {
+        return;
+    }
+
+    if (presence.type() == QXmppPresence::Unavailable) {
+        reset(jid);
+        return;
+    }
+    if (presence.type() != QXmppPresence::Available) {
+        return;
+    }
+
+    std::optional<Caps> caps;
+    if (!presence.capabilityHash().isEmpty() && !presence.capabilityNode().isEmpty() && !presence.capabilityVer().isEmpty()) {
+        caps = Caps { presence.capabilityHash(), presence.capabilityNode(), presence.capabilityVer() };
+    }
+
+    Qt::beginPropertyUpdateGroup();
+    if (auto itr = availableJids.find(jid); itr == availableJids.end()) {
+        // The JID may refer to another entity than before, e.g. a MUC occupant.
+        availableJids.insert(jid, caps);
+        dropInfo(jid);
+    } else if (caps && caps != *itr) {
+        // Presences without caps do not mean that the caps have been removed, servers may
+        // strip unchanged caps (caps optimization).
+        *itr = caps;
+        infoCache.remove({ jid, {} });
+        if (auto data = findJidWatch(jid)) {
+            data->changesTracked = true;
+            fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+        }
+    }
+    Qt::endPropertyUpdateGroup();
+}
+
+QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::capsInfo(const QString &jid, const Caps &caps)
+{
+    if (capsHashAlgorithm(caps.hash)) {
+        if (auto *cachedInfo = capsCache[{ caps.hash, caps.ver }]) {
+            applyCapsInfo(jid, caps, *cachedInfo);
+            return makeReadyTask<Result<QXmppDiscoInfo>>(QXmppDiscoInfo { *cachedInfo });
+        }
+    }
+
+    const auto node = caps.node + u'#' + QString::fromLatin1(caps.ver.toBase64());
+    return infoRequests.produce(
+        { jid, node },
+        [this, caps](const auto &key) { return startCapsRequest(std::get<0>(key), caps); },
+        q);
+}
+
+QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::startCapsRequest(const QString &jid, const Caps &caps)
+{
+    // wait for another entity with the same caps
+    if (capsHashAlgorithm(caps.hash)) {
+        auto [itr, inserted] = capsRequests.try_emplace(CapsKey { caps.hash, caps.ver });
+        if (!inserted) {
+            QXmppPromise<Result<QXmppDiscoInfo>> promise;
+            auto task = promise.task();
+            itr->second.push_back({ jid, caps, std::move(promise) });
+            return task;
+        }
+    }
+    return requestCapsInfo(jid, caps);
+}
+
+QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::requestCapsInfo(const QString &jid, const Caps &caps)
+{
+    const auto node = caps.node + u'#' + QString::fromLatin1(caps.ver.toBase64());
+    return chain<Result<QXmppDiscoInfo>>(
+        q->client()->sendIq(CompatIq { GetIq<QXmppDiscoInfo> { generateSequentialStanzaId(), {}, jid, {}, QXmppDiscoInfo { node } } }),
+        q,
+        [this, jid, caps](QXmppClient::IqResult &&response) -> Result<QXmppDiscoInfo> {
+            const auto algorithm = capsHashAlgorithm(caps.hash);
+            const auto iqElement = std::holds_alternative<QDomElement>(response) ? std::get<QDomElement>(response) : QDomElement();
+
+            auto result = parseIqResponseFlat<QXmppDiscoInfo>(std::move(response));
+            if (!hasValue(result)) {
+                if (algorithm) {
+                    finishCapsRequest({ caps.hash, caps.ver }, {});
+                }
+                return result;
+            }
+
+            const auto &info = getValue(result);
+            if (algorithm) {
+                // Unverified info is only used for this entity. Other entities with the same
+                // caps are requested themselves.
+                const auto query = firstChildElement(iqElement, u"query", ns_disco_info);
+                if (capsVerificationString(query, *algorithm) == caps.ver) {
+                    capsCache.insert({ caps.hash, caps.ver }, new QXmppDiscoInfo { info });
+                    applyCapsInfo(jid, caps, info);
+                    finishCapsRequest({ caps.hash, caps.ver }, info);
+                    return result;
+                }
+                q->warning(u"Received service discovery information of %1 does not match its entity capabilities."_s.arg(jid));
+                finishCapsRequest({ caps.hash, caps.ver }, {});
+            }
+            applyCapsInfo(jid, caps, info);
+            return result;
+        });
+}
+
+void QXmppDiscoveryManagerPrivate::finishCapsRequest(const CapsKey &key, const std::optional<QXmppDiscoInfo> &info)
+{
+    auto node = capsRequests.extract(key);
+    if (node.empty()) {
+        return;
+    }
+
+    for (auto &waiter : node.mapped()) {
+        if (info) {
+            applyCapsInfo(waiter.jid, waiter.caps, *info);
+            waiter.promise.finish(*info);
+        } else {
+            startCapsRequest(waiter.jid, waiter.caps).then(q, [promise = std::move(waiter.promise)](auto &&result) mutable {
+                promise.finish(std::move(result));
+            });
+        }
+    }
+}
+
+void QXmppDiscoveryManagerPrivate::applyCapsInfo(const QString &jid, const Caps &caps, const QXmppDiscoInfo &info)
+{
+    // the caps may have changed in the meantime
+    if (availableJids.value(jid) == caps) {
+        infoCache.insert({ jid, {} }, new QXmppDiscoInfo { info });
+        updateInfoWatches(jid, {}, info);
     }
 }
 

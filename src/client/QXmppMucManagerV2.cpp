@@ -997,7 +997,6 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             }
 
             // store new presence (keyed by nickname, unique per XEP-0045)
-            DiscoInfoTracking::reset(q->client(), presence.from());
             auto newParticipant = std::make_shared<MucParticipantData>(presence);
             auto [itr, inserted] = data.participants.emplace(nickname, newParticipant);
             QX_ALWAYS_ASSERT(inserted);
@@ -1068,8 +1067,6 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
 
             // Re-key the participant under the new nickname.
             if (!newNick.isEmpty()) {
-                DiscoInfoTracking::reset(q->client(), roomJid + u'/' + nickname);
-                DiscoInfoTracking::reset(q->client(), roomJid + u'/' + newNick);
                 if (auto node = data.participants.extract(nickname); !node.empty()) {
                     auto updated = presence;
                     updated.setFrom(roomJid + u'/' + newNick);
@@ -1112,14 +1109,12 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 Q_EMIT q->participantLeft(roomJid, QXmppMucParticipant(pItr->second), reason);
                 data.participants.erase(pItr);
             }
-            DiscoInfoTracking::reset(q->client(), presence.from());
         } else if (presence.type() == QXmppPresence::Available) {
             if (auto pItr = data.participants.find(nickname); pItr != data.participants.end()) {
                 // Existing participant — update presence
                 pItr->second->setPresence(presence);
             } else {
                 // New participant joined
-                DiscoInfoTracking::reset(q->client(), presence.from());
                 auto newParticipant = std::make_shared<MucParticipantData>(presence);
                 data.participants.emplace(nickname, newParticipant);
                 Q_EMIT q->participantJoined(roomJid, QXmppMucParticipant(newParticipant));

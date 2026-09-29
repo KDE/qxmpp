@@ -1518,6 +1518,14 @@ private:
     Q_SLOT void watchInfoTrackingEnds();
     Q_SLOT void watchInfoInvalidate();
     Q_SLOT void watchInfoReset();
+    Q_SLOT void watchInfoPresence();
+    Q_SLOT void watchInfoCaps();
+    Q_SLOT void watchInfoCapsChanged();
+    Q_SLOT void watchInfoCapsInvalid();
+    Q_SLOT void watchInfoCapsUnknownHash();
+    Q_SLOT void watchInfoCapsSameVer();
+    Q_SLOT void watchInfoCapsSameVerInvalid();
+    Q_SLOT void infoCaps();
     Q_SLOT void watchAccountInfoAccountChange();
     Q_SLOT void watchInfoLifetime();
     Q_SLOT void watchInfoModifiedByNotifier();
@@ -2402,6 +2410,289 @@ void tst_QXmppDiscoveryManager::watchInfoReset()
     // without a watch only the cache is cleared
     watch = {};
     DiscoInfoTracking::reset(&test, u"room@muc.example.org/nick"_s);
+    test.expectNoPacket();
+}
+
+static QXmppPresence presence(const QString &from, QXmppPresence::Type type = QXmppPresence::Available)
+{
+    QXmppPresence presence(type);
+    presence.setFrom(from);
+    return presence;
+}
+
+// XEP-0115, example 1
+static QXmppPresence capsPresence(const QString &from, const QString &hash = u"sha-1"_s, const QByteArray &ver = "QgayPKawpkPSDYmwT/WM94uAlu0=")
+{
+    auto p = presence(from);
+    p.setCapabilityHash(hash);
+    p.setCapabilityNode(u"http://code.google.com/p/exodus"_s);
+    p.setCapabilityVer(QByteArray::fromBase64(ver));
+    return p;
+}
+
+static QString capsRequest(const QString &to, const QString &ver = u"QgayPKawpkPSDYmwT/WM94uAlu0="_s)
+{
+    return u"<iq id='qx1' to='%1' type='get'>"
+           "<query xmlns='http://jabber.org/protocol/disco#info' node='http://code.google.com/p/exodus#%2'/>"
+           "</iq>"_s.arg(to, ver);
+}
+
+static QString capsResponse(const QString &from, const QString &extraFeature = {})
+{
+    return u"<iq id='qx1' from='%1' type='result'>"
+           "<query xmlns='http://jabber.org/protocol/disco#info' node='http://code.google.com/p/exodus#QgayPKawpkPSDYmwT/WM94uAlu0='>"
+           "<identity category='client' name='Exodus 0.9.1' type='pc'/>"
+           "<feature var='http://jabber.org/protocol/caps'/>"
+           "<feature var='http://jabber.org/protocol/disco#info'/>"
+           "<feature var='http://jabber.org/protocol/disco#items'/>"
+           "<feature var='http://jabber.org/protocol/muc'/>"
+           "%2"
+           "</query>"
+           "</iq>"_s.arg(from, extraFeature.isEmpty() ? QString() : u"<feature var='" + extraFeature + u"'/>");
+}
+
+void tst_QXmppDiscoveryManager::watchInfoPresence()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto watch = disco->watchInfo(u"alice@example.org/phone"_s);
+    test.expect(infoRequest(u"alice@example.org/phone"_s));
+    test.inject(infoResponse(u"alice@example.org/phone"_s, u"urn:xmpp:jingle:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    // the JID may refer to another entity once it becomes available
+    test.injectPresence(presence(u"alice@example.org/phone"_s));
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+    QVERIFY(!watch.changesTracked().value());
+    test.expect(infoRequest(u"alice@example.org/phone"_s));
+    test.inject(infoResponse(u"alice@example.org/phone"_s, u"urn:xmpp:jingle:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    // further presences do not change anything
+    test.injectPresence(presence(u"alice@example.org/phone"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    test.expectNoPacket();
+
+    // the info is dropped when the entity becomes unavailable
+    test.injectPresence(presence(u"alice@example.org/phone"_s, QXmppPresence::Unavailable));
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+    test.expect(infoRequest(u"alice@example.org/phone"_s));
+    test.inject(u"<iq id='qx1' from='alice@example.org/phone' type='error'>"
+                "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+    QCOMPARE(watch.state().value(), State::Error);
+
+    // presences of bare JIDs are ignored
+    auto bareWatch = disco->watchInfo(u"alice@example.org"_s);
+    test.expect(infoRequest(u"alice@example.org"_s));
+    test.inject(infoResponse(u"alice@example.org"_s, u"urn:xmpp:mam:2"_s));
+    test.injectPresence(presence(u"alice@example.org"_s, QXmppPresence::Unavailable));
+    QCOMPARE(bareWatch.state().value(), State::Loaded);
+    test.expectNoPacket();
+}
+
+void tst_QXmppDiscoveryManager::watchInfoCaps()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // the caps node is requested
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    test.expectNoPacket();
+    auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    QVERIFY(watch.changesTracked().value());
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QVERIFY(watch.watchFeature(QXmpp::Namespace::Muc).supported().value());
+
+    // the info is cached for other entities with the same caps
+    auto otherWatch = disco->watchInfo(u"benvolio@montague.lit/garden"_s);
+    test.expect(infoRequest(u"benvolio@montague.lit/garden"_s));
+    QCOMPARE(otherWatch.state().value(), State::Loading);
+    test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
+    QCOMPARE(otherWatch.state().value(), State::Loaded);
+    QVERIFY(otherWatch.changesTracked().value());
+    QCOMPARE(watchedFeatures(otherWatch), watchedFeatures(watch));
+    test.expectNoPacket();
+    test.inject(capsResponse(u"benvolio@montague.lit/garden"_s));
+
+    // also on new streams
+    otherWatch = {};
+    Q_EMIT test.disconnected();
+    Q_EMIT test.connected();
+    test.expect(infoRequest(u"romeo@montague.lit/orchard"_s));
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QVERIFY(!watch.changesTracked().value());
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QVERIFY(watch.changesTracked().value());
+    test.expectNoPacket();
+
+    // the caps are dropped with the presence
+    test.injectPresence(presence(u"romeo@montague.lit/orchard"_s, QXmppPresence::Unavailable));
+    QVERIFY(!watch.changesTracked().value());
+    QCOMPARE(watch.state().value(), State::Loading);
+    test.expect(infoRequest(u"romeo@montague.lit/orchard"_s));
+}
+
+void tst_QXmppDiscoveryManager::watchInfoCapsChanged()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    // servers may strip unchanged caps
+    test.injectPresence(presence(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QVERIFY(watch.changesTracked().value());
+    test.expectNoPacket();
+
+    // new caps: the old info is kept until the new info has been received
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s, u"sha-1"_s, "66/0NaeaBKkwk85efJTGmU47vXI="));
+    QCOMPARE(watch.state().value(), State::Stale);
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s, u"66/0NaeaBKkwk85efJTGmU47vXI="_s));
+}
+
+void tst_QXmppDiscoveryManager::watchInfoCapsInvalid()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // the info is used for the entity itself
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s, u"urn:xmpp:jingle:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QVERIFY(watch.watchFeature(u"urn:xmpp:jingle:1"_s).supported().value());
+
+    // but not cached for other entities
+    test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
+    auto otherWatch = disco->watchInfo(u"benvolio@montague.lit/garden"_s);
+    test.expect(capsRequest(u"benvolio@montague.lit/garden"_s));
+    test.inject(capsResponse(u"benvolio@montague.lit/garden"_s));
+    QCOMPARE(otherWatch.state().value(), State::Loaded);
+    QVERIFY(!otherWatch.watchFeature(u"urn:xmpp:jingle:1"_s).supported().value());
+
+    // the verified info is cached
+    test.injectPresence(capsPresence(u"juliet@capulet.lit/balcony"_s));
+    auto thirdWatch = disco->watchInfo(u"juliet@capulet.lit/balcony"_s);
+    QCOMPARE(thirdWatch.state().value(), State::Loaded);
+    test.expectNoPacket();
+}
+
+void tst_QXmppDiscoveryManager::watchInfoCapsUnknownHash()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // the info is requested, but not cached
+    for (const auto &jid : { u"romeo@montague.lit/orchard"_s, u"benvolio@montague.lit/garden"_s }) {
+        test.injectPresence(capsPresence(jid, u"md5"_s));
+        auto watch = disco->watchInfo(jid);
+        QVERIFY(watch.changesTracked().value());
+        test.expect(capsRequest(jid));
+        test.inject(capsResponse(jid));
+        QCOMPARE(watch.state().value(), State::Loaded);
+    }
+}
+
+void tst_QXmppDiscoveryManager::watchInfoCapsSameVer()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // only one entity is requested
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
+    auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    auto otherWatch = disco->watchInfo(u"benvolio@montague.lit/garden"_s);
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+    test.expectNoPacket();
+    QCOMPARE(otherWatch.state().value(), State::Loading);
+
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(otherWatch.state().value(), State::Loaded);
+    test.expectNoPacket();
+}
+
+void tst_QXmppDiscoveryManager::watchInfoCapsSameVerInvalid()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
+    auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    auto otherWatch = disco->watchInfo(u"benvolio@montague.lit/garden"_s);
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+
+    // the other entity is requested if the verification fails
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s, u"urn:xmpp:jingle:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(otherWatch.state().value(), State::Loading);
+    test.expect(capsRequest(u"benvolio@montague.lit/garden"_s));
+    test.inject(capsResponse(u"benvolio@montague.lit/garden"_s));
+    QCOMPARE(otherWatch.state().value(), State::Loaded);
+    QVERIFY(!otherWatch.watchFeature(u"urn:xmpp:jingle:1"_s).supported().value());
+}
+
+void tst_QXmppDiscoveryManager::infoCaps()
+{
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    auto task = disco->info(u"romeo@montague.lit/orchard"_s);
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QVERIFY(expectFutureVariant<QXmppDiscoInfo>(task).features().contains(u"http://jabber.org/protocol/muc"_s));
+
+    // cached info is up to date, also with the strict policy
+    test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
+    task = disco->info(u"benvolio@montague.lit/garden"_s, {}, QXmppDiscoveryManager::CachePolicy::Strict);
+    QVERIFY(task.isFinished());
+    QVERIFY(expectFutureVariant<QXmppDiscoInfo>(task).features().contains(u"http://jabber.org/protocol/muc"_s));
     test.expectNoPacket();
 }
 
