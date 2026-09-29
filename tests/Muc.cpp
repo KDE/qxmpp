@@ -106,6 +106,9 @@ private:
     Q_SLOT void permissionsSubjectChangeable();
     Q_SLOT void roomInfoProperties();
     Q_SLOT void roomInfoStatus104();
+    Q_SLOT void roomInfoWatchTracked();
+    Q_SLOT void roomInfoWatchDestroyed();
+    Q_SLOT void roomInfoWatchCreated();
     Q_SLOT void roomInfoBindable();
     Q_SLOT void roomFeatureProperties();
     Q_SLOT void roomFeatureStatus172_173();
@@ -2593,6 +2596,124 @@ void tst_QXmppMuc::roomInfoStatus104()
                 "</query></iq>"_s);
 
     QCOMPARE(room.description().value(), u"Updated Coven"_s);
+}
+
+static QString roomInfoRequest(const QString &roomJid)
+{
+    return u"<iq id='qx1' to='" + roomJid + u"' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>";
+}
+
+static QString roomNotFound(const QString &id, const QString &roomJid)
+{
+    return u"<iq id='" + id + u"' from='" + roomJid + u"' type='error'>"
+                                                      "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                                                      "</iq>";
+}
+
+// connects the client and answers the MUC service discovery without services
+static void connectWithoutServices(TestClient &test)
+{
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expect(u"<iq id='qx1' to='shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='shakespeare.lit' type='result'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+}
+
+void tst_QXmppMuc::roomInfoWatchTracked()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
+
+    auto room = joinedRoom(test, muc);
+
+    // the info from joining is up to date
+    auto watch = disco->watchInfo(u"coven@chat.shakespeare.lit"_s);
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QVERIFY(watch.changesTracked().value());
+    test.expectNoPacket();
+
+    room.leave();
+    test.ignore();  // unavailable presence
+    QXmppPresence leavePresence;
+    parsePacket(leavePresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(leavePresence);
+    QVERIFY(!watch.changesTracked().value());
+    QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+void tst_QXmppMuc::roomInfoWatchDestroyed()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
+
+    joinedRoom(test, muc);
+    auto watch = disco->watchInfo(u"coven@chat.shakespeare.lit"_s);
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    QXmppPresence destroyPresence;
+    parsePacket(destroyPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<destroy/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(destroyPresence);
+
+    QVERIFY(!watch.changesTracked().value());
+    QCOMPARE(watch.state().value(), State::Stale);
+    auto id = test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit"_s));
+    test.inject(roomNotFound(id, u"coven@chat.shakespeare.lit"_s));
+    QCOMPARE(watch.state().value(), State::Error);
+}
+
+void tst_QXmppMuc::roomInfoWatchCreated()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
+
+    auto watch = disco->watchInfo(u"newroom@chat.shakespeare.lit"_s);
+    auto id = test.expectPacketRandomOrder(roomInfoRequest(u"newroom@chat.shakespeare.lit"_s));
+    test.inject(roomNotFound(id, u"newroom@chat.shakespeare.lit"_s));
+    QCOMPARE(watch.state().value(), State::Error);
+
+    auto room = createdRoom(test, muc);
+    auto task = room.setRoomConfig(QXmppMucRoomConfig {});
+    test.ignore();  // config submission
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    expectFutureVariant<QXmpp::Success>(task);
+
+    // the room info is requested once the room is configured
+    QVERIFY(watch.changesTracked().value());
+    id = test.expectPacketRandomOrder(roomInfoRequest(u"newroom@chat.shakespeare.lit"_s));
+    test.inject(u"<iq id='" + id + u"' from='newroom@chat.shakespeare.lit' type='result'>"
+                                   "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                   "<identity category='conference' type='text'/>"
+                                   "<feature var='http://jabber.org/protocol/muc'/>"
+                                   "</query></iq>");
+    QCOMPARE(watch.state().value(), State::Loaded);
 }
 
 void tst_QXmppMuc::roomInfoBindable()

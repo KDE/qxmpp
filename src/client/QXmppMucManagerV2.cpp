@@ -6,7 +6,7 @@
 
 #include "QXmppAsync_p.h"
 #include "QXmppClient.h"
-#include "QXmppDiscoveryManager.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppMessageRetraction.h"
 #include "QXmppMucForms.h"
 #include "QXmppPubSubManager.h"
@@ -783,6 +783,8 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
             data.state = MucRoomState::Joined;
             data.joined = true;
             data.joinTimer.reset();
+            // configuration changes are announced with status code 104
+            DiscoInfoTracking::setTracked(client(), bareFrom, true);
             // XEP-0410: start self-ping silence tracking.
             data.lastActivity = std::chrono::steady_clock::now();
             d->rescheduleSelfPing();
@@ -824,6 +826,8 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         }
         // Status 104: room configuration changed — re-fetch roominfo and config (if subscribed)
         if (message.mucUserQuery() && message.mucUserQuery()->statusCodes().contains(104)) {
+            // requests sent before the change must not be used
+            DiscoInfoTracking::invalidate(client(), bareFrom);
             d->fetchRoomInfo(bareFrom);
             if (data.watchingRoomConfig) {
                 d->fetchRoomConfigSubscribed(bareFrom);
@@ -1091,6 +1095,9 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
 
             deactivateRoom(roomJid);
             rescheduleSelfPing();
+            if (presence.mucDestroy()) {
+                DiscoInfoTracking::invalidate(q->client(), roomJid);
+            }
 
             if (promise) {
                 promise->finish(Success());
@@ -1402,6 +1409,7 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     }
     auto data = std::move(itr->second);
     activeRooms.erase(itr);
+    DiscoInfoTracking::setTracked(q->client(), jid, false);
 
     // Move out pending room-config waiters before resetting so we can finish them
     // with an error once the room state is clean. deactivateAllRooms() may have
@@ -2709,6 +2717,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
         m_data->manager->d->rescheduleSelfPing();
         // Fetch room info now that the room is configured
         m_data->manager->d->fetchRoomInfo(m_data->roomJid);
+        DiscoInfoTracking::setTracked(m_data->manager->client(), m_data->roomJid, true);
     }
     co_return result;
 }
@@ -2738,6 +2747,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     if (std::holds_alternative<Success>(result) && m_data->state == MucRoomState::Creating) {
         m_data->manager->d->deactivateRoom(m_data->roomJid);
         m_data->manager->d->rescheduleSelfPing();
+        DiscoInfoTracking::invalidate(m_data->manager->client(), m_data->roomJid);
     }
     co_return result;
 }
@@ -2761,9 +2771,13 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
     auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_data->manager);
     // Only tear down if still joined — a disconnect during the await may have already
     // deactivated (and a subsequent rejoin revived) the room.
-    if (std::holds_alternative<Success>(result) && m_data->state == MucRoomState::Joined) {
-        m_data->manager->d->deactivateRoom(m_data->roomJid);
-        m_data->manager->d->rescheduleSelfPing();
+    if (std::holds_alternative<Success>(result)) {
+        // the room may already have been left because of the destroy presence
+        if (m_data->state == MucRoomState::Joined) {
+            m_data->manager->d->deactivateRoom(m_data->roomJid);
+            m_data->manager->d->rescheduleSelfPing();
+        }
+        DiscoInfoTracking::invalidate(m_data->manager->client(), m_data->roomJid);
     }
     co_return result;
 }
