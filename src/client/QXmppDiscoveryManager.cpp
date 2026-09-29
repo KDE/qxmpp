@@ -48,7 +48,7 @@ static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, co
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {
-    d->infoCache.setMaxCost(50);
+    d->recentInfoEntries.setMaxCost(50);
     d->itemsCache.setMaxCost(50);
     d->capsCache.setMaxCost(200);
     d->clientCapabilitiesNode = u"org.qxmpp.caps"_s;
@@ -57,6 +57,9 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
 
 QXmppDiscoveryManager::~QXmppDiscoveryManager()
 {
+    for (const auto &entry : d->lockInfoEntries()) {
+        entry->manager = nullptr;
+    }
     const auto infoWatches = d->lockInfoWatches();
     for (const auto &data : infoWatches) {
         data->manager = nullptr;
@@ -84,13 +87,17 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
     // XEP-0115: Entity Capabilities, the info is up to date with both policies
     if (node.isEmpty()) {
         if (auto itr = d->availableJids.constFind(jid); itr != d->availableJids.cend() && itr->has_value()) {
+            // also covers info that has not been verified or is no longer in the caps cache
+            if (auto entry = d->findEntry(jid, {}); entry && entry->state.value() == QXmppDiscoInfoWatch::State::Loaded) {
+                return makeReadyTask<Result<QXmppDiscoInfo>>(*entry->info.value());
+            }
             return d->capsInfo(jid, **itr);
         }
     }
 
     if (cachePolicy == CachePolicy::Relaxed) {
-        if (auto *cachedInfo = d->infoCache[{ jid, node }]) {
-            return makeReadyTask<Result<QXmppDiscoInfo>>(*cachedInfo);
+        if (auto entry = d->findEntry(jid, node); entry && entry->state.value() == QXmppDiscoInfoWatch::State::Loaded) {
+            return makeReadyTask<Result<QXmppDiscoInfo>>(*entry->info.value());
         }
     }
 
@@ -104,8 +111,7 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
                 [this, jid, node](auto &&result) -> Result<QXmppDiscoInfo> {
                     // only cache successful responses for now (permanent errors could also be cached)
                     if (hasValue(result)) {
-                        d->infoCache.insert({ jid, node }, new QXmppDiscoInfo { getValue(result) });
-                        d->updateInfoWatches(jid, node, getValue(result));
+                        d->storeInfo(jid, node, getValue(result));
                     }
                     return result;
                 });
@@ -310,14 +316,45 @@ QXmppTask<void> QXmppDiscoInfoWatch::Data::waitUntilKnown()
     return task;
 }
 
+void QXmppDiscoInfoWatch::Data::setEntry(std::shared_ptr<DiscoInfoEntry> newEntry)
+{
+    if (newEntry == entry) {
+        return;
+    }
+    if (newEntry) {
+        newEntry->watchCount++;
+        state.setBinding([entry = newEntry.get()] { return entry->state.value(); });
+        info.setBinding([entry = newEntry.get()] { return entry->info.value(); });
+        changesTracked.setBinding([entry = newEntry.get()] { return entry->changesTracked.value(); });
+    } else {
+        state = State::Unknown;
+        info = std::nullopt;
+        changesTracked = false;
+    }
+    if (entry) {
+        entry->watchCount--;
+    }
+    entry = std::move(newEntry);
+}
+
 QXmppDiscoInfoWatch::Data::~Data()
 {
+    if (entry) {
+        entry->watchCount--;
+    }
     if (manager) {
         // the key may already belong to a new watch
         auto &watches = manager->d->infoWatches;
         if (auto itr = watches.find(key); itr != watches.end() && itr->second.expired()) {
             watches.erase(itr);
         }
+    }
+}
+
+DiscoInfoEntry::~DiscoInfoEntry()
+{
+    if (manager) {
+        manager->infoEntries.remove({ jid, node });
     }
 }
 
@@ -364,7 +401,10 @@ QBindable<bool> QXmppDiscoInfoWatch::changesTracked() const
 void QXmppDiscoInfoWatch::refresh()
 {
     if (d->manager) {
-        d->manager->d->fetchInfo(d, QXmppDiscoveryManager::CachePolicy::Strict);
+        d->manager->d->updateEntry(*d);
+        if (d->entry) {
+            d->manager->d->fetchInfo(d->entry, QXmppDiscoveryManager::CachePolicy::Strict);
+        }
     }
 }
 
@@ -746,7 +786,8 @@ void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
         const auto newStream = client->streamManagementState() != QXmppClient::ResumedStream;
         if (newStream) {
             d->itemsCache.clear();
-            d->infoCache.clear();
+            // only watched info is kept, as stale info
+            d->recentInfoEntries.clear();
             d->clearTracked();
             d->discoverServices();
         }
@@ -829,31 +870,58 @@ QXmppDiscoInfoWatch QXmppDiscoveryManagerPrivate::watchInfo(QXmppDiscoInfoWatch:
     auto data = std::make_shared<QXmppDiscoInfoWatch::Data>();
     data->manager = q;
     data->key = std::move(key);
-    data->changesTracked = data->key.target == QXmppDiscoInfoWatch::Data::Target::Jid &&
-        data->key.node.isEmpty() && isTracked(data->key.jid);
     infoWatches.insert_or_assign(data->key, data);
 
-    // Cached info of untracked entities may be outdated. Server and account info are only
-    // requested on new streams.
-    if (data->key.target == QXmppDiscoInfoWatch::Data::Target::Jid && !data->changesTracked.value()) {
-        if (auto *cachedInfo = infoCache[{ data->key.jid, data->key.node }]) {
-            data->infoJid = data->key.jid;
-            data->info = *cachedInfo;
-            data->state = QXmppDiscoInfoWatch::State::Stale;
+    if (data->key.target == QXmppDiscoInfoWatch::Data::Target::Jid) {
+        auto entry = this->entry(data->key.jid, data->key.node);
+        const auto firstWatch = entry->watchCount == 0;
+        data->setEntry(entry);
+
+        // Cached info of untracked entities may be outdated. Server and account info are only
+        // requested on new streams.
+        if (firstWatch && !entry->changesTracked.value()) {
+            fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
+        } else {
+            fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Relaxed);
         }
-        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
     } else {
-        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Relaxed);
+        updateEntry(*data);
+        if (data->entry) {
+            fetchInfo(data->entry, QXmppDiscoveryManager::CachePolicy::Relaxed);
+        }
     }
     return QXmppDiscoInfoWatch(std::move(data));
 }
 
-std::shared_ptr<QXmppDiscoInfoWatch::Data> QXmppDiscoveryManagerPrivate::findJidWatch(const QString &jid) const
+std::shared_ptr<DiscoInfoEntry> QXmppDiscoveryManagerPrivate::findEntry(const QString &jid, const QString &node) const
 {
-    if (auto itr = infoWatches.find({ QXmppDiscoInfoWatch::Data::Target::Jid, jid, {} }); itr != infoWatches.end()) {
-        return itr->second.lock();
+    return infoEntries.value({ jid, node }).lock();
+}
+
+std::shared_ptr<DiscoInfoEntry> QXmppDiscoveryManagerPrivate::entry(const QString &jid, const QString &node)
+{
+    if (auto entry = findEntry(jid, node)) {
+        return entry;
     }
-    return {};
+
+    auto entry = std::make_shared<DiscoInfoEntry>();
+    entry->manager = this;
+    entry->jid = jid;
+    entry->node = node;
+    entry->changesTracked = node.isEmpty() && isTracked(jid);
+    infoEntries.insert({ jid, node }, entry);
+    return entry;
+}
+
+void QXmppDiscoveryManagerPrivate::storeInfo(const QString &jid, const QString &node, const QXmppDiscoInfo &info)
+{
+    auto entry = this->entry(jid, node);
+    recentInfoEntries.insert({ jid, node }, new std::shared_ptr { entry });
+
+    Qt::beginPropertyUpdateGroup();
+    entry->info = info;
+    entry->state = QXmppDiscoInfoWatch::State::Loaded;
+    Qt::endPropertyUpdateGroup();
 }
 
 bool QXmppDiscoveryManagerPrivate::isTracked(const QString &jid) const
@@ -873,34 +941,32 @@ void QXmppDiscoveryManagerPrivate::setTracked(const QString &jid, bool tracked)
     } else {
         trackedJids.remove(jid);
     }
-    if (auto data = findJidWatch(jid)) {
-        data->changesTracked = isTracked(jid);
+    if (auto entry = findEntry(jid, {})) {
+        entry->changesTracked = isTracked(jid);
     }
 }
 
 void QXmppDiscoveryManagerPrivate::clearTracked()
 {
-    auto jids = trackedJids;
-    for (auto itr = availableJids.cbegin(); itr != availableJids.cend(); ++itr) {
-        jids.insert(itr.key());
-    }
     trackedJids.clear();
     availableJids.clear();
 
     Qt::beginPropertyUpdateGroup();
-    for (const auto &jid : std::as_const(jids)) {
-        if (auto data = findJidWatch(jid)) {
-            data->changesTracked = false;
-        }
+    for (const auto &entry : lockInfoEntries()) {
+        entry->changesTracked = false;
     }
     Qt::endPropertyUpdateGroup();
 }
 
 void QXmppDiscoveryManagerPrivate::invalidate(const QString &jid)
 {
-    infoCache.remove({ jid, {} });
-    if (auto data = findJidWatch(jid)) {
-        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+    if (auto entry = findEntry(jid, {})) {
+        entry->changesTracked = isTracked(jid);
+        if (entry->watchCount > 0) {
+            fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
+        } else {
+            recentInfoEntries.remove({ jid, {} });
+        }
     }
 }
 
@@ -913,14 +979,17 @@ void QXmppDiscoveryManagerPrivate::reset(const QString &jid)
 
 void QXmppDiscoveryManagerPrivate::dropInfo(const QString &jid)
 {
-    infoCache.remove({ jid, {} });
-    if (auto data = findJidWatch(jid)) {
+    if (auto entry = findEntry(jid, {})) {
+        if (entry->watchCount == 0) {
+            recentInfoEntries.remove({ jid, {} });
+            return;
+        }
+
         Qt::beginPropertyUpdateGroup();
-        data->changesTracked = isTracked(jid);
-        data->infoJid.clear();
-        data->info = std::nullopt;
-        data->state = QXmppDiscoInfoWatch::State::Unknown;
-        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+        entry->changesTracked = isTracked(jid);
+        entry->info = std::nullopt;
+        entry->state = QXmppDiscoInfoWatch::State::Unknown;
+        fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
         Qt::endPropertyUpdateGroup();
     }
 }
@@ -954,11 +1023,7 @@ void QXmppDiscoveryManagerPrivate::handlePresence(const QXmppPresence &presence)
         // Presences without caps do not mean that the caps have been removed, servers may
         // strip unchanged caps (caps optimization).
         *itr = caps;
-        infoCache.remove({ jid, {} });
-        if (auto data = findJidWatch(jid)) {
-            data->changesTracked = true;
-            fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
-        }
+        invalidate(jid);
     }
     Qt::endPropertyUpdateGroup();
 }
@@ -1054,8 +1119,7 @@ void QXmppDiscoveryManagerPrivate::applyCapsInfo(const QString &jid, const Caps 
 {
     // the caps may have changed in the meantime
     if (availableJids.value(jid) == caps) {
-        infoCache.insert({ jid, {} }, new QXmppDiscoInfo { info });
-        updateInfoWatches(jid, {}, info);
+        storeInfo(jid, {}, info);
     }
 }
 
@@ -1072,6 +1136,18 @@ std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> QXmppDiscoveryManagerPri
     return watches;
 }
 
+std::vector<std::shared_ptr<DiscoInfoEntry>> QXmppDiscoveryManagerPrivate::lockInfoEntries() const
+{
+    std::vector<std::shared_ptr<DiscoInfoEntry>> entries;
+    entries.reserve(infoEntries.size());
+    for (const auto &entry : infoEntries) {
+        if (auto locked = entry.lock()) {
+            entries.push_back(std::move(locked));
+        }
+    }
+    return entries;
+}
+
 QString QXmppDiscoveryManagerPrivate::resolveJid(const QXmppDiscoInfoWatch::Data &data) const
 {
     using enum QXmppDiscoInfoWatch::Data::Target;
@@ -1084,75 +1160,53 @@ QString QXmppDiscoveryManagerPrivate::resolveJid(const QXmppDiscoInfoWatch::Data
     return {};
 }
 
-void QXmppDiscoveryManagerPrivate::fetchInfo(const std::shared_ptr<QXmppDiscoInfoWatch::Data> &data, QXmppDiscoveryManager::CachePolicy cachePolicy)
+// Watches on the server or account info follow the configured account.
+void QXmppDiscoveryManagerPrivate::updateEntry(QXmppDiscoInfoWatch::Data &data)
+{
+    if (data.key.target == QXmppDiscoInfoWatch::Data::Target::Jid) {
+        return;
+    }
+    const auto jid = resolveJid(data);
+    if (!data.entry || data.entry->jid != jid) {
+        data.setEntry(jid.isEmpty() ? nullptr : entry(jid, {}));
+    }
+}
+
+void QXmppDiscoveryManagerPrivate::fetchInfo(const std::shared_ptr<DiscoInfoEntry> &entry, QXmppDiscoveryManager::CachePolicy cachePolicy)
 {
     using State = QXmppDiscoInfoWatch::State;
 
-    const auto jid = resolveJid(*data);
-    if (jid.isEmpty()) {
+    if (cachePolicy == QXmppDiscoveryManager::CachePolicy::Relaxed && entry->state.value() == State::Loaded) {
         return;
     }
 
-    if (cachePolicy == QXmppDiscoveryManager::CachePolicy::Relaxed) {
-        if (auto *cachedInfo = infoCache[{ jid, data->key.node }]) {
-            updateInfoWatches(jid, data->key.node, *cachedInfo);
-            return;
-        }
-    }
-
-    if (data->state == State::Loaded) {
-        data->state = State::Stale;
+    if (entry->state.value() == State::Loaded) {
+        entry->state = State::Stale;
     }
     if (!clientConnected) {
         return;
     }
-    if (data->state == State::Unknown || data->state == State::Error) {
-        data->state = State::Loading;
+    if (entry->state.value() == State::Unknown || entry->state.value() == State::Error) {
+        entry->state = State::Loading;
     }
 
-    // successful responses are applied to all watches by info()
-    q->info(jid, data->key.node, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [this, weakData = std::weak_ptr(data), jid](auto &&result) {
-        auto data = weakData.lock();
-        if (!data || hasValue(result) || resolveJid(*data) != jid) {
+    // successful responses are stored by info()
+    q->info(entry->jid, entry->node, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [weakEntry = std::weak_ptr(entry)](auto &&result) {
+        auto entry = weakEntry.lock();
+        if (!entry || hasValue(result)) {
             return;
         }
 
         if (getError(result).isStanzaError()) {
             Qt::beginPropertyUpdateGroup();
-            data->infoJid = jid;
-            data->info = std::nullopt;
-            data->state = State::Error;
+            entry->info = std::nullopt;
+            entry->state = State::Error;
             Qt::endPropertyUpdateGroup();
-        } else if (data->state == State::Loading) {
+        } else if (entry->state.value() == State::Loading) {
             // not an answer from the entity, e.g. the connection has been lost
-            data->state = State::Unknown;
+            entry->state = State::Unknown;
         }
     });
-}
-
-void QXmppDiscoveryManagerPrivate::updateInfoWatches(const QString &jid, const QString &node, const QXmppDiscoInfo &info)
-{
-    using enum QXmppDiscoInfoWatch::Data::Target;
-
-    // no user code can modify the map while the notifications are deferred
-    Qt::beginPropertyUpdateGroup();
-
-    auto update = [&](QXmppDiscoInfoWatch::Data::Key &&key) {
-        if (auto itr = infoWatches.find(key); itr != infoWatches.end()) {
-            if (auto data = itr->second.lock(); data && resolveJid(*data) == jid) {
-                data->infoJid = jid;
-                data->info = info;
-                data->state = QXmppDiscoInfoWatch::State::Loaded;
-            }
-        }
-    };
-    update({ Jid, jid, node });
-    if (node.isEmpty()) {
-        update({ Server, {}, {} });
-        update({ Account, {}, {} });
-    }
-
-    Qt::endPropertyUpdateGroup();
 }
 
 void QXmppDiscoveryManagerPrivate::refreshInfoWatches(bool newStream)
@@ -1163,17 +1217,21 @@ void QXmppDiscoveryManagerPrivate::refreshInfoWatches(bool newStream)
     // group, so this iterates over a snapshot.
     Qt::beginPropertyUpdateGroup();
 
-    for (const auto &data : lockInfoWatches()) {
+    if (newStream) {
+        // info of the previous account is released and does not show up as stale info
+        for (const auto &data : lockInfoWatches()) {
+            updateEntry(*data);
+        }
+    }
+    for (const auto &entry : lockInfoEntries()) {
+        if (entry->watchCount == 0) {
+            continue;
+        }
         if (newStream) {
-            // information of the previous account must not show up as stale information
-            if (data->info.value() && data->infoJid != resolveJid(*data)) {
-                data->info = std::nullopt;
-                data->state = State::Unknown;
-            }
-            fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
-        } else if (data->state == State::Unknown || data->state == State::Stale) {
+            fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
+        } else if (entry->state.value() == State::Unknown || entry->state.value() == State::Stale) {
             // requests of the resumed stream may have failed while disconnected
-            fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+            fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
         }
     }
 

@@ -20,6 +20,28 @@ class QXmppPresence;
 
 using namespace QXmpp::Private;
 
+namespace QXmpp::Private {
+
+// Service discovery information of one entity, shared by the watches on it. Unwatched entries
+// are kept by the cache of the manager.
+struct DiscoInfoEntry {
+    using Key = std::tuple<QString, QString>;
+
+    ~DiscoInfoEntry();
+
+    // reset by the manager on destruction
+    QXmppDiscoveryManagerPrivate *manager = nullptr;
+    QString jid;
+    QString node;
+    int watchCount = 0;
+
+    QProperty<QXmppDiscoInfoWatch::State> state { QXmppDiscoInfoWatch::State::Unknown };
+    QProperty<std::optional<QXmppDiscoInfo>> info;
+    QProperty<bool> changesTracked;
+};
+
+}  // namespace QXmpp::Private
+
 struct QXmppDiscoInfoWatch::Data {
     enum class Target {
         Jid,
@@ -45,12 +67,13 @@ struct QXmppDiscoInfoWatch::Data {
     ~Data();
 
     QXmppTask<void> waitUntilKnown();
+    void setEntry(std::shared_ptr<DiscoInfoEntry> newEntry);
 
     // reset by the manager on destruction
     QXmppDiscoveryManager *manager = nullptr;
     Key key;
-    // JID the current info belongs to; differs from the resolved JID after an account change
-    QString infoJid;
+    // entry of the resolved JID, the properties are bound to it
+    std::shared_ptr<DiscoInfoEntry> entry;
 
     QProperty<State> state { State::Unknown };
     QProperty<std::optional<QXmppDiscoInfo>> info;
@@ -99,15 +122,16 @@ public:
     QList<QXmppDiscoIdentity> identities;
     QList<QXmppDataForm> dataForms;
 
-    // cached data
-    QCache<std::tuple<QString, QString>, QXmppDiscoInfo> infoCache;
+    // info of all entities, kept alive by watches and by the cache of recently received info
+    QHash<DiscoInfoEntry::Key, std::weak_ptr<DiscoInfoEntry>> infoEntries;
+    QCache<DiscoInfoEntry::Key, std::shared_ptr<DiscoInfoEntry>> recentInfoEntries;
     QCache<std::tuple<QString, QString>, QList<QXmppDiscoItem>> itemsCache;
 
     // outgoing requests
     AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QXmppDiscoInfo>> infoRequests;
     AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QList<QXmppDiscoItem>>> itemsRequests;
 
-    // info watches
+    // info watches, the watches on server and account info follow the configured account
     std::unordered_map<QXmppDiscoInfoWatch::Data::Key, std::weak_ptr<QXmppDiscoInfoWatch::Data>, QXmppDiscoInfoWatch::Data::KeyHash> infoWatches;
     // JIDs whose changes are reported by other managers, e.g. joined MUC rooms
     QSet<QString> trackedJids;
@@ -142,7 +166,9 @@ public:
     std::variant<CompatIq<QXmppDiscoItems>, StanzaError> handleIq(GetIq<QXmppDiscoItems> &&iq);
 
     QXmppDiscoInfoWatch watchInfo(QXmppDiscoInfoWatch::Data::Key &&key);
-    std::shared_ptr<QXmppDiscoInfoWatch::Data> findJidWatch(const QString &jid) const;
+    std::shared_ptr<DiscoInfoEntry> findEntry(const QString &jid, const QString &node) const;
+    std::shared_ptr<DiscoInfoEntry> entry(const QString &jid, const QString &node);
+    void storeInfo(const QString &jid, const QString &node, const QXmppDiscoInfo &info);
     bool isTracked(const QString &jid) const;
     void setTracked(const QString &jid, bool tracked);
     void clearTracked();
@@ -157,9 +183,10 @@ public:
     void finishCapsRequest(const CapsKey &key, const std::optional<QXmppDiscoInfo> &info);
     void applyCapsInfo(const QString &jid, const Caps &caps, const QXmppDiscoInfo &info);
     std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> lockInfoWatches() const;
+    std::vector<std::shared_ptr<DiscoInfoEntry>> lockInfoEntries() const;
     QString resolveJid(const QXmppDiscoInfoWatch::Data &data) const;
-    void fetchInfo(const std::shared_ptr<QXmppDiscoInfoWatch::Data> &data, QXmppDiscoveryManager::CachePolicy cachePolicy);
-    void updateInfoWatches(const QString &jid, const QString &node, const QXmppDiscoInfo &info);
+    void updateEntry(QXmppDiscoInfoWatch::Data &data);
+    void fetchInfo(const std::shared_ptr<DiscoInfoEntry> &entry, QXmppDiscoveryManager::CachePolicy cachePolicy);
     void refreshInfoWatches(bool newStream);
 
     void discoverServices();
