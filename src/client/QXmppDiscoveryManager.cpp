@@ -324,6 +324,21 @@ QBindable<std::optional<QXmppDiscoInfo>> QXmppDiscoInfoWatch::info() const
 }
 
 /*!
+    Returns whether changes of the information are tracked.
+
+    If changes are tracked, the information is requested again whenever it changes, so
+    information in the state Loaded stays up to date. This is the case for MUC rooms that have
+    been joined using QXmppMucManagerV2.
+
+    Otherwise the information is a snapshot from the time it has been requested. Use refresh()
+    to request it again.
+*/
+QBindable<bool> QXmppDiscoInfoWatch::changesTracked() const
+{
+    return &d->changesTracked;
+}
+
+/*!
     Requests the information again, even if it is up to date.
 
     Existing information stays available with the state Stale until the response arrives.
@@ -484,6 +499,20 @@ QXmppDiscoFeatureWatch QXmpp::Private::watchAccountFeature(QXmppClient *client, 
         return disco->watchAccountInfo().watchFeature(feature);
     }
     return {};
+}
+
+void QXmpp::Private::DiscoInfoTracking::setTracked(QXmppClient *client, const QString &jid, bool tracked)
+{
+    if (auto *disco = client->findExtension<QXmppDiscoveryManager>()) {
+        disco->d->setTracked(jid, tracked);
+    }
+}
+
+void QXmpp::Private::DiscoInfoTracking::invalidate(QXmppClient *client, const QString &jid)
+{
+    if (auto *disco = client->findExtension<QXmppDiscoveryManager>()) {
+        disco->d->invalidate(jid);
+    }
 }
 
 // QXmppDiscoServicesWatch
@@ -687,12 +716,17 @@ void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
         if (newStream) {
             d->itemsCache.clear();
             d->infoCache.clear();
+            d->clearTracked();
             d->discoverServices();
         }
         d->refreshInfoWatches(newStream);
     });
-    connect(client, &QXmppClient::disconnected, this, [this]() {
+    connect(client, &QXmppClient::disconnected, this, [this, client]() {
         d->clientConnected = false;
+        // without stream management no changes are received until the next stream
+        if (client->streamManagementState() == QXmppClient::NoStreamManagement) {
+            d->clearTracked();
+        }
         // Queries still in flight will never complete; let a later watch restart discovery.
         if (d->discoveryState == DiscoveryState::Running) {
             d->discoveryState = DiscoveryState::NotStarted;
@@ -706,6 +740,7 @@ void QXmppDiscoveryManager::onUnregistered(QXmppClient *client)
     d->clientConnected = false;
     d->discoveryState = DiscoveryState::NotStarted;
     d->discoveredServices.clear();
+    d->clearTracked();
     disconnect(client, nullptr, this, nullptr);
 }
 
@@ -763,10 +798,52 @@ QXmppDiscoInfoWatch QXmppDiscoveryManagerPrivate::watchInfo(QXmppDiscoInfoWatch:
     auto data = std::make_shared<QXmppDiscoInfoWatch::Data>();
     data->manager = q;
     data->key = std::move(key);
+    data->changesTracked = data->key.target == QXmppDiscoInfoWatch::Data::Target::Jid &&
+        data->key.node.isEmpty() && trackedJids.contains(data->key.jid);
     infoWatches.insert_or_assign(data->key, data);
 
     fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Relaxed);
     return QXmppDiscoInfoWatch(std::move(data));
+}
+
+std::shared_ptr<QXmppDiscoInfoWatch::Data> QXmppDiscoveryManagerPrivate::findJidWatch(const QString &jid) const
+{
+    if (auto itr = infoWatches.find({ QXmppDiscoInfoWatch::Data::Target::Jid, jid, {} }); itr != infoWatches.end()) {
+        return itr->second.lock();
+    }
+    return {};
+}
+
+void QXmppDiscoveryManagerPrivate::setTracked(const QString &jid, bool tracked)
+{
+    if (tracked) {
+        trackedJids.insert(jid);
+    } else {
+        trackedJids.remove(jid);
+    }
+    if (auto data = findJidWatch(jid)) {
+        data->changesTracked = tracked;
+    }
+}
+
+void QXmppDiscoveryManagerPrivate::clearTracked()
+{
+    Qt::beginPropertyUpdateGroup();
+    for (const auto &jid : std::as_const(trackedJids)) {
+        if (auto data = findJidWatch(jid)) {
+            data->changesTracked = false;
+        }
+    }
+    Qt::endPropertyUpdateGroup();
+    trackedJids.clear();
+}
+
+void QXmppDiscoveryManagerPrivate::invalidate(const QString &jid)
+{
+    infoCache.remove({ jid, {} });
+    if (auto data = findJidWatch(jid)) {
+        fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+    }
 }
 
 // Watches can be destroyed or created by user code, which modifies the map.
