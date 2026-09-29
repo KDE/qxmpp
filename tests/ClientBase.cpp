@@ -1515,6 +1515,13 @@ private:
     Q_SLOT void watchInfoLifetime();
     Q_SLOT void watchInfoModifiedByNotifier();
     Q_SLOT void watchInfoDefault();
+    Q_SLOT void watchFeature();
+    Q_SLOT void watchFeatures();
+    Q_SLOT void watchFeatureStale();
+    Q_SLOT void watchFeatureError();
+    Q_SLOT void watchFeatureLifetime();
+    Q_SLOT void watchFeatureNamespace();
+    Q_SLOT void watchFeatureDefault();
 };
 
 void tst_QXmppDiscoveryManager::testInfo()
@@ -2342,6 +2349,188 @@ void tst_QXmppDiscoveryManager::watchInfoDefault()
 
     watch.refresh();
     QCOMPARE(watch.state().value(), QXmppDiscoInfoWatch::State::Unknown);
+}
+
+static QString infoResponse(const QString &from, const QStringList &features)
+{
+    QString featureElements;
+    for (const auto &feature : features) {
+        featureElements += u"<feature var='%1'/>"_s.arg(feature);
+    }
+    return u"<iq id='qx1' from='%1' type='result'>"
+           "<query xmlns='http://jabber.org/protocol/disco#info'>%2</query>"
+           "</iq>"_s.arg(from, featureElements);
+}
+
+void tst_QXmppDiscoveryManager::watchFeature()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+
+    auto mam = disco->watchServerInfo().watchFeature(u"urn:xmpp:mam:2"_s);
+    auto blocking = disco->watchServerInfo().watchFeature(u"urn:xmpp:blocking"_s);
+    QVERIFY(!mam.supported().value());
+    QCOMPARE(mam.state().value(), State::Unknown);
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    QVERIFY(!mam.supported().value());
+    QCOMPARE(mam.state().value(), State::Loading);
+
+    // feature watches share the request of their info watch
+    test.expect(infoRequest(u"example.org"_s));
+    test.expectNoPacket();
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+
+    QVERIFY(mam.supported().value());
+    QCOMPARE(mam.state().value(), State::Loaded);
+    QVERIFY(!blocking.supported().value());
+    QCOMPARE(blocking.state().value(), State::Loaded);
+}
+
+void tst_QXmppDiscoveryManager::watchFeatures()
+{
+    TestClient test;
+    test.configuration().setJid(u"alice@example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto info = disco->watchAccountInfo();
+    auto mix = info.watchFeatures({ u"urn:xmpp:mix:pam:2"_s, u"urn:xmpp:mix:pam:2#archive"_s });
+    auto none = info.watchFeatures(QStringList {});
+    QVERIFY(!mix.supported().value());
+    QVERIFY(!none.supported().value());
+
+    test.expect(infoRequest(u"alice@example.org"_s));
+    test.inject(infoResponse(u"alice@example.org"_s, u"urn:xmpp:mix:pam:2"_s));
+
+    // all features must be supported
+    QVERIFY(!mix.supported().value());
+    QVERIFY(none.supported().value());
+
+    info.refresh();
+    test.expect(infoRequest(u"alice@example.org"_s));
+    test.inject(infoResponse(u"alice@example.org"_s, QStringList { u"urn:xmpp:mix:pam:2"_s, u"urn:xmpp:mix:pam:2#archive"_s }));
+    QVERIFY(mix.supported().value());
+}
+
+void tst_QXmppDiscoveryManager::watchFeatureStale()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto mam = disco->watchServerInfo().watchFeature(u"urn:xmpp:mam:2"_s);
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+    QVERIFY(mam.supported().value());
+
+    int supportedChanges = 0;
+    auto notifier = mam.supported().addNotifier([&] { supportedChanges++; });
+
+    // the support stays available while the information is refreshed
+    test.streamPrivate()->iqManager.cancelAll();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    QCOMPARE(mam.state().value(), State::Stale);
+    QVERIFY(mam.supported().value());
+
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+    QCOMPARE(mam.state().value(), State::Loaded);
+    QVERIFY(mam.supported().value());
+    QCOMPARE(supportedChanges, 0);
+
+    // changed support is applied
+    test.streamPrivate()->iqManager.cancelAll();
+    Q_EMIT test.connected();
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:blocking"_s));
+    QVERIFY(!mam.supported().value());
+    QCOMPARE(supportedChanges, 1);
+}
+
+void tst_QXmppDiscoveryManager::watchFeatureError()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto muc = disco->watchInfo(u"room@muc.example.org"_s).watchFeature(u"http://jabber.org/protocol/muc"_s);
+    test.expect(infoRequest(u"room@muc.example.org"_s));
+    test.inject(u"<iq id='qx1' from='room@muc.example.org' type='error'>"
+                "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</iq>"_s);
+
+    QCOMPARE(muc.state().value(), State::Error);
+    QVERIFY(!muc.supported().value());
+}
+
+void tst_QXmppDiscoveryManager::watchFeatureLifetime()
+{
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // the feature watch keeps its info watch alive
+    auto mam = disco->watchServerInfo().watchFeature(u"urn:xmpp:mam:2"_s);
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
+    QVERIFY(mam.supported().value());
+
+    // bindings on the feature watch are updated
+    QProperty<bool> enabled;
+    enabled.setBinding(mam.supported().makeBinding());
+    QVERIFY(enabled.value());
+
+    test.streamPrivate()->iqManager.cancelAll();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:blocking"_s));
+    QVERIFY(!enabled.value());
+}
+
+void tst_QXmppDiscoveryManager::watchFeatureNamespace()
+{
+    TestClient test;
+    test.configuration().setDomain(u"example.org"_s);
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    auto info = disco->watchServerInfo();
+    auto mam = info.watchFeature(QXmpp::Namespace::Mam2);
+    auto mamAndBlocking = info.watchFeatures({ QXmpp::Namespace::Mam2, QXmpp::Namespace::Blocking });
+    auto carbons = info.watchFeatures({ QXmpp::Namespace::Carbons2 });
+
+    test.expect(infoRequest(u"example.org"_s));
+    test.inject(infoResponse(u"example.org"_s, QStringList { u"urn:xmpp:mam:2"_s, u"urn:xmpp:blocking"_s }));
+
+    QVERIFY(mam.supported().value());
+    QVERIFY(mamAndBlocking.supported().value());
+    QVERIFY(!carbons.supported().value());
+}
+
+void tst_QXmppDiscoveryManager::watchFeatureDefault()
+{
+    QXmppDiscoFeatureWatch watch;
+    QCOMPARE(watch.state().value(), QXmppDiscoInfoWatch::State::Unknown);
+    QVERIFY(!watch.supported().value());
 }
 
 }  // namespace Discovery

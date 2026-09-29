@@ -13,6 +13,7 @@
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 
+#include "Algorithms.h"
 #include "Async.h"
 #include "Iq.h"
 #include "StringLiterals.h"
@@ -298,6 +299,111 @@ void QXmppDiscoInfoWatch::refresh()
     if (d->manager) {
         d->manager->d->fetchInfo(d, QXmppDiscoveryManager::CachePolicy::Strict);
     }
+}
+
+/*!
+    Returns a watch on whether the entity supports \a feature.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppDiscoInfoWatch::watchFeature(const QString &feature) const
+{
+    return watchFeatures({ feature });
+}
+
+/*!
+    Returns a watch on whether the entity supports all of \a features.
+
+    The feature watch shares the information of this watch and does not cause any requests
+    on its own.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppDiscoInfoWatch::watchFeatures(const QStringList &features) const
+{
+    auto data = std::make_shared<QXmppDiscoFeatureWatch::Data>(*this, features);
+    data->supported.setBinding([data = data.get()] {
+        const auto info = data->infoWatch.info().value();
+        return info && std::ranges::all_of(data->features, [&](const auto &feature) {
+                   return info->features().contains(feature);
+               });
+    });
+    return QXmppDiscoFeatureWatch(std::move(data));
+}
+
+/*!
+    \overload
+
+    Returns a watch on whether the entity supports \a feature.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppDiscoInfoWatch::watchFeature(QXmpp::Namespace feature) const
+{
+    return watchFeatures({ namespaceUri(feature) });
+}
+
+/*!
+    \overload
+
+    Returns a watch on whether the entity supports all of \a features.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppDiscoInfoWatch::watchFeatures(const QList<QXmpp::Namespace> &features) const
+{
+    return watchFeatures(transform<QStringList>(features, namespaceUri));
+}
+
+// QXmppDiscoFeatureWatch
+
+/*!
+    \class QXmppDiscoFeatureWatch
+    \inmodule QXmpp
+
+    \brief Lightweight handle to a watch on whether an entity supports features.
+
+    Returned by QXmppDiscoInfoWatch::watchFeature() and QXmppDiscoInfoWatch::watchFeatures().
+    Cheap to copy — all copies share the same underlying state. The feature watch keeps the
+    info watch it has been created from alive.
+
+    \since QXmpp 1.17
+*/
+
+/*!
+    Constructs a watch that is not connected to any entity.
+
+    Its state stays Unknown and the features are never supported.
+*/
+QXmppDiscoFeatureWatch::QXmppDiscoFeatureWatch()
+    : d(std::make_shared<Data>())
+{
+}
+
+QXmppDiscoFeatureWatch::QXmppDiscoFeatureWatch(std::shared_ptr<Data> d)
+    : d(std::move(d))
+{
+}
+
+/*!
+    Returns whether the entity supports all watched features.
+
+    As long as the information has not been received, this is \c false. Check state() to
+    distinguish missing support from missing information, e.g. before telling the user that a
+    feature is unsupported.
+
+    The information may be outdated in the state QXmppDiscoInfoWatch::State::Stale. If the
+    entity responded with an error, no feature is supported.
+*/
+QBindable<bool> QXmppDiscoFeatureWatch::supported() const
+{
+    return &d->supported;
+}
+
+/*! Returns the state of the information the support is based on. */
+QBindable<QXmppDiscoInfoWatch::State> QXmppDiscoFeatureWatch::state() const
+{
+    return d->infoWatch.state();
 }
 
 // QXmppDiscoServicesWatch
