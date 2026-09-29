@@ -52,6 +52,33 @@ private:
     std::shared_ptr<Data> d;
 };
 
+class QXMPP_EXPORT QXmppDiscoInfoWatch
+{
+public:
+    enum class State {
+        Unknown,
+        Loading,
+        Loaded,
+        Stale,
+        Error,
+    };
+
+    QXmppDiscoInfoWatch();
+
+    QBindable<State> state() const;
+    QBindable<std::optional<QXmppDiscoInfo>> info() const;
+
+    void refresh();
+
+private:
+    friend class QXmppDiscoveryManager;
+    friend class QXmppDiscoveryManagerPrivate;
+    struct Data;
+    explicit QXmppDiscoInfoWatch(std::shared_ptr<Data> d);
+
+    std::shared_ptr<Data> d;
+};
+
 /*!
     \inmodule QXmpp
 
@@ -86,6 +113,10 @@ public:
 
     QXmppDiscoServicesWatch discoverServices(QXmpp::Disco::Category category, std::optional<QXmpp::Disco::Type> type = {}, QStringList requiredFeatures = {});
     QXmppDiscoServicesWatch discoverServices(QString category, std::optional<QString> type = {}, QStringList requiredFeatures = {});
+
+    QXmppDiscoInfoWatch watchInfo(const QString &jid, const QString &node = {});
+    QXmppDiscoInfoWatch watchServerInfo();
+    QXmppDiscoInfoWatch watchAccountInfo();
 
     const QList<QXmppDiscoIdentity> &identities() const;
     void setIdentities(const QList<QXmppDiscoIdentity> &identities);
@@ -162,6 +193,7 @@ protected:
     void onUnregistered(QXmppClient *client);
 
 private:
+    friend class QXmppDiscoInfoWatch;
     friend class QXmppDiscoveryManagerPrivate;
     const std::unique_ptr<QXmppDiscoveryManagerPrivate> d;
 };

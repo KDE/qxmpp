@@ -51,7 +51,12 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
     d->identities = { d->defaultIdentity() };
 }
 
-QXmppDiscoveryManager::~QXmppDiscoveryManager() = default;
+QXmppDiscoveryManager::~QXmppDiscoveryManager()
+{
+    for (const auto &data : d->lockInfoWatches()) {
+        data->manager = nullptr;
+    }
+}
 
 /*!
     Fetches discovery info from the specified XMPP entity.
@@ -79,6 +84,7 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
                     // only cache successful responses for now (permanent errors could also be cached)
                     if (hasValue(result)) {
                         d->infoCache.insert({ jid, node }, new QXmppDiscoInfo { getValue(result) });
+                        d->updateInfoWatches(jid, node, getValue(result));
                     }
                     return result;
                 });
@@ -207,6 +213,93 @@ QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
     return QXmppDiscoInfo { {}, allIdentities, allFeatures, d->dataForms };
 }
 
+// QXmppDiscoInfoWatch
+
+/*!
+    \class QXmppDiscoInfoWatch
+    \inmodule QXmpp
+
+    \brief Lightweight handle to a watch on the service discovery information of an entity.
+
+    Returned by QXmppDiscoveryManager::watchInfo(), QXmppDiscoveryManager::watchServerInfo()
+    and QXmppDiscoveryManager::watchAccountInfo(). Cheap to copy — all copies and all other
+    watches on the same entity share the same underlying state. When the last copy goes out
+    of scope, the watch is automatically unregistered from the discovery manager.
+
+    \since QXmpp 1.17
+*/
+
+/*!
+    \enum QXmppDiscoInfoWatch::State
+
+    \value Unknown No information is available and no request is running, e.g. because the
+    client is not connected.
+    \value Loading The information is being requested for the first time.
+    \value Loaded The information is up to date.
+    \value Stale The information is from an earlier point in time and may be outdated, e.g.
+    after a new stream has been started. A new request is running or will be started once the
+    client is connected.
+    \value Error The entity responded with an error, e.g. because it does not exist.
+
+    The information is available exactly in the states Loaded and Stale. A watch that has
+    information never goes back to Loading, so user interfaces can keep showing it while it is
+    refreshed.
+*/
+
+/*!
+    Constructs a watch that is not connected to any entity.
+
+    Its state stays Unknown and it never contains information.
+*/
+QXmppDiscoInfoWatch::QXmppDiscoInfoWatch()
+    : d(std::make_shared<Data>())
+{
+}
+
+QXmppDiscoInfoWatch::QXmppDiscoInfoWatch(std::shared_ptr<Data> d)
+    : d(std::move(d))
+{
+}
+
+QXmppDiscoInfoWatch::Data::~Data()
+{
+    if (manager) {
+        // the key may already belong to a new watch
+        auto &watches = manager->d->infoWatches;
+        if (auto itr = watches.find(key); itr != watches.end() && itr->second.expired()) {
+            watches.erase(itr);
+        }
+    }
+}
+
+/*! Returns the state of the watched information. */
+QBindable<QXmppDiscoInfoWatch::State> QXmppDiscoInfoWatch::state() const
+{
+    return &d->state;
+}
+
+/*!
+    Returns the watched information.
+
+    Contains a value exactly if the state is Loaded or Stale.
+*/
+QBindable<std::optional<QXmppDiscoInfo>> QXmppDiscoInfoWatch::info() const
+{
+    return &d->info;
+}
+
+/*!
+    Requests the information again, even if it is up to date.
+
+    Existing information stays available with the state Stale until the response arrives.
+*/
+void QXmppDiscoInfoWatch::refresh()
+{
+    if (d->manager) {
+        d->manager->d->fetchInfo(d, QXmppDiscoveryManager::CachePolicy::Strict);
+    }
+}
+
 // QXmppDiscoServicesWatch
 
 /*! Returns whether all discovery queries have completed. */
@@ -291,6 +384,55 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category
 }
 
 /*!
+    \brief Watches the service discovery information of \a jid and \a node.
+
+    Returns a lightweight handle that provides reactive access to the information via
+    QBindable properties. All watches on the same entity share their state and the
+    information is only requested once.
+
+    The information is requested when the first watch is created and again on every new
+    stream. Until the new response arrives, the previous information stays available with
+    the state QXmppDiscoInfoWatch::State::Stale.
+
+    Keep the handle alive as long as you need updates.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoInfoWatch QXmppDiscoveryManager::watchInfo(const QString &jid, const QString &node)
+{
+    return d->watchInfo({ QXmppDiscoInfoWatch::Data::Target::Jid, jid, node });
+}
+
+/*!
+    \brief Watches the service discovery information of the own server.
+
+    Unlike watchInfo() with the server's domain, this watch follows the configured domain,
+    so it stays valid after the account has been changed.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoInfoWatch QXmppDiscoveryManager::watchServerInfo()
+{
+    return d->watchInfo({ QXmppDiscoInfoWatch::Data::Target::Server, {}, {} });
+}
+
+/*!
+    \brief Watches the service discovery information of the own bare JID.
+
+    The account's information contains the features the server provides for the account,
+    e.g. \xep{0163}{Personal Eventing Protocol} or \xep{0313}{Message Archive Management}.
+
+    This watch follows the configured JID, so it stays valid after the account has been
+    changed.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoInfoWatch QXmppDiscoveryManager::watchAccountInfo()
+{
+    return d->watchInfo({ QXmppDiscoInfoWatch::Data::Target::Account, {}, {} });
+}
+
+/*!
     Returns the capabilities node of the local XMPP client.
 
     By default this is "org.qxmpp.caps".
@@ -355,11 +497,13 @@ void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
 {
     connect(client, &QXmppClient::connected, this, [this, client]() {
         d->clientConnected = true;
-        if (client->streamManagementState() != QXmppClient::ResumedStream) {
+        const auto newStream = client->streamManagementState() != QXmppClient::ResumedStream;
+        if (newStream) {
             d->itemsCache.clear();
             d->infoCache.clear();
             d->discoverServices();
         }
+        d->refreshInfoWatches(newStream);
     });
     connect(client, &QXmppClient::disconnected, this, [this]() {
         d->clientConnected = false;
@@ -419,6 +563,145 @@ std::variant<CompatIq<QXmppDiscoItems>, QXmppStanza::Error> QXmppDiscoveryManage
         return CompatIq { QXmppIq::Result, QXmppDiscoItems() };
     }
     return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
+}
+
+QXmppDiscoInfoWatch QXmppDiscoveryManagerPrivate::watchInfo(QXmppDiscoInfoWatch::Data::Key &&key)
+{
+    if (auto itr = infoWatches.find(key); itr != infoWatches.end()) {
+        // an expired watch may still be in the map while it is being destroyed
+        if (auto data = itr->second.lock()) {
+            return QXmppDiscoInfoWatch(std::move(data));
+        }
+    }
+
+    auto data = std::make_shared<QXmppDiscoInfoWatch::Data>();
+    data->manager = q;
+    data->key = std::move(key);
+    infoWatches.insert_or_assign(data->key, data);
+
+    fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Relaxed);
+    return QXmppDiscoInfoWatch(std::move(data));
+}
+
+// Watches can be destroyed or created by user code, which modifies the map.
+std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> QXmppDiscoveryManagerPrivate::lockInfoWatches() const
+{
+    std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> watches;
+    watches.reserve(infoWatches.size());
+    for (const auto &[key, watch] : infoWatches) {
+        if (auto data = watch.lock()) {
+            watches.push_back(std::move(data));
+        }
+    }
+    return watches;
+}
+
+QString QXmppDiscoveryManagerPrivate::resolveJid(const QXmppDiscoInfoWatch::Data &data) const
+{
+    using enum QXmppDiscoInfoWatch::Data::Target;
+    if (data.key.target == Jid) {
+        return data.key.jid;
+    }
+    if (auto *client = q->client()) {
+        return data.key.target == Server ? client->configuration().domain() : client->configuration().jidBare();
+    }
+    return {};
+}
+
+void QXmppDiscoveryManagerPrivate::fetchInfo(const std::shared_ptr<QXmppDiscoInfoWatch::Data> &data, QXmppDiscoveryManager::CachePolicy cachePolicy)
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    const auto jid = resolveJid(*data);
+    if (jid.isEmpty()) {
+        return;
+    }
+
+    if (cachePolicy == QXmppDiscoveryManager::CachePolicy::Relaxed) {
+        if (auto *cachedInfo = infoCache[{ jid, data->key.node }]) {
+            updateInfoWatches(jid, data->key.node, *cachedInfo);
+            return;
+        }
+    }
+
+    if (data->state == State::Loaded) {
+        data->state = State::Stale;
+    }
+    if (!clientConnected) {
+        return;
+    }
+    if (data->state == State::Unknown || data->state == State::Error) {
+        data->state = State::Loading;
+    }
+
+    // successful responses are applied to all watches by info()
+    q->info(jid, data->key.node, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [this, weakData = std::weak_ptr(data), jid](auto &&result) {
+        auto data = weakData.lock();
+        if (!data || hasValue(result) || resolveJid(*data) != jid) {
+            return;
+        }
+
+        if (getError(result).isStanzaError()) {
+            Qt::beginPropertyUpdateGroup();
+            data->infoJid = jid;
+            data->info = std::nullopt;
+            data->state = State::Error;
+            Qt::endPropertyUpdateGroup();
+        } else if (data->state == State::Loading) {
+            // not an answer from the entity, e.g. the connection has been lost
+            data->state = State::Unknown;
+        }
+    });
+}
+
+void QXmppDiscoveryManagerPrivate::updateInfoWatches(const QString &jid, const QString &node, const QXmppDiscoInfo &info)
+{
+    using enum QXmppDiscoInfoWatch::Data::Target;
+
+    // no user code can modify the map while the notifications are deferred
+    Qt::beginPropertyUpdateGroup();
+
+    auto update = [&](QXmppDiscoInfoWatch::Data::Key &&key) {
+        if (auto itr = infoWatches.find(key); itr != infoWatches.end()) {
+            if (auto data = itr->second.lock(); data && resolveJid(*data) == jid) {
+                data->infoJid = jid;
+                data->info = info;
+                data->state = QXmppDiscoInfoWatch::State::Loaded;
+            }
+        }
+    };
+    update({ Jid, jid, node });
+    if (node.isEmpty()) {
+        update({ Server, {}, {} });
+        update({ Account, {}, {} });
+    }
+
+    Qt::endPropertyUpdateGroup();
+}
+
+void QXmppDiscoveryManagerPrivate::refreshInfoWatches(bool newStream)
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    // Sending requests emits signals (e.g. for logging), which are not deferred by the update
+    // group, so this iterates over a snapshot.
+    Qt::beginPropertyUpdateGroup();
+
+    for (const auto &data : lockInfoWatches()) {
+        if (newStream) {
+            // information of the previous account must not show up as stale information
+            if (data->info.value() && data->infoJid != resolveJid(*data)) {
+                data->info = std::nullopt;
+                data->state = State::Unknown;
+            }
+            fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+        } else if (data->state == State::Unknown || data->state == State::Stale) {
+            // requests of the resumed stream may have failed while disconnected
+            fetchInfo(data, QXmppDiscoveryManager::CachePolicy::Strict);
+        }
+    }
+
+    Qt::endPropertyUpdateGroup();
 }
 
 void QXmppDiscoveryManagerPrivate::discoverServices()

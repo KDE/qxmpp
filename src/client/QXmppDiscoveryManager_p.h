@@ -11,9 +11,45 @@
 #include "Async.h"
 #include "Iq.h"
 
+#include <unordered_map>
+
 #include <QCache>
 
 using namespace QXmpp::Private;
+
+struct QXmppDiscoInfoWatch::Data {
+    enum class Target {
+        Jid,
+        Server,
+        Account,
+    };
+
+    struct Key {
+        Target target;
+        QString jid;
+        QString node;
+
+        bool operator==(const Key &) const = default;
+    };
+
+    struct KeyHash {
+        size_t operator()(const Key &key) const noexcept
+        {
+            return qHashMulti(0, key.target, key.jid, key.node);
+        }
+    };
+
+    ~Data();
+
+    // reset by the manager on destruction
+    QXmppDiscoveryManager *manager = nullptr;
+    Key key;
+    // JID the current info belongs to; differs from the resolved JID after an account change
+    QString infoJid;
+
+    QProperty<State> state { State::Unknown };
+    QProperty<std::optional<QXmppDiscoInfo>> info;
+};
 
 class QXmppDiscoveryManagerPrivate
 {
@@ -40,6 +76,9 @@ public:
     AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QXmppDiscoInfo>> infoRequests;
     AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QList<QXmppDiscoItem>>> itemsRequests;
 
+    // info watches
+    std::unordered_map<QXmppDiscoInfoWatch::Data::Key, std::weak_ptr<QXmppDiscoInfoWatch::Data>, QXmppDiscoInfoWatch::Data::KeyHash> infoWatches;
+
     // service watches
     QList<WatchEntry> watches;
     QList<QXmppDiscoService> discoveredServices;
@@ -62,6 +101,13 @@ public:
 
     std::variant<CompatIq<QXmppDiscoInfo>, StanzaError> handleIq(GetIq<QXmppDiscoInfo> &&iq);
     std::variant<CompatIq<QXmppDiscoItems>, StanzaError> handleIq(GetIq<QXmppDiscoItems> &&iq);
+
+    QXmppDiscoInfoWatch watchInfo(QXmppDiscoInfoWatch::Data::Key &&key);
+    std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> lockInfoWatches() const;
+    QString resolveJid(const QXmppDiscoInfoWatch::Data &data) const;
+    void fetchInfo(const std::shared_ptr<QXmppDiscoInfoWatch::Data> &data, QXmppDiscoveryManager::CachePolicy cachePolicy);
+    void updateInfoWatches(const QString &jid, const QString &node, const QXmppDiscoInfo &info);
+    void refreshInfoWatches(bool newStream);
 
     void discoverServices();
     void processServiceInfo(const QString &jid, const QXmppDiscoInfo &info);
