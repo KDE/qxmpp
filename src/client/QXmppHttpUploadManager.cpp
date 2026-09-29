@@ -310,10 +310,10 @@ struct QXmppHttpUploadManagerPrivate {
 
         support.setBinding([this]() -> QXmppHttpUploadManager::Support {
             using enum QXmppHttpUploadManager::Support;
-            if (!servicesWatch->loaded().value()) {
-                return Unknown;
+            if (!services.value().isEmpty()) {
+                return Supported;
             }
-            return services.value().isEmpty() ? Unsupported : Supported;
+            return servicesWatch->loaded().value() ? Unsupported : Unknown;
         });
 
         servicesNotifier = services.addNotifier([this]() {
@@ -372,6 +372,9 @@ QList<QXmppHttpUploadService> QXmppHttpUploadManager::services() const
 
 /*!
     Returns the server's support for upload services.
+
+    The support is Supported as soon as an upload service has been discovered, even if the
+    discovery of other services is still running.
 
     \since QXmpp 1.13
 */
