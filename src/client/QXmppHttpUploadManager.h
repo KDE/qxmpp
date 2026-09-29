@@ -35,6 +35,8 @@ public:
     std::optional<quint64> sizeLimit() const;
     void setSizeLimit(std::optional<quint64> sizeLimit);
 
+    bool operator==(const QXmppHttpUploadService &other) const;
+
 private:
     QSharedDataPointer<QXmppHttpUploadServicePrivate> d;
 };

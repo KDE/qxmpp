@@ -98,6 +98,16 @@ void QXmppHttpUploadService::setSizeLimit(std::optional<quint64> sizeLimit)
     d->sizeLimit = sizeLimit;
 }
 
+/*!
+    Returns true if \a other has the same JID and size limit.
+
+    \since QXmpp 1.17
+*/
+bool QXmppHttpUploadService::operator==(const QXmppHttpUploadService &other) const
+{
+    return d->jid == other.d->jid && d->sizeLimit == other.d->sizeLimit;
+}
+
 struct QXmppHttpUploadPrivate {
     explicit QXmppHttpUploadPrivate(QXmppHttpUpload *q) : q(q) { }
 

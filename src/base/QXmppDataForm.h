@@ -232,6 +232,8 @@ public:
 
     bool isNull() const;
 
+    bool operator==(const QXmppDataForm &other) const;
+
     static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_data };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
