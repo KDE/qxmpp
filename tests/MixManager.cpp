@@ -37,8 +37,8 @@ class tst_QXmppMixManager : public QObject
 
 private:
     Q_SLOT void testDiscoveryFeatures();
-    Q_SLOT void testParticipantSupport();
-    Q_SLOT void testMessageArchivingSupport();
+    Q_SLOT void testWatchSupport();
+    Q_SLOT void testSupportReconnection();
     Q_SLOT void testService();
     Q_SLOT void testServiceDiscovery();
     Q_SLOT void testUpdateSupport_data();
@@ -91,27 +91,99 @@ void tst_QXmppMixManager::testDiscoveryFeatures()
     QCOMPARE(manager.discoveryFeatures(), QStringList { "urn:xmpp:mix:core:1" });
 }
 
-void tst_QXmppMixManager::testParticipantSupport()
+// Connects and answers the disco#info request on the own account with the response in which
+// "%1" is replaced by the ID of the request.
+static void connectAndAnswerSupport(TestClient &client, const QString &response)
 {
-    QXmppMixManager manager;
-    QSignalSpy spy(&manager, &QXmppMixManager::participantSupportChanged);
+    client.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT client.connected();
 
-    QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Unknown);
-    manager.setParticipantSupport(QXmppMixManager::Support::Supported);
-    QCOMPARE(manager.participantSupport(), QXmppMixManager::Support::Supported);
-    QCOMPARE(spy.size(), 1);
+    auto infoId = client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
+        "<query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='shakespeare.example' type='get'>"
+        "<query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    client.inject(response.arg(infoId));
 }
 
-void tst_QXmppMixManager::testMessageArchivingSupport()
+static QString supportResponse(const QStringList &features)
 {
-    QXmppMixManager manager;
-    QSignalSpy spy(&manager, &QXmppMixManager::messageArchivingSupportChanged);
-
-    QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Unknown);
-    manager.setMessageArchivingSupport(QXmppMixManager::Support::Supported);
-    QCOMPARE(manager.messageArchivingSupport(), QXmppMixManager::Support::Supported);
-    QCOMPARE(spy.size(), 1);
+    QString xml = u"<iq id='%1' from='hag66@shakespeare.example' type='result'>"
+                  "<query xmlns='http://jabber.org/protocol/disco#info'>"_s;
+    for (const auto &feature : features) {
+        xml += u"<feature var='" + feature + u"'/>";
+    }
+    return xml + u"</query></iq>";
 }
+
+void tst_QXmppMixManager::testWatchSupport()
+{
+    QXmppMixManager unregistered;
+    QVERIFY(!unregistered.watchParticipantSupport().supported().value());
+    QVERIFY(!unregistered.watchMessageArchivingSupport().supported().value());
+
+    auto tester = Tester(u"hag66@shakespeare.example"_s);
+    auto participantSupport = tester.manager->watchParticipantSupport();
+    auto messageArchivingSupport = tester.manager->watchMessageArchivingSupport();
+
+    connectAndAnswerSupport(tester.client, supportResponse({ u"urn:xmpp:mix:pam:2"_s }));
+
+    QCOMPARE(participantSupport.state().value(), QXmppDiscoInfoWatch::State::Loaded);
+    QVERIFY(participantSupport.supported().value());
+    QVERIFY(!messageArchivingSupport.supported().value());
+}
+
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+void tst_QXmppMixManager::testSupportReconnection()
+{
+    auto tester = Tester(u"hag66@shakespeare.example"_s);
+    auto &client = tester.client;
+    auto manager = tester.manager;
+    QSignalSpy participantSpy(manager, &QXmppMixManager::participantSupportChanged);
+    QSignalSpy archivingSpy(manager, &QXmppMixManager::messageArchivingSupportChanged);
+
+    QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Unknown);
+
+    connectAndAnswerSupport(client, supportResponse({ u"urn:xmpp:mix:pam:2"_s }));
+
+    QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Supported);
+    QCOMPARE(manager->messageArchivingSupport(), QXmppMixManager::Support::Unsupported);
+    QCOMPARE(participantSpy.size(), 1);
+    QCOMPARE(archivingSpy.size(), 1);
+
+    // the values are kept until the new information arrives
+    Q_EMIT client.disconnected();
+    client.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT client.connected();
+
+    QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Supported);
+    QCOMPARE(manager->messageArchivingSupport(), QXmppMixManager::Support::Unsupported);
+    QCOMPARE(participantSpy.size(), 1);
+    QCOMPARE(archivingSpy.size(), 1);
+
+    auto infoId = client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
+        "<query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    client.inject(supportResponse({ u"urn:xmpp:mix:pam:2"_s, u"urn:xmpp:mix:pam:2#archive"_s }).arg(infoId));
+
+    QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Supported);
+    QCOMPARE(manager->messageArchivingSupport(), QXmppMixManager::Support::Supported);
+    QCOMPARE(participantSpy.size(), 1);
+    QCOMPARE(archivingSpy.size(), 2);
+
+    // unregistering resets the values
+    manager->onUnregistered(&client);
+
+    QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Unknown);
+    QCOMPARE(manager->messageArchivingSupport(), QXmppMixManager::Support::Unknown);
+    QCOMPARE(participantSpy.size(), 2);
+    QCOMPARE(archivingSpy.size(), 3);
+}
+
+QT_WARNING_POP
 
 void tst_QXmppMixManager::testService()
 {
@@ -201,75 +273,50 @@ void tst_QXmppMixManager::testServiceDiscovery()
 
 void tst_QXmppMixManager::testUpdateSupport_data()
 {
-    QTest::addColumn<QString>("expect");
-    QTest::addColumn<QString>("inject");
+    QTest::addColumn<QString>("response");
     QTest::addColumn<QXmppMixManager::Support>("participantSupport");
     QTest::addColumn<QXmppMixManager::Support>("messageArchivingSupport");
 
     QTest::newRow("error")
-        << "<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='hag66@shakespeare.example' type='error'>"
+        << u"<iq id='%1' from='hag66@shakespeare.example' type='error'>"
            "<query xmlns='http://jabber.org/protocol/disco#info'/>"
            "<error type='cancel'>"
            "<not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
            "</error>"
-           "</iq>"
+           "</iq>"_s
         << QXmppMixManager::Support::Unknown
         << QXmppMixManager::Support::Unknown;
     QTest::newRow("bothUnsupported")
-        << "<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='hag66@shakespeare.example' type='result'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
+        << supportResponse({})
         << QXmppMixManager::Support::Unsupported
         << QXmppMixManager::Support::Unsupported;
     QTest::newRow("participantSupport")
-        << "<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='hag66@shakespeare.example' type='result'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'>"
-           "<feature var='urn:xmpp:mix:pam:2'/>"
-           "</query>"
-           "</iq>"
+        << supportResponse({ u"urn:xmpp:mix:pam:2"_s })
         << QXmppMixManager::Support::Supported
         << QXmppMixManager::Support::Unsupported;
     QTest::newRow("bothSupported")
-        << "<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'/>"
-           "</iq>"
-        << "<iq id='qx1' from='hag66@shakespeare.example' type='result'>"
-           "<query xmlns='http://jabber.org/protocol/disco#info'>"
-           "<feature var='urn:xmpp:mix:pam:2'/>"
-           "<feature var='urn:xmpp:mix:pam:2#archive'/>"
-           "</query>"
-           "</iq>"
+        << supportResponse({ u"urn:xmpp:mix:pam:2"_s, u"urn:xmpp:mix:pam:2#archive"_s })
         << QXmppMixManager::Support::Supported
         << QXmppMixManager::Support::Supported;
 }
 
 void tst_QXmppMixManager::testUpdateSupport()
 {
-    QFETCH(QString, expect);
-    QFETCH(QString, inject);
+    QFETCH(QString, response);
     QFETCH(QXmppMixManager::Support, participantSupport);
     QFETCH(QXmppMixManager::Support, messageArchivingSupport);
 
     auto tester = Tester(u"hag66@shakespeare.example"_s);
-    auto &client = tester.client;
-    auto manager = tester.manager;
+    connectAndAnswerSupport(tester.client, response);
 
-    manager->updateSupport();
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QCOMPARE(tester.manager->participantSupport(), participantSupport);
+    QCOMPARE(tester.manager->messageArchivingSupport(), messageArchivingSupport);
+    QT_WARNING_POP
 
-    client.expect(std::move(expect));
-    client.inject(inject);
-
-    QCOMPARE(manager->participantSupport(), participantSupport);
-    QCOMPARE(manager->messageArchivingSupport(), messageArchivingSupport);
+    QCOMPARE(tester.manager->watchParticipantSupport().supported().value(), participantSupport == QXmppMixManager::Support::Supported);
+    QCOMPARE(tester.manager->watchMessageArchivingSupport().supported().value(), messageArchivingSupport == QXmppMixManager::Support::Supported);
 }
 
 void tst_QXmppMixManager::testAddJidToNode()
