@@ -91,7 +91,50 @@ private:
 
     // HttpUploadManager
     Q_SLOT void testUpload();
+    Q_SLOT void testSupport();
 };
+
+void tst_QXmppHttpUploadManager::testSupport()
+{
+    using Support = QXmppHttpUploadManager::Support;
+
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *manager = test.addNewExtension<QXmppHttpUploadManager>();
+
+    // support seen by handlers of servicesChanged once a service has been found
+    QList<Support> supportWithServices;
+    connect(manager, &QXmppHttpUploadManager::servicesChanged, &test, [&] {
+        if (!manager->services().isEmpty()) {
+            supportWithServices.append(manager->support());
+        }
+    });
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    QCOMPARE(manager->support(), Support::Unknown);
+
+    auto itemsId = test.expectPacketRandomOrder(
+        u"<iq id='qx1' to='capulet.example' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    test.inject(u"<iq id='" + itemsId + u"' from='capulet.example' type='result'>"
+                                        "<query xmlns='http://jabber.org/protocol/disco#items'>"
+                                        "<item jid='upload.capulet.example'/>"
+                                        "<item jid='slow.capulet.example'/>"
+                                        "</query></iq>");
+
+    auto uploadId = test.expectPacketRandomOrder(
+        u"<iq id='qx1' to='upload.capulet.example' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='" + uploadId + u"' from='upload.capulet.example' type='result'>"
+                                         "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                         "<identity category='store' type='file'/>"
+                                         "<feature var='urn:xmpp:http:upload:0'/>"
+                                         "</query></iq>");
+
+    // supported before the discovery of the other service has finished
+    QCOMPARE(manager->support(), Support::Supported);
+    QCOMPARE(supportWithServices, QList { Support::Supported });
+}
 
 void tst_QXmppHttpUploadManager::testHandleStanza_data()
 {
