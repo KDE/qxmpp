@@ -81,6 +81,7 @@ public:
 private:
     friend class QXmppDiscoveryManager;
     friend class QXmppDiscoveryManagerPrivate;
+    friend class QXmppDiscoFeatureWatch;
     struct Data;
     explicit QXmppDiscoInfoWatch(std::shared_ptr<Data> d);
 
@@ -94,6 +95,8 @@ public:
 
     QBindable<bool> supported() const;
     QBindable<QXmppDiscoInfoWatch::State> state() const;
+
+    QXmppTask<bool> resolve() const;
 
 private:
     friend class QXmppDiscoInfoWatch;

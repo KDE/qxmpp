@@ -41,6 +41,8 @@ struct QXmppDiscoInfoWatch::Data {
 
     ~Data();
 
+    QXmppTask<void> waitUntilKnown();
+
     // reset by the manager on destruction
     QXmppDiscoveryManager *manager = nullptr;
     Key key;
@@ -49,6 +51,10 @@ struct QXmppDiscoInfoWatch::Data {
 
     QProperty<State> state { State::Unknown };
     QProperty<std::optional<QXmppDiscoInfo>> info;
+
+    // finished once the state is Loaded, Stale or Error
+    std::vector<QXmppPromise<void>> knownPromises;
+    std::optional<QPropertyNotifier> knownNotifier;
 };
 
 struct QXmppDiscoFeatureWatch::Data {
