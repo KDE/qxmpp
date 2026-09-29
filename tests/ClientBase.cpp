@@ -3830,6 +3830,19 @@ void tst_QXmppDiscoveryIq::discoInfo()
     auto info = unwrap(QXmppDiscoInfo::fromDom(xmlToDom(xml)));
     QCOMPARE(info.calculateEntityCapabilitiesHash(), QByteArray::fromBase64("q07IKJEyjvHSyhy//CH0CxmKi8w="));
     serializePacket(info, xml);
+
+    // the hash is generated from the serialized values, duplicate features are ignored
+    info = unwrap(QXmppDiscoInfo::fromDom(xmlToDom(
+        u"<query xmlns='http://jabber.org/protocol/disco#info'>"
+        "<identity category='client' type='pc'/>"
+        "<feature var='urn:x'/>"
+        "<feature var='urn:x'/>"
+        "<x xmlns='jabber:x:data' type='result'>"
+        "<field var='FORM_TYPE' type='hidden'><value>urn:y</value></field>"
+        "<field var='muc#roomconfig_x' type='boolean'><value>1</value></field>"
+        "</x>"
+        "</query>"_s)));
+    QCOMPARE(info.calculateEntityCapabilitiesHash(), QByteArray::fromBase64("rK7XqKVrZPXCIej/ajYkMLFoEzA="));
 }
 
 void tst_QXmppDiscoveryIq::capsVerificationString_data()
