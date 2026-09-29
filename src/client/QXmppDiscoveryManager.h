@@ -8,6 +8,7 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppDiscoveryIq.h"
+#include "QXmppNamespaces.h"
 
 #include <memory>
 #include <variant>
@@ -52,6 +53,8 @@ private:
     std::shared_ptr<Data> d;
 };
 
+class QXmppDiscoFeatureWatch;
+
 class QXMPP_EXPORT QXmppDiscoInfoWatch
 {
 public:
@@ -70,11 +73,32 @@ public:
 
     void refresh();
 
+    QXmppDiscoFeatureWatch watchFeature(const QString &feature) const;
+    QXmppDiscoFeatureWatch watchFeatures(const QStringList &features) const;
+    QXmppDiscoFeatureWatch watchFeature(QXmpp::Namespace feature) const;
+    QXmppDiscoFeatureWatch watchFeatures(const QList<QXmpp::Namespace> &features) const;
+
 private:
     friend class QXmppDiscoveryManager;
     friend class QXmppDiscoveryManagerPrivate;
     struct Data;
     explicit QXmppDiscoInfoWatch(std::shared_ptr<Data> d);
+
+    std::shared_ptr<Data> d;
+};
+
+class QXMPP_EXPORT QXmppDiscoFeatureWatch
+{
+public:
+    QXmppDiscoFeatureWatch();
+
+    QBindable<bool> supported() const;
+    QBindable<QXmppDiscoInfoWatch::State> state() const;
+
+private:
+    friend class QXmppDiscoInfoWatch;
+    struct Data;
+    explicit QXmppDiscoFeatureWatch(std::shared_ptr<Data> d);
 
     std::shared_ptr<Data> d;
 };

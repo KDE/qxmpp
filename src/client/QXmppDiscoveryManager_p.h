@@ -51,6 +51,12 @@ struct QXmppDiscoInfoWatch::Data {
     QProperty<std::optional<QXmppDiscoInfo>> info;
 };
 
+struct QXmppDiscoFeatureWatch::Data {
+    QXmppDiscoInfoWatch infoWatch;
+    QStringList features;
+    QProperty<bool> supported;
+};
+
 class QXmppDiscoveryManagerPrivate
 {
 public:
