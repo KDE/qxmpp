@@ -6,6 +6,7 @@
 #define QXMPPMAMMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppError.h"
 #include "QXmppMamIq.h"
 #include "QXmppResultSet.h"
@@ -32,6 +33,9 @@ class QXmppMamManagerPrivate;
     QXmppMamManager *manager = new QXmppMamManager;
     client->addExtension(manager);
     \endcode
+
+    Checking whether the account supports message archiving using watchAccountSupport()
+    requires the QXmppDiscoveryManager to be registered with the client.
 
     \ingroup Managers
 
@@ -64,6 +68,8 @@ public:
                                                const QDateTime &start = QDateTime(),
                                                const QDateTime &end = QDateTime(),
                                                const QXmppResultSetQuery &resultSetQuery = QXmppResultSetQuery());
+
+    QXmppDiscoFeatureWatch watchAccountSupport() const;
 
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;

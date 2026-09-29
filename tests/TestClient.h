@@ -6,6 +6,7 @@
 #define CLIENTTESTING_H
 
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 
 #include "util.h"
 
@@ -45,6 +46,8 @@ public:
     // compares packets, ignoring different IDs and order of sending
     // returns ID of the packet that matched
     QString expectPacketRandomOrder(QString &&expected);
+    // connects with a new stream and answers the disco#info request to jid with the features
+    void connectAndAnswerDiscoInfo(const QString &jid, const QStringList &features);
     QString takePacket();
     QString takeLastPacket();
     void expectNoPacket() const;
@@ -71,5 +74,22 @@ private:
     bool autoResetEnabled;
     QList<QString> m_sentPackets;
 };
+
+// Checks that the feature watch returned by watchSupport is based on feature in the disco#info of
+// jid, for the account juliet@capulet.example.
+template<typename Manager, typename WatchSupport>
+void checkWatchSupport(WatchSupport watchSupport, const QString &jid, const QString &feature)
+{
+    TestClient client;
+    client.configuration().setJid(u"juliet@capulet.example"_s);
+    client.addNewExtension<QXmppDiscoveryManager>();
+    auto *manager = client.addNewExtension<Manager>();
+
+    auto watch = std::invoke(watchSupport, manager);
+    QVERIFY(!watch.supported().value());
+
+    client.connectAndAnswerDiscoInfo(jid, { feature });
+    QVERIFY(watch.supported().value());
+}
 
 #endif  // CLIENTTESTING_H

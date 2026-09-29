@@ -106,6 +106,23 @@ QString TestClient::expectPacketRandomOrder(QString &&expected)
     return {};
 }
 
+void TestClient::connectAndAnswerDiscoInfo(const QString &jid, const QStringList &features)
+{
+    setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT connected();
+
+    auto id = expectPacketRandomOrder(
+        u"<iq id='qx1' to='" + jid + u"' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>");
+
+    QString featureElements;
+    for (const auto &feature : features) {
+        featureElements += u"<feature var='" + feature + u"'/>";
+    }
+    inject(u"<iq id='%1' from='%2' type='result'>"
+           "<query xmlns='http://jabber.org/protocol/disco#info'>%3</query>"
+           "</iq>"_s.arg(id, jid, featureElements));
+}
+
 QString TestClient::takePacket()
 {
     [this]() { QVERIFY(!m_sentPackets.isEmpty()); }();

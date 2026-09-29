@@ -6,6 +6,7 @@
 #define QXMPPVCARDMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 
 #include <variant>
 
@@ -38,6 +39,9 @@ struct QXmppError;
     Using setClientVCard() client can set its vCard.
 
     \note Client can't set/change vCards of roster entries.
+
+    Checking whether the server supports vCards using watchServerSupport() requires the
+    QXmppDiscoveryManager to be registered with the client.
 
     \ingroup Managers
 */
@@ -72,6 +76,8 @@ public:
 
     QString requestClientVCard();
     bool isClientVCardReceived() const;
+
+    QXmppDiscoFeatureWatch watchServerSupport() const;
 
     QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;

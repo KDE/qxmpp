@@ -6,6 +6,7 @@
 #define QXMPPEXTERNALSERVICEDISCOVERYMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppError.h"
 #include "QXmppExternalService.h"
 #include "QXmppTask.h"
@@ -24,6 +25,7 @@ public:
 
     using ServicesResult = std::variant<QList<QXmppExternalService>, QXmppError>;
 
+    QXmppDiscoFeatureWatch watchServerSupport() const;
     QXmppTask<ServicesResult> requestServices(const QString &jid, const QString &node = {});
 
     QStringList discoveryFeatures() const override;

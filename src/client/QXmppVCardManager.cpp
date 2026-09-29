@@ -7,6 +7,7 @@
 #include "QXmppAccountMigrationManager.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppError.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
@@ -165,6 +166,21 @@ QString QXmppVCardManager::requestClientVCard()
 bool QXmppVCardManager::isClientVCardReceived() const
 {
     return d->isClientVCardReceived;
+}
+
+/*!
+    Returns a watch on whether the own server supports \xep{0054}{vcard-temp}.
+
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the server information. This requires the QXmppDiscoveryManager to be registered
+    with the client. If the manager is not registered with a client, a watch that never loads is
+    returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppVCardManager::watchServerSupport() const
+{
+    return watchServerFeature(client(), QXmpp::Namespace::VCard);
 }
 
 QStringList QXmppVCardManager::discoveryFeatures() const

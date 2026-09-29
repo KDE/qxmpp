@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppIqHandling.h"
 
@@ -25,6 +26,9 @@ using namespace QXmpp::Private;
     \code
     auto *manager = client->addNewExtension<QXmppExternalServiceDiscoveryManager>();
     \endcode
+
+    Checking whether the server supports external service discovery using watchServerSupport()
+    requires the QXmppDiscoveryManager to be registered with the client.
 
     \ingroup Managers
 
@@ -51,6 +55,21 @@ QXmppTask<QXmppExternalServiceDiscoveryManager::ServicesResult> QXmppExternalSer
     co_return parseIq<QXmppExternalServiceDiscoveryIq>(co_await client()->sendIq(std::move(request)).withContext(this), [](QXmppExternalServiceDiscoveryIq &&iq) -> ServicesResult {
         return iq.externalServices();
     });
+}
+
+/*!
+    Returns a watch on whether the own server supports \xep{0215}{External Service Discovery}.
+
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the server information. This requires the QXmppDiscoveryManager to be registered
+    with the client. If the manager is not registered with a client, a watch that never loads is
+    returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppExternalServiceDiscoveryManager::watchServerSupport() const
+{
+    return watchServerFeature(client(), QXmpp::Namespace::ExternalServiceDiscovery2);
 }
 
 QStringList QXmppExternalServiceDiscoveryManager::discoveryFeatures() const

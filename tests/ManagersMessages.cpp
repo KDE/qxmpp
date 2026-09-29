@@ -87,6 +87,7 @@ class tst_QXmppMamManager : public QObject
     Q_OBJECT
 
 private:
+    Q_SLOT void watchAccountSupport();
     Q_SLOT void initTestCase();
 
     Q_SLOT void testHandleStanza_data();
@@ -102,6 +103,11 @@ private:
     QXmppMamTestHelper m_helper;
     QXmppMamManager m_manager;
 };
+
+void tst_QXmppMamManager::watchAccountSupport()
+{
+    checkWatchSupport<QXmppMamManager>(&QXmppMamManager::watchAccountSupport, u"juliet@capulet.example"_s, u"urn:xmpp:mam:2"_s);
+}
 
 void tst_QXmppMamManager::initTestCase()
 {
@@ -480,6 +486,7 @@ class tst_QXmppCarbonManager : public QObject
     Q_OBJECT
 
 private:
+    Q_SLOT void watchServerSupport();
     Q_SLOT void initTestCase();
 
     Q_SLOT void testHandleStanza_data();
@@ -491,6 +498,11 @@ private:
     QXmppCarbonManagerV2 *m_managerV2;
     QXmppClient client;
 };
+
+void tst_QXmppCarbonManager::watchServerSupport()
+{
+    checkWatchSupport<QXmppCarbonManagerV2>(&QXmppCarbonManagerV2::watchServerSupport, u"capulet.example"_s, u"urn:xmpp:carbons:2"_s);
+}
 
 void tst_QXmppCarbonManager::initTestCase()
 {

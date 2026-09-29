@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager_p.h"
 #include "QXmppMessage.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppUtils_p.h"
@@ -95,6 +96,21 @@ QXmppCarbonManagerV2::~QXmppCarbonManagerV2() = default;
 QBindable<bool> QXmppCarbonManagerV2::enabled() const
 {
     return &m_enabled;
+}
+
+/*!
+    Returns a watch on whether the own server supports \xep{0280}{Message Carbons}.
+
+    The information is requested as long as a copy of the watch exists and shared with all other
+    watches on the server information. This requires the QXmppDiscoveryManager to be registered
+    with the client. If the manager is not registered with a client, a watch that never loads is
+    returned.
+
+    \since QXmpp 1.17
+*/
+QXmppDiscoFeatureWatch QXmppCarbonManagerV2::watchServerSupport() const
+{
+    return watchServerFeature(client(), QXmpp::Namespace::Carbons2);
 }
 
 bool QXmppCarbonManagerV2::handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &)
