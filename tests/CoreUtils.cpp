@@ -15,6 +15,7 @@
 #include "QXmppHashing_p.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
+#include "QXmppNamespaces.h"
 #include "QXmppPresence.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -54,6 +55,7 @@ private:
     Q_SLOT void testCalculateHashes();
     Q_SLOT void testParseHostAddress_data();
     Q_SLOT void testParseHostAddress();
+    Q_SLOT void testNamespaces();
 };
 
 void tst_QXmppUtils::testCrc32()
@@ -270,6 +272,28 @@ void tst_QXmppUtils::testParseHostAddress()
     const auto address = parseHostAddress(input);
     QCOMPARE(address.first, resultHost);
     QCOMPARE(address.second, resultPort);
+}
+
+void tst_QXmppUtils::testNamespaces()
+{
+    using Ns = QXmpp::Namespace;
+
+    QCOMPARE(namespaceUri(Ns::Xml), u"http://www.w3.org/XML/1998/namespace"_s);
+    QCOMPARE(namespaceUri(Ns::Mam2), u"urn:xmpp:mam:2"_s);
+    QCOMPARE(namespaceUri(Ns::MixPam2Archive), u"urn:xmpp:mix:pam:2#archive"_s);
+    QCOMPARE(namespaceUri(Ns::Fast0), u"urn:xmpp:fast:0"_s);
+
+    QCOMPARE(namespaceFromUri(u"urn:xmpp:carbons:2"), Ns::Carbons2);
+    QCOMPARE(namespaceFromUri(u"urn:xmpp:carbons:1"), std::nullopt);
+    QCOMPARE(namespaceFromUri(u"org.qxmpp.credentials"), std::nullopt);
+    QCOMPARE(namespaceFromUri(u""), std::nullopt);
+
+    // every namespace has a unique URI
+    for (int i = 0; i <= int(Ns::Fast0); i++) {
+        const auto ns = Ns(i);
+        QVERIFY(!namespaceUri(ns).isEmpty());
+        QCOMPARE(namespaceFromUri(namespaceUri(ns)), ns);
+    }
 }
 
 }  // namespace Utils

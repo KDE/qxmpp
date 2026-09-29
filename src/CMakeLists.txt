@@ -60,6 +60,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppMucData.h
     base/QXmppMucIq.h
     base/QXmppMucForms.h
+    base/QXmppNamespaces.h
     base/QXmppNonza.h
     base/QXmppNonSASLAuth.h
     base/QXmppOutOfBandUrl.h
@@ -225,6 +226,7 @@ set(SOURCE_FILES
     base/QXmppMucData.cpp
     base/QXmppMucIq.cpp
     base/QXmppMucForms.cpp
+    base/QXmppNamespaces.cpp
     base/QXmppNonza.cpp
     base/QXmppNonSASLAuth.cpp
     base/QXmppOutOfBandUrl.cpp
