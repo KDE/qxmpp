@@ -2762,11 +2762,9 @@ void tst_QXmppMuc::occupantInfoWatch()
 
     // the nickname may be used by another user after the occupant has left
     injectOccupantPresence(test, u"firstwitch"_s, u"unavailable"_s);
-    QCOMPARE(watch.state().value(), State::Loading);
+    QCOMPARE(watch.state().value(), State::Unknown);
     QVERIFY(!watch.info().value());
-    auto id = test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
-    test.inject(roomNotFound(id, u"coven@chat.shakespeare.lit/firstwitch"_s));
-    QCOMPARE(watch.state().value(), State::Error);
+    test.expectNoPacket();
 
     // and the info is requested again when someone joins with the nickname
     injectOccupantPresence(test, u"firstwitch"_s);
@@ -2798,9 +2796,9 @@ void tst_QXmppMuc::occupantInfoWatchNickChange()
                 "</presence>");
     test.injectPresence(nickChange);
 
-    QCOMPARE(watch.state().value(), State::Loading);
+    QCOMPARE(watch.state().value(), State::Unknown);
     QVERIFY(!watch.info().value());
-    test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
+    test.expectNoPacket();
 }
 
 void tst_QXmppMuc::occupantInfoWatchLeave()
@@ -2830,9 +2828,9 @@ void tst_QXmppMuc::occupantInfoWatchLeave()
                 "</presence>");
     test.injectPresence(leavePresence);
 
-    QCOMPARE(watch.state().value(), State::Loading);
+    QCOMPARE(watch.state().value(), State::Unknown);
     QVERIFY(!watch.info().value());
-    test.expectPacketRandomOrder(roomInfoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
+    test.expectNoPacket();
 }
 
 void tst_QXmppMuc::roomInfoBindable()
