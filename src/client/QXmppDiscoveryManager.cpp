@@ -21,6 +21,8 @@
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
+#include <QDomDocument>
+#include <QTextStream>
 
 using namespace QXmpp;
 
@@ -44,6 +46,8 @@ static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, co
         client,
         parseIqResponseFlat<Response>);
 }
+
+QXmppEntityCapsStorage::~QXmppEntityCapsStorage() = default;
 
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
@@ -749,6 +753,30 @@ void QXmppDiscoveryManager::setClientCapabilitiesNode(const QString &node)
     d->clientCapabilitiesNode = node;
 }
 
+/*!
+    Returns the storage for verified information of entity capabilities, if one has been set.
+
+    \since QXmpp 1.17
+*/
+std::shared_ptr<QXmppEntityCapsStorage> QXmppDiscoveryManager::entityCapsStorage() const
+{
+    return d->capsStorage;
+}
+
+/*!
+    Sets the \a storage for verified information of entity capabilities.
+
+    The stored information is used for all entities that announce the same capabilities, so no
+    request is needed for them. Since it does not depend on the account, the storage can be
+    shared between multiple clients.
+
+    \since QXmpp 1.17
+*/
+void QXmppDiscoveryManager::setEntityCapsStorage(std::shared_ptr<QXmppEntityCapsStorage> storage)
+{
+    d->capsStorage = std::move(storage);
+}
+
 QStringList QXmppDiscoveryManager::discoveryFeatures() const
 {
     return { ns_disco_info.toString() };
@@ -1070,8 +1098,8 @@ void QXmppDiscoveryManagerPrivate::handlePresence(const QXmppPresence &presence)
 
 QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::capsInfo(const QString &jid, const Caps &caps)
 {
-    if (capsHashAlgorithm(caps.hash)) {
-        if (auto *cachedInfo = capsCache[{ caps.hash, caps.ver }]) {
+    if (const auto key = capsKey(caps)) {
+        if (auto *cachedInfo = capsCache[*key]) {
             applyCapsInfo(jid, caps, *cachedInfo);
             return makeReadyTask<Result<QXmppDiscoInfo>>(QXmppDiscoInfo { *cachedInfo });
         }
@@ -1088,16 +1116,87 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::capsInfo(const Q
 QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::startCapsRequest(const QString &jid, const Caps &caps)
 {
     // wait for another entity with the same caps
-    if (capsHashAlgorithm(caps.hash)) {
-        auto [itr, inserted] = capsRequests.try_emplace(CapsKey { caps.hash, caps.ver });
+    if (const auto key = capsKey(caps)) {
+        auto [itr, inserted] = capsRequests.try_emplace(*key);
         if (!inserted) {
             QXmppPromise<Result<QXmppDiscoInfo>> promise;
             auto task = promise.task();
             itr->second.push_back({ jid, caps, std::move(promise) });
             return task;
         }
+        if (capsStorage) {
+            return loadCapsInfo(jid, caps);
+        }
     }
     return requestCapsInfo(jid, caps);
+}
+
+std::optional<QXmppDiscoveryManagerPrivate::CapsKey> QXmppDiscoveryManagerPrivate::capsKey(const Caps &caps)
+{
+    if (const auto algorithm = capsHashAlgorithm(caps.hash)) {
+        return CapsKey { *algorithm, caps.ver };
+    }
+    return {};
+}
+
+static QXmppEntityCapsStorage::Key capsStorageKey(const QXmppDiscoveryManagerPrivate::CapsKey &key)
+{
+    return { QXmppEntityCapsStorage::Method::EntityCapabilities, std::get<0>(key), std::get<1>(key) };
+}
+
+static QString serializeCapsInfo(const QDomElement &query)
+{
+    auto element = query.cloneNode().toElement();
+    // the node differs between entities with the same caps
+    element.removeAttribute(u"node"_s);
+
+    QString xml;
+    QTextStream stream(&xml);
+    element.save(stream, -1);
+    stream.flush();
+    return xml;
+}
+
+static std::optional<QXmppDiscoInfo> parseStoredCapsInfo(const QString &xml, const QXmppDiscoveryManagerPrivate::CapsKey &key)
+{
+    QDomDocument doc;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    if (!doc.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing)) {
+#else
+    if (!doc.setContent(xml, true)) {
+#endif
+        return {};
+    }
+
+    const auto query = doc.documentElement();
+    const auto &[algorithm, ver] = key;
+    if (query.tagName() != u"query" || query.namespaceURI() != ns_disco_info ||
+        capsVerificationString(query, algorithm) != ver) {
+        return {};
+    }
+    return QXmppDiscoInfo::fromDom(query);
+}
+
+QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::loadCapsInfo(const QString &jid, const Caps &caps)
+{
+    // only called for supported hash algorithms
+    const auto key = *capsKey(caps);
+    QXmppPromise<Result<QXmppDiscoInfo>> promise;
+    auto task = promise.task();
+    capsStorage->load(capsStorageKey(key)).then(q, [this, jid, caps, key, promise = std::move(promise)](std::optional<QString> &&xml) mutable {
+        // the storage may contain info of other versions or be corrupted
+        if (auto info = xml ? parseStoredCapsInfo(*xml, key) : std::nullopt) {
+            capsCache.insert(key, new QXmppDiscoInfo { *info });
+            applyCapsInfo(jid, caps, *info);
+            finishCapsRequest(key, *info);
+            promise.finish(std::move(*info));
+            return;
+        }
+        requestCapsInfo(jid, caps).then(q, [promise = std::move(promise)](auto &&result) mutable {
+            promise.finish(std::move(result));
+        });
+    });
+    return task;
 }
 
 QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::requestCapsInfo(const QString &jid, const Caps &caps)
@@ -1107,30 +1206,33 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::requestCapsInfo(
         q->client()->sendIq(CompatIq { GetIq<QXmppDiscoInfo> { generateSequentialStanzaId(), {}, jid, {}, QXmppDiscoInfo { node } } }),
         q,
         [this, jid, caps](QXmppClient::IqResult &&response) -> Result<QXmppDiscoInfo> {
-            const auto algorithm = capsHashAlgorithm(caps.hash);
+            const auto key = capsKey(caps);
             const auto iqElement = std::holds_alternative<QDomElement>(response) ? std::get<QDomElement>(response) : QDomElement();
 
             auto result = parseIqResponseFlat<QXmppDiscoInfo>(std::move(response));
             if (!hasValue(result)) {
-                if (algorithm) {
-                    finishCapsRequest({ caps.hash, caps.ver }, {});
+                if (key) {
+                    finishCapsRequest(*key, {});
                 }
                 return result;
             }
 
             const auto &info = getValue(result);
-            if (algorithm) {
+            if (key) {
                 // Unverified info is only used for this entity. Other entities with the same
                 // caps are requested themselves.
                 const auto query = firstChildElement(iqElement, u"query", ns_disco_info);
-                if (capsVerificationString(query, *algorithm) == caps.ver) {
-                    capsCache.insert({ caps.hash, caps.ver }, new QXmppDiscoInfo { info });
+                if (capsVerificationString(query, std::get<0>(*key)) == caps.ver) {
+                    capsCache.insert(*key, new QXmppDiscoInfo { info });
+                    if (capsStorage) {
+                        capsStorage->store({ capsStorageKey(*key) }, serializeCapsInfo(query));
+                    }
                     applyCapsInfo(jid, caps, info);
-                    finishCapsRequest({ caps.hash, caps.ver }, info);
+                    finishCapsRequest(*key, info);
                     return result;
                 }
                 q->warning(u"Received service discovery information of %1 does not match its entity capabilities."_s.arg(jid));
-                finishCapsRequest({ caps.hash, caps.ver }, {});
+                finishCapsRequest(*key, {});
             }
             applyCapsInfo(jid, caps, info);
             return result;

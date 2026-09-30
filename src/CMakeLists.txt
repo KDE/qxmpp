@@ -136,6 +136,7 @@ set(INSTALL_HEADER_FILES
     client/QXmppCredentials.h
     client/QXmppDiscoveryManager.h
     client/QXmppE2eeExtension.h
+    client/QXmppEntityCapsStorage.h
     client/QXmppEntityTimeManager.h
     client/QXmppExternalServiceDiscoveryManager.h
     client/QXmppFileSharingManager.h

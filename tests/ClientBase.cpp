@@ -21,6 +21,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
+#include "QXmppEntityCapsStorage.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageRetraction.h"
@@ -1529,6 +1530,8 @@ private:
     Q_SLOT void watchInfoCapsSameVerInvalid();
     Q_SLOT void watchInfoAwaitPresence();
     Q_SLOT void watchInfoAwaitPresenceTimeout();
+    Q_SLOT void entityCapsStorage();
+    Q_SLOT void entityCapsStorageInvalid();
     Q_SLOT void infoCaps();
     Q_SLOT void watchAccountInfoAccountChange();
     Q_SLOT void watchInfoLifetime();
@@ -2884,6 +2887,129 @@ void tst_QXmppDiscoveryManager::watchInfoAwaitPresenceTimeout()
     test.expect(infoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
     test.inject(infoResponse(u"coven@chat.shakespeare.lit/firstwitch"_s, u"urn:xmpp:jingle:1"_s));
     QCOMPARE(watch.state().value(), State::Loaded);
+}
+
+// Finishes loads only when requested, so waiting entities can be tested.
+class TestCapsStorage : public QXmppEntityCapsStorage
+{
+public:
+    QXmppTask<std::optional<QString>> load(const Key &key) override
+    {
+        QXmppPromise<std::optional<QString>> promise;
+        auto task = promise.task();
+        loads.push_back({ key, std::move(promise) });
+        return task;
+    }
+    QXmppTask<void> store(const QList<Key> &keys, const QString &xml) override
+    {
+        for (const auto &key : keys) {
+            entries.push_back({ key, xml });
+        }
+        return makeReadyTask();
+    }
+
+    std::optional<QString> find(const Key &key) const
+    {
+        auto itr = std::ranges::find(entries, key, &std::pair<Key, QString>::first);
+        return itr != entries.end() ? std::optional(itr->second) : std::nullopt;
+    }
+    void finishLoads()
+    {
+        for (auto &[key, promise] : std::exchange(loads, {})) {
+            promise.finish(find(key));
+        }
+    }
+
+    std::vector<std::pair<Key, QXmppPromise<std::optional<QString>>>> loads;
+    std::vector<std::pair<Key, QString>> entries;
+};
+
+static const QXmppEntityCapsStorage::Key capsStorageKey { QXmppEntityCapsStorage::Method::EntityCapabilities, QXmpp::HashAlgorithm::Sha1, QByteArray::fromBase64("QgayPKawpkPSDYmwT/WM94uAlu0=") };
+
+void tst_QXmppDiscoveryManager::entityCapsStorage()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    auto storage = std::make_shared<TestCapsStorage>();
+    {
+        TestClient test;
+        auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+        disco->setEntityCapsStorage(storage);
+        QCOMPARE(disco->entityCapsStorage(), storage);
+        test.setStreamManagementState(QXmppClient::NewStream);
+        Q_EMIT test.connected();
+
+        // unknown info is requested and stored once it has been verified
+        test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+        auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+        test.expectNoPacket();
+        QCOMPARE(storage->loads.size(), 1);
+        storage->finishLoads();
+        test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+        test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+        QCOMPARE(watch.state().value(), State::Loaded);
+
+        const auto xml = storage->find(capsStorageKey);
+        QVERIFY(xml);
+        QVERIFY(xml->contains(u"http://jabber.org/protocol/muc"_s));
+        QVERIFY(!xml->contains(u"node="_s));
+
+        // unverified info is not stored
+        test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s, u"sha-1"_s, "66/0NaeaBKkwk85efJTGmU47vXI="));
+        auto otherWatch = disco->watchInfo(u"benvolio@montague.lit/garden"_s);
+        storage->finishLoads();
+        test.expect(capsRequest(u"benvolio@montague.lit/garden"_s, u"66/0NaeaBKkwk85efJTGmU47vXI="_s));
+        test.inject(capsResponse(u"benvolio@montague.lit/garden"_s));
+        QCOMPARE(otherWatch.state().value(), State::Loaded);
+        QCOMPARE(storage->entries.size(), 1);
+    }
+
+    // the stored info is used by other sessions and only loaded once for the same caps
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    disco->setEntityCapsStorage(storage);
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
+    auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    auto otherWatch = disco->watchInfo(u"benvolio@montague.lit/garden"_s);
+    QCOMPARE(storage->loads.size(), 1);
+    QCOMPARE(watch.state().value(), State::Loading);
+
+    storage->finishLoads();
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(otherWatch.state().value(), State::Loaded);
+    QVERIFY(watch.watchFeature(QXmpp::Namespace::Muc).supported().value());
+    test.expectNoPacket();
+}
+
+void tst_QXmppDiscoveryManager::entityCapsStorageInvalid()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    // e.g. corrupted or modified by another application
+    auto storage = std::make_shared<TestCapsStorage>();
+    storage->entries.push_back({ capsStorageKey,
+                                 u"<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                 "<identity category='client' name='Exodus 0.9.1' type='pc'/>"
+                                 "<feature var='urn:xmpp:jingle:1'/>"
+                                 "</query>"_s });
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    disco->setEntityCapsStorage(storage);
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    storage->finishLoads();
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QVERIFY(!watch.watchFeature(u"urn:xmpp:jingle:1"_s).supported().value());
 }
 
 void tst_QXmppDiscoveryManager::infoCaps()
