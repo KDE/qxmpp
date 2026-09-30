@@ -1520,12 +1520,15 @@ private:
     Q_SLOT void watchInfoInvalidate();
     Q_SLOT void watchInfoReset();
     Q_SLOT void watchInfoPresence();
+    Q_SLOT void watchInfoOutdatedResponses();
     Q_SLOT void watchInfoCaps();
     Q_SLOT void watchInfoCapsChanged();
     Q_SLOT void watchInfoCapsInvalid();
     Q_SLOT void watchInfoCapsUnknownHash();
     Q_SLOT void watchInfoCapsSameVer();
     Q_SLOT void watchInfoCapsSameVerInvalid();
+    Q_SLOT void watchInfoAwaitPresence();
+    Q_SLOT void watchInfoAwaitPresenceTimeout();
     Q_SLOT void infoCaps();
     Q_SLOT void watchAccountInfoAccountChange();
     Q_SLOT void watchInfoLifetime();
@@ -2452,13 +2455,13 @@ void tst_QXmppDiscoveryManager::watchInfoReset()
     QList<State> states;
     auto notifier = watch.state().addNotifier([&] { states.append(watch.state().value()); });
 
-    // the old info is not kept
+    // the old info is not kept and the unavailable entity is not requested
     DiscoInfoTracking::reset(&test, u"room@muc.example.org/nick"_s);
-    QCOMPARE(watch.state().value(), State::Loading);
+    QCOMPARE(watch.state().value(), State::Unknown);
     QVERIFY(!watch.info().value());
     QVERIFY(!watch.changesTracked().value());
-    QCOMPARE(states, QList { State::Loading });
-    test.expect(infoRequest(u"room@muc.example.org/nick"_s));
+    QCOMPARE(states, QList { State::Unknown });
+    test.expectNoPacket();
 
     // without a watch only the cache is cleared
     watch = {};
@@ -2532,15 +2535,27 @@ void tst_QXmppDiscoveryManager::watchInfoPresence()
     QCOMPARE(watch.state().value(), State::Loaded);
     test.expectNoPacket();
 
-    // the info is dropped when the entity becomes unavailable
+    // the info is dropped when the entity becomes unavailable, it would only answer with an error
     test.injectPresence(presence(u"alice@example.org/phone"_s, QXmppPresence::Unavailable));
-    QCOMPARE(watch.state().value(), State::Loading);
+    QCOMPARE(watch.state().value(), State::Unknown);
     QVERIFY(!watch.info().value());
+    test.expectNoPacket();
+
+    // and requested again once it is available
+    test.injectPresence(presence(u"alice@example.org/phone"_s));
+    QCOMPARE(watch.state().value(), State::Loading);
     test.expect(infoRequest(u"alice@example.org/phone"_s));
+    test.inject(infoResponse(u"alice@example.org/phone"_s, u"urn:xmpp:jingle:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+
+    // errors of requests sent before the entity became unavailable are ignored
+    watch.refresh();
+    test.expect(infoRequest(u"alice@example.org/phone"_s));
+    test.injectPresence(presence(u"alice@example.org/phone"_s, QXmppPresence::Unavailable));
     test.inject(u"<iq id='qx1' from='alice@example.org/phone' type='error'>"
                 "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
                 "</iq>"_s);
-    QCOMPARE(watch.state().value(), State::Error);
+    QCOMPARE(watch.state().value(), State::Unknown);
 
     // presences of bare JIDs are ignored
     auto bareWatch = disco->watchInfo(u"alice@example.org"_s);
@@ -2549,6 +2564,59 @@ void tst_QXmppDiscoveryManager::watchInfoPresence()
     test.injectPresence(presence(u"alice@example.org"_s, QXmppPresence::Unavailable));
     QCOMPARE(bareWatch.state().value(), State::Loaded);
     test.expectNoPacket();
+}
+
+static QString aliceInfoResponse(const QString &id, const QString &feature)
+{
+    return u"<iq id='%1' from='alice@example.org/phone' type='result'>"
+           "<query xmlns='http://jabber.org/protocol/disco#info'><feature var='%2'/></query>"
+           "</iq>"_s.arg(id, feature);
+}
+
+void tst_QXmppDiscoveryManager::watchInfoOutdatedResponses()
+{
+    using State = QXmppDiscoInfoWatch::State;
+    const auto response = aliceInfoResponse;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+
+    // the JID may refer to another entity once it becomes available, so the running request is
+    // not reused
+    auto watch = disco->watchInfo(u"alice@example.org/phone"_s);
+    auto oldId = test.expectPacketRandomOrder(infoRequest(u"alice@example.org/phone"_s));
+    test.injectPresence(presence(u"alice@example.org/phone"_s));
+    auto newId = test.expectPacketRandomOrder(infoRequest(u"alice@example.org/phone"_s));
+    QVERIFY(oldId != newId);
+
+    test.inject(response(oldId, u"urn:old"_s));
+    QCOMPARE(watch.state().value(), State::Loading);
+    QVERIFY(!watch.info().value());
+    test.inject(response(newId, u"urn:new"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
+    QCOMPARE(watchedFeatures(watch), QStringList { u"urn:new"_s });
+
+    // responses received after the entity has become unavailable are not stored
+    watch.refresh();
+    auto id = test.expectPacketRandomOrder(infoRequest(u"alice@example.org/phone"_s));
+    test.injectPresence(presence(u"alice@example.org/phone"_s, QXmppPresence::Unavailable));
+    test.inject(response(id, u"urn:old"_s));
+    QCOMPARE(watch.state().value(), State::Unknown);
+    QVERIFY(!watch.info().value());
+
+    // the caller of info() still gets the response, but it is not cached
+    watch = {};
+    auto task = disco->info(u"alice@example.org/phone"_s);
+    id = test.expectPacketRandomOrder(infoRequest(u"alice@example.org/phone"_s));
+    test.injectPresence(presence(u"alice@example.org/phone"_s));
+    test.inject(response(id, u"urn:old"_s));
+    QVERIFY(task.isFinished());
+    QVERIFY(expectFutureVariant<QXmppDiscoInfo>(task).features().contains(u"urn:old"_s));
+
+    task = disco->info(u"alice@example.org/phone"_s);
+    test.expectPacketRandomOrder(infoRequest(u"alice@example.org/phone"_s));
 }
 
 void tst_QXmppDiscoveryManager::watchInfoCaps()
@@ -2585,9 +2653,9 @@ void tst_QXmppDiscoveryManager::watchInfoCaps()
     otherWatch = {};
     Q_EMIT test.disconnected();
     Q_EMIT test.connected();
-    test.expect(infoRequest(u"romeo@montague.lit/orchard"_s));
-    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Stale);
     QVERIFY(!watch.changesTracked().value());
+    test.expectNoPacket();
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
     QCOMPARE(watch.state().value(), State::Loaded);
     QVERIFY(watch.changesTracked().value());
@@ -2596,8 +2664,8 @@ void tst_QXmppDiscoveryManager::watchInfoCaps()
     // the caps are dropped with the presence
     test.injectPresence(presence(u"romeo@montague.lit/orchard"_s, QXmppPresence::Unavailable));
     QVERIFY(!watch.changesTracked().value());
-    QCOMPARE(watch.state().value(), State::Loading);
-    test.expect(infoRequest(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(watch.state().value(), State::Unknown);
+    test.expectNoPacket();
 }
 
 void tst_QXmppDiscoveryManager::watchInfoCapsChanged()
@@ -2726,6 +2794,96 @@ void tst_QXmppDiscoveryManager::watchInfoCapsSameVerInvalid()
     test.inject(capsResponse(u"benvolio@montague.lit/garden"_s));
     QCOMPARE(otherWatch.state().value(), State::Loaded);
     QVERIFY(!otherWatch.watchFeature(u"urn:xmpp:jingle:1"_s).supported().value());
+}
+
+void tst_QXmppDiscoveryManager::watchInfoAwaitPresence()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *d = QXmppDiscoveryManagerPrivate::get(disco);
+    auto romeo = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    auto benvolio = disco->watchInfo(u"benvolio@montague.lit/garden"_s);
+    auto juliet = disco->watchInfo(u"juliet@capulet.lit/balcony"_s);
+    auto server = disco->watchInfo(u"montague.lit"_s);
+
+    // the info of full JIDs is requested once their presence has been received
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expect(infoRequest(u"montague.lit"_s));
+    test.inject(infoResponse(u"montague.lit"_s, u"urn:xmpp:mam:2"_s));
+    test.expectNoPacket();
+    QCOMPARE(romeo.state().value(), State::Loading);
+    QVERIFY(d->presenceTimer.isActive());
+
+    // other watches do not request the info either
+    auto otherRomeo = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
+    test.expectNoPacket();
+
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    test.expect(capsRequest(u"romeo@montague.lit/orchard"_s));
+    test.inject(capsResponse(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(romeo.state().value(), State::Loaded);
+
+    // entities with the same caps need no request
+    test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
+    QCOMPARE(benvolio.state().value(), State::Loaded);
+    test.expectNoPacket();
+
+    // entities that become unavailable are not requested
+    test.injectPresence(presence(u"juliet@capulet.lit/balcony"_s, QXmppPresence::Unavailable));
+    QCOMPARE(juliet.state().value(), State::Unknown);
+    test.expectNoPacket();
+
+    // the known info is kept while waiting
+    Q_EMIT test.disconnected();
+    Q_EMIT test.connected();
+    QCOMPARE(romeo.state().value(), State::Stale);
+    QVERIFY(romeo.info().value());
+    test.expect(infoRequest(u"montague.lit"_s));
+    test.inject(infoResponse(u"montague.lit"_s, u"urn:xmpp:mam:2"_s));
+    test.expectNoPacket();
+
+    // with the same caps the info is loaded without request
+    QList<State> states;
+    auto notifier = romeo.state().addNotifier([&] { states.append(romeo.state().value()); });
+    test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
+    QCOMPARE(romeo.state().value(), State::Loaded);
+    QCOMPARE(states, QList { State::Loaded });
+    test.expectNoPacket();
+}
+
+void tst_QXmppDiscoveryManager::watchInfoAwaitPresenceTimeout()
+{
+    using State = QXmppDiscoInfoWatch::State;
+
+    TestClient test;
+    auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
+    auto *d = QXmppDiscoveryManagerPrivate::get(disco);
+    auto watch = disco->watchInfo(u"coven@chat.shakespeare.lit/firstwitch"_s);
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT test.connected();
+    test.expectNoPacket();
+
+    // the waiting continues on resumed streams
+    Q_EMIT test.disconnected();
+    QVERIFY(!d->presenceTimer.isActive());
+    QCOMPARE(watch.state().value(), State::Unknown);
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    Q_EMIT test.connected();
+    QCOMPARE(watch.state().value(), State::Loading);
+    test.expectNoPacket();
+
+    // entities without presence are requested after a timeout
+    QVERIFY(d->presenceTimer.isActive());
+    d->presenceTimer.setInterval(0);
+    d->presenceTimer.start();
+    QTRY_VERIFY(!d->presenceTimer.isActive());
+    test.expect(infoRequest(u"coven@chat.shakespeare.lit/firstwitch"_s));
+    test.inject(infoResponse(u"coven@chat.shakespeare.lit/firstwitch"_s, u"urn:xmpp:jingle:1"_s));
+    QCOMPARE(watch.state().value(), State::Loaded);
 }
 
 void tst_QXmppDiscoveryManager::infoCaps()
@@ -2872,9 +3030,15 @@ void tst_QXmppDiscoveryManager::watchInfoModifiedByNotifier()
     QVERIFY(!watch);
     QCOMPARE(qsizetype(createdWatches.size()), createdCount);
 
-    // the map is still consistent
+    // the map is still consistent, the known info is kept by the running request
     auto serverWatch = disco->watchServerInfo();
-    QCOMPARE(serverWatch.state().value(), State::Loading);
+    QCOMPARE(serverWatch.state().value(), State::Stale);
+    QVERIFY(serverWatch.info().value());
+    auto id = test.expectPacketRandomOrder(infoRequest(u"example.org"_s));
+    test.inject(u"<iq id='" + id + u"' from='example.org' type='result'>"
+                                   "<query xmlns='http://jabber.org/protocol/disco#info'><feature var='urn:xmpp:mam:2'/></query>"
+                                   "</iq>");
+    QCOMPARE(serverWatch.state().value(), State::Loaded);
 }
 
 void tst_QXmppDiscoveryManager::watchInfoDefault()

@@ -15,6 +15,7 @@
 #include <unordered_map>
 
 #include <QCache>
+#include <QTimer>
 
 class QXmppPresence;
 
@@ -34,6 +35,11 @@ struct DiscoInfoEntry {
     QString jid;
     QString node;
     int watchCount = 0;
+    // on new streams the info of full JIDs is requested once their presence has been received
+    bool awaitingPresence = false;
+    // Incremented when the info changes or the JID may refer to another entity. Responses to
+    // requests of earlier generations are not stored and new requests are not attached to them.
+    uint64_t generation = 0;
 
     QProperty<QXmppDiscoInfoWatch::State> state { QXmppDiscoInfoWatch::State::Unknown };
     QProperty<std::optional<QXmppDiscoInfo>> info;
@@ -128,7 +134,8 @@ public:
     QCache<std::tuple<QString, QString>, QList<QXmppDiscoItem>> itemsCache;
 
     // outgoing requests
-    AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QXmppDiscoInfo>> infoRequests;
+    // jid, node and generation of the entry (0 for caps requests)
+    AttachableRequests<std::tuple<QString, QString, uint64_t>, QXmpp::Result<QXmppDiscoInfo>> infoRequests;
     AttachableRequests<std::tuple<QString, QString>, QXmpp::Result<QList<QXmppDiscoItem>>> itemsRequests;
 
     // info watches, the watches on server and account info follow the configured account
@@ -141,6 +148,8 @@ public:
     QCache<CapsKey, QXmppDiscoInfo> capsCache;
     // entities with the same caps waiting for a verification in progress
     std::map<CapsKey, std::vector<CapsWaiter>> capsRequests;
+    // requests the info of full JIDs without presence, e.g. of MUC occupants or components
+    QTimer presenceTimer;
 
     // service watches
     QList<WatchEntry> watches;
@@ -158,6 +167,7 @@ public:
     bool clientConnected = false;
 
     explicit QXmppDiscoveryManagerPrivate(QXmppDiscoveryManager *q) : q(q) { }
+    static QXmppDiscoveryManagerPrivate *get(QXmppDiscoveryManager *manager) { return manager->d.get(); }
 
     static QString defaultApplicationName();
     static QXmppDiscoIdentity defaultIdentity();
@@ -188,6 +198,7 @@ public:
     void updateEntry(QXmppDiscoInfoWatch::Data &data);
     void fetchInfo(const std::shared_ptr<DiscoInfoEntry> &entry, QXmppDiscoveryManager::CachePolicy cachePolicy);
     void refreshInfoWatches(bool newStream);
+    void fetchAwaitedInfo();
 
     void discoverServices();
     void processServiceInfo(const QString &jid, const QXmppDiscoInfo &info);
@@ -211,8 +222,9 @@ struct DiscoInfoTracking {
     static void setTracked(QXmppClient *client, const QString &jid, bool tracked);
     // Drops the cached info of \a jid and requests it again if it is watched.
     static void invalidate(QXmppClient *client, const QString &jid);
-    // Like invalidate(), but for JIDs that may now refer to another entity, e.g. MUC occupants.
-    // Watches do not keep the old info and changes are no longer tracked.
+    // Drops the info of \a jid, which is unavailable and may refer to another entity once it
+    // becomes available again, e.g. a MUC occupant. Watches go to Unknown without a request and
+    // changes are no longer tracked; the info is requested again on the next presence.
     static void reset(QXmppClient *client, const QString &jid);
 };
 

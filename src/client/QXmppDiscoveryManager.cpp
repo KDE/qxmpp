@@ -51,6 +51,9 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
     d->recentInfoEntries.setMaxCost(50);
     d->itemsCache.setMaxCost(50);
     d->capsCache.setMaxCost(200);
+    d->presenceTimer.setSingleShot(true);
+    d->presenceTimer.setInterval(std::chrono::seconds(5));
+    connect(&d->presenceTimer, &QTimer::timeout, this, [this] { d->fetchAwaitedInfo(); });
     d->clientCapabilitiesNode = u"org.qxmpp.caps"_s;
     d->identities = { d->defaultIdentity() };
 }
@@ -101,17 +104,20 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
         }
     }
 
+    // keeps the entry alive while the request is running, so that changes can be detected
+    auto entry = d->entry(jid, node);
     return d->infoRequests.produce(
-        { jid, node },
-        [this](const auto &key) {
-            auto &[jid, node] = key;
+        { jid, node, entry->generation },
+        [this, entry](const auto &key) {
+            auto &[jid, node, generation] = key;
             return chain<Result<QXmppDiscoInfo>>(
                 get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node }),
                 this,
-                [this, jid, node](auto &&result) -> Result<QXmppDiscoInfo> {
-                    // only cache successful responses for now (permanent errors could also be cached)
-                    if (hasValue(result)) {
-                        d->storeInfo(jid, node, getValue(result));
+                [this, entry, generation](auto &&result) -> Result<QXmppDiscoInfo> {
+                    // Only cache successful responses for now (permanent errors could also be
+                    // cached). Responses to requests sent before the info changed are outdated.
+                    if (hasValue(result) && entry->generation == generation) {
+                        d->storeInfo(entry->jid, entry->node, getValue(result));
                     }
                     return result;
                 });
@@ -266,12 +272,12 @@ static bool isKnown(QXmppDiscoInfoWatch::State state)
     \enum QXmppDiscoInfoWatch::State
 
     \value Unknown No information is available and no request is running, e.g. because the
-    client is not connected.
+    client is not connected or the entity is unavailable.
     \value Loading The information is being requested for the first time.
     \value Loaded The information is up to date.
     \value Stale The information is from an earlier point in time and may be outdated, e.g.
     after a new stream has been started. A new request is running or will be started once the
-    client is connected.
+    client is connected or the presence of the entity has been received.
     \value Error The entity responded with an error, e.g. because it does not exist.
 
     The information is available exactly in the states Loaded and Stale. A watch that has
@@ -383,7 +389,8 @@ QBindable<std::optional<QXmppDiscoInfo>> QXmppDiscoInfoWatch::info() const
     \xep{0115}{Entity Capabilities} in their presence.
 
     The information of full JIDs is dropped when the entity becomes unavailable or available
-    again, as the JID may refer to another entity then, e.g. a MUC occupant.
+    again, as the JID may refer to another entity then, e.g. a MUC occupant. Unavailable entities
+    are in the state Unknown until they become available again.
 
     Otherwise the information is a snapshot from the time it has been requested. Use refresh()
     to request it again.
@@ -677,6 +684,11 @@ QXmppDiscoServicesWatch QXmppDiscoveryManager::discoverServices(QString category
     Stale while it is requested again, unless changes of the entity are tracked (see
     QXmppDiscoInfoWatch::changesTracked()).
 
+    On new streams, the information of full JIDs is only requested after their presence has
+    been received, because with \xep{0115}{Entity Capabilities} the information is often
+    known without a request then. Full JIDs without presence, e.g. of MUC occupants in
+    rooms that have not been joined again yet, are requested after a few seconds.
+
     Keep the handle alive as long as you need updates.
 
     \since QXmpp 1.17
@@ -799,6 +811,13 @@ void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
         if (client->streamManagementState() == QXmppClient::NoStreamManagement) {
             d->clearTracked();
         }
+        // entries keep waiting for the presence on resumed streams
+        d->presenceTimer.stop();
+        for (const auto &entry : d->lockInfoEntries()) {
+            if (entry->awaitingPresence && entry->state.value() == QXmppDiscoInfoWatch::State::Loading) {
+                entry->state = QXmppDiscoInfoWatch::State::Unknown;
+            }
+        }
         // Queries still in flight will never complete; let a later watch restart discovery.
         if (d->discoveryState == DiscoveryState::Running) {
             d->discoveryState = DiscoveryState::NotStarted;
@@ -810,6 +829,7 @@ void QXmppDiscoveryManager::onUnregistered(QXmppClient *client)
 {
     // Drop the results with the client they belong to; a later registration rediscovers.
     d->clientConnected = false;
+    d->presenceTimer.stop();
     d->discoveryState = DiscoveryState::NotStarted;
     d->discoveredServices.clear();
     d->clearTracked();
@@ -879,7 +899,7 @@ QXmppDiscoInfoWatch QXmppDiscoveryManagerPrivate::watchInfo(QXmppDiscoInfoWatch:
 
         // Cached info of untracked entities may be outdated. Server and account info are only
         // requested on new streams.
-        if (firstWatch && !entry->changesTracked.value()) {
+        if (firstWatch && !entry->changesTracked.value() && !entry->awaitingPresence) {
             fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
         } else {
             fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Relaxed);
@@ -961,6 +981,7 @@ void QXmppDiscoveryManagerPrivate::clearTracked()
 void QXmppDiscoveryManagerPrivate::invalidate(const QString &jid)
 {
     if (auto entry = findEntry(jid, {})) {
+        entry->generation++;
         entry->changesTracked = isTracked(jid);
         if (entry->watchCount > 0) {
             fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
@@ -974,12 +995,31 @@ void QXmppDiscoveryManagerPrivate::reset(const QString &jid)
 {
     trackedJids.remove(jid);
     availableJids.remove(jid);
-    dropInfo(jid);
+
+    auto entry = findEntry(jid, {});
+    if (!entry) {
+        return;
+    }
+    entry->generation++;
+    entry->awaitingPresence = false;
+    if (entry->watchCount == 0) {
+        recentInfoEntries.remove({ jid, {} });
+        return;
+    }
+
+    // The entity is unavailable, so it would answer with an error. The info is requested again
+    // once it becomes available.
+    Qt::beginPropertyUpdateGroup();
+    entry->changesTracked = false;
+    entry->info = std::nullopt;
+    entry->state = QXmppDiscoInfoWatch::State::Unknown;
+    Qt::endPropertyUpdateGroup();
 }
 
 void QXmppDiscoveryManagerPrivate::dropInfo(const QString &jid)
 {
     if (auto entry = findEntry(jid, {})) {
+        entry->generation++;
         if (entry->watchCount == 0) {
             recentInfoEntries.remove({ jid, {} });
             return;
@@ -1038,8 +1078,9 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::capsInfo(const Q
     }
 
     const auto node = caps.node + u'#' + QString::fromLatin1(caps.ver.toBase64());
+    // the caps identify the info, so requests of entities with the same JID can be shared
     return infoRequests.produce(
-        { jid, node },
+        { jid, node, 0 },
         [this, caps](const auto &key) { return startCapsRequest(std::get<0>(key), caps); },
         q);
 }
@@ -1176,9 +1217,12 @@ void QXmppDiscoveryManagerPrivate::fetchInfo(const std::shared_ptr<DiscoInfoEntr
 {
     using State = QXmppDiscoInfoWatch::State;
 
-    if (cachePolicy == QXmppDiscoveryManager::CachePolicy::Relaxed && entry->state.value() == State::Loaded) {
-        return;
+    if (cachePolicy == QXmppDiscoveryManager::CachePolicy::Relaxed) {
+        if (entry->state.value() == State::Loaded || entry->awaitingPresence) {
+            return;
+        }
     }
+    entry->awaitingPresence = false;
 
     if (entry->state.value() == State::Loaded) {
         entry->state = State::Stale;
@@ -1191,9 +1235,10 @@ void QXmppDiscoveryManagerPrivate::fetchInfo(const std::shared_ptr<DiscoInfoEntr
     }
 
     // successful responses are stored by info()
-    q->info(entry->jid, entry->node, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [weakEntry = std::weak_ptr(entry)](auto &&result) {
+    q->info(entry->jid, entry->node, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [weakEntry = std::weak_ptr(entry), generation = entry->generation](auto &&result) {
         auto entry = weakEntry.lock();
-        if (!entry || hasValue(result)) {
+        // the info has changed in the meantime, e.g. the entity has become unavailable
+        if (!entry || hasValue(result) || entry->generation != generation) {
             return;
         }
 
@@ -1225,9 +1270,22 @@ void QXmppDiscoveryManagerPrivate::refreshInfoWatches(bool newStream)
     }
     for (const auto &entry : lockInfoEntries()) {
         if (entry->watchCount == 0) {
+            entry->awaitingPresence = false;
             continue;
         }
-        if (newStream) {
+        // Presences are received after the connection has been established. With entity
+        // capabilities, the info is often cached, so no request is needed.
+        if (newStream && entry->node.isEmpty() && !QXmppUtils::jidToResource(entry->jid).isEmpty()) {
+            entry->awaitingPresence = true;
+        }
+        if (entry->awaitingPresence) {
+            if (entry->state.value() == State::Loaded) {
+                entry->state = State::Stale;
+            } else if (entry->state.value() == State::Unknown || entry->state.value() == State::Error) {
+                entry->state = State::Loading;
+            }
+            presenceTimer.start();
+        } else if (newStream) {
             fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
         } else if (entry->state.value() == State::Unknown || entry->state.value() == State::Stale) {
             // requests of the resumed stream may have failed while disconnected
@@ -1235,6 +1293,22 @@ void QXmppDiscoveryManagerPrivate::refreshInfoWatches(bool newStream)
         }
     }
 
+    Qt::endPropertyUpdateGroup();
+}
+
+void QXmppDiscoveryManagerPrivate::fetchAwaitedInfo()
+{
+    Qt::beginPropertyUpdateGroup();
+    for (const auto &entry : lockInfoEntries()) {
+        if (!entry->awaitingPresence) {
+            continue;
+        }
+        if (entry->watchCount > 0) {
+            fetchInfo(entry, QXmppDiscoveryManager::CachePolicy::Strict);
+        } else {
+            entry->awaitingPresence = false;
+        }
+    }
     Qt::endPropertyUpdateGroup();
 }
 
