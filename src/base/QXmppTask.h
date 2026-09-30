@@ -105,7 +105,7 @@ public:
         sharedData().promiseCount += 1;
     }
     /*! Move constructor. */
-    QXmppPromise(QXmppPromise<T> &&p)
+    QXmppPromise(QXmppPromise<T> &&p) noexcept
     {
         std::swap(data, p.data);
         if (!shared()) {
@@ -141,23 +141,23 @@ public:
     [[deprecated]]
     QXmppPromise<T> &operator=(const QXmppPromise<T> &p)
     {
-        if (shared()) {
-            sharedData().promiseCount -= 1;
-        }
-        p.detachData();
-        data = p.data;
-        if (shared()) {
-            sharedData().promiseCount += 1;
-        }
-        return *this;
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
+        QXmppPromise<T> copy(p);
+        QT_WARNING_POP
+        return *this = std::move(copy);
     }
     /*! Move assignment operator, moving from \a p. */
-    QXmppPromise<T> &operator=(QXmppPromise<T> &&p)
+    QXmppPromise<T> &operator=(QXmppPromise<T> &&p) noexcept
     {
-        std::swap(data, p.data);
-        if (!shared()) {
-            if (auto *task = inlineData().task) {
-                task->setPromise(this);
+        if (this != &p) {
+            // the previous state is released right away, like by the destructor
+            QXmppPromise<T> previous(std::move(*this));
+            std::swap(data, p.data);
+            if (!shared()) {
+                if (auto *task = inlineData().task) {
+                    task->setPromise(this);
+                }
             }
         }
         return *this;
@@ -346,7 +346,7 @@ class QXmppTask
 
 public:
     /*! Move constructor. */
-    QXmppTask(QXmppTask &&t) : data(InlineData {})
+    QXmppTask(QXmppTask &&t) noexcept : data(InlineData {})
     {
         std::swap(data, t.data);
         if (!shared()) {

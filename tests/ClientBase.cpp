@@ -52,6 +52,7 @@
 #include <QCoreApplication>
 #include <QNetworkProxy>
 #include <QObject>
+#include <QScopeGuard>
 #include <QSslCertificate>
 #include <QSslKey>
 #include <QSslSocket>
@@ -74,6 +75,9 @@ private:
     Q_SLOT void testTaskStore();
     Q_SLOT void testTaskOptionalNullopt();
     Q_SLOT void testTaskThenChainSuspended();
+    Q_SLOT void testPromiseMoveAssignment();
+    Q_SLOT void testPromiseMoveAssignmentReleasesPrevious();
+    Q_SLOT void testPromiseCopyAssignment();
     Q_SLOT void testChainIq();
     Q_SLOT void colorGeneration();
 #if QT_GUI_LIB
@@ -331,6 +335,66 @@ void tst_QXmppClient::testTaskThenChainSuspended()
     QVERIFY(chainedTask.isFinished());
     QVERIFY(chainedTask.hasResult());
     QCOMPARE(chainedTask.takeResult(), u"42"_s);
+}
+
+// containers move them instead of copying them
+static_assert(std::is_nothrow_move_constructible_v<QXmppPromise<int>>);
+static_assert(std::is_nothrow_move_assignable_v<QXmppPromise<int>>);
+static_assert(std::is_nothrow_move_constructible_v<QXmppTask<int>>);
+
+void tst_QXmppClient::testPromiseMoveAssignment()
+{
+    QXmppPromise<int> promise;
+    std::optional<QXmppTask<int>> oldTask = promise.task();
+
+    QXmppPromise<int> newPromise;
+    auto task = newPromise.task();
+    promise = std::move(newPromise);
+
+    // the task of the previous promise must not detach the promise from its new task
+    oldTask.reset();
+    promise.finish(42);
+    QVERIFY(task.isFinished());
+    QCOMPARE(task.takeResult(), 42);
+}
+
+static QXmppTask<void> awaitTask(QXmppTask<int> task, bool &destroyed)
+{
+    auto guard = qScopeGuard([&] { destroyed = true; });
+    co_await task;
+}
+
+void tst_QXmppClient::testPromiseMoveAssignmentReleasesPrevious()
+{
+    // the previous state is released right away, e.g. a waiting coroutine is cancelled
+    bool destroyed = false;
+    QXmppPromise<int> promise;
+    auto coroutineTask = awaitTask(promise.task(), destroyed);
+    QVERIFY(!destroyed);
+
+    QXmppPromise<int> newPromise;
+    promise = std::move(newPromise);
+    QVERIFY(destroyed);
+    QVERIFY(!coroutineTask.isFinished());
+}
+
+void tst_QXmppClient::testPromiseCopyAssignment()
+{
+    QXmppPromise<int> promise;
+    std::optional<QXmppTask<int>> oldTask = promise.task();
+
+    QXmppPromise<int> newPromise;
+    auto task = newPromise.task();
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    promise = newPromise;
+    QT_WARNING_POP
+
+    // the task of the previous promise is detached from it
+    oldTask.reset();
+    promise.finish(42);
+    QVERIFY(task.isFinished());
+    QCOMPARE(task.takeResult(), 42);
 }
 
 using RosterResult = std::variant<QXmppRosterIq, QXmppError>;
