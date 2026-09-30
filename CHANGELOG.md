@@ -4,6 +4,41 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.17.0 (Unreleased)
+-------------------------
+
+ - DiscoveryManager: Add reactive watches on the info of entities (@lnj, !819)
+   - `QXmppDiscoInfoWatch` via `watchInfo()`, `watchServerInfo()` and
+     `watchAccountInfo()`: watches on the same entity share one request and
+     keep the previous info as stale until the new info has been received
+   - `QXmppDiscoFeatureWatch` for whether an entity supports features, with
+     `resolve()` for awaiting the result
+   - Use entity capabilities (XEP-0115) from presences, so the info of other
+     entities with the same capabilities requires no request
+   - `QXmppEntityCapsStorage` interface for keeping verified entity
+     capabilities between sessions
+ - Add `QXmpp::Namespace` enum for all known namespaces with
+   `namespaceUri()` and `namespaceFromUri()` (@lnj, !819)
+ - Add `watchServerSupport()`/`watchAccountSupport()` feature watches to the
+   Blocking, CarbonsV2, External Service Discovery, MAM, Moved, Registration
+   and vCard managers and `watchParticipantSupport()`/
+   `watchMessageArchivingSupport()` to the MIX manager (@lnj, !819)
+ - Deprecate `supportedByServer` of the Moved and Registration managers and
+   `participantSupport`/`messageArchivingSupport` of the MIX manager in favour
+   of the new feature watches; their values are now kept on reconnection
+   until the new info has been received (@lnj, !819)
+ - Add `operator==` to `QXmppDataForm`, `QXmppDiscoIdentity`,
+   `QXmppDiscoInfo`, `QXmppDiscoService` and `QXmppHttpUploadService`
+   (@lnj, !819)
+ - CarbonManagerV2: Only enable carbons if the server supports them (@lnj, !819)
+ - HttpUploadManager: Report support as soon as an upload service has been
+   found (@lnj, !819)
+ - DiscoInfo: Fix the entity capabilities hash of data forms without a hidden
+   `FORM_TYPE` field and of strings sorted differently in UTF-16 and UTF-8
+   (@lnj, !819)
+ - Task: Fix assigning to a `QXmppPromise` with an attached task and make
+   moves of promises and tasks `noexcept` (@lnj, !819)
+
 QXmpp 1.16.3 (July 23, 2026)
 ----------------------------
 
