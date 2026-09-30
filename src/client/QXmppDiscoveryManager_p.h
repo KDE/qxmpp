@@ -6,6 +6,7 @@
 #define QXMPPDISCOVERYMANAGER_P_H
 
 #include "QXmppDiscoveryManager.h"
+#include "QXmppEntityCapsStorage.h"
 #include "QXmppPromise.h"
 
 #include "Async.h"
@@ -116,7 +117,8 @@ public:
 
         bool operator==(const Caps &) const = default;
     };
-    using CapsKey = std::tuple<QString, QByteArray>;
+    // hash algorithm and verification string
+    using CapsKey = std::tuple<QXmpp::HashAlgorithm, QByteArray>;
     struct CapsWaiter {
         QString jid;
         Caps caps;
@@ -150,6 +152,8 @@ public:
     std::map<CapsKey, std::vector<CapsWaiter>> capsRequests;
     // requests the info of full JIDs without presence, e.g. of MUC occupants or components
     QTimer presenceTimer;
+    // verified info of previous sessions
+    std::shared_ptr<QXmppEntityCapsStorage> capsStorage;
 
     // service watches
     QList<WatchEntry> watches;
@@ -189,9 +193,11 @@ public:
     void handlePresence(const QXmppPresence &presence);
     QXmppTask<QXmpp::Result<QXmppDiscoInfo>> capsInfo(const QString &jid, const Caps &caps);
     QXmppTask<QXmpp::Result<QXmppDiscoInfo>> startCapsRequest(const QString &jid, const Caps &caps);
+    QXmppTask<QXmpp::Result<QXmppDiscoInfo>> loadCapsInfo(const QString &jid, const Caps &caps);
     QXmppTask<QXmpp::Result<QXmppDiscoInfo>> requestCapsInfo(const QString &jid, const Caps &caps);
     void finishCapsRequest(const CapsKey &key, const std::optional<QXmppDiscoInfo> &info);
     void applyCapsInfo(const QString &jid, const Caps &caps, const QXmppDiscoInfo &info);
+    static std::optional<CapsKey> capsKey(const Caps &caps);
     std::vector<std::shared_ptr<QXmppDiscoInfoWatch::Data>> lockInfoWatches() const;
     std::vector<std::shared_ptr<DiscoInfoEntry>> lockInfoEntries() const;
     QString resolveJid(const QXmppDiscoInfoWatch::Data &data) const;

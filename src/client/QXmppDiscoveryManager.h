@@ -21,6 +21,7 @@ class QXmppTask;
 class QXmppDataForm;
 class QXmppDiscoveryIq;
 class QXmppDiscoveryManagerPrivate;
+class QXmppEntityCapsStorage;
 struct QXmppError;
 
 namespace QXmpp::Private {
@@ -158,6 +159,9 @@ public:
 
     QString clientCapabilitiesNode() const;
     void setClientCapabilitiesNode(const QString &);
+
+    std::shared_ptr<QXmppEntityCapsStorage> entityCapsStorage() const;
+    void setEntityCapsStorage(std::shared_ptr<QXmppEntityCapsStorage> storage);
 
     QXmppDiscoInfo buildClientInfo() const;
 
