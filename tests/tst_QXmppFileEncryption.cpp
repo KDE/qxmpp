@@ -22,6 +22,8 @@ private:
     Q_SLOT void deviceDecrypt_data();
     Q_SLOT void deviceDecrypt();
     Q_SLOT void paddingSize();
+    Q_SLOT void deviceEncryptReadAfterEnd();
+    Q_SLOT void deviceDecryptFinishTwice();
     Q_SLOT void errorQueueCleared();
 };
 
@@ -131,6 +133,44 @@ void tst_QXmppFileEncryption::paddingSize()
         auto decryptedData = process(encryptedData, Aes256CbcPkcs7, Decode, key, iv);
         QCOMPARE(decryptedData, data);
     }
+}
+
+void tst_QXmppFileEncryption::deviceEncryptReadAfterEnd()
+{
+    QByteArray data = "This is an example text message";
+    QByteArray key = "12345678901234567890123456789012";
+    QByteArray iv = "12345678901234567890123456789012";
+
+    auto buffer = std::make_unique<QBuffer>(&data);
+    buffer->open(QIODevice::ReadOnly);
+
+    EncryptionDevice encDev(std::move(buffer), Aes256CbcPkcs7, key, iv);
+    auto encrypted = encDev.readAll();
+    QCOMPARE(encrypted, process(data, Aes256CbcPkcs7, Encode, key, iv));
+
+    // reading again must not finalize the cipher a second time (i.e. append another padding block)
+    QVERIFY(encDev.read(16).isEmpty());
+}
+
+void tst_QXmppFileEncryption::deviceDecryptFinishTwice()
+{
+    QByteArray data = "This is an example text message";
+    QByteArray key = "12345678901234567890123456789012";
+    QByteArray iv = "12345678901234567890123456789012";
+    auto encrypted = process(data, Aes256CbcPkcs7, Encode, key, iv);
+
+    QByteArray decrypted;
+    auto buffer = std::make_unique<QBuffer>(&decrypted);
+    buffer->open(QIODevice::WriteOnly);
+
+    // QXmppEncryptedFileSharingProvider calls finish() after the device has been closed
+    DecryptionDevice decDev(std::move(buffer), Aes256CbcPkcs7, key, iv);
+    decDev.write(encrypted);
+    decDev.close();
+    decDev.finish();
+
+    QCOMPARE(decrypted, data);
+    QCOMPARE(ERR_peek_error(), 0UL);
 }
 
 void tst_QXmppFileEncryption::errorQueueCleared()

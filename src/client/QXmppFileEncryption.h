@@ -68,6 +68,7 @@ public:
 
 private:
     Cipher m_cipherConfig;
+    bool m_finished = false;
     std::vector<char> m_outputBuffer;
     std::unique_ptr<QIODevice> m_output;
     std::unique_ptr<CipherContext> m_cipher;
