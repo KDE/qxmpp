@@ -4,6 +4,8 @@
 
 #include "QXmppFileEncryption.h"
 
+#include <openssl/err.h>
+
 #include <QtTest>
 
 using namespace QXmpp;
@@ -20,6 +22,7 @@ private:
     Q_SLOT void deviceDecrypt_data();
     Q_SLOT void deviceDecrypt();
     Q_SLOT void paddingSize();
+    Q_SLOT void errorQueueCleared();
 };
 
 void tst_QXmppFileEncryption::basic()
@@ -128,6 +131,18 @@ void tst_QXmppFileEncryption::paddingSize()
         auto decryptedData = process(encryptedData, Aes256CbcPkcs7, Decode, key, iv);
         QCOMPARE(decryptedData, data);
     }
+}
+
+void tst_QXmppFileEncryption::errorQueueCleared()
+{
+    QByteArray key = "12345678901234567890123456789012";
+    QByteArray iv = "12345678901234567890123456789012";
+
+    // not a multiple of the block size
+    QVERIFY(process(QByteArray(17, 'a'), Aes256CbcPkcs7, Decode, key, iv).isEmpty());
+
+    // errors must not be left in the thread's error queue (would break QSslSocket)
+    QCOMPARE(ERR_peek_error(), 0UL);
 }
 
 QTEST_MAIN(tst_QXmppFileEncryption)
