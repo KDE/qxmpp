@@ -5,6 +5,7 @@
 #include "Crypto.h"
 
 #include <openssl/crypto.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 #include <openssl/rand.h>
@@ -12,6 +13,18 @@
 #include <QMessageAuthenticationCode>
 
 namespace QXmpp::Private::Crypto {
+
+// OpenSSL's error queue is per thread and shared with everything else using OpenSSL in that
+// thread, including QSslSocket. QSslSocket expects the queue to be empty when it reads from the
+// socket and aborts the connection with any error left over from here. All errors are reported
+// via return values, so remove everything that has been added to the queue in the meantime.
+class ErrorQueueGuard
+{
+public:
+    ErrorQueueGuard() { ERR_set_mark(); }
+    ~ErrorQueueGuard() { ERR_pop_to_mark(); }
+    Q_DISABLE_COPY_MOVE(ErrorQueueGuard)
+};
 
 static const EVP_CIPHER *evpCipher(Cipher cipher)
 {
@@ -39,6 +52,8 @@ static bool isCbc(Cipher cipher)
 static QByteArray aesProcess(const QByteArray &data, const QByteArray &key, const QByteArray &iv,
                              const EVP_CIPHER *cipher, bool encrypt, bool padding)
 {
+    ErrorQueueGuard errorQueueGuard;
+
     auto *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         return {};
@@ -78,6 +93,8 @@ static QByteArray aesProcess(const QByteArray &data, const QByteArray &key, cons
 
 QByteArray aesGcmEncrypt(const QByteArray &data, const QByteArray &key, const QByteArray &iv)
 {
+    ErrorQueueGuard errorQueueGuard;
+
     // GCM encryption without auth tag (matching existing QCA behavior for compatibility)
     auto *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
@@ -124,6 +141,8 @@ QByteArray aesGcmEncrypt(const QByteArray &data, const QByteArray &key, const QB
 
 QByteArray aesGcmDecrypt(const QByteArray &data, const QByteArray &key, const QByteArray &iv)
 {
+    ErrorQueueGuard errorQueueGuard;
+
     // GCM decryption without auth tag verification (matching existing QCA behavior)
     auto *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
@@ -219,6 +238,8 @@ QByteArray aesCtrProcess(const QByteArray &data, const QByteArray &key, const QB
 
 SecureByteArray hkdfSha256(const QByteArray &key, const QByteArray &salt, const QByteArray &info, int outputLen)
 {
+    ErrorQueueGuard errorQueueGuard;
+
     auto *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, nullptr);
     if (!pctx) {
         return {};
@@ -284,6 +305,8 @@ bool constTimeEqual(const QByteArray &a, const QByteArray &b)
 
 QByteArray randomBytes(int count)
 {
+    ErrorQueueGuard errorQueueGuard;
+
     QByteArray output(count, '\0');
     if (RAND_bytes(reinterpret_cast<unsigned char *>(output.data()), count) != 1) {
         return {};
@@ -296,6 +319,8 @@ QByteArray randomBytes(int count)
 CipherContext::CipherContext(Cipher cipher, Direction direction, const QByteArray &key, const QByteArray &iv)
     : m_cipher(cipher)
 {
+    ErrorQueueGuard errorQueueGuard;
+
     m_ctx = EVP_CIPHER_CTX_new();
     if (!m_ctx) {
         return;
@@ -351,6 +376,8 @@ QByteArray CipherContext::update(const QByteArray &data)
         return {};
     }
 
+    ErrorQueueGuard errorQueueGuard;
+
     QByteArray output(data.size() + EVP_CIPHER_CTX_block_size(m_ctx), '\0');
     int outLen = 0;
 
@@ -369,6 +396,8 @@ QByteArray CipherContext::finalize()
     if (!m_ctx) {
         return {};
     }
+
+    ErrorQueueGuard errorQueueGuard;
 
     // For GCM modes, skip finalization (matching existing behavior)
     if (isGcm(m_cipher)) {

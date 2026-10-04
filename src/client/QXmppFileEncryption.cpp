@@ -151,7 +151,7 @@ qint64 EncryptionDevice::readData(char *data, qint64 len)
 
         // process input buffer
         auto processed = m_cipher->update(inputBuffer);
-        if (m_input->atEnd()) {
+        if (!m_finalized && m_input->atEnd()) {
             m_finalized = true;
             processed += m_cipher->finalize();
         }
@@ -241,6 +241,12 @@ qint64 DecryptionDevice::writeData(const char *data, qint64 len)
 
 void DecryptionDevice::finish()
 {
+    // the cipher can only be finalized once
+    if (m_finished) {
+        return;
+    }
+    m_finished = true;
+
     auto finalized = m_cipher->finalize();
     if (!finalized.isEmpty()) {
         m_output->write(finalized.constData(), finalized.size());
