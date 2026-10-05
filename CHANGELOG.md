@@ -13,12 +13,38 @@ QXmpp 1.17.0 (Unreleased)
      keep the previous info as stale until the new info has been received
    - `QXmppDiscoFeatureWatch` for whether an entity supports features, with
      `resolve()` for awaiting the result
-   - Use entity capabilities (XEP-0115) from presences, so the info of other
-     entities with the same capabilities requires no request
+   - Use [XEP-0115: Entity Capabilities](https://xmpp.org/extensions/xep-0115.html)
+     from presences, so the info of other entities with the same capabilities
+     requires no request
    - `QXmppEntityCapsStorage` interface for keeping verified entity
      capabilities between sessions
- - Add `QXmpp::Namespace` enum for all known namespaces with
-   `namespaceUri()` and `namespaceFromUri()` (@lnj, !819)
+ - Client: Event-driven reconnection aware of stream resumption (@lnj, !818)
+   - Keep the stream resumable after a ping timeout and don't consider it
+     resumable anymore after resumption failed
+   - Retry more often while the server's resumption window is still open
+   - Add `setNetworkAvailable()`/`isNetworkAvailable()`, `reconnectNow()`
+     and `checkConnection()` to react to network changes immediately
+   - Add opt-in `QXmppNetworkMonitor` extension feeding `QNetworkInformation`
+     changes into the client
+   - Reconnect after the server ended the stream temporarily, don't retry on
+     a timer after a failed TLS handshake and use the backoff after ping
+     timeouts
+   - Only ping when no data has been received for a while and use very
+     coarse timers for pings and reconnection
+   - Servers on the local machine are not affected by the network availability
+ - Implement [XEP-0424: Message Retraction](https://xmpp.org/extensions/xep-0424.html)
+   (`QXmppMessage::retraction()`/`retracted()`) and add
+   `QXmppMessageRetractionLimits` data form for the advertised retraction
+   limits (@lnj, !799, !811)
+ - Implement [XEP-0425: Moderated Message Deletion](https://xmpp.org/extensions/xep-0425.html),
+   including `QXmppMucManagerV2` support for retracting messages as a
+   moderator (@lnj, !798)
+ - Implement [XEP-0377: Spam Reporting](https://xmpp.org/extensions/xep-0377.html)
+   (`QXmppSpamReport`, `QXmppBlockingManager::reportAndBlock()`)
+   (@lnj, !787, !808)
+ - AccountMigration: Add [XEP-0227: Portable Import/Export Format for XMPP-IM Servers](https://xmpp.org/extensions/xep-0227.html)
+   as configurable export format with native roster and vCard serialization;
+   the format is auto-detected on import (@lnj, !797, !800)
  - Add `watchServerSupport()`/`watchAccountSupport()` feature watches to the
    Blocking, CarbonsV2, External Service Discovery, MAM, Moved, Registration
    and vCard managers and `watchParticipantSupport()`/
@@ -27,12 +53,29 @@ QXmpp 1.17.0 (Unreleased)
    `participantSupport`/`messageArchivingSupport` of the MIX manager in favour
    of the new feature watches; their values are now kept on reconnection
    until the new info has been received (@lnj, !819)
+ - MucManagerV2: Add `mucServiceInfos()` and `isMucRoom()`, publish the
+   config form fetched during room creation (@lnj, !813)
+ - Add `QXmpp::Namespace` enum for all known namespaces with
+   `namespaceUri()` and `namespaceFromUri()` (@lnj, !819)
  - Add `operator==` to `QXmppDataForm`, `QXmppDiscoIdentity`,
    `QXmppDiscoInfo`, `QXmppDiscoService` and `QXmppHttpUploadService`
    (@lnj, !819)
+ - Logger: Add `OutputMode` (Auto/Raw/Readable) to control formatting of
+   logged XML, replacing `setPrettyXml()`/`enablePrettyXml()` which are now
+   deprecated (@lnj, !814)
+ - Logger: Optionally elide very long messages (@lnj, !807)
+ - Logger: Filter out Stream Management ack messages (@lnj, !791)
+ - AccountMigration: Deprecate format-less `QXmppExportData::toXml()`
+   (@lnj, !801)
+ - Client: Generate resources with a random postfix for Bind 1 (@lnj, !786)
  - CarbonManagerV2: Only enable carbons if the server supports them (@lnj, !819)
  - HttpUploadManager: Report support as soon as an upload service has been
    found (@lnj, !819)
+ - Client: Fix reconnection backoff never being applied (@lnj, !817)
+ - DiscoveryManager: Fix service watches created while connected not starting
+   discovery (@lnj, !813)
+ - Bookmarks: Fix `bookmarksReset()` not always being emitted when a fetch
+   fails (@lnj, !810)
  - DiscoInfo: Fix the entity capabilities hash of data forms without a hidden
    `FORM_TYPE` field and of strings sorted differently in UTF-16 and UTF-8
    (@lnj, !819)
