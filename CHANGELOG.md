@@ -4,8 +4,8 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.17.0 (Unreleased)
--------------------------
+QXmpp 1.17.0 (October 6, 2026)
+------------------------------
 
  - DiscoveryManager: Add reactive watches on the info of entities (@lnj, !819)
    - `QXmppDiscoInfoWatch` via `watchInfo()`, `watchServerInfo()` and
