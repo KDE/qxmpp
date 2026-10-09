@@ -262,7 +262,7 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
     That can be done as soon as the user is logged in to the server:
     \code
     connect(client, &QXmppClient::connected, this, [=]() {
-    auto future = manager->start();
+    auto future = manager->setUp();
     });
     \endcode
 
