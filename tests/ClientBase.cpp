@@ -4404,7 +4404,7 @@ void tst_QXmppDiscoveryIq::discoMessageRetractionLimits()
     // An entity that does not enforce a limit does not advertise one.
     QXmppMessageRetractionLimits empty;
     QVERIFY(!empty.maxAge().has_value());
-    QCOMPARE(empty.toDataForm().fields().size(), 1);
+    QCOMPARE(empty.toDataForm().constFields().size(), 1);
 }
 
 }  // namespace DiscoveryIq
