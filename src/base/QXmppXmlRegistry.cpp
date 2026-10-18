@@ -30,6 +30,8 @@ struct ParserEntry {
     std::type_index type;
 };
 
+namespace {
+
 // Storage key: (localName, namespaceURI).
 struct XmlElementId {
     QString tag;
@@ -37,6 +39,8 @@ struct XmlElementId {
 
     bool operator==(const XmlElementId &) const = default;
 };
+
+}  // namespace
 
 #ifndef QXMPP_DOC
 template<>

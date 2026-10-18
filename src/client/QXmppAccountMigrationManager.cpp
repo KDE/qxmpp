@@ -24,6 +24,8 @@ using namespace QXmpp::Private;
 
 // Utilities for account data extensions
 
+namespace {
+
 struct XmlElementId {
     QString tagName;
     QString xmlns;
@@ -46,6 +48,8 @@ struct XmlElementId {
         return result < 0;
     }
 };
+
+}  // namespace
 
 #ifndef QXMPP_DOC
 template<>
