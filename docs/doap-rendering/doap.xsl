@@ -3,7 +3,7 @@
 <!--
 SPDX-FileCopyrightText: 2019 Adrien Destugues <pulkomandy@pulkomandy.tk>
 
-SPDX-License-Identifier: CC0-1.0
+SPDX-License-Identifier: CC-BY-4.0
 -->
 
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"
