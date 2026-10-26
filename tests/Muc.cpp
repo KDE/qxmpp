@@ -3595,12 +3595,27 @@ void tst_QXmppMuc::destroyRoomWithoutReason()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
 
+    QSignalSpy removedSpy(muc, &QXmppMucManagerV2::removedFromRoom);
+
     auto task = room.destroyRoom();
     test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
                 "<query xmlns='http://jabber.org/protocol/muc#owner'>"
                 "<destroy/>"
                 "</query></iq>"_s);
     QVERIFY(!task.isFinished());
+
+    // the service removes us before sending the result
+    QXmppPresence destroyPresence;
+    parsePacket(destroyPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<destroy/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(destroyPresence);
+    QCOMPARE(removedSpy.size(), 0);
 
     test.inject(u"<iq id='qx1' type='result'/>"_s);
     QVERIFY(task.isFinished());

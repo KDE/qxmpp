@@ -85,6 +85,11 @@ public:
         The room state is still accessible during this signal's emission.
         After all handlers return, the room state is cleaned up.
         The \a destroy parameter contains room destruction info if the reason is \c RoomDestroyed.
+
+        Not emitted for QXmppMucRoomV2::leave() and QXmppMucRoomV2::destroyRoom().
+
+        To clean up whenever the room is no longer joined, including after leave() and
+        destroyRoom(), use QXmppMucRoomV2::joined() instead.
     */
     Q_SIGNAL void removedFromRoom(const QString &roomJid, QXmpp::Muc::LeaveReason reason, const std::optional<QXmpp::Muc::Destroy> &destroy);
     /*! Emitted with the \a messages received for the room at \a roomJid during joining. */

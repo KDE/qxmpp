@@ -140,6 +140,8 @@ struct MucRoomData {
     std::unique_ptr<QTimer, DeleteLaterDeleter> nickChangeTimer;
     std::optional<QXmppPromise<Result<>>> leavePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
+    // destroyRoom() is waiting for the result; the destroy presence is then not reported
+    bool destroying = false;
     // XEP-0410: MUC Self-Ping
     std::chrono::steady_clock::time_point lastActivity;
     bool selfPingInFlight = false;
@@ -245,6 +247,7 @@ struct MucRoomData {
         joinPromise.reset();
         createPromise.reset();
         leavePromise.reset();
+        destroying = false;
         nickChangePromise.reset();
         joinTimer.reset();
         leaveTimer.reset();
@@ -1099,7 +1102,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                 promise = std::move(data.leavePromise);
             }
 
-            if (reason != Muc::LeaveReason::Left) {
+            if (reason != Muc::LeaveReason::Left && !(reason == Muc::LeaveReason::RoomDestroyed && data.destroying)) {
                 Q_EMIT q->removedFromRoom(roomJid, reason, presence.mucDestroy());
             }
 
@@ -2778,6 +2781,8 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     An optional \a reason and an \a alternateJid can be provided; the alternate
     JID is sent to occupants so they may join an alternative room.
 
+    QXmppMucManagerV2::removedFromRoom() is not emitted for the room.
+
     \since QXmpp 1.16
 */
 QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QString &alternateJid)
@@ -2786,7 +2791,9 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
         co_return QXmppError { u"Room is not joined."_s };
     }
 
+    m_data->destroying = true;
     auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroy = MucOwnerDestroy { .alternateJid = alternateJid, .reason = reason } }).withContext(m_data->manager);
+    m_data->destroying = false;
     // Only tear down if still joined — a disconnect during the await may have already
     // deactivated (and a subsequent rejoin revived) the room.
     if (std::holds_alternative<Success>(result)) {
