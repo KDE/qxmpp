@@ -584,7 +584,7 @@ void tst_QXmppJingleData::testCandidate()
 void tst_QXmppJingleData::testContent()
 {
     const QByteArray xml(
-        "<content creator=\"initiator\" name=\"voice\">"
+        "<content xmlns=\"urn:xmpp:jingle:1\" creator=\"initiator\" name=\"voice\">"
         "<description xmlns=\"urn:xmpp:jingle:apps:rtp:1\" media=\"audio\">"
         "<rtcp-mux/>"
         "<encryption xmlns=\"urn:xmpp:jingle:apps:rtp:1\">"
@@ -706,7 +706,7 @@ void tst_QXmppJingleData::testContent()
 void tst_QXmppJingleData::testContentFingerprint()
 {
     const QByteArray xml(
-        "<content creator=\"initiator\" name=\"voice\">"
+        "<content xmlns=\"urn:xmpp:jingle:1\" creator=\"initiator\" name=\"voice\">"
         "<description xmlns=\"urn:xmpp:jingle:apps:rtp:1\" media=\"audio\">"
         "<payload-type id=\"0\" name=\"PCMU\"/>"
         "</description>"
@@ -929,7 +929,7 @@ void tst_QXmppJingleData::testContentSdpParameters()
 void tst_QXmppJingleData::testContentRtpFeedbackNegotiation()
 {
     const QByteArray xml(
-        "<content creator=\"initiator\" name=\"voice\">"
+        "<content xmlns=\"urn:xmpp:jingle:1\" creator=\"initiator\" name=\"voice\">"
         "<description xmlns=\"urn:xmpp:jingle:apps:rtp:1\">"
         "<rtcp-fb xmlns=\"urn:xmpp:jingle:apps:rtp:rtcp-fb:0\" type=\"nack\" subtype=\"pli\"/>"
         "<rtcp-fb xmlns=\"urn:xmpp:jingle:apps:rtp:rtcp-fb:0\" type=\"nack\" subtype=\"sli\"/>"
@@ -999,7 +999,7 @@ void tst_QXmppJingleData::testContentRtpFeedbackNegotiation()
 void tst_QXmppJingleData::testContentRtpHeaderExtensionsNegotiation()
 {
     const QByteArray xml(
-        "<content creator=\"initiator\" name=\"voice\">"
+        "<content xmlns=\"urn:xmpp:jingle:1\" creator=\"initiator\" name=\"voice\">"
         "<description xmlns=\"urn:xmpp:jingle:apps:rtp:1\">"
         "<rtp-hdrext xmlns=\"urn:xmpp:jingle:apps:rtp:rtp-hdrext:0\" id=\"1\" uri=\"urn:ietf:params:rtp-hdrext:toffset\"/>"
         "<rtp-hdrext xmlns=\"urn:xmpp:jingle:apps:rtp:rtp-hdrext:0\" id=\"2\" uri=\"urn:ietf:params:rtp-hdrext:ntp-64\"/>"
@@ -1066,7 +1066,7 @@ void tst_QXmppJingleData::testSession()
         " initiator=\"romeo@montague.lit/orchard\""
         " sid=\"a73sjjvkla37jfea\">"
         "<muji xmlns=\"urn:xmpp:jingle:muji:0\" room=\"darkcave@chat.shakespeare.lit\"/>"
-        "<content creator=\"initiator\" name=\"this-is-a-stub\"/>"
+        "<content xmlns=\"urn:xmpp:jingle:1\" creator=\"initiator\" name=\"this-is-a-stub\"/>"
         "</jingle>"
         "</iq>");
 

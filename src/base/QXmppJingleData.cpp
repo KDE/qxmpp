@@ -721,7 +721,7 @@ void QXmppJingleIq::Content::toXml(QXmlStreamWriter *writer) const
 
     XmlWriter w(writer);
     w.write(Element {
-        u"content",
+        { u"content", ns_jingle },
         OptionalAttribute { u"creator", d->creator },
         OptionalAttribute { u"disposition", d->disposition },
         OptionalAttribute { u"name", d->name },

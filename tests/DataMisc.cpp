@@ -289,8 +289,8 @@ void tst_QXmppPresence::testPresenceWithMuji()
         "<presence>"
         "<muji xmlns=\"urn:xmpp:jingle:muji:0\">"
         "<preparing/>"
-        "<content creator=\"initiator\" name=\"video\"/>"
-        "<content creator=\"initiator\" name=\"voice\"/>"
+        "<content xmlns=\"urn:xmpp:jingle:1\" creator=\"initiator\" name=\"video\"/>"
+        "<content xmlns=\"urn:xmpp:jingle:1\" creator=\"initiator\" name=\"voice\"/>"
         "</muji>"
         "</presence>");
 
@@ -320,6 +320,19 @@ void tst_QXmppPresence::testPresenceWithMuji()
     QCOMPARE(presence2.mujiContents().at(0).name(), u"video"_s);
     QCOMPARE(presence2.mujiContents().at(1).name(), u"voice"_s);
     serializePacket(presence2, xml);
+
+    // contents in the muji namespace as sent by QXmpp < 1.17.1
+    const QByteArray legacyXml(
+        "<presence>"
+        "<muji xmlns=\"urn:xmpp:jingle:muji:0\">"
+        "<content creator=\"initiator\" name=\"video\"/>"
+        "</muji>"
+        "</presence>");
+
+    QXmppPresence presence3;
+    parsePacket(presence3, legacyXml);
+    QCOMPARE(presence3.mujiContents().size(), 1);
+    QCOMPARE(presence3.mujiContents().at(0).name(), u"video"_s);
 }
 
 void tst_QXmppPresence::testPresenceWithLastUserInteraction()
