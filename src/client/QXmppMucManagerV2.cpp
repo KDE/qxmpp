@@ -2772,7 +2772,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
         co_return QXmppError { u"Room is not joined."_s };
     }
 
-    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_data->manager);
+    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroy = MucOwnerDestroy { alternateJid, reason } }).withContext(m_data->manager);
     // Only tear down if still joined — a disconnect during the await may have already
     // deactivated (and a subsequent rejoin revived) the room.
     if (std::holds_alternative<Success>(result)) {

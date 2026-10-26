@@ -232,6 +232,26 @@ void MucAdminQuery::toXml(QXmlStreamWriter *writer) const
     XmlWriter(writer).write(Element { Tag { u"query", ns_muc_admin }, items });
 }
 
+std::optional<MucOwnerDestroy> MucOwnerDestroy::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+    return MucOwnerDestroy {
+        .alternateJid = el.attribute(u"jid"_s),
+        .reason = el.firstChildElement(u"reason"_s).text(),
+    };
+}
+
+void MucOwnerDestroy::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        u"destroy",
+        OptionalAttribute { u"jid", alternateJid },
+        OptionalTextElement { u"reason", reason },
+    });
+}
+
 std::optional<MucOwnerQuery> MucOwnerQuery::fromDom(const QDomElement &el)
 {
     if (elementXmlTag(el) != XmlTag) {
@@ -239,11 +259,7 @@ std::optional<MucOwnerQuery> MucOwnerQuery::fromDom(const QDomElement &el)
     }
     MucOwnerQuery q;
     q.form = parseOptionalChildElement<QXmppDataForm>(el);
-    const auto destroyEl = el.firstChildElement(u"destroy"_s);
-    if (!destroyEl.isNull()) {
-        q.destroyAlternateJid = destroyEl.attribute(u"jid"_s);
-        q.destroyReason = destroyEl.firstChildElement(u"reason"_s).text();
-    }
+    q.destroy = parseOptionalChildElement<MucOwnerDestroy>(el);
     return q;
 }
 
@@ -253,14 +269,7 @@ void MucOwnerQuery::toXml(QXmlStreamWriter *writer) const
     w.write(Element {
         Tag { u"query", ns_muc_owner },
         form,
-        OptionalContent {
-            !destroyAlternateJid.isEmpty() || !destroyReason.isEmpty(),
-            Element {
-                u"destroy",
-                OptionalAttribute { u"jid", destroyAlternateJid },
-                OptionalTextElement { u"reason", destroyReason },
-            },
-        },
+        destroy,
     });
 }
 

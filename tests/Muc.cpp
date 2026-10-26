@@ -141,6 +141,7 @@ private:
     Q_SLOT void cancelRoomCreation();
     Q_SLOT void reconfigureRoom();
     Q_SLOT void destroyRoom();
+    Q_SLOT void destroyRoomWithoutReason();
     Q_SLOT void subscribeToRoomConfig();
     Q_SLOT void setWatchRoomConfigFetch();
     Q_SLOT void rewatchRoomConfigStaleCache();
@@ -3446,6 +3447,32 @@ void tst_QXmppMuc::destroyRoom()
     test.inject(u"<iq id='qx1' type='result'/>"_s);
     QVERIFY(task.isFinished());
     expectVariant<QXmpp::Success>(task.result());
+}
+
+void tst_QXmppMuc::destroyRoomWithoutReason()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    auto task = room.destroyRoom();
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+                "<destroy/>"
+                "</query></iq>"_s);
+    QVERIFY(!task.isFinished());
+
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    QVERIFY(task.isFinished());
+    expectVariant<QXmpp::Success>(task.result());
+    QVERIFY(!room.joined().value());
+
+    // the room can be created again
+    auto createTask = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s, u"coven"_s);
+    QVERIFY(!createTask.isFinished());
+    test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 }
 
 void tst_QXmppMuc::selfPingJoined()
