@@ -83,6 +83,7 @@ private:
     Q_SLOT void participantKicked();
     Q_SLOT void selfBanned();
     Q_SLOT void roomDestroyed();
+    Q_SLOT void roomDestroyedWithoutStatusCode();
     Q_SLOT void selfRemovedMembersOnly();
     Q_SLOT void selfRemovedServiceShutdown();
     Q_SLOT void selfRemovedError();
@@ -1944,6 +1945,35 @@ void tst_QXmppMuc::roomDestroyed()
     QVERIFY(destroyInfo.has_value());
     QCOMPARE(destroyInfo->alternateRoom(), u"darkcave@chat.shakespeare.lit"_s);
     QCOMPARE(destroyInfo->reason(), u"Moved to a new room"_s);
+}
+
+void tst_QXmppMuc::roomDestroyedWithoutStatusCode()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+
+    QSignalSpy removedSpy(muc, &QXmppMucManagerV2::removedFromRoom);
+    QSignalSpy participantLeftSpy(muc, &QXmppMucManagerV2::participantLeft);
+
+    // as sent by ejabberd and in the example of XEP-0045 §10.9
+    QXmppPresence destroyPresence;
+    parsePacket(destroyPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<destroy/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(destroyPresence);
+
+    QCOMPARE(removedSpy.size(), 1);
+    QCOMPARE(removedSpy.at(0).at(1).value<Muc::LeaveReason>(), Muc::LeaveReason::RoomDestroyed);
+    QCOMPARE(participantLeftSpy.size(), 0);
+    QVERIFY(!room.joined().value());
 }
 
 void tst_QXmppMuc::selfRemovedMembersOnly()

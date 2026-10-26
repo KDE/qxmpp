@@ -1089,8 +1089,10 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     }
                 }
             }
-        } else if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
+        } else if (presence.type() == QXmppPresence::Unavailable && (presence.mucStatusCodes().contains(110) || presence.mucDestroy())) {
             // Self-unavailable without 303: we left the room
+            // A room destruction is only sent to each occupant itself (XEP-0045 §10.9), and some
+            // services (e.g. ejabberd) omit status code 110 there.
             auto reason = leaveReasonFromPresence(presence);
             std::optional<QXmppPromise<Result<>>> promise;
             if (data.leavePromise) {
@@ -1110,7 +1112,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             if (promise) {
                 promise->finish(Success());
             }
-        } else if (presence.type() == QXmppPresence::Unavailable && !presence.mucStatusCodes().contains(110)) {
+        } else if (presence.type() == QXmppPresence::Unavailable) {
             // Another participant left the room
             auto reason = leaveReasonFromPresence(presence);
             if (auto pItr = data.participants.find(nickname); pItr != data.participants.end()) {
