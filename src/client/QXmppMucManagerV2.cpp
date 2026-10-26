@@ -578,9 +578,14 @@ QXmppTask<Result<QString>> QXmppMucManagerV2::requestUniqueRoomName(QString serv
 /*!
     Joins the MUC room at \a jid with the given \a nickname.
 
-    Sends an initial presence to the room and waits for all occupant presences that the MUC service
-    sends back. The returned task resolves once the server sends the self-presence with status code
-    110, meaning the participant list is already fully populated when the task finishes.
+    Sends an initial presence to the room and waits for all occupant presences, the discussion
+    history and the subject that the MUC service sends back. The returned task resolves once the
+    subject has been received, so the participant list is already fully populated when the task
+    finishes.
+
+    QXmppMucRoomV2::joined() is already \c true when the task resolves, so a notifier added
+    afterwards does not report it. Use QBindable::subscribe() or read the value first, see
+    \l{Reactive Properties}.
 
     If a join for the same room is already in progress the task fails immediately. If the room is
     already joined the existing room handle is returned as a success.
@@ -654,6 +659,10 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     server has confirmed room creation (XEP-0045 status code 201) and the configuration form
     has been fetched. If the room is already tracked, i.e. joined or being joined or created
     (see findRoom()), the task fails immediately.
+
+    QXmppMucRoomV2::joined() is still \c false when the task resolves. It becomes \c true once
+    QXmppMucRoomV2::setRoomConfig() has unlocked the room, and only then the room is usable, e.g.
+    for sending messages.
 
     If the user may not create rooms on the service, the task fails with the stanza error of
     the service. \xep{0045}{Multi-User Chat} requires \c not-allowed for this, but some
@@ -1784,6 +1793,10 @@ QBindable<QString> QXmppMucRoomV2::nickname() const
 
 /*!
     Returns whether the room is currently joined as a bindable property.
+
+    This becomes \c true when QXmppMucManagerV2::joinRoom() resolves, or after
+    QXmppMucManagerV2::createRoom() once setRoomConfig() has unlocked the room. It becomes
+    \c false when leaving the room, being removed from it or losing the connection.
 */
 QBindable<bool> QXmppMucRoomV2::joined() const
 {
