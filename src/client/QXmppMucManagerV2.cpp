@@ -11,10 +11,12 @@
 #include "QXmppMucForms.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppStanza.h"
+#include "QXmppStanza_p.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 #include <QXmppUtils.h>
 
+#include "Enums.h"
 #include "Global.h"
 #include "IqSending.h"
 #include "Ping.h"
@@ -650,6 +652,10 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     has been fetched. If the room is already tracked, i.e. joined or being joined or created
     (see findRoom()), the task fails immediately.
 
+    If the user may not create rooms on the service, the task fails with the stanza error of
+    the service. \xep{0045}{Multi-User Chat} requires \c not-allowed for this, but some
+    services use \c forbidden.
+
     \since QXmpp 1.16
 */
 QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::createRoom(QString serviceJid,
@@ -1041,7 +1047,9 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
             }
         } else if (presence.type() == QXmppPresence::Error) {
             auto error = presence.error();
-            throwRoomError(roomJid, QXmppError { u"Cannot join MUC: "_s + error.text(), std::move(error) });
+            auto text = error.text().isEmpty() ? Enums::toString(error.condition()) : error.text();
+            auto description = (data.createPromise ? u"Cannot create MUC: "_s : u"Cannot join MUC: "_s) + text;
+            throwRoomError(roomJid, QXmppError { std::move(description), std::move(error) });
             return;
         }
         break;

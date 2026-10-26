@@ -136,6 +136,7 @@ private:
     Q_SLOT void joinRoomNotFound();
     Q_SLOT void createRoom();
     Q_SLOT void createRoomAlreadyExists();
+    Q_SLOT void createRoomNotAllowed();
     Q_SLOT void requestUniqueRoomName();
     Q_SLOT void requestUniqueRoomNameEmpty();
     Q_SLOT void createRoomUnique();
@@ -3299,6 +3300,41 @@ void tst_QXmppMuc::createRoomAlreadyExists()
 
     QVERIFY(task.isFinished());
     expectFutureVariant<QXmppError>(task);
+}
+
+void tst_QXmppMuc::createRoomNotAllowed()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto createRoom = [&](const QString &errorText) {
+        auto task = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s, u"coven"_s);
+        test.ignore();  // presence
+
+        QXmppPresence errorPresence;
+        parsePacket(errorPresence,
+                    QStringLiteral("<presence from='coven@chat.shakespeare.lit/thirdwitch' type='error'>"
+                                   "<x xmlns='http://jabber.org/protocol/muc'/>"
+                                   "<error by='coven@chat.shakespeare.lit' type='cancel'>"
+                                   "<not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                                   "%1</error></presence>")
+                        .arg(errorText)
+                        .toUtf8());
+        test.injectPresence(errorPresence);
+
+        return expectFutureVariant<QXmppError>(task);
+    };
+
+    auto error = createRoom(u"<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>Room creation is restricted</text>"_s);
+    QCOMPARE(error.description, u"Cannot create MUC: Room creation is restricted"_s);
+    QCOMPARE(error.value<QXmppStanza::Error>()->condition(), QXmppStanza::Error::NotAllowed);
+    QVERIFY(!muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+
+    // without text, the condition is used
+    error = createRoom({});
+    QCOMPARE(error.description, u"Cannot create MUC: not-allowed"_s);
 }
 
 void tst_QXmppMuc::requestUniqueRoomName()
