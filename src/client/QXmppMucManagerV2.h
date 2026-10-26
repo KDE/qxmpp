@@ -50,11 +50,12 @@ public:
     void setSelfPingSilenceThreshold(std::chrono::milliseconds threshold);
 
     /*!
-        Returns a handle for the tracked room at \a jid, or \c std::nullopt if the manager
-        has no state for this JID.
+        Returns a handle for the tracked room at \a jid, or \c std::nullopt if the room is not
+        tracked. This does not join the room or send any request.
 
-        Inactive rooms (left but still referenced by a caller handle) are revived transparently
-        so that leave → findRoom observes the same underlying state.
+        A room is tracked from the start of joinRoom() or createRoom() until it is left, and its
+        state is kept up to date automatically in the meantime. A left room is still returned
+        as long as another handle to it exists, with its last known state.
     */
     std::optional<QXmppMucRoomV2> findRoom(const QString &jid);
 

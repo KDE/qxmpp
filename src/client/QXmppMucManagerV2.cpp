@@ -647,8 +647,8 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     The room is created in a locked state; no other users can join until the owner submits
     the configuration form via QXmppMucRoomV2::setRoomConfig(). The task resolves once the
     server has confirmed room creation (XEP-0045 status code 201) and the configuration form
-    has been fetched. If the local state machine detects that the room is already tracked,
-    the task fails immediately.
+    has been fetched. If the room is already tracked, i.e. joined or being joined or created
+    (see findRoom()), the task fails immediately.
 
     \since QXmpp 1.16
 */
