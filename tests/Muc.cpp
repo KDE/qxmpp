@@ -34,6 +34,7 @@ private:
     Q_SLOT void bookmarks2Set();
     Q_SLOT void bookmarks2SetUpdate();
     Q_SLOT void bookmarks2Remove();
+    Q_SLOT void bookmarks2OwnChangeSignals();
 
     // MUC avatars
     Q_SLOT void avatarFetch();
@@ -395,6 +396,75 @@ void tst_QXmppMuc::bookmarks2Remove()
     test.inject(u"<iq id='qx1' type='result'/>"_s);
 
     expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppMuc::bookmarks2OwnChangeSignals()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.addNewExtension<QXmppPubSubManager>();
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
+
+    QSignalSpy addedSignal(bm, &QXmppPepBookmarkManager::bookmarksAdded);
+    QSignalSpy changedSignal(bm, &QXmppPepBookmarkManager::bookmarksChanged);
+    QSignalSpy removedSignal(bm, &QXmppPepBookmarkManager::bookmarksRemoved);
+
+    bm->onConnected();
+    test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
+    test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
+
+    const auto itemEvent = u"<message from='juliet@capulet.lit' to='juliet@capulet.lit/balcony' type='headline'>"
+                           "<event xmlns='http://jabber.org/protocol/pubsub#event'>"
+                           "<items node='urn:xmpp:bookmarks:1'>"
+                           "<item id='theplay@conference.shakespeare.lit'><conference xmlns='urn:xmpp:bookmarks:1'><nick>JC</nick></conference></item>"
+                           "</items>"
+                           "</event></message>"_s;
+    const auto retractEvent = u"<message from='juliet@capulet.lit' to='juliet@capulet.lit/balcony' type='headline'>"
+                              "<event xmlns='http://jabber.org/protocol/pubsub#event'>"
+                              "<items node='urn:xmpp:bookmarks:1'><retract id='theplay@conference.shakespeare.lit'/></items>"
+                              "</event></message>"_s;
+    auto setBookmark = [&]() {
+        return bm->setBookmark(QXmppMucBookmark { u"theplay@conference.shakespeare.lit"_s, {}, false, u"JC"_s, {} });
+    };
+    auto removeBookmark = [&]() {
+        return bm->removeBookmark(u"theplay@conference.shakespeare.lit"_s);
+    };
+
+    // IQ result before the event notification
+    auto setTask = setBookmark();
+    test.ignore();
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    expectFutureVariant<Success>(setTask);
+    test.inject(itemEvent);
+    QCOMPARE(addedSignal.size(), 1);
+    QCOMPARE(changedSignal.size(), 0);
+
+    auto removeTask = removeBookmark();
+    test.ignore();
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    expectFutureVariant<Success>(removeTask);
+    test.inject(retractEvent);
+    QCOMPARE(removedSignal.size(), 1);
+    QCOMPARE(removedSignal.at(0).at(0).value<QList<QString>>(), QList { u"theplay@conference.shakespeare.lit"_s });
+    QVERIFY(bm->bookmarks()->isEmpty());
+
+    // event notification before the IQ result
+    setTask = setBookmark();
+    test.ignore();
+    test.inject(itemEvent);
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    expectFutureVariant<Success>(setTask);
+    QCOMPARE(addedSignal.size(), 2);
+    QCOMPARE(changedSignal.size(), 0);
+
+    removeTask = removeBookmark();
+    test.ignore();
+    test.inject(retractEvent);
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    expectFutureVariant<Success>(removeTask);
+    QCOMPARE(removedSignal.size(), 2);
+    QCOMPARE(removedSignal.at(1).at(0).value<QList<QString>>(), QList { u"theplay@conference.shakespeare.lit"_s });
 }
 
 void tst_QXmppMuc::avatarFetch()

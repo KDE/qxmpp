@@ -24,6 +24,8 @@ struct QXmppPepBookmarkManagerPrivate {
 
     void setBookmarks(QList<QXmpp::Private::Bookmarks2ConferenceItem> &&items);
     void resetBookmarks();
+    void storeBookmarks(QList<QXmppMucBookmark> &&newBookmarks);
+    void eraseBookmarks(const QList<QString> &jids);
     QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
     QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 };

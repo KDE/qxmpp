@@ -8,6 +8,7 @@ QXmpp 1.17.1 (UNRELEASED)
 -------------------------
 
  - MUC: Fix destroying a room without reason or alternate JID, which sent no destroy request (@melvo, @lnj)
+ - Bookmarks: Fix signals for own changes depending on whether the IQ result or the event notification arrives first: bookmarksChanged() instead of bookmarksAdded() and bookmarksRemoved() with an empty list (@lnj)
 
 QXmpp 1.17.0 (October 6, 2026)
 ------------------------------
