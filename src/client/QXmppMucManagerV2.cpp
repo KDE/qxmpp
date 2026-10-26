@@ -1759,6 +1759,10 @@ QBindable<QString> QXmppMucRoomV2::subject() const
 
 /*!
     Returns the user's nickname in the room as a bindable property.
+
+    Unlike selfParticipant()->nickname(), this is also set while not joined: it holds the
+    requested nickname during joinRoom() and the last used one after leaving. Once joined, it
+    contains the nickname confirmed by the service, which may differ from the requested one.
 */
 QBindable<QString> QXmppMucRoomV2::nickname() const
 {
