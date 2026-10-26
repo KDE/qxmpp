@@ -6,6 +6,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageRetraction.h"
+#include "QXmppMucData_p.h"
 #include "QXmppMucForms.h"
 #include "QXmppMucIq.h"
 #include "QXmppMucManagerV2.h"
@@ -142,6 +143,7 @@ private:
     Q_SLOT void reconfigureRoom();
     Q_SLOT void destroyRoom();
     Q_SLOT void destroyRoomWithoutReason();
+    Q_SLOT void ownerQueryDestroy();
     Q_SLOT void subscribeToRoomConfig();
     Q_SLOT void setWatchRoomConfigFetch();
     Q_SLOT void rewatchRoomConfigStaleCache();
@@ -3473,6 +3475,41 @@ void tst_QXmppMuc::destroyRoomWithoutReason()
     auto createTask = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s, u"coven"_s);
     QVERIFY(!createTask.isFinished());
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+}
+
+void tst_QXmppMuc::ownerQueryDestroy()
+{
+    using namespace QXmpp::Private;
+
+    const QByteArray xml =
+        "<query xmlns='http://jabber.org/protocol/muc#owner'>"
+        "<destroy jid='coven@chat.shakespeare.lit'>"
+        "<password>cauldronburn</password>"
+        "<reason>Macbeth doth come.</reason>"
+        "</destroy>"
+        "</query>";
+
+    auto query = MucOwnerQuery::fromDom(xmlToDom(xml));
+    QVERIFY(query);
+    QVERIFY(!query->form);
+    QVERIFY(query->destroy);
+    QCOMPARE(query->destroy->alternateJid, u"coven@chat.shakespeare.lit"_s);
+    QCOMPARE(query->destroy->password, u"cauldronburn"_s);
+    QCOMPARE(query->destroy->reason, u"Macbeth doth come."_s);
+    serializePacket(*query, xml);
+
+    const QByteArray emptyXml = "<query xmlns='http://jabber.org/protocol/muc#owner'><destroy/></query>";
+    query = MucOwnerQuery::fromDom(xmlToDom(emptyXml));
+    QVERIFY(query);
+    QVERIFY(query->destroy);
+    QVERIFY(query->destroy->alternateJid.isEmpty());
+    QVERIFY(query->destroy->password.isEmpty());
+    QVERIFY(query->destroy->reason.isEmpty());
+    serializePacket(*query, emptyXml);
+
+    query = MucOwnerQuery::fromDom(xmlToDom("<query xmlns='http://jabber.org/protocol/muc#owner'/>"));
+    QVERIFY(query);
+    QVERIFY(!query->destroy);
 }
 
 void tst_QXmppMuc::selfPingJoined()

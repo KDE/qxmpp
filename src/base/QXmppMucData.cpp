@@ -239,6 +239,7 @@ std::optional<MucOwnerDestroy> MucOwnerDestroy::fromDom(const QDomElement &el)
     }
     return MucOwnerDestroy {
         .alternateJid = el.attribute(u"jid"_s),
+        .password = el.firstChildElement(u"password"_s).text(),
         .reason = el.firstChildElement(u"reason"_s).text(),
     };
 }
@@ -248,6 +249,7 @@ void MucOwnerDestroy::toXml(QXmlStreamWriter *writer) const
     XmlWriter(writer).write(Element {
         u"destroy",
         OptionalAttribute { u"jid", alternateJid },
+        OptionalTextElement { u"password", password },
         OptionalTextElement { u"reason", reason },
     });
 }

@@ -29,6 +29,7 @@ struct MucAdminQuery {
 // Request to destroy a room in a muc#owner query (XEP-0045 §10.9).
 struct MucOwnerDestroy {
     QString alternateJid;
+    QString password;
     QString reason;
 
     static constexpr std::tuple XmlTag = { u"destroy", ns_muc_owner };
