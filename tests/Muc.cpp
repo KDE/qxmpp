@@ -138,6 +138,7 @@ private:
     Q_SLOT void createRoom();
     Q_SLOT void createRoomAlreadyExists();
     Q_SLOT void createRoomNotAllowed();
+    Q_SLOT void createRoomOccupantId();
     Q_SLOT void requestUniqueRoomName();
     Q_SLOT void requestUniqueRoomNameEmpty();
     Q_SLOT void createRoomUnique();
@@ -169,6 +170,7 @@ private:
     Q_SLOT void occupantIdStrippedPresence();
     Q_SLOT void occupantIdStrippedMessage();
     Q_SLOT void occupantIdAccessor();
+    Q_SLOT void occupantIdMessageBeforeRoomInfo();
 
     // Shared-ownership lifetime safety
     Q_SLOT void handleSurvivesLeave();
@@ -207,6 +209,15 @@ static QString roomConfigResultXml(const QString &name = {})
                         "</field>"_s) +
         u"</x>"
         "</query></iq>"_s;
+}
+
+// The join completes only after the room's disco#info result (the first IQ, id qx1).
+static void injectRoomInfo(TestClient &test, const QString &roomJid = u"coven@chat.shakespeare.lit"_s, const QString &features = {})
+{
+    test.inject(u"<iq id='qx1' from='" + roomJid + u"' type='result'>"
+                                                   "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                                   "<identity category='conference' type='text'/>" +
+                features + u"</query></iq>");
 }
 
 void tst_QXmppMuc::bookmarks2Updates()
@@ -493,7 +504,7 @@ void tst_QXmppMuc::avatarFetch()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='garden@chat.shakespeare.example.org' type='groupchat'><subject>The Garden</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = *muc->findRoom(u"garden@chat.shakespeare.example.org"_s);
 
     // Inject disco#info result (qx1) with avatar hash + vcard-temp support.
     // Since watchAvatar is still false, this only populates roomInfo — no fetch yet.
@@ -511,6 +522,7 @@ void tst_QXmppMuc::avatarFetch()
         "</x>"
         "</query>"
         "</iq>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     QVERIFY(!room.avatar().value().has_value());
 
@@ -740,6 +752,7 @@ void tst_QXmppMuc::joinRoom()
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
 
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QCOMPARE(room.subject().value(), u"Cauldron"_s);
 }
@@ -776,6 +789,7 @@ void tst_QXmppMuc::joinRoomWithHistory()
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
 
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
 }
 
@@ -804,6 +818,7 @@ void tst_QXmppMuc::joinRoomWithPassword()
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
 
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
 }
 
@@ -860,6 +875,7 @@ void tst_QXmppMuc::joinRoomTimerStopped()
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
 
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
 
     // Wait to ensure timer doesn't fire after join completion
@@ -903,6 +919,7 @@ void tst_QXmppMuc::joinRoomAlreadyInProgress()
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
 
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task1);
 
     // Third join after fully joined must succeed idempotently
@@ -967,6 +984,7 @@ void tst_QXmppMuc::joinRoomWithHistoryMessages()
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
 
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QCOMPARE(room.subject().value(), u"Cauldron"_s);
     QCOMPARE(historyRoomJid, u"coven@chat.shakespeare.lit"_s);
@@ -1117,6 +1135,7 @@ void tst_QXmppMuc::joinRoomNicknameModifiedByService()
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
 
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QCOMPARE(room.nickname().value(), u"thirdwitch-2"_s);
     auto self = room.selfParticipant();
@@ -1352,7 +1371,7 @@ void tst_QXmppMuc::canModerateMessages()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = *muc->findRoom(u"coven@chat.shakespeare.lit"_s);
 
     // Before disco#info advertises moderation support: false even though we are a moderator
     QVERIFY(!room.canModerateMessages().value());
@@ -1363,6 +1382,7 @@ void tst_QXmppMuc::canModerateMessages()
                 "<identity category='conference' type='text'/>"
                 "<feature var='urn:xmpp:message-moderate:1'/>"
                 "</query></iq>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     QVERIFY(room.canModerateMessages().value());
 
@@ -1489,6 +1509,7 @@ void tst_QXmppMuc::sendPrivateMessage()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     // Find firstwitch in participants
@@ -1688,6 +1709,7 @@ void tst_QXmppMuc::participantNicknameChange()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
     muc->handleMessage(subjectMsg);
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     // Find firstwitch participant handle
@@ -2575,7 +2597,7 @@ void tst_QXmppMuc::permissionsSubjectChangeable()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = *muc->findRoom(u"coven@chat.shakespeare.lit"_s);
 
     // participant: canChangeSubject is false until disco#info arrives
     QVERIFY(room.canSendMessages().value());
@@ -2591,6 +2613,7 @@ void tst_QXmppMuc::permissionsSubjectChangeable()
                 "<field var='muc#roominfo_subjectmod'><value>1</value></field>"
                 "</x>"
                 "</query></iq>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     QVERIFY(room.canChangeSubject().value());
 }
@@ -2634,7 +2657,7 @@ void tst_QXmppMuc::roomInfoProperties()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = *muc->findRoom(u"coven@chat.shakespeare.lit"_s);
 
     // Before disco#info arrives: empty
     QVERIFY(room.description().value().isEmpty());
@@ -2642,6 +2665,7 @@ void tst_QXmppMuc::roomInfoProperties()
     QVERIFY(room.contactJids().value().isEmpty());
 
     test.inject(discoRoomInfo);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     QCOMPARE(room.description().value(), u"A Witch Coven"_s);
     QCOMPARE(room.language().value(), u"en"_s);
@@ -2671,13 +2695,14 @@ void tst_QXmppMuc::roomInfoStatus104()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = *muc->findRoom(u"coven@chat.shakespeare.lit"_s);
 
     // Answer the initial disco#info with an empty result
     test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
                 "<query xmlns='http://jabber.org/ns/protocols/disco#info'>"
                 "<identity category='conference' type='text'/>"
                 "</query></iq>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
     QVERIFY(room.description().value().isEmpty());
 
     // Inject a status-104 message — triggers a new disco#info fetch (CachePolicy::Strict)
@@ -2960,13 +2985,14 @@ void tst_QXmppMuc::roomInfoBindable()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = *muc->findRoom(u"coven@chat.shakespeare.lit"_s);
 
     // Before disco#info: roomInfo is nullopt
     QVERIFY(!room.roomInfo().value().has_value());
 
     // Inject disco#info with full roominfo
     test.inject(discoRoomInfo);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     // roomInfo() now holds the full form
     auto info = room.roomInfo().value();
@@ -3001,6 +3027,7 @@ static QXmppMucRoomV2 joinTestRoom(TestClient &test, QXmppMucManagerV2 *muc, con
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, QString("<message from='%1' type='groupchat'><subject>Test</subject></message>").arg(roomJid).toUtf8());
     muc->handleMessage(subjectMsg);
+    injectRoomInfo(test, roomJid);
     return expectFutureVariant<QXmppMucRoomV2>(joinTask);
 }
 
@@ -3133,7 +3160,7 @@ void tst_QXmppMuc::roomFeatureProperties()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    auto room = *muc->findRoom(u"coven@chat.shakespeare.lit"_s);
 
     // Before disco#info: defaults
     QVERIFY(!room.isNonAnonymous().value());
@@ -3153,6 +3180,7 @@ void tst_QXmppMuc::roomFeatureProperties()
                 "<feature var='muc_persistent'/>"
                 "<feature var='muc_passwordprotected'/>"
                 "</query></iq>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     QVERIFY(room.isNonAnonymous().value());
     QVERIFY(!room.isPublic().value());  // muc_public absent → not public
@@ -3185,6 +3213,7 @@ void tst_QXmppMuc::roomFeatureStatus172_173()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
+    injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     // Initially semi-anonymous
@@ -4563,12 +4592,8 @@ void tst_QXmppMuc::occupantIdSupported()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
-
-    // Before disco#info: occupant IDs are stripped (not supported yet)
-    auto self = room.selfParticipant();
-    QVERIFY(self.has_value());
-    QVERIFY(self->occupantId().isEmpty());
+    // The join completes only after disco#info tells whether occupant IDs are supported
+    QVERIFY(!joinTask.isFinished());
 
     // Inject disco#info with occupant-id feature
     test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
@@ -4576,6 +4601,10 @@ void tst_QXmppMuc::occupantIdSupported()
                 "<identity category='conference' type='text'/>"
                 "<feature var='urn:xmpp:occupant-id:0'/>"
                 "</query></iq>"_s);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Occupant IDs received while joining are kept
+    QCOMPARE(room.selfParticipant()->occupantId(), u"self-occupant-id"_s);
 
     // After disco#info: new presences with occupant-id should be kept
     QXmppPresence otherPresence;
@@ -4625,13 +4654,16 @@ void tst_QXmppMuc::occupantIdStrippedPresence()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     // Inject disco#info WITHOUT occupant-id feature
     test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
                 "<query xmlns='http://jabber.org/protocol/disco#info'>"
                 "<identity category='conference' type='text'/>"
                 "</query></iq>"_s);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // Occupant ID received while joining is stripped
+    QVERIFY(room.selfParticipant()->occupantId().isEmpty());
 
     // New participant with injected occupant-id should have it stripped
     QXmppPresence otherPresence;
@@ -4677,16 +4709,33 @@ void tst_QXmppMuc::occupantIdStrippedMessage()
                 "</presence>");
     test.injectPresence(selfPresence);
 
+    QList<QXmppMessage> history;
+    QObject::connect(muc, &QXmppMucManagerV2::roomHistoryReceived, muc, [&](const QString &, const QList<QXmppMessage> &messages) {
+        history = messages;
+    });
+    QXmppMessage historyMsg;
+    parsePacket(historyMsg,
+                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                "<body>Old</body>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
+                "<delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/>"
+                "</message>");
+    QVERIFY(muc->handleMessage(historyMsg));
+
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     // Inject disco#info WITHOUT occupant-id feature
     test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
                 "<query xmlns='http://jabber.org/protocol/disco#info'>"
                 "<identity category='conference' type='text'/>"
                 "</query></iq>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
+
+    // History message received while joining is stripped
+    QCOMPARE(history.size(), 1);
+    QVERIFY(history.first().mucOccupantId().isEmpty());
 
     // Receive a message with injected occupant-id — should be stripped
     QXmppMessage receivedMsg;
@@ -4741,7 +4790,6 @@ void tst_QXmppMuc::occupantIdAccessor()
     QXmppMessage subjectMsg;
     parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
     muc->handleMessage(subjectMsg);
-    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
     // Inject disco#info WITH occupant-id feature so IDs are not stripped
     test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
@@ -4749,12 +4797,64 @@ void tst_QXmppMuc::occupantIdAccessor()
                 "<identity category='conference' type='text'/>"
                 "<feature var='urn:xmpp:occupant-id:0'/>"
                 "</query></iq>"_s);
+    auto room = expectFutureVariant<QXmppMucRoomV2>(joinTask);
 
-    // Note: the occupant IDs were set during joining before disco#info arrived.
-    // Since supportsOccupantIds was false at that point, they were stripped.
-    auto self = room.selfParticipant();
-    QVERIFY(self.has_value());
-    QVERIFY(self->occupantId().isEmpty());
+    // Occupant IDs received while joining, before disco#info arrived, are kept
+    QCOMPARE(room.selfParticipant()->occupantId(), u"self-id"_s);
+    for (const auto &participant : room.participants()) {
+        if (participant.nickname().value() == u"firstwitch"_s) {
+            QCOMPARE(participant.occupantId(), u"witch-1-id"_s);
+        }
+    }
+}
+
+void tst_QXmppMuc::occupantIdMessageBeforeRoomInfo()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QXmppMessage subjectMsg;
+    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
+    muc->handleMessage(subjectMsg);
+
+    QList<QXmppMessage> received;
+    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &msg) {
+        QVERIFY(joinTask.isFinished());
+        received.append(msg);
+    });
+
+    // live message before disco#info: delivered after the join
+    QXmppMessage liveMsg;
+    parsePacket(liveMsg,
+                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                "<body>Hello</body>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='witch-1-id'/>"
+                "</message>");
+    QVERIFY(muc->handleMessage(liveMsg));
+    QVERIFY(!joinTask.isFinished());
+    QVERIFY(received.isEmpty());
+
+    injectRoomInfo(test, u"coven@chat.shakespeare.lit"_s, u"<feature var='urn:xmpp:occupant-id:0'/>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.first().body(), u"Hello"_s);
+    QCOMPARE(received.first().mucOccupantId(), u"witch-1-id"_s);
 }
 
 //
@@ -4925,6 +5025,46 @@ void tst_QXmppMuc::inactiveRoomsPruned()
     // room handles from the loop went out of scope → weak_ptrs expired.
     // After pruning at threshold 32, all expired entries should be cleaned up.
     QVERIFY(muc->d->inactiveRooms.size() <= 32);
+}
+
+void tst_QXmppMuc::createRoomOccupantId()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto createTask = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s, u"newroom"_s);
+    test.ignore();  // presence
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='self-id'/>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='owner' role='moderator'/>"
+                "<status code='201'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    test.ignore();  // config form IQ get
+    test.inject(roomConfigResultXml());
+    auto room = expectFutureVariant<QXmppMucRoomV2>(createTask);
+
+    auto task = room.setRoomConfig(QXmppMucRoomConfig {});
+    test.ignore();  // config submission
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    expectFutureVariant<QXmpp::Success>(task);
+    QVERIFY(room.joined().value());
+
+    auto id = test.expectPacketRandomOrder(roomInfoRequest(u"newroom@chat.shakespeare.lit"_s));
+    test.inject(u"<iq id='" + id + u"' from='newroom@chat.shakespeare.lit' type='result'>"
+                                   "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                   "<identity category='conference' type='text'/>"
+                                   "<feature var='http://jabber.org/protocol/muc'/>"
+                                   "<feature var='urn:xmpp:occupant-id:0'/>"
+                                   "</query></iq>");
+    QCOMPARE(room.selfParticipant()->occupantId(), u"self-id"_s);
 }
 
 QTEST_MAIN(tst_QXmppMuc)

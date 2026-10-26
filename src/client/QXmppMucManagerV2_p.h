@@ -56,6 +56,7 @@ struct QXmppMucManagerV2Private {
 
     // MUC Core
     void fetchRoomInfo(const QString &roomJid);
+    void finishJoin(const QString &roomJid, QXmpp::Private::MucRoomData &data);
     void fetchAvatar(const QString &roomJid);
     QXmppTask<QXmpp::Result<QXmpp::Private::MucOwnerQuery>> sendOwnerFormRequest(const QString &roomJid);
     void fetchConfigForm(const QString &roomJid);

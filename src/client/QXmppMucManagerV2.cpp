@@ -104,6 +104,8 @@ enum class MucRoomState {
     NotJoined,
     JoiningOccupantPresences,
     JoiningRoomHistory,
+    // Subject received, waiting for the room's disco#info to know whether occupant IDs are valid.
+    JoiningRoomInfo,
     Creating,
     Joined,
 };
@@ -134,6 +136,8 @@ struct MucRoomData {
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> createPromise;
     QList<QXmppMessage> historyMessages;
+    // Messages received in the JoiningRoomInfo state, handled again after the join.
+    QList<QXmppMessage> deferredMessages;
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
     std::unordered_map<QString, PendingMessage> pendingMessages;
     std::optional<QXmppPromise<Result<>>> nickChangePromise;
@@ -167,6 +171,8 @@ struct MucRoomData {
     QProperty<QStringList> avatarHashes;
     QProperty<std::optional<QXmpp::Muc::Avatar>> avatar;
     bool supportsOccupantIds = false;
+    // Whether the disco#info result for the current session has been received.
+    bool roomInfoFetched = false;
     bool supportsVCard = false;
     bool watchingAvatar = false;
     bool fetchingAvatar = false;
@@ -235,6 +241,18 @@ struct MucRoomData {
         });
     }
 
+    // XEP-0421: occupant IDs are only valid if the room supports them, otherwise they could be
+    // injected by participants. While joining they are kept until the disco#info result tells
+    // whether they are valid. The join completes only after that.
+    bool stripOccupantIds() const
+    {
+        using enum MucRoomState;
+        if (supportsOccupantIds) {
+            return false;
+        }
+        return roomInfoFetched || !(state == JoiningOccupantPresences || state == JoiningRoomHistory || state == JoiningRoomInfo);
+    }
+
     // Reset per-session state on leave. The participants map is intentionally kept
     // as a frozen snapshot for caller handles; selfParticipant (the "who am I"
     // pointer) is reset to null so permission bindings evaluate to false.
@@ -244,6 +262,8 @@ struct MucRoomData {
         joined = false;
         selfParticipant = nullptr;
         historyMessages.clear();
+        deferredMessages.clear();
+        roomInfoFetched = false;
         joinPromise.reset();
         createPromise.reset();
         leavePromise.reset();
@@ -580,8 +600,9 @@ QXmppTask<Result<QString>> QXmppMucManagerV2::requestUniqueRoomName(QString serv
 
     Sends an initial presence to the room and waits for all occupant presences, the discussion
     history and the subject that the MUC service sends back. The returned task resolves once the
-    subject has been received, so the participant list is already fully populated when the task
-    finishes.
+    subject and the room's service discovery info have been received, so the participant list is
+    already fully populated when the task finishes. The service discovery info tells whether the
+    room supports occupant IDs (\xep{0421}{Occupant identifiers for semi-anonymous MUCs}).
 
     QXmppMucRoomV2::joined() is already \c true when the task resolves, so a notifier added
     afterwards does not report it. Use QBindable::subscribe() or read the value first, see
@@ -755,7 +776,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
 
     // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
     auto message = [&]() {
-        if (!data.supportsOccupantIds && !uncheckedMessage.mucOccupantId().isEmpty()) {
+        if (data.stripOccupantIds() && !uncheckedMessage.mucOccupantId().isEmpty()) {
             auto msg = uncheckedMessage;
             msg.setMucOccupantId({});
             return msg;
@@ -798,24 +819,15 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         } else if (message.hasSubject()) {
             // Has <subject/> but no body: subject message, always the last stanza during joining (XEP-0045 §7.2.7)
             data.subject = message.subject();
-            data.state = MucRoomState::Joined;
-            data.joined = true;
-            data.joinTimer.reset();
-            // configuration changes are announced with status code 104
-            DiscoInfoTracking::setTracked(client(), bareFrom, true);
-            // XEP-0410: start self-ping silence tracking.
-            data.lastActivity = std::chrono::steady_clock::now();
-            d->rescheduleSelfPing();
-
-            auto history = std::move(data.historyMessages);
-            auto promise = std::move(*data.joinPromise);
-            data.joinPromise.reset();
-
-            if (!history.isEmpty()) {
-                Q_EMIT roomHistoryReceived(bareFrom, history);
+            if (data.roomInfoFetched) {
+                d->finishJoin(bareFrom, data);
+            } else {
+                data.state = MucRoomState::JoiningRoomInfo;
             }
-            promise.finish(QXmppMucRoomV2(d->activeRooms[bareFrom]));
         }
+        return true;
+    case MucRoomState::JoiningRoomInfo:
+        data.deferredMessages.append(message);
         return true;
     case MucRoomState::Joined:
         // XEP-0410: any incoming stanza on a joined room counts as activity.
@@ -987,7 +999,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
     auto nickname = QXmppUtils::jidToResource(presence.from());
 
     // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
-    if (!data.supportsOccupantIds) {
+    if (data.stripOccupantIds()) {
         presence.setMucOccupantId({});
     }
 
@@ -1007,7 +1019,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     // room sent two presences for the same nickname
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same nickname"_s });
                     return;
-                } else if (!participant->occupantId.isEmpty() && participant->occupantId == presence.mucOccupantId()) {
+                } else if (data.supportsOccupantIds && !participant->occupantId.isEmpty() && participant->occupantId == presence.mucOccupantId()) {
                     // sent two presences with the same occupant ID
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same occupant ID"_s });
                     return;
@@ -1066,6 +1078,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
         }
         break;
     case JoiningRoomHistory:
+    case JoiningRoomInfo:
     case Creating:
     case Joined:
         if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(303)) {
@@ -1541,30 +1554,72 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
     }
     disco->info(roomJid, {}, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [this, roomJid](auto &&result) {
         auto itr = activeRooms.find(roomJid);
-        if (itr == activeRooms.end() || hasError(result)) {
+        if (itr == activeRooms.end()) {
             return;
         }
-        auto &info = getValue(result);
         auto &data = *itr->second;
-        const auto oldHashes = data.avatarHashes.value();
-        data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
-        const auto &features = info.features();
-        data.supportsOccupantIds = features.contains(ns_muc_occupant_id);
-        data.supportsVCard = features.contains(ns_vcard);
-        data.supportsModeration = features.contains(ns_message_moderate);
-        data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
-        data.isPublic = features.contains(muc_feat_public);
-        data.isMembersOnly = features.contains(muc_feat_membersonly);
-        data.isModerated = features.contains(muc_feat_moderated);
-        data.isPersistent = features.contains(muc_feat_persistent);
-        data.isPasswordProtected = features.contains(muc_feat_passwordprotected);
-        if (data.avatarHashes.value() != oldHashes) {
-            data.avatarOutdated = true;
+        if (!hasError(result)) {
+            auto &info = getValue(result);
+            const auto oldHashes = data.avatarHashes.value();
+            data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
+            const auto &features = info.features();
+            data.supportsOccupantIds = features.contains(ns_muc_occupant_id);
+            data.supportsVCard = features.contains(ns_vcard);
+            data.supportsModeration = features.contains(ns_message_moderate);
+            data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
+            data.isPublic = features.contains(muc_feat_public);
+            data.isMembersOnly = features.contains(muc_feat_membersonly);
+            data.isModerated = features.contains(muc_feat_moderated);
+            data.isPersistent = features.contains(muc_feat_persistent);
+            data.isPasswordProtected = features.contains(muc_feat_passwordprotected);
+            if (data.avatarHashes.value() != oldHashes) {
+                data.avatarOutdated = true;
+            }
+            if (data.watchingAvatar && !data.fetchingAvatar && data.avatarOutdated) {
+                fetchAvatar(roomJid);
+            }
         }
-        if (data.watchingAvatar && !data.fetchingAvatar && data.avatarOutdated) {
-            fetchAvatar(roomJid);
+
+        data.roomInfoFetched = true;
+        if (!data.supportsOccupantIds) {
+            for (const auto &[nickname, participant] : data.participants) {
+                participant->occupantId.clear();
+            }
+        }
+        if (data.state == MucRoomState::JoiningRoomInfo) {
+            finishJoin(roomJid, data);
         }
     });
+}
+
+void QXmppMucManagerV2Private::finishJoin(const QString &roomJid, MucRoomData &data)
+{
+    data.state = MucRoomState::Joined;
+    data.joined = true;
+    data.joinTimer.reset();
+    // configuration changes are announced with status code 104
+    DiscoInfoTracking::setTracked(q->client(), roomJid, true);
+    // XEP-0410: start self-ping silence tracking.
+    data.lastActivity = std::chrono::steady_clock::now();
+    rescheduleSelfPing();
+
+    auto history = std::move(data.historyMessages);
+    auto deferred = std::move(data.deferredMessages);
+    auto promise = std::move(*data.joinPromise);
+    data.joinPromise.reset();
+
+    if (!data.supportsOccupantIds) {
+        for (auto &message : history) {
+            message.setMucOccupantId({});
+        }
+    }
+    if (!history.isEmpty()) {
+        Q_EMIT q->roomHistoryReceived(roomJid, history);
+    }
+    promise.finish(QXmppMucRoomV2(activeRooms[roomJid]));
+    for (const auto &message : deferred) {
+        q->handleMessage(message);
+    }
 }
 
 void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)

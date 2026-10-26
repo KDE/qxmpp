@@ -10,6 +10,7 @@ QXmpp 1.17.1 (UNRELEASED)
  - MUC: Fix destroying a room without reason or alternate JID, which sent no destroy request (@melvo, @lnj)
  - MUC: Fix handling a room destruction without status code 110 (as sent by ejabberd), which left the room joined (@lnj)
  - MUC: Don't emit removedFromRoom() for the own destroyRoom(), which depended on the order of the server's responses (@lnj)
+ - MUC: Fix occupant IDs received before the room's disco#info, e.g. the own one after createRoom(), which were dropped. joinRoom() now also waits for the disco#info result (@lnj)
  - Bookmarks: Fix signals for own changes depending on whether the IQ result or the event notification arrives first: bookmarksChanged() instead of bookmarksAdded() and bookmarksRemoved() with an empty list (@lnj)
 
 QXmpp 1.17.0 (October 6, 2026)
