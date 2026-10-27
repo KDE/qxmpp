@@ -338,7 +338,7 @@ QXmppTask<void> QXmppRosterManager::initRosterFromCacheAndSync()
         co_return;
     }
 
-    auto result = co_await requestRoster().withContext(this);
+    auto result = co_await requestRoster(d->cachedVersion).withContext(this);
     if (!hasValue(result)) {
         co_return;
     }
@@ -483,7 +483,8 @@ void QXmppRosterManager::handleSubscriptionRequest(const QString &bareJid, const
     }
 }
 
-QXmppTask<QXmppRosterManager::RosterResult> QXmppRosterManager::requestRoster()
+// Without \a version the server always sends the full roster; account export relies on that.
+QXmppTask<QXmppRosterManager::RosterResult> QXmppRosterManager::requestRoster(std::optional<QString> version)
 {
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Get);
@@ -491,7 +492,7 @@ QXmppTask<QXmppRosterManager::RosterResult> QXmppRosterManager::requestRoster()
 
     // RFC 6121 §2.6: Roster Versioning. Sending the `ver` attribute (even empty) signals support
     // to versioning-aware servers; servers that don't support it ignore the attribute.
-    iq.setVersion(d->cachedVersion);
+    iq.setVersion(std::move(version));
 
     // TODO: Request MIX annotations only when the server supports MIX-PAM.
     iq.setMixAnnotate(true);
