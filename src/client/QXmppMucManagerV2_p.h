@@ -63,6 +63,7 @@ struct QXmppMucManagerV2Private {
     void fetchRoomConfigSubscribed(const QString &roomJid);
     void handlePresence(const QXmppPresence &);
     void handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, QXmppPresence);
+    void handleSelfUnavailable(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &presence);
     void throwRoomError(const QString &roomJid, QXmppError &&error);
     void handleJoinTimeout(const QString &roomJid);
     void handleLeaveTimeout(const QString &roomJid);

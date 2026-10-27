@@ -83,6 +83,7 @@ private:
     Q_SLOT void roomPresenceIgnored();
     Q_SLOT void participantKicked();
     Q_SLOT void joinRoomSelfKicked();
+    Q_SLOT void leaveRoomWhileJoining();
     Q_SLOT void selfBanned();
     Q_SLOT void roomDestroyed();
     Q_SLOT void roomDestroyedWithoutStatusCode();
@@ -1928,6 +1929,37 @@ void tst_QXmppMuc::joinRoomSelfKicked()
     test.injectPresence(kickPresence);
 
     expectFutureVariant<QXmppError>(task);
+}
+
+void tst_QXmppMuc::leaveRoomWhileJoining()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info request
+    test.ignore();  // presence
+
+    // leave before the own presence has been received
+    auto room = muc->findRoom(u"coven@chat.shakespeare.lit"_s);
+    QVERIFY(room);
+    auto leaveTask = room->leave();
+    test.ignore();  // unavailable presence
+
+    QXmppPresence leavePresence;
+    parsePacket(leavePresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='none'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(leavePresence);
+
+    expectFutureVariant<QXmpp::Success>(leaveTask);
+    expectFutureVariant<QXmppError>(joinTask);
 }
 
 void tst_QXmppMuc::participantKicked()
