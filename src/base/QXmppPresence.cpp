@@ -708,8 +708,8 @@ void QXmppPresence::parseExtension(const QDomElement &element, QXmppElementList 
             d->isPreparingMujiSession = true;
         }
 
-        // allow any namespace (not just ns_jingle): XEP has no XML schema and examples don't have
-        // jingle namespace, but muji namespace
+        // allow any namespace (not just ns_jingle): QXmpp < 1.17.1 sent the contents in the muji
+        // namespace as in the examples of XEP-0272 v0.2.0
         d->mujiContents = transformFilter<QList<QXmppJingleIq::Content>>(iterChildElements(element, u"content"), parseElement<QXmppJingleIq::Content>);
         // XEP-0283: Moved
     } else if (element.tagName() == u"moved" && element.namespaceURI() == ns_moved) {

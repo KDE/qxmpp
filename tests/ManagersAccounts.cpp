@@ -762,12 +762,22 @@ void tst_QXmppAccountMigrationManager::testRealImportExport()
     QVERIFY(rosterManager);
     QVERIFY(vcardManager);
 
+    // A roster push gives the roster manager a cached version; the export must still request
+    // the full roster instead of a versioned (possibly empty) one.
+    client->inject(
+        u"<iq id='push1' type='set'>"
+        "<query xmlns='jabber:iq:roster' ver='ver1'>"
+        "<item jid='old@bare.com'/>"
+        "</query>"
+        "</iq>"_s);
+    client->expect(u"<iq id='push1' type='result'/>"_s);
+
     auto exportTask = manager->exportData();
     QVERIFY(!exportTask.isFinished());
 
     auto id = client->expectPacketRandomOrder(
         u"<iq from='pasnox@xmpp.example' type='get'>"
-        "<query xmlns='jabber:iq:roster' ver=''>"
+        "<query xmlns='jabber:iq:roster'>"
         "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
         "</query>"
         "</iq>"_s);
@@ -775,7 +785,7 @@ void tst_QXmppAccountMigrationManager::testRealImportExport()
 
     id = client->expectPacketRandomOrder(
         u"<iq from='pasnox@xmpp.example' type='get'>"
-        "<query xmlns='jabber:iq:roster' ver=''>"
+        "<query xmlns='jabber:iq:roster'>"
         "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
         "</query>"
         "</iq>"_s);
@@ -888,7 +898,7 @@ void tst_QXmppAccountMigrationManager::testSerialization()
     QVERIFY(!exportTask.isFinished());
 
     client->expect(u"<iq id='qx2' from='pasnox@xmpp.example' type='get'>"
-                   "<query xmlns='jabber:iq:roster' ver=''>"
+                   "<query xmlns='jabber:iq:roster'>"
                    "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
                    "</query>"
                    "</iq>"_s);
@@ -896,7 +906,7 @@ void tst_QXmppAccountMigrationManager::testSerialization()
 
     auto rosterPacketId = client->expectPacketRandomOrder(
         u"<iq from='pasnox@xmpp.example' type='get'>"
-        "<query xmlns='jabber:iq:roster' ver=''>"
+        "<query xmlns='jabber:iq:roster'>"
         "<annotate xmlns='urn:xmpp:mix:roster:0'/>"
         "</query>"
         "</iq>"_s);
