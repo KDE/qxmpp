@@ -82,6 +82,7 @@ private:
     Q_SLOT void participantsList();
     Q_SLOT void roomPresenceIgnored();
     Q_SLOT void participantKicked();
+    Q_SLOT void joinRoomSelfKicked();
     Q_SLOT void selfBanned();
     Q_SLOT void roomDestroyed();
     Q_SLOT void roomDestroyedWithoutStatusCode();
@@ -146,6 +147,7 @@ private:
     Q_SLOT void createRoomUnique();
     Q_SLOT void setRoomConfigCreation();
     Q_SLOT void setRoomConfigCreationDisconnected();
+    Q_SLOT void setRoomConfigCreationRemoved();
     Q_SLOT void cancelRoomCreation();
     Q_SLOT void reconfigureRoom();
     Q_SLOT void destroyRoom();
@@ -1892,6 +1894,42 @@ void tst_QXmppMuc::roomPresenceIgnored()
     QCOMPARE(room.participants().first().nickname().value(), u"thirdwitch"_s);
 }
 
+void tst_QXmppMuc::joinRoomSelfKicked()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info request
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    // kicked before the subject
+    QXmppPresence kickPresence;
+    parsePacket(kickPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<status code='307'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(kickPresence);
+
+    expectFutureVariant<QXmppError>(task);
+}
+
 void tst_QXmppMuc::participantKicked()
 {
     TestClient test(true);
@@ -3589,6 +3627,34 @@ void tst_QXmppMuc::setRoomConfigCreationDisconnected()
     // the disconnect fails the join before the disco#info result
     test.setStreamManagementState(QXmppClient::NoStreamManagement);
     test.simulateDisconnected();
+    expectFutureVariant<QXmppError>(task);
+    QVERIFY(!room.joined().value());
+}
+
+void tst_QXmppMuc::setRoomConfigCreationRemoved()
+{
+    TestClient test(true);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = createdRoom(test, muc);
+    auto task = room.setRoomConfig(QXmppMucRoomConfig {});
+    test.ignore();  // config submission
+    test.inject(u"<iq id='qx1' type='result'/>"_s);
+    test.ignore();  // disco#info request
+    QVERIFY(!task.isFinished());
+
+    // the room is destroyed before the disco#info result
+    QXmppPresence destroyPresence;
+    parsePacket(destroyPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch' type='unavailable'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='none' role='none'/>"
+                "<destroy/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(destroyPresence);
+
     expectFutureVariant<QXmppError>(task);
     QVERIFY(!room.joined().value());
 }

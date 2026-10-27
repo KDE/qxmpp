@@ -1377,11 +1377,9 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
 
     // Move promise out before deactivating so we can finish it cleanly after the
     // session state (including the promise slots) is reset.
-    std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> promise;
-    if (itr->second->joinPromise) {
-        promise = std::move(itr->second->joinPromise);
-    } else if (itr->second->createPromise) {
-        promise = std::move(itr->second->createPromise);
+    auto promise = std::exchange(itr->second->joinPromise, {});
+    if (!promise) {
+        promise = std::exchange(itr->second->createPromise, {});
     }
     deactivateRoom(roomJid);
     rescheduleSelfPing();
@@ -1455,10 +1453,26 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
         DiscoInfoTracking::reset(q->client(), jid + u'/' + nickname);
     }
 
-    // Move out pending room-config waiters before resetting so we can finish them
-    // with an error once the room state is clean. deactivateAllRooms() may have
-    // already drained them, in which case this is empty.
+    // Move out pending promises before resetting so we can finish them with an error
+    // once the room state is clean, e.g. after being removed from the room while
+    // joining. Callers finishing them differently (throwRoomError(), leave,
+    // deactivateAllRooms()) have already moved them out.
     auto configWaiters = std::move(data->roomConfigWaiters);
+    std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
+    std::vector<QXmppPromise<Result<>>> otherPromises;
+    for (auto *promise : { &data->joinPromise, &data->createPromise }) {
+        if (*promise) {
+            joinPromises.push_back(std::move(**promise));
+        }
+    }
+    for (auto *promise : { &data->leavePromise, &data->nickChangePromise }) {
+        if (*promise) {
+            otherPromises.push_back(std::move(**promise));
+        }
+    }
+    for (auto &[id, pending] : data->pendingMessages) {
+        otherPromises.push_back(std::move(pending.promise));
+    }
 
     // Reset per-session state (promises, timers, state flags). Participants and
     // permission bindings are intentionally preserved — they serve as a frozen
@@ -1469,10 +1483,17 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     // same MucRoomData instance as long as any caller handle is still holding it.
     inactiveRooms[jid] = data;
 
-    // Finish any outstanding room-config requests now that the room state is clean,
+    // Finish any outstanding requests now that the room state is clean,
     // so their tasks don't hang forever after a leave/destroy/disconnect.
     for (auto &p : configWaiters) {
         p.finish(QXmppError { u"The room session ended before the configuration request completed."_s });
+    }
+    const auto error = QXmppError { u"The room session ended before the request completed."_s };
+    for (auto &p : joinPromises) {
+        p.finish(error);
+    }
+    for (auto &p : otherPromises) {
+        p.finish(error);
     }
 
     // data shared_ptr goes out of scope here. If no caller holds a handle, the data
@@ -1492,21 +1513,22 @@ void QXmppMucManagerV2Private::deactivateAllRooms()
     std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> configWaiters;
 
     for (auto &[jid, data] : activeRooms) {
-        if (data->joinPromise) {
-            joinPromises.push_back(std::move(*data->joinPromise));
+        if (auto promise = std::exchange(data->joinPromise, {})) {
+            joinPromises.push_back(std::move(*promise));
         }
-        if (data->createPromise) {
-            joinPromises.push_back(std::move(*data->createPromise));
+        if (auto promise = std::exchange(data->createPromise, {})) {
+            joinPromises.push_back(std::move(*promise));
         }
-        if (data->leavePromise) {
-            otherPromises.push_back(std::move(*data->leavePromise));
+        if (auto promise = std::exchange(data->leavePromise, {})) {
+            otherPromises.push_back(std::move(*promise));
         }
-        if (data->nickChangePromise) {
-            otherPromises.push_back(std::move(*data->nickChangePromise));
+        if (auto promise = std::exchange(data->nickChangePromise, {})) {
+            otherPromises.push_back(std::move(*promise));
         }
         for (auto &[msgId, pending] : data->pendingMessages) {
             otherPromises.push_back(std::move(pending.promise));
         }
+        data->pendingMessages.clear();
         // Drain here so deactivateRoom() finds an empty vector and we can finish them
         // below, once every room is clean.
         for (auto &waiter : data->roomConfigWaiters) {
@@ -1757,10 +1779,7 @@ void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
         return;
     }
 
-    std::optional<QXmppPromise<Result<>>> promise;
-    if (itr->second->leavePromise) {
-        promise = std::move(itr->second->leavePromise);
-    }
+    auto promise = std::exchange(itr->second->leavePromise, {});
     deactivateRoom(roomJid);
     rescheduleSelfPing();
 
