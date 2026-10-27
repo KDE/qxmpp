@@ -51,7 +51,7 @@ struct QXmppMucManagerV2Private {
     std::shared_ptr<QXmpp::Private::MucRoomData> lookupRoom(const QString &jid);
     std::shared_ptr<QXmpp::Private::MucRoomData> createOrReviveRoom(const QString &jid);
     void deactivateRoom(const QString &jid);
-    void deactivateAllRooms();
+    void deactivateAllRooms(const QString &errorText);
     void pruneInactiveRooms();
 
     // MUC Core

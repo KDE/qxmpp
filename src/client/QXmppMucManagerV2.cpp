@@ -932,6 +932,7 @@ void QXmppMucManagerV2::onRegistered(QXmppClient *client)
 
 void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 {
+    d->deactivateAllRooms(u"The MUC manager has been removed from the client."_s);
     d->mucServices = QStringList();
     d->mucServiceInfos = QList<QXmppDiscoService>();
     d->mucServicesLoaded = false;
@@ -942,14 +943,14 @@ void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 void QXmppMucManagerV2::onConnected()
 {
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->deactivateAllRooms();
+        d->deactivateAllRooms(u"Disconnected from server."_s);
     }
 }
 
 void QXmppMucManagerV2::onDisconnected()
 {
     if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
-        d->deactivateAllRooms();
+        d->deactivateAllRooms(u"Disconnected from server."_s);
     }
 }
 
@@ -1516,7 +1517,7 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     }
 }
 
-void QXmppMucManagerV2Private::deactivateAllRooms()
+void QXmppMucManagerV2Private::deactivateAllRooms(const QString &errorText)
 {
     // Collect pending promises before resetting so their error callbacks observe a
     // clean (empty) room state.
@@ -1562,7 +1563,7 @@ void QXmppMucManagerV2Private::deactivateAllRooms()
 
     selfPingTimer.stop();
 
-    const auto error = QXmppError { u"Disconnected from server."_s };
+    const auto error = QXmppError { errorText };
     for (auto &promise : joinPromises) {
         promise.finish(error);
     }

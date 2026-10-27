@@ -14,6 +14,7 @@ QXmpp 1.17.1 (UNRELEASED)
  - MUC: setRoomConfig() for a created room now resolves after the room's disco#info result, so its occupant IDs are final once joined() is true, like after joinRoom() (@lnj)
  - MUC: Fix pending tasks never finishing when the room session ended, e.g. joinRoom() or setRoomConfig() after being removed from the room while joining (@lnj)
  - MUC: Fix leave() while joining before the own presence, which only finished after the timeout (@lnj)
+ - MUC: Fail pending tasks when the manager is removed from the client (@lnj)
  - MUC: Ignore presences from the bare room JID, e.g. ejabberd's entity capabilities, which were handled as a participant without nickname (@lnj)
  - Bookmarks: Fix signals for own changes depending on whether the IQ result or the event notification arrives first: bookmarksChanged() instead of bookmarksAdded() and bookmarksRemoved() with an empty list (@lnj)
 
