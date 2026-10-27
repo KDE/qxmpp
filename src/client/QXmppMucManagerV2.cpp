@@ -998,6 +998,11 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
 
     auto nickname = QXmppUtils::jidToResource(presence.from());
 
+    // Presences from the room itself (e.g. ejabberd's entity capabilities) are no occupants.
+    if (nickname.isEmpty() && presence.type() != QXmppPresence::Error) {
+        return;
+    }
+
     // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
     if (data.stripOccupantIds()) {
         presence.setMucOccupantId({});

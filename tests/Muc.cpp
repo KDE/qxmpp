@@ -80,6 +80,7 @@ private:
     Q_SLOT void participantNicknameChange();
     Q_SLOT void participantJoinLeave();
     Q_SLOT void participantsList();
+    Q_SLOT void roomPresenceIgnored();
     Q_SLOT void participantKicked();
     Q_SLOT void selfBanned();
     Q_SLOT void roomDestroyed();
@@ -1845,6 +1846,48 @@ void tst_QXmppMuc::participantsList()
     participants = room.participants();
     QCOMPARE(participants.size(), 1);
     QCOMPARE(participants.first().nickname().value(), u"thirdwitch"_s);
+}
+
+void tst_QXmppMuc::roomPresenceIgnored()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    bool participantJoined = false;
+    QObject::connect(muc, &QXmppMucManagerV2::participantJoined, muc, [&] { participantJoined = true; });
+
+    // ejabberd sends the entity capabilities of the room from the bare room JID
+    QXmppPresence roomPresence;
+    parsePacket(roomPresence,
+                "<presence from='newroom@chat.shakespeare.lit'>"
+                "<c xmlns='http://jabber.org/protocol/caps' hash='sha-1' node='https://www.process-one.net/ejabberd/' ver='p9eVARsd5yD6Oc1R9XBG3qJ1VvY='/>"
+                "</presence>");
+
+    auto createTask = muc->createRoom(u"chat.shakespeare.lit"_s, u"thirdwitch"_s, u"newroom"_s);
+    test.ignore();  // presence
+    test.injectPresence(roomPresence);
+    QVERIFY(!createTask.isFinished());
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='newroom@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='owner' role='moderator'/>"
+                "<status code='110'/>"
+                "<status code='201'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+    test.injectPresence(roomPresence);
+    test.ignore();  // config form IQ get
+    test.inject(roomConfigResultXml());
+    auto room = expectFutureVariant<QXmppMucRoomV2>(createTask);
+
+    QVERIFY(!participantJoined);
+    QCOMPARE(room.participants().size(), 1);
+    QCOMPARE(room.participants().first().nickname().value(), u"thirdwitch"_s);
 }
 
 void tst_QXmppMuc::participantKicked()
