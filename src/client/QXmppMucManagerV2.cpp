@@ -943,14 +943,14 @@ void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 void QXmppMucManagerV2::onConnected()
 {
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->deactivateAllRooms(u"Disconnected from server."_s);
+        d->handleConnectionLost();
     }
 }
 
 void QXmppMucManagerV2::onDisconnected()
 {
     if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
-        d->deactivateAllRooms(u"Disconnected from server."_s);
+        d->handleConnectionLost();
     }
 }
 
@@ -1515,6 +1515,21 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     if (inactiveRooms.size() > 32) {
         pruneInactiveRooms();
     }
+}
+
+void QXmppMucManagerV2Private::handleConnectionLost()
+{
+    // Collect first: handlers may change the rooms.
+    QStringList joinedRooms;
+    for (const auto &[jid, data] : activeRooms) {
+        if (data->joined) {
+            joinedRooms.append(jid);
+        }
+    }
+    for (const auto &jid : std::as_const(joinedRooms)) {
+        Q_EMIT q->removedFromRoom(jid, Muc::LeaveReason::ConnectionLost, std::nullopt);
+    }
+    deactivateAllRooms(u"Disconnected from server."_s);
 }
 
 void QXmppMucManagerV2Private::deactivateAllRooms(const QString &errorText)

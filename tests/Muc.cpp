@@ -2397,6 +2397,16 @@ void tst_QXmppMuc::roomInfoForm()
     serializePacket(form, xml2);
 }
 
+// Records removedFromRoom() emissions and whether the room was still joined at that time.
+static auto watchRemovedFromRoom(QXmppMucManagerV2 *muc, QList<std::pair<QString, bool>> &removed)
+{
+    return QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc,
+                            [muc, &removed](const QString &roomJid, Muc::LeaveReason reason, const auto &) {
+                                QCOMPARE(reason, Muc::LeaveReason::ConnectionLost);
+                                removed.append({ roomJid, muc->findRoom(roomJid)->joined().value() });
+                            });
+}
+
 void tst_QXmppMuc::disconnectNoStreamManagement()
 {
     TestClient test(true);
@@ -2406,12 +2416,26 @@ void tst_QXmppMuc::disconnectNoStreamManagement()
     auto room = joinedRoom(test, muc);
     QVERIFY(room.joined().value());
 
+    // a room still being joined is not reported, its task fails
+    auto joinTask = muc->joinRoom(u"other@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info request
+    test.ignore();  // presence
+
+    QList<std::pair<QString, bool>> removed;
+    watchRemovedFromRoom(muc, removed);
+
     // Simulate disconnect without stream management (intentional disconnect)
     test.setStreamManagementState(QXmppClient::NoStreamManagement);
     test.simulateDisconnected();
 
     // Room state must be cleared immediately
     QVERIFY(!room.joined().value());
+    QCOMPARE(removed, (QList<std::pair<QString, bool>> { { u"coven@chat.shakespeare.lit"_s, true } }));
+    expectFutureVariant<QXmppError>(joinTask);
+
+    // not reported again on the next connect
+    test.simulateConnected();
+    QCOMPARE(removed.size(), 1);
 }
 
 void tst_QXmppMuc::disconnectResumedStream()
@@ -2421,6 +2445,9 @@ void tst_QXmppMuc::disconnectResumedStream()
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
     auto room = joinedRoom(test, muc);
+
+    QList<std::pair<QString, bool>> removed;
+    watchRemovedFromRoom(muc, removed);
 
     // Simulate network drop (SM enabled, disconnect without clearing SM)
     test.setStreamManagementState(QXmppClient::NewStream);
@@ -2435,6 +2462,7 @@ void tst_QXmppMuc::disconnectResumedStream()
 
     // Room state must still be intact after resume
     QVERIFY(room.joined().value());
+    QVERIFY(removed.isEmpty());
 }
 
 void tst_QXmppMuc::disconnectNewStream()
@@ -2446,17 +2474,22 @@ void tst_QXmppMuc::disconnectNewStream()
 
     auto room = joinedRoom(test, muc);
 
+    QList<std::pair<QString, bool>> removed;
+    watchRemovedFromRoom(muc, removed);
+
     // Simulate network drop (SM enabled)
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateDisconnected();
 
     // Room preserved while resumption is possible
+    QVERIFY(removed.isEmpty());
 
     // Simulate reconnect where stream resumption failed (NewStream)
     test.simulateConnected();
 
     // Room must be cleared now — server no longer knows about our presence
     QVERIFY(!room.joined().value());
+    QCOMPARE(removed, (QList<std::pair<QString, bool>> { { u"coven@chat.shakespeare.lit"_s, true } }));
 }
 
 void tst_QXmppMuc::setRole()
