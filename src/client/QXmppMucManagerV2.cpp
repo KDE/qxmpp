@@ -11,10 +11,12 @@
 #include "QXmppMucForms.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppStanza.h"
+#include "QXmppStanza_p.h"
 #include "QXmppUtils_p.h"
 #include "QXmppVCardIq.h"
 #include <QXmppUtils.h>
 
+#include "Enums.h"
 #include "Global.h"
 #include "IqSending.h"
 #include "Ping.h"
@@ -102,6 +104,8 @@ enum class MucRoomState {
     NotJoined,
     JoiningOccupantPresences,
     JoiningRoomHistory,
+    // Subject received, waiting for the room's disco#info to know whether occupant IDs are valid.
+    JoiningRoomInfo,
     Creating,
     Joined,
 };
@@ -132,12 +136,16 @@ struct MucRoomData {
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> createPromise;
     QList<QXmppMessage> historyMessages;
+    // Messages received in the JoiningRoomInfo state, handled again after the join.
+    QList<QXmppMessage> deferredMessages;
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
     std::unordered_map<QString, PendingMessage> pendingMessages;
     std::optional<QXmppPromise<Result<>>> nickChangePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> nickChangeTimer;
     std::optional<QXmppPromise<Result<>>> leavePromise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> leaveTimer;
+    // destroyRoom() is waiting for the result; the destroy presence is then not reported
+    bool destroying = false;
     // XEP-0410: MUC Self-Ping
     std::chrono::steady_clock::time_point lastActivity;
     bool selfPingInFlight = false;
@@ -163,6 +171,8 @@ struct MucRoomData {
     QProperty<QStringList> avatarHashes;
     QProperty<std::optional<QXmpp::Muc::Avatar>> avatar;
     bool supportsOccupantIds = false;
+    // Whether the disco#info result for the current session has been received.
+    bool roomInfoFetched = false;
     bool supportsVCard = false;
     bool watchingAvatar = false;
     bool fetchingAvatar = false;
@@ -231,6 +241,18 @@ struct MucRoomData {
         });
     }
 
+    // XEP-0421: occupant IDs are only valid if the room supports them, otherwise they could be
+    // injected by participants. While joining they are kept until the disco#info result tells
+    // whether they are valid. The join completes only after that.
+    bool stripOccupantIds() const
+    {
+        using enum MucRoomState;
+        if (supportsOccupantIds) {
+            return false;
+        }
+        return roomInfoFetched || !(state == JoiningOccupantPresences || state == JoiningRoomHistory || state == JoiningRoomInfo);
+    }
+
     // Reset per-session state on leave. The participants map is intentionally kept
     // as a frozen snapshot for caller handles; selfParticipant (the "who am I"
     // pointer) is reset to null so permission bindings evaluate to false.
@@ -240,9 +262,12 @@ struct MucRoomData {
         joined = false;
         selfParticipant = nullptr;
         historyMessages.clear();
+        deferredMessages.clear();
+        roomInfoFetched = false;
         joinPromise.reset();
         createPromise.reset();
         leavePromise.reset();
+        destroying = false;
         nickChangePromise.reset();
         joinTimer.reset();
         leaveTimer.reset();
@@ -573,9 +598,15 @@ QXmppTask<Result<QString>> QXmppMucManagerV2::requestUniqueRoomName(QString serv
 /*!
     Joins the MUC room at \a jid with the given \a nickname.
 
-    Sends an initial presence to the room and waits for all occupant presences that the MUC service
-    sends back. The returned task resolves once the server sends the self-presence with status code
-    110, meaning the participant list is already fully populated when the task finishes.
+    Sends an initial presence to the room and waits for all occupant presences, the discussion
+    history and the subject that the MUC service sends back. The returned task resolves once the
+    subject and the room's service discovery info have been received, so the participant list is
+    already fully populated when the task finishes. The service discovery info tells whether the
+    room supports occupant IDs (\xep{0421}{Occupant identifiers for semi-anonymous MUCs}).
+
+    QXmppMucRoomV2::joined() is already \c true when the task resolves, so a notifier added
+    afterwards does not report it. Use QBindable::subscribe() or read the value first, see
+    \l{Reactive Properties}.
 
     If a join for the same room is already in progress the task fails immediately. If the room is
     already joined the existing room handle is returned as a success.
@@ -647,8 +678,16 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     The room is created in a locked state; no other users can join until the owner submits
     the configuration form via QXmppMucRoomV2::setRoomConfig(). The task resolves once the
     server has confirmed room creation (XEP-0045 status code 201) and the configuration form
-    has been fetched. If the local state machine detects that the room is already tracked,
-    the task fails immediately.
+    has been fetched. If the room is already tracked, i.e. joined or being joined or created
+    (see findRoom()), the task fails immediately.
+
+    QXmppMucRoomV2::joined() is still \c false when the task resolves. It is \c true once the
+    task of QXmppMucRoomV2::setRoomConfig() has resolved, and only then the room is usable, e.g.
+    for sending messages.
+
+    If the user may not create rooms on the service, the task fails with the stanza error of
+    the service. \xep{0045}{Multi-User Chat} requires \c not-allowed for this, but some
+    services use \c forbidden.
 
     \since QXmpp 1.16
 */
@@ -737,7 +776,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
 
     // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
     auto message = [&]() {
-        if (!data.supportsOccupantIds && !uncheckedMessage.mucOccupantId().isEmpty()) {
+        if (data.stripOccupantIds() && !uncheckedMessage.mucOccupantId().isEmpty()) {
             auto msg = uncheckedMessage;
             msg.setMucOccupantId({});
             return msg;
@@ -780,24 +819,15 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         } else if (message.hasSubject()) {
             // Has <subject/> but no body: subject message, always the last stanza during joining (XEP-0045 §7.2.7)
             data.subject = message.subject();
-            data.state = MucRoomState::Joined;
-            data.joined = true;
-            data.joinTimer.reset();
-            // configuration changes are announced with status code 104
-            DiscoInfoTracking::setTracked(client(), bareFrom, true);
-            // XEP-0410: start self-ping silence tracking.
-            data.lastActivity = std::chrono::steady_clock::now();
-            d->rescheduleSelfPing();
-
-            auto history = std::move(data.historyMessages);
-            auto promise = std::move(*data.joinPromise);
-            data.joinPromise.reset();
-
-            if (!history.isEmpty()) {
-                Q_EMIT roomHistoryReceived(bareFrom, history);
+            if (data.roomInfoFetched) {
+                d->finishJoin(bareFrom, data);
+            } else {
+                data.state = MucRoomState::JoiningRoomInfo;
             }
-            promise.finish(QXmppMucRoomV2(d->activeRooms[bareFrom]));
         }
+        return true;
+    case MucRoomState::JoiningRoomInfo:
+        data.deferredMessages.append(message);
         return true;
     case MucRoomState::Joined:
         // XEP-0410: any incoming stanza on a joined room counts as activity.
@@ -902,6 +932,7 @@ void QXmppMucManagerV2::onRegistered(QXmppClient *client)
 
 void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 {
+    d->deactivateAllRooms(u"The MUC manager has been removed from the client."_s);
     d->mucServices = QStringList();
     d->mucServiceInfos = QList<QXmppDiscoService>();
     d->mucServicesLoaded = false;
@@ -912,14 +943,14 @@ void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 void QXmppMucManagerV2::onConnected()
 {
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->deactivateAllRooms();
+        d->handleConnectionLost();
     }
 }
 
 void QXmppMucManagerV2::onDisconnected()
 {
     if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
-        d->deactivateAllRooms();
+        d->handleConnectionLost();
     }
 }
 
@@ -962,14 +993,48 @@ void QXmppMucManagerV2Private::handlePresence(const QXmppPresence &p)
     }
 }
 
+// Self-unavailable without 303: we left the room.
+// A room destruction is only sent to each occupant itself (XEP-0045 §10.9), and some services
+// (e.g. ejabberd) omit status code 110 there.
+static bool isSelfUnavailable(const QXmppPresence &presence)
+{
+    return presence.type() == QXmppPresence::Unavailable && !presence.mucStatusCodes().contains(303) &&
+        (presence.mucStatusCodes().contains(110) || presence.mucDestroy());
+}
+
+void QXmppMucManagerV2Private::handleSelfUnavailable(const QString &roomJid, MucRoomData &data, const QXmppPresence &presence)
+{
+    auto reason = leaveReasonFromPresence(presence);
+    auto promise = std::exchange(data.leavePromise, {});
+
+    if (reason != Muc::LeaveReason::Left && !(reason == Muc::LeaveReason::RoomDestroyed && data.destroying)) {
+        Q_EMIT q->removedFromRoom(roomJid, reason, presence.mucDestroy());
+    }
+
+    deactivateRoom(roomJid);
+    rescheduleSelfPing();
+    if (presence.mucDestroy()) {
+        DiscoInfoTracking::invalidate(q->client(), roomJid);
+    }
+
+    if (promise) {
+        promise->finish(Success());
+    }
+}
+
 void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, QXmppPresence presence)
 {
     using enum MucRoomState;
 
     auto nickname = QXmppUtils::jidToResource(presence.from());
 
+    // Presences from the room itself (e.g. ejabberd's entity capabilities) are no occupants.
+    if (nickname.isEmpty() && presence.type() != QXmppPresence::Error) {
+        return;
+    }
+
     // Strip occupant ID if the room does not support XEP-0421 to prevent occupant ID injection.
-    if (!data.supportsOccupantIds) {
+    if (data.stripOccupantIds()) {
         presence.setMucOccupantId({});
     }
 
@@ -989,7 +1054,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     // room sent two presences for the same nickname
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same nickname"_s });
                     return;
-                } else if (!participant->occupantId.isEmpty() && participant->occupantId == presence.mucOccupantId()) {
+                } else if (data.supportsOccupantIds && !participant->occupantId.isEmpty() && participant->occupantId == presence.mucOccupantId()) {
                     // sent two presences with the same occupant ID
                     throwRoomError(roomJid, QXmppError { u"MUC reported two presences for the same occupant ID"_s });
                     return;
@@ -1039,13 +1104,20 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     }
                 }
             }
+        } else if (isSelfUnavailable(presence)) {
+            // e.g. leave() before the own presence
+            handleSelfUnavailable(roomJid, data, presence);
+            return;
         } else if (presence.type() == QXmppPresence::Error) {
             auto error = presence.error();
-            throwRoomError(roomJid, QXmppError { u"Cannot join MUC: "_s + error.text(), std::move(error) });
+            auto text = error.text().isEmpty() ? Enums::toString(error.condition()) : error.text();
+            auto description = (data.createPromise ? u"Cannot create MUC: "_s : u"Cannot join MUC: "_s) + text;
+            throwRoomError(roomJid, QXmppError { std::move(description), std::move(error) });
             return;
         }
         break;
     case JoiningRoomHistory:
+    case JoiningRoomInfo:
     case Creating:
     case Joined:
         if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(303)) {
@@ -1081,28 +1153,9 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                     }
                 }
             }
-        } else if (presence.type() == QXmppPresence::Unavailable && presence.mucStatusCodes().contains(110)) {
-            // Self-unavailable without 303: we left the room
-            auto reason = leaveReasonFromPresence(presence);
-            std::optional<QXmppPromise<Result<>>> promise;
-            if (data.leavePromise) {
-                promise = std::move(data.leavePromise);
-            }
-
-            if (reason != Muc::LeaveReason::Left) {
-                Q_EMIT q->removedFromRoom(roomJid, reason, presence.mucDestroy());
-            }
-
-            deactivateRoom(roomJid);
-            rescheduleSelfPing();
-            if (presence.mucDestroy()) {
-                DiscoInfoTracking::invalidate(q->client(), roomJid);
-            }
-
-            if (promise) {
-                promise->finish(Success());
-            }
-        } else if (presence.type() == QXmppPresence::Unavailable && !presence.mucStatusCodes().contains(110)) {
+        } else if (isSelfUnavailable(presence)) {
+            handleSelfUnavailable(roomJid, data, presence);
+        } else if (presence.type() == QXmppPresence::Unavailable) {
             // Another participant left the room
             auto reason = leaveReasonFromPresence(presence);
             if (auto pItr = data.participants.find(nickname); pItr != data.participants.end()) {
@@ -1337,11 +1390,9 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
 
     // Move promise out before deactivating so we can finish it cleanly after the
     // session state (including the promise slots) is reset.
-    std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> promise;
-    if (itr->second->joinPromise) {
-        promise = std::move(itr->second->joinPromise);
-    } else if (itr->second->createPromise) {
-        promise = std::move(itr->second->createPromise);
+    auto promise = std::exchange(itr->second->joinPromise, {});
+    if (!promise) {
+        promise = std::exchange(itr->second->createPromise, {});
     }
     deactivateRoom(roomJid);
     rescheduleSelfPing();
@@ -1415,10 +1466,26 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
         DiscoInfoTracking::reset(q->client(), jid + u'/' + nickname);
     }
 
-    // Move out pending room-config waiters before resetting so we can finish them
-    // with an error once the room state is clean. deactivateAllRooms() may have
-    // already drained them, in which case this is empty.
+    // Move out pending promises before resetting so we can finish them with an error
+    // once the room state is clean, e.g. after being removed from the room while
+    // joining. Callers finishing them differently (throwRoomError(), leave,
+    // deactivateAllRooms()) have already moved them out.
     auto configWaiters = std::move(data->roomConfigWaiters);
+    std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
+    std::vector<QXmppPromise<Result<>>> otherPromises;
+    for (auto *promise : { &data->joinPromise, &data->createPromise }) {
+        if (*promise) {
+            joinPromises.push_back(std::move(**promise));
+        }
+    }
+    for (auto *promise : { &data->leavePromise, &data->nickChangePromise }) {
+        if (*promise) {
+            otherPromises.push_back(std::move(**promise));
+        }
+    }
+    for (auto &[id, pending] : data->pendingMessages) {
+        otherPromises.push_back(std::move(pending.promise));
+    }
 
     // Reset per-session state (promises, timers, state flags). Participants and
     // permission bindings are intentionally preserved — they serve as a frozen
@@ -1429,10 +1496,17 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     // same MucRoomData instance as long as any caller handle is still holding it.
     inactiveRooms[jid] = data;
 
-    // Finish any outstanding room-config requests now that the room state is clean,
+    // Finish any outstanding requests now that the room state is clean,
     // so their tasks don't hang forever after a leave/destroy/disconnect.
     for (auto &p : configWaiters) {
         p.finish(QXmppError { u"The room session ended before the configuration request completed."_s });
+    }
+    const auto error = QXmppError { u"The room session ended before the request completed."_s };
+    for (auto &p : joinPromises) {
+        p.finish(error);
+    }
+    for (auto &p : otherPromises) {
+        p.finish(error);
     }
 
     // data shared_ptr goes out of scope here. If no caller holds a handle, the data
@@ -1443,7 +1517,22 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     }
 }
 
-void QXmppMucManagerV2Private::deactivateAllRooms()
+void QXmppMucManagerV2Private::handleConnectionLost()
+{
+    // Collect first: handlers may change the rooms.
+    QStringList joinedRooms;
+    for (const auto &[jid, data] : activeRooms) {
+        if (data->joined) {
+            joinedRooms.append(jid);
+        }
+    }
+    for (const auto &jid : std::as_const(joinedRooms)) {
+        Q_EMIT q->removedFromRoom(jid, Muc::LeaveReason::ConnectionLost, std::nullopt);
+    }
+    deactivateAllRooms(u"Disconnected from server."_s);
+}
+
+void QXmppMucManagerV2Private::deactivateAllRooms(const QString &errorText)
 {
     // Collect pending promises before resetting so their error callbacks observe a
     // clean (empty) room state.
@@ -1452,21 +1541,22 @@ void QXmppMucManagerV2Private::deactivateAllRooms()
     std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> configWaiters;
 
     for (auto &[jid, data] : activeRooms) {
-        if (data->joinPromise) {
-            joinPromises.push_back(std::move(*data->joinPromise));
+        if (auto promise = std::exchange(data->joinPromise, {})) {
+            joinPromises.push_back(std::move(*promise));
         }
-        if (data->createPromise) {
-            joinPromises.push_back(std::move(*data->createPromise));
+        if (auto promise = std::exchange(data->createPromise, {})) {
+            joinPromises.push_back(std::move(*promise));
         }
-        if (data->leavePromise) {
-            otherPromises.push_back(std::move(*data->leavePromise));
+        if (auto promise = std::exchange(data->leavePromise, {})) {
+            otherPromises.push_back(std::move(*promise));
         }
-        if (data->nickChangePromise) {
-            otherPromises.push_back(std::move(*data->nickChangePromise));
+        if (auto promise = std::exchange(data->nickChangePromise, {})) {
+            otherPromises.push_back(std::move(*promise));
         }
         for (auto &[msgId, pending] : data->pendingMessages) {
             otherPromises.push_back(std::move(pending.promise));
         }
+        data->pendingMessages.clear();
         // Drain here so deactivateRoom() finds an empty vector and we can finish them
         // below, once every room is clean.
         for (auto &waiter : data->roomConfigWaiters) {
@@ -1488,7 +1578,7 @@ void QXmppMucManagerV2Private::deactivateAllRooms()
 
     selfPingTimer.stop();
 
-    const auto error = QXmppError { u"Disconnected from server."_s };
+    const auto error = QXmppError { errorText };
     for (auto &promise : joinPromises) {
         promise.finish(error);
     }
@@ -1519,30 +1609,72 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
     }
     disco->info(roomJid, {}, QXmppDiscoveryManager::CachePolicy::Strict).then(q, [this, roomJid](auto &&result) {
         auto itr = activeRooms.find(roomJid);
-        if (itr == activeRooms.end() || hasError(result)) {
+        if (itr == activeRooms.end()) {
             return;
         }
-        auto &info = getValue(result);
         auto &data = *itr->second;
-        const auto oldHashes = data.avatarHashes.value();
-        data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
-        const auto &features = info.features();
-        data.supportsOccupantIds = features.contains(ns_muc_occupant_id);
-        data.supportsVCard = features.contains(ns_vcard);
-        data.supportsModeration = features.contains(ns_message_moderate);
-        data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
-        data.isPublic = features.contains(muc_feat_public);
-        data.isMembersOnly = features.contains(muc_feat_membersonly);
-        data.isModerated = features.contains(muc_feat_moderated);
-        data.isPersistent = features.contains(muc_feat_persistent);
-        data.isPasswordProtected = features.contains(muc_feat_passwordprotected);
-        if (data.avatarHashes.value() != oldHashes) {
-            data.avatarOutdated = true;
+        if (!hasError(result)) {
+            auto &info = getValue(result);
+            const auto oldHashes = data.avatarHashes.value();
+            data.roomInfo = info.template dataForm<QXmppMucRoomInfo>();
+            const auto &features = info.features();
+            data.supportsOccupantIds = features.contains(ns_muc_occupant_id);
+            data.supportsVCard = features.contains(ns_vcard);
+            data.supportsModeration = features.contains(ns_message_moderate);
+            data.isNonAnonymous = features.contains(muc_feat_nonanonymous);
+            data.isPublic = features.contains(muc_feat_public);
+            data.isMembersOnly = features.contains(muc_feat_membersonly);
+            data.isModerated = features.contains(muc_feat_moderated);
+            data.isPersistent = features.contains(muc_feat_persistent);
+            data.isPasswordProtected = features.contains(muc_feat_passwordprotected);
+            if (data.avatarHashes.value() != oldHashes) {
+                data.avatarOutdated = true;
+            }
+            if (data.watchingAvatar && !data.fetchingAvatar && data.avatarOutdated) {
+                fetchAvatar(roomJid);
+            }
         }
-        if (data.watchingAvatar && !data.fetchingAvatar && data.avatarOutdated) {
-            fetchAvatar(roomJid);
+
+        data.roomInfoFetched = true;
+        if (!data.supportsOccupantIds) {
+            for (const auto &[nickname, participant] : data.participants) {
+                participant->occupantId.clear();
+            }
+        }
+        if (data.state == MucRoomState::JoiningRoomInfo) {
+            finishJoin(roomJid, data);
         }
     });
+}
+
+void QXmppMucManagerV2Private::finishJoin(const QString &roomJid, MucRoomData &data)
+{
+    data.state = MucRoomState::Joined;
+    data.joined = true;
+    data.joinTimer.reset();
+    // configuration changes are announced with status code 104
+    DiscoInfoTracking::setTracked(q->client(), roomJid, true);
+    // XEP-0410: start self-ping silence tracking.
+    data.lastActivity = std::chrono::steady_clock::now();
+    rescheduleSelfPing();
+
+    auto history = std::move(data.historyMessages);
+    auto deferred = std::move(data.deferredMessages);
+    auto promise = std::move(*data.joinPromise);
+    data.joinPromise.reset();
+
+    if (!data.supportsOccupantIds) {
+        for (auto &message : history) {
+            message.setMucOccupantId({});
+        }
+    }
+    if (!history.isEmpty()) {
+        Q_EMIT q->roomHistoryReceived(roomJid, history);
+    }
+    promise.finish(QXmppMucRoomV2(activeRooms[roomJid]));
+    for (const auto &message : deferred) {
+        q->handleMessage(message);
+    }
 }
 
 void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
@@ -1675,10 +1807,7 @@ void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
         return;
     }
 
-    std::optional<QXmppPromise<Result<>>> promise;
-    if (itr->second->leavePromise) {
-        promise = std::move(itr->second->leavePromise);
-    }
+    auto promise = std::exchange(itr->second->leavePromise, {});
     deactivateRoom(roomJid);
     rescheduleSelfPing();
 
@@ -1759,6 +1888,10 @@ QBindable<QString> QXmppMucRoomV2::subject() const
 
 /*!
     Returns the user's nickname in the room as a bindable property.
+
+    Unlike selfParticipant()->nickname(), this is also set while not joined: it holds the
+    requested nickname during joinRoom() and the last used one after leaving. Once joined, it
+    contains the nickname confirmed by the service, which may differ from the requested one.
 */
 QBindable<QString> QXmppMucRoomV2::nickname() const
 {
@@ -1767,6 +1900,10 @@ QBindable<QString> QXmppMucRoomV2::nickname() const
 
 /*!
     Returns whether the room is currently joined as a bindable property.
+
+    This becomes \c true when QXmppMucManagerV2::joinRoom() resolves, or after
+    QXmppMucManagerV2::createRoom() once setRoomConfig() has unlocked the room. It becomes
+    \c false when leaving the room, being removed from it or losing the connection.
 */
 QBindable<bool> QXmppMucRoomV2::joined() const
 {
@@ -2693,8 +2830,9 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
     Submits the room \a config to the server.
 
     In the \c Creating state (after createRoom()) this unlocks the room and
-    transitions it to the \c Joined state. In the \c Joined state this
-    updates an existing room's configuration.
+    transitions it to the \c Joined state. The task then resolves once the room's service
+    discovery info has been received, like joinRoom(), and joined() is \c true. In the \c Joined
+    state this updates an existing room's configuration.
 
     \since QXmpp 1.16
 */
@@ -2713,15 +2851,18 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
     // Re-check the state: a disconnect during the await may have deactivated the room
     // (state reset to NotJoined), in which case we must not stomp it back to Joined.
     if (std::holds_alternative<Success>(result) && wasCreating && m_data->state == Creating) {
-        // Unlock the room: transition to Joined state
-        m_data->state = MucRoomState::Joined;
-        m_data->joined = true;
-        // XEP-0410: start self-ping silence tracking.
-        m_data->lastActivity = std::chrono::steady_clock::now();
-        m_data->manager->d->rescheduleSelfPing();
-        // Fetch room info now that the room is configured
+        // The room is unlocked. Like with joinRoom(), it is joined once the disco#info result
+        // tells whether the occupant IDs received so far are valid.
+        QXmppPromise<Result<QXmppMucRoomV2>> promise;
+        auto joinTask = promise.task();
+        m_data->joinPromise = std::move(promise);
+        m_data->state = JoiningRoomInfo;
         m_data->manager->d->fetchRoomInfo(m_data->roomJid);
-        DiscoInfoTracking::setTracked(m_data->manager->client(), m_data->roomJid, true);
+
+        auto joinResult = co_await std::move(joinTask);
+        if (auto *error = std::get_if<QXmppError>(&joinResult)) {
+            co_return std::move(*error);
+        }
     }
     co_return result;
 }
@@ -2764,6 +2905,8 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     An optional \a reason and an \a alternateJid can be provided; the alternate
     JID is sent to occupants so they may join an alternative room.
 
+    QXmppMucManagerV2::removedFromRoom() is not emitted for the room.
+
     \since QXmpp 1.16
 */
 QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QString &alternateJid)
@@ -2772,7 +2915,9 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
         co_return QXmppError { u"Room is not joined."_s };
     }
 
-    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroyAlternateJid = alternateJid, .destroyReason = reason }).withContext(m_data->manager);
+    m_data->destroying = true;
+    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroy = MucOwnerDestroy { .alternateJid = alternateJid, .reason = reason } }).withContext(m_data->manager);
+    m_data->destroying = false;
     // Only tear down if still joined — a disconnect during the await may have already
     // deactivated (and a subsequent rejoin revived) the room.
     if (std::holds_alternative<Success>(result)) {

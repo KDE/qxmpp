@@ -50,11 +50,12 @@ public:
     void setSelfPingSilenceThreshold(std::chrono::milliseconds threshold);
 
     /*!
-        Returns a handle for the tracked room at \a jid, or \c std::nullopt if the manager
-        has no state for this JID.
+        Returns a handle for the tracked room at \a jid, or \c std::nullopt if the room is not
+        tracked. This does not join the room or send any request.
 
-        Inactive rooms (left but still referenced by a caller handle) are revived transparently
-        so that leave → findRoom observes the same underlying state.
+        A room is tracked from the start of joinRoom() or createRoom() until it is left, and its
+        state is kept up to date automatically in the meantime. A left room is still returned
+        as long as another handle to it exists, with its last known state.
     */
     std::optional<QXmppMucRoomV2> findRoom(const QString &jid);
 
@@ -84,6 +85,15 @@ public:
         The room state is still accessible during this signal's emission.
         After all handlers return, the room state is cleaned up.
         The \a destroy parameter contains room destruction info if the reason is \c RoomDestroyed.
+
+        Not emitted for QXmppMucRoomV2::leave() and QXmppMucRoomV2::destroyRoom().
+
+        Also emitted with \c LeaveReason::ConnectionLost for each joined room when the connection
+        is lost and the stream is not resumed. Rooms still being joined are not reported, their
+        joinRoom() tasks fail instead.
+
+        To clean up whenever the room is no longer joined, including after leave() and
+        destroyRoom(), use QXmppMucRoomV2::joined() instead.
     */
     Q_SIGNAL void removedFromRoom(const QString &roomJid, QXmpp::Muc::LeaveReason reason, const std::optional<QXmpp::Muc::Destroy> &destroy);
     /*! Emitted with the \a messages received for the room at \a roomJid during joining. */
@@ -367,7 +377,13 @@ public:
     QBindable<QXmpp::Muc::Role> role() const;
     /*! Returns the participant's affiliation with the room. */
     QBindable<QXmpp::Muc::Affiliation> affiliation() const;
-    /*! Returns the participant's \xep{0421}{Occupant Id} if the room supports it. */
+    /*!
+        Returns the participant's \xep{0421}{Occupant Id} if the room supports it.
+
+        The occupant ID doesn't change while the room is joined, so it isn't bindable. It is final
+        once QXmppMucRoomV2::joined() is \c true. Before, it may still be removed if the room turns
+        out not to support occupant IDs.
+    */
     QString occupantId() const;
 
 private:

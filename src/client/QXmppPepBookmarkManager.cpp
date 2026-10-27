@@ -32,6 +32,8 @@ struct Bookmarks2Conference {
     QString password;
     // extensions (none supported)
     // TODO: impl generic extensions for passthrough for editing
+
+    bool operator==(const Bookmarks2Conference &) const = default;
 };
 
 struct Bookmarks2ConferenceItem : public QXmppPubSubBaseItem {
@@ -148,20 +150,21 @@ using EmptyResult = std::variant<Success, QXmppError>;
 /*!
     \fn QXmppPepBookmarkManager::bookmarksAdded(const QList<QXmppMucBookmark> &newBookmarks)
 
-    Emitted with the \a newBookmarks that have been added. This is triggered by PubSub event
-    notifications.
+    Emitted with the \a newBookmarks that have been added, by this or another client.
 */
 
 /*!
     \fn QXmppPepBookmarkManager::bookmarksChanged(const QList<QXmppPepBookmarkManager::BookmarkChange> &bookmarkUpdates)
 
-    Emitted with the \a bookmarkUpdates describing the bookmarks that have been changed.
+    Emitted with the \a bookmarkUpdates describing the bookmarks that have been changed, by this
+    or another client.
 */
 
 /*!
     \fn QXmppPepBookmarkManager::bookmarksRemoved(const QList<QString> &removedBookmarkJids)
 
-    Emitted with the \a removedBookmarkJids of the bookmarks that have been retracted.
+    Emitted with the \a removedBookmarkJids of the bookmarks that have been retracted, by this or
+    another client.
 */
 
 /*! Default constructor. */
@@ -195,8 +198,8 @@ const std::optional<QList<QXmppMucBookmark>> &QXmppPepBookmarkManager::bookmarks
     Publishes or updates a \a bookmark via \xep{0402}{PEP Native Bookmarks}.
 
     If a bookmark for the same JID already exists it is replaced. The change is
-    propagated to all connected clients via PubSub event notification, which will
-    trigger bookmarksChanged() on this manager.
+    propagated to all connected clients via PubSub event notification and triggers
+    bookmarksAdded() or bookmarksChanged() on this manager.
 
     The JID of \a bookmark must not be empty.
 */
@@ -236,52 +239,14 @@ bool QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, cons
             bookmarks = QList<QXmppMucBookmark>();
             Q_EMIT bookmarksReset();
             break;
-        case Items: {
-            const auto items = event.items();
-
-            // No reserve because in practise in 95% of the use-case only one change/addition is
-            // done and only one allocation is needed then.
-            QList<BookmarkChange> changes;
-            QList<QXmppMucBookmark> addedBookmarks;
-
-            for (const auto &item : items) {
-                auto payload = item.payload;
-                auto newBookmark = QXmppMucBookmark { item.id(), std::move(payload) };
-
-                if (auto it = std::ranges::find(bookmarks, item.id(), &QXmppMucBookmark::jid); it != bookmarks.end()) {
-                    changes.push_back(BookmarkChange { std::move(*it), newBookmark });
-                    *it = std::move(newBookmark);
-                } else {
-                    addedBookmarks.push_back(newBookmark);
-                    bookmarks.push_back(std::move(newBookmark));
-                }
-            }
-
-            if (!changes.isEmpty()) {
-                Q_EMIT bookmarksChanged(changes);
-            }
-            if (!addedBookmarks.isEmpty()) {
-                Q_EMIT bookmarksAdded(addedBookmarks);
-            }
+        case Items:
+            d->storeBookmarks(transform<QList<QXmppMucBookmark>>(event.items(), [](const auto &item) {
+                return QXmppMucBookmark { item.id(), item.payload };
+            }));
             break;
-        }
-        case Retract: {
-            const auto jids = event.retractIds();
-
-            QList<QString> removedJids;
-            removedJids.reserve(jids.size());
-
-            for (const auto &jid : jids) {
-                if (auto it = std::ranges::find(bookmarks, jid, &QXmppMucBookmark::jid);
-                    it != bookmarks.end()) {
-                    bookmarks.erase(it);
-                    removedJids.push_back(jid);
-                }
-            }
-
-            Q_EMIT bookmarksRemoved(removedJids);
+        case Retract:
+            d->eraseBookmarks(event.retractIds());
             break;
-        }
         case Configuration:
         case Subscription:
             break;
@@ -339,14 +304,7 @@ auto QXmppPepBookmarkManagerPrivate::setBookmark(QXmppMucBookmark &&bookmark) ->
             if (hasError(result)) {
                 return getError(std::move(result));
             }
-            if (bookmarks) {
-                if (auto it = std::ranges::find(*bookmarks, bookmark.jid(), &QXmppMucBookmark::jid);
-                    it != bookmarks->end()) {
-                    *it = std::move(bookmark);
-                } else {
-                    bookmarks->append(std::move(bookmark));
-                }
-            }
+            storeBookmarks({ std::move(bookmark) });
             return Success();
         });
 }
@@ -357,12 +315,7 @@ QXmppTask<EmptyResult> QXmppPepBookmarkManagerPrivate::removeBookmark(const QStr
         if (hasError(result)) {
             return getError(std::move(result));
         }
-        if (bookmarks) {
-            if (auto it = std::ranges::find(*bookmarks, jid, &QXmppMucBookmark::jid);
-                it != bookmarks->end()) {
-                bookmarks->erase(it);
-            }
-        }
+        eraseBookmarks({ jid });
         return Success();
     });
 }
@@ -391,4 +344,55 @@ void QXmppPepBookmarkManagerPrivate::resetBookmarks()
 {
     bookmarks.reset();
     Q_EMIT q->bookmarksReset();
+}
+
+// Own changes are applied on the IQ result and again on the event notification, in any order.
+// Only the first one reports them, the second one finds the cache already up to date.
+void QXmppPepBookmarkManagerPrivate::storeBookmarks(QList<QXmppMucBookmark> &&newBookmarks)
+{
+    if (!bookmarks) {
+        return;
+    }
+
+    QList<QXmppPepBookmarkManager::BookmarkChange> changes;
+    QList<QXmppMucBookmark> addedBookmarks;
+
+    for (auto &newBookmark : newBookmarks) {
+        if (auto it = std::ranges::find(*bookmarks, newBookmark.jid(), &QXmppMucBookmark::jid); it != bookmarks->end()) {
+            if (it->d->payload == newBookmark.d->payload) {
+                continue;
+            }
+            changes.push_back({ std::move(*it), newBookmark });
+            *it = std::move(newBookmark);
+        } else {
+            addedBookmarks.push_back(newBookmark);
+            bookmarks->push_back(std::move(newBookmark));
+        }
+    }
+
+    if (!changes.isEmpty()) {
+        Q_EMIT q->bookmarksChanged(changes);
+    }
+    if (!addedBookmarks.isEmpty()) {
+        Q_EMIT q->bookmarksAdded(addedBookmarks);
+    }
+}
+
+void QXmppPepBookmarkManagerPrivate::eraseBookmarks(const QList<QString> &jids)
+{
+    if (!bookmarks) {
+        return;
+    }
+
+    QList<QString> removedJids;
+    for (const auto &jid : jids) {
+        if (auto it = std::ranges::find(*bookmarks, jid, &QXmppMucBookmark::jid); it != bookmarks->end()) {
+            bookmarks->erase(it);
+            removedJids.push_back(jid);
+        }
+    }
+
+    if (!removedJids.isEmpty()) {
+        Q_EMIT q->bookmarksRemoved(removedJids);
+    }
 }

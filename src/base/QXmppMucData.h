@@ -103,7 +103,9 @@ enum class Role {
     \value RoomDestroyed The room was destroyed by its owner (§10.9).
     \value ServiceShutdown The participant was removed because the MUC service is being shut down (status 332).
     \value Error The participant was removed because of an error (status 333).
-    \value ConnectionLost The client detected via \xep{0410}{MUC Self-Ping} that it had been silently removed.
+    \value ConnectionLost The connection to the room was lost: the stream was not resumed after
+    a disconnect, or the client detected via \xep{0410}{MUC Self-Ping} that it had been silently
+    removed.
 */
 enum class LeaveReason {
     Left,

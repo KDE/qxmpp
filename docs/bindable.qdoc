@@ -40,14 +40,19 @@ room.subject().addNotifier([]() { qDebug() << "subject changed"; });
 // Right — the handle is a member of the observing object.
 class MyController : public QObject
 {
-    // ...
+public:
+    explicit MyController(QXmppMucRoomV2 room)
+        : m_room(std::move(room))
+    {
+        m_subjectNotifier = m_room.subject().addNotifier([this]() {
+            qDebug() << "subject changed:" << m_room.subject().value();
+        });
+    }
+
+private:
     QXmppMucRoomV2 m_room;
     QPropertyNotifier m_subjectNotifier;
 };
-
-m_subjectNotifier = m_room.subject().addNotifier([this]() {
-    qDebug() << "subject changed:" << m_room.subject().value();
-});
 \endcode
 
 \section1 addNotifier() versus subscribe()

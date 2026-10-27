@@ -26,12 +26,22 @@ struct MucAdminQuery {
     void toXml(QXmlStreamWriter *writer) const;
 };
 
+// Request to destroy a room in a muc#owner query (XEP-0045 §10.9).
+struct MucOwnerDestroy {
+    QString alternateJid;
+    QString password;
+    QString reason;
+
+    static constexpr std::tuple XmlTag = { u"destroy", ns_muc_owner };
+    static std::optional<MucOwnerDestroy> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+};
+
 // IQ payload for muc#owner requests (XEP-0045 §10).
 // Used to fetch, submit, or cancel a room configuration form, or to destroy a room.
 struct MucOwnerQuery {
     std::optional<QXmppDataForm> form;
-    QString destroyAlternateJid;
-    QString destroyReason;
+    std::optional<MucOwnerDestroy> destroy;
 
     static constexpr std::tuple XmlTag = { u"query", ns_muc_owner };
     static std::optional<MucOwnerQuery> fromDom(const QDomElement &el);

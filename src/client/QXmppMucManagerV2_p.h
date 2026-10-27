@@ -51,17 +51,20 @@ struct QXmppMucManagerV2Private {
     std::shared_ptr<QXmpp::Private::MucRoomData> lookupRoom(const QString &jid);
     std::shared_ptr<QXmpp::Private::MucRoomData> createOrReviveRoom(const QString &jid);
     void deactivateRoom(const QString &jid);
-    void deactivateAllRooms();
+    void handleConnectionLost();
+    void deactivateAllRooms(const QString &errorText);
     void pruneInactiveRooms();
 
     // MUC Core
     void fetchRoomInfo(const QString &roomJid);
+    void finishJoin(const QString &roomJid, QXmpp::Private::MucRoomData &data);
     void fetchAvatar(const QString &roomJid);
     QXmppTask<QXmpp::Result<QXmpp::Private::MucOwnerQuery>> sendOwnerFormRequest(const QString &roomJid);
     void fetchConfigForm(const QString &roomJid);
     void fetchRoomConfigSubscribed(const QString &roomJid);
     void handlePresence(const QXmppPresence &);
     void handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, QXmppPresence);
+    void handleSelfUnavailable(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &presence);
     void throwRoomError(const QString &roomJid, QXmppError &&error);
     void handleJoinTimeout(const QString &roomJid);
     void handleLeaveTimeout(const QString &roomJid);
