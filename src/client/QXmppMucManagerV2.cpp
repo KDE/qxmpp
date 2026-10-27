@@ -681,8 +681,8 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
     has been fetched. If the room is already tracked, i.e. joined or being joined or created
     (see findRoom()), the task fails immediately.
 
-    QXmppMucRoomV2::joined() is still \c false when the task resolves. It becomes \c true once
-    QXmppMucRoomV2::setRoomConfig() has unlocked the room, and only then the room is usable, e.g.
+    QXmppMucRoomV2::joined() is still \c false when the task resolves. It is \c true once the
+    task of QXmppMucRoomV2::setRoomConfig() has resolved, and only then the room is usable, e.g.
     for sending messages.
 
     If the user may not create rooms on the service, the task fails with the stanza error of
@@ -2783,8 +2783,9 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
     Submits the room \a config to the server.
 
     In the \c Creating state (after createRoom()) this unlocks the room and
-    transitions it to the \c Joined state. In the \c Joined state this
-    updates an existing room's configuration.
+    transitions it to the \c Joined state. The task then resolves once the room's service
+    discovery info has been received, like joinRoom(), and joined() is \c true. In the \c Joined
+    state this updates an existing room's configuration.
 
     \since QXmpp 1.16
 */
@@ -2803,15 +2804,18 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
     // Re-check the state: a disconnect during the await may have deactivated the room
     // (state reset to NotJoined), in which case we must not stomp it back to Joined.
     if (std::holds_alternative<Success>(result) && wasCreating && m_data->state == Creating) {
-        // Unlock the room: transition to Joined state
-        m_data->state = MucRoomState::Joined;
-        m_data->joined = true;
-        // XEP-0410: start self-ping silence tracking.
-        m_data->lastActivity = std::chrono::steady_clock::now();
-        m_data->manager->d->rescheduleSelfPing();
-        // Fetch room info now that the room is configured
+        // The room is unlocked. Like with joinRoom(), it is joined once the disco#info result
+        // tells whether the occupant IDs received so far are valid.
+        QXmppPromise<Result<QXmppMucRoomV2>> promise;
+        auto joinTask = promise.task();
+        m_data->joinPromise = std::move(promise);
+        m_data->state = JoiningRoomInfo;
         m_data->manager->d->fetchRoomInfo(m_data->roomJid);
-        DiscoInfoTracking::setTracked(m_data->manager->client(), m_data->roomJid, true);
+
+        auto joinResult = co_await std::move(joinTask);
+        if (auto *error = std::get_if<QXmppError>(&joinResult)) {
+            co_return std::move(*error);
+        }
     }
     co_return result;
 }

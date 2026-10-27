@@ -373,7 +373,13 @@ public:
     QBindable<QXmpp::Muc::Role> role() const;
     /*! Returns the participant's affiliation with the room. */
     QBindable<QXmpp::Muc::Affiliation> affiliation() const;
-    /*! Returns the participant's \xep{0421}{Occupant Id} if the room supports it. */
+    /*!
+        Returns the participant's \xep{0421}{Occupant Id} if the room supports it.
+
+        The occupant ID doesn't change while the room is joined, so it isn't bindable. It is final
+        once QXmppMucRoomV2::joined() is \c true. Before, it may still be removed if the room turns
+        out not to support occupant IDs.
+    */
     QString occupantId() const;
 
 private:
