@@ -367,7 +367,12 @@ struct QXmppAccountMigrationManagerPrivate {
 /*!
     \fn QXmppAccountMigrationManager::errorOccurred(const QXmppError &error)
 
-    Emitted when an error occured during export or import. \a error is the occured error.
+    Emitted when a non-fatal error occurred during export or import. \a error is the error that
+    occurred.
+
+    Such an error does not abort the export or import, which continues with the remaining data
+    (e.g., the other MIX channels if joining one of them failed). Errors that make the export or
+    import fail are reported by the results of exportData() and importData() instead.
 */
 
 /*!
