@@ -1112,6 +1112,11 @@ void Manager::onRegistered(QXmppClient *client)
             Q_EMIT deviceChanged(modifiedDevicesItr.key(), modifiedDevicesItr.value());
         }
     });
+
+    // The subscriptions may be lost if the stream is not resumed.
+    connect(client, &QXmppClient::disconnected, this, [this] {
+        d->jidsOfManuallySubscribedDevices.clear();
+    });
 }
 
 void Manager::onUnregistered(QXmppClient *client)
