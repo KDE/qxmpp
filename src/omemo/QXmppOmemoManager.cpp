@@ -636,7 +636,8 @@ QXmppTask<QList<QXmppOmemoDevice>> Manager::devices(QList<QString> jids)
 
 /*!
     Removes all devices of the contact with JID \a jid and the subscription to
-    the contact's device list.
+    the contact's device list if this client has explicitly subscribed to it
+    in the current session.
 
     This should be called after removing a contact.
     The devices are removed even if the subscription could not be removed.
@@ -652,7 +653,11 @@ QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(QString jid)
 {
     Q_ASSERT_X(jid != d->ownBareJid(), "Removing contact device", "Own JID passed");
 
-    auto result = co_await d->unsubscribeFromDeviceList(jid).withContext(this);
+    QXmppPubSubManager::Result result = Success();
+
+    if (d->jidsOfManuallySubscribedDevices.contains(jid)) {
+        result = co_await d->unsubscribeFromDeviceList(jid).withContext(this);
+    }
 
     d->devices.remove(jid);
 
