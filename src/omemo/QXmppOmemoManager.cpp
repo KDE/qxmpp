@@ -262,7 +262,7 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
     That can be done as soon as the user is logged in to the server:
     \code
     connect(client, &QXmppClient::connected, this, [=]() {
-    auto future = manager->start();
+    auto future = manager->setUp();
     });
     \endcode
 
@@ -531,10 +531,12 @@ QXmppTask<QList<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QStri
     presence subscription because their device lists are not automatically
     subscribed.
     The user must be logged in while calling this.
+    JIDs whose device lists are already subscribed are not subscribed again.
 
     Call \c QXmppOmemoManager::unsubscribeFromDeviceLists() before logout.
 
-    Returns the results of the subscription for each JID.
+    Returns the results of the subscription for each JID, including a success result for each
+    already subscribed one.
 */
 QXmppTask<QList<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList<QString> jids)
 {
@@ -1109,6 +1111,11 @@ void Manager::onRegistered(QXmppClient *client)
         for (auto modifiedDevicesItr = modifiedDevices.cbegin(); modifiedDevicesItr != modifiedDevices.cend(); ++modifiedDevicesItr) {
             Q_EMIT deviceChanged(modifiedDevicesItr.key(), modifiedDevicesItr.value());
         }
+    });
+
+    // The subscriptions may be lost if the stream is not resumed.
+    connect(client, &QXmppClient::disconnected, this, [this] {
+        d->jidsOfManuallySubscribedDevices.clear();
     });
 }
 
