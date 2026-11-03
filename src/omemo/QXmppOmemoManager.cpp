@@ -639,21 +639,20 @@ QXmppTask<QList<QXmppOmemoDevice>> Manager::devices(QList<QString> jids)
     the contact's device list.
 
     This should be called after removing a contact.
+    The devices are removed even if the subscription could not be removed.
+
     The JID of the current user must not be passed.
     Use \c QXmppOmemoManager::resetAll() in order to remove all devices of the
     user.
 
-    Returns the result of the contact device removals.
+    Returns the result of removing the subscription to the contact's device
+    list.
 */
 QXmppTask<QXmppPubSubManager::Result> Manager::removeContactDevices(QString jid)
 {
     Q_ASSERT_X(jid != d->ownBareJid(), "Removing contact device", "Own JID passed");
 
     auto result = co_await d->unsubscribeFromDeviceList(jid).withContext(this);
-    if (std::holds_alternative<QXmppError>(result)) {
-        warning(u"Contact '" + jid + u"' could not be removed because the device list subscription could not be removed");
-        co_return result;
-    }
 
     d->devices.remove(jid);
 
