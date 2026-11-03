@@ -4,8 +4,8 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.17.1 (UNRELEASED)
--------------------------
+QXmpp 1.17.1 (November 3, 2026)
+-------------------------------
 
  - MUC: Fix destroying a room without reason or alternate JID, which sent no destroy request (@melvo, @lnj, !827)
  - MUC: Fix handling a room destruction without status code 110 (as sent by ejabberd), which left the room joined (@lnj, !827)
