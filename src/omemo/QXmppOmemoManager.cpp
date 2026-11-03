@@ -531,19 +531,15 @@ QXmppTask<QList<Manager::DevicesResult>> Manager::requestDeviceLists(QList<QStri
     presence subscription because their device lists are not automatically
     subscribed.
     The user must be logged in while calling this.
-    If the user's resource is already subscribed to the device lists of JIDs in \a jids, those JIDs
-    are skipped.
+    JIDs whose device lists are already subscribed are not subscribed again.
 
     Call \c QXmppOmemoManager::unsubscribeFromDeviceLists() before logout.
 
-    Returns the results of the subscription for each JID.
+    Returns the results of the subscription for each JID, including a success result for each
+    already subscribed one.
 */
 QXmppTask<QList<Manager::DevicesResult>> Manager::subscribeToDeviceLists(QList<QString> jids)
 {
-    removeIf(jids, [this](const QString &jid) {
-        return d->jidsOfManuallySubscribedDevices.contains(jid);
-    });
-
     QList<DevicesResult> devicesResults;
     devicesResults.reserve(jids.size());
 

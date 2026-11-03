@@ -2713,13 +2713,18 @@ QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> ManagerPriva
 }
 
 // Subscribes to the device list of a contact if the contact's device is not stored yet.
+// If the device list is already subscribed, it is only requested.
 //
 // \a jid is JID of the contact whose device list is being subscribed. \a deviceId is ID of the
 // device that is checked.
 void ManagerPrivate::subscribeToNewDeviceLists(const QString &jid, uint32_t deviceId)
 {
     if (!devices.value(jid).contains(deviceId)) {
-        subscribeToDeviceList(jid);
+        if (jidsOfManuallySubscribedDevices.contains(jid)) {
+            requestDeviceList(jid);
+        } else {
+            subscribeToDeviceList(jid);
+        }
     }
 }
 
@@ -2731,17 +2736,25 @@ void ManagerPrivate::subscribeToNewDeviceLists(const QString &jid, uint32_t devi
 //
 // \a jid is JID of the contact whose device list is being subscribed.
 //
-// Returns the result of the subscription and manual request.
+// Returns the result of the subscription and manual request, or a success result if the device
+// list is already subscribed or being subscribed.
 QXmppTask<QXmppPubSubManager::Result> ManagerPrivate::subscribeToDeviceList(QString jid)
 {
+    if (jidsOfManuallySubscribedDevices.contains(jid)) {
+        co_return Success();
+    }
+
+    // Added before the subscription has finished to avoid subscribing multiple times in parallel
+    jidsOfManuallySubscribedDevices.append(jid);
+
     auto result = co_await pubSubManager->subscribeToNode(jid, staticString(ns_omemo_2_devices), ownFullJid()).withContext(q);
 
     if (const auto error = std::get_if<QXmppError>(&result)) {
+        jidsOfManuallySubscribedDevices.removeAll(jid);
         warning(u"Device list for JID '" + jid + u"' could not be subscribed: " + errorToString(*error));
         co_return std::move(*error);
     }
 
-    jidsOfManuallySubscribedDevices.append(jid);
     co_return mapToSuccess(co_await requestDeviceList(jid).withContext(q));
 }
 
