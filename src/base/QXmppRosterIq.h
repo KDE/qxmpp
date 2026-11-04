@@ -26,7 +26,7 @@ class QXmppRosterIqPrivate;
 
     \brief The QXmppRosterIq class represents a roster IQ.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppRosterIq : public QXmppIq
 {

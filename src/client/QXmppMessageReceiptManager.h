@@ -16,7 +16,7 @@
     send and receive message delivery receipts as defined in
     \xep{0184}{Message Delivery Receipts}.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppMessageReceiptManager : public QXmppClientExtension, public QXmppMessageHandler
 {

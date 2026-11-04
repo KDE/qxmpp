@@ -2639,7 +2639,7 @@ QXMPP_PRIVATE_DEFINE_RULE_OF_SIX(QXmppJingleReason)
     \brief The QXmppJingleMessageInitiationElement class represents a Jingle Message Initiation
     element as specified by \xep{0353}{Jingle Message Initiation}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.6
 */
@@ -2860,7 +2860,7 @@ public:
     \brief The QXmppCallInviteElement class represents a Call Invite
     element as specified by \xep{0482}{Call Invites}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.6
 */

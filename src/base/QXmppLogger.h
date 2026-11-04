@@ -27,7 +27,7 @@ class QXmppLoggerPrivate;
 
     \brief The QXmppLogger class represents a sink for logging messages.
 
-    \ingroup Core
+    \ingroup qxmpp-core
 */
 class QXMPP_EXPORT QXmppLogger : public QObject
 {
@@ -224,7 +224,7 @@ private:
 
     \brief The QXmppLoggable class represents a source of logging messages.
 
-    \ingroup Core
+    \ingroup qxmpp-core
 */
 class QXMPP_EXPORT QXmppLoggable : public QObject
 {

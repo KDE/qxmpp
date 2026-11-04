@@ -35,7 +35,7 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
 
     \since QXmpp 1.5
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 
 /*!

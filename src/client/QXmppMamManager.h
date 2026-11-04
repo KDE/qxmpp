@@ -37,7 +37,7 @@ class QXmppMamManagerPrivate;
     Checking whether the account supports message archiving using watchAccountSupport()
     requires the QXmppDiscoveryManager to be registered with the client.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.0
 */

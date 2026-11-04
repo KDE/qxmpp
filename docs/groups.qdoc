@@ -4,32 +4,32 @@
 // SPDX-License-Identifier: CC0-1.0
 
 /*!
-\group Core
+\group qxmpp-core
 \title Core classes
 
 Core classes include all necessary classes to build a basic client or server
 application. This for example also includes the logging class QXmppLogger.
 
-\annotatedlist {Core}
+\annotatedlist {qxmpp-core}
 */
 
 /*!
-\group Managers
+\group qxmpp-managers
 \title Managers
 
 Managers are used to extend the basic QXmppClient. Some of them are loaded by
 default, others need to be added to the client using
 QXmppClient::addExtension().
 
-\annotatedlist {Managers}
+\annotatedlist {qxmpp-managers}
 */
 
 /*!
-\group Stanzas
+\group qxmpp-stanzas
 \title Stanzas
 
 All packets that are sent and received are serialized in Stanzas, so this
 includes IQ stanzas, message stanzas, presence stanzas and other stanzas.
 
-\annotatedlist {Stanzas}
+\annotatedlist {qxmpp-stanzas}
 */

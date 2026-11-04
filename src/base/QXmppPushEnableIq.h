@@ -18,7 +18,7 @@ class QXmppDataForm;
     \brief This class represents an IQ to enable or disablepush notifications
     on the user server.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.3
 */

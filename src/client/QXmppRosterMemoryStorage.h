@@ -21,7 +21,7 @@ class QXmppRosterMemoryStoragePrivate;
     custom QXmppRosterStorage to QXmppRosterManager::setStorage() to persist the
     roster across sessions.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
     \since QXmpp 1.16
 */
 class QXMPP_EXPORT QXmppRosterMemoryStorage : public QXmppRosterStorage

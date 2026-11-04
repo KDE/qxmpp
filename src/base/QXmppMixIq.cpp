@@ -46,7 +46,7 @@ struct Enums::Data<QXmppMixIq::Type> {
 //
 // \since QXmpp 1.7
 //
-// \ingroup Stanzas
+// \ingroup qxmpp-stanzas
 //
 
 /*! Constructs a MIX subscription update IQ. */
@@ -118,7 +118,7 @@ void QXmppMixSubscriptionUpdateIq::toXmlElementFromChild(QXmlStreamWriter *write
 //
 // \since QXmpp 1.7
 //
-// \ingroup Stanzas
+// \ingroup qxmpp-stanzas
 //
 
 /*! Constructs a MIX invitation request IQ. */
@@ -175,7 +175,7 @@ void QXmppMixInvitationRequestIq::toXmlElementFromChild(QXmlStreamWriter *writer
 //
 // \since QXmpp 1.7
 //
-// \ingroup Stanzas
+// \ingroup qxmpp-stanzas
 //
 
 /*! Constructs a MIX invitation response IQ. */
@@ -243,7 +243,7 @@ public:
 
     \since QXmpp 1.1
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 /*!

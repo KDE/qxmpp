@@ -19,7 +19,7 @@ using namespace QXmpp::Private;
 
     \brief The QXmppTrustManager manages end-to-end encryption trust decisions.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.5
 */

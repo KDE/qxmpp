@@ -51,7 +51,7 @@ class QXmppTask;
     Information that has been removed although it is still in use is requested from the entities
     again and stored anew, so removing too much only causes additional requests.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
     \since QXmpp 1.17
 */
 class QXMPP_EXPORT QXmppEntityCapsStorage

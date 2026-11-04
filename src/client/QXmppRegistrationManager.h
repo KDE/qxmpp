@@ -210,7 +210,7 @@ class QXmppRegistrationManagerPrivate;
     but that does not work always. There might also be forms that have no clear
     username or password fields.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.2
 */

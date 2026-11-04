@@ -20,7 +20,7 @@ class QXmppRegisterIqPrivate;
 
     It is used to create an account on the server.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 class QXMPP_EXPORT QXmppRegisterIq : public QXmppIq

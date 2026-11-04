@@ -275,7 +275,7 @@ void QXmppExternalService::toXml(QXmlStreamWriter *writer) const
     \brief The QXmppExternalServiceDiscoveryIq class represents an IQ used to discover external
     services as defined by \xep{0215}{External Service Discovery}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.6
 */

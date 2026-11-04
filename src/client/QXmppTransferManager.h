@@ -278,7 +278,7 @@ private:
     client->addExtension(manager);
     \endcode
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppTransferManager : public QXmppClientExtension
 {

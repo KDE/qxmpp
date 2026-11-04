@@ -105,7 +105,7 @@ struct QXmppPepBookmarkManagerPrivate;
     });
 \endcode
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
     \since QXmpp 1.16
 */
 class QXMPP_EXPORT QXmppPepBookmarkManager : public QXmppClientExtension,

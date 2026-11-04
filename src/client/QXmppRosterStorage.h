@@ -46,7 +46,7 @@ class QXmppTask;
     applications should either instantiate one storage object per
     QXmppRosterManager or implement their own JID-scoped backend.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
     \since QXmpp 1.16
 */
 class QXMPP_EXPORT QXmppRosterStorage

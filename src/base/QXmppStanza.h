@@ -102,7 +102,7 @@ class QXmppStanzaErrorPrivate;
 
     \brief The QXmppStanza class is the base class for all XMPP stanzas.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppStanza : public QXmppNonza
 {

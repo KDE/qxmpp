@@ -25,7 +25,7 @@ using namespace QXmpp::Private;
     The QXmppPubSubIq class represents an IQ used for the publish-subscribe
     mechanisms defined by \xep{0060}{Publish-Subscribe}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.5
 */

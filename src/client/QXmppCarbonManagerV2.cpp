@@ -86,7 +86,7 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
 
     \note Enabling via Bind 2 has been added in QXmpp 1.8.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.5
 */

@@ -28,7 +28,7 @@ class QXmppMessage;
     and implement handleStanza(). You can then add your extension to the
     client instance using QXmppClient::addExtension().
 
-    \ingroup Core
+    \ingroup qxmpp-core
 */
 class QXMPP_EXPORT QXmppClientExtension : public QXmppLoggable, public QXmppExtension
 {

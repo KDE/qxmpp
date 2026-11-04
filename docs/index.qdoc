@@ -90,7 +90,7 @@ into classic signals are covered in \l{Reactive Properties}.
 
 Managers are the primary way to use XMPP features. Register them with
 QXmppClient and extend QXmppClient by subclassing QXmppClientExtension. See the
-\l{Managers} module for the full list.
+\l{qxmpp-managers}{Managers} module for the full list.
 
 \section2 Messaging
 \list

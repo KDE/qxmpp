@@ -21,7 +21,7 @@ using namespace QXmpp::Private;
 
     QXmppPingIq represents a Ping IQ as defined by \xep{0199}{XMPP Ping}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 QXmppPingIq::QXmppPingIq()

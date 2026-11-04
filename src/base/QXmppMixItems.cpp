@@ -257,7 +257,7 @@ public:
 
     \since QXmpp 1.7
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 /*!
@@ -878,7 +878,7 @@ public:
 
     \since QXmpp 1.5
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 QXmppMixInfoItem::QXmppMixInfoItem()
@@ -1003,7 +1003,7 @@ public:
 
     \since QXmpp 1.5
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 QXmppMixParticipantItem::QXmppMixParticipantItem()

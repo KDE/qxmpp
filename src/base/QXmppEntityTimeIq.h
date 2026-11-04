@@ -15,7 +15,7 @@
     \brief QXmppEntityTimeIq represents an entity time request/response as
     defined in \xep{0202}{Entity Time}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppEntityTimeIq : public QXmppIq
 {

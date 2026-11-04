@@ -13,7 +13,7 @@
     \brief The QXmppStartTlsPacket represents packets used for initiating
     STARTTLS negotiation when connecting.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \deprecated STARTTLS packets will be removed from the public API.
 */

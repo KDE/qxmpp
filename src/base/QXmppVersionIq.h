@@ -13,7 +13,7 @@
     \brief The QXmppVersionIq class represents an IQ for conveying a software
     version as defined by \xep{0092}{Software Version}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppVersionIq : public QXmppIq
 {

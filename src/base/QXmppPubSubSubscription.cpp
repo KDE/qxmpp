@@ -25,7 +25,7 @@ using namespace QXmpp::Private;
     in event notifications and IQ requests, as defined in \xep{0060}{Publish-
     Subscribe}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.5
 */

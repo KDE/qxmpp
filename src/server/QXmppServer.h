@@ -37,7 +37,7 @@ class QXmppStanza;
     XMPP ping, statistics and file transfer proxy support. You can write
     your own extensions for QXmppServer by subclassing QXmppServerExtension.
 
-    \ingroup Core
+    \ingroup qxmpp-core
 */
 class QXMPP_EXPORT QXmppServer : public QXmppLoggable
 {

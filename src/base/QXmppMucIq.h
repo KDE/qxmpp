@@ -15,7 +15,7 @@
 
     It is used to convey information such as permissions.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppMucItem
 {
@@ -98,7 +98,7 @@ private:
 
     It is used to get or modify room memberships.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppMucAdminIq : public QXmppIq
 {

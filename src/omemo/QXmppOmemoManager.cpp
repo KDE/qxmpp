@@ -292,7 +292,7 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
     client->send(stanza, params);
     \endcode
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.5
 */

@@ -120,7 +120,7 @@ private:
 
     Since QXmpp 1.12 info and items queries are cached per session by default.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppDiscoveryManager : public QXmppClientExtension
 {

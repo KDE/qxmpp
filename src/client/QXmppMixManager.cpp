@@ -230,7 +230,7 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
     });
     \endcode
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.7
 */

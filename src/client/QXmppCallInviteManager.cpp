@@ -198,7 +198,7 @@ public:
     \brief The QXmppCallInviteManager class makes it possible to retrieve
     Call Invite elements as defined by \xep{0482}{Call Invites}.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.6
 */

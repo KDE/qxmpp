@@ -296,7 +296,7 @@ public:
 /*!
     \class QXmppJingleMessageInitiationManager
     \inmodule QXmpp
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \brief The QXmppJingleMessageInitiationManager class makes it possible to retrieve
     Jingle Message Initiation elements as defined by \xep{0353}{Jingle Message Initiation}.

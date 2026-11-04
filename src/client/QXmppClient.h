@@ -104,7 +104,7 @@ struct SessionBegin;
     After that you can login and use QXmppCredentials to serialize the token data and store it
     permanently. Note that the token may change over time, though.
 
-    \ingroup Core
+    \ingroup qxmpp-core
 */
 class QXMPP_EXPORT QXmppClient : public QXmppLoggable
 {

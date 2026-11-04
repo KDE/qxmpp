@@ -75,7 +75,7 @@ class QXmppTask;
     Unlike QFuture, this is not thread-safe. This avoids the need to do mutex locking at every
     access though.
 
-    \ingroup Core
+    \ingroup qxmpp-core
 
     \since QXmpp 1.5
 */
@@ -327,7 +327,7 @@ private:
     Unlike QFuture, this is *not* thread-safe!! This avoids the need to do mutex locking at every
     access though.
 
-    \ingroup Core
+    \ingroup qxmpp-core
 
     \since QXmpp 1.5
 */

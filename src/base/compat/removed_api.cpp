@@ -186,7 +186,7 @@ public:
     list of features and other information about an entity as defined by
     \xep{0030}{Service Discovery}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \deprecated
 */

@@ -52,7 +52,7 @@ using namespace QXmpp::Private;
 
     In addition, archiving via MAM must be enabled on the server.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.5
 */

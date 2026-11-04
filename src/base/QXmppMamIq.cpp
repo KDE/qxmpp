@@ -30,7 +30,7 @@ public:
     The QXmppMamQueryIq class represents the query IQ for \xep{0313}{Message
     Archive Management}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.0
 */
@@ -147,7 +147,7 @@ public:
     The QXmppMamResultIq class represents the result IQ for \xep{0313}{Message
     Archive Management}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.0
 */

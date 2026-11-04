@@ -35,7 +35,7 @@ QT_WARNING_DISABLE_DEPRECATED
     client->addExtension(manager);
     \endcode
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \deprecated
 */

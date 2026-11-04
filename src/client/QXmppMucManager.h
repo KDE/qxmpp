@@ -40,7 +40,7 @@ class QXmppMucRoomPrivate;
 
     \note This manager is going to be replaced with the QXmppMucManagerV2 in the future.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppMucManager : public QXmppClientExtension
 {

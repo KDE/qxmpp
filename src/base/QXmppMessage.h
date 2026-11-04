@@ -63,7 +63,7 @@ struct Reply {
 
     \brief The QXmppMessage class represents an XMPP message.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppMessage : public QXmppStanza
 {

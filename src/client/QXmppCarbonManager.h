@@ -20,7 +20,7 @@ class QXmppMessage;
 
     \warning This manager does not decrypt e2ee messages. You can use QXmppCarbonManagerV2.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.0
 */

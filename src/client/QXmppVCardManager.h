@@ -43,7 +43,7 @@ struct QXmppError;
     Checking whether the server supports vCards using watchServerSupport() requires the
     QXmppDiscoveryManager to be registered with the client.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppVCardManager : public QXmppClientExtension
 {

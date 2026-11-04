@@ -319,7 +319,7 @@ bool QXmppOmemoDeviceBundle::isOmemoDeviceBundle(const QDomElement &element)
     by \xep{0384}{OMEMO Encryption} and \xep{0420}{Stanza Content Encryption}
     (SCE).
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 /*!

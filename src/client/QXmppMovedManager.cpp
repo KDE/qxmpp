@@ -114,7 +114,7 @@ public:
     does not has QXmppMovedManager support the request message will be changed to introduce a warning message before emitting
     the subscription{Request}Received signal.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.9
 */

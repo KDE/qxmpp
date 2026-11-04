@@ -13,7 +13,7 @@
     \brief The QXmppDialback class represents a stanza used for the Server
     Dialback protocol as specified by \xep{0220}{Server Dialback}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 class QXMPP_EXPORT QXmppDialback : public QXmppStanza

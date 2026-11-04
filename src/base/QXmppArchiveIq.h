@@ -86,7 +86,7 @@ private:
 
     It is used to get chat as a QXmppArchiveChat.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppArchiveChatIq : public QXmppIq
 {
@@ -115,7 +115,7 @@ private:
 
     \brief Represents an archive list as defined by \xep{0136}{Message Archiving}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppArchiveListIq : public QXmppIq
 {
@@ -162,7 +162,7 @@ private:
 
     \brief Represents an archive remove IQ as defined by \xep{0136}{Message Archiving}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppArchiveRemoveIq : public QXmppIq
 {
@@ -195,7 +195,7 @@ private:
 
     \brief Represents an archive retrieve IQ as defined by \xep{0136}{Message Archiving}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppArchiveRetrieveIq : public QXmppIq
 {
@@ -230,7 +230,7 @@ private:
 
     \brief Represents an archive preference IQ as defined by \xep{0136}{Message Archiving}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppArchivePrefIq : public QXmppIq
 {

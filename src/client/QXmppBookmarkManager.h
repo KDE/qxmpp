@@ -14,7 +14,7 @@ class QXmppBookmarkSet;
 
 /*!
     \inmodule QXmpp
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \brief The QXmppBookmarkManager class allows you to store and retrieve
     bookmarks as defined by \xep{0048}{Bookmarks}.

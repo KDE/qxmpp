@@ -30,7 +30,7 @@ using namespace QXmpp::Private;
     Checking whether the server supports external service discovery using watchServerSupport()
     requires the QXmppDiscoveryManager to be registered with the client.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.6
 */

@@ -23,7 +23,7 @@ class QXmppHttpUploadSlotIqPrivate;
 
     \since QXmpp 1.1
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppHttpUploadRequestIq : public QXmppIq
 {
@@ -65,7 +65,7 @@ private:
 
     \since QXmpp 1.1
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppHttpUploadSlotIq : public QXmppIq
 {

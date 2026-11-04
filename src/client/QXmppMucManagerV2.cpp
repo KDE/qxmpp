@@ -410,7 +410,7 @@ struct MucRoomData {
 
     \sa {Reactive Properties}
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
     \since QXmpp 1.13
 */
 

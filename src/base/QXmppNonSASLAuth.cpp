@@ -24,7 +24,7 @@ using namespace QXmpp::Private;
     QXmppNonSASLAuthIq represents a Non-SASL authentication IQ as defined by
     \xep{0078}{Non-SASL Authentication}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 QXmppNonSASLAuthIq::QXmppNonSASLAuthIq()

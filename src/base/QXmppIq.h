@@ -20,7 +20,7 @@ class QXmppIqPrivate;
 
     \brief The QXmppIq class is the base class for all IQs.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 class QXMPP_EXPORT QXmppIq : public QXmppStanza

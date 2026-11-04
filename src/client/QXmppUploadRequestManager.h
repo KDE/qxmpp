@@ -82,7 +82,7 @@ private:
 
     \since QXmpp 1.1
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppUploadRequestManager : public QXmppClientExtension
 {

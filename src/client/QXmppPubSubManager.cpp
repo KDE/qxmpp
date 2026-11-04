@@ -88,7 +88,7 @@ using namespace QXmpp::Private;
         \li correctly handle configuration required (and other) cases
     \endlist
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 
     \since QXmpp 1.5
 */

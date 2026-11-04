@@ -22,7 +22,7 @@ using namespace QXmpp::Private;
 
     The QXmppIbbOpenIq represents an IBB open request as defined by \xep{0047}{In-Band Bytestreams}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 QXmppIbbOpenIq::QXmppIbbOpenIq() : QXmppIq(QXmppIq::Set), m_block_size(1024)
@@ -91,7 +91,7 @@ void QXmppIbbOpenIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 
     The QXmppIbbCloseIq represents an IBB close request as defined by \xep{0047}{In-Band Bytestreams}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 QXmppIbbCloseIq::QXmppIbbCloseIq() : QXmppIq(QXmppIq::Set)
@@ -135,7 +135,7 @@ void QXmppIbbCloseIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
 
     The QXmppIbbDataIq represents an IBB data request as defined by \xep{0047}{In-Band Bytestreams}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 
 QXmppIbbDataIq::QXmppIbbDataIq() : QXmppIq(QXmppIq::Set), m_seq(0)

@@ -423,7 +423,7 @@ private:
     \brief The QXmppJingleIq class represents an IQ used for initiating media
     sessions as specified by \xep{0166}{Jingle}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppJingleIq : public QXmppIq
 {

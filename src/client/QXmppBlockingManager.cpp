@@ -168,7 +168,7 @@ struct QXmppBlockingManagerPrivate {
     Checking whether the server supports blocking using watchServerSupport() requires the
     QXmppDiscoveryManager to be registered with the client.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
     \sa QXmppBlocklist
     \since QXmpp 1.6
 */

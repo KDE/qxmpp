@@ -20,7 +20,7 @@ class QXmppVersionManagerPrivate;
     \c QXmppClient::findExtension<QXmppVersionManager>() should be used to get
     the instantiated object of this class.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppVersionManager : public QXmppClientExtension
 {

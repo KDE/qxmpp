@@ -12,5 +12,5 @@ You maybe need to open a local web server to display the list of supported XEPs 
 Here is an example with Python's built-in web server and Firefox:
 ```
 python3 -m http.server
-firefox http://0.0.0.0:8000/xep.html
+firefox http://0.0.0.0:8000/qxmpp-xep.html
 ```

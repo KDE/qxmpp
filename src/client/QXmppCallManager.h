@@ -67,7 +67,7 @@ struct TurnServer;
 
     \warning THIS API IS NOT FINALIZED YET
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppCallManager : public QXmppClientExtension
 {

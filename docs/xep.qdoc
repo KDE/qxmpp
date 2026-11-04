@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: CC0-1.0
 
 /*!
-\page xep.html
+\page qxmpp-xep.html
 \title XMPP Extension Protocols
 
 This document lists the XMPP Extension Protocols (XEPs) supported by QXmpp.

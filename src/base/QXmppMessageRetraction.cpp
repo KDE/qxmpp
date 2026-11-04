@@ -26,7 +26,7 @@ using namespace QXmpp::Private;
     This is the \c {<moderated/>} element (and its accompanying \c {<reason/>}) that a
     \xep{0045}{Multi-User Chat} service adds when a moderator retracts another occupant's message.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.17
 */
@@ -129,7 +129,7 @@ void QXmppMessageModeration::toXml(QXmlStreamWriter *writer) const
     marker, a human-readable fallback body and the \xep{0334}{Message Processing Hints} \c store
     hint (see QXmppMessage::setFallbackMarkers() and QXmppMessage::Store).
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.17
 */
@@ -213,7 +213,7 @@ void QXmppMessageRetraction::toXml(QXmlStreamWriter *writer) const
     message with a \c {<retracted/>} tombstone. It records when the message was retracted and, for
     \xep{0425}{Moderated Message Retraction}, by whom.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.17
 */

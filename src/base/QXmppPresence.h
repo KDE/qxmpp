@@ -20,7 +20,7 @@ class QXmppPresencePrivate;
 
     \brief The QXmppPresence class represents an XMPP presence stanza.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 */
 class QXMPP_EXPORT QXmppPresence : public QXmppStanza
 {

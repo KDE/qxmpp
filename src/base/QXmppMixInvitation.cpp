@@ -33,7 +33,7 @@ public:
     \xep{0369}{Mediated Information eXchange (MIX)} channel as defined by
     \xep{0407}{Mediated Information eXchange (MIX): Miscellaneous Capabilities}.
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.4
 */

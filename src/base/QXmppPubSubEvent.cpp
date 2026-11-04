@@ -48,7 +48,7 @@ using namespace QXmpp::Private;
     QXmppPubSubEvent<QXmppTuneItem>::isPubSubEvent(element);
     \endcode
 
-    \ingroup Stanzas
+    \ingroup qxmpp-stanzas
 
     \since QXmpp 1.5
 */

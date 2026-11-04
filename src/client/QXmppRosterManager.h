@@ -81,7 +81,7 @@ class QXmppRosterStorage;
     are verified and automatically accepted without emitting subscriptionRequestReceived(). If
     verification fails, the **invalid** old JID is passed in subscriptionRequestReceived()!
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 class QXMPP_EXPORT QXmppRosterManager : public QXmppClientExtension
 {

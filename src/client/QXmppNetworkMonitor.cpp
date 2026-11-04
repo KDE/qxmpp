@@ -75,7 +75,7 @@ public:
     directly) can call QXmppClient::setNetworkAvailable() and the related functions themselves
     instead. The two should not be combined.
 
-    \ingroup Core
+    \ingroup qxmpp-core
 
     \since QXmpp 1.17
 */

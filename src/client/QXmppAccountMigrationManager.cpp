@@ -354,7 +354,7 @@ struct QXmppAccountMigrationManagerPrivate {
     The data that is exported (or imported) is determined by the other registered client
     extensions. They can register callbacks for export and import using registerExtension().
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
     \since QXmpp 1.8
 */
 

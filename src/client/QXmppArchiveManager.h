@@ -28,7 +28,7 @@
     \note Few servers support message archiving. Check if the server in use supports
     this XEP.
 
-    \ingroup Managers
+    \ingroup qxmpp-managers
 */
 
 class QXMPP_EXPORT QXmppArchiveManager : public QXmppClientExtension
