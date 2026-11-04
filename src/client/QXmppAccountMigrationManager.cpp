@@ -97,6 +97,102 @@ struct QXmppExportDataPrivate : QSharedData {
     std::unordered_map<std::type_index, std::any> extensions;
 };
 
+/*!
+    \class QXmppExportData
+    \inmodule QXmpp
+
+    \brief The QXmppExportData class contains the data of an account that is exported or
+    imported by the QXmppAccountMigrationManager.
+
+    The data consists of the JID of the account and a set of extensions. Each extension is an
+    arbitrary data type that has been registered with registerExtension(), so it can be
+    serialized to and parsed from XML. QXmppAccountMigrationManager::exportData() fills the
+    extensions with the data of all registered export data types and
+    QXmppAccountMigrationManager::importData() imports them to the connected account.
+
+    The data can be serialized with toXml() and parsed with fromDom(), either in QXmpp's own
+    format or as \xep{0227}{Portable Import/Export Format for XMPP-IM Servers}.
+
+    \since QXmpp 1.8
+*/
+
+/*!
+    \enum QXmppExportData::Format
+
+    Output format used when serializing account data.
+
+    \value QXmpp QXmpp's own format, rooted at \c {<account-data/>} (\c org.qxmpp.export).
+    \value Xep0227 \xep{0227}{Portable Import/Export Format for XMPP-IM Servers}, rooted at
+    \c {<server-data/>} (\c urn:xmpp:pie:0).
+
+    \since QXmpp 1.17
+*/
+
+/*!
+    \typealias QXmppExportData::Result
+
+    Contains T or QXmppError.
+*/
+
+/*!
+    \typealias QXmppExportData::ExtensionParser
+
+    Function that parses an extension of type T from a QDomElement.
+*/
+
+/*!
+    \typealias QXmppExportData::ExtensionSerializer
+
+    Function that serializes an extension of type T to a QXmlStreamWriter.
+*/
+
+/*!
+    \fn template <typename T> std::optional<T> QXmppExportData::extension() const
+
+    Returns the extension of type T, or \c std::nullopt if the data does not contain one.
+*/
+
+/*!
+    \fn template <typename T> void QXmppExportData::setExtension(T &&value)
+
+    Sets the extension of type T to \a value.
+
+    The type T must have been registered with registerExtension() before.
+*/
+
+/*!
+    \fn template <typename T, QXmppExportData::ExtensionParser<T> parse, QXmppExportData::ExtensionSerializer<T> serialize> void QXmppExportData::registerExtension(QStringView tagName, QStringView xmlns)
+
+    Registers the extension type T for the QXmpp format.
+
+    The extension is serialized as an XML element with the name \a tagName and the namespace
+    \a xmlns using the functions \c parse and \c serialize.
+
+    This is equivalent to calling registerExtension(Format, QStringView, QStringView) with
+    Format::QXmpp.
+*/
+
+/*!
+    \fn template <typename T, QXmppExportData::ExtensionParser<T> parse, QXmppExportData::ExtensionSerializer<T> serialize> void QXmppExportData::registerExtension(QXmppExportData::Format format, QStringView tagName, QStringView xmlns)
+
+    Registers the extension type T for \a format.
+
+    The extension is serialized as an XML element with the name \a tagName and the namespace
+    \a xmlns using the functions \c parse and \c serialize.
+
+    A type may be registered for both formats. When serializing to Format::Xep0227, types that
+    are only registered for Format::QXmpp are embedded as a QXmpp specific fallback.
+
+    \since QXmpp 1.17
+*/
+
+/*!
+    \fn template <typename T> bool QXmppExportData::isExtensionRegistered()
+
+    Returns whether the extension type T has been registered for any format.
+*/
+
+/*! Constructs empty export data. */
 QXmppExportData::QXmppExportData()
     : d(new QXmppExportDataPrivate())
 {
@@ -131,13 +227,13 @@ static std::optional<QXmppError> parseExtensionChildren(const QDomElement &paren
 /*!
     Parses account data from \a el.
 
-    Both the QXmpp format (\c {<account-data/>}) and \xep{0227, Portable Import/Export
+    Both the QXmpp format (\c {<account-data/>}) and \xep{0227}{Portable Import/Export
     Format for XMPP-IM Servers} (\c {<server-data/>}) are accepted; the format is detected
-    from the root element. When an \xep{0227} document carries the same data both as a
-    native element and as an embedded QXmpp fallback, the native \xep{0227} element is
+    from the root element. When an \xepn{0227} document carries the same data both as a
+    native element and as an embedded QXmpp fallback, the native \xepn{0227} element is
     preferred.
 
-    \note \xep{0227} documents may contain multiple hosts and users, but as this is used for
+    \note \xepn{0227} documents may contain multiple hosts and users, but as this is used for
     single-account client-side migration only the first host and user are read.
 */
 std::variant<QXmppExportData, QXmppError> QXmppExportData::fromDom(const QDomElement &el)
@@ -196,8 +292,8 @@ void QXmppExportData::toXml(QXmlStreamWriter *writer) const
     Serializes the account data to \a writer using \a format.
 
     Pass Format::QXmpp to write QXmpp's own format (\c {<account-data/>}), or Format::Xep0227
-    to write \xep{0227, Portable Import/Export Format for XMPP-IM Servers}; in the latter case
-    data types without a native \xep{0227} representation (e.g. MIX) are embedded as a
+    to write \xep{0227}{Portable Import/Export Format for XMPP-IM Servers}; in the latter case
+    data types without a native \xepn{0227} representation (e.g. MIX) are embedded as a
     QXmpp-specific fallback so no data is lost, and standard servers ignore those elements.
 
     \since QXmpp 1.17
@@ -294,11 +390,13 @@ void QXmppExportData::toXml(QXmlStreamWriter *writer, Format format) const
     writer->writeEndDocument();
 }
 
+/*! Returns the bare JID of the exported account. */
 const QString &QXmppExportData::accountJid() const
 {
     return d->accountJid;
 }
 
+/*! Sets the bare JID of the exported account to \a jid. */
 void QXmppExportData::setAccountJid(const QString &jid)
 {
     d->accountJid = jid;

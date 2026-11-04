@@ -23,12 +23,8 @@ public:
     template<typename T = QXmpp::Success>
     using Result = std::variant<T, QXmppError>;
 
-    //! Output format used when serializing account data.
     enum class Format {
-        //! QXmpp's own format, rooted at \c {<account-data/>} (\c org.qxmpp.export).
         QXmpp,
-        //! \xep{0227, Portable Import/Export Format for XMPP-IM Servers}, rooted at
-        //! \c {<server-data/>} (\c urn:xmpp:pie:0).
         Xep0227,
     };
 
