@@ -295,7 +295,7 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
 */
 
 /*!
-    Blocks a list of JIDs.
+    Blocks the JIDs \a jids.
 
     \sa unblock()
 */
@@ -334,7 +334,7 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::reportAndBlock(QSt
 */
 
 /*!
-    Unblocks a list of JIDs.
+    Unblocks the JIDs \a jids.
 
     \sa block()
 */

@@ -305,7 +305,7 @@ struct QXmppMessageRetractionLimitsPrivate : QSharedData {
     \inmodule QXmpp
 
     Data form used in service discovery information for advertising the limits an entity enforces on
-    message retractions. See \xep{0424, Message Retraction} for details.
+    message retractions. See \xep{0424}{Message Retraction} for details.
 
     ```
     QXmppDiscoInfo info;

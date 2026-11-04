@@ -104,10 +104,11 @@ public:
         Emitted when a message in the joined room at \a roomJid is retracted via
         \xep{0424}{Message Retraction} or \xep{0425}{Moderated Message Retraction}.
 
-        The retracted message is identified by \c {retraction.retractedId()} (the message's
-        \xep{0359}{stanza id}). For moderated retractions, \c {retraction.moderation()} carries
-        the moderator and reason. Spoofed moderated retractions (claiming moderation but not sent
-        by the room itself) never trigger this signal.
+        The retracted message is identified by \c {retraction.retractedId()} of \a retraction
+        (the message's \xep{0359}{stanza id}). For moderated retractions,
+        \c {retraction.moderation()} carries the moderator and reason. Spoofed moderated
+        retractions (claiming moderation but not sent by the room itself) never trigger this
+        signal.
 
         The retraction message is also delivered through messageReceived() (with its
         QXmppMessage::retraction() set), so clients that need the raw stanza still receive it.
