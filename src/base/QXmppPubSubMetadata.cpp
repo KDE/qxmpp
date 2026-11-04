@@ -47,142 +47,312 @@ public:
     QXmppPubSubMetadata::ItemLimit maxItems = QXmppPubSubMetadata::Unset();
 };
 
+/*!
+    \class QXmppPubSubMetadata
+    \inmodule QXmpp
+
+    \brief The QXmppPubSubMetadata class represents the metadata of a PubSub node as defined by
+    \xep{0060}{Publish-Subscribe}.
+
+    Node metadata is provided by the service as a data form in the service discovery
+    information of a node.
+
+    All fields are optional: \c std::nullopt, invalid dates, empty strings and empty lists mean
+    that a field is not set and it is not included in the serialized form.
+
+    \sa QXmppPubSubNodeConfig
+
+    \since QXmpp 1.5
+
+    \ingroup qxmpp-stanzas
+*/
+
+/*!
+    \typealias QXmppPubSubMetadata::ItemLimit
+
+    Maximum number of items of a node: either a number, Max for the maximum supported by the
+    service or Unset if no limit has been set.
+*/
+
+/*! Constructs empty node metadata. */
 QXmppPubSubMetadata::QXmppPubSubMetadata()
     : d(new QXmppPubSubMetadataPrivate)
 {
 }
 
+/*! Default copy-constructor */
 QXmppPubSubMetadata::QXmppPubSubMetadata(const QXmppPubSubMetadata &) = default;
+/*! Default move-constructor */
 QXmppPubSubMetadata::QXmppPubSubMetadata(QXmppPubSubMetadata &&) = default;
 QXmppPubSubMetadata::~QXmppPubSubMetadata() = default;
+/*! Default assignment operator */
 QXmppPubSubMetadata &QXmppPubSubMetadata::operator=(const QXmppPubSubMetadata &) = default;
+/*! Default move-assignment operator */
 QXmppPubSubMetadata &QXmppPubSubMetadata::operator=(QXmppPubSubMetadata &&) = default;
 
+/*!
+    Returns the JIDs of the entities to contact with questions about the node.
+
+    This corresponds to the \c {pubsub#contact} field.
+*/
 QStringList QXmppPubSubMetadata::contactJids() const
 {
     return d->contactJids;
 }
 
+/*!
+    Sets the JIDs of the entities to contact with questions about the node to \a contactJids.
+
+    \sa contactJids()
+*/
 void QXmppPubSubMetadata::setContactJids(const QStringList &contactJids)
 {
     d->contactJids = contactJids;
 }
 
+/*!
+    Returns the date and time when the node was created.
+
+    This corresponds to the \c {pubsub#creation_date} field.
+*/
 QDateTime QXmppPubSubMetadata::creationDate() const
 {
     return d->creationDate;
 }
 
+/*!
+    Sets the date and time when the node was created to \a creationDate.
+
+    \sa creationDate()
+*/
 void QXmppPubSubMetadata::setCreationDate(const QDateTime &creationDate)
 {
     d->creationDate = creationDate;
 }
 
+/*!
+    Returns the JID of the entity that created the node.
+
+    This corresponds to the \c {pubsub#creator} field.
+*/
 QString QXmppPubSubMetadata::creatorJid() const
 {
     return d->creatorJid;
 }
 
+/*!
+    Sets the JID of the entity that created the node to \a creatorJid.
+
+    \sa creatorJid()
+*/
 void QXmppPubSubMetadata::setCreatorJid(const QString &creatorJid)
 {
     d->creatorJid = creatorJid;
 }
 
+/*!
+    Returns the description of the node.
+
+    This corresponds to the \c {pubsub#description} field.
+*/
 QString QXmppPubSubMetadata::description() const
 {
     return d->description;
 }
 
+/*!
+    Sets the description of the node to \a description.
+
+    \sa description()
+*/
 void QXmppPubSubMetadata::setDescription(const QString &description)
 {
     d->description = description;
 }
 
+/*!
+    Returns the default language of the node.
+
+    This corresponds to the \c {pubsub#language} field.
+*/
 QString QXmppPubSubMetadata::language() const
 {
     return d->language;
 }
 
+/*!
+    Sets the default language of the node to \a language.
+
+    \sa language()
+*/
 void QXmppPubSubMetadata::setLanguage(const QString &language)
 {
     d->language = language;
 }
 
+/*!
+    Returns the access model of the node.
+
+    The access model defines who may subscribe to the node and retrieve its items.
+
+    This corresponds to the \c {pubsub#access_model} field.
+*/
 std::optional<QXmppPubSubNodeConfig::AccessModel> QXmppPubSubMetadata::accessModel() const
 {
     return d->accessModel;
 }
 
+/*!
+    Sets the access model of the node to \a accessModel.
+
+    \sa accessModel()
+*/
 void QXmppPubSubMetadata::setAccessModel(std::optional<QXmppPubSubNodeConfig::AccessModel> accessModel)
 {
     d->accessModel = accessModel;
 }
 
+/*!
+    Returns the publish model of the node.
+
+    The publish model defines who is allowed to publish items to the node.
+
+    This corresponds to the \c {pubsub#publish_model} field.
+*/
 std::optional<QXmppPubSubNodeConfig::PublishModel> QXmppPubSubMetadata::publishModel() const
 {
     return d->publishModel;
 }
 
+/*!
+    Sets the publish model of the node to \a publishModel.
+
+    \sa publishModel()
+*/
 void QXmppPubSubMetadata::setPublishModel(std::optional<QXmppPubSubNodeConfig::PublishModel> publishModel)
 {
     d->publishModel = publishModel;
 }
 
+/*!
+    Returns the number of subscribers to the node.
+
+    This corresponds to the \c {pubsub#num_subscribers} field.
+*/
 std::optional<quint64> QXmppPubSubMetadata::numberOfSubscribers() const
 {
     return d->subscriberCount;
 }
 
+/*!
+    Sets the number of subscribers to the node to \a numberOfSubscribers.
+
+    \sa numberOfSubscribers()
+*/
 void QXmppPubSubMetadata::setNumberOfSubscribers(const std::optional<quint64> &numberOfSubscribers)
 {
     d->subscriberCount = numberOfSubscribers;
 }
 
+/*!
+    Returns the JIDs of the owners of the node.
+
+    This corresponds to the \c {pubsub#owner} field.
+*/
 QStringList QXmppPubSubMetadata::ownerJids() const
 {
     return d->ownerJids;
 }
 
+/*!
+    Sets the JIDs of the owners of the node to \a ownerJids.
+
+    \sa ownerJids()
+*/
 void QXmppPubSubMetadata::setOwnerJids(const QStringList &ownerJids)
 {
     d->ownerJids = ownerJids;
 }
 
+/*!
+    Returns the JIDs of the entities that may publish to the node.
+
+    This corresponds to the \c {pubsub#publisher} field.
+*/
 QStringList QXmppPubSubMetadata::publisherJids() const
 {
     return d->publisherJids;
 }
 
+/*!
+    Sets the JIDs of the entities that may publish to the node to \a publisherJids.
+
+    \sa publisherJids()
+*/
 void QXmppPubSubMetadata::setPublisherJids(const QStringList &publisherJids)
 {
     d->publisherJids = publisherJids;
 }
 
+/*!
+    Returns the human readable name of the node.
+
+    This corresponds to the \c {pubsub#title} field.
+*/
 QString QXmppPubSubMetadata::title() const
 {
     return d->title;
 }
 
+/*!
+    Sets the human readable name of the node to \a title.
+
+    \sa title()
+*/
 void QXmppPubSubMetadata::setTitle(const QString &title)
 {
     d->title = title;
 }
 
+/*!
+    Returns the type of the payload of the node's items.
+
+    This is usually the namespace of the payload elements.
+
+    This corresponds to the \c {pubsub#type} field.
+*/
 QString QXmppPubSubMetadata::type() const
 {
     return d->type;
 }
 
+/*!
+    Sets the type of the payload of the node's items to \a type.
+
+    \sa type()
+*/
 void QXmppPubSubMetadata::setType(const QString &type)
 {
     d->type = type;
 }
 
+/*!
+    Returns the maximum number of items the node keeps.
+
+    The limit is either a number, Max for the maximum supported by the service or Unset.
+
+    This corresponds to the \c {pubsub#max_items} field.
+*/
 auto QXmppPubSubMetadata::maxItems() const -> ItemLimit
 {
     return d->maxItems;
 }
 
+/*!
+    Sets the maximum number of items the node keeps to \a maxItems.
+
+    \sa maxItems()
+*/
 void QXmppPubSubMetadata::setMaxItems(ItemLimit maxItems)
 {
     d->maxItems = maxItems;
