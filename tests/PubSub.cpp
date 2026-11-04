@@ -17,6 +17,7 @@
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubIq_p.h"
 #include "QXmppPubSubMetadata.h"
+#include "QXmppPubSubPublishOptions.h"
 #include "QXmppPubSubSubAuthorization.h"
 #include "QXmppPubSubSubscription.h"
 #include "QXmppResultSet.h"
@@ -591,6 +592,7 @@ class tst_QXmppPubSubForms : public QObject
 private:
     Q_SLOT void subAuthorization();
     Q_SLOT void metadata();
+    Q_SLOT void publishOptions();
 };
 
 void tst_QXmppPubSubForms::subAuthorization()
@@ -639,6 +641,34 @@ void tst_QXmppPubSubForms::metadata()
         "<field type=\"text-single\" var=\"pubsub#title\"><value>Princely Musings (Atom)</value></field>"
         "</x>");
     serializePacket(form, xml);
+}
+
+void tst_QXmppPubSubForms::publishOptions()
+{
+    QByteArray xml(R"(
+<x xmlns="jabber:x:data" type="submit">
+<field type="hidden" var="FORM_TYPE">
+<value>http://jabber.org/protocol/pubsub#publish-options</value>
+</field>
+<field type="list-single" var="pubsub#access_model"><value>presence</value></field>
+</x>)");
+
+    QXmppDataForm form;
+    parsePacket(form, xml);
+
+    auto publishOptions = QXmppPubSubPublishOptions::fromDataForm(form);
+    QVERIFY(publishOptions.has_value());
+    QVERIFY(publishOptions->accessModel().has_value());
+    QCOMPARE(*publishOptions->accessModel(), QXmppPubSubNodeConfig::Presence);
+
+    form = publishOptions->toDataForm();
+    form.setType(QXmppDataForm::Submit);
+    xml = QString::fromUtf8(xml).remove(QChar('\n')).toUtf8();
+    serializePacket(form, xml);
+
+    // node configuration forms are not accepted
+    form.fields()[0].setValue(u"http://jabber.org/protocol/pubsub#node_config"_s);
+    QVERIFY(!QXmppPubSubPublishOptions::fromDataForm(form).has_value());
 }
 
 // ===================== tst_QXmppPubSubIq =====================

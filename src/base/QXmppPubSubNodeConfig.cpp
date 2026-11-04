@@ -681,6 +681,19 @@ void QXmppPubSubNodeConfig::serializeForm(QXmppDataForm &form) const
                       d->payloadType);
 }
 
+std::optional<QXmppPubSubPublishOptions> QXmppPubSubPublishOptions::fromDataForm(const QXmppDataForm &form)
+{
+    if (form.formType() != PUBLISH_OPTIONS_FORM_TYPE) {
+        return std::nullopt;
+    }
+
+    QXmppPubSubPublishOptions publishOptions;
+    if (QXmppDataFormBase::fromDataForm(form, publishOptions)) {
+        return publishOptions;
+    }
+    return std::nullopt;
+}
+
 QString QXmppPubSubPublishOptions::formType() const
 {
     return PUBLISH_OPTIONS_FORM_TYPE;
