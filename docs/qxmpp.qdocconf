@@ -37,10 +37,9 @@ exampledirs             = ../examples
 imagedirs               = ../docs/images
 
 # excluded from scanning. *_p.h and *_p.cpp are private implementation
-# files; the codec/sasl files use constructs that confuse qdoc's parser.
+# files; the codec file uses constructs that confuse qdoc's parser.
 # Append: qt-cpp-defines.qdocconf adds Qt's own platform-suffix excludes.
 excludefiles           += ../src/base/QXmppCodec.cpp \
-                          ../src/base/QXmppSasl.cpp \
                           ../src/base/*_p.h ../src/base/*_p.cpp \
                           ../src/client/*_p.h ../src/client/*_p.cpp \
                           ../src/omemo/*_p.h ../src/omemo/*_p.cpp \

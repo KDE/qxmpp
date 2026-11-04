@@ -760,7 +760,7 @@ QUuid QXmppSasl2UserAgent::deviceId() const
 }
 
 /*!
-    Sets the unique and stable ID of this device.
+    Sets the unique and stable ID of this device to \a id.
 
     This ID is intended to be persistent across reconnects and reboots of the used device.
 */
@@ -769,25 +769,25 @@ void QXmppSasl2UserAgent::setDeviceId(QUuid id)
     d->id = id;
 }
 
-/*! Returns the name of the used software (e.g. *AwesomeXMPP*). */
+/*! Returns the name of the used software (e.g. \e AwesomeXMPP). */
 const QString &QXmppSasl2UserAgent::softwareName() const
 {
     return d->software;
 }
 
-/*! Sets the name of the used software (e.g. *AwesomeXMPP*). */
+/*! Sets the name of the used software to \a software (e.g. \e AwesomeXMPP). */
 void QXmppSasl2UserAgent::setSoftwareName(const QString &software)
 {
     d->software = software;
 }
 
-/*! Returns the name of this device (e.g. *Kiva's Phone*). */
+/*! Returns the name of this device (e.g. \e {Kiva's Phone}). */
 const QString &QXmppSasl2UserAgent::deviceName() const
 {
     return d->device;
 }
 
-/*! Sets the name of this device (e.g. *Kiva's Phone*). */
+/*! Sets the name of this device to \a device (e.g. \e {Kiva's Phone}). */
 void QXmppSasl2UserAgent::setDeviceName(const QString &device)
 {
     d->device = device;
