@@ -16,6 +16,9 @@
 using namespace QXmpp::Private;
 
 /*!
+    \class QXmppExternalServiceDiscoveryManager
+    \inmodule QXmpp
+
     \brief The QXmppExternalServiceDiscoveryManager class makes it possible to
     discover information about external services from providers
     as defined by \xep{0215}{External Service Discovery}.
