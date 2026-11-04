@@ -9,14 +9,47 @@
 #include <QVariant>
 #include <qdebug.h>
 
+/*!
+    \class QXmppInvokable
+    \inmodule QXmpp
+
+    \brief The QXmppInvokable class is the base class for all objects that can be invoked via
+    RPC.
+
+    All public slots of objects derived from this class are exposed to the RPC interface of the
+    QXmppRpcManager. The methods can only use argument and return types that QVariant supports.
+
+    \note This class is only used by QXmppRpcManager, which is deprecated.
+
+    \sa QXmppRpcManager
+*/
+
 /*! Constructs a QXmppInvokable with the specified \a parent. */
 QXmppInvokable::QXmppInvokable(QObject *parent)
     : QObject(parent)
 {
 }
 
+/*!
+    \fn bool QXmppInvokable::isAuthorized(const QString &jid) const
+
+    Returns whether the entity with the JID \a jid is allowed to execute methods of this object.
+
+    Reimplement this method to restrict access to the object.
+*/
+
+/*! Destroys the object. */
 QXmppInvokable::~QXmppInvokable() = default;
 
+/*!
+    Executes the \a method on this object with the arguments \a args and returns its result.
+
+    This method is reentrant and the method is invoked in a thread safe manner. However, the side
+    effects of the invoked method may not be thread safe.
+
+    Returns an invalid QVariant if the method does not exist or the types of the arguments do not
+    match.
+*/
 QVariant QXmppInvokable::dispatch(const QByteArray &method, const QList<QVariant> &args)
 {
     buildMethodHash();
@@ -65,6 +98,9 @@ QVariant QXmppInvokable::dispatch(const QByteArray &method, const QList<QVariant
     }
 }
 
+/*!
+    Returns the type names of the values in \a params, e.g. for type checking.
+*/
 QList<QByteArray> QXmppInvokable::paramTypes(const QList<QVariant> &params)
 {
     QList<QByteArray> types;
@@ -89,6 +125,9 @@ void QXmppInvokable::buildMethodHash()
     }
 }
 
+/*!
+    Returns the names of all slots of this object for introspection of the provided interface.
+*/
 QStringList QXmppInvokable::interfaces() const
 {
     QStringList results;

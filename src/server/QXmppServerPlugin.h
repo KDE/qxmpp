@@ -12,6 +12,15 @@
 class QXmppServer;
 class QXmppServerExtension;
 
+/*!
+    \class QXmppServerPluginInterface
+    \inmodule QXmpp
+
+    \brief The QXmppServerPluginInterface class is the Qt plugin interface for QXmppServer
+    plugins.
+
+    Plugins usually do not implement this interface directly, but derive from QXmppServerPlugin.
+*/
 class QXMPP_EXPORT QXmppServerPluginInterface
 {
 public:
