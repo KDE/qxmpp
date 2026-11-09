@@ -4,6 +4,14 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.17.2 (Unreleased)
+-------------------------
+
+ - Client: Fix connecting to the server after disconnectFromServer() was called during the DNS lookup of the server. state() now reports the connecting state during the lookup (@lnj, !837)
+ - OMEMO: Do not request already subscribed device lists again (@lnj, !832)
+ - PubSub: Fix the form type of node metadata, which was not the one defined by XEP-0060 (@lnj, !835)
+ - PubSub: Add the missing implementation of QXmppPubSubPublishOptions::fromDataForm(), which failed at link time (@lnj, !836)
+
 QXmpp 1.17.1 (November 3, 2026)
 -------------------------------
 
