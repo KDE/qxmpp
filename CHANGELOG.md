@@ -4,8 +4,8 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-QXmpp 1.17.2 (Unreleased)
--------------------------
+QXmpp 1.17.2 (November 9, 2026)
+-------------------------------
 
  - Client: Fix connecting to the server after disconnectFromServer() was called during the DNS lookup of the server. state() now reports the connecting state during the lookup (@lnj, !837)
  - OMEMO: Do not request already subscribed device lists again (@lnj, !832)
