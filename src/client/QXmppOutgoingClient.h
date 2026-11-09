@@ -100,7 +100,7 @@ public:
     void pingNow();
     bool isAuthenticated() const;
     bool isConnected() const;
-    bool isServerLookupActive() const;
+    QXmppClient::State state() const;
     QXmppTask<IqResult> sendIq(QXmppIq &&);
 
     QXmppStanza::Error::Condition xmppStreamError();
@@ -117,8 +117,8 @@ public:
     /*! This signal is emitted when the stream is connected. */
     Q_SIGNAL void connected(const QXmpp::Private::SessionBegin &);
 
-    /*! This signal is emitted when a DNS lookup of the server starts or is cancelled. */
-    Q_SIGNAL void serverLookupChanged();
+    /*! This signal is emitted when the connection state has changed. */
+    Q_SIGNAL void stateChanged(QXmppClient::State state);
 
     /*! This signal is emitted when the stream is disconnected. */
     Q_SIGNAL void disconnected(const QXmpp::Private::SessionEnd &);

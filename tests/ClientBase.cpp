@@ -110,6 +110,7 @@ private:
     Q_SLOT void noReconnectAfterPermanentStreamError();
     Q_SLOT void noReconnectAfterOwnDisconnect();
     Q_SLOT void disconnectDuringServerLookup();
+    Q_SLOT void stateChangedOnlyOnChange();
     Q_SLOT void keepAliveTimeoutBackoff();
     Q_SLOT void noRetryAfterTlsFailure();
     Q_SLOT void networkLossEndsSession_data();
@@ -1111,6 +1112,24 @@ void tst_QXmppClient::disconnectDuringServerLookup()
     QCOMPARE(client.state(), QXmppClient::DisconnectedState);
     QCOMPARE(stateChanged.size(), 1);
     QVERIFY(errorOccurred.isEmpty());
+}
+
+void tst_QXmppClient::stateChangedOnlyOnChange()
+{
+    QXmppClient client(QXmppClient::NoExtensions);
+    QXmppConfiguration config;
+    config.setJid(u"user@example.invalid"_s);
+    config.setPassword(u"password"_s);
+    config.setHost(u"127.0.0.1"_s);
+    // reserved port without a server, so that the connection is refused
+    config.setPort(1);
+    config.setAutoReconnectionEnabled(false);
+
+    QList<QXmppClient::State> states;
+    connect(&client, &QXmppClient::stateChanged, &client, [&](auto state) { states.append(state); });
+
+    client.connectToServer(config);
+    QTRY_COMPARE(states, (QList { QXmppClient::ConnectingState, QXmppClient::DisconnectedState }));
 }
 
 void tst_QXmppClient::keepAliveTimeoutBackoff()

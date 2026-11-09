@@ -150,7 +150,15 @@ void QXmppOutgoingClientPrivate::cancelServerLookup()
     ++lookupGeneration;
     if (lookupActive) {
         lookupActive = false;
-        Q_EMIT q->serverLookupChanged();
+        updateState();
+    }
+}
+
+void QXmppOutgoingClientPrivate::updateState()
+{
+    if (const auto state = q->state(); state != reportedState) {
+        reportedState = state;
+        Q_EMIT q->stateChanged(state);
     }
 }
 
@@ -174,6 +182,7 @@ QXmppOutgoingClient::QXmppOutgoingClient(QObject *parent)
     : QXmppLoggable(parent),
       d(std::make_unique<QXmppOutgoingClientPrivate>(this))
 {
+    connect(&d->socket, &XmppSocket::internalSocketStateChanged, this, [this] { d->updateState(); });
     connect(&d->socket, &XmppSocket::started, this, &QXmppOutgoingClient::handleStart);
     connect(&d->socket, &XmppSocket::disconnected, this, &QXmppOutgoingClient::handleSocketDisconnected);
     connect(&d->socket, &XmppSocket::stanzaReceived, this, &QXmppOutgoingClient::handlePacketReceived);
@@ -293,7 +302,7 @@ void QXmppOutgoingClient::connectToHost()
         : lookupXmppClientRecords(domain, this);
 
     d->lookupActive = true;
-    Q_EMIT serverLookupChanged();
+    d->updateState();
 
     recordsTask.then(this, [this, domain, generation = d->lookupGeneration](auto result) {
         if (generation != d->lookupGeneration) {
@@ -373,9 +382,23 @@ bool QXmppOutgoingClient::isAuthenticated() const
 /*
     Returns true if the socket is connected and a session has been started.
 */
-bool QXmppOutgoingClient::isServerLookupActive() const
+/*
+    Returns the connection state of the stream, which is also connecting during the DNS lookup of
+    the server.
+*/
+QXmppClient::State QXmppOutgoingClient::state() const
 {
-    return d->lookupActive;
+    if (isConnected()) {
+        return QXmppClient::ConnectedState;
+    }
+    if (d->lookupActive) {
+        return QXmppClient::ConnectingState;
+    }
+    const auto state = d->socket.internalSocket()->state();
+    if (state != QAbstractSocket::UnconnectedState && state != QAbstractSocket::ClosingState) {
+        return QXmppClient::ConnectingState;
+    }
+    return QXmppClient::DisconnectedState;
 }
 
 bool QXmppOutgoingClient::isConnected() const
@@ -640,6 +663,7 @@ void QXmppOutgoingClient::openSession()
     d->carbonManager.onSessionOpened(session);
     d->csiManager.onSessionOpened(session);
     Q_EMIT connected(session);
+    d->updateState();
 }
 
 void QXmppOutgoingClient::closeSession()

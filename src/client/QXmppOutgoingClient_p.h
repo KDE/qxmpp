@@ -189,6 +189,7 @@ public:
     explicit QXmppOutgoingClientPrivate(QXmppOutgoingClient *q);
     void connectToHost(const ServerAddress &);
     void cancelServerLookup();
+    void updateState();
     void connectToAddressList(std::vector<ServerAddress> &&);
     void connectToNextAddress();
 
@@ -212,6 +213,8 @@ public:
     // Results of lookups started with another generation are outdated and ignored.
     uint lookupGeneration = 0;
     bool lookupActive = false;
+
+    QXmppClient::State reportedState = QXmppClient::DisconnectedState;
 
     QString streamId;
 

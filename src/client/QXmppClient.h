@@ -438,7 +438,6 @@ private:
 
     void _q_elementReceived(const QDomElement &element, bool &handled);
     void _q_reconnect();
-    void onInternalSocketStateChanged();
     void _q_streamConnected(const QXmpp::Private::SessionBegin &);
     void _q_streamDisconnected();
 

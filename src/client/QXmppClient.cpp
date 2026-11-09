@@ -422,8 +422,7 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
         d->onErrorOccurred(text, error, oldError);
     });
 
-    connect(&d->stream->xmppSocket(), &XmppSocket::internalSocketStateChanged, this, &QXmppClient::onInternalSocketStateChanged);
-    connect(d->stream, &QXmppOutgoingClient::serverLookupChanged, this, &QXmppClient::onInternalSocketStateChanged);
+    connect(d->stream, &QXmppOutgoingClient::stateChanged, this, &QXmppClient::stateChanged);
 
     // reconnection
     d->reconnectionTimer = new QTimer(this);
@@ -967,18 +966,7 @@ QXmppOutgoingClient *QXmppClient::stream() const
 /*! Returns the client's current state. */
 QXmppClient::State QXmppClient::state() const
 {
-    if (d->stream->isConnected()) {
-        return QXmppClient::ConnectedState;
-    }
-    if (d->stream->isServerLookupActive()) {
-        return QXmppClient::ConnectingState;
-    }
-    auto state = d->stream->xmppSocket().internalSocket()->state();
-    if (state != QAbstractSocket::UnconnectedState && state != QAbstractSocket::ClosingState) {
-        return QXmppClient::ConnectingState;
-    } else {
-        return QXmppClient::DisconnectedState;
-    }
+    return d->stream->state();
 }
 
 /*! Returns the client's current presence. */
@@ -1103,12 +1091,6 @@ void QXmppClient::_q_reconnect()
     }
 }
 
-void QXmppClient::onInternalSocketStateChanged()
-{
-    // FIXME: only emit signal if state actually changed
-    Q_EMIT stateChanged(state());
-}
-
 /*! At connection establishment, send initial presence. */
 void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session)
 {
@@ -1121,7 +1103,6 @@ void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session
         Q_EMIT credentialsChanged();
     }
     Q_EMIT connected();
-    Q_EMIT stateChanged(QXmppClient::ConnectedState);
 
     // send initial presence
     if (d->stream->isAuthenticated() && streamManagementState() != ResumedStream) {
@@ -1133,7 +1114,6 @@ void QXmppClient::_q_streamDisconnected()
 {
     // notify managers
     Q_EMIT disconnected();
-    Q_EMIT stateChanged(QXmppClient::DisconnectedState);
 }
 
 /*! Returns the QXmppLogger associated with the current QXmppClient. */
