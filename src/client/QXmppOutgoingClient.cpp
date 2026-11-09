@@ -145,6 +145,15 @@ void QXmppOutgoingClientPrivate::connectToHost(const ServerAddress &address)
     socket.connectToHost(address);
 }
 
+void QXmppOutgoingClientPrivate::cancelServerLookup()
+{
+    ++lookupGeneration;
+    if (lookupActive) {
+        lookupActive = false;
+        Q_EMIT q->serverLookupChanged();
+    }
+}
+
 void QXmppOutgoingClientPrivate::connectToAddressList(std::vector<ServerAddress> &&addresses)
 {
     serverAddresses = std::move(addresses);
@@ -242,6 +251,8 @@ CsiManager &QXmppOutgoingClient::csiManager() const
 */
 void QXmppOutgoingClient::connectToHost()
 {
+    d->cancelServerLookup();
+
     // if a host for resumption is available, connect to it
     if (d->c2sStreamManager.hasResumeAddress()) {
         auto [host, port] = d->c2sStreamManager.resumeAddress();
@@ -281,7 +292,15 @@ void QXmppOutgoingClient::connectToHost()
         ? lookupXmppClientHybridRecords(domain, this)
         : lookupXmppClientRecords(domain, this);
 
-    recordsTask.then(this, [this, domain](auto result) {
+    d->lookupActive = true;
+    Q_EMIT serverLookupChanged();
+
+    recordsTask.then(this, [this, domain, generation = d->lookupGeneration](auto result) {
+        if (generation != d->lookupGeneration) {
+            return;
+        }
+        d->lookupActive = false;
+
         if (hasError(result)) {
             warning(u"Lookup for domain %1 failed: %2"_s.arg(domain, getError(result).description));
 
@@ -315,6 +334,7 @@ void QXmppOutgoingClient::connectToHost()
 */
 void QXmppOutgoingClient::disconnectFromHost()
 {
+    d->cancelServerLookup();
     d->c2sStreamManager.onStreamClosed();
     d->socket.disconnectFromHost();
 }
@@ -329,6 +349,7 @@ void QXmppOutgoingClient::disconnectFromHost()
 */
 void QXmppOutgoingClient::disconnectForResumption()
 {
+    d->cancelServerLookup();
     d->socket.abort();
 }
 
@@ -352,6 +373,11 @@ bool QXmppOutgoingClient::isAuthenticated() const
 /*
     Returns true if the socket is connected and a session has been started.
 */
+bool QXmppOutgoingClient::isServerLookupActive() const
+{
+    return d->lookupActive;
+}
+
 bool QXmppOutgoingClient::isConnected() const
 {
     return d->socket.isConnected() && d->sessionStarted;

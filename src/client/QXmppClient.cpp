@@ -423,6 +423,7 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     });
 
     connect(&d->stream->xmppSocket(), &XmppSocket::internalSocketStateChanged, this, &QXmppClient::onInternalSocketStateChanged);
+    connect(d->stream, &QXmppOutgoingClient::serverLookupChanged, this, &QXmppClient::onInternalSocketStateChanged);
 
     // reconnection
     d->reconnectionTimer = new QTimer(this);
@@ -968,6 +969,9 @@ QXmppClient::State QXmppClient::state() const
 {
     if (d->stream->isConnected()) {
         return QXmppClient::ConnectedState;
+    }
+    if (d->stream->isServerLookupActive()) {
+        return QXmppClient::ConnectingState;
     }
     auto state = d->stream->xmppSocket().internalSocket()->state();
     if (state != QAbstractSocket::UnconnectedState && state != QAbstractSocket::ClosingState) {

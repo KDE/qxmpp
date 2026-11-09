@@ -53,6 +53,7 @@
 #include <chrono>
 
 #include <QCoreApplication>
+#include <QDnsLookup>
 #include <QNetworkProxy>
 #include <QObject>
 #include <QScopeGuard>
@@ -108,6 +109,7 @@ private:
     Q_SLOT void reconnectAfterServerClosedStream();
     Q_SLOT void noReconnectAfterPermanentStreamError();
     Q_SLOT void noReconnectAfterOwnDisconnect();
+    Q_SLOT void disconnectDuringServerLookup();
     Q_SLOT void keepAliveTimeoutBackoff();
     Q_SLOT void noRetryAfterTlsFailure();
     Q_SLOT void networkLossEndsSession_data();
@@ -1081,6 +1083,34 @@ void tst_QXmppClient::noReconnectAfterOwnDisconnect()
     QTRY_COMPARE(client.state(), QXmppClient::DisconnectedState);
     QTest::qWait(50);
     QVERIFY(!client.isReconnectionScheduled());
+}
+
+void tst_QXmppClient::disconnectDuringServerLookup()
+{
+    QXmppClient client(QXmppClient::NoExtensions);
+    QXmppConfiguration config;
+    config.setJid(u"user@example.invalid"_s);
+    config.setPassword(u"password"_s);
+
+    client.connectToServer(config);
+    QCOMPARE(client.state(), QXmppClient::ConnectingState);
+
+    QSignalSpy stateChanged(&client, &QXmppClient::stateChanged);
+    QSignalSpy errorOccurred(&client, &QXmppClient::errorOccurred);
+    client.disconnectFromServer();
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+    QCOMPARE(stateChanged.size(), 1);
+
+    // wait until the lookup of the client must have finished, too
+    QDnsLookup lookup(QDnsLookup::SRV, u"_xmpp-client._tcp.example.invalid"_s);
+    QSignalSpy lookupFinished(&lookup, &QDnsLookup::finished);
+    lookup.lookup();
+    QVERIFY(lookupFinished.wait(30000));
+    QTest::qWait(200);
+
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+    QCOMPARE(stateChanged.size(), 1);
+    QVERIFY(errorOccurred.isEmpty());
 }
 
 void tst_QXmppClient::keepAliveTimeoutBackoff()

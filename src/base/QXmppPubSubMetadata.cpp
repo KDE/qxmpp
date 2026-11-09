@@ -13,7 +13,7 @@
 
 using namespace QXmpp::Private;
 
-constexpr QStringView FORM_TYPE_METADATA = u"http://jabber.org/protocol/pubsub#metadata";
+constexpr QStringView FORM_TYPE_METADATA = u"http://jabber.org/protocol/pubsub#meta-data";
 
 constexpr QStringView CONTACT_JIDS = u"pubsub#contact";
 constexpr QStringView CREATION_DATE = u"pubsub#creation_date";

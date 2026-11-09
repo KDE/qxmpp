@@ -2713,18 +2713,13 @@ QXmppTask<QXmppPubSubManager::ItemResult<QXmppOmemoDeviceListItem>> ManagerPriva
 }
 
 // Subscribes to the device list of a contact if the contact's device is not stored yet.
-// If the device list is already subscribed, it is only requested.
 //
 // \a jid is JID of the contact whose device list is being subscribed. \a deviceId is ID of the
 // device that is checked.
 void ManagerPrivate::subscribeToNewDeviceLists(const QString &jid, uint32_t deviceId)
 {
     if (!devices.value(jid).contains(deviceId)) {
-        if (jidsOfManuallySubscribedDevices.contains(jid)) {
-            requestDeviceList(jid);
-        } else {
-            subscribeToDeviceList(jid);
-        }
+        subscribeToDeviceList(jid);
     }
 }
 
