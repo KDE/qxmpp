@@ -448,6 +448,7 @@ private:
 
     friend class QXmppClientExtension;
     friend class QXmppCarbonManagerV2;
+    friend class QXmppMamManager;
     friend class QXmppNetworkMonitor;
     friend class QXmppRegistrationManager;
     friend class TestClient;

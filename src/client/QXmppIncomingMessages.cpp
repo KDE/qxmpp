@@ -84,29 +84,41 @@ IncomingMessages::IncomingMessages(QXmppClient *client, Hooks hooks, const QList
 {
 }
 
+// Parses a received message. Without a way to decrypt it, it is parsed completely like before,
+// so the fallback body is the body.
+IncomingMessages::ParsedMessage IncomingMessages::parse(const QDomElement &element, QXmppE2eeExtension *legacyEncryption) const
+{
+    ParsedMessage parsed;
+    parsed.encryption = Xml::Registry::encryption(element);
+    const bool hasProvider = !parsed.encryption.isNull() && E2ee::Providers(m_hooks).contains(parsed.encryption);
+    parsed.legacyEncrypted = !hasProvider && legacyEncryption && legacyEncryption->isEncrypted(element);
+    parsed.message.parse(element, hasProvider || parsed.legacyEncrypted ? ScePublic : SceAll);
+    return parsed;
+}
+
 // Processes a message received directly from the stream.
 void IncomingMessages::processElement(const QDomElement &element, QXmppE2eeExtension *legacyEncryption)
 {
-    const auto encryption = Xml::Registry::encryption(element);
-    const bool hasProvider = !encryption.isNull() && E2ee::Providers(m_hooks).contains(encryption);
-    const bool legacyEncrypted = legacyEncryption && legacyEncryption->isEncrypted(element);
-
-    // Without a way to decrypt the message, it is parsed completely like before, so the
-    // fallback body is the body.
-    QXmppMessage message;
-    message.parse(element, hasProvider || legacyEncrypted ? ScePublic : SceAll);
-
-    process(Context(std::move(message), Origin::Stream), encryption);
+    auto parsed = parse(element, legacyEncryption);
+    process(Context(std::move(parsed.message), Origin::Stream), parsed.encryption, {});
 }
 
 // Processes a message unwrapped or injected by an extension.
 void IncomingMessages::process(Context &&context)
 {
     auto encryption = Private::encryption(context.message());
-    process(std::move(context), encryption);
+    process(std::move(context), encryption, {});
 }
 
-void IncomingMessages::process(Context &&context, QStringView encryption)
+QXmppTask<IncomingMessages::CollectResult> IncomingMessages::collect(Context &&context, QStringView encryption)
+{
+    QXmppPromise<CollectResult> promise;
+    auto task = promise.task();
+    process(std::move(context), encryption, std::move(promise));
+    return task;
+}
+
+void IncomingMessages::process(Context &&context, QStringView encryption, std::optional<QXmppPromise<CollectResult>> result)
 {
     if (!encryption.isNull() && !E2ee::Providers(m_hooks).contains(encryption)) {
         fail(context, DecryptionState::Unsupported);
@@ -117,7 +129,7 @@ void IncomingMessages::process(Context &&context, QStringView encryption)
     // order is kept per JID of the unwrapped message (e.g. the room).
     const auto conversationJid = context.conversationJid();
     auto &queue = m_queues[conversationJid];
-    queue.push_back(Pending { std::move(context), encryption });
+    queue.push_back(Pending { std::move(context), encryption, std::move(result) });
     auto *pending = &queue.back();
 
     // Started immediately, not when the message is at the front of the queue, so handlers see
@@ -140,17 +152,20 @@ void IncomingMessages::runNext(const QString &conversationJid)
         return;
     }
     if (pending.dropped) {
+        if (pending.result) {
+            pending.result->finish(CollectResult());
+        }
         finishFront(conversationJid);
         return;
     }
     if (pending.encryption.isNull()) {
-        finish(pending.context);
+        finish(std::move(pending.context), pending.result);
         finishFront(conversationJid);
         return;
     }
 
     decrypt(std::move(pending.context), pending.encryption).then(m_client, [this, conversationJid](Context &&context) {
-        finish(context);
+        finish(std::move(context), m_queues.at(conversationJid).front().result);
         finishFront(conversationJid);
     });
 }
@@ -197,12 +212,16 @@ QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryp
     co_return context;
 }
 
-void IncomingMessages::finish(Context &context)
+void IncomingMessages::finish(Context &&context, std::optional<QXmppPromise<CollectResult>> &result)
 {
-    if (MessageContextAccess::d(context).withoutContent) {
+    const bool delivered = !MessageContextAccess::d(context).withoutContent &&
+        m_hooks.run<Received>(context) == HookResult::Continue;
+
+    if (result) {
+        result->finish(delivered ? CollectResult(std::move(context)) : CollectResult());
         return;
     }
-    if (m_hooks.run<Received>(context) == HookResult::Stop) {
+    if (!delivered) {
         return;
     }
 

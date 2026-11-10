@@ -11,6 +11,7 @@
 // original test keeps its own namespace; main() runs them in turn.
 
 #include "QXmppArchiveIq.h"
+#include "QXmppAsync_p.h"
 #include "QXmppAttentionManager.h"
 #include "QXmppCarbonManager.h"
 #include "QXmppCarbonManagerV2.h"
@@ -18,12 +19,17 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppE2eeProvider.h"
+#include "QXmppHooks.h"
 #include "QXmppMamManager.h"
 #include "QXmppMessage.h"
+#include "QXmppMessageContext.h"
 #include "QXmppMessageHandler.h"
 #include "QXmppMessageReceiptManager.h"
+#include "QXmppMessages.h"
 #include "QXmppRosterManager.h"
 #include "QXmppUtils.h"
+#include "QXmppXmlRegistry.h"
 
 #include "Async.h"
 #include "TestClient.h"
@@ -31,6 +37,7 @@
 
 #include <QCoreApplication>
 #include <QObject>
+#include <QScopeGuard>
 
 namespace Mam {
 
@@ -82,6 +89,54 @@ public:
     void compareResultSetReplys(const QXmppResultSetReply &lhs, const QXmppResultSetReply &rhs) const;
 };
 
+// an encryption unknown to QXmpp, decrypted by a provider
+constexpr QStringView MamTestEncryption = u"urn:test:mam-e2ee";
+
+struct MamTestEncrypted {
+    static constexpr std::tuple XmlTag = { u"encrypted", MamTestEncryption };
+
+    QString body;
+
+    static std::optional<MamTestEncrypted> fromDom(const QDomElement &el)
+    {
+        return MamTestEncrypted { el.attribute(u"body"_s) };
+    }
+
+    void toXml(QXmlStreamWriter *w) const
+    {
+        w->writeStartElement(u"encrypted"_s);
+        w->writeDefaultNamespace(MamTestEncryption.toString());
+        w->writeAttribute(u"body"_s, body);
+        w->writeEndElement();
+    }
+};
+
+class MamTestE2eeManager : public QXmppClientExtension
+{
+    Q_OBJECT
+public:
+    MamTestE2eeManager()
+    {
+        QXmpp::E2ee::Providers(hooks()).add(QXmpp::E2ee::Provider {
+            .encryption = MamTestEncryption,
+            .decryptMessage = [](QXmpp::E2ee::DecryptRequest request) {
+                QXmpp::E2ee::Decrypted decrypted;
+                const auto body = request.message().extensions().get<MamTestEncrypted>()->body;
+                decrypted.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'><body xmlns='jabber:client'>"_s + body + u"</body></content>"_s));
+                return makeReadyTask<QXmpp::E2ee::DecryptResult>(std::move(decrypted));
+            },
+        });
+    }
+};
+
+static QString mamResult(const QString &id, const QString &message)
+{
+    return u"<message to='juliet@capulet.lit/chamber'>"
+           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s +
+        id + u"'><forwarded xmlns='urn:xmpp:forward:0'><delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"_s +
+        message + u"</forwarded></result></message>"_s;
+}
+
 class tst_QXmppMamManager : public QObject
 {
     Q_OBJECT
@@ -99,6 +154,7 @@ private:
     // test for task-based API
     Q_SLOT void retrieveMessagesUnencrypted();
     Q_SLOT void retrieveMessagesEncrypted();
+    Q_SLOT void retrieveMessagesPipeline();
 
     QXmppMamTestHelper m_helper;
     QXmppMamManager m_manager;
@@ -377,6 +433,51 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
     QCOMPARE(retrieved.messages.at(0).body(), "Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.");
     QCOMPARE(retrieved.messages.at(1).body(), "What man art thou that thus bescreen'd in night so stumblest on my counsel?");
     QCOMPARE(retrieved.result.resultSetReply().first(), "28482-98726-73623");
+}
+
+void tst_QXmppMamManager::retrieveMessagesPipeline()
+{
+    using namespace QXmpp::Messages;
+
+    QXmpp::Xml::Registry::registerEncryptedContainer<MamTestEncrypted>(QXmpp::Xml::Scope::Message);
+    auto cleanup = qScopeGuard([] { QXmpp::Xml::Registry::unregisterElement<MamTestEncrypted>(); });
+
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.addNewExtension<MamTestE2eeManager>();
+    auto *mam = test.addNewExtension<QXmppMamManager>();
+
+    QObject owner;
+    QStringList received;
+    test.hooks(&owner).add<Received>([&](Context &context) {
+        const auto *archive = context.attachment<ArchiveInfo>();
+        received << (context.origin() == Origin::Mam && archive ? archive->archiveJid() + u' ' + archive->id() + u' ' + context.conversationJid() : u"no archive"_s);
+        // consumed by an extension
+        return context.message().body() == u"consumed" ? QXmpp::HookResult::Stop : QXmpp::HookResult::Continue;
+    });
+    QSignalSpy liveMessages(&test, &QXmppClient::messageReceived);
+
+    auto task = mam->retrieveMessages();
+    test.ignore();
+    mam->handleStanza(xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                 "<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body='secret'/></message>"_s)));
+    mam->handleStanza(xmlToDom(mamResult(u"2"_s, u"<message xmlns='jabber:client' to='romeo@montague.lit/orchard' from='juliet@capulet.lit/balcony' type='chat'>"
+                                                 "<body>sent</body></message>"_s)));
+    mam->handleStanza(xmlToDom(mamResult(u"3"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                 "<body>consumed</body></message>"_s)));
+    test.inject(u"<iq type='result' id='qx1'><fin xmlns='urn:xmpp:mam:2'/></iq>"_s);
+
+    auto retrieved = expectFutureVariant<QXmppMamManager::RetrievedMessages>(task);
+    QCOMPARE(retrieved.messages.size(), 2);
+    QCOMPARE(retrieved.messages.at(0).body(), u"secret"_s);
+    QCOMPARE(retrieved.messages.at(0).e2eeMetadata()->encryptionNamespace(), MamTestEncryption);
+    QCOMPARE(retrieved.messages.at(0).stamp(), QDateTime(QDate(2010, 7, 10), QTime(23, 8, 25), QTimeZone::UTC));
+    QCOMPARE(retrieved.messages.at(1).body(), u"sent"_s);
+
+    // own messages belong to the conversation with the recipient
+    QCOMPARE(received, (QStringList { u"juliet@capulet.lit 1 romeo@montague.lit"_s, u"juliet@capulet.lit 2 romeo@montague.lit"_s, u"juliet@capulet.lit 3 romeo@montague.lit"_s }));
+    // archived messages are not delivered as live messages
+    QCOMPARE(liveMessages.size(), 0);
 }
 
 void QXmppMamTestHelper::archivedMessageReceived(const QString &queryId, const QXmppMessage &message)

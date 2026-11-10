@@ -39,8 +39,23 @@ namespace QXmpp::Messages {
     \value Stream Received directly from the server.
     \value CarbonReceived Copy of a message received by another own device.
     \value CarbonSent Copy of a message sent by another own device.
-    \value Mam Result of an archive query, not delivered as a live message.
+    \value Mam Result of an archive query, not delivered as a live message. The context has a
+    QXmpp::Messages::ArchiveInfo attachment.
     \value Injected Injected by an extension via QXmppClientExtension::injectMessage().
+*/
+
+/*!
+    \class QXmpp::Messages::ArchiveInfo
+    \inmodule QXmpp
+
+    Attachment of messages retrieved from an archive (\xep{0313}{Message Archive Management}),
+    see Context::attachment().
+
+    occupantJid() is the real JID of the sender reported by a MUC archive. It is only set if the
+    archive reports exactly one, as a sender could add one to its message. It must only be trusted
+    for messages from the archive of a non-anonymous room.
+
+    \since QXmpp 1.18
 */
 
 /*!
@@ -63,7 +78,9 @@ namespace QXmpp::Messages {
 
     Hook run for each incoming message after the decryption. Handlers returning
     QXmpp::HookResult::Stop consume the message, it is then not delivered via
-    QXmppClient::messageReceived().
+    QXmppClient::messageReceived(). Messages of archive queries (Origin::Mam) are never delivered
+    via QXmppClient::messageReceived(), consumed ones are not returned by
+    QXmppMamManager::retrieveMessages().
 */
 
 /*!
