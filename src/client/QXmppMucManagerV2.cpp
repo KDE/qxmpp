@@ -424,6 +424,7 @@ QXmppMucManagerV2::QXmppMucManagerV2()
         // XEP-0424: Message Retraction (the manager handles incoming retractions in joined rooms)
         features << ns_message_retract.toString();
     });
+    hooks().add<Messages::ResolveSender>(d.get(), &QXmppMucManagerV2Private::resolveSender);
 }
 
 QXmppMucManagerV2::~QXmppMucManagerV2() = default;
@@ -1830,6 +1831,60 @@ void QXmppMucManagerV2Private::handleNickChangeTimeout(const QString &roomJid)
     // XEP-0410 §4.1: nick change ended (with timeout) — room can be self-pinged again.
     rescheduleSelfPing();
     promise.finish(QXmppError { u"Changing nickname timed out."_s });
+}
+
+// Sets the real JID of the sender of messages from joined rooms, so they can be decrypted.
+// The nickname in 'from' is set by the room. Messages of occupants not known (anymore) keep the
+// room as sender.
+HookResult QXmppMucManagerV2Private::resolveSender(Messages::Context &context)
+{
+    using enum HookResult;
+
+    const auto &message = context.message();
+    if (message.type() != QXmppMessage::GroupChat) {
+        return Continue;
+    }
+
+    const auto roomJid = QXmppUtils::jidToBareJid(message.from());
+    auto roomItr = activeRooms.find(roomJid);
+    if (roomItr == activeRooms.end()) {
+        return Continue;
+    }
+    context.setConversationJid(roomJid);
+
+    const auto nickname = QXmppUtils::jidToResource(message.from());
+    if (nickname.isEmpty()) {
+        // message from the room itself
+        return Continue;
+    }
+
+    const auto &data = *roomItr->second;
+    std::shared_ptr<MucParticipantData> participant;
+    if (const auto occupantId = message.mucOccupantId(); data.supportsOccupantIds && !occupantId.isEmpty()) {
+        // The occupant ID stays the same across nickname changes and is kept in the archive.
+        for (const auto &[_, candidate] : data.participants) {
+            if (candidate->occupantId == occupantId) {
+                participant = candidate;
+                break;
+            }
+        }
+    } else if (context.origin() != Messages::Origin::Mam && !message.stamp().isValid()) {
+        // A nickname only identifies the current occupant: the nickname of an earlier message
+        // (room history or archive) may belong to someone else by now.
+        if (auto itr = data.participants.find(nickname); itr != data.participants.end()) {
+            participant = itr->second;
+        }
+    }
+    if (!participant) {
+        return Continue;
+    }
+
+    if (participant == data.selfParticipant.value()) {
+        context.setSenderJid(q->client()->configuration().jidBare());
+    } else if (const auto jid = participant->jid.value(); !jid.isEmpty()) {
+        context.setSenderJid(QXmppUtils::jidToBareJid(jid));
+    }
+    return Continue;
 }
 
 void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, const QString &originId)

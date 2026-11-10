@@ -7,6 +7,8 @@
 
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppMessageContext.h"
+#include "QXmppMessages.h"
 #include "QXmppMucData.h"
 #include "QXmppMucData_p.h"
 #include "QXmppMucManagerV2.h"
@@ -70,6 +72,7 @@ struct QXmppMucManagerV2Private {
     void handleLeaveTimeout(const QString &roomJid);
     void handleNickChangeTimeout(const QString &roomJid);
     void handleMessageTimeout(const QString &roomJid, const QString &originId);
+    QXmpp::HookResult resolveSender(QXmpp::Messages::Context &context);
 
     // XEP-0410: MUC Self-Ping
     void rescheduleSelfPing();

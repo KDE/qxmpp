@@ -5,7 +5,9 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
+#include "QXmppMessageContext.h"
 #include "QXmppMessageRetraction.h"
+#include "QXmppMessages.h"
 #include "QXmppMucData_p.h"
 #include "QXmppMucForms.h"
 #include "QXmppMucIq.h"
@@ -66,6 +68,8 @@ private:
 
     // MUC messages
     Q_SLOT void receiveMessage();
+    Q_SLOT void resolveSender();
+    Q_SLOT void resolveSenderOccupantId();
     Q_SLOT void sendMessage();
     Q_SLOT void sendMessageError();
     Q_SLOT void sendPrivateMessage();
@@ -1180,7 +1184,8 @@ void tst_QXmppMuc::joinRoomNicknameModifiedWithoutStatus210()
 
 static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
                                  const QString &roomJid = u"coven@chat.shakespeare.lit"_s,
-                                 const QString &nick = u"thirdwitch"_s)
+                                 const QString &nick = u"thirdwitch"_s,
+                                 bool occupantIds = false)
 {
     auto joinTask = muc->joinRoom(roomJid, nick);
     test.ignore();  // disco#info IQ (id: qx1)
@@ -1189,8 +1194,9 @@ static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
     test.inject(QStringLiteral("<iq id='qx1' from='%1' type='result'><query xmlns='http://jabber.org/protocol/disco#info'>"
                                "<identity category='conference' type='text' name='Test Room'/>"
                                "<feature var='http://jabber.org/protocol/muc'/>"
+                               "%2"
                                "</query></iq>")
-                    .arg(roomJid));
+                    .arg(roomJid, occupantIds ? u"<feature var='urn:xmpp:occupant-id:0'/>"_s : QString()));
 
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
@@ -1261,6 +1267,99 @@ void tst_QXmppMuc::receiveMessage()
                 "</message>");
     QVERIFY(muc->handleMessage(liveMsg));
     QCOMPARE(receivedMsg.body(), u"Thrice the brinded cat hath mew'd."_s);
+}
+
+void tst_QXmppMuc::resolveSender()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    joinedRoom(test, muc);
+
+    QXmppPresence participant;
+    parsePacket(participant,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant' jid='crone1@shakespeare.lit/desktop'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(participant);
+
+    QObject owner;
+    QStringList senders;
+    QStringList conversations;
+    test.hooks(&owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &context) {
+        senders << context.senderJid();
+        conversations << context.conversationJid();
+        return QXmpp::HookResult::Continue;
+    });
+
+    auto message = [](const QString &from) {
+        return u"<message from='"_s + from + u"' to='hag66@shakespeare.lit/pda' type='groupchat'><body>Hi</body></message>"_s;
+    };
+    // participant with known real JID
+    test.injectMessage(message(u"coven@chat.shakespeare.lit/firstwitch"_s));
+    // own message reflected by the room
+    test.injectMessage(message(u"coven@chat.shakespeare.lit/thirdwitch"_s));
+    // unknown occupant
+    test.injectMessage(message(u"coven@chat.shakespeare.lit/secondwitch"_s));
+    // room not joined
+    test.injectMessage(message(u"other@chat.shakespeare.lit/firstwitch"_s));
+    // room history: the nickname may have belonged to someone else
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' to='hag66@shakespeare.lit/pda' type='groupchat'>"
+                       "<body>Hi</body><delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/></message>"_s);
+    // occupant IDs are not supported by the room and could be forged
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/secondwitch' to='hag66@shakespeare.lit/pda' type='groupchat'>"
+                       "<body>Hi</body><occupant-id xmlns='urn:xmpp:occupant-id:0' id='forged'/></message>"_s);
+
+    QCOMPARE(senders, (QStringList { u"crone1@shakespeare.lit"_s, u"hag66@shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s, u"other@chat.shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s }));
+    QCOMPARE(conversations, (QStringList { u"coven@chat.shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s, u"other@chat.shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s }));
+}
+
+void tst_QXmppMuc::resolveSenderOccupantId()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, true);
+
+    // the nickname has been changed since the messages below were sent
+    QXmppPresence participant;
+    parsePacket(participant,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant' jid='crone1@shakespeare.lit/desktop'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='crone1-id'/>"
+                "</presence>");
+    test.injectPresence(participant);
+    parsePacket(participant,
+                "<presence from='coven@chat.shakespeare.lit/secondwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant' jid='crone2@shakespeare.lit/desktop'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='crone2-id'/>"
+                "</presence>");
+    test.injectPresence(participant);
+
+    QObject owner;
+    QStringList senders;
+    test.hooks(&owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &context) {
+        senders << context.senderJid();
+        return QXmpp::HookResult::Continue;
+    });
+
+    auto message = [](const QString &nick, const QString &occupantId) {
+        return u"<message from='coven@chat.shakespeare.lit/%1' to='hag66@shakespeare.lit/pda' type='groupchat'><body>Hi</body><delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/><occupant-id xmlns='urn:xmpp:occupant-id:0' id='%2'/></message>"_s.arg(nick, occupantId);
+    };
+    // sent by crone1 using the current nickname of crone2
+    test.injectMessage(message(u"secondwitch"_s, u"crone1-id"_s));
+    // occupant that has left the room
+    test.injectMessage(message(u"firstwitch"_s, u"departed-id"_s));
+
+    QCOMPARE(senders, (QStringList { u"crone1@shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s }));
 }
 
 void tst_QXmppMuc::moderateMessage()
