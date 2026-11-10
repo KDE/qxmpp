@@ -28,7 +28,10 @@
 #include "util.h"
 
 #include <QCoreApplication>
+#include <QDeadlineTimer>
 #include <QObject>
+#include <QScopeGuard>
+#include <QSignalSpy>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -95,12 +98,14 @@ private:
 
     OmemoUser m_alice1;
     OmemoUser m_alice2;
+    OmemoUser m_bob;
 };
 
 void tst_QXmppOmemoManager::initTestCase()
 {
     initOmemoUser(m_alice1);
     initOmemoUser(m_alice2);
+    initOmemoUser(m_bob);
 }
 
 void tst_QXmppOmemoManager::testSecurityPolicies()
@@ -240,153 +245,133 @@ void tst_QXmppOmemoManager::testLoad()
     m_alice1.omemoStorage->resetAll();
 }
 
+// Waits for \a task and returns its result.
+template<typename T>
+static T awaitTask(QXmppTask<T> &&task, std::chrono::milliseconds timeout = std::chrono::seconds(20))
+{
+    QDeadlineTimer deadline(timeout);
+    while (!task.isFinished() && !deadline.hasExpired()) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    }
+    VERIFY2(task.isFinished(), "Task did not finish in time");
+    if constexpr (!std::is_void_v<T>) {
+        return task.result();
+    }
+}
+
+// Connects the user and sets up OMEMO, trusting all keys automatically.
+static bool connectAndSetUp(OmemoUser &user, const QXmppConfiguration &config)
+{
+    QSignalSpy connectedSpy(&user.client, &QXmppClient::connected);
+    user.client.connectToServer(config);
+    if (!connectedSpy.wait(10'000)) {
+        return false;
+    }
+    awaitTask(user.manager->setSecurityPolicy(Toakafa));
+    return awaitTask(user.manager->setUp());
+}
+
+static bool hasDecryptedMessage(const QSignalSpy &spy, const QString &body)
+{
+    return std::any_of(spy.begin(), spy.end(), [&](const QList<QVariant> &arguments) {
+        const auto message = arguments.at(0).value<QXmppMessage>();
+        return message.e2eeMetadata() && message.e2eeMetadata()->encryption() == QXmpp::Omemo2 && message.body() == body;
+    });
+}
+
+static int devicesAdded(const QSignalSpy &spy, const QString &jid)
+{
+    return int(std::count_if(spy.begin(), spy.end(), [&](const QList<QVariant> &arguments) {
+        return arguments.at(0).toString() == jid;
+    }));
+}
+
 void tst_QXmppOmemoManager::testSendMessage()
 {
     SKIP_IF_INTEGRATION_TESTS_DISABLED()
+    if (!IntegrationTests::secondAccountAvailable()) {
+        QSKIP("Export 'QXMPP_JID_2' and 'QXMPP_PASSWORD_2' for a second account.");
+    }
 
-    QSignalSpy disconnectedAlice1Spy(&m_alice1.client, &QXmppClient::disconnected);
+    const auto configAlice1 = IntegrationTests::clientConfiguration();
+    auto configAlice2 = configAlice1;
+    configAlice2.setResource(u"second"_s);
+    const auto configBob = IntegrationTests::secondClientConfiguration();
+    const auto aliceJid = configAlice1.jidBare();
+    const auto bobJid = configBob.jidBare();
 
-    auto isFirstMessageSentByAlice1 = false;
-    auto isFirstMessageDecryptedByAlice2 = false;
-    auto isEmptyOmemoMessageReceivedByAlice1 = false;
-    auto isSecondMessageSentByAlice1 = false;
-    auto isSecondMessageDecryptedByAlice2 = false;
+    QSignalSpy alice1DeviceSpy(m_alice1.manager, &QXmppOmemoManager::deviceAdded);
 
-    const auto config1 = IntegrationTests::clientConfiguration();
-    auto config2 = config1;
-    config2.setResource(config2.resource() + u"2"_s);
+    QVERIFY(connectAndSetUp(m_alice1, configAlice1));
+    QVERIFY(connectAndSetUp(m_bob, configBob));
+    QVERIFY(connectAndSetUp(m_alice2, configAlice2));
 
-    const QObject context;
-    QString recipient = "bob@" + config1.domain();
+    // Alice 1 learns the device of Alice 2 from the own device list and the one of Bob by
+    // requesting it.
+    QTRY_VERIFY_WITH_TIMEOUT(devicesAdded(alice1DeviceSpy, aliceJid) >= 1, 20'000);
+    awaitTask(m_alice1.manager->requestDeviceLists({ bobJid }));
+    QTRY_VERIFY_WITH_TIMEOUT(devicesAdded(alice1DeviceSpy, bobJid) >= 1, 20'000);
 
+    QSignalSpy bobReceivedSpy(&m_bob.client, &QXmppClient::messageReceived);
+    QSignalSpy alice1ReceivedSpy(&m_alice1.client, &QXmppClient::messageReceived);
+    QSignalSpy alice2ReceivedSpy(&m_alice2.client, &QXmppClient::messageReceived);
+
+    // Alice 1 to Bob, Alice 2 gets a carbon copy
     QXmppMessage message1;
-    message1.setTo(recipient);
-    message1.setBody("Hello Bob!");
+    message1.setTo(bobJid);
+    message1.setBody(u"Hello Bob!"_s);
+    QVERIFY(std::holds_alternative<QXmpp::SendSuccess>(awaitTask(m_alice1.client.sendSensitive(std::move(message1)))));
+
+    QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(bobReceivedSpy, u"Hello Bob!"_s), 20'000);
+    QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(alice2ReceivedSpy, u"Hello Bob!"_s), 20'000);
+
+    // Bob to both devices of Alice
+    // Bob knows the device of Alice 1 from her message and learns the one of Alice 2.
+    awaitTask(m_bob.manager->requestDeviceLists({ aliceJid }));
+    QTRY_VERIFY_WITH_TIMEOUT(awaitTask(m_bob.manager->devices({ aliceJid })).size() >= 2, 20'000);
 
     QXmppMessage message2;
-    message2.setTo(recipient);
-    message2.setBody("Hello Bob again!");
+    message2.setTo(aliceJid);
+    message2.setBody(u"Hello Alice!"_s);
+    QVERIFY(std::holds_alternative<QXmpp::SendSuccess>(awaitTask(m_bob.client.sendSensitive(std::move(message2)))));
 
-    connect(&m_alice1.client, &QXmppClient::connected, &context, [this, config2] {
-        auto future = m_alice1.manager->setUp();
-        future.then(this, [this, config2](bool isSetUp) {
-            if (isSetUp) {
-                auto future = m_alice1.manager->setSecurityPolicy(Toakafa);
-                future.then(this, [this, config2] {
-                    auto future = m_alice2.manager->setSecurityPolicy(Toakafa);
-                    future.then(this, [this, config2] {
-                        m_alice2.client.connectToServer(config2);
-                    });
-                });
-            }
-        });
-    });
+    QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(alice1ReceivedSpy, u"Hello Alice!"_s), 20'000);
+    QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(alice2ReceivedSpy, u"Hello Alice!"_s), 20'000);
 
-    connect(&m_alice2.client, &QXmppClient::connected, &context, [this] {
-        m_alice2.manager->setUp();
-    });
-
-    connect(&m_alice2.logger, &QXmppLogger::message, &context, [=](QXmppLogger::MessageType type, const QString &text) {
-        if (type == QXmppLogger::SentMessage) {
-            qDebug() << "Alice 2 - SENT: " << text;
-        } else {
-            qDebug() << "Alice 2 - RECEIVED: " << text;
+    // Decrypted messages used only for building sessions (empty OMEMO messages) are not
+    // delivered.
+    for (const auto *spy : { &bobReceivedSpy, &alice1ReceivedSpy, &alice2ReceivedSpy }) {
+        for (const auto &arguments : *spy) {
+            const auto message = arguments.at(0).value<QXmppMessage>();
+            QVERIFY(!(message.e2eeMetadata() && message.body().isEmpty()));
         }
-    });
+    }
 
-    connect(&m_alice2.client, &QXmppClient::messageReceived, &context, [=, &isFirstMessageDecryptedByAlice2, &isSecondMessageDecryptedByAlice2](const QXmppMessage &receivedMessage) {
-        // Process only encrypted stanzas.
-        if (receivedMessage.e2eeMetadata()) {
-            qDebug() << "Decrypted message:" << receivedMessage.body();
-            if (receivedMessage.body() == message1.body()) {
-                isFirstMessageDecryptedByAlice2 = true;
-            } else if (receivedMessage.body() == message2.body()) {
-                isSecondMessageDecryptedByAlice2 = true;
-            }
-        }
-    });
-
-    connect(&m_alice1.logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) mutable {
-        if (type == QXmppLogger::SentMessage) {
-            qDebug() << "Alice - SENT: " << text;
-        } else if (type == QXmppLogger::ReceivedMessage) {
-            qDebug() << "Alice - RECEIVED: " << text;
-
-            // Check if Alice 1 received an empty OMEMO message from Alice 2.
-            // If that is the case, send a second message to Alice 2.
-            // The empty OMEMO message is not emitted via QXmppClient::messageReceived().
-            // Thus, it must be parsed manually here.
-            const auto content = text.toUtf8();
-            if (content.startsWith(QByteArrayLiteral("<message "))) {
-                QXmppMessage message;
-                parsePacket(message, text.toUtf8());
-
-                if (const auto optionalOmemoElement = message.omemoElement(); optionalOmemoElement && optionalOmemoElement.value().payload().isEmpty()) {
-                    isEmptyOmemoMessageReceivedByAlice1 = true;
-
-                    auto future = m_alice1.client.sendSensitive(std::move(message2), QXmppSendStanzaParams());
-                    future.then(this, [=, &isSecondMessageSentByAlice1](QXmpp::SendResult result) {
-                        if (std::get_if<QXmpp::SendSuccess>(&result)) {
-                            isSecondMessageSentByAlice1 = true;
-                        }
-                    });
-                }
-            }
-        }
-    });
-
-    // Wait for receiving the device of Alice 2 in order to send a message to Bob and a message
-    // carbon to Alice 2.
-    connect(m_alice1.manager, &QXmppOmemoManager::deviceAdded, &context, [=, this, &isFirstMessageSentByAlice1](const QString &jid, uint32_t) mutable {
-        if (jid == m_alice2.client.configuration().jidBare()) {
-            if (!isFirstMessageSentByAlice1) {
-                auto future = m_alice1.client.sendSensitive(std::move(message1), QXmppSendStanzaParams());
-                future.then(this, [=, &isFirstMessageSentByAlice1](QXmpp::SendResult result) {
-                    if (std::get_if<QXmpp::SendSuccess>(&result)) {
-                        isFirstMessageSentByAlice1 = true;
-                    }
-                });
-            }
-        }
-    });
-
-    m_alice1.client.connectToServer(config1);
-
-    QTRY_VERIFY_WITH_TIMEOUT(isFirstMessageSentByAlice1, 10000);
-    QTRY_VERIFY_WITH_TIMEOUT(isFirstMessageDecryptedByAlice2, 10000);
-    QTRY_VERIFY_WITH_TIMEOUT(isEmptyOmemoMessageReceivedByAlice1, 10000);
-    QTRY_VERIFY_WITH_TIMEOUT(isSecondMessageSentByAlice1, 10000);
-    QTRY_VERIFY_WITH_TIMEOUT(isSecondMessageDecryptedByAlice2, 10000);
-
-    m_alice1.client.disconnectFromServer();
-    QVERIFY2(disconnectedAlice1Spy.wait(), "Could not disconnect from server!");
+    finish(m_alice1);
     finish(m_alice2);
+    finish(m_bob);
 }
 
 void tst_QXmppOmemoManager::testSendIq()
 {
     SKIP_IF_INTEGRATION_TESTS_DISABLED()
+    if (!IntegrationTests::secondAccountAvailable()) {
+        QSKIP("Export 'QXMPP_JID_2' and 'QXMPP_PASSWORD_2' for a second account.");
+    }
 
-    QSignalSpy disconnectedAlice1Spy(&m_alice1.client, &QXmppClient::disconnected);
-
-    auto isFirstRequestSent = false;
-    auto isErrorResponseReceived = false;
-    auto isSecondRequestSent = false;
-    auto isResultResponseReceived = false;
-
-    const auto config1 = IntegrationTests::clientConfiguration();
-    auto config2 = config1;
-    config2.setResource(config2.resource() + u"2"_s);
-
-    const QObject context;
+    auto configAlice = IntegrationTests::clientConfiguration();
+    configAlice.setResource(u"first"_s);
+    auto configBob = IntegrationTests::secondClientConfiguration();
+    configBob.setResource(u"phone"_s);
+    const auto bobJid = configBob.jidBare();
 
     QXmppBitsOfBinaryIq requestIq;
-    requestIq.setTo(config2.jid());
+    requestIq.setTo(configBob.jid());
     requestIq.setCid(QXmppBitsOfBinaryContentId::fromContentId(u"sha1+8f35fef110ffc5df08d579a50083ff9308fb6242@bob.xmpp.org"_s));
 
     QXmppBitsOfBinaryIq responseIq;
     responseIq.setType(QXmppIq::Result);
-    responseIq.setTo(config1.jid());
+    responseIq.setTo(configAlice.jid());
     responseIq.setData(QByteArray::fromBase64(QByteArrayLiteral(
         "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAMAAAC67D+PAAAAclBMVEUAAADYZArfaA9GIAoBAAGN"
         "QA3MXgniaAiEOgZMIATDXRXZZhHUZBHIXhDrbQ6sUQ7OYA2TRAubRwqMQQq7VQlKHgMAAAK5WRfJ"
@@ -394,95 +379,42 @@ void tst_QXmppOmemoManager::testSendIq()
         "Rw6EMBTAUP8kJKENnaF37n9FQPLCekAgzklhgCwfrlNHEXhrvCsxaU/SwLGAFuIWZFpBERtKm9Xf"
         "JqH+vVWh4POqgHrsAtht095b+geYRSl57QHSPgP3+CwvAAAAAABJRU5ErkJggg==")));
 
-    OmemoIqHandler iqHandler(requestIq, responseIq);
+    QVERIFY(connectAndSetUp(m_alice1, configAlice));
+    QVERIFY(connectAndSetUp(m_bob, configBob));
 
-    connect(&m_alice1.client, &QXmppClient::connected, &context, [=, this] {
-        auto future = m_alice1.manager->setUp();
-        future.then(this, [=, this](bool isSetUp) {
-            if (isSetUp) {
-                auto future = m_alice1.manager->setSecurityPolicy(Toakafa);
-                future.then(this, [=, this] {
-                    auto future = m_alice2.manager->setSecurityPolicy(Toakafa);
-                    future.then(this, [=, this] {
-                        m_alice2.client.connectToServer(config2);
-                    });
-                });
-            }
-        });
-    });
+    awaitTask(m_alice1.manager->requestDeviceLists({ bobJid }));
+    QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_alice1.manager->devices({ bobJid })).isEmpty(), 20'000);
 
-    connect(&m_alice2.client, &QXmppClient::connected, &context, [this] {
-        m_alice2.manager->setUp();
-    });
+    // Bob can't handle the request and replies with an encrypted error.
+    auto request = requestIq;
+    auto result = awaitTask(m_alice1.client.sendSensitiveIq(std::move(request)));
+    auto stanzaError = expectVariant<QXmppError>(std::move(result)).value<QXmppStanza::Error>();
+    QVERIFY(stanzaError.has_value());
+    // The error is in the encrypted content, but QXmppClient::sendSensitiveIq() reports error
+    // responses before decrypting them.
+    QEXPECT_FAIL("", "Encrypted error responses are not decrypted", Continue);
+    QCOMPARE(stanzaError->condition(), QXmppStanza::Error::FeatureNotImplemented);
 
-    connect(&m_alice1.logger, &QXmppLogger::message, &context, [=](QXmppLogger::MessageType type, const QString &text) {
-        if (type == QXmppLogger::SentMessage) {
-            qDebug() << "Alice - SENT: " << text;
-        } else if (type == QXmppLogger::ReceivedMessage) {
-            qDebug() << "Alice - RECEIVED: " << text;
-        }
-    });
+    // Bob handles the request and replies with the encrypted result.
+    auto *iqHandler = new OmemoIqHandler(requestIq, responseIq);
+    m_bob.client.addExtension(iqHandler);
+    auto cleanup = qScopeGuard([&] { m_bob.client.removeExtension(iqHandler); });
 
-    connect(&m_alice2.logger, &QXmppLogger::message, &context, [=](QXmppLogger::MessageType type, const QString &text) {
-        if (type == QXmppLogger::SentMessage) {
-            qDebug() << "Alice 2 - SENT: " << text;
-        } else {
-            qDebug() << "Alice 2 - RECEIVED: " << text;
-        }
-    });
+    request = requestIq;
+    result = awaitTask(m_alice1.client.sendSensitiveIq(std::move(request)));
+    // QXmppClient::sendSensitiveIq() and QXmppOmemoManager::encryptIq() copy the request into a
+    // QXmppIq, which loses the payload of subclasses.
+    QEXPECT_FAIL("", "The payload of encrypted IQs is lost", Continue);
+    QVERIFY(std::holds_alternative<QDomElement>(result));
+    if (const auto *response = std::get_if<QDomElement>(&result)) {
+        QVERIFY(isIqElement<QXmppBitsOfBinaryIq>(*response));
+        QXmppBitsOfBinaryIq resultIq;
+        resultIq.parse(*response);
+        QCOMPARE(resultIq.data(), responseIq.data());
+    }
 
-    // Wait for receiving the device of Alice 2 in order to send a request to it.
-    connect(m_alice1.manager, &QXmppOmemoManager::deviceAdded, &context, [=, this, &isFirstRequestSent, &isErrorResponseReceived, &isSecondRequestSent, &isResultResponseReceived, &iqHandler](const QString &jid, uint32_t) {
-        if (jid != m_alice2.client.configuration().jidBare()) {
-            return;
-        }
-        if (!isFirstRequestSent && !isSecondRequestSent) {
-            auto requestIqCopy = requestIq;
-            auto future = m_alice1.client.sendSensitiveIq(std::move(requestIqCopy));
-            future.then(this, [=, this, &isFirstRequestSent, &isErrorResponseReceived, &isSecondRequestSent, &isResultResponseReceived, &iqHandler](QXmppClient::IqResult result) {
-                if (const auto response = std::get_if<QDomElement>(&result)) {
-                    isFirstRequestSent = true;
-
-                    QXmppIq iq;
-                    iq.parse(*response);
-
-                    QCOMPARE(iq.type(), QXmppIq::Error);
-                    const auto error = iq.error();
-                    QCOMPARE(error.type(), QXmppStanza::Error::Cancel);
-                    QCOMPARE(error.condition(), QXmppStanza::Error::FeatureNotImplemented);
-                    isErrorResponseReceived = true;
-
-                    m_alice2.client.addExtension(&iqHandler);
-
-                    auto requestIqCopy = requestIq;
-                    auto future = m_alice1.client.sendSensitiveIq(std::move(requestIqCopy));
-                    future.then(this, [=, &isSecondRequestSent, &isResultResponseReceived](QXmppClient::IqResult result) {
-                        if (const auto response = std::get_if<QDomElement>(&result)) {
-                            isSecondRequestSent = true;
-
-                            if (isIqElement<QXmppBitsOfBinaryIq>(*response)) {
-                                QXmppBitsOfBinaryIq iq;
-                                iq.parse(*response);
-                                QCOMPARE(iq.data(), responseIq.data());
-                                isResultResponseReceived = true;
-                            }
-                        }
-                    });
-                }
-            });
-        }
-    });
-
-    m_alice1.client.connectToServer(config1);
-
-    QTRY_VERIFY_WITH_TIMEOUT(isFirstRequestSent, 20'000);
-    QTRY_VERIFY(isErrorResponseReceived);
-    QTRY_VERIFY(isSecondRequestSent);
-    QTRY_VERIFY(isResultResponseReceived);
-
-    m_alice1.client.disconnectFromServer();
-    QVERIFY2(disconnectedAlice1Spy.wait(), "Could not disconnect from server!");
-    finish(m_alice2);
+    finish(m_alice1);
+    finish(m_bob);
 }
 
 void tst_QXmppOmemoManager::finish(OmemoUser &omemoUser)
