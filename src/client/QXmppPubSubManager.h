@@ -17,6 +17,17 @@
 class QXmppPubSubPublishOptions;
 class QXmppPubSubSubscribeOptions;
 
+namespace QXmpp::PubSub {
+
+struct EventReceived {
+    static constexpr QStringView Name = u"org.qxmpp.pubsub.event-received";
+    // name of the node
+    using Key = QStringView;
+    using Signature = QXmpp::HookResult(const QDomElement &element, const QString &service, const QString &node);
+};
+
+}  // namespace QXmpp::PubSub
+
 class QXMPP_EXPORT QXmppPubSubManager : public QXmppClientExtension
 {
     Q_OBJECT

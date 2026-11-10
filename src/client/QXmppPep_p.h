@@ -31,8 +31,10 @@ inline QXmppTask<GetResult<ItemT>> request(QXmppPubSubManager *pubSub, const QSt
 // NodeName is a template parameter, so the right qstring comparison overload is used
 // (if we used 'const QString &' as type, a 'const char *' string would be converted)
 template<typename ItemT, typename NodeName, typename Manager, typename ReceivedSignal>
-inline bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &eventNode, NodeName nodeName, Manager *manager, ReceivedSignal itemReceived)
+inline QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &eventNode, NodeName nodeName, Manager *manager, ReceivedSignal itemReceived)
 {
+    using enum QXmpp::HookResult;
+
     if (eventNode == nodeName && QXmppPubSubEvent<ItemT>::isPubSubEvent(element)) {
         QXmppPubSubEvent<ItemT> event;
         event.parse(element);
@@ -43,13 +45,13 @@ inline bool handlePubSubEvent(const QDomElement &element, const QString &pubSubS
             } else {
                 (manager->*itemReceived)(pubSubService, {});
             }
-            return true;
+            return Stop;
         } else if (event.eventType() == QXmppPubSubEventBase::Retract) {
             (manager->*itemReceived)(pubSubService, {});
-            return true;
+            return Stop;
         }
     }
-    return false;
+    return Continue;
 }
 
 }  // namespace QXmpp::Private::Pep

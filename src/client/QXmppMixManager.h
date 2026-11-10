@@ -11,13 +11,12 @@
 #include "QXmppMixConfigItem.h"
 #include "QXmppMixInfoItem.h"
 #include "QXmppMixParticipantItem.h"
-#include "QXmppPubSubEventHandler.h"
 
 class QXmppMixIq;
 class QXmppMixInvitation;
 class QXmppMixManagerPrivate;
 
-class QXMPP_EXPORT QXmppMixManager : public QXmppClientExtension, public QXmppPubSubEventHandler
+class QXMPP_EXPORT QXmppMixManager : public QXmppClientExtension
 {
     Q_OBJECT
     Q_PROPERTY(Support participantSupport READ participantSupport NOTIFY participantSupportChanged)
@@ -140,9 +139,9 @@ public:
 protected:
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
-    bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
 
 private:
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
     QXmppMixIq prepareJoinIq(const QString &channelJid, const QString &nickname, QXmppMixConfigItem::Nodes nodes);
     QXmppTask<JoiningResult> joinChannel(QXmppMixIq &&iq);
     QXmppTask<JidResult> requestJids(const QString &channelJid, const QString &node);

@@ -6,7 +6,6 @@
 #define QXMPPPEPBOOKMARKMANAGER_H
 
 #include "QXmppClientExtension.h"
-#include "QXmppPubSubEventHandler.h"
 #include "QXmppTask.h"
 
 #include <optional>
@@ -108,8 +107,7 @@ struct QXmppPepBookmarkManagerPrivate;
     \ingroup qxmpp-managers
     \since QXmpp 1.16
 */
-class QXMPP_EXPORT QXmppPepBookmarkManager : public QXmppClientExtension,
-                                             public QXmppPubSubEventHandler
+class QXMPP_EXPORT QXmppPepBookmarkManager : public QXmppClientExtension
 {
     Q_OBJECT
 
@@ -131,14 +129,13 @@ public:
     QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
     QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 
-    bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
-
 protected:
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
 
 private:
     void onConnected();
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
 
     friend struct QXmppPepBookmarkManagerPrivate;
     friend class tst_QXmppMuc;

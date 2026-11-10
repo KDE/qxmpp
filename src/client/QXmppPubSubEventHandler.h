@@ -10,11 +10,14 @@
 class QDomElement;
 class QXmppPubSubManager;
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
 // Documented in QXmppPubSubManager.cpp.
-class QXMPP_EXPORT QXmppPubSubEventHandler : public QXmppExtension
+class [[deprecated("Use the QXmpp::PubSub::EventReceived hook")]]
+QXMPP_EXPORT QXmppPubSubEventHandler : public QXmppExtension
 {
 public:
     virtual bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) = 0;
 };
+#endif
 
 #endif  // QXMPPPUBSUBEVENTHANDLER_H

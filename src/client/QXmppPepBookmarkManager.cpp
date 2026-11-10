@@ -172,6 +172,7 @@ using EmptyResult = std::variant<Success, QXmppError>;
 QXmppPepBookmarkManager::QXmppPepBookmarkManager()
     : d(std::make_unique<QXmppPepBookmarkManagerPrivate>(this))
 {
+    hooks().add<PubSub::EventReceived>(ns_bookmarks2, this, &QXmppPepBookmarkManager::handlePubSubEvent);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_bookmarks2 + u"+notify";
     });
@@ -217,13 +218,10 @@ QXmppTask<Result<>> QXmppPepBookmarkManager::removeBookmark(const QString &jid)
     return d->removeBookmark(jid);
 }
 
-/*!
-    Handles an incoming PubSub \a element for the given \a pubSubService and \a nodeName.
-
-    Returns \c true if the event was handled.
-*/
-bool QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
+    using enum HookResult;
+
     if (d->bookmarks && pubSubService == client()->configuration().jidBare() && nodeName == ns_bookmarks2) {
         auto &bookmarks = *d->bookmarks;
 
@@ -249,9 +247,9 @@ bool QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, cons
         case Subscription:
             break;
         }
-        return true;
+        return Stop;
     }
-    return false;
+    return Continue;
 }
 
 void QXmppPepBookmarkManager::onRegistered(QXmppClient *client)

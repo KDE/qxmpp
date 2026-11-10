@@ -8,7 +8,6 @@
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppMessageHandler.h"
-#include "QXmppPubSubEventHandler.h"
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
@@ -65,7 +64,7 @@ private:
     QSharedDataPointer<QXmppOmemoDevicePrivate> d;
 };
 
-class QXMPPOMEMO_EXPORT QXmppOmemoManager : public QXmppClientExtension, public QXmppE2eeExtension, public QXmppPubSubEventHandler, public QXmppMessageHandler
+class QXMPPOMEMO_EXPORT QXmppOmemoManager : public QXmppClientExtension, public QXmppE2eeExtension, public QXmppMessageHandler
 {
     Q_OBJECT
 
@@ -150,9 +149,10 @@ public:
 protected:
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
-    bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
 
 private:
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
+
     std::unique_ptr<QXmppOmemoManagerPrivate> d;
 
     friend class QXmppOmemoManagerPrivate;

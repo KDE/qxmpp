@@ -8,7 +8,6 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppError.h"
-#include "QXmppPubSubEventHandler.h"
 
 #include <variant>
 
@@ -16,7 +15,7 @@ template<typename T>
 class QXmppTask;
 class QXmppGeolocItem;
 
-class QXMPP_EXPORT QXmppUserLocationManager : public QXmppClientExtension, public QXmppPubSubEventHandler
+class QXMPP_EXPORT QXmppUserLocationManager : public QXmppClientExtension
 {
     Q_OBJECT
 
@@ -35,8 +34,8 @@ public:
 
     Q_SIGNAL void itemReceived(const QString &jid, const QXmppGeolocItem &);
 
-protected:
-    bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
+private:
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
 };
 
 #endif  // QXMPPUSERLOCATIONMANAGER_H

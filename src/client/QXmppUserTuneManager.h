@@ -7,7 +7,6 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppError.h"
-#include "QXmppPubSubEventHandler.h"
 
 #include <variant>
 
@@ -15,7 +14,7 @@ class QXmppTuneItem;
 template<typename T>
 class QXmppTask;
 
-class QXMPP_EXPORT QXmppUserTuneManager : public QXmppClientExtension, public QXmppPubSubEventHandler
+class QXMPP_EXPORT QXmppUserTuneManager : public QXmppClientExtension
 {
     Q_OBJECT
 
@@ -31,8 +30,8 @@ public:
 
     Q_SIGNAL void itemReceived(const QString &jid, const QXmppTuneItem &item);
 
-protected:
-    bool handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName) override;
+private:
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
 };
 
 #endif  // QXMPPUSERTUNEMANAGER_H

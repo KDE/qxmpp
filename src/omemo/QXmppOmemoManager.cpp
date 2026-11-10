@@ -10,6 +10,7 @@
 #include "QXmppOmemoItems_p.h"
 #include "QXmppOmemoManager_p.h"
 #include "QXmppPubSubEvent.h"
+#include "QXmppPubSubManager.h"
 #include "QXmppTrustManager.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -314,6 +315,7 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     d->initOmemoLibrary();
     d->schedulePeriodicTasks();
 
+    hooks().add<PubSub::EventReceived>(ns_omemo_2_devices, this, &QXmppOmemoManager::handlePubSubEvent);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_omemo_2_devices + u"+notify";
     });
@@ -1127,8 +1129,10 @@ void Manager::onUnregistered(QXmppClient *client)
     // on removal)
 }
 
-bool Manager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult Manager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
+    using enum HookResult;
+
     if (nodeName == ns_omemo_2_devices && QXmppPubSubEvent<QXmppOmemoDeviceListItem>::isPubSubEvent(element)) {
         QXmppPubSubEvent<QXmppOmemoDeviceListItem> event;
         event.parse(element);
@@ -1175,8 +1179,8 @@ bool Manager::handlePubSubEvent(const QDomElement &element, const QString &pubSu
             break;
         }
 
-        return true;
+        return Stop;
     }
 
-    return false;
+    return Continue;
 }

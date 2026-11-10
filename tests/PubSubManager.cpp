@@ -27,28 +27,52 @@ using AffiliationType = QXmppPubSubAffiliation::Affiliation;
 const char *XMLNS_PUBSUB = "http://jabber.org/protocol/pubsub";
 const char *XMLNS_PUBSUB_AUTO_CREATE = "http://jabber.org/protocol/pubsub#auto-create";
 
-class TestEventManager : public QXmppClientExtension, public QXmppPubSubEventHandler
+class TestEventManager : public QXmppClientExtension
 {
 public:
+    TestEventManager()
+    {
+        // only events of this node are passed
+        hooks().add<QXmpp::PubSub::EventReceived>(u"princely_musings", this, &TestEventManager::handlePubSubEvent);
+    }
+
     QXmppPubSubManager *pubSub()
     {
         return client()->findExtension<QXmppPubSubManager>();
     }
 
-    bool handlePubSubEvent(const QDomElement &, const QString &pubSubService, const QString &nodeName) override
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &, const QString &pubSubService, const QString &nodeName)
     {
+        using enum QXmpp::HookResult;
+
         m_events++;
-#define return return false;
+#define return return Continue;
         QCOMPARE(pubSubService, m_serviceJid);
         QCOMPARE(nodeName, m_node);
 #undef return
-        return true;
+        return Stop;
     }
 
     QString m_serviceJid;
     QString m_node;
     uint m_events = 0;
 };
+
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+// External extension using the deprecated interface.
+class LegacyEventManager : public QXmppClientExtension, public QXmppPubSubEventHandler
+{
+public:
+    bool handlePubSubEvent(const QDomElement &, const QString &pubSubService, const QString &nodeName) override
+    {
+        m_events << pubSubService + u'/' + nodeName;
+        return true;
+    }
+
+    QStringList m_events;
+};
+QT_WARNING_POP
 
 struct Client {
     Client(const QString &jid = {})
@@ -108,6 +132,7 @@ private:
     Q_SLOT void testUnsubscribeFromNode();
     Q_SLOT void testEventNotifications_data();
     Q_SLOT void testEventNotifications();
+    Q_SLOT void testLegacyEventHandler();
     Q_SLOT void testStandardItemToString();
 };
 
@@ -1348,6 +1373,31 @@ void tst_QXmppPubSubManager::testEventNotifications()
     }
 
     QCOMPARE(eventManager->pubSub(), psManager);
+}
+
+void tst_QXmppPubSubManager::testLegacyEventHandler()
+{
+    const auto event = xmlToDom(
+        u"<message from='pubsub.shakespeare.lit' to='francisco@denmark.lit' id='foo'>"
+        "<event xmlns='http://jabber.org/protocol/pubsub#event'>"
+        "<items node='princely_musings'><item id='1'/></items>"
+        "</event>"
+        "</message>"_s);
+
+    auto [client, psManager] = Client();
+    auto *legacyManager = client->addNewExtension<LegacyEventManager>();
+
+    QVERIFY(psManager->handleStanza(event));
+    QCOMPARE(legacyManager->m_events, QStringList { u"pubsub.shakespeare.lit/princely_musings"_s });
+
+    // handlers of the hook are called first and can stop the processing
+    auto *eventManager = client->addNewExtension<TestEventManager>();
+    eventManager->m_node = u"princely_musings"_s;
+    eventManager->m_serviceJid = u"pubsub.shakespeare.lit"_s;
+
+    QVERIFY(psManager->handleStanza(event));
+    QCOMPARE(eventManager->m_events, 1u);
+    QCOMPARE(legacyManager->m_events.size(), 1);
 }
 
 void tst_QXmppPubSubManager::testStandardItemToString()

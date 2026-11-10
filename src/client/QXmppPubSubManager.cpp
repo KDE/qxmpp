@@ -28,12 +28,43 @@ using namespace QXmpp;
 using namespace QXmpp::Private;
 
 /*!
+    \namespace QXmpp::PubSub
+    \inmodule QXmpp
+
+    Hooks of QXmppPubSubManager.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \struct QXmpp::PubSub::EventReceived
+    \inmodule QXmpp
+
+    Hook for handling incoming \xep{0060}{Publish-Subscribe} event notifications.
+
+    Handlers are added per node, the key is the name of the node:
+    \code
+    hooks().add<QXmpp::PubSub::EventReceived>(u"urn:xmpp:mix:nodes:info", this, &MyManager::handleEvent);
+    \endcode
+
+    The handler gets the &lt;message/&gt; element, the JID of the PubSub service (the own bare JID
+    if the 'from' attribute is empty) and the name of the node. It returns
+    QXmpp::HookResult::Stop if it handled the event.
+
+    \since QXmpp 1.18
+*/
+
+/*!
     \class QXmppPubSubEventHandler
     \inmodule QXmpp
 
     Interface for handling \xep{0060}{Publish-Subscribe} (PubSub) events.
 
+    Extensions implementing it are called after the handlers of the QXmpp::PubSub::EventReceived
+    hook, in the order in which they were added to the client.
+
     \since QXmpp 1.5
+    \deprecated since QXmpp 1.18, use the QXmpp::PubSub::EventReceived hook instead.
 */
 
 /*!
@@ -878,6 +909,13 @@ bool QXmppPubSubManager::handleStanza(const QDomElement &element)
         }
         const auto node = event.firstChildElement().attribute(u"node"_s);
 
+        if (hooks().run<PubSub::EventReceived>(node, element, service, node) == HookResult::Stop) {
+            return true;
+        }
+
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
         const auto extensions = client()->extensions();
         for (auto *extension : extensions) {
             if (auto *eventHandler = dynamic_cast<QXmppPubSubEventHandler *>(extension)) {
@@ -886,6 +924,8 @@ bool QXmppPubSubManager::handleStanza(const QDomElement &element)
                 }
             }
         }
+        QT_WARNING_POP
+#endif
     }
     return false;
 }

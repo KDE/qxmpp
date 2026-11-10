@@ -452,6 +452,9 @@ QXmppMixManager::QXmppMixManager()
     });
 
     QXmppExportData::registerExtension<MixData, MixData::fromDom, serializeMixData>(u"mix", ns_qxmpp_export);
+    for (auto node : { ns_mix_node_allowed, ns_mix_node_banned, ns_mix_node_config, ns_mix_node_info, ns_mix_node_participants }) {
+        hooks().add<PubSub::EventReceived>(node, this, &QXmppMixManager::handlePubSubEvent);
+    }
 }
 
 QXmppMixManager::~QXmppMixManager() = default;
@@ -1210,8 +1213,10 @@ void QXmppMixManager::onUnregistered(QXmppClient *client)
     }
 }
 
-bool QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
+    using enum HookResult;
+
     if (nodeName == ns_mix_node_allowed && QXmppPubSubEvent<QXmppPubSubBaseItem>::isPubSubEvent(element)) {
         QXmppPubSubEvent<QXmppPubSubBaseItem> event;
         event.parse(element);
@@ -1246,7 +1251,7 @@ bool QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QStrin
             break;
         }
 
-        return true;
+        return Stop;
     }
 
     if (nodeName == ns_mix_node_banned && QXmppPubSubEvent<QXmppPubSubBaseItem>::isPubSubEvent(element)) {
@@ -1281,7 +1286,7 @@ bool QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QStrin
             break;
         }
 
-        return true;
+        return Stop;
     }
 
     if (nodeName == ns_mix_node_config && QXmppPubSubEvent<QXmppMixConfigItem>::isPubSubEvent(element)) {
@@ -1302,7 +1307,7 @@ bool QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QStrin
             break;
         }
 
-        return true;
+        return Stop;
     }
 
     if (nodeName == ns_mix_node_info && QXmppPubSubEvent<QXmppMixInfoItem>::isPubSubEvent(element)) {
@@ -1323,7 +1328,7 @@ bool QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QStrin
             break;
         }
 
-        return true;
+        return Stop;
     }
 
     if (nodeName == ns_mix_node_participants && QXmppPubSubEvent<QXmppMixParticipantItem>::isPubSubEvent(element)) {
@@ -1358,10 +1363,10 @@ bool QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QStrin
             break;
         }
 
-        return true;
+        return Stop;
     }
 
-    return false;
+    return Continue;
 }
 
 /*!

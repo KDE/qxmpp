@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppGeolocItem.h"
 #include "QXmppPep_p.h"
+#include "QXmppPubSubManager.h"
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -68,6 +69,7 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
 
 QXmppUserLocationManager::QXmppUserLocationManager()
 {
+    hooks().add<PubSub::EventReceived>(ns_geoloc, this, &QXmppUserLocationManager::handlePubSubEvent);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_geoloc.toString();
         features << ns_geoloc_notify.toString();
@@ -89,7 +91,7 @@ auto QXmppUserLocationManager::publish(const QXmppGeolocItem &item)
     return pubSub(client())->publishOwnPepItem(ns_geoloc.toString(), item);
 }
 
-bool QXmppUserLocationManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppUserLocationManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
     return Pep::handlePubSubEvent<Item>(element, pubSubService, nodeName, ns_geoloc.toString(), this, &QXmppUserLocationManager::itemReceived);
 }

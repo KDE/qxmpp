@@ -7,6 +7,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppPep_p.h"
+#include "QXmppPubSubManager.h"
 #include "QXmppUserTuneItem.h"
 
 using namespace QXmpp;
@@ -67,6 +68,7 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
 
 QXmppUserTuneManager::QXmppUserTuneManager()
 {
+    hooks().add<PubSub::EventReceived>(ns_tune, this, &QXmppUserTuneManager::handlePubSubEvent);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_tune);
         features << staticString(ns_tune_notify);
@@ -91,7 +93,7 @@ auto QXmppUserTuneManager::publish(const QXmppTuneItem &item)
     return pubSub(client())->publishOwnPepItem(staticString(ns_tune), item);
 }
 
-bool QXmppUserTuneManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppUserTuneManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
 {
     return Pep::handlePubSubEvent<Item>(element, pubSubService, nodeName, staticString(ns_tune), this, &QXmppUserTuneManager::itemReceived);
 }
