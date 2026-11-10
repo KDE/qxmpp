@@ -579,8 +579,9 @@ void tst_QXmppVCardManager::testSetClientVCard()
     vCardManager->requestClientVCard();
     QVERIFY(vCardSpy.wait());
 
-    // check our vcard has the correct address
-    QCOMPARE(vCardManager->clientVCard().from(), client->configuration().jidBare());
+    // check our vcard has the correct address (servers may omit it for the own account)
+    const auto vCardFrom = vCardManager->clientVCard().from();
+    QVERIFY2(vCardFrom.isEmpty() || vCardFrom == client->configuration().jidBare(), qPrintable(vCardFrom));
 
     // set a new vcard
     QXmppVCardIq newVCard;
@@ -595,7 +596,8 @@ void tst_QXmppVCardManager::testSetClientVCard()
 
     // reconnect
     client->disconnectFromServer();
-    QVERIFY(disconnectSpy.wait());
+    // may be emitted directly with a local server
+    QTRY_VERIFY(!disconnectSpy.isEmpty());
 
     client->connectToServer(config);
     QVERIFY2(connectSpy.wait(), "Could not connect to server!");
@@ -605,7 +607,7 @@ void tst_QXmppVCardManager::testSetClientVCard()
     QVERIFY(vCardSpy.wait());
 
     // check our vcard has been changed successfully
-    QCOMPARE(vCardManager->clientVCard().from(), client->configuration().jidBare());
+    QVERIFY(vCardManager->clientVCard().from().isEmpty() || vCardManager->clientVCard().from() == client->configuration().jidBare());
     QCOMPARE(vCardManager->clientVCard().firstName(), u"Bob"_s);
     QCOMPARE(vCardManager->clientVCard().birthday(), QDate(01, 02, 2000));
     QCOMPARE(vCardManager->clientVCard().email(), u"bob@qxmpp.org"_s);
@@ -615,7 +617,7 @@ void tst_QXmppVCardManager::testSetClientVCard()
 
     // disconnect
     client->disconnectFromServer();
-    QVERIFY(disconnectSpy.wait());
+    QTRY_COMPARE(disconnectSpy.size(), 2);
 }
 
 }  // namespace VCard

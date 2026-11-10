@@ -37,6 +37,8 @@
 #include <QBuffer>
 #include <QCoreApplication>
 #include <QMimeDatabase>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QObject>
 #include <QTimer>
 
@@ -470,7 +472,13 @@ void tst_QXmppHttpUploadManager::testUpload()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.addNewExtension<QXmppUploadRequestManager>();
-    auto *uploadManager = test.addNewExtension<QXmppHttpUploadManager>();
+    auto *netManager = new QNetworkAccessManager(&test);
+    if (IntegrationTests::ignoreSslErrors()) {
+        connect(netManager, &QNetworkAccessManager::sslErrors, netManager, [](QNetworkReply *reply, const QList<QSslError> &) {
+            reply->ignoreSslErrors();
+        });
+    }
+    auto *uploadManager = test.addNewExtension<QXmppHttpUploadManager>(netManager);
 
     test.connectToServer(IntegrationTests::clientConfiguration());
     QSignalSpy(&test, &QXmppClient::connected).wait();
@@ -517,9 +525,7 @@ void tst_QXmppHttpUploadManager::testUpload()
     // test signals
     QSignalSpy finishedSpy(upload.get(), &QXmppHttpUpload::finished);
     QSignalSpy progressSpy(upload.get(), &QXmppHttpUpload::progressChanged);
-    finishedSpy.wait();
-    QCOMPARE(finishedSpy.size(), 1);
-    QVERIFY(!progressSpy.empty());
+    QTRY_COMPARE(finishedSpy.size(), 1);
 
     // test result
     auto result = upload->result().value();
@@ -527,6 +533,7 @@ void tst_QXmppHttpUploadManager::testUpload()
         qDebug() << "Upload failed:" << std::get<QXmppError>(result).description;
         QVERIFY2(false, "Uploading the file failed");
     }
+    QVERIFY(!progressSpy.empty());
 
     auto url = expectVariant<QUrl>(std::move(result));
     QCOMPARE(upload->bytesSent(), 2280ULL);
