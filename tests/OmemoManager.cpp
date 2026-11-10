@@ -72,8 +72,9 @@ public:
                 return false;
             }
 
-            m_responseIq.setId(iq.id());
-            client()->reply(std::move(m_responseIq), e2eeMetadata);
+            auto response = m_responseIq;
+            response.setId(iq.id());
+            client()->reply(std::move(response), e2eeMetadata);
             return true;
         }
 
@@ -408,14 +409,17 @@ void tst_QXmppOmemoManager::testSendIq()
     awaitTask(m_alice1.manager->requestDeviceLists({ bobJid }));
     QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_alice1.manager->devices({ bobJid })).isEmpty(), 20'000);
 
+    // Via the e2ee provider, selected by the SelectEncryption hook
+    QObject owner;
+    m_alice1.client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+        selection.setEncryption(QXmpp::E2ee::Omemo2);
+    });
+
     // Bob can't handle the request and replies with an encrypted error.
     auto request = requestIq;
     auto result = awaitTask(m_alice1.client.sendSensitiveIq(std::move(request)));
     auto stanzaError = expectVariant<QXmppError>(std::move(result)).value<QXmppStanza::Error>();
     QVERIFY(stanzaError.has_value());
-    // The error is in the encrypted content, but QXmppClient::sendSensitiveIq() reports error
-    // responses before decrypting them.
-    QEXPECT_FAIL("", "Encrypted error responses are not decrypted", Continue);
     QCOMPARE(stanzaError->condition(), QXmppStanza::Error::FeatureNotImplemented);
 
     // Bob handles the request and replies with the encrypted result.
@@ -423,18 +427,26 @@ void tst_QXmppOmemoManager::testSendIq()
     m_bob.client.addExtension(iqHandler);
     auto cleanup = qScopeGuard([&] { m_bob.client.removeExtension(iqHandler); });
 
+    auto checkResult = [&](QXmppClient::IqResult &&result) {
+        QVERIFY(std::holds_alternative<QDomElement>(result));
+        if (const auto *response = std::get_if<QDomElement>(&result)) {
+            QVERIFY(isIqElement<QXmppBitsOfBinaryIq>(*response));
+            QXmppBitsOfBinaryIq resultIq;
+            resultIq.parse(*response);
+            QCOMPARE(resultIq.data(), responseIq.data());
+        }
+    };
+    request = requestIq;
+    checkResult(awaitTask(m_alice1.client.sendSensitiveIq(std::move(request))));
+
+    // Via the encryption extension like before
+    m_alice1.client.hooks(&owner).removeAll();
     request = requestIq;
     result = awaitTask(m_alice1.client.sendSensitiveIq(std::move(request)));
     // QXmppClient::sendSensitiveIq() and QXmppOmemoManager::encryptIq() copy the request into a
     // QXmppIq, which loses the payload of subclasses.
-    QEXPECT_FAIL("", "The payload of encrypted IQs is lost", Continue);
+    QEXPECT_FAIL("", "The payload of IQs encrypted via the encryption extension is lost", Continue);
     QVERIFY(std::holds_alternative<QDomElement>(result));
-    if (const auto *response = std::get_if<QDomElement>(&result)) {
-        QVERIFY(isIqElement<QXmppBitsOfBinaryIq>(*response));
-        QXmppBitsOfBinaryIq resultIq;
-        resultIq.parse(*response);
-        QCOMPARE(resultIq.data(), responseIq.data());
-    }
 
     finish(m_alice1);
     finish(m_bob);

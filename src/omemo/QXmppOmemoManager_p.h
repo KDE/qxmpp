@@ -110,6 +110,13 @@ struct DecryptionResult {
     QString sceTo;
 };
 
+// An IQ serialized with its payload, encrypted by the e2ee provider.
+struct SerializedIq {
+    QDomElement element;
+
+    QString to() const { return element.attribute(QStringLiteral("to")); }
+};
+
 struct IqDecryptionResult {
     QDomElement iq;
     QXmppE2eeMetadata e2eeMetadata;
@@ -205,6 +212,8 @@ public:
     QXmppTask<std::optional<QXmppMessage>> decryptMessage(QXmppMessage stanza);
     QXmppTask<QXmpp::E2ee::DecryptResult> decryptMessageContent(QXmppMessage stanza, QString senderJid);
     QXmppTask<QXmpp::E2ee::EncryptResult> encryptMessageContent(QXmppMessage message, QList<QString> recipientJids, TrustLevels acceptedTrustLevels);
+    QXmppTask<QXmpp::E2ee::EncryptResult> encryptIqContent(QDomElement iq, QList<QString> recipientJids, TrustLevels acceptedTrustLevels);
+    QXmppTask<QXmpp::E2ee::DecryptResult> decryptIqContent(QDomElement iq, QString senderJid);
     QXmppTask<std::optional<IqDecryptionResult>> decryptIq(QDomElement iqElement);
     template<typename T>
     QXmppTask<std::optional<DecryptionResult>> decryptStanza(T stanza,

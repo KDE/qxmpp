@@ -17,10 +17,12 @@
 #include "QXmppTrustMessageElement.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
+#include "QXmppXmlElement.h"
 
 #include "Async.h"
 #include "OmemoCryptoProvider.h"
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <protocol.h>
 
@@ -987,6 +989,62 @@ QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessageContent(QXmppMessag
     co_return encrypted;
 }
 
+// Encrypts the payload of an IQ for the provider.
+QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptIqContent(QDomElement iq, QList<QString> recipientJids, TrustLevels acceptedTrustLevels)
+{
+    if (!initialized) {
+        co_return QXmppError {
+            u"OMEMO manager must be initialized before encrypting"_s,
+            SendError::EncryptionError
+        };
+    }
+
+    auto omemoElement = co_await encryptStanza(SerializedIq { iq }, recipientJids, acceptedTrustLevels);
+    if (!omemoElement) {
+        co_return QXmppError {
+            u"OMEMO element could not be created"_s,
+            SendError::EncryptionError
+        };
+    }
+
+    Xml::Extensions elements;
+    elements.add(std::move(*omemoElement));
+    E2ee::Encrypted encrypted;
+    encrypted.setElements(std::move(elements));
+    co_return encrypted;
+}
+
+// Decrypts the payload of an IQ for the provider.
+QXmppTask<E2ee::DecryptResult> ManagerPrivate::decryptIqContent(QDomElement iqElement, QString senderJid)
+{
+    if (!initialized) {
+        co_return QXmppError { u"OMEMO manager must be initialized before decrypting"_s, {} };
+    }
+
+    QXmppOmemoIq iq;
+    iq.parse(iqElement);
+    const auto omemoElement = iq.omemoElement();
+    const auto omemoEnvelope = omemoElement.searchEnvelope(ownBareJid(), ownDevice.id);
+    if (!omemoEnvelope) {
+        co_return E2ee::NoEnvelope {};
+    }
+
+    const auto senderDeviceId = omemoElement.senderDeviceId();
+    subscribeToNewDeviceLists(senderJid, senderDeviceId);
+
+    auto decrypted = co_await decryptStanza(iq, senderJid, senderDeviceId, *omemoEnvelope, omemoElement.payload(), false).withContext(q);
+    if (!decrypted) {
+        co_return QXmppError { u"Couldn't decrypt OMEMO IQ"_s, {} };
+    }
+
+    E2ee::Decrypted result;
+    result.setContent(decrypted->sceContent);
+    result.setMetadata(decrypted->e2eeMetadata);
+    result.setSceFrom(decrypted->sceFrom);
+    result.setSceTo(decrypted->sceTo);
+    co_return result;
+}
+
 // Encrypts a message or IQ stanza.
 //
 // \a stanza is stanza to be encrypted. \a recipientJids is JIDs of the devices for whom the
@@ -1281,6 +1339,12 @@ QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
     sceEnvelopeWriter.writeContent([&writer, &stanza] {
         if constexpr (std::is_same_v<T, QXmppMessage>) {
             stanza.serializeExtensions(&writer, SceSensitive, staticString(ns_client));
+        } else if constexpr (std::is_same_v<T, SerializedIq>) {
+            // the payload or the error
+            XmlWriter w(&writer);
+            for (auto child = stanza.element.firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
+                Xml::Element::fromDom(child).toXml(w);
+            }
         } else {
             // If the IQ stanza contains an error (i.e., it is an error response), that error is
             // serialized instead of actual content.
