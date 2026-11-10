@@ -122,7 +122,8 @@ public:
             .decryptMessage = [](QXmpp::E2ee::DecryptRequest request) {
                 QXmpp::E2ee::Decrypted decrypted;
                 const auto body = request.message().extensions().get<MamTestEncrypted>()->body;
-                decrypted.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'><body xmlns='jabber:client'>"_s + body + u"</body></content>"_s));
+                const auto bodyXml = body.isEmpty() ? QString() : u"<body xmlns='jabber:client'>"_s + body + u"</body>"_s;
+                decrypted.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'>"_s + bodyXml + u"</content>"_s));
                 return makeReadyTask<QXmpp::E2ee::DecryptResult>(std::move(decrypted));
             },
         });
@@ -597,6 +598,7 @@ private:
 
     Q_SLOT void testHandleStanza_data();
     Q_SLOT void testHandleStanza();
+    Q_SLOT void pipeline();
 
     QXmppCarbonTestHelper m_helper;
     MessageHandler *m_messageHandler;
@@ -881,6 +883,42 @@ void tst_QXmppCarbonManager::testHandleStanza()
             QCOMPARE(m_messageHandler->received.size(), size_t(0));
         }
     }
+}
+
+void tst_QXmppCarbonManager::pipeline()
+{
+    using namespace QXmpp::Messages;
+
+    QXmpp::Xml::Registry::registerEncryptedContainer<Mam::MamTestEncrypted>(QXmpp::Xml::Scope::Message);
+    auto cleanup = qScopeGuard([] { QXmpp::Xml::Registry::unregisterElement<Mam::MamTestEncrypted>(); });
+
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.addNewExtension<Mam::MamTestE2eeManager>();
+    auto *carbons = test.addNewExtension<QXmppCarbonManagerV2>();
+
+    QObject owner;
+    QStringList received;
+    test.hooks(&owner).add<Received>([&](Context &context) {
+        received << QString::number(int(context.origin())) + u' ' + context.senderJid() + u' ' + context.conversationJid() + u' ' + context.message().body();
+        return QXmpp::HookResult::Continue;
+    });
+
+    auto carbon = [](const QString &type, const QString &from, const QString &to, const QString &content) {
+        return u"<message xmlns='jabber:client' from='juliet@capulet.lit' to='juliet@capulet.lit/balcony' type='chat'><%1 xmlns='urn:xmpp:carbons:2'><forwarded xmlns='urn:xmpp:forward:0'><message xmlns='jabber:client' from='%2' to='%3' type='chat'>%4</message></forwarded></%1></message>"_s.arg(type, from, to, content);
+    };
+    carbons->handleStanza(xmlToDom(carbon(u"received"_s, u"romeo@montague.lit/orchard"_s, u"juliet@capulet.lit/chamber"_s, u"<body>hi</body>"_s)), std::nullopt);
+    carbons->handleStanza(xmlToDom(carbon(u"sent"_s, u"juliet@capulet.lit/chamber"_s, u"romeo@montague.lit/orchard"_s, u"<body>hello</body>"_s)), std::nullopt);
+    // encrypted without body, e.g. a reaction: the fallback body is not the body
+    carbons->handleStanza(xmlToDom(carbon(u"sent"_s, u"juliet@capulet.lit/chamber"_s, u"romeo@montague.lit/orchard"_s,
+                                          u"<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body=''/>"_s)),
+                          std::nullopt);
+
+    QCOMPARE(received, (QStringList {
+                           QString::number(int(Origin::CarbonReceived)) + u" romeo@montague.lit romeo@montague.lit hi"_s,
+                           QString::number(int(Origin::CarbonSent)) + u" juliet@capulet.lit romeo@montague.lit hello"_s,
+                           QString::number(int(Origin::CarbonSent)) + u" juliet@capulet.lit romeo@montague.lit "_s,
+                       }));
 }
 
 }  // namespace Carbon

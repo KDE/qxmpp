@@ -42,6 +42,7 @@ public:
     ParsedMessage parse(const QDomElement &element, QXmppE2eeExtension *legacyEncryption) const;
     void processElement(const QDomElement &element, QXmppE2eeExtension *legacyEncryption);
     void process(Messages::Context &&context);
+    void process(Messages::Context &&context, QStringView encryption) { process(std::move(context), encryption, {}); }
     // Processes a message without delivering it, e.g. of an archive query.
     QXmppTask<CollectResult> collect(Messages::Context &&context, QStringView encryption);
 

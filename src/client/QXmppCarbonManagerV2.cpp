@@ -5,9 +5,12 @@
 #include "QXmppCarbonManagerV2.h"
 
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager_p.h"
+#include "QXmppIncomingMessages_p.h"
 #include "QXmppMessage.h"
+#include "QXmppMessageContext.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppUtils_p.h"
 
@@ -139,11 +142,15 @@ bool QXmppCarbonManagerV2::handleStanza(const QDomElement &element, const std::o
         return false;
     }
 
-    QXmppMessage message;
-    message.parse(messageElement);
-    message.setCarbonForwarded(true);
+    using Messages::Origin;
+    const auto origin = carbon.tagName() == u"sent" ? Origin::CarbonSent : Origin::CarbonReceived;
 
-    injectMessage(std::move(message));
+    // parsed like messages from the stream, so encrypted messages are only parsed publicly
+    auto &incomingMessages = client()->d->incomingMessages;
+    auto parsed = incomingMessages.parse(messageElement, client()->encryptionExtension());
+    parsed.message.setCarbonForwarded(true);
+
+    incomingMessages.process(Messages::Context(std::move(parsed.message), origin), parsed.encryption);
     return true;
 }
 
