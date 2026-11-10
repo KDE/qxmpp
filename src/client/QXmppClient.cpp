@@ -481,6 +481,10 @@ bool QXmppClient::insertExtension(int index, QXmppClientExtension *extension)
         qWarning("Cannot add extension, it has already been added");
         return false;
     }
+    if (extension->client()) {
+        qWarning("Cannot add extension, it has already been added to another client");
+        return false;
+    }
 
     extension->setParent(this);
     d->extensions.insert(index, extension);

@@ -74,6 +74,7 @@ class tst_QXmppClient : public QObject
 private:
     Q_SLOT void testSendMessage();
     Q_SLOT void testIndexOfExtension();
+    Q_SLOT void testExtensionInOtherClient();
     Q_SLOT void testE2eeExtension();
     Q_SLOT void testTaskDirect();
     Q_SLOT void testTaskStore();
@@ -166,6 +167,20 @@ void tst_QXmppClient::testIndexOfExtension()
     // These extensions are in the list.
     QCOMPARE(client->indexOfExtension<QXmppRosterManager>(), 0);
     QCOMPARE(client->indexOfExtension<QXmppVCardManager>(), 1);
+}
+
+void tst_QXmppClient::testExtensionInOtherClient()
+{
+    QXmppClient client(QXmppClient::NoExtensions);
+    QXmppClient otherClient(QXmppClient::NoExtensions);
+
+    auto *extension = client.addNewExtension<QXmppVersionManager>();
+
+    QTest::ignoreMessage(QtWarningMsg, "Cannot add extension, it has already been added to another client");
+    QVERIFY(!otherClient.addExtension(extension));
+    QCOMPARE(extension->parent(), &client);
+    QVERIFY(client.extensions().contains(extension));
+    QVERIFY(otherClient.extensions().isEmpty());
 }
 
 class EncryptionExtension : public QXmppE2eeExtension
