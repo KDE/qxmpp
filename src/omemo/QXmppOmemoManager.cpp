@@ -316,6 +316,12 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     d->schedulePeriodicTasks();
 
     hooks().add<PubSub::EventReceived>(ns_omemo_2_devices, this, &QXmppOmemoManager::handlePubSubEvent);
+    E2ee::Providers(hooks()).add(E2ee::Provider {
+        .encryption = E2ee::Omemo2,
+        .decryptMessage = [this](E2ee::DecryptRequest request) {
+            return d->decryptMessageContent(request.message(), request.senderJid());
+        },
+    });
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_omemo_2_devices + u"+notify";
     });
@@ -1018,23 +1024,6 @@ bool Manager::handleStanza(const QDomElement &stanza)
         }
     });
     return true;
-}
-
-bool Manager::handleMessage(const QXmppMessage &message)
-{
-    if (d->initialized && message.omemoElement()) {
-        d->decryptMessage(message).then(this, [this, message](std::optional<QXmppMessage> optionalDecryptedMessage) {
-            if (optionalDecryptedMessage) {
-                injectMessage(std::move(*optionalDecryptedMessage));
-            } else {
-                Q_EMIT client()->messageReceived(message);
-            }
-        });
-
-        return true;
-    }
-
-    return false;
 }
 
 /*!

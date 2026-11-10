@@ -12,6 +12,8 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppGlobal.h"
 #include "QXmppMessage.h"
+#include "QXmppMessageContext.h"
+#include "QXmppMessages.h"
 #include "QXmppMixInfoItem.h"
 #include "QXmppMixInvitation.h"
 #include "QXmppMixIq.h"
@@ -455,6 +457,14 @@ QXmppMixManager::QXmppMixManager()
     for (auto node : { ns_mix_node_allowed, ns_mix_node_banned, ns_mix_node_config, ns_mix_node_info, ns_mix_node_participants }) {
         hooks().add<PubSub::EventReceived>(node, this, &QXmppMixManager::handlePubSubEvent);
     }
+    // The channel stamps the real JID of the sender of channel messages (XEP-0405).
+    hooks().add<Messages::ResolveSender>([](Messages::Context &context) {
+        const auto &message = context.message();
+        if (message.type() == QXmppMessage::GroupChat && !message.mixUserJid().isEmpty()) {
+            context.setSenderJid(QXmppUtils::jidToBareJid(message.mixUserJid()));
+        }
+        return HookResult::Continue;
+    });
 }
 
 QXmppMixManager::~QXmppMixManager() = default;

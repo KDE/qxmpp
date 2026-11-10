@@ -1359,6 +1359,60 @@ QXmppTask<std::optional<QXmppMessage>> ManagerPrivate::decryptMessage(QXmppMessa
     co_return {};
 }
 
+// Decrypts the content of a message for the e2ee provider.
+//
+// \a senderJid is the real sender resolved by the message pipeline (e.g. by MUC). The pipeline
+// merges the content and checks the SCE affixes.
+QXmppTask<E2ee::DecryptResult> ManagerPrivate::decryptMessageContent(QXmppMessage stanza, QString senderJid)
+{
+    if (!initialized) {
+        co_return QXmppError { u"OMEMO manager must be initialized before decrypting"_s, {} };
+    }
+
+    const auto omemoElement = stanza.omemoElement();
+    if (!omemoElement) {
+        co_return QXmppError { u"Message contains no OMEMO element"_s, {} };
+    }
+
+    const auto omemoEnvelope = omemoElement->searchEnvelope(ownBareJid(), ownDevice.id);
+    if (!omemoEnvelope) {
+        co_return E2ee::NoEnvelope {};
+    }
+
+    const auto senderDeviceId = omemoElement->senderDeviceId();
+    const auto omemoPayload = omemoElement->payload();
+
+    subscribeToNewDeviceLists(senderJid, senderDeviceId);
+
+    // Empty OMEMO messages are sent by a receiver of this device's first OMEMO message after
+    // building the initial session or by devices building a new session with this device.
+    if (omemoPayload.isEmpty()) {
+        auto payloadDecryptionData = co_await extractPayloadDecryptionData(senderJid, senderDeviceId, *omemoEnvelope).withContext(q);
+        if (!payloadDecryptionData) {
+            co_return QXmppError { u"Empty OMEMO message could not be successfully processed"_s, {} };
+        }
+        q->debug(u"Successfully processed empty OMEMO message"_s);
+
+        QXmppE2eeMetadata metadata;
+        metadata.setEncryption(Omemo2);
+        E2ee::Decrypted result;
+        result.setMetadata(metadata);
+        co_return result;
+    }
+
+    auto decrypted = co_await decryptStanza(stanza, senderJid, senderDeviceId, *omemoEnvelope, omemoPayload).withContext(q);
+    if (!decrypted) {
+        co_return QXmppError { u"Couldn't decrypt OMEMO message"_s, {} };
+    }
+
+    E2ee::Decrypted result;
+    result.setContent(decrypted->sceContent);
+    result.setMetadata(decrypted->e2eeMetadata);
+    result.setSceFrom(decrypted->sceFrom);
+    result.setSceTo(decrypted->sceTo);
+    co_return result;
+}
+
 // Decrypts an IQ stanza.
 //
 // The payload is decrypted and set as the content (i.e., first child element) of the returned
@@ -1456,7 +1510,7 @@ QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanz
     const auto &senderDevice = devices.value(senderJid).value(senderDeviceId);
     e2eeMetadata.setSenderKey(senderDevice.keyId);
 
-    co_return DecryptionResult { sceEnvelopeReader.contentElement(), std::move(e2eeMetadata) };
+    co_return DecryptionResult { sceEnvelopeReader.contentElement(), std::move(e2eeMetadata), sceEnvelopeReader.from(), sceEnvelopeReader.to() };
 }
 
 // Extracts the SCE envelope from an OMEMO payload.

@@ -8,6 +8,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppE2eeProvider.h"
 #include "QXmppOmemoDeviceBundle_p.h"
 #include "QXmppOmemoManager.h"
 #include "QXmppOmemoStorage.h"
@@ -104,6 +105,9 @@ struct PayloadEncryptionResult {
 struct DecryptionResult {
     QDomElement sceContent;
     QXmppE2eeMetadata e2eeMetadata;
+    // SCE affixes
+    QString sceFrom;
+    QString sceTo;
 };
 
 struct IqDecryptionResult {
@@ -199,6 +203,7 @@ public:
     std::optional<OmemoEnvelopeData> createOmemoEnvelopeData(const signal_protocol_address &address, const SecureByteArray &payloadDecryptionData) const;
 
     QXmppTask<std::optional<QXmppMessage>> decryptMessage(QXmppMessage stanza);
+    QXmppTask<QXmpp::E2ee::DecryptResult> decryptMessageContent(QXmppMessage stanza, QString senderJid);
     QXmppTask<std::optional<IqDecryptionResult>> decryptIq(QDomElement iqElement);
     template<typename T>
     QXmppTask<std::optional<DecryptionResult>> decryptStanza(T stanza,

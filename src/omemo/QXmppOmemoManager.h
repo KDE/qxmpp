@@ -7,7 +7,6 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
-#include "QXmppMessageHandler.h"
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
@@ -64,7 +63,7 @@ private:
     QSharedDataPointer<QXmppOmemoDevicePrivate> d;
 };
 
-class QXMPPOMEMO_EXPORT QXmppOmemoManager : public QXmppClientExtension, public QXmppE2eeExtension, public QXmppMessageHandler
+class QXMPPOMEMO_EXPORT QXmppOmemoManager : public QXmppClientExtension, public QXmppE2eeExtension
 {
     Q_OBJECT
 
@@ -136,7 +135,6 @@ public:
     bool isEncrypted(const QXmppMessage &) override;
 
     bool handleStanza(const QDomElement &stanza) override;
-    bool handleMessage(const QXmppMessage &message) override;
 
     Q_SIGNAL void trustLevelsChanged(const QMultiHash<QString, QByteArray> &modifiedKeys);
 
