@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppAsync_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppE2eeProvider.h"
 #include "QXmppMamManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
@@ -78,6 +80,9 @@ private:
     Q_SLOT void resolveSenderArchive();
     Q_SLOT void sendMessage();
     Q_SLOT void sendMessageError();
+    Q_SLOT void sendMessageForgedReflection();
+    Q_SLOT void sendMessageConsumedReflection();
+    Q_SLOT void sendMessageEncrypted();
     Q_SLOT void sendPrivateMessage();
     Q_SLOT void moderateMessage();
     Q_SLOT void messageRetractedReceived();
@@ -1427,6 +1432,126 @@ void tst_QXmppMuc::resolveSenderArchive()
     QCOMPARE(senders, QStringList { expectedSender });
 }
 
+// encrypts nothing, records the recipients
+class MucTestE2eeManager : public QXmppClientExtension
+{
+    Q_OBJECT
+public:
+    static constexpr QStringView Encryption = u"urn:test:muc-e2ee";
+
+    MucTestE2eeManager()
+    {
+        QXmpp::E2ee::Providers(hooks()).add(QXmpp::E2ee::Provider {
+            .encryption = Encryption,
+            .encryptMessage = [this](QXmpp::E2ee::EncryptRequest request) {
+                recipientJids = request.recipientJids();
+                return makeReadyTask<QXmpp::E2ee::EncryptResult>(QXmpp::E2ee::Encrypted());
+            },
+        });
+    }
+
+    QList<QString> recipientJids;
+};
+
+static QString sentOriginId(TestClient &test)
+{
+    QXmppMessage sent;
+    parsePacket(sent, test.takePacket().toUtf8());
+    return sent.originId();
+}
+
+static QString reflection(const QString &nick, const QString &originId)
+{
+    return u"<message from='coven@chat.shakespeare.lit/"_s + nick + u"' type='groupchat'><body>Hi</body>"
+                                                                    "<origin-id xmlns='urn:xmpp:sid:0' id='"_s +
+        originId + u"'/></message>"_s;
+}
+
+void tst_QXmppMuc::sendMessageForgedReflection()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    QXmppMessage message;
+    message.setBody(u"Hi"_s);
+    auto task = room.sendMessage(std::move(message));
+    const auto originId = sentOriginId(test);
+
+    // another occupant sends a message with the same origin ID
+    test.injectMessage(reflection(u"firstwitch"_s, originId));
+    QVERIFY(!task.isFinished());
+
+    test.injectMessage(reflection(u"thirdwitch"_s, originId));
+    expectFutureVariant<QXmpp::Success>(task);
+}
+
+void tst_QXmppMuc::sendMessageConsumedReflection()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    // the application consumes all messages
+    QObject owner;
+    test.hooks(&owner).add<QXmpp::Messages::Received>([](QXmpp::Messages::Context &) { return QXmpp::HookResult::Stop; });
+
+    // also messages sent via QXmppClient::send() wait for the reflection
+    QXmppMessage message(u"hag66@shakespeare.lit/pda"_s, u"coven@chat.shakespeare.lit"_s, u"Hi"_s);
+    message.setType(QXmppMessage::GroupChat);
+    auto task = test.send(std::move(message));
+    const auto originId = sentOriginId(test);
+    QVERIFY(!originId.isEmpty());
+    QVERIFY(!task.isFinished());
+
+    test.injectMessage(reflection(u"thirdwitch"_s, originId));
+    QVERIFY(expectFutureVariant<QXmpp::SendSuccess>(task).acknowledged);
+}
+
+void tst_QXmppMuc::sendMessageEncrypted()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *e2ee = test.addNewExtension<MucTestE2eeManager>();
+    auto room = joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, { u"muc_nonanonymous"_s });
+
+    for (const auto &[nick, jid] : { std::pair { u"firstwitch"_s, u"crone1@shakespeare.lit/desktop"_s }, std::pair { u"secondwitch"_s, u"crone2@shakespeare.lit/laptop"_s } }) {
+        QXmppPresence presence;
+        parsePacket(presence, (u"<presence from='coven@chat.shakespeare.lit/"_s + nick + u"'>"
+                                                                                         "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                                                                                         "<item affiliation='member' role='participant' jid='"_s +
+                               jid + u"'/></x></presence>"_s)
+                                  .toUtf8());
+        test.injectPresence(presence);
+    }
+
+    QObject owner;
+    test.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+        selection.setEncryption(MucTestE2eeManager::Encryption);
+    });
+
+    QXmppMessage message;
+    message.setBody(u"Hi"_s);
+    auto task = room.sendMessage(std::move(message));
+
+    // encrypted for the occupants instead of the room
+    auto recipients = e2ee->recipientJids;
+    std::ranges::sort(recipients);
+    QCOMPARE(recipients, (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone2@shakespeare.lit"_s }));
+
+    // the reflection is matched by the public origin ID
+    const auto originId = sentOriginId(test);
+    QVERIFY(!originId.isEmpty());
+    test.injectMessage(reflection(u"thirdwitch"_s, originId));
+    expectFutureVariant<QXmpp::Success>(task);
+}
+
 void tst_QXmppMuc::moderateMessage()
 {
     TestClient test(true);
@@ -1595,15 +1720,11 @@ void tst_QXmppMuc::sendMessage()
     QVERIFY(!sentMsg.originId().isEmpty());
 
     // Inject reflected message with same origin-id
-    QXmppMessage reflected;
-    parsePacket(reflected,
-                QStringLiteral("<message from='coven@chat.shakespeare.lit/thirdwitch' type='groupchat'>"
-                               "<body>Thrice the brinded cat hath mew'd.</body>"
-                               "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
-                               "</message>")
-                    .arg(sentMsg.originId())
-                    .toUtf8());
-    muc->handleMessage(reflected);
+    test.injectMessage(QStringLiteral("<message from='coven@chat.shakespeare.lit/thirdwitch' type='groupchat'>"
+                                      "<body>Thrice the brinded cat hath mew'd.</body>"
+                                      "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
+                                      "</message>")
+                           .arg(sentMsg.originId()));
 
     QVERIFY(sendTask.isFinished());
     expectVariant<QXmpp::Success>(sendTask.result());
@@ -1629,17 +1750,13 @@ void tst_QXmppMuc::sendMessageError()
     parsePacket(sentMsg, sent.toUtf8());
 
     // Inject error response with same origin-id
-    QXmppMessage errorMsg;
-    parsePacket(errorMsg,
-                QStringLiteral("<message from='coven@chat.shakespeare.lit' type='error'>"
-                               "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
-                               "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
-                               "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>You are not allowed to send messages</text>"
-                               "</error>"
-                               "</message>")
-                    .arg(sentMsg.originId())
-                    .toUtf8());
-    muc->handleMessage(errorMsg);
+    test.injectMessage(QStringLiteral("<message from='coven@chat.shakespeare.lit' type='error'>"
+                                      "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
+                                      "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                                      "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>You are not allowed to send messages</text>"
+                                      "</error>"
+                                      "</message>")
+                           .arg(sentMsg.originId()));
 
     QVERIFY(sendTask.isFinished());
     auto error = expectVariant<QXmppError>(sendTask.result());
@@ -1731,15 +1848,11 @@ void tst_QXmppMuc::setSubject()
     QVERIFY(!sentMsg.originId().isEmpty());
 
     // Inject reflected subject message with same origin-id
-    QXmppMessage reflected;
-    parsePacket(reflected,
-                QStringLiteral("<message from='coven@chat.shakespeare.lit/thirdwitch' type='groupchat'>"
-                               "<subject>New Spells</subject>"
-                               "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
-                               "</message>")
-                    .arg(sentMsg.originId())
-                    .toUtf8());
-    muc->handleMessage(reflected);
+    test.injectMessage(QStringLiteral("<message from='coven@chat.shakespeare.lit/thirdwitch' type='groupchat'>"
+                                      "<subject>New Spells</subject>"
+                                      "<origin-id xmlns='urn:xmpp:sid:0' id='%1'/>"
+                                      "</message>")
+                           .arg(sentMsg.originId()));
 
     QVERIFY(subjectTask.isFinished());
     expectVariant<QXmpp::Success>(subjectTask.result());

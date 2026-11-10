@@ -52,5 +52,6 @@ echo "export QXMPP_JID=alice@localhost"
 echo "export QXMPP_PASSWORD=$PASSWORD"
 echo "export QXMPP_JID_2=bob@localhost"
 echo "export QXMPP_PASSWORD_2=$PASSWORD"
+echo "export QXMPP_TESTS_MUC_SERVICE=muc.localhost"
 # the certificate of HTTP File Upload is self-signed
 echo "export QXMPP_TESTS_IGNORE_SSL_ERRORS=1"

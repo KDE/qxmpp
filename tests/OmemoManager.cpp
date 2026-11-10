@@ -16,7 +16,10 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppMessage.h"
+#include "QXmppMessageContext.h"
 #include "QXmppMessages.h"
+#include "QXmppMucForms.h"
+#include "QXmppMucManagerV2.h"
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoManager.h"
 #include "QXmppOmemoManager_p.h"
@@ -42,6 +45,7 @@ struct OmemoUser {
     QXmppLogger logger;
     QXmppOmemoManager *manager = nullptr;
     QXmppCarbonManagerV2 *carbonManager = nullptr;
+    QXmppMucManagerV2 *mucManager = nullptr;
     QXmppDiscoveryManager *discoveryManager = nullptr;
     QXmppPubSubManager *pubSubManager = nullptr;
     std::unique_ptr<QXmppOmemoMemoryStorage> omemoStorage;
@@ -95,6 +99,7 @@ private:
     Q_SLOT void testLoad();
     Q_SLOT void testSendMessage();
     Q_SLOT void testSendIq();
+    Q_SLOT void testMucMessage();
     Q_SLOT void finish(OmemoUser &omemoUser);
 
     OmemoUser m_alice1;
@@ -165,6 +170,9 @@ void tst_QXmppOmemoManager::initOmemoUser(OmemoUser &omemoUser)
 
     omemoUser.carbonManager = new QXmppCarbonManagerV2;
     omemoUser.client.addExtension(omemoUser.carbonManager);
+
+    omemoUser.mucManager = new QXmppMucManagerV2;
+    omemoUser.client.addExtension(omemoUser.mucManager);
 
     omemoUser.logger.setLoggingType(QXmppLogger::SignalLogging);
     omemoUser.client.setLogger(&omemoUser.logger);
@@ -428,6 +436,73 @@ void tst_QXmppOmemoManager::testSendIq()
         QCOMPARE(resultIq.data(), responseIq.data());
     }
 
+    finish(m_alice1);
+    finish(m_bob);
+}
+
+void tst_QXmppOmemoManager::testMucMessage()
+{
+    SKIP_IF_INTEGRATION_TESTS_DISABLED()
+    if (!IntegrationTests::secondAccountAvailable()) {
+        QSKIP("Export 'QXMPP_JID_2' and 'QXMPP_PASSWORD_2' for a second account.");
+    }
+    const auto mucService = qEnvironmentVariable("QXMPP_TESTS_MUC_SERVICE");
+    if (mucService.isEmpty()) {
+        QSKIP("Export 'QXMPP_TESTS_MUC_SERVICE' with the JID of a MUC service.");
+    }
+
+    const auto configAlice = IntegrationTests::clientConfiguration();
+    const auto configBob = IntegrationTests::secondClientConfiguration();
+    QVERIFY(connectAndSetUp(m_alice1, configAlice));
+    QVERIFY(connectAndSetUp(m_bob, configBob));
+    awaitTask(m_alice1.manager->requestDeviceLists({ configBob.jidBare() }));
+    awaitTask(m_bob.manager->requestDeviceLists({ configAlice.jidBare() }));
+    QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_alice1.manager->devices({ configBob.jidBare() })).isEmpty(), 20'000);
+    QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_bob.manager->devices({ configAlice.jidBare() })).isEmpty(), 20'000);
+
+    // non-anonymous room, as needed for OMEMO
+    auto created = awaitTask(m_alice1.mucManager->createRoom(mucService, u"alice"_s, QXmppUtils::generateStanzaUuid().toLower()));
+    auto room = expectVariant<QXmppMucRoomV2>(std::move(created));
+    QTRY_VERIFY_WITH_TIMEOUT(room.roomConfig().value().has_value(), 20'000);
+    auto config = *room.roomConfig().value();
+    config.setWhoCanDiscoverJids(QXmppMucRoomConfig::WhoCanDiscoverJids::Anyone);
+    expectVariant<QXmpp::Success>(awaitTask(room.setRoomConfig(config)));
+    auto cleanup = qScopeGuard([&] { awaitTask(room.destroyRoom()); });
+
+    expectVariant<QXmppMucRoomV2>(awaitTask(m_bob.mucManager->joinRoom(room.jid(), u"bob"_s)));
+    QTRY_VERIFY_WITH_TIMEOUT(room.participants().size() >= 2, 20'000);
+
+    // the sender is resolved before the decryption
+    QStringList bobSenders;
+    QObject owner;
+    m_bob.client.hooks(&owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &context) {
+        if (context.decryptionState() == QXmpp::Messages::DecryptionState::Decrypted) {
+            bobSenders << context.senderJid();
+        }
+        return QXmpp::HookResult::Continue;
+    });
+    QSignalSpy bobReceivedSpy(m_bob.mucManager, &QXmppMucManagerV2::messageReceived);
+    m_alice1.client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+        selection.setEncryption(QXmpp::E2ee::Omemo2);
+    });
+
+    // encrypted for the occupants, finishes with the reflection of the room
+    QXmppMessage message;
+    message.setBody(u"Hello room!"_s);
+    expectVariant<QXmpp::Success>(awaitTask(room.sendMessage(std::move(message))));
+
+    // Bob decrypts it with the keys of the real sender
+    QTRY_VERIFY_WITH_TIMEOUT(std::ranges::any_of(bobReceivedSpy, [](const QList<QVariant> &arguments) {
+                                 const auto message = arguments.at(1).value<QXmppMessage>();
+                                 return message.e2eeMetadata() && message.body() == u"Hello room!";
+                             }),
+                             20'000);
+    QCOMPARE(bobSenders, QStringList { configAlice.jidBare() });
+
+    m_alice1.client.hooks(&owner).removeAll();
+    m_bob.client.hooks(&owner).removeAll();
+    cleanup.dismiss();
+    awaitTask(room.destroyRoom());
     finish(m_alice1);
     finish(m_bob);
 }

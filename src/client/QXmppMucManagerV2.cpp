@@ -426,6 +426,9 @@ QXmppMucManagerV2::QXmppMucManagerV2()
         features << ns_message_retract.toString();
     });
     hooks().add<Messages::ResolveSender>(d.get(), &QXmppMucManagerV2Private::resolveSender);
+    hooks().add<Messages::Prepare>(d.get(), &QXmppMucManagerV2Private::prepareMessage);
+    hooks().add<Messages::ResolveRecipients>(d.get(), &QXmppMucManagerV2Private::resolveRecipients);
+    hooks().add<Messages::ConfirmDelivery>(d.get(), &QXmppMucManagerV2Private::confirmDelivery);
 }
 
 QXmppMucManagerV2::~QXmppMucManagerV2() = default;
@@ -782,15 +785,8 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         return uncheckedMessage;
     }();
 
-    // Handle error responses to sent messages
+    // Error responses to sent messages are handled by resolveSender().
     if (message.type() == QXmppMessage::Error) {
-        if (auto originId = message.originId(); !originId.isEmpty()) {
-            if (auto pendingItr = data.pendingMessages.find(originId); pendingItr != data.pendingMessages.end()) {
-                pendingItr->second.promise.finish(QXmppError { message.error().text(), message.error() });
-                data.pendingMessages.erase(pendingItr);
-                return true;
-            }
-        }
         return false;
     }
 
@@ -830,13 +826,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
     case MucRoomState::Joined:
         // XEP-0410: any incoming stanza on a joined room counts as activity.
         data.lastActivity = std::chrono::steady_clock::now();
-        // Check for reflected message (match by origin-id)
-        if (auto originId = message.originId(); !originId.isEmpty()) {
-            if (auto pendingItr = data.pendingMessages.find(originId); pendingItr != data.pendingMessages.end()) {
-                pendingItr->second.promise.finish(Success());
-                data.pendingMessages.erase(pendingItr);
-            }
-        }
+        // Reflections of sent messages are handled by resolveSender().
         // XEP-0424: Message Retraction / XEP-0425: Moderated Message Retraction.
         // The retraction is signalled separately via messageRetracted(), but the message is
         // intentionally not consumed here: it still flows through to messageReceived() below so
@@ -1842,13 +1832,35 @@ HookResult QXmppMucManagerV2Private::resolveSender(Messages::Context &context)
     using enum HookResult;
 
     const auto &message = context.message();
-    if (message.type() != QXmppMessage::GroupChat) {
+    if (message.type() != QXmppMessage::GroupChat && message.type() != QXmppMessage::Error) {
         return Continue;
     }
 
     const auto roomJid = QXmppUtils::jidToBareJid(message.from());
     auto roomItr = activeRooms.find(roomJid);
     if (roomItr == activeRooms.end()) {
+        return Continue;
+    }
+
+    // confirms the delivery of a sent message, see confirmDelivery()
+    auto &roomData = *roomItr->second;
+    if (auto pendingItr = roomData.pendingMessages.find(message.originId());
+        !message.originId().isEmpty() && pendingItr != roomData.pendingMessages.end()) {
+        if (message.type() == QXmppMessage::Error) {
+            auto promise = std::move(pendingItr->second.promise);
+            roomData.pendingMessages.erase(pendingItr);
+            promise.finish(QXmppError { message.error().text(), message.error() });
+            // the error is reported to the sender
+            return Stop;
+        }
+        // only the room reflects the message with the own nickname
+        if (context.origin() != Messages::Origin::Mam && QXmppUtils::jidToResource(message.from()) == roomData.nickname.value()) {
+            auto promise = std::move(pendingItr->second.promise);
+            roomData.pendingMessages.erase(pendingItr);
+            promise.finish(Success());
+        }
+    }
+    if (message.type() != QXmppMessage::GroupChat) {
         return Continue;
     }
     context.setConversationJid(roomJid);
@@ -1893,6 +1905,80 @@ HookResult QXmppMucManagerV2Private::resolveSender(Messages::Context &context)
         context.setSenderJid(QXmppUtils::jidToBareJid(jid));
     }
     return Continue;
+}
+
+// The joined room a groupchat message is sent to.
+MucRoomData *QXmppMucManagerV2Private::joinedRoom(const QXmppMessage &message)
+{
+    if (message.type() != QXmppMessage::GroupChat) {
+        return nullptr;
+    }
+    auto itr = activeRooms.find(QXmppUtils::jidToBareJid(message.to()));
+    if (itr == activeRooms.end() || itr->second->state != MucRoomState::Joined) {
+        return nullptr;
+    }
+    return itr->second.get();
+}
+
+HookResult QXmppMucManagerV2Private::prepareMessage(Messages::OutgoingMessage &outgoing)
+{
+    // the origin ID identifies the reflection of the message (XEP-0359)
+    auto &message = outgoing.message();
+    if (joinedRoom(message) && message.originId().isEmpty()) {
+        message.setOriginId(QXmppUtils::generateStanzaUuid());
+    }
+    return HookResult::Continue;
+}
+
+QXmppTask<void> QXmppMucManagerV2Private::resolveRecipients(Messages::OutgoingMessage &outgoing)
+{
+    auto *data = joinedRoom(outgoing.message());
+    // recipients set by the sender are kept
+    if (!data || outgoing.recipientJids() != QList<QString> { data->roomJid }) {
+        co_return;
+    }
+
+    // the occupants with a known real JID, in anonymous rooms there are none
+    QList<QString> recipients;
+    const auto self = data->selfParticipant.value();
+    for (const auto &[_, participant] : data->participants) {
+        if (participant == self) {
+            continue;
+        }
+        if (auto jid = QXmppUtils::jidToBareJid(participant->jid.value()); !jid.isEmpty() && !recipients.contains(jid)) {
+            recipients.append(jid);
+        }
+    }
+    outgoing.recipientJids() = recipients;
+}
+
+// Waits for the reflection of a message sent to a joined room or an error.
+QXmppTask<void> QXmppMucManagerV2Private::confirmDelivery(const Messages::OutgoingMessage &outgoing, SendResult &result)
+{
+    auto *data = joinedRoom(outgoing.message());
+    const auto originId = outgoing.message().originId();
+    if (!data || originId.isEmpty() || data->pendingMessages.contains(originId)) {
+        co_return;
+    }
+
+    QXmppPromise<Result<>> promise;
+    auto reflected = promise.task();
+
+    auto *timer = new QTimer();
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, q, [this, roomJid = data->roomJid, originId]() {
+        handleMessageTimeout(roomJid, originId);
+    });
+    data->pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
+    timer->start(timeout);
+
+    // result stays valid until this has finished
+    if (auto reflectionResult = co_await reflected.withContext(q); std::holds_alternative<QXmppError>(reflectionResult)) {
+        result = std::get<QXmppError>(std::move(reflectionResult));
+    } else {
+        // the room has processed the message
+        result = SendSuccess { true };
+    }
 }
 
 void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, const QString &originId)
@@ -2428,25 +2514,14 @@ QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
 
     message.setTo(m_data->roomJid);
     message.setType(QXmppMessage::GroupChat);
-    if (message.originId().isEmpty()) {
-        message.setOriginId(QXmppUtils::generateStanzaUuid());
-    }
-    auto originId = message.originId();
 
-    QXmppPromise<Result<>> promise;
-    auto task = promise.task();
-
-    auto *timer = new QTimer();
-    timer->setSingleShot(true);
-    QObject::connect(timer, &QTimer::timeout, m_data->manager, [d = m_data->manager->d.get(), roomJid = m_data->roomJid, originId]() {
-        d->handleMessageTimeout(roomJid, originId);
+    // the message pipeline waits for the reflection, see QXmppMucManagerV2Private::confirmDelivery()
+    return m_data->manager->client()->send(std::move(message)).then(m_data->manager, [](SendResult &&result) -> Result<> {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            return std::move(*error);
+        }
+        return Success();
     });
-
-    m_data->pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
-    timer->start(m_data->manager->d->timeout);
-
-    m_data->manager->client()->send(std::move(message));
-    return task;
 }
 
 /*!
