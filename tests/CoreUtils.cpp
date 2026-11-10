@@ -31,6 +31,7 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QObject>
+#include <QScopeGuard>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QThread>
@@ -774,6 +775,9 @@ private:
     Q_SLOT void testUnregister();
     Q_SLOT void testContainerApi();
     Q_SLOT void testRoundTripMessage();
+    Q_SLOT void testSensitivitySerialization();
+    Q_SLOT void testSensitivityParsing();
+    Q_SLOT void testEncryptedContainer();
 };
 
 void tst_QXmppXmlRegistry::testRegisterAndParseMessage()
@@ -962,6 +966,94 @@ void tst_QXmppXmlRegistry::testRoundTripMessage()
     QCOMPARE(foo->value, u"roundtrip"_s);
 
     Registry::unregisterElement<FooExtension>();
+}
+
+static QString serializeMessage(const QXmppMessage &message, QXmpp::SceMode sceMode)
+{
+    QString output;
+    QXmlStreamWriter writer(&output);
+    message.toXml(&writer, sceMode);
+    return output;
+}
+
+void tst_QXmppXmlRegistry::testSensitivitySerialization()
+{
+    Registry::registerElement<FooExtension>(Scope::Message);
+    Registry::registerElement<BarExtension>(Scope::Message, Sensitivity::Public);
+    auto cleanup = qScopeGuard([] {
+        Registry::unregisterElement<FooExtension>();
+        Registry::unregisterElement<BarExtension>();
+    });
+
+    QCOMPARE(Registry::sensitivity(std::any(FooExtension {})), Sensitivity::Sensitive);
+    QCOMPARE(Registry::sensitivity(std::any(BarExtension {})), Sensitivity::Public);
+    QCOMPARE(Registry::sensitivity(std::any(42)), Sensitivity::Sensitive);
+
+    QXmppMessage message;
+    message.extensions().add(FooExtension { u"secret"_s });
+    message.extensions().add(BarExtension { 3 });
+    message.publicExtensions().add(FooExtension { u"fallback"_s });
+
+    const auto all = serializeMessage(message, QXmpp::SceAll);
+    QVERIFY(all.contains(u"secret"));
+    QVERIFY(all.contains(u"<bar"));
+    QVERIFY(!all.contains(u"fallback"));
+
+    const auto publicPart = serializeMessage(message, QXmpp::ScePublic);
+    QVERIFY(!publicPart.contains(u"secret"));
+    QVERIFY(publicPart.contains(u"<bar"));
+    QVERIFY(publicPart.contains(u"fallback"));
+
+    const auto sensitivePart = serializeMessage(message, QXmpp::SceSensitive);
+    QVERIFY(sensitivePart.contains(u"secret"));
+    QVERIFY(!sensitivePart.contains(u"<bar"));
+    QVERIFY(!sensitivePart.contains(u"fallback"));
+}
+
+void tst_QXmppXmlRegistry::testSensitivityParsing()
+{
+    Registry::registerElement<FooExtension>(Scope::Message);
+    Registry::registerElement<BarExtension>(Scope::Message, Sensitivity::Public);
+    auto cleanup = qScopeGuard([] {
+        Registry::unregisterElement<FooExtension>();
+        Registry::unregisterElement<BarExtension>();
+    });
+
+    const auto xml = xmlToDom(QByteArrayLiteral(
+        "<message to='alice@example.org'>"
+        "<foo xmlns='urn:test:foo' value='outer'/>"
+        "<bar xmlns='urn:test:bar' n='2'/>"
+        "<unknown xmlns='urn:test:unknown'/>"
+        "</message>"));
+
+    // public part of an encrypted message: sensitive and unknown elements are kept apart
+    QXmppMessage publicPart;
+    publicPart.parse(xml, QXmpp::ScePublic);
+    QVERIFY(!publicPart.extensions().contains<FooExtension>());
+    QVERIFY(!publicPart.extensions().contains<QXmpp::Xml::Element>());
+    QCOMPARE(publicPart.extensions().get<BarExtension>()->count, 2);
+    QCOMPARE(publicPart.publicExtensions().get<FooExtension>()->value, u"outer"_s);
+    QVERIFY(publicPart.publicExtensions().contains<QXmpp::Xml::Element>());
+
+    QXmppMessage unencrypted;
+    unencrypted.parse(xml, QXmpp::SceAll);
+    QCOMPARE(unencrypted.extensions().get<FooExtension>()->value, u"outer"_s);
+    QVERIFY(unencrypted.extensions().contains<BarExtension>());
+    QVERIFY(unencrypted.publicExtensions().isEmpty());
+}
+
+void tst_QXmppXmlRegistry::testEncryptedContainer()
+{
+    QVERIFY(Registry::encryption(xmlToDom(QByteArrayLiteral("<message><debug xmlns='urn:test:debug'/></message>"))).isNull());
+
+    // an encryption unknown to QXmpp
+    Registry::registerEncryptedContainer<GenericExtension>(Scope::Message);
+    auto cleanup = qScopeGuard([] { Registry::unregisterElement<GenericExtension>(); });
+
+    QCOMPARE(Registry::encryption(xmlToDom(QByteArrayLiteral("<message><body>x</body><debug xmlns='urn:test:debug'/></message>"))), u"urn:test:debug");
+    QVERIFY(Registry::encryption(xmlToDom(QByteArrayLiteral("<message><body>x</body></message>"))).isNull());
+    QCOMPARE(Registry::encryption(std::any(GenericExtension {})), u"urn:test:debug");
+    QCOMPARE(Registry::sensitivity(std::any(GenericExtension {})), Sensitivity::Public);
 }
 
 // ===================== tst_QXmppXmlFormatter =====================

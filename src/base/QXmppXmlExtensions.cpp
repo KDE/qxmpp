@@ -102,6 +102,24 @@ bool Extensions::tryParseAndAdd(Scope scope, const QDomElement &el)
 }
 
 /*!
+    Like tryParseAndAdd(), but for parsing a part of an end-to-end encrypted stanza.
+
+    With QXmpp::ScePublic (the unencrypted part of an encrypted stanza), sensitive elements are
+    added to \a publicExtensions instead, so they can't be mistaken for encrypted content.
+*/
+bool Extensions::tryParseAndAdd(Scope scope, const QDomElement &el, SceMode sceMode, Extensions &publicExtensions)
+{
+    auto parsed = Registry::tryParse(scope, el);
+    auto value = parsed ? std::move(*parsed) : std::any(Element::fromDom(el));
+    if (sceMode == ScePublic && Registry::sensitivity(value) == Sensitivity::Sensitive) {
+        publicExtensions.push(std::move(value));
+    } else {
+        push(std::move(value));
+    }
+    return true;
+}
+
+/*!
     Serializes all stored extensions to \a w.
 
     Delegates to QXmpp::Xml::Registry::serializeAll for dispatch.
@@ -109,6 +127,23 @@ bool Extensions::tryParseAndAdd(Scope scope, const QDomElement &el)
 void Extensions::toXml(QXmlStreamWriter *w) const
 {
     Registry::serializeAll(*w, d->items);
+}
+
+/*!
+    Serializes the stored extensions of the part \a sceMode of an encrypted stanza to \a w.
+*/
+void Extensions::toXml(QXmlStreamWriter *w, SceMode sceMode) const
+{
+    if (sceMode == SceAll) {
+        Registry::serializeAll(*w, d->items);
+        return;
+    }
+    const auto wanted = sceMode == ScePublic ? Sensitivity::Public : Sensitivity::Sensitive;
+    std::vector<std::any> items;
+    std::copy_if(d->items.cbegin(), d->items.cend(), std::back_inserter(items), [&](const std::any &item) {
+        return Registry::sensitivity(item) == wanted;
+    });
+    Registry::serializeAll(*w, items);
 }
 
 }  // namespace QXmpp::Xml

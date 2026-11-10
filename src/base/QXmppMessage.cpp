@@ -244,6 +244,7 @@ public:
 
     // Registered and fallback XML extensions
     QXmpp::Xml::Extensions extensions;
+    Xml::Extensions publicExtensions;
 };
 
 /*!
@@ -1870,6 +1871,29 @@ const QXmpp::Xml::Extensions &QXmppMessage::extensions() const
     return d->extensions;
 }
 
+/*!
+    Returns the extensions sent in the public part of an end-to-end encrypted message.
+
+    They are sent in addition to the public elements of extensions(), whatever their
+    QXmpp::Xml::Sensitivity is, e.g. a fallback body for clients not supporting the encryption.
+    They are not sent with unencrypted messages.
+
+    In received encrypted messages, it contains the sensitive elements found outside of the
+    encrypted content. They are never merged with the decrypted content.
+
+    \since QXmpp 1.18
+*/
+Xml::Extensions &QXmppMessage::publicExtensions()
+{
+    return d->publicExtensions;
+}
+
+/*! \overload */
+const Xml::Extensions &QXmppMessage::publicExtensions() const
+{
+    return d->publicExtensions;
+}
+
 void QXmppMessage::parse(const QDomElement &element)
 {
     parse(element, QXmpp::SceAll);
@@ -2214,7 +2238,7 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         return true;
     }
-    return d->extensions.tryParseAndAdd(QXmpp::Xml::Scope::Message, element);
+    return d->extensions.tryParseAndAdd(Xml::Scope::Message, element, sceMode, d->publicExtensions);
 }
 
 /*!
@@ -2448,7 +2472,10 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
     // public part (e.g. the fallback body for e2ee messages)
     w.write(d->fallbackMarkers);
 
-    d->extensions.toXml(writer);
+    d->extensions.toXml(writer, sceMode);
+    if (sceMode == ScePublic) {
+        d->publicExtensions.toXml(writer);
+    }
 }
 
 struct QXmppFallbackPrivate : QSharedData {

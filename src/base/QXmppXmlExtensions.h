@@ -134,7 +134,9 @@ public:
 
     // Internal: called from QXmppMessage::parseExtension / QXmppPresence::parseExtension.
     bool tryParseAndAdd(Scope scope, const QDomElement &el);
+    bool tryParseAndAdd(Scope scope, const QDomElement &el, QXmpp::SceMode sceMode, Extensions &publicExtensions);
     void toXml(QXmlStreamWriter *w) const;
+    void toXml(QXmlStreamWriter *w, QXmpp::SceMode sceMode) const;
 
 private:
     const std::vector<std::any> &items() const;

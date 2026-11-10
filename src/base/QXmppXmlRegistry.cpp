@@ -28,6 +28,13 @@ struct ParserEntry {
     Scopes scopes;
     ErasedParser parse;
     std::type_index type;
+    // namespace of the encryption for encrypted containers
+    QStringView encryption;
+};
+
+struct TypeEntry {
+    Sensitivity sensitivity;
+    QStringView encryption;
 };
 
 namespace {
@@ -57,6 +64,7 @@ struct RegistryState {
     std::unordered_map<XmlElementId, ParserEntry> parsers;
     std::unordered_map<std::type_index, ErasedSerializer> serializers;
     std::unordered_map<std::type_index, XmlElementId> typeToId;
+    std::unordered_map<std::type_index, TypeEntry> types;
 };
 
 static QReadWriteLock s_lock;
@@ -69,7 +77,8 @@ static RegistryState &state()
 
 void Registry::registerInternal(std::type_index type, Scopes scopes,
                                 QStringView tag, QStringView xmlns,
-                                ErasedParser parse, ErasedSerializer serialize)
+                                ErasedParser parse, ErasedSerializer serialize,
+                                Sensitivity sensitivity, bool encryptedContainer)
 {
     XmlElementId id { tag.toString(), xmlns.toString() };
 
@@ -83,6 +92,7 @@ void Registry::registerInternal(std::type_index type, Scopes scopes,
         // Clean up old type's entries.
         st.serializers.erase(it->second.type);
         st.typeToId.erase(it->second.type);
+        st.types.erase(it->second.type);
     }
 
     if (auto it = st.typeToId.find(type); it != st.typeToId.end()) {
@@ -90,9 +100,12 @@ void Registry::registerInternal(std::type_index type, Scopes scopes,
         st.parsers.erase(it->second);
     }
 
-    st.parsers.insert_or_assign(id, ParserEntry { scopes, std::move(parse), type });
+    // the namespace is static, it is the one of T::XmlTag
+    const auto encryption = encryptedContainer ? xmlns : QStringView();
+    st.parsers.insert_or_assign(id, ParserEntry { scopes, std::move(parse), type, encryption });
     st.serializers.insert_or_assign(type, std::move(serialize));
     st.typeToId.insert_or_assign(type, id);
+    st.types.insert_or_assign(type, TypeEntry { sensitivity, encryption });
 }
 
 void Registry::unregisterInternal(std::type_index type)
@@ -108,6 +121,60 @@ void Registry::unregisterInternal(std::type_index type)
     st.parsers.erase(idIt->second);
     st.serializers.erase(type);
     st.typeToId.erase(idIt);
+    st.types.erase(type);
+}
+
+/*!
+    Returns the sensitivity of the registered type of \a value.
+
+    Values of unregistered types and QXmpp::Xml::Element fallbacks are sensitive.
+
+    \since QXmpp 1.18
+*/
+Sensitivity Registry::sensitivity(const std::any &value)
+{
+    QReadLocker lock(&s_lock);
+    const auto &types = state().types;
+    if (auto it = types.find(std::type_index(value.type())); it != types.end()) {
+        return it->second.sensitivity;
+    }
+    return Sensitivity::Sensitive;
+}
+
+/*!
+    Returns the namespace of the encryption of the first child element of \a stanza registered
+    as encrypted container, see registerEncryptedContainer(). Returns a null string view if there
+    is none.
+
+    \since QXmpp 1.18
+*/
+QStringView Registry::encryption(const QDomElement &stanza)
+{
+    QReadLocker lock(&s_lock);
+    const auto &parsers = state().parsers;
+    for (auto child = stanza.firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
+        if (auto it = parsers.find(XmlElementId { child.tagName(), child.namespaceURI() });
+            it != parsers.end() && !it->second.encryption.isNull()) {
+            return it->second.encryption;
+        }
+    }
+    return {};
+}
+
+/*!
+    Returns the namespace of the encryption if \a value is of a type registered as encrypted
+    container. Returns a null string view otherwise.
+
+    \since QXmpp 1.18
+*/
+QStringView Registry::encryption(const std::any &value)
+{
+    QReadLocker lock(&s_lock);
+    const auto &types = state().types;
+    if (auto it = types.find(std::type_index(value.type())); it != types.end()) {
+        return it->second.encryption;
+    }
+    return {};
 }
 
 std::optional<std::any> Registry::tryParse(Scope scope, const QDomElement &el)

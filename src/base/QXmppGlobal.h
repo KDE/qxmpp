@@ -13,6 +13,7 @@
 #include <variant>
 
 #include <QString>
+#include <QStringView>
 
 struct QXmppError;
 
@@ -115,6 +116,33 @@ enum EncryptionMethod {
     OMEMO = Omemo0,
 #endif
 };
+
+/*!
+    \namespace QXmpp::E2ee
+    \inmodule QXmpp
+
+    End-to-end encryptions are identified by their namespace (\xep{0380}{Explicit Message
+    Encryption}), which is also the namespace of the element containing the encrypted content.
+    Encryptions not known to QXmpp can be added by extensions using their own namespace.
+
+    \since QXmpp 1.18
+*/
+namespace E2ee {
+
+/*! \xep{0364}{Current Off-the-Record Messaging Usage} \since QXmpp 1.18 */
+inline constexpr QStringView Otr = u"urn:xmpp:otr:0";
+/*! \xep{0027}{Current Jabber OpenPGP Usage} \since QXmpp 1.18 */
+inline constexpr QStringView LegacyOpenPgp = u"jabber:x:encrypted";
+/*! \xep{0373}{OpenPGP for XMPP} \since QXmpp 1.18 */
+inline constexpr QStringView Ox = u"urn:xmpp:openpgp:0";
+/*! \xep{0384}{OMEMO Encryption} \since QXmpp 1.18 */
+inline constexpr QStringView Omemo0 = u"eu.siacs.conversations.axolotl";
+/*! \xep{0384}{OMEMO Encryption} since version 0.4 \since QXmpp 1.18 */
+inline constexpr QStringView Omemo1 = u"urn:xmpp:omemo:1";
+/*! \xep{0384}{OMEMO Encryption} since version 0.8 \since QXmpp 1.18 */
+inline constexpr QStringView Omemo2 = u"urn:xmpp:omemo:2";
+
+}  // namespace E2ee
 
 /*!
     \inmodule QXmpp

@@ -23,6 +23,23 @@ class QXmlStreamWriter;
 namespace QXmpp::Xml {
 
 /*!
+    \enum QXmpp::Xml::Sensitivity
+
+    Whether an element is encrypted with \xep{0420}{Stanza Content Encryption} or sent in the
+    public part of an encrypted stanza.
+
+    \value Sensitive Encrypted. Unknown elements are handled as sensitive.
+    \value Public Sent unencrypted, e.g. elements needed for routing or the encrypted element
+    itself.
+
+    \since QXmpp 1.18
+*/
+enum class Sensitivity : uint8_t {
+    Sensitive,
+    Public,
+};
+
+/*!
     \inmodule QXmpp
 
     \brief A global registry for type-driven parsing and serialization of XML extension elements.
@@ -66,6 +83,9 @@ public:
     /*!
         Registers \c T for the given \a scopes.
 
+        \a sensitivity decides whether the element is encrypted in end-to-end encrypted stanzas
+        (since QXmpp 1.18).
+
         If a type with the same \c XmlTag is already registered, the previous
         entry is replaced and a warning is emitted.
     */
@@ -73,22 +93,28 @@ public:
         requires QXmpp::Private::HasXmlTag<T> &&
         QXmpp::Private::DomParsable<T> &&
         QXmpp::Private::QXmlStreamSerializeable<T>
-    static void registerElement(Scopes scopes)
+    static void registerElement(Scopes scopes, Sensitivity sensitivity = Sensitivity::Sensitive)
     {
-        ErasedParser parse = [](const QDomElement &el) -> std::optional<std::any> {
-            auto result = QXmpp::Private::parseElement<T>(el);
-            if (!result) {
-                return {};
-            }
-            return std::any(std::move(*result));
-        };
-        ErasedSerializer serialize = [](const std::any &val, QXmlStreamWriter &w) {
-            std::any_cast<const T &>(val).toXml(&w);
-        };
-        auto [xmlTag, xmlNs] = T::XmlTag;
-        registerInternal(std::type_index(typeid(T)), scopes,
-                         xmlTag, xmlNs,
-                         std::move(parse), std::move(serialize));
+        registerElementInternal<T>(scopes, sensitivity, false);
+    }
+
+    /*!
+        Registers \c T as the element containing the encrypted content of an end-to-end
+        encryption.
+
+        The encryption is identified by the namespace of \c T, see QXmpp::E2ee. The element is
+        public. Stanzas containing it are handled as encrypted. \a scopes are the stanzas the
+        element can occur in.
+
+        \since QXmpp 1.18
+    */
+    template<typename T>
+        requires QXmpp::Private::HasXmlTag<T> &&
+        QXmpp::Private::DomParsable<T> &&
+        QXmpp::Private::QXmlStreamSerializeable<T>
+    static void registerEncryptedContainer(Scopes scopes)
+    {
+        registerElementInternal<T>(scopes, Sensitivity::Public, true);
     }
 
     /*!
@@ -102,6 +128,10 @@ public:
     {
         unregisterInternal(std::type_index(typeid(T)));
     }
+
+    static Sensitivity sensitivity(const std::any &value);
+    static QStringView encryption(const QDomElement &stanza);
+    static QStringView encryption(const std::any &value);
 
     /*!
         Attempts to parse \a el as a registered extension type for \a scope.
@@ -122,9 +152,29 @@ private:
     using ErasedParser = std::function<std::optional<std::any>(const QDomElement &)>;
     using ErasedSerializer = std::function<void(const std::any &, QXmlStreamWriter &)>;
 
+    template<typename T>
+    static void registerElementInternal(Scopes scopes, Sensitivity sensitivity, bool encryptedContainer)
+    {
+        ErasedParser parse = [](const QDomElement &el) -> std::optional<std::any> {
+            auto result = QXmpp::Private::parseElement<T>(el);
+            if (!result) {
+                return {};
+            }
+            return std::any(std::move(*result));
+        };
+        ErasedSerializer serialize = [](const std::any &val, QXmlStreamWriter &w) {
+            std::any_cast<const T &>(val).toXml(&w);
+        };
+        auto [xmlTag, xmlNs] = T::XmlTag;
+        registerInternal(std::type_index(typeid(T)), scopes,
+                         xmlTag, xmlNs,
+                         std::move(parse), std::move(serialize), sensitivity, encryptedContainer);
+    }
+
     static void registerInternal(std::type_index type, Scopes scopes,
                                  QStringView tag, QStringView xmlns,
-                                 ErasedParser parse, ErasedSerializer serialize);
+                                 ErasedParser parse, ErasedSerializer serialize,
+                                 Sensitivity sensitivity, bool encryptedContainer);
     static void unregisterInternal(std::type_index type);
 };
 

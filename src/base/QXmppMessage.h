@@ -384,6 +384,8 @@ public:
 
     QXmpp::Xml::Extensions &extensions();
     const QXmpp::Xml::Extensions &extensions() const;
+    QXmpp::Xml::Extensions &publicExtensions();
+    const QXmpp::Xml::Extensions &publicExtensions() const;
 
 #ifdef BUILD_OMEMO
     // XEP-0384: OMEMO Encryption
