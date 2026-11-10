@@ -10,6 +10,7 @@
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoEnvelope_p.h"
 #include "QXmppOmemoIq_p.h"
+#include "QXmppXmlRegistry.h"
 
 #include "util.h"
 
@@ -618,6 +619,9 @@ void tst_QXmppOmemoData::testMessageOmemoElement()
 
     parsePacket(message1, xmlIn);
     QVERIFY(message1.omemoElement());
+    // stored as extension and detected as encrypted container
+    QVERIFY(message1.extensions().contains<QXmppOmemoElement>());
+    QCOMPARE(QXmpp::Xml::Registry::encryption(xmlToDom(xmlIn)), QXmpp::E2ee::Omemo2);
     serializePacket(message1, xmlOut1);
 
     QXmppMessage message2;

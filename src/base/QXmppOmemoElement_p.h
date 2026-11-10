@@ -6,6 +6,7 @@
 #ifndef QXMPPOMEMOELEMENT_H
 #define QXMPPOMEMOELEMENT_H
 
+#include "QXmppConstants_p.h"
 #include "QXmppGlobal.h"
 #include "QXmppOmemoEnvelope_p.h"
 
@@ -19,6 +20,8 @@ class QXmlStreamWriter;
 class QXMPP_EXPORT QXmppOmemoElement
 {
 public:
+    static constexpr std::tuple XmlTag = { u"encrypted", QXmpp::Private::ns_omemo_2 };
+
     uint32_t senderDeviceId() const;
     void setSenderDeviceId(uint32_t id);
 

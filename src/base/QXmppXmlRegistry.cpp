@@ -4,6 +4,7 @@
 
 #include "QXmppXmlRegistry.h"
 
+#include "QXmppOmemoElement_p.h"
 #include "QXmppXmlElement.h"
 
 #include "XmlWriter.h"
@@ -75,6 +76,20 @@ static RegistryState &state()
     return s;
 }
 
+// Registers the elements of QXmpp once, before the first lookup. Not called from
+// registerInternal(), so it can use the public registration functions.
+static void ensureBuiltinElements()
+{
+    [[maybe_unused]]
+    static const bool registered = [] {
+#ifdef BUILD_OMEMO
+        // XEP-0384: OMEMO Encryption
+        Registry::registerEncryptedContainer<QXmppOmemoElement>(Scope::Message);
+#endif
+        return true;
+    }();
+}
+
 void Registry::registerInternal(std::type_index type, Scopes scopes,
                                 QStringView tag, QStringView xmlns,
                                 ErasedParser parse, ErasedSerializer serialize,
@@ -133,6 +148,7 @@ void Registry::unregisterInternal(std::type_index type)
 */
 Sensitivity Registry::sensitivity(const std::any &value)
 {
+    ensureBuiltinElements();
     QReadLocker lock(&s_lock);
     const auto &types = state().types;
     if (auto it = types.find(std::type_index(value.type())); it != types.end()) {
@@ -150,6 +166,7 @@ Sensitivity Registry::sensitivity(const std::any &value)
 */
 QStringView Registry::encryption(const QDomElement &stanza)
 {
+    ensureBuiltinElements();
     QReadLocker lock(&s_lock);
     const auto &parsers = state().parsers;
     for (auto child = stanza.firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
@@ -169,6 +186,7 @@ QStringView Registry::encryption(const QDomElement &stanza)
 */
 QStringView Registry::encryption(const std::any &value)
 {
+    ensureBuiltinElements();
     QReadLocker lock(&s_lock);
     const auto &types = state().types;
     if (auto it = types.find(std::type_index(value.type())); it != types.end()) {
@@ -179,6 +197,7 @@ QStringView Registry::encryption(const std::any &value)
 
 std::optional<std::any> Registry::tryParse(Scope scope, const QDomElement &el)
 {
+    ensureBuiltinElements();
     XmlElementId id { el.tagName(), el.namespaceURI() };
 
     // Copy the parser function under the read lock; call it outside.
@@ -203,6 +222,7 @@ std::optional<std::any> Registry::tryParse(Scope scope, const QDomElement &el)
 
 void Registry::serializeAll(QXmlStreamWriter &w, const std::vector<std::any> &items)
 {
+    ensureBuiltinElements();
     for (const auto &item : items) {
         // Fallback type: serialize directly without a registry lookup.
         if (item.type() == typeid(QXmpp::Xml::Element)) {

@@ -208,10 +208,6 @@ public:
     // XEP-0382: Spoiler messages
     bool isSpoiler = false;
     QString spoilerHint;
-#ifdef BUILD_OMEMO
-    // XEP-0384: OMEMO Encryption
-    std::optional<QXmppOmemoElement> omemoElement;
-#endif
 
     // XEP-0407: Mediated Information eXchange (MIX): Miscellaneous Capabilities
     std::optional<QXmppMixInvitation> mixInvitation;
@@ -1425,7 +1421,7 @@ void QXmppMessage::setSpoilerHint(const QString &spoilerHint)
 */
 std::optional<QXmppOmemoElement> QXmppMessage::omemoElement() const
 {
-    return d->omemoElement;
+    return d->extensions.get<QXmppOmemoElement>();
 }
 
 /*!
@@ -1437,7 +1433,10 @@ std::optional<QXmppOmemoElement> QXmppMessage::omemoElement() const
 */
 void QXmppMessage::setOmemoElement(const std::optional<QXmppOmemoElement> &omemoElement)
 {
-    d->omemoElement = omemoElement;
+    d->extensions.removeAll<QXmppOmemoElement>();
+    if (omemoElement) {
+        d->extensions.add(*omemoElement);
+    }
 }
 #endif
 
@@ -2014,13 +2013,6 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             d->encryptionName = element.attribute(u"name"_s);
             return true;
         }
-#ifdef BUILD_OMEMO
-        // XEP-0384: OMEMO Encryption
-        if (QXmppOmemoElement::isOmemoElement(element)) {
-            d->omemoElement = parseOptionalElement<QXmppOmemoElement>(element);
-            return true;
-        }
-#endif
         // XEP-0421: Occupant identifiers for semi-anonymous MUCs
         if (isElement<MucOccupantId>(element)) {
             d->mucOccupantId = element.attribute(u"id"_s);
@@ -2308,11 +2300,6 @@ void QXmppMessage::serializeExtensions(QXmlStreamWriter *writer, QXmpp::SceMode 
         if (!d->mucOccupantId.isEmpty()) {
             w.write(Element { MucOccupantId::XmlTag, Attribute { u"id", d->mucOccupantId } });
         }
-
-#ifdef BUILD_OMEMO
-        // XEP-0384: OMEMO Encryption
-        w.write(d->omemoElement);
-#endif
     }
 
     if (sceMode & QXmpp::SceSensitive) {
