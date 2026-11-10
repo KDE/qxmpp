@@ -4,6 +4,45 @@ SPDX-FileCopyrightText: 2010 Jeremy Lainé <jeremy.laine@m4x.org>
 SPDX-License-Identifier: CC0-1.0
 -->
 
+QXmpp 1.18.0 (UNRELEASED)
+-------------------------
+
+ - Add hooks: extensions define hooks and add handlers via `QXmppClientExtension::hooks()`, also in their constructor; hooks can be asynchronous, have keys, a single responder or be adapted to another hook (@lnj, !839)
+   - `QXmpp::Disco::CollectInfo`: features and identities of the client
+   - `QXmpp::PubSub::EventReceived`: PubSub event notifications, per node
+ - Deprecate `QXmppClientExtension::discoveryFeatures()`/`discoveryIdentities()`, use `QXmpp::Disco::CollectInfo` (@lnj, !839)
+ - Deprecate `QXmppPubSubEventHandler`, use `QXmpp::PubSub::EventReceived` (@lnj, !839)
+ - Add the `QXmpp::Client::StanzaReceived` hook; deprecate `QXmppClientExtension::handleStanza()`, use the hook, and `QXmppMessageHandler`, use `QXmpp::Messages::Received` (@lnj, !839)
+ - Deprecate `QXmppClient::sendSensitive()` and `reply()`, use `send()` with the `SelectEncryption` hook; deprecate `QXmppClient::setEncryptionExtension()`/`encryptionExtension()`, use `QXmpp::E2ee::Provider` (@lnj, !839)
+ - Add a pipeline for incoming messages (`QXmpp::Messages`) with the hooks `ResolveSender` (asynchronous) and `Received` and the state in `QXmpp::Messages::Context` (@lnj, !839)
+ - Add `QXmpp::E2ee::Provider` for end-to-end encryptions, registered via `QXmpp::E2ee::Providers`, OMEMO is a provider now (@lnj, !839)
+ - Add `QXmpp::E2ee` namespace constants identifying encryptions, also custom ones can be added by their namespace (@lnj, !839)
+ - Add `QXmppE2eeMetadata::encryptionNamespace()`, also for encryptions unknown to QXmpp (@lnj, !839)
+ - XmlRegistry: Add the SCE sensitivity of elements (`QXmpp::Xml::Sensitivity`) and encrypted containers (@lnj, !839)
+ - Message: Add `publicExtensions()` for elements sent in the public part of encrypted messages (@lnj, !839)
+ - MUC: Decrypt OMEMO messages with the keys of the real sender, also of messages from the archive of the room (@lnj, !839)
+ - MAM: Process retrieved messages in the message pipeline, with the new attachment `QXmpp::Messages::ArchiveInfo` (@lnj, !839)
+ - CarbonManagerV2: Process carbon copies in the message pipeline with the origins `CarbonSent` and `CarbonReceived` (@lnj, !839)
+ - Add a pipeline for outgoing messages sent via `QXmppClient::send()`, `sendSensitive()` and `reply()` with the hooks `SelectEncryption` (asynchronous), `Prepare` and `ResolveRecipients` (asynchronous), which can make sending fail with `OutgoingMessage::setError()`; OMEMO encrypts as provider (@lnj, !839)
+ - Add `QXmppSendStanzaParams::setEncryptionRequired()` and `QXmpp::SendError::Cancelled` (@lnj, !839)
+ - Add the asynchronous `ConfirmDelivery` hook; `QXmppClient::send()` of messages to joined MUC rooms finishes after the reflection (@lnj, !839)
+ - MUC: Encrypt messages for the real JIDs of the occupants and in members-only rooms for all members, admins and owners, also offline ones; their lists are retrieved before the first encrypted message after joining and kept up to date (@lnj, !839)
+ - Muc: Add `UserQuery::items()` (@lnj, !839)
+ - Encrypt IQs via the e2ee providers (`encryptIq`, `decryptIq`), selected by `SelectEncryption`; this keeps the payload of `QXmppIq` subclasses and decrypts encrypted error responses (@lnj, !839)
+ - Fix `isIqElement<QXmppBitsOfBinaryIq>()` (@lnj, !839)
+ - E2EE providers can encrypt only the body (`QXmpp::E2ee::ContentEncryption::BodyOnly`), e.g. for OMEMO 0.3 (@lnj, !839)
+ - Message: Parse delays and MUC status codes also in the public part of encrypted messages (@lnj, !839)
+
+Breaking changes:
+ - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
+ - The managers of QXmpp no longer override `discoveryFeatures()`/`discoveryIdentities()` and `handleStanza()` and no longer implement `QXmppPubSubEventHandler` and `QXmppMessageHandler`; calling `handleStanza()` of a manager directly has no effect anymore, the `handleMessage()` functions stay (@lnj, !839)
+ - Handlers of the `StanzaReceived` hook, i.e. the managers of QXmpp, run before implementations of `handleStanza()` (@lnj, !839)
+ - XmlRegistry: The logging category is now `org.qxmpp.xml.registry` (@lnj, !839)
+ - XmlRegistry: Registered elements are sensitive by default, i.e. only sent encrypted in encrypted messages; in the public part of received ones they are added to `publicExtensions()` (@lnj, !839)
+ - `QXmppClient::injectMessage()` always returns true and may deliver the message later (@lnj, !839)
+ - `QXmppClient::send()` encrypts messages if an encryption is selected by a `SelectEncryption` handler (@lnj, !839)
+ - `QXmppMamManager::retrieveMessages()` no longer returns messages consumed by a `Received` hook or encrypted messages without content, e.g. OMEMO key exchanges (@lnj, !839)
+
 QXmpp 1.17.2 (November 9, 2026)
 -------------------------------
 
