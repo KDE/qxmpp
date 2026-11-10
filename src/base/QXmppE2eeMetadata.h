@@ -26,6 +26,8 @@ public:
 
     QXmpp::EncryptionMethod encryption() const;
     void setEncryption(QXmpp::EncryptionMethod encryption);
+    QString encryptionNamespace() const;
+    void setEncryptionNamespace(const QString &encryption);
 
     QByteArray senderKey() const;
     void setSenderKey(const QByteArray &keyId);

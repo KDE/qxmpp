@@ -52,6 +52,7 @@ private:
     Q_SLOT void errorJingleCondition();
 
     Q_SLOT void testEncryption();
+    Q_SLOT void testEncryptionNamespace();
     Q_SLOT void testSenderKey();
     Q_SLOT void testSceTimestamp();
 };
@@ -445,6 +446,38 @@ void tst_QXmppStanza::testEncryption()
     e2eeMetadata.setEncryption(QXmpp::Omemo2);
     stanza.setE2eeMetadata(e2eeMetadata);
     QCOMPARE(stanza.e2eeMetadata()->encryption(), QXmpp::Omemo2);
+}
+
+void tst_QXmppStanza::testEncryptionNamespace()
+{
+    QXmppE2eeMetadata metadata;
+    QCOMPARE(metadata.encryption(), QXmpp::NoEncryption);
+    QVERIFY(metadata.encryptionNamespace().isEmpty());
+
+    metadata.setEncryption(QXmpp::Omemo2);
+    QCOMPARE(metadata.encryptionNamespace(), QXmpp::E2ee::Omemo2);
+
+    metadata.setEncryptionNamespace(QXmpp::E2ee::Ox.toString());
+    QCOMPARE(metadata.encryption(), QXmpp::Ox);
+
+    // encryption unknown to QXmpp
+    metadata.setEncryptionNamespace(u"urn:example:e2ee"_s);
+    QCOMPARE(metadata.encryption(), QXmpp::UnknownEncryption);
+    QCOMPARE(metadata.encryptionNamespace(), u"urn:example:e2ee"_s);
+    metadata.setEncryption(QXmpp::UnknownEncryption);
+    QCOMPARE(metadata.encryptionNamespace(), u"urn:example:e2ee"_s);
+
+    metadata.setEncryption(QXmpp::NoEncryption);
+    QCOMPARE(metadata.encryption(), QXmpp::NoEncryption);
+    QVERIFY(metadata.encryptionNamespace().isEmpty());
+
+    // without namespace
+    metadata.setEncryption(QXmpp::UnknownEncryption);
+    QCOMPARE(metadata.encryption(), QXmpp::UnknownEncryption);
+    QVERIFY(metadata.encryptionNamespace().isEmpty());
+
+    metadata.setEncryptionNamespace({});
+    QCOMPARE(metadata.encryption(), QXmpp::NoEncryption);
 }
 
 void tst_QXmppStanza::testSenderKey()

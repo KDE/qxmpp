@@ -10,6 +10,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppGlobal_p.h"
 #include "QXmppStanza_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -524,7 +525,9 @@ void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
 class QXmppE2eeMetadataPrivate : public QSharedData
 {
 public:
-    QXmpp::EncryptionMethod encryption;
+    // Namespace of the encryption: null for NoEncryption, empty for UnknownEncryption without
+    // a namespace.
+    QString encryption;
     QByteArray senderKey;
 
     // XEP-0420: Stanza Content Encryption
@@ -554,18 +557,63 @@ QXmppE2eeMetadata &QXmppE2eeMetadata::operator=(QXmppE2eeMetadata &&) = default;
 
 /*!
     Returns the used encryption protocol.
+
+    Encryptions unknown to QXmpp are returned as QXmpp::UnknownEncryption, see
+    encryptionNamespace().
 */
 QXmpp::EncryptionMethod QXmppE2eeMetadata::encryption() const
 {
-    return d->encryption;
+    if (d->encryption.isNull()) {
+        return NoEncryption;
+    }
+    if (d->encryption.isEmpty()) {
+        return UnknownEncryption;
+    }
+    return Enums::fromString<EncryptionMethod>(d->encryption).value_or(UnknownEncryption);
 }
 
 /*!
     Sets the used \a encryption protocol.
+
+    QXmpp::UnknownEncryption keeps the namespace of an encryption unknown to QXmpp.
 */
 void QXmppE2eeMetadata::setEncryption(QXmpp::EncryptionMethod encryption)
 {
-    d->encryption = encryption;
+    switch (encryption) {
+    case NoEncryption:
+        d->encryption = QString();
+        break;
+    case UnknownEncryption:
+        if (this->encryption() != UnknownEncryption) {
+            d->encryption = u""_s;
+        }
+        break;
+    default:
+        d->encryption = Enums::toString(encryption);
+    }
+}
+
+/*!
+    Returns the namespace of the used encryption (see QXmpp::E2ee), e.g. "urn:xmpp:omemo:2".
+
+    In contrast to encryption(), this also identifies encryptions unknown to QXmpp. Empty if not
+    encrypted or the namespace is unknown.
+
+    \since QXmpp 1.18
+*/
+QString QXmppE2eeMetadata::encryptionNamespace() const
+{
+    return d->encryption.isEmpty() ? QString() : d->encryption;
+}
+
+/*!
+    Sets the namespace of the used \a encryption (see QXmpp::E2ee).
+
+    \since QXmpp 1.18
+*/
+void QXmppE2eeMetadata::setEncryptionNamespace(const QString &encryption)
+{
+    d->encryption = encryption.isEmpty() ? QString() : encryption;
 }
 
 /*!
