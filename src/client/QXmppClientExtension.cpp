@@ -5,10 +5,22 @@
 #include "QXmppClientExtension.h"
 
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
+#include "QXmppHooks_p.h"
+
+using namespace QXmpp;
+
+class QXmppClientExtensionPrivate
+{
+public:
+    QXmppClient *client = nullptr;
+    // handlers of this extension, added to each client the extension is added to
+    Private::HookRegistry hooks;
+};
 
 /*! Constructs a QXmppClient extension. */
 QXmppClientExtension::QXmppClientExtension()
-    : m_client(nullptr)
+    : d(std::make_unique<QXmppClientExtensionPrivate>())
 {
 }
 
@@ -46,7 +58,23 @@ bool QXmppClientExtension::handleStanza(const QDomElement &, const std::optional
 /*! Returns the client which loaded this extension. */
 QXmppClient *QXmppClientExtension::client() const
 {
-    return m_client;
+    return d->client;
+}
+
+/*!
+    Returns the hooks of the client with this extension as the owner of added handlers.
+
+    Handlers can already be added in the constructor of the extension. All handlers, whenever
+    they were added, are active from the time the extension is added to a client until it is
+    removed or destroyed. An extension can only be added to one client. Hooks can only be run
+    while the extension is added to a client.
+
+    \since QXmpp 1.18
+*/
+Hooks QXmppClientExtension::hooks() const
+{
+    auto *self = const_cast<QXmppClientExtension *>(this);
+    return { d->client ? &d->client->d->hookRegistry : nullptr, &d->hooks, self };
 }
 
 /*!
@@ -54,13 +82,15 @@ QXmppClient *QXmppClientExtension::client() const
 */
 void QXmppClientExtension::setClient(QXmppClient *client)
 {
-    if (m_client != nullptr) {
-        onUnregistered(m_client);
+    if (d->client != nullptr) {
+        onUnregistered(d->client);
+        d->client->d->hookRegistry.removeAll(this);
     }
 
-    m_client = client;
+    d->client = client;
 
     if (client != nullptr) {
+        client->d->hookRegistry.addAll(d->hooks);
         onRegistered(client);
     }
 }

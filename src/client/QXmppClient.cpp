@@ -41,6 +41,7 @@
 #include <QSslSocket>
 #include <QTimer>
 
+using namespace QXmpp;
 using namespace std::chrono_literals;
 using namespace QXmpp::Private;
 using MessageEncryptResult = QXmppE2eeExtension::MessageEncryptResult;
@@ -503,6 +504,8 @@ bool QXmppClient::removeExtension(QXmppClientExtension *extension)
     if (d->extensions.contains(extension)) {
         d->extensions.removeAll(extension);
         extension->setClient(nullptr);
+        // also removes handlers added via hooks(extension) of extensions overriding setClient()
+        d->hookRegistry.removeAll(extension);
         delete extension;
         return true;
     } else {
@@ -537,6 +540,21 @@ void QXmppClient::setEncryptionExtension(QXmppE2eeExtension *extension)
 QList<QXmppClientExtension *> QXmppClient::extensions() const
 {
     return d->extensions;
+}
+
+/*!
+    Returns the hooks of the client with \a owner as the owner of added handlers.
+
+    Handlers added through the returned object are removed when \a owner is destroyed. Running
+    hooks does not require an owner, \a owner can be \c nullptr then.
+
+    Extensions should use QXmppClientExtension::hooks() instead.
+
+    \since QXmpp 1.18
+*/
+Hooks QXmppClient::hooks(QObject *owner)
+{
+    return { &d->hookRegistry, owner };
 }
 
 /*! Returns a modifiable reference to the current configuration of QXmppClient. */

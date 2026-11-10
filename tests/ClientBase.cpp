@@ -22,6 +22,7 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppEntityCapsStorage.h"
+#include "QXmppHooks.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageRetraction.h"
@@ -56,6 +57,7 @@
 #include <QDnsLookup>
 #include <QNetworkProxy>
 #include <QObject>
+#include <QRegularExpression>
 #include <QScopeGuard>
 #include <QSslCertificate>
 #include <QSslKey>
@@ -4672,6 +4674,338 @@ void tst_QXmppRosterIq::rosterMixChannel()
 
 }  // namespace RosterIq
 
-QXMPP_TEST_MAIN(Client::tst_QXmppClient, tst_QXmppNetworkMonitor, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq)
+namespace HookTests {
+
+using namespace QXmpp;
+
+// Hooks defined by an extension, nothing is declared in QXmpp for them.
+struct Notified {
+    static constexpr QStringView Name = u"test.notified";
+    using Signature = void(const QString &value);
+};
+
+struct Filter {
+    static constexpr QStringView Name = u"test.filter";
+    using Signature = HookResult(QString &value);
+};
+
+struct Collect {
+    static constexpr QStringView Name = u"test.collect";
+    using Signature = void(QStringList &values, const QString &input);
+};
+
+// same name as Notified, different signature
+struct NotifiedWithInt {
+    static constexpr QStringView Name = u"test.notified";
+    using Signature = void(int value);
+};
+
+static_assert(HookDefinition<Notified>);
+static_assert(HookDefinition<Filter>);
+
+struct NotHook {
+    static constexpr QStringView Name = u"test.not-a-hook";
+    using Signature = int(QString);
+};
+static_assert(!HookDefinition<NotHook>);
+
+// Runs the hook it defines.
+class DefiningManager : public QXmppClientExtension
+{
+    Q_OBJECT
+public:
+    void notify(const QString &value) { hooks().run<Notified>(value); }
+};
+
+// Registers on a hook of another manager via a (private) object.
+class ListeningManagerPrivate
+{
+public:
+    void onNotified(const QString &value) { received << value; }
+
+    QStringList received;
+};
+
+class ListeningManager : public QXmppClientExtension
+{
+    Q_OBJECT
+public:
+    ListeningManagerPrivate d;
+    int unregisteredCount = 0;
+
+protected:
+    void onRegistered(QXmppClient *) override
+    {
+        hooks().add<Notified>(&d, &ListeningManagerPrivate::onNotified);
+    }
+    void onUnregistered(QXmppClient *) override
+    {
+        unregisteredCount++;
+    }
+};
+
+// Adds its handlers in the constructor, before it is added to a client.
+class ConstructorListeningManager : public QXmppClientExtension
+{
+    Q_OBJECT
+public:
+    ConstructorListeningManager()
+    {
+        hooks().add<Notified>(&d, &ListeningManagerPrivate::onNotified);
+    }
+
+    ListeningManagerPrivate d;
+};
+
+class tst_QXmppHooks : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void hooksRunAll();
+    Q_SLOT void hooksSequence();
+    Q_SLOT void hooksStop();
+    Q_SLOT void hooksFold();
+    Q_SLOT void hooksSignatureMismatch();
+    Q_SLOT void hooksOwnerDestroyed();
+    Q_SLOT void hooksRemoveDuringRun();
+    Q_SLOT void hooksAddDuringRun();
+    Q_SLOT void hooksHasHandlers();
+    Q_SLOT void hooksExtensions();
+    Q_SLOT void hooksExtensionWithoutClient();
+    Q_SLOT void hooksExtensionConstructor();
+};
+
+void tst_QXmppHooks::hooksRunAll()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    // no handlers
+    hooks.run<Notified>(u"nobody"_s);
+
+    QStringList calls;
+    hooks.add<Notified>([&](const QString &value) { calls << u"a:" + value; });
+    hooks.add<Notified>([&](const QString &value) { calls << u"b:" + value; });
+
+    client.hooks(nullptr).run<Notified>(u"x"_s);
+    QCOMPARE(calls, (QStringList { u"a:x"_s, u"b:x"_s }));
+}
+
+void tst_QXmppHooks::hooksSequence()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    QStringList calls;
+    hooks.add<Notified>([&](const QString &) { calls << u"late"_s; }, HookSequence::Late);
+    hooks.add<Notified>([&](const QString &) { calls << u"default1"_s; });
+    hooks.add<Notified>([&](const QString &) { calls << u"first"_s; }, HookSequence::First);
+    hooks.add<Notified>([&](const QString &) { calls << u"default2"_s; });
+
+    hooks.run<Notified>(QString());
+    QCOMPARE(calls, (QStringList { u"first"_s, u"default1"_s, u"default2"_s, u"late"_s }));
+}
+
+void tst_QXmppHooks::hooksStop()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    QString empty;
+    QCOMPARE(hooks.run<Filter>(empty), HookResult::Continue);
+
+    int lateCalls = 0;
+    hooks.add<Filter>([](QString &value) {
+        value += u"a";
+        return HookResult::Continue;
+    });
+    hooks.add<Filter>([](QString &value) {
+        value += u"b";
+        return value.startsWith(u"stop") ? HookResult::Stop : HookResult::Continue;
+    });
+    hooks.add<Filter>([&](QString &) {
+        lateCalls++;
+        return HookResult::Continue;
+    });
+
+    QString value = u"stop"_s;
+    QCOMPARE(hooks.run<Filter>(value), HookResult::Stop);
+    QCOMPARE(value, u"stopab"_s);
+    QCOMPARE(lateCalls, 0);
+
+    value = u"go"_s;
+    QCOMPARE(hooks.run<Filter>(value), HookResult::Continue);
+    QCOMPARE(value, u"goab"_s);
+    QCOMPARE(lateCalls, 1);
+}
+
+void tst_QXmppHooks::hooksFold()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    hooks.add<Collect>([](QStringList &values, const QString &input) { values << input.toUpper(); });
+    hooks.add<Collect>([](QStringList &values, const QString &input) { values << input + input; });
+
+    QStringList values;
+    hooks.run<Collect>(values, u"ab"_s);
+    QCOMPARE(values, (QStringList { u"AB"_s, u"abab"_s }));
+}
+
+void tst_QXmppHooks::hooksSignatureMismatch()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    QStringList calls;
+    hooks.add<Notified>([&](const QString &value) { calls << value; });
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u"Rejected handler for hook.*"_s));
+    hooks.add<NotifiedWithInt>([&](int) { calls << u"int"_s; });
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u"Hook.*was run with a different signature.*"_s));
+    hooks.run<NotifiedWithInt>(1);
+    QVERIFY(calls.isEmpty());
+
+    hooks.run<Notified>(u"string"_s);
+    QCOMPARE(calls, QStringList { u"string"_s });
+}
+
+void tst_QXmppHooks::hooksOwnerDestroyed()
+{
+    QXmppClient client;
+    auto owner = std::make_unique<QObject>();
+    QObject otherOwner;
+
+    QStringList calls;
+    client.hooks(owner.get()).add<Notified>([&](const QString &) { calls << u"owner"_s; });
+    client.hooks(&otherOwner).add<Notified>([&](const QString &) { calls << u"other"_s; });
+
+    owner.reset();
+    client.hooks(nullptr).run<Notified>(QString());
+    QCOMPARE(calls, QStringList { u"other"_s });
+
+    client.hooks(&otherOwner).removeAll();
+    calls.clear();
+    client.hooks(nullptr).run<Notified>(QString());
+    QVERIFY(calls.isEmpty());
+
+    // adding without owner is not possible
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u"Cannot add handler for hook.*without an owner.*"_s));
+    client.hooks(nullptr).add<Notified>([&](const QString &) { calls << u"no owner"_s; });
+    client.hooks(nullptr).run<Notified>(QString());
+    QVERIFY(calls.isEmpty());
+}
+
+void tst_QXmppHooks::hooksRemoveDuringRun()
+{
+    QXmppClient client;
+    QObject owner1;
+    auto owner2 = std::make_unique<QObject>();
+
+    QStringList calls;
+    client.hooks(&owner1).add<Notified>([&](const QString &) {
+        calls << u"1"_s;
+        owner2.reset();
+    });
+    client.hooks(owner2.get()).add<Notified>([&](const QString &) { calls << u"2"_s; });
+
+    client.hooks(nullptr).run<Notified>(QString());
+    QCOMPARE(calls, QStringList { u"1"_s });
+}
+
+void tst_QXmppHooks::hooksAddDuringRun()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    QStringList calls;
+    bool added = false;
+    hooks.add<Notified>([&](const QString &) {
+        calls << u"first"_s;
+        if (!added) {
+            added = true;
+            hooks.add<Notified>([&](const QString &) { calls << u"added"_s; });
+        }
+    });
+
+    hooks.run<Notified>(QString());
+    QCOMPARE(calls, QStringList { u"first"_s });
+
+    calls.clear();
+    hooks.run<Notified>(QString());
+    QCOMPARE(calls, (QStringList { u"first"_s, u"added"_s }));
+}
+
+void tst_QXmppHooks::hooksHasHandlers()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    QVERIFY(!hooks.hasHandlers<Notified>());
+    hooks.add<Notified>([](const QString &) { });
+    QVERIFY(hooks.hasHandlers<Notified>());
+    QVERIFY(!hooks.hasHandlers<Filter>());
+    hooks.removeAll();
+    QVERIFY(!hooks.hasHandlers<Notified>());
+}
+
+void tst_QXmppHooks::hooksExtensions()
+{
+    QXmppClient client(QXmppClient::NoExtensions);
+
+    // the listener is added before the extension defining the hook
+    auto *listener = client.addNewExtension<ListeningManager>();
+    auto *definer = client.addNewExtension<DefiningManager>();
+
+    definer->notify(u"hello"_s);
+    QCOMPARE(listener->d.received, QStringList { u"hello"_s });
+
+    // handlers are removed together with the extension
+    QVERIFY(client.removeExtension(listener));
+    QVERIFY(!client.hooks(nullptr).hasHandlers<Notified>());
+    definer->notify(u"after removal"_s);
+}
+
+void tst_QXmppHooks::hooksExtensionWithoutClient()
+{
+    DefiningManager definer;
+    // not registered: running is a no-op
+    definer.notify(u"nothing"_s);
+}
+
+void tst_QXmppHooks::hooksExtensionConstructor()
+{
+    auto *listener = new ConstructorListeningManager();
+
+    QXmppClient client(QXmppClient::NoExtensions);
+    auto *definer = client.addNewExtension<DefiningManager>();
+    QVERIFY(!client.hooks(nullptr).hasHandlers<Notified>());
+
+    client.addExtension(listener);
+    definer->notify(u"hello"_s);
+    QCOMPARE(listener->d.received, QStringList { u"hello"_s });
+
+    // an extension can only be added to one client
+    QXmppClient otherClient(QXmppClient::NoExtensions);
+    QTest::ignoreMessage(QtWarningMsg, "Cannot add extension, it has already been added to another client");
+    QVERIFY(!otherClient.addExtension(listener));
+    QVERIFY(client.hooks(nullptr).hasHandlers<Notified>());
+
+    QVERIFY(client.removeExtension(listener));
+    QVERIFY(!client.hooks(nullptr).hasHandlers<Notified>());
+}
+
+}  // namespace HookTests
+
+QXMPP_TEST_MAIN(Client::tst_QXmppClient, tst_QXmppNetworkMonitor, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq, HookTests::tst_QXmppHooks)
 
 #include "ClientBase.moc"

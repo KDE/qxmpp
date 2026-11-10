@@ -7,6 +7,7 @@
 
 #include "QXmppDiscoveryIq.h"
 #include "QXmppExtension.h"
+#include "QXmppHooks.h"
 #include "QXmppLogger.h"
 
 #include <memory>
@@ -46,6 +47,7 @@ public:
 
 protected:
     QXmppClient *client() const;
+    QXmpp::Hooks hooks() const;
     virtual void setClient(QXmppClient *client);
 
     virtual void onRegistered(QXmppClient *client);
@@ -55,8 +57,7 @@ protected:
     bool injectMessage(QXmppMessage &&message);
 
 private:
-    // m_client can be replaced with a d-ptr if needed (same size)
-    QXmppClient *m_client;
+    std::unique_ptr<QXmppClientExtensionPrivate> d;
 
     friend class QXmppClient;
 };

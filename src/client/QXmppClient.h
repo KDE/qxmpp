@@ -8,6 +8,7 @@
 #define QXMPPCLIENT_H
 
 #include "QXmppConfiguration.h"
+#include "QXmppHooks.h"
 #include "QXmppLogger.h"
 #include "QXmppPresence.h"
 #include "QXmppSendResult.h"
@@ -202,6 +203,8 @@ public:
     void setEncryptionExtension(QXmppE2eeExtension *);
 
     QList<QXmppClientExtension *> extensions() const;
+
+    QXmpp::Hooks hooks(QObject *owner);
 
     /*!
         \brief Returns the extension which can be cast into type T*, or 0

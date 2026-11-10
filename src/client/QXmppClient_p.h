@@ -20,6 +20,7 @@
 #define QXMPPCLIENT_P_H
 
 #include "QXmppE2eeExtension.h"
+#include "QXmppHooks_p.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppPresence.h"
 #include "QXmppSendResult.h"
@@ -56,6 +57,7 @@ public:
     /*! Current presence of the client */
     QXmppPresence clientPresence;
     QList<QXmppClientExtension *> extensions;
+    QXmpp::Private::HookRegistry hookRegistry;
     QXmppLogger *logger;
     /*! Pointer to the XMPP stream */
     QXmppOutgoingClient *stream;

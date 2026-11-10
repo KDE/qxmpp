@@ -40,6 +40,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppGeolocItem.h
     base/QXmppGlobal.h
     base/QXmppHash.h
+    base/QXmppHooks.h
     base/QXmppHttpFileSource.h
     base/QXmppHttpUploadIq.h
     base/QXmppIbbIq.h
@@ -211,6 +212,7 @@ set(SOURCE_FILES
     base/QXmppGeolocItem.cpp
     base/QXmppHash.cpp
     base/QXmppHashing.cpp
+    base/QXmppHooks.cpp
     base/QXmppHttpFileSource.cpp
     base/QXmppHttpUploadIq.cpp
     base/QXmppIbbIq.cpp
