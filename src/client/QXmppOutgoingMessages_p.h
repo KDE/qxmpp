@@ -13,9 +13,15 @@
 #include "QXmppTask.h"
 
 #include <deque>
+#include <memory>
+#include <optional>
 #include <unordered_map>
 
 class QXmppClient;
+
+namespace QXmpp::Messages {
+class OutgoingMessage;
+}
 class QXmppClientPrivate;
 class QXmppStanza;
 
@@ -50,10 +56,12 @@ private:
         QXmppPromise<SendResult> result;
     };
 
+    struct Delivery;
+
     QXmppTask<void> processFront(QString conversationJid);
-    QXmppTask<SendResult> sendEncrypted(QXmppMessage &&message, const QString &encryption, QXmppSendStanzaParams params);
-    void finishFront(const QString &conversationJid, QXmppTask<SendResult> &&sendTask);
+    void finishFront(const QString &conversationJid, QXmppTask<SendResult> &&sendTask, std::shared_ptr<Messages::OutgoingMessage> message = {});
     void finishFront(const QString &conversationJid, SendResult &&result);
+    void confirmDelivery(std::shared_ptr<Delivery> delivery, QXmppTask<SendResult> sendTask);
 
     QXmppClient *m_client;
     QXmppClientPrivate *m_clientPrivate;

@@ -41,10 +41,13 @@ namespace QXmpp::Messages {
         (\xep{0380}{Explicit Message Encryption}) and a fallback body are added for messages
         with a body.
     \li Send.
+    \li ConfirmDelivery: asynchronous, e.g. MUC waits for the reflection of the room. The task
+        returned by QXmppClient::send() finishes afterwards.
     \endlist
 
     Outgoing messages to the same JID are sent in the order in which they were passed, also
-    across the asynchronous phases.
+    across the asynchronous phases. Waiting for the confirmation of the delivery does not block
+    the next message.
 
     \since QXmpp 1.18
 */
@@ -102,6 +105,21 @@ namespace QXmpp::Messages {
     Handlers can modify the message. Handlers returning QXmpp::HookResult::Stop cancel sending,
     which then fails with the error set via QXmpp::Messages::OutgoingMessage::setError() or else
     with QXmpp::SendError::Cancelled.
+*/
+
+/*!
+    \struct QXmpp::Messages::ConfirmDelivery
+    \inmodule QXmpp
+
+    Asynchronous hook run for each outgoing message right after it has been written to the
+    stream, also before the server has acknowledged it, as a confirmation may arrive earlier.
+
+    Handlers wait for a confirmation of the delivery and set the result: an error makes sending
+    fail, QXmpp::SendSuccess with \c acknowledged set confirms the delivery. Without confirmation,
+    the result is the one of the stream (see QXmppClient::send()). If the stream reports an error,
+    sending fails without waiting for the handlers.
+
+    QXmppMucManagerV2 waits for the reflection of messages sent to joined rooms.
 */
 
 /*!

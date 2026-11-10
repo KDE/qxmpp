@@ -5591,6 +5591,7 @@ private:
     Q_SLOT void outgoingStoreHint();
     Q_SLOT void outgoingRequired();
     Q_SLOT void outgoingReply();
+    Q_SLOT void outgoingConfirmDelivery();
 };
 
 void tst_QXmppMessages::initTestCase()
@@ -6062,6 +6063,45 @@ void tst_QXmppMessages::outgoingReply()
     QCOMPARE(preset, TestEncryption);
     QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
     QCOMPARE(e2ee->encryptRequests.size(), 1);
+}
+
+void tst_QXmppMessages::outgoingConfirmDelivery()
+{
+    TestClient client;
+    QObject owner;
+
+    // e.g. waiting for a reflection
+    std::vector<std::pair<QXmppPromise<void>, SendResult *>> confirmations;
+    QStringList messages;
+    client.hooks(&owner).add<ConfirmDelivery>([&](const OutgoingMessage &message, SendResult &result) {
+        messages << message.message().body();
+        confirmations.emplace_back(QXmppPromise<void>(), &result);
+        return confirmations.back().first.task();
+    });
+
+    auto task1 = client.send(QXmppMessage(u"me@example.org/res"_s, u"room@example.org"_s, u"1"_s));
+    auto task2 = client.send(QXmppMessage(u"me@example.org/res"_s, u"room@example.org"_s, u"2"_s));
+    auto task3 = client.send(QXmppMessage(u"me@example.org/res"_s, u"room@example.org"_s, u"3"_s));
+
+    // the next message is sent without waiting for the confirmation
+    QCOMPARE(messages, (QStringList { u"1"_s, u"2"_s, u"3"_s }));
+    QVERIFY(client.takePacket().contains(u"<body>1</body>"_s));
+    QVERIFY(client.takePacket().contains(u"<body>2</body>"_s));
+    QVERIFY(client.takePacket().contains(u"<body>3</body>"_s));
+    QVERIFY(!task1.isFinished());
+
+    // confirmed in any order
+    *confirmations.at(1).second = QXmppError { u"Rejected"_s, {} };
+    confirmations.at(1).first.finish();
+    QCOMPARE(expectFutureVariant<QXmppError>(task2).description, u"Rejected"_s);
+
+    *confirmations.at(0).second = SendSuccess { true };
+    confirmations.at(0).first.finish();
+    QVERIFY(expectFutureVariant<SendSuccess>(task1).acknowledged);
+
+    // without confirmation, the result of the stream is used
+    confirmations.at(2).first.finish();
+    QVERIFY(!task3.isFinished());
 }
 
 }  // namespace MessagesTests

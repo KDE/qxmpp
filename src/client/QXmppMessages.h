@@ -8,6 +8,7 @@
 #include "QXmppError.h"
 #include "QXmppHooks.h"
 #include "QXmppMessage.h"
+#include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
 
 #include <optional>
@@ -136,6 +137,11 @@ struct Prepare {
 struct ResolveRecipients {
     static constexpr QStringView Name = u"org.qxmpp.message.resolve-recipients";
     using Signature = QXmppTask<void>(OutgoingMessage &message);
+};
+
+struct ConfirmDelivery {
+    static constexpr QStringView Name = u"org.qxmpp.message.confirm-delivery";
+    using Signature = QXmppTask<void>(const OutgoingMessage &message, QXmpp::SendResult &result);
 };
 
 }  // namespace QXmpp::Messages
