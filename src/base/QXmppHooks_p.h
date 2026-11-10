@@ -25,14 +25,16 @@ namespace QXmpp::Private {
 class QXMPP_PRIVATE_EXPORT HookRegistry : public QObject
 {
 public:
-    void add(QStringView name, const std::type_info &signature, int sequence, QObject *owner, std::shared_ptr<void> function);
+    // \a key is null for hooks without key. For single responder hooks, a warning is logged if
+    // \a warnDuplicate is set and there already is a handler.
+    void add(QStringView name, const QString &key, const std::type_info &signature, int sequence, QObject *owner, std::shared_ptr<void> function, bool singleResponder, bool warnDuplicate);
     void addAll(const HookRegistry &other);
-    bool run(QStringView name, const std::type_info &signature, const std::function<bool(void *)> &invoke) const;
-    bool hasHandlers(QStringView name) const;
+    bool run(QStringView name, const QString &key, const std::type_info &signature, const std::function<bool(void *)> &invoke) const;
+    // For single responder hooks, only the first handler is run.
+    QXmppTask<bool> runAsync(QStringView name, const QString &key, const std::type_info &signature, std::function<QXmppTask<bool>(void *)> invoke, bool singleResponder) const;
+    // \a key std::nullopt checks all keys
+    bool hasHandlers(QStringView name, const std::optional<QString> &key) const;
     void removeAll(QObject *owner);
-
-private:
-    void add(QStringView name, const char *signature, int sequence, QObject *owner, std::shared_ptr<void> function);
 
     struct Entry {
         int sequence;
@@ -40,11 +42,23 @@ private:
         // name of the signature's type_info, compared by value to work across shared libraries
         const char *signature;
         std::shared_ptr<void> function;
+        bool singleResponder = false;
         bool removed = false;
     };
     using EntryList = std::vector<std::shared_ptr<Entry>>;
 
-    QHash<QString, std::shared_ptr<const EntryList>> m_hooks;
+private:
+    struct Hook {
+        // name of the signature's type_info, the same for all handlers of the hook
+        const char *signature = nullptr;
+        // handlers per key, the key is null for hooks without key
+        QHash<QString, std::shared_ptr<const EntryList>> handlers;
+    };
+
+    void add(QStringView name, const QString &key, const char *signature, int sequence, QObject *owner, std::shared_ptr<void> function, bool singleResponder, bool warnDuplicate);
+    std::shared_ptr<const EntryList> entries(QStringView name, const QString &key, const char *signature) const;
+
+    QHash<QString, Hook> m_hooks;
     QHash<QObject *, QMetaObject::Connection> m_owners;
 };
 

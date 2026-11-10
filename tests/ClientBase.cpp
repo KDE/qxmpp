@@ -4700,14 +4700,95 @@ struct NotifiedWithInt {
     using Signature = void(int value);
 };
 
+struct AsyncNotified {
+    static constexpr QStringView Name = u"test.async-notified";
+    using Signature = QXmppTask<void>(QStringList &calls);
+};
+
+struct AsyncFilter {
+    static constexpr QStringView Name = u"test.async-filter";
+    using Signature = QXmppTask<HookResult>(QStringList &calls, QString value);
+};
+
 static_assert(HookDefinition<Notified>);
 static_assert(HookDefinition<Filter>);
+static_assert(HookDefinition<AsyncNotified>);
+static_assert(HookDefinition<AsyncFilter>);
 
 struct NotHook {
-    static constexpr QStringView Name = u"test.not-a-hook";
-    using Signature = int(QString);
+    using Signature = void(QString);
 };
 static_assert(!HookDefinition<NotHook>);
+
+// keyed hooks
+struct KeyedNotified {
+    static constexpr QStringView Name = u"test.keyed-notified";
+    using Key = QString;
+    using Signature = void(const QString &value);
+};
+
+struct TupleKeyed {
+    static constexpr QStringView Name = u"test.tuple-keyed";
+    using Key = std::tuple<QString, QString>;
+    using Signature = void(QStringList &calls);
+};
+
+// same name as KeyedNotified, other key type
+struct KeyedNotifiedByView {
+    static constexpr QStringView Name = u"test.keyed-notified";
+    using Key = QStringView;
+    using Signature = void(const QString &value);
+};
+
+static_assert(KeyedHookDefinition<KeyedNotified>);
+static_assert(KeyedHookDefinition<TupleKeyed>);
+static_assert(!KeyedHookDefinition<Notified>);
+
+// single responders
+struct Lookup {
+    static constexpr QStringView Name = u"test.lookup";
+    using Signature = int(const QString &value);
+};
+
+struct AsyncLookup {
+    static constexpr QStringView Name = u"test.async-lookup";
+    using Key = QString;
+    using Signature = QXmppTask<QString>(const QString &value);
+};
+
+static_assert(HookDefinition<Lookup>);
+static_assert(Private::HookSignature<Lookup::Signature>::IsSingleResponder);
+static_assert(Private::HookSignature<AsyncLookup::Signature>::IsSingleResponder);
+static_assert(!Private::HookSignature<Filter::Signature>::IsSingleResponder);
+
+// an adapted hook: typed handlers on a hook working on serialized data
+struct Serialized {
+    static constexpr QStringView Name = u"test.serialized";
+    using Key = QString;
+    using Signature = QXmppTask<QString>(const QString &json);
+};
+
+struct Number {
+    int value;
+};
+
+template<int Id>
+struct NumberRequest {
+    using Target = Serialized;
+    static QString key() { return u"number-"_s + QString::number(Id); }
+
+    template<typename Handler>
+        requires std::is_invocable_r_v<int, Handler &, const Number &>
+    static auto adapt(Handler &&handler)
+    {
+        return [handler = std::forward<Handler>(handler)](const QString &json) mutable {
+            return QString::number(handler(Number { json.toInt() }));
+        };
+    }
+};
+
+static_assert(AdaptedHookDefinition<NumberRequest<1>>);
+static_assert(!AdaptedHookDefinition<Notified>);
 
 // Runs the hook it defines.
 class DefiningManager : public QXmppClientExtension
@@ -4774,6 +4855,18 @@ private:
     Q_SLOT void hooksExtensions();
     Q_SLOT void hooksExtensionWithoutClient();
     Q_SLOT void hooksExtensionConstructor();
+    Q_SLOT void hooksAsync();
+    Q_SLOT void hooksAsyncSync();
+    Q_SLOT void hooksAsyncStop();
+    Q_SLOT void hooksAsyncOwnerDestroyed();
+    Q_SLOT void hooksAsyncTaskDropped();
+    Q_SLOT void hooksAsyncRegistryDestroyed();
+    Q_SLOT void hooksKeyed();
+    Q_SLOT void hooksKeyedTuple();
+    Q_SLOT void hooksKeyedSignatureMismatch();
+    Q_SLOT void hooksSingleResponder();
+    Q_SLOT void hooksSingleResponderAsync();
+    Q_SLOT void hooksAdapted();
 };
 
 void tst_QXmppHooks::hooksRunAll()
@@ -5002,6 +5095,347 @@ void tst_QXmppHooks::hooksExtensionConstructor()
 
     QVERIFY(client.removeExtension(listener));
     QVERIFY(!client.hooks(nullptr).hasHandlers<Notified>());
+}
+
+void tst_QXmppHooks::hooksAsync()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    // no handlers
+    QStringList calls;
+    QVERIFY(hooks.run<AsyncNotified>(calls).isFinished());
+
+    std::optional<QXmppPromise<void>> pending;
+    hooks.add<AsyncNotified>([&](QStringList &calls) {
+        calls << u"a"_s;
+        pending.emplace();
+        return pending->task();
+    });
+    // synchronous handler
+    hooks.add<AsyncNotified>([](QStringList &calls) { calls << u"b"_s; });
+
+    auto task = hooks.run<AsyncNotified>(calls);
+    QVERIFY(!task.isFinished());
+    QCOMPARE(calls, QStringList { u"a"_s });
+
+    pending->finish();
+    QVERIFY(task.isFinished());
+    QCOMPARE(calls, (QStringList { u"a"_s, u"b"_s }));
+}
+
+void tst_QXmppHooks::hooksAsyncSync()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    // only synchronous handlers: finished immediately
+    QStringList calls;
+    hooks.add<AsyncNotified>([](QStringList &calls) { calls << u"a"_s; });
+    hooks.add<AsyncNotified>([](QStringList &calls) { calls << u"b"_s; });
+
+    auto task = hooks.run<AsyncNotified>(calls);
+    QVERIFY(task.isFinished());
+    QCOMPARE(calls, (QStringList { u"a"_s, u"b"_s }));
+}
+
+void tst_QXmppHooks::hooksAsyncStop()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    std::optional<QXmppPromise<HookResult>> pending;
+    hooks.add<AsyncFilter>([&](QStringList &calls, QString value) {
+        calls << u"a:" + value;
+        pending.emplace();
+        return pending->task();
+    });
+    hooks.add<AsyncFilter>([](QStringList &calls, QString value) {
+        calls << u"b:" + value;
+        return HookResult::Continue;
+    });
+
+    // arguments passed by value are copied
+    QStringList calls;
+    auto task = hooks.run<AsyncFilter>(calls, u"x"_s);
+    pending->finish(HookResult::Stop);
+    QVERIFY(task.isFinished());
+    QCOMPARE(task.result(), HookResult::Stop);
+    QCOMPARE(calls, QStringList { u"a:x"_s });
+
+    calls.clear();
+    task = hooks.run<AsyncFilter>(calls, u"y"_s);
+    pending->finish(HookResult::Continue);
+    QVERIFY(task.isFinished());
+    QCOMPARE(task.result(), HookResult::Continue);
+    QCOMPARE(calls, (QStringList { u"a:y"_s, u"b:y"_s }));
+}
+
+void tst_QXmppHooks::hooksAsyncOwnerDestroyed()
+{
+    QXmppClient client;
+    auto owner = std::make_unique<QObject>();
+    QObject otherOwner;
+
+    // the promise outlives the owner, e.g. it is held by a database thread
+    std::optional<QXmppPromise<void>> pending;
+    client.hooks(owner.get()).add<AsyncNotified>([&](QStringList &calls) {
+        calls << u"owner"_s;
+        pending.emplace();
+        return pending->task();
+    });
+    client.hooks(&otherOwner).add<AsyncNotified>([](QStringList &calls) { calls << u"other"_s; });
+
+    QStringList calls;
+    auto task = client.hooks(nullptr).run<AsyncNotified>(calls);
+    QVERIFY(!task.isFinished());
+
+    // the handler is skipped
+    owner.reset();
+    QVERIFY(task.isFinished());
+    QCOMPARE(calls, (QStringList { u"owner"_s, u"other"_s }));
+
+    pending->finish();
+    QCOMPARE(calls, (QStringList { u"owner"_s, u"other"_s }));
+}
+
+void tst_QXmppHooks::hooksAsyncTaskDropped()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    std::optional<QXmppPromise<void>> pending;
+    hooks.add<AsyncNotified>([&](QStringList &calls) {
+        calls << u"a"_s;
+        pending.emplace();
+        return pending->task();
+    });
+    hooks.add<AsyncNotified>([](QStringList &calls) { calls << u"b"_s; });
+
+    QStringList calls;
+    auto task = hooks.run<AsyncNotified>(calls);
+    QVERIFY(!task.isFinished());
+
+    // the handler is skipped
+    pending.reset();
+    QVERIFY(task.isFinished());
+    QCOMPARE(calls, (QStringList { u"a"_s, u"b"_s }));
+}
+
+void tst_QXmppHooks::hooksAsyncRegistryDestroyed()
+{
+    auto client = std::make_unique<QXmppClient>();
+    QObject owner;
+
+    std::optional<QXmppPromise<void>> pending;
+    client->hooks(&owner).add<AsyncNotified>([&](QStringList &calls) {
+        calls << u"a"_s;
+        pending.emplace();
+        return pending->task();
+    });
+    client->hooks(&owner).add<AsyncNotified>([](QStringList &calls) { calls << u"b"_s; });
+
+    QStringList calls;
+    auto task = client->hooks(nullptr).run<AsyncNotified>(calls);
+
+    // the running hook keeps its handlers
+    client.reset();
+    pending->finish();
+    QVERIFY(task.isFinished());
+    QCOMPARE(calls, (QStringList { u"a"_s, u"b"_s }));
+}
+
+void tst_QXmppHooks::hooksKeyed()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+    QVERIFY(!hooks.hasHandlers<KeyedNotified>());
+
+    QStringList calls;
+    hooks.add<KeyedNotified>(u"a"_s, [&](const QString &value) { calls << u"a:"_s + value; });
+    hooks.add<KeyedNotified>(u"b"_s, [&](const QString &value) { calls << u"b:"_s + value; });
+    hooks.add<KeyedNotified>(u"a"_s, [&](const QString &value) { calls << u"a2:"_s + value; }, HookSequence::Early);
+
+    // only the handlers of the key, in their order
+    hooks.run<KeyedNotified>(u"a"_s, u"x"_s);
+    QCOMPARE(calls, (QStringList { u"a2:x"_s, u"a:x"_s }));
+    calls.clear();
+    hooks.run<KeyedNotified>(u"c"_s, u"x"_s);
+    QVERIFY(calls.isEmpty());
+
+    QVERIFY(hooks.hasHandlers<KeyedNotified>());
+    QVERIFY(hooks.hasHandlers<KeyedNotified>(u"b"_s));
+    QVERIFY(!hooks.hasHandlers<KeyedNotified>(u"c"_s));
+
+    // also removed per owner
+    QObject otherOwner;
+    client.hooks(&otherOwner).add<KeyedNotified>(u"c"_s, [&](const QString &) { calls << u"c"_s; });
+    hooks.removeAll();
+    QVERIFY(!hooks.hasHandlers<KeyedNotified>(u"a"_s));
+    QVERIFY(hooks.hasHandlers<KeyedNotified>());
+    hooks.run<KeyedNotified>(u"c"_s, u"x"_s);
+    QCOMPARE(calls, QStringList { u"c"_s });
+}
+
+void tst_QXmppHooks::hooksKeyedTuple()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    hooks.add<TupleKeyed>({ u"a:b"_s, u"c"_s }, [](QStringList &calls) { calls << u"first"_s; });
+    hooks.add<TupleKeyed>({ u"a"_s, u"b:c"_s }, [](QStringList &calls) { calls << u"second"_s; });
+
+    // the elements are not simply joined
+    QStringList calls;
+    hooks.run<TupleKeyed>({ u"a"_s, u"b:c"_s }, calls);
+    QCOMPARE(calls, QStringList { u"second"_s });
+    QCOMPARE(Private::hookKeyString(std::tuple { u"a:b"_s, u"c"_s }) == Private::hookKeyString(std::tuple { u"a"_s, u"b:c"_s }), false);
+    QCOMPARE(Private::hookKeyString(std::tuple { QString(), u"ab"_s }) == Private::hookKeyString(std::tuple { u"a"_s, u"b"_s }), false);
+}
+
+void tst_QXmppHooks::hooksKeyedSignatureMismatch()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    QStringList calls;
+    hooks.add<KeyedNotified>(u"a"_s, [&](const QString &value) { calls << value; });
+
+    // same name and signature, other key type
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u"Rejected handler for hook.*"_s));
+    hooks.add<KeyedNotifiedByView>(u"a", [&](const QString &) { calls << u"view"_s; });
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u"Hook.*was run with a different signature.*"_s));
+    hooks.run<KeyedNotifiedByView>(u"a", u"x"_s);
+    QVERIFY(calls.isEmpty());
+
+    hooks.run<KeyedNotified>(u"a"_s, u"x"_s);
+    QCOMPARE(calls, QStringList { u"x"_s });
+}
+
+void tst_QXmppHooks::hooksSingleResponder()
+{
+    QXmppClient client;
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+
+    // no handler
+    QVERIFY(!hooks.run<Lookup>(u"x"_s));
+
+    QStringList calls;
+    hooks.add<Lookup>([&](const QString &value) {
+        calls << u"default:"_s + value;
+        return 1;
+    });
+
+    // another handler is reported, the sequence decides which one is used
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u"Hook test.lookup already has a handler.*"_s));
+    hooks.add<Lookup>([&](const QString &value) {
+        calls << u"early:"_s + value;
+        return 2;
+    },
+                      HookSequence::Early);
+
+    QCOMPARE(hooks.run<Lookup>(u"x"_s), std::optional(2));
+    // only the first handler runs
+    QCOMPARE(calls, QStringList { u"early:x"_s });
+}
+
+void tst_QXmppHooks::hooksSingleResponderAsync()
+{
+    QXmppClient client;
+    auto owner = std::make_unique<QObject>();
+    QObject otherOwner;
+
+    // a handler may return the value directly
+    client.hooks(&otherOwner).add<AsyncLookup>(u"direct"_s, [](const QString &value) { return value + u"!"_s; });
+    auto task = client.hooks(nullptr).run<AsyncLookup>(u"direct"_s, u"x"_s);
+    QVERIFY(task.isFinished());
+    QCOMPARE(task.result(), std::optional(u"x!"_s));
+
+    // no handler
+    auto none = client.hooks(nullptr).run<AsyncLookup>(u"none"_s, u"x"_s);
+    QVERIFY(none.isFinished());
+    QVERIFY(!none.result());
+
+    std::optional<QXmppPromise<QString>> pending;
+    auto waiting = [&](const QString &) {
+        pending.emplace();
+        return pending->task();
+    };
+    client.hooks(owner.get()).add<AsyncLookup>(u"waiting"_s, waiting);
+
+    task = client.hooks(nullptr).run<AsyncLookup>(u"waiting"_s, u"x"_s);
+    QVERIFY(!task.isFinished());
+    pending->finish(u"result"_s);
+    QVERIFY(task.isFinished());
+    QCOMPARE(task.result(), std::optional(u"result"_s));
+
+    // owner destroyed: the result is lost, no other handler replaces it
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u"Hook test.async-lookup \\(key waiting\\) already has a handler.*"_s));
+    client.hooks(&otherOwner).add<AsyncLookup>(u"waiting"_s, [](const QString &) { return u"fallback"_s; });
+    task = client.hooks(nullptr).run<AsyncLookup>(u"waiting"_s, u"x"_s);
+    QVERIFY(!task.isFinished());
+    owner.reset();
+    QVERIFY(task.isFinished());
+    QVERIFY(!task.result());
+
+    // task dropped: the result is lost too
+    QObject dropOwner;
+    client.hooks(&dropOwner).add<AsyncLookup>(u"dropped"_s, waiting);
+    task = client.hooks(nullptr).run<AsyncLookup>(u"dropped"_s, u"x"_s);
+    QVERIFY(!task.isFinished());
+    pending.reset();
+    QVERIFY(task.isFinished());
+    QVERIFY(!task.result());
+}
+
+// Adds a typed handler via an adapted hook in its constructor.
+class AdaptingManager : public QXmppClientExtension
+{
+    Q_OBJECT
+public:
+    AdaptingManager()
+    {
+        hooks().add<NumberRequest<1>>([](const Number &number) { return number.value * 2; });
+    }
+};
+
+void tst_QXmppHooks::hooksAdapted()
+{
+    QXmppClient client(QXmppClient::NoExtensions);
+    QObject owner;
+    auto hooks = client.hooks(&owner);
+    QVERIFY(!hooks.hasHandlers<NumberRequest<2>>());
+
+    hooks.add<NumberRequest<2>>([](const Number &number) { return number.value + 1; });
+    QVERIFY(hooks.hasHandlers<NumberRequest<2>>());
+    QVERIFY(!hooks.hasHandlers<NumberRequest<1>>());
+
+    // the target is run with the serialized data
+    auto task = hooks.run<Serialized>(u"number-2"_s, u"41"_s);
+    QVERIFY(task.isFinished());
+    QCOMPARE(task.result(), std::optional(u"42"_s));
+
+    // added by an extension in its constructor
+    auto *manager = new AdaptingManager();
+    QVERIFY(!hooks.hasHandlers<NumberRequest<1>>());
+    client.addExtension(manager);
+    QVERIFY(hooks.hasHandlers<NumberRequest<1>>());
+    QCOMPARE(hooks.run<Serialized>(u"number-1"_s, u"21"_s).result(), std::optional(u"42"_s));
+
+    // removed with the owner
+    client.removeExtension(manager);
+    QVERIFY(!hooks.hasHandlers<NumberRequest<1>>());
+    hooks.removeAll();
+    QVERIFY(!hooks.hasHandlers<NumberRequest<2>>());
 }
 
 }  // namespace HookTests
