@@ -601,6 +601,9 @@ void tst_QXmppBitsOfBinary::testIsBobIq()
         "</iq>");
     QCOMPARE(QXmppBitsOfBinaryIq::isBitsOfBinaryIq(xmlToDom(xmlWithoutBobData)), false);
     QT_WARNING_POP
+
+    QVERIFY(QXmpp::isIqElement<QXmppBitsOfBinaryIq>(xmlToDom(xmlSimple)));
+    QVERIFY(!QXmpp::isIqElement<QXmppBitsOfBinaryIq>(xmlToDom(xmlWithoutBobData)));
 }
 
 void tst_QXmppBitsOfBinary::fromByteArray()

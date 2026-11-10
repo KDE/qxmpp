@@ -14,7 +14,7 @@ public:
     QXmppBitsOfBinaryIq();
     ~QXmppBitsOfBinaryIq() override;
 
-    static constexpr std::tuple PayloadXmlTag = { u"data", QXmpp::Private::ns_oob };
+    static constexpr std::tuple PayloadXmlTag = { u"data", QXmpp::Private::ns_bob };
     [[deprecated("Use QXmpp::isIqElement()")]]
     static bool isBitsOfBinaryIq(const QDomElement &element);
 
