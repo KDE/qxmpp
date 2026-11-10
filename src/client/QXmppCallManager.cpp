@@ -236,6 +236,16 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
 QXmppCallManager::QXmppCallManager()
     : d(std::make_unique<QXmppCallManagerPrivate>(this))
 {
+    hooks().add<Disco::CollectInfo>([this](QList<QString> &features, auto &) {
+        features << staticString(ns_jingle)      // XEP-0166: Jingle
+                 << staticString(ns_jingle_rtp)  // XEP-0167: Jingle RTP Sessions
+                 << staticString(ns_jingle_rtp_audio)
+                 << staticString(ns_jingle_rtp_video)
+                 << staticString(ns_jingle_ice_udp);  // XEP-0176: Jingle ICE-UDP Transport Method
+        if (d->supportsDtls) {
+            features << staticString(ns_jingle_dtls);  // XEP-0320: Use of DTLS-SRTP in Jingle Sessions
+        }
+    });
 }
 
 /*! Destroys the QXmppCallManager object. */
@@ -283,21 +293,6 @@ void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &se
         }
     }
     d->fallbackTurnServer = server;
-}
-
-QStringList QXmppCallManager::discoveryFeatures() const
-{
-    QStringList features = {
-        staticString(ns_jingle),      // XEP-0166: Jingle
-        staticString(ns_jingle_rtp),  // XEP-0167: Jingle RTP Sessions
-        staticString(ns_jingle_rtp_audio),
-        staticString(ns_jingle_rtp_video),
-        staticString(ns_jingle_ice_udp),  // XEP-0176: Jingle ICE-UDP Transport Method
-    };
-    if (d->supportsDtls) {
-        features.append(staticString(ns_jingle_dtls));  // XEP-0320: Use of DTLS-SRTP in Jingle Sessions
-    }
-    return features;
 }
 
 bool QXmppCallManager::handleStanza(const QDomElement &element)

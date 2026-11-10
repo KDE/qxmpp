@@ -7,6 +7,7 @@
 #include "QXmppByteStreamIq.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppIbbIq.h"
 #include "QXmppSocks.h"
 #include "QXmppStreamInitiationIq_p.h"
@@ -32,6 +33,7 @@
 #include <QTimer>
 #include <QUrl>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 // time to try to connect to a SOCKS host (7 seconds)
@@ -724,6 +726,17 @@ QXmppTransferOutgoingJob *QXmppTransferManagerPrivate::getOutgoingJobByRequestId
 QXmppTransferManager::QXmppTransferManager()
     : d(std::make_unique<QXmppTransferManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        // XEP-0047: In-Band Bytestreams
+        features << staticString(ns_ibb);
+        // XEP-0065: SOCKS5 Bytestreams
+        features << staticString(ns_bytestreams);
+        // XEP-0095: Stream Initiation
+        features << staticString(ns_stream_initiation);
+        // XEP-0096: SI File Transfer
+        features << staticString(ns_stream_initiation_file_transfer);
+    });
+
     // start SOCKS server
     d->socksServer = new QXmppSocksServer(this);
     connect(d->socksServer, &QXmppSocksServer::newConnection, this, &QXmppTransferManager::_q_socksServerConnected);
@@ -827,16 +840,6 @@ void QXmppTransferManager::byteStreamSetReceived(const QXmppByteStreamIq &iq)
     }
 
     job->connectToHosts(iq);
-}
-
-QStringList QXmppTransferManager::discoveryFeatures() const
-{
-    return {
-        staticString(ns_ibb),                              // XEP-0047: In-Band Bytestreams
-        staticString(ns_bytestreams),                      // XEP-0065: SOCKS5 Bytestreams
-        staticString(ns_stream_initiation),                // XEP-0095: Stream Initiation
-        staticString(ns_stream_initiation_file_transfer),  // XEP-0096: SI File Transfer
-    };
 }
 
 bool QXmppTransferManager::handleStanza(const QDomElement &element)

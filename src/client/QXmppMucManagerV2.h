@@ -40,8 +40,6 @@ public:
     QXmppMucManagerV2();
     ~QXmppMucManagerV2();
 
-    QStringList discoveryFeatures() const override;
-
     QBindable<QStringList> mucServices() const;
     QBindable<QList<QXmppDiscoService>> mucServiceInfos() const;
     QBindable<bool> mucServicesLoaded() const;

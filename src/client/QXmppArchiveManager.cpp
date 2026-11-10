@@ -7,6 +7,7 @@
 #include "QXmppArchiveIq.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
@@ -14,13 +15,18 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
-QStringList QXmppArchiveManager::discoveryFeatures() const
+QXmppArchiveManager::QXmppArchiveManager()
 {
-    // XEP-0036: Message Archiving
-    return { staticString(ns_archive) };
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        // XEP-0036: Message Archiving
+        features << staticString(ns_archive);
+    });
 }
+
+QXmppArchiveManager::~QXmppArchiveManager() = default;
 
 bool QXmppArchiveManager::handleStanza(const QDomElement &element)
 {

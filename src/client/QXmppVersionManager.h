@@ -40,7 +40,6 @@ public:
     QString clientVersion() const;
     QString clientOs() const;
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
     QXmppVersionIq handleIq(QXmppVersionIq &&iq);
 

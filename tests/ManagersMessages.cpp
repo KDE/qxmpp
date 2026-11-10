@@ -820,7 +820,7 @@ void tst_QXmppAttentionManager::initTestCase()
 
 void tst_QXmppAttentionManager::testDiscoFeatures()
 {
-    QCOMPARE(manager->discoveryFeatures(), QStringList() << "urn:xmpp:attention:0");
+    QCOMPARE(addedDiscoveryFeatures<QXmppAttentionManager>(), QStringList { u"urn:xmpp:attention:0"_s });
 }
 
 void tst_QXmppAttentionManager::testReceived_data()

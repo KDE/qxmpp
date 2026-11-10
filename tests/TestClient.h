@@ -92,4 +92,24 @@ void checkWatchSupport(WatchSupport watchSupport, const QString &jid, const QStr
     QVERIFY(watch.supported().value());
 }
 
+// Returns the service discovery features a new extension of type Extension adds to a client that
+// already has the extensions of the types Dependencies.
+template<typename Extension, typename... Dependencies>
+QStringList addedDiscoveryFeatures()
+{
+    QXmppClient client(QXmppClient::NoExtensions);
+    auto *disco = client.addNewExtension<QXmppDiscoveryManager>();
+    (client.addNewExtension<Dependencies>(), ...);
+    const auto baseFeatures = disco->buildClientInfo().features();
+
+    if constexpr (std::is_constructible_v<Extension, QXmppClient *>) {
+        client.addNewExtension<Extension>(&client);
+    } else {
+        client.addNewExtension<Extension>();
+    }
+    auto features = disco->buildClientInfo().features();
+    features.removeIf([&](const QString &feature) { return baseFeatures.contains(feature); });
+    return features;
+}
+
 #endif  // CLIENTTESTING_H

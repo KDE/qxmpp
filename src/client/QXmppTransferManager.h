@@ -316,7 +316,6 @@ public:
     QXmppTransferJob::Methods supportedMethods() const;
     void setSupportedMethods(QXmppTransferJob::Methods methods);
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
     /*!

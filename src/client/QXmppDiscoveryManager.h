@@ -28,6 +28,15 @@ namespace QXmpp::Private {
 struct DiscoInfoTracking;
 }
 
+namespace QXmpp::Disco {
+
+struct CollectInfo {
+    static constexpr QStringView Name = u"org.qxmpp.disco.collect-info";
+    using Signature = void(QList<QString> &features, QList<QXmppDiscoIdentity> &identities);
+};
+
+}  // namespace QXmpp::Disco
+
 /*!
     \inmodule QXmpp
 
@@ -165,7 +174,6 @@ public:
 
     QXmppDiscoInfo buildClientInfo() const;
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
 #if QXMPP_DEPRECATED_SINCE(1, 13)

@@ -60,8 +60,6 @@ public:
                                              const QVariant &arg9 = QVariant(),
                                              const QVariant &arg10 = QVariant());
 
-    QStringList discoveryFeatures() const override;
-    QList<QXmppDiscoIdentity> discoveryIdentities() const override;
     bool handleStanza(const QDomElement &element) override;
 
     Q_SIGNAL void rpcCallResponse(const QXmppRpcResponseIq &result);

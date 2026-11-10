@@ -148,7 +148,6 @@ public:
 
     static QString standardItemIdToString(StandardItemId itemId);
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
 private:

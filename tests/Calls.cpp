@@ -1731,10 +1731,7 @@ void tst_QXmppExternalServiceDiscoveryManager::testRequestServices()
 
 void tst_QXmppExternalServiceDiscoveryManager::testDiscoveryFeatures()
 {
-    TestClient test;
-    auto *m = test.addNewExtension<QXmppExternalServiceDiscoveryManager>();
-
-    QVERIFY(m->discoveryFeatures().contains(u"urn:xmpp:extdisco:2"));
+    QVERIFY(addedDiscoveryFeatures<QXmppExternalServiceDiscoveryManager>().contains(u"urn:xmpp:extdisco:2"));
 }
 
 // ============================================================

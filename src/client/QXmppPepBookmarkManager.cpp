@@ -6,6 +6,7 @@
 
 #include "QXmppAsync_p.h"
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppPepBookmarkManager_p.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
@@ -171,15 +172,12 @@ using EmptyResult = std::variant<Success, QXmppError>;
 QXmppPepBookmarkManager::QXmppPepBookmarkManager()
     : d(std::make_unique<QXmppPepBookmarkManagerPrivate>(this))
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_bookmarks2 + u"+notify";
+    });
 }
 
 QXmppPepBookmarkManager::~QXmppPepBookmarkManager() = default;
-
-/*! Supported service discovery features. */
-QStringList QXmppPepBookmarkManager::discoveryFeatures() const
-{
-    return { ns_bookmarks2 + u"+notify" };
-}
 
 /*!
     Returns the currently cached list of bookmarks.

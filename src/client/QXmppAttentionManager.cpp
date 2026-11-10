@@ -9,12 +9,14 @@
 // QXmpp
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppRosterManager.h"
 #include "QXmppUtils.h"
 
 #include "StringLiterals.h"
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 /*!
@@ -89,17 +91,12 @@ public:
 QXmppAttentionManager::QXmppAttentionManager(quint8 allowedAttempts, QTime timeFrame)
     : d(new QXmppAttentionManagerPrivate(this, allowedAttempts, timeFrame))
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_attention);
+    });
 }
 
 QXmppAttentionManager::~QXmppAttentionManager() = default;
-
-/*! Returns the \xep{0224}{Attention} feature. */
-QStringList QXmppAttentionManager::discoveryFeatures() const
-{
-    return {
-        staticString(ns_attention),
-    };
-}
 
 /*!
     Returns the number of allowed attempts of attentions from a bare JID in the

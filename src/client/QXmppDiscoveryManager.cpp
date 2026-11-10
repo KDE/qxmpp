@@ -52,6 +52,10 @@ QXmppEntityCapsStorage::~QXmppEntityCapsStorage() = default;
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_disco_info.toString();
+    });
+
     d->recentInfoEntries.setMaxCost(50);
     d->itemsCache.setMaxCost(50);
     d->capsCache.setMaxCost(200);
@@ -168,7 +172,8 @@ QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QStr
 
     The identities are added to the service discovery information other entities can request.
 
-    \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
+    \note Additionally also all identities added via the QXmpp::Disco::CollectInfo hook and the
+    deprecated QXmppClientExtension::discoveryIdentities() are added.
 
     \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
 
@@ -184,7 +189,8 @@ const QList<QXmppDiscoIdentity> &QXmppDiscoveryManager::identities() const
 
     The identities are added to the service discovery information other entities can request.
 
-    \note Additionally also all identities reported via QXmppClientExtension::discoveryIdentities() are added.
+    \note Additionally also all identities added via the QXmpp::Disco::CollectInfo hook and the
+    deprecated QXmppClientExtension::discoveryIdentities() are added.
 
     \note The default identity is type=client, category=pc/phone (OS dependent) and name="{application name} {application version}".
 
@@ -224,28 +230,43 @@ void QXmppDiscoveryManager::setInfoForms(const QList<QXmppDataForm> &dataForms)
 }
 
 /*!
+    \struct QXmpp::Disco::CollectInfo
+    \inmodule QXmpp
+
+    Hook for adding features and identities to the service discovery information of the client,
+    see QXmppDiscoveryManager::buildClientInfo().
+
+    \since QXmpp 1.18
+*/
+
+/*!
     Builds a full disco info element for this client.
 
-    Contains features and identities from all extensions and identities and data forms configured
-    in this manager.
+    Contains the features and identities added via the QXmpp::Disco::CollectInfo hook and the
+    deprecated QXmppClientExtension::discoveryFeatures() and discoveryIdentities(), and the
+    identities and data forms configured in this manager.
 
     \since QXmpp 1.12
 */
 QXmppDiscoInfo QXmppDiscoveryManager::buildClientInfo() const
 {
-    const auto extensions = client()->extensions();
-
     // collect features and identities
     auto allFeatures = QXmppClientPrivate::discoveryFeatures();
     auto allIdentities = d->identities;
+    hooks().run<Disco::CollectInfo>(allFeatures, allIdentities);
+
+    // extensions still implementing the deprecated virtual functions
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    const auto extensions = client()->extensions();
     for (auto *extension : extensions) {
-        if (extension) {
-            allFeatures << extension->discoveryFeatures();
-            allIdentities << extension->discoveryIdentities();
-        }
+        allFeatures << extension->discoveryFeatures();
+        allIdentities << extension->discoveryIdentities();
     }
+    QT_WARNING_POP
 
     std::sort(allFeatures.begin(), allFeatures.end());
+    allFeatures.erase(std::unique(allFeatures.begin(), allFeatures.end()), allFeatures.end());
 
     return QXmppDiscoInfo { {}, allIdentities, allFeatures, d->dataForms };
 }
@@ -775,11 +796,6 @@ std::shared_ptr<QXmppEntityCapsStorage> QXmppDiscoveryManager::entityCapsStorage
 void QXmppDiscoveryManager::setEntityCapsStorage(std::shared_ptr<QXmppEntityCapsStorage> storage)
 {
     d->capsStorage = std::move(storage);
-}
-
-QStringList QXmppDiscoveryManager::discoveryFeatures() const
-{
-    return { ns_disco_info.toString() };
 }
 
 bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)

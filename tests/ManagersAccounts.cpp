@@ -91,7 +91,7 @@ void tst_QXmppRegistrationManager::initTestCase()
 
 void tst_QXmppRegistrationManager::testDiscoFeatures()
 {
-    QCOMPARE(manager->discoveryFeatures(), QStringList() << "jabber:iq:register");
+    QCOMPARE(addedDiscoveryFeatures<QXmppRegistrationManager>(), QStringList { u"jabber:iq:register"_s });
 }
 
 void tst_QXmppRegistrationManager::testChangePassword_data()
@@ -1184,9 +1184,7 @@ void tst_QXmppMovedManager::testMovedPresence()
 
 void tst_QXmppMovedManager::testDiscoveryFeatures()
 {
-    QXmppMovedManager manager;
-
-    QCOMPARE(manager.discoveryFeatures(), QStringList { ns_moved.toString() });
+    QCOMPARE((addedDiscoveryFeatures<QXmppMovedManager, QXmppPubSubManager>()), QStringList { ns_moved.toString() });
 }
 
 QT_WARNING_PUSH

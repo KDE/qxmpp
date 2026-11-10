@@ -6,9 +6,11 @@
 #include "QXmppUserLocationManager.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppGeolocItem.h"
 #include "QXmppPep_p.h"
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 static QXmppPubSubManager *pubSub(QXmppClient *client)
@@ -64,14 +66,12 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
     \a jid is the JID of the contact. \a item contains the received location data.
 */
 
-QXmppUserLocationManager::QXmppUserLocationManager() = default;
-
-QStringList QXmppUserLocationManager::discoveryFeatures() const
+QXmppUserLocationManager::QXmppUserLocationManager()
 {
-    return {
-        ns_geoloc.toString(),
-        ns_geoloc_notify.toString(),
-    };
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_geoloc.toString();
+        features << ns_geoloc_notify.toString();
+    });
 }
 
 /*!

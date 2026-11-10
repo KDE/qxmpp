@@ -69,14 +69,13 @@ using namespace QXmpp::Private;
     client->addExtension(manager);
     \endcode
 
-    \note To subscribe to PEP event notifications use the
-    QXmppClientExtension::discoveryFeatures method of your client extension
-    according to section 9.2 of \xep{0060}{Publish-Subscribe}. For example:
+    \note To subscribe to PEP event notifications add the notify feature according to section
+    9.2 of \xep{0060}{Publish-Subscribe} using the QXmpp::Disco::CollectInfo hook.
+    For example in the constructor of your client extension:
     \code
-    QStringList YourExtension::discoveryFeatures() const
-    {
-    return { "http://jabber.org/protocol/tune+notify" };
-    }
+    hooks().add<QXmpp::Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << u"http://jabber.org/protocol/tune+notify"_s;
+    });
     \endcode
 
     \list
@@ -197,6 +196,9 @@ using namespace QXmpp::Private;
 /*! Default constructor. */
 QXmppPubSubManager::QXmppPubSubManager()
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_pubsub_rsm);
+    });
 }
 
 /*! Default destructor. */
@@ -860,13 +862,6 @@ QString QXmppPubSubManager::standardItemIdToString(StandardItemId itemId)
         return u"current"_s;
     }
     return {};
-}
-
-QStringList QXmppPubSubManager::discoveryFeatures() const
-{
-    return {
-        staticString(ns_pubsub_rsm)
-    };
 }
 
 bool QXmppPubSubManager::handleStanza(const QDomElement &element)

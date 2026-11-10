@@ -89,7 +89,6 @@ public:
     Q_SIGNAL void blocked(const QList<QString> &jids);
     Q_SIGNAL void unblocked(const QList<QString> &jids);
 
-    QStringList discoveryFeatures() const override;
     void onRegistered(QXmppClient *) override;
     void onUnregistered(QXmppClient *) override;
     bool handleStanza(const QDomElement &, const std::optional<QXmppE2eeMetadata> &) override;

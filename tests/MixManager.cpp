@@ -87,8 +87,7 @@ private:
 
 void tst_QXmppMixManager::testDiscoveryFeatures()
 {
-    QXmppMixManager manager;
-    QCOMPARE(manager.discoveryFeatures(), QStringList { "urn:xmpp:mix:core:1" });
+    QCOMPARE((addedDiscoveryFeatures<QXmppMixManager, QXmppPubSubManager>()), QStringList { u"urn:xmpp:mix:core:1"_s });
 }
 
 // Connects and answers the disco#info request on the own account with the response in which

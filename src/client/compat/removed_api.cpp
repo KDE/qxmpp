@@ -425,6 +425,15 @@ void QXmppRemoteMethod::gotResult(const QXmppRpcResponseIq &iq)
 /*! Constructs a QXmppRpcManager. */
 QXmppRpcManager::QXmppRpcManager()
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, QList<QXmppDiscoIdentity> &identities) {
+        // XEP-0009: Jabber-RPC
+        features << ns_rpc.toString();
+
+        QXmppDiscoIdentity identity;
+        identity.setCategory(u"automation"_s);
+        identity.setType(u"rpc"_s);
+        identities << identity;
+    });
 }
 
 /*! Adds a local \a interface which can be queried using RPC. */
@@ -543,22 +552,6 @@ QXmppRemoteMethodResult QXmppRpcManager::callRemoteMethod(const QString &jid,
     Q_ASSERT(check);
 
     return method.call();
-}
-
-QStringList QXmppRpcManager::discoveryFeatures() const
-{
-    return {
-        // XEP-0009: Jabber-RPC
-        ns_rpc.toString(),
-    };
-}
-
-QList<QXmppDiscoIdentity> QXmppRpcManager::discoveryIdentities() const
-{
-    QXmppDiscoIdentity identity;
-    identity.setCategory(u"automation"_s);
-    identity.setType(u"rpc"_s);
-    return QList<QXmppDiscoIdentity>() << identity;
 }
 
 bool QXmppRpcManager::handleStanza(const QDomElement &element)

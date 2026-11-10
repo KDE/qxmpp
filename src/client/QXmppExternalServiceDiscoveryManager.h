@@ -27,8 +27,6 @@ public:
 
     QXmppDiscoFeatureWatch watchServerSupport() const;
     QXmppTask<ServicesResult> requestServices(const QString &jid, const QString &node = {});
-
-    QStringList discoveryFeatures() const override;
 };
 
 #endif  // QXMPPEXTERNALSERVICEDISCOVERYMANAGER_H

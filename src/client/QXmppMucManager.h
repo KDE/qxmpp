@@ -60,7 +60,6 @@ public:
 
     QList<QXmppMucRoom *> rooms() const;
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
     /*!

@@ -36,6 +36,9 @@ class QXMPP_EXPORT QXmppArchiveManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
+    QXmppArchiveManager();
+    ~QXmppArchiveManager() override;
+
     void listCollections(const QString &jid, const QDateTime &start = QDateTime(), const QDateTime &end = QDateTime(),
                          const QXmppResultSetQuery &rsm = QXmppResultSetQuery());
     void listCollections(const QString &jid, const QDateTime &start, const QDateTime &end, int max);
@@ -43,7 +46,6 @@ public:
     void retrieveCollection(const QString &jid, const QDateTime &start, const QXmppResultSetQuery &rsm = QXmppResultSetQuery());
     void retrieveCollection(const QString &jid, const QDateTime &start, int max);
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
     /*!

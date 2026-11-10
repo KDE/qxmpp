@@ -25,8 +25,6 @@ public:
     explicit QXmppMovedManager();
     ~QXmppMovedManager() override;
 
-    QStringList discoveryFeatures() const override;
-
     QXmppDiscoFeatureWatch watchServerSupport() const;
 
 #if QXMPP_DEPRECATED_SINCE(1, 17)

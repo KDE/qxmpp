@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppGlobal.h"
 #include "QXmppMessage.h"
@@ -446,15 +447,14 @@ constexpr QStringView MIX_SERVICE_DISCOVERY_NODE = u"mix";
 QXmppMixManager::QXmppMixManager()
     : d(new QXmppMixManagerPrivate())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_mix);
+    });
+
     QXmppExportData::registerExtension<MixData, MixData::fromDom, serializeMixData>(u"mix", ns_qxmpp_export);
 }
 
 QXmppMixManager::~QXmppMixManager() = default;
-
-QStringList QXmppMixManager::discoveryFeatures() const
-{
-    return { staticString(ns_mix) };
-}
 
 /*!
     Returns a watch on whether the server supports MIX channel participants as specified in

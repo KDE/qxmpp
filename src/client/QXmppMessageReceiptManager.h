@@ -24,7 +24,6 @@ class QXMPP_EXPORT QXmppMessageReceiptManager : public QXmppClientExtension, pub
 public:
     QXmppMessageReceiptManager();
 
-    QStringList discoveryFeatures() const override;
     bool handleMessage(const QXmppMessage &) override;
 
     /*!

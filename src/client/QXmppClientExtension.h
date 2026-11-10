@@ -39,7 +39,10 @@ public:
     QXmppClientExtension();
     ~QXmppClientExtension() override;
 
+    // Always declared, so the layout of the vtable does not depend on QXMPP_DISABLE_DEPRECATED_BEFORE.
+    [[deprecated("Use the QXmpp::Disco::CollectInfo hook")]]
     virtual QStringList discoveryFeatures() const;
+    [[deprecated("Use the QXmpp::Disco::CollectInfo hook")]]
     virtual QList<QXmppDiscoIdentity> discoveryIdentities() const;
 
     virtual bool handleStanza(const QDomElement &stanza);

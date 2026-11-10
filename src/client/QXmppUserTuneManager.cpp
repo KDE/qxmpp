@@ -5,9 +5,11 @@
 #include "QXmppUserTuneManager.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppPep_p.h"
 #include "QXmppUserTuneItem.h"
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 static QXmppPubSubManager *pubSub(QXmppClient *client)
@@ -65,14 +67,10 @@ static QXmppPubSubManager *pubSub(QXmppClient *client)
 
 QXmppUserTuneManager::QXmppUserTuneManager()
 {
-}
-
-QStringList QXmppUserTuneManager::discoveryFeatures() const
-{
-    return {
-        staticString(ns_tune),
-        staticString(ns_tune_notify),
-    };
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_tune);
+        features << staticString(ns_tune_notify);
+    });
 }
 
 /*!

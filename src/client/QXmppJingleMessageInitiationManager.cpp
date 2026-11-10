@@ -7,6 +7,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppPromise.h"
 #include "QXmppUtils.h"
@@ -306,14 +307,12 @@ public:
 QXmppJingleMessageInitiationManager::QXmppJingleMessageInitiationManager()
     : d(std::make_unique<QXmppJingleMessageInitiationManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_jingle_message);
+    });
 }
 
 QXmppJingleMessageInitiationManager::~QXmppJingleMessageInitiationManager() = default;
-
-QStringList QXmppJingleMessageInitiationManager::discoveryFeatures() const
-{
-    return { staticString(ns_jingle_message) };
-}
 
 /*!
     Creates a proposal JMI element and passes it as a message.

@@ -5,6 +5,7 @@
 #include "QXmppBlockingManager.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppSpamReport.h"
@@ -211,6 +212,9 @@ struct QXmppBlockingManagerPrivate {
 QXmppBlockingManager::QXmppBlockingManager()
     : d(new QXmppBlockingManagerPrivate)
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_blocking);
+    });
 }
 
 QXmppBlockingManager::~QXmppBlockingManager() = default;
@@ -359,11 +363,6 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QList<QStr
 QXmppDiscoFeatureWatch QXmppBlockingManager::watchServerSupport() const
 {
     return watchServerFeature(client(), QXmpp::Namespace::Blocking);
-}
-
-QStringList QXmppBlockingManager::discoveryFeatures() const
-{
-    return { staticString(ns_blocking) };
 }
 
 void QXmppBlockingManager::onRegistered(QXmppClient *client)

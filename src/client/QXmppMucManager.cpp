@@ -47,6 +47,14 @@ public:
 QXmppMucManager::QXmppMucManager()
     : d(std::make_unique<QXmppMucManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        // XEP-0045: Multi-User Chat
+        features << staticString(ns_muc);
+        features << staticString(ns_muc_admin);
+        features << staticString(ns_muc_owner);
+        features << staticString(ns_muc_user);
+        features << staticString(ns_conference);
+    });
 }
 
 QXmppMucManager::~QXmppMucManager() = default;
@@ -74,18 +82,6 @@ QXmppMucRoom *QXmppMucManager::addRoom(const QString &roomJid)
 QList<QXmppMucRoom *> QXmppMucManager::rooms() const
 {
     return d->rooms.values();
-}
-
-QStringList QXmppMucManager::discoveryFeatures() const
-{
-    // XEP-0045: Multi-User Chat
-    return {
-        staticString(ns_muc),
-        staticString(ns_muc_admin),
-        staticString(ns_muc_owner),
-        staticString(ns_muc_user),
-        staticString(ns_conference),
-    };
 }
 
 bool QXmppMucManager::handleStanza(const QDomElement &element)

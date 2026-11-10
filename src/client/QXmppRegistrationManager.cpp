@@ -7,6 +7,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppRegisterIq.h"
@@ -52,17 +53,12 @@ QXmppRegistrationManagerPrivate::QXmppRegistrationManagerPrivate()
 QXmppRegistrationManager::QXmppRegistrationManager()
     : d(std::make_unique<QXmppRegistrationManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_register.toString();
+    });
 }
 
 QXmppRegistrationManager::~QXmppRegistrationManager() = default;
-
-/*! This adds the \c jabber:iq:register namespace to the features. */
-QStringList QXmppRegistrationManager::discoveryFeatures() const
-{
-    return QStringList {
-        ns_register.toString()
-    };
-}
 
 /*!
     Changes the password of the user's account to \a newPassword. \a newPassword must not be

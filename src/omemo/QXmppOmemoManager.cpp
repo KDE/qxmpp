@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoIq_p.h"
 #include "QXmppOmemoItems_p.h"
@@ -312,6 +313,10 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     d->ownDevice.label = DEVICE_LABEL;
     d->initOmemoLibrary();
     d->schedulePeriodicTasks();
+
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_omemo_2_devices + u"+notify";
+    });
 }
 
 QXmppOmemoManager::~QXmppOmemoManager() = default;
@@ -983,13 +988,6 @@ bool QXmppOmemoManager::isEncrypted(const QDomElement &el)
 bool QXmppOmemoManager::isEncrypted(const QXmppMessage &message)
 {
     return message.omemoElement().has_value();
-}
-
-QStringList Manager::discoveryFeatures() const
-{
-    return {
-        ns_omemo_2_devices + u"+notify"
-    };
 }
 
 bool Manager::handleStanza(const QDomElement &stanza)

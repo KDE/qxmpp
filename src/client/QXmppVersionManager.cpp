@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
 #include "QXmppVersionIq.h"
@@ -30,6 +31,11 @@ public:
 QXmppVersionManager::QXmppVersionManager()
     : d(std::make_unique<QXmppVersionManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        // XEP-0092: Software Version
+        features << staticString(ns_version);
+    });
+
     d->clientName = qApp->applicationName();
     if (d->clientName.isEmpty()) {
         d->clientName = u"Based on QXmpp"_s;
@@ -110,14 +116,6 @@ QString QXmppVersionManager::clientVersion() const
 QString QXmppVersionManager::clientOs() const
 {
     return d->clientOs;
-}
-
-QStringList QXmppVersionManager::discoveryFeatures() const
-{
-    return {
-        // XEP-0092: Software Version
-        staticString(ns_version),
-    };
 }
 
 bool QXmppVersionManager::handleStanza(const QDomElement &element)

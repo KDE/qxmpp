@@ -26,8 +26,6 @@ public:
 
     QXmppUserTuneManager();
 
-    QStringList discoveryFeatures() const override;
-
     auto request(const QString &jid) -> QXmppTask<GetResult>;
     auto publish(const QXmppTuneItem &item) -> QXmppTask<PublishResult>;
 

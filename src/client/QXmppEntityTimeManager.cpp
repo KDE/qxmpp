@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppEntityTimeIq.h"
 #include "QXmppIqHandling.h"
 #include "QXmppUtils.h"
@@ -59,10 +60,14 @@ auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<
     co_return parseIq<QXmppEntityTimeIq>(co_await client()->sendIq(std::move(iq)));
 }
 
-QStringList QXmppEntityTimeManager::discoveryFeatures() const
+QXmppEntityTimeManager::QXmppEntityTimeManager()
 {
-    return { staticString(ns_entity_time) };
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_entity_time);
+    });
 }
+
+QXmppEntityTimeManager::~QXmppEntityTimeManager() = default;
 
 bool QXmppEntityTimeManager::handleStanza(const QDomElement &element)
 {

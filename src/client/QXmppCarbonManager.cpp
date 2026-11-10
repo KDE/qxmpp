@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
@@ -15,11 +16,15 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 QXmppCarbonManager::QXmppCarbonManager()
     : m_carbonsEnabled(false)
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_carbons);
+    });
 }
 
 QXmppCarbonManager::~QXmppCarbonManager()
@@ -61,11 +66,6 @@ void QXmppCarbonManager::setCarbonsEnabled(bool enabled)
         iq.setExtensions(QXmppElementList() << carbonselement);
         client()->send(std::move(iq));
     }
-}
-
-QStringList QXmppCarbonManager::discoveryFeatures() const
-{
-    return { staticString(ns_carbons) };
 }
 
 bool QXmppCarbonManager::handleStanza(const QDomElement &element)

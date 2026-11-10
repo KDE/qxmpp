@@ -6,6 +6,7 @@
 
 #include "QXmppAsync_p.h"
 #include "QXmppClient.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppMessageRetraction.h"
 #include "QXmppMucForms.h"
@@ -418,19 +419,14 @@ struct MucRoomData {
 QXmppMucManagerV2::QXmppMucManagerV2()
     : d(std::make_unique<QXmppMucManagerV2Private>(this))
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_muc.toString();
+        // XEP-0424: Message Retraction (the manager handles incoming retractions in joined rooms)
+        features << ns_message_retract.toString();
+    });
 }
 
 QXmppMucManagerV2::~QXmppMucManagerV2() = default;
-
-/*! Supported service discovery features. */
-QStringList QXmppMucManagerV2::discoveryFeatures() const
-{
-    return {
-        ns_muc.toString(),
-        // XEP-0424: Message Retraction (the manager handles incoming retractions in joined rooms)
-        ns_message_retract.toString(),
-    };
-}
 
 /*!
     Returns the JIDs of discovered MUC services on the server.

@@ -1561,6 +1561,7 @@ class tst_QXmppDiscoveryManager : public QObject
     Q_OBJECT
 private:
     Q_SLOT void testInfo();
+    Q_SLOT void legacyDiscoveryFeatures();
     Q_SLOT void testItems();
     Q_SLOT void testRequests();
     Q_SLOT void cachingItems();
@@ -1616,6 +1617,33 @@ private:
     Q_SLOT void resolveFeatureManagerDestroyed();
     Q_SLOT void resolveFeatureContinuation();
 };
+
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+// External extension using the deprecated virtual functions.
+class LegacyDiscoveryExtension : public QXmppClientExtension
+{
+public:
+    QStringList discoveryFeatures() const override { return { u"urn:example:legacy"_s }; }
+    QList<QXmppDiscoIdentity> discoveryIdentities() const override
+    {
+        return { QXmppDiscoIdentity(u"automation"_s, u"legacy"_s) };
+    }
+};
+QT_WARNING_POP
+
+void tst_QXmppDiscoveryManager::legacyDiscoveryFeatures()
+{
+    QCOMPARE(addedDiscoveryFeatures<LegacyDiscoveryExtension>(), QStringList { u"urn:example:legacy"_s });
+
+    QXmppClient client(QXmppClient::NoExtensions);
+    auto *disco = client.addNewExtension<QXmppDiscoveryManager>();
+    client.addNewExtension<LegacyDiscoveryExtension>();
+    const auto identities = disco->buildClientInfo().identities();
+    QVERIFY(std::any_of(identities.begin(), identities.end(), [](const auto &identity) {
+        return identity.category() == u"automation" && identity.type() == u"legacy";
+    }));
+}
 
 void tst_QXmppDiscoveryManager::testInfo()
 {
@@ -3580,7 +3608,7 @@ void tst_QXmppRosterManager::initTestCase()
 
 void tst_QXmppRosterManager::testDiscoFeatures()
 {
-    QCOMPARE(manager->discoveryFeatures(), QStringList());
+    QCOMPARE(addedDiscoveryFeatures<QXmppRosterManager>(), QStringList());
 }
 
 void tst_QXmppRosterManager::testRenameItem()

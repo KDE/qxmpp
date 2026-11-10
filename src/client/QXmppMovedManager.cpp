@@ -6,6 +6,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppMovedItem_p.h"
 #include "QXmppPubSubManager.h"
@@ -129,14 +130,12 @@ public:
 QXmppMovedManager::QXmppMovedManager()
     : d(new QXmppMovedManagerPrivate())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_moved);
+    });
 }
 
 QXmppMovedManager::~QXmppMovedManager() = default;
-
-QStringList QXmppMovedManager::discoveryFeatures() const
-{
-    return { staticString(ns_moved) };
-}
 
 /*!
     Returns a watch on whether the own server supports \xep{0283}{Moved}.

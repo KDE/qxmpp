@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppIqHandling.h"
@@ -13,6 +14,7 @@
 #include "Async.h"
 #include "StringLiterals.h"
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 /*!
@@ -39,6 +41,9 @@ using namespace QXmpp::Private;
 */
 QXmppExternalServiceDiscoveryManager::QXmppExternalServiceDiscoveryManager()
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << staticString(ns_external_service_discovery);
+    });
 }
 
 QXmppExternalServiceDiscoveryManager::~QXmppExternalServiceDiscoveryManager() = default;
@@ -73,9 +78,4 @@ QXmppTask<QXmppExternalServiceDiscoveryManager::ServicesResult> QXmppExternalSer
 QXmppDiscoFeatureWatch QXmppExternalServiceDiscoveryManager::watchServerSupport() const
 {
     return watchServerFeature(client(), QXmpp::Namespace::ExternalServiceDiscovery2);
-}
-
-QStringList QXmppExternalServiceDiscoveryManager::discoveryFeatures() const
-{
-    return { staticString(ns_external_service_discovery) };
 }

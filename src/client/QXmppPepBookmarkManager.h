@@ -122,8 +122,6 @@ public:
     QXmppPepBookmarkManager();
     ~QXmppPepBookmarkManager();
 
-    QStringList discoveryFeatures() const override;
-
     const std::optional<QList<QXmppMucBookmark>> &bookmarks() const;
     Q_SIGNAL void bookmarksReset();
     Q_SIGNAL void bookmarksAdded(const QList<QXmppMucBookmark> &newBookmarks);

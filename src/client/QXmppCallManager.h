@@ -93,7 +93,6 @@ public:
     bool dtlsRequired() const;
     void setDtlsRequired(bool);
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
     Q_SIGNAL void callReceived(std::unique_ptr<QXmppCall> &call);

@@ -229,8 +229,6 @@ public:
     QXmppRegistrationManager();
     ~QXmppRegistrationManager();
 
-    QStringList discoveryFeatures() const override;
-
     void changePassword(const QString &newPassword);
     void deleteAccount();
 

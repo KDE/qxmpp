@@ -79,8 +79,6 @@ public:
     QXmppCallInviteManager();
     ~QXmppCallInviteManager();
 
-    QStringList discoveryFeatures() const override;
-
     QXmppTask<ProposeResult> invite(
         QString callPartnerJid,
         bool audio = true,

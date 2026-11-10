@@ -28,12 +28,14 @@ class QXMPP_EXPORT QXmppEntityTimeManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
+    QXmppEntityTimeManager();
+    ~QXmppEntityTimeManager() override;
+
     QString requestTime(const QString &jid);
 
     using EntityTimeResult = std::variant<QXmppEntityTimeIq, QXmppError>;
     QXmppTask<EntityTimeResult> requestEntityTime(const QString &jid);
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
     std::variant<QXmppEntityTimeIq, QXmppStanza::Error> handleIq(QXmppEntityTimeIq iq);
 

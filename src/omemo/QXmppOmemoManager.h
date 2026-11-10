@@ -136,7 +136,6 @@ public:
     bool isEncrypted(const QDomElement &) override;
     bool isEncrypted(const QXmppMessage &) override;
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &stanza) override;
     bool handleMessage(const QXmppMessage &message) override;
 

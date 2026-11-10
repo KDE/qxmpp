@@ -94,8 +94,6 @@ public:
     QXmppJingleMessageInitiationManager();
     ~QXmppJingleMessageInitiationManager();
 
-    QStringList discoveryFeatures() const override;
-
     QXmppTask<ProposeResult> propose(
         const QString &remoteJid,
         const QXmppJingleRtpDescription &description);

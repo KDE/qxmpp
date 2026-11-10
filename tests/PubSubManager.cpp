@@ -113,9 +113,7 @@ private:
 
 void tst_QXmppPubSubManager::testDiscoFeatures()
 {
-    // so the coverage report is happy:
-    PSManager manager;
-    QCOMPARE(manager.discoveryFeatures(), QStringList { "http://jabber.org/protocol/pubsub#rsm" });
+    QCOMPARE(addedDiscoveryFeatures<PSManager>(), QStringList { u"http://jabber.org/protocol/pubsub#rsm"_s });
 }
 
 void tst_QXmppPubSubManager::testRequestFeatures()

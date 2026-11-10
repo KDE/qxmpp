@@ -26,13 +26,23 @@ QXmppClientExtension::QXmppClientExtension()
 
 QXmppClientExtension::~QXmppClientExtension() = default;
 
-/*! Returns the discovery features to add to the client. */
+/*!
+    Returns the discovery features to add to the client.
+
+    \deprecated since QXmpp 1.18, add the features via the QXmpp::Disco::CollectInfo hook
+    instead. Implementations are still used, after the handlers of the hook.
+*/
 QStringList QXmppClientExtension::discoveryFeatures() const
 {
     return QStringList();
 }
 
-/*! Returns the discovery identities to add to the client. */
+/*!
+    Returns the discovery identities to add to the client.
+
+    \deprecated since QXmpp 1.18, add the identities via the QXmpp::Disco::CollectInfo hook
+    instead. Implementations are still used, after the handlers of the hook.
+*/
 QList<QXmppDiscoIdentity> QXmppClientExtension::discoveryIdentities() const
 {
     return QList<QXmppDiscoIdentity>();

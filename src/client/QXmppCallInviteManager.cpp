@@ -6,6 +6,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppPromise.h"
 #include "QXmppUtils.h"
@@ -205,14 +206,12 @@ public:
 QXmppCallInviteManager::QXmppCallInviteManager()
     : d(std::make_unique<QXmppCallInviteManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_call_invites.toString();
+    });
 }
 
 QXmppCallInviteManager::~QXmppCallInviteManager() = default;
-
-QStringList QXmppCallInviteManager::discoveryFeatures() const
-{
-    return { ns_call_invites.toString() };
-}
 
 /*!
     Creates a proposal Call Invite element and sends it as a message to

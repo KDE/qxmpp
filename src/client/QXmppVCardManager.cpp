@@ -7,6 +7,7 @@
 #include "QXmppAccountMigrationManager.h"
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppError.h"
 #include "QXmppTask.h"
@@ -88,6 +89,11 @@ public:
 QXmppVCardManager::QXmppVCardManager()
     : d(std::make_unique<QXmppVCardManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        // XEP-0054: vcard-temp
+        features << staticString(ns_vcard);
+    });
+
     QXmppExportData::registerExtension<VCardData, VCardData::fromDom, serializeVCardData>(u"vcard", ns_qxmpp_export);
     QXmppExportData::registerExtension<VCardData, VCardData::fromDomPie, serializeVCardDataPie>(QXmppExportData::Format::Xep0227, u"vCard", ns_vcard);
 }
@@ -181,14 +187,6 @@ bool QXmppVCardManager::isClientVCardReceived() const
 QXmppDiscoFeatureWatch QXmppVCardManager::watchServerSupport() const
 {
     return watchServerFeature(client(), QXmpp::Namespace::VCard);
-}
-
-QStringList QXmppVCardManager::discoveryFeatures() const
-{
-    return {
-        // XEP-0054: vcard-temp
-        staticString(ns_vcard),
-    };
 }
 
 bool QXmppVCardManager::handleStanza(const QDomElement &element)

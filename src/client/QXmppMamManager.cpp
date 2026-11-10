@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppMamIq.h"
@@ -136,6 +137,10 @@ public:
 QXmppMamManager::QXmppMamManager()
     : d(std::make_unique<QXmppMamManagerPrivate>())
 {
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        // XEP-0313: Message Archive Management
+        features << staticString(ns_mam);
+    });
 }
 
 QXmppMamManager::~QXmppMamManager() = default;
@@ -153,12 +158,6 @@ QXmppMamManager::~QXmppMamManager() = default;
 QXmppDiscoFeatureWatch QXmppMamManager::watchAccountSupport() const
 {
     return watchAccountFeature(client(), QXmpp::Namespace::Mam2);
-}
-
-QStringList QXmppMamManager::discoveryFeatures() const
-{
-    // XEP-0313: Message Archive Management
-    return { staticString(ns_mam) };
 }
 
 bool QXmppMamManager::handleStanza(const QDomElement &element)

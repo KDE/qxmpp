@@ -35,7 +35,6 @@ public:
     bool carbonsEnabled() const;
     void setCarbonsEnabled(bool enabled);
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
     Q_SIGNAL void messageReceived(const QXmppMessage &);

@@ -70,8 +70,6 @@ public:
     QXmppMixManager();
     ~QXmppMixManager() override;
 
-    QStringList discoveryFeatures() const override;
-
     QXmppDiscoFeatureWatch watchParticipantSupport() const;
     QXmppDiscoFeatureWatch watchMessageArchivingSupport() const;
 

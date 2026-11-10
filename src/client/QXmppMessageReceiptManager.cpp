@@ -7,6 +7,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppMessage.h"
 #include "QXmppTask.h"
@@ -14,6 +15,7 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
 
 /*!
@@ -23,11 +25,9 @@ using namespace QXmpp::Private;
 QXmppMessageReceiptManager::QXmppMessageReceiptManager()
     : QXmppClientExtension()
 {
-}
-
-QStringList QXmppMessageReceiptManager::discoveryFeatures() const
-{
-    return { ns_message_receipts.toString() };
+    hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
+        features << ns_message_receipts.toString();
+    });
 }
 
 bool QXmppMessageReceiptManager::handleMessage(const QXmppMessage &message)

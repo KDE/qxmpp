@@ -20,8 +20,6 @@ public:
     QXmppAttentionManager(quint8 allowedAttempts = 3, QTime timeFrame = QTime(0, 15, 0));
     ~QXmppAttentionManager();
 
-    QStringList discoveryFeatures() const override;
-
     quint8 allowedAttempts() const;
     void setAllowedAttempts(quint8 allowedAttempts);
 

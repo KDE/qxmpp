@@ -71,7 +71,6 @@ public:
 
     QXmppDiscoFeatureWatch watchAccountSupport() const;
 
-    QStringList discoveryFeatures() const override;
     bool handleStanza(const QDomElement &element) override;
 
     /*!
