@@ -960,6 +960,33 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
     co_return std::make_unique<QXmppMessage>(std::move(message));
 }
 
+// Encrypts the sensitive content of \a message for the provider, the message pipeline adds the
+// public parts.
+QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessageContent(QXmppMessage message, QList<QString> recipientJids, TrustLevels acceptedTrustLevels)
+{
+    if (!initialized) {
+        co_return QXmppError {
+            u"OMEMO manager must be initialized before encrypting"_s,
+            SendError::EncryptionError
+        };
+    }
+    recipientJids.append(ownBareJid());
+
+    auto omemoElement = co_await encryptStanza(message, recipientJids, acceptedTrustLevels);
+    if (!omemoElement) {
+        co_return QXmppError {
+            u"OMEMO element could not be created"_s,
+            SendError::EncryptionError,
+        };
+    }
+
+    Xml::Extensions elements;
+    elements.add(std::move(*omemoElement));
+    E2ee::Encrypted encrypted;
+    encrypted.setElements(std::move(elements));
+    co_return encrypted;
+}
+
 // Encrypts a message or IQ stanza.
 //
 // \a stanza is stanza to be encrypted. \a recipientJids is JIDs of the devices for whom the

@@ -204,6 +204,7 @@ public:
 
     QXmppTask<std::optional<QXmppMessage>> decryptMessage(QXmppMessage stanza);
     QXmppTask<QXmpp::E2ee::DecryptResult> decryptMessageContent(QXmppMessage stanza, QString senderJid);
+    QXmppTask<QXmpp::E2ee::EncryptResult> encryptMessageContent(QXmppMessage message, QList<QString> recipientJids, TrustLevels acceptedTrustLevels);
     QXmppTask<std::optional<IqDecryptionResult>> decryptIq(QDomElement iqElement);
     template<typename T>
     QXmppTask<std::optional<DecryptionResult>> decryptStanza(T stanza,

@@ -16,6 +16,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppMessage.h"
+#include "QXmppMessages.h"
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoManager.h"
 #include "QXmppOmemoManager_p.h"
@@ -337,6 +338,20 @@ void tst_QXmppOmemoManager::testSendMessage()
 
     QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(alice1ReceivedSpy, u"Hello Alice!"_s), 20'000);
     QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(alice2ReceivedSpy, u"Hello Alice!"_s), 20'000);
+
+    // Bob selects OMEMO via the message pipeline, it is used as e2ee provider
+    QObject owner;
+    m_bob.client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+        selection.setEncryption(QXmpp::E2ee::Omemo2);
+    });
+    QXmppMessage message3;
+    message3.setTo(aliceJid);
+    message3.setBody(u"Hello again!"_s);
+    QVERIFY(std::holds_alternative<QXmpp::SendSuccess>(awaitTask(m_bob.client.send(std::move(message3)))));
+
+    QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(alice1ReceivedSpy, u"Hello again!"_s), 20'000);
+    QTRY_VERIFY_WITH_TIMEOUT(hasDecryptedMessage(alice2ReceivedSpy, u"Hello again!"_s), 20'000);
+    m_bob.client.hooks(&owner).removeAll();
 
     // Decrypted messages used only for building sessions (empty OMEMO messages) are not
     // delivered.
