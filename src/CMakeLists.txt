@@ -137,6 +137,7 @@ set(INSTALL_HEADER_FILES
     client/QXmppCredentials.h
     client/QXmppDiscoveryManager.h
     client/QXmppE2eeExtension.h
+    client/QXmppE2eeProvider.h
     client/QXmppEntityCapsStorage.h
     client/QXmppEntityTimeManager.h
     client/QXmppExternalServiceDiscoveryManager.h
@@ -148,6 +149,8 @@ set(INSTALL_HEADER_FILES
     client/QXmppIqHandling.h
     client/QXmppJingleMessageInitiationManager.h
     client/QXmppMamManager.h
+    client/QXmppMessages.h
+    client/QXmppMessageContext.h
     client/QXmppMessageHandler.h
     client/QXmppMessageReceiptManager.h
     client/QXmppMixManager.h
@@ -293,15 +296,18 @@ set(SOURCE_FILES
     client/QXmppConfiguration.cpp
     client/QXmppDiscoveryManager.cpp
     client/QXmppE2eeExtension.cpp
+    client/QXmppE2eeProvider.cpp
     client/QXmppEntityTimeManager.cpp
     client/QXmppExternalServiceDiscoveryManager.cpp
     client/QXmppFileSharingManager.cpp
     client/QXmppHttpFileSharingProvider.cpp
     client/QXmppHttpUploadManager.cpp
+    client/QXmppIncomingMessages.cpp
     client/QXmppInvokable.cpp
     client/QXmppIqHandling.cpp
     client/QXmppJingleMessageInitiationManager.cpp
     client/QXmppMamManager.cpp
+    client/QXmppMessageContext.cpp
     client/QXmppMessageReceiptManager.cpp
     client/QXmppMixManager.cpp
     client/QXmppMovedManager.cpp

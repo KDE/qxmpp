@@ -1,0 +1,94 @@
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+//
+// SPDX-License-Identifier: LGPL-2.1-or-later
+
+#ifndef QXMPPE2EEPROVIDER_H
+#define QXMPPE2EEPROVIDER_H
+
+#include "QXmppE2eeMetadata.h"
+#include "QXmppError.h"
+#include "QXmppHooks.h"
+#include "QXmppMessage.h"
+#include "QXmppTask.h"
+
+#include <functional>
+#include <variant>
+
+#include <QDomElement>
+
+namespace QXmpp::E2ee {
+
+// Classes with getters and setters, so fields can be added in a source compatible way.
+
+class DecryptRequest
+{
+public:
+    const QXmppMessage &message() const { return m_message; }
+    void setMessage(QXmppMessage message) { m_message = std::move(message); }
+
+    // real sender resolved by the pipeline (not the room JID in MUCs)
+    const QString &senderJid() const { return m_senderJid; }
+    void setSenderJid(QString jid) { m_senderJid = std::move(jid); }
+
+private:
+    QXmppMessage m_message;
+    QString m_senderJid;
+};
+
+class Decrypted
+{
+public:
+    // the SCE <content/> element, merged into the message by the pipeline; a null element for
+    // messages only used by the encryption (e.g. OMEMO key exchange), which are not delivered
+    const QDomElement &content() const { return m_content; }
+    void setContent(QDomElement content) { m_content = std::move(content); }
+
+    const QXmppE2eeMetadata &metadata() const { return m_metadata; }
+    void setMetadata(QXmppE2eeMetadata metadata) { m_metadata = std::move(metadata); }
+
+    // SCE affixes, checked by the pipeline against the sender and the recipient;
+    // empty if the method has no SCE (OMEMO 0)
+    const QString &sceFrom() const { return m_sceFrom; }
+    void setSceFrom(QString jid) { m_sceFrom = std::move(jid); }
+    const QString &sceTo() const { return m_sceTo; }
+    void setSceTo(QString jid) { m_sceTo = std::move(jid); }
+
+private:
+    QDomElement m_content;
+    QXmppE2eeMetadata m_metadata;
+    QString m_sceFrom;
+    QString m_sceTo;
+};
+
+// The message is encrypted, but not for this device.
+struct NoEnvelope { };
+
+using DecryptResult = std::variant<Decrypted, NoEnvelope, QXmppError>;
+
+// Registered per encryption. Function members instead of virtuals, so it can be extended without
+// breaking the ABI.
+struct Provider {
+    // Namespace of the encryption, e.g. QXmpp::E2ee::Omemo2. It must reference static storage,
+    // like the namespace of the encrypted container (see Xml::Registry::registerEncryptedContainer()).
+    QStringView encryption;
+    std::function<QXmppTask<DecryptResult>(DecryptRequest)> decryptMessage;
+};
+
+// A view on the hooks of a client, e.g. Providers(hooks()) in an extension. A provider is removed
+// when its owner is destroyed or the extension is removed from the client.
+class QXMPP_EXPORT Providers
+{
+public:
+    explicit Providers(QXmpp::Hooks hooks);
+
+    void add(Provider provider) const;
+    std::optional<Provider> find(QStringView encryption) const;
+    bool contains(QStringView encryption) const { return find(encryption).has_value(); }
+
+private:
+    QXmpp::Hooks m_hooks;
+};
+
+}  // namespace QXmpp::E2ee
+
+#endif  // QXMPPE2EEPROVIDER_H

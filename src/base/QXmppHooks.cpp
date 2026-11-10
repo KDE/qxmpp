@@ -172,6 +172,42 @@ QXmppTask<bool> runHandlers(std::shared_ptr<const HookRegistry::EntryList> entri
     hooks().run<EventReceived>(node, element, service, node);
     \endcode
 
+    \section1 Registries
+
+    Registries can be built on hooks, so they share the lifetime rules of handlers. For example,
+    QXmpp::E2ee::Providers stores each end-to-end encryption provider as the single responder of
+    a keyed hook:
+
+    \code
+    struct PackLookup {
+        static constexpr QStringView Name = u"org.example.stickers.pack-lookup";
+        using Key = QString;
+        using Signature = StickerPack();
+    };
+
+    class StickerPacks
+    {
+    public:
+        explicit StickerPacks(QXmpp::Hooks hooks) : m_hooks(std::move(hooks)) { }
+
+        void add(StickerPack pack) const
+        {
+            const auto id = pack.id;
+            m_hooks.add<PackLookup>(id, [pack = std::move(pack)] { return pack; });
+        }
+        std::optional<StickerPack> find(const QString &id) const
+        {
+            return m_hooks.run<PackLookup>(id);
+        }
+
+    private:
+        QXmpp::Hooks m_hooks;
+    };
+
+    // in an extension, e.g. in its constructor
+    StickerPacks(hooks()).add(pack);
+    \endcode
+
     \section1 Adapted hooks
 
     A type with a \c Target hook and a static \c adapt() function adds typed handlers to another

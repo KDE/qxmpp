@@ -9,6 +9,7 @@
 #include "QXmppXmlElementScope.h"
 
 #include <any>
+#include <functional>
 #include <optional>
 #include <typeindex>
 #include <vector>
@@ -137,6 +138,8 @@ public:
     bool tryParseAndAdd(Scope scope, const QDomElement &el, QXmpp::SceMode sceMode, Extensions &publicExtensions);
     void toXml(QXmlStreamWriter *w) const;
     void toXml(QXmlStreamWriter *w, QXmpp::SceMode sceMode) const;
+    // Internal: removes all values for which \a predicate returns true.
+    int removeIf(const std::function<bool(const std::any &)> &predicate);
 
 private:
     const std::vector<std::any> &items() const;

@@ -130,6 +130,14 @@ void Extensions::toXml(QXmlStreamWriter *w) const
 }
 
 /*!
+    Removes all values for which \a predicate returns true and returns how many were removed.
+*/
+int Extensions::removeIf(const std::function<bool(const std::any &)> &predicate)
+{
+    return int(std::erase_if(d->items, predicate));
+}
+
+/*!
     Serializes the stored extensions of the part \a sceMode of an encrypted stanza to \a w.
 */
 void Extensions::toXml(QXmlStreamWriter *w, SceMode sceMode) const

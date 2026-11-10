@@ -52,6 +52,11 @@ void TestClient::injectPresence(const QXmppPresence &presence) { Q_EMIT presence
 void TestClient::simulateConnected() { Q_EMIT connected(); }
 void TestClient::simulateDisconnected() { Q_EMIT disconnected(); }
 
+void TestClient::injectMessage(const QString &xml)
+{
+    d->incomingMessages.processElement(xmlToDom(xml), d->encryptionExtension);
+}
+
 void TestClient::inject(const QDomElement &element)
 {
     if (!d->stream->handleIqResponse(element)) {

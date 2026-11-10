@@ -17,7 +17,6 @@
 #include "QXmppEntityTimeManager.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
-#include "QXmppMessageHandler.h"
 #include "QXmppPacket_p.h"
 #include "QXmppPromise.h"
 #include "QXmppRosterManager.h"
@@ -58,6 +57,7 @@ QXmppClientPrivate::QXmppClientPrivate(QXmppClient *qq)
     : clientPresence(QXmppPresence::Available),
       logger(nullptr),
       stream(nullptr),
+      incomingMessages(qq, Hooks(&hookRegistry, nullptr), &extensions),
       encryptionExtension(nullptr),
       receivedConflict(false),
       reconnectionTries(0),
@@ -326,36 +326,6 @@ bool process(const QList<QXmppClientExtension *> &extensions, const QDomElement 
 }
 
 }  // namespace QXmpp::Private::StanzaPipeline
-
-namespace QXmpp::Private::MessagePipeline {
-
-bool process(QXmppClient *, const QList<QXmppClientExtension *> &extensions, QXmppMessage &&message)
-{
-    for (auto *extension : extensions) {
-        if (auto *messageHandler = dynamic_cast<QXmppMessageHandler *>(extension)) {
-            if (messageHandler->handleMessage(message)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool process(QXmppClient *client, const QList<QXmppClientExtension *> &extensions, QXmppE2eeExtension *e2eeExt, const QDomElement &element)
-{
-    if (element.tagName() != u"message") {
-        return false;
-    }
-    QXmppMessage message;
-    if (e2eeExt) {
-        message.parse(element, e2eeExt->isEncrypted(element) ? ScePublic : SceAll);
-    } else {
-        message.parse(element);
-    }
-    return process(client, extensions, std::move(message));
-}
-
-}  // namespace QXmpp::Private::MessagePipeline
 
 /*!
     \typedef QXmppClient::IqResult
@@ -1075,15 +1045,15 @@ void QXmppClient::injectIq(const QDomElement &element, const std::optional<QXmpp
     }
 }
 
-/*! Processes the message with message handlers and emits messageReceived as a fallback. */
+/*!
+    Processes the message like a received one and emits messageReceived() if no extension
+    handles it. The message may be processed asynchronously, e.g. if it needs to be decrypted.
+    Always returns true.
+*/
 bool QXmppClient::injectMessage(QXmppMessage &&message)
 {
-    auto handled = MessagePipeline::process(this, d->extensions, std::move(message));
-    if (!handled) {
-        // no extension handled the message
-        Q_EMIT messageReceived(message);
-    }
-    return handled;
+    d->incomingMessages.process(Messages::Context(std::move(message), Messages::Origin::Injected));
+    return true;
 }
 
 /*!
@@ -1101,8 +1071,12 @@ void QXmppClient::_q_elementReceived(const QDomElement &element, bool &handled)
 {
     // The stanza comes directly from the XMPP stream, so it's not end-to-end
     // encrypted and there's no e2ee metadata (std::nullopt).
-    handled = StanzaPipeline::process(d->extensions, element, std::nullopt) ||
-        MessagePipeline::process(this, d->extensions, d->encryptionExtension, element);
+    handled = StanzaPipeline::process(d->extensions, element, std::nullopt);
+    if (!handled && element.tagName() == u"message") {
+        // messages not handled by the legacy handleStanza() are always handled by the pipeline
+        d->incomingMessages.processElement(element, d->encryptionExtension);
+        handled = true;
+    }
 }
 
 void QXmppClient::_q_reconnect()

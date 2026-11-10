@@ -21,11 +21,14 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
+#include "QXmppE2eeProvider.h"
 #include "QXmppEntityCapsStorage.h"
 #include "QXmppHooks.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
+#include "QXmppMessageContext.h"
 #include "QXmppMessageRetraction.h"
+#include "QXmppMessages.h"
 #include "QXmppMovedManager.h"
 #include "QXmppNetworkMonitor.h"
 #include "QXmppOutgoingClient.h"
@@ -44,6 +47,8 @@
 #include "QXmppTask.h"
 #include "QXmppVCardManager.h"
 #include "QXmppVersionManager.h"
+#include "QXmppXmlElement.h"
+#include "QXmppXmlRegistry.h"
 
 #include "Algorithms.h"
 #include "Iq.h"
@@ -5468,6 +5473,352 @@ void tst_QXmppHooks::hooksAdapted()
 
 }  // namespace HookTests
 
-QXMPP_TEST_MAIN(Client::tst_QXmppClient, tst_QXmppNetworkMonitor, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq, HookTests::tst_QXmppHooks)
+namespace MessagesTests {
+
+using namespace QXmpp;
+using namespace QXmpp::Messages;
+
+// Element containing the encrypted content of the test encryption.
+// an encryption unknown to QXmpp
+constexpr QStringView TestEncryption = u"urn:test:e2ee";
+
+struct TestEncrypted {
+    static constexpr std::tuple XmlTag = { u"encrypted", TestEncryption };
+
+    QString data;
+
+    static std::optional<TestEncrypted> fromDom(const QDomElement &el)
+    {
+        return TestEncrypted { el.attribute(u"data"_s) };
+    }
+
+    void toXml(QXmlStreamWriter *w) const
+    {
+        w->writeStartElement(u"encrypted"_s);
+        w->writeDefaultNamespace(u"urn:test:e2ee"_s);
+        w->writeAttribute(u"data"_s, data);
+        w->writeEndElement();
+    }
+};
+
+// Decrypts asynchronously, the test finishes the requests.
+class TestE2eeManager : public QXmppClientExtension
+{
+public:
+    TestE2eeManager()
+    {
+        QXmpp::E2ee::Providers(hooks()).add(E2ee::Provider {
+            .encryption = TestEncryption,
+            .decryptMessage = [this](E2ee::DecryptRequest request) {
+                requests.push_back(request);
+                QXmppPromise<E2ee::DecryptResult> promise;
+                auto task = promise.task();
+                promises.push_back(std::move(promise));
+                return task;
+            },
+        });
+    }
+
+    std::vector<E2ee::DecryptRequest> requests;
+    std::vector<QXmppPromise<E2ee::DecryptResult>> promises;
+};
+
+static E2ee::Decrypted decrypted(const QString &body, const QString &from, const QString &to)
+{
+    E2ee::Decrypted result;
+    result.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'><body xmlns='jabber:client'>"_s + body + u"</body></content>"_s));
+    // the encryption of the metadata is set by the pipeline
+    result.setMetadata(QXmppE2eeMetadata());
+    result.setSceFrom(from);
+    result.setSceTo(to);
+    return result;
+}
+
+static QString encryptedMessage(const QString &from, const QString &id)
+{
+    return u"<message from='"_s + from + u"' to='me@example.org/res' type='chat' id='"_s + id + u"'>"
+                                                                                                "<body>fallback</body>"
+                                                                                                "<unknown xmlns='urn:test:unknown'/>"
+                                                                                                "<encrypted xmlns='urn:test:e2ee' data='x'/>"
+                                                                                                "</message>"_s;
+}
+
+static QString plainMessage(const QString &from, const QString &id)
+{
+    return u"<message from='"_s + from + u"' to='me@example.org/res' type='chat' id='"_s + id + u"'><body>plain</body></message>"_s;
+}
+
+class tst_QXmppMessages : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void initTestCase();
+    Q_SLOT void cleanupTestCase();
+    Q_SLOT void messagesUnencrypted();
+    Q_SLOT void messagesResolveSenderStop();
+    Q_SLOT void messagesResolveSenderAsync();
+    Q_SLOT void messagesDecrypt();
+    Q_SLOT void messagesDecryptSenderMismatch();
+    Q_SLOT void messagesNoEnvelope();
+    Q_SLOT void messagesDecryptRecipientMismatch();
+    Q_SLOT void messagesDecryptWithoutContent();
+    Q_SLOT void messagesUnsupported();
+};
+
+void tst_QXmppMessages::initTestCase()
+{
+    Xml::Registry::registerEncryptedContainer<TestEncrypted>(Xml::Scope::Message);
+}
+
+void tst_QXmppMessages::cleanupTestCase()
+{
+    Xml::Registry::unregisterElement<TestEncrypted>();
+}
+
+void tst_QXmppMessages::messagesUnencrypted()
+{
+    TestClient client;
+    QObject owner;
+    QSignalSpy spy(&client, &QXmppClient::messageReceived);
+
+    QStringList calls;
+    std::optional<Origin> origin;
+    QString senderJid, conversationJid;
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<ResolveSender>([&](Context &context) {
+        origin = context.origin();
+        senderJid = context.senderJid();
+        conversationJid = context.conversationJid();
+        calls << u"resolve"_s;
+        return HookResult::Continue;
+    });
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        state = context.decryptionState();
+        calls << u"received:"_s + context.message().id();
+        return context.message().id() == u"consumed" ? HookResult::Stop : HookResult::Continue;
+    });
+
+    client.injectMessage(plainMessage(u"alice@example.org/phone"_s, u"1"_s));
+    QCOMPARE(calls, (QStringList { u"resolve"_s, u"received:1"_s }));
+    QCOMPARE(origin, Origin::Stream);
+    QCOMPARE(senderJid, u"alice@example.org"_s);
+    QCOMPARE(conversationJid, u"alice@example.org"_s);
+    QCOMPARE(state, DecryptionState::NotEncrypted);
+    QCOMPARE(spy.size(), 1);
+    QCOMPARE(spy.at(0).at(0).value<QXmppMessage>().body(), u"plain"_s);
+
+    // consumed messages are not delivered
+    client.injectMessage(plainMessage(u"alice@example.org/phone"_s, u"consumed"_s));
+    QCOMPARE(spy.size(), 1);
+}
+
+void tst_QXmppMessages::messagesResolveSenderStop()
+{
+    TestClient client;
+    QObject owner;
+    QSignalSpy spy(&client, &QXmppClient::messageReceived);
+
+    bool received = false;
+    client.hooks(&owner).add<ResolveSender>([](Context &) { return HookResult::Stop; });
+    client.hooks(&owner).add<Received>([&](Context &) {
+        received = true;
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(plainMessage(u"alice@example.org/phone"_s, u"1"_s));
+    QVERIFY(!received);
+    QCOMPARE(spy.size(), 0);
+}
+
+void tst_QXmppMessages::messagesResolveSenderAsync()
+{
+    TestClient client;
+    QObject owner;
+
+    // waits for the first message, e.g. for a database
+    std::vector<std::pair<QString, QXmppPromise<HookResult>>> resolving;
+    client.hooks(&owner).add<ResolveSender>([&](Context &context) {
+        resolving.emplace_back(context.message().id(), QXmppPromise<HookResult>());
+        if (context.message().id() != u"1") {
+            auto &promise = resolving.back().second;
+            promise.finish(context.message().id() == u"dropped" ? HookResult::Stop : HookResult::Continue);
+        } else {
+            context.setSenderJid(u"resolved@example.org"_s);
+        }
+        return resolving.back().second.task();
+    });
+    QStringList received;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        received << context.message().id() + u':' + context.senderJid();
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(plainMessage(u"alice@example.org/phone"_s, u"1"_s));
+    client.injectMessage(plainMessage(u"alice@example.org/phone"_s, u"dropped"_s));
+    client.injectMessage(plainMessage(u"alice@example.org/phone"_s, u"2"_s));
+    // other conversations are not blocked
+    client.injectMessage(plainMessage(u"bob@example.org/phone"_s, u"3"_s));
+    // all are started right away
+    QCOMPARE(resolving.size(), 4);
+    QCOMPARE(received, (QStringList { u"3:bob@example.org"_s }));
+
+    // the order of the conversation is kept
+    resolving.at(0).second.finish(HookResult::Continue);
+    QCOMPARE(received, (QStringList { u"3:bob@example.org"_s, u"1:resolved@example.org"_s, u"2:alice@example.org"_s }));
+}
+
+void tst_QXmppMessages::messagesDecrypt()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+
+    std::vector<std::tuple<QString, DecryptionState, QString>> delivered;
+    QXmppMessage decryptedMessage;
+    QString decryptedEncryption;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        delivered.emplace_back(context.message().id(), context.decryptionState(), context.message().body());
+        if (context.decryptionState() == DecryptionState::Decrypted) {
+            decryptedMessage = context.message();
+            decryptedEncryption = context.e2eeMetadata()->encryptionNamespace();
+        }
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    client.injectMessage(plainMessage(u"alice@example.org/phone"_s, u"2"_s));
+    client.injectMessage(plainMessage(u"bob@example.org/pc"_s, u"3"_s));
+
+    // other conversations are not blocked by the decryption
+    QCOMPARE(delivered.size(), 1);
+    QCOMPARE(std::get<0>(delivered.at(0)), u"3"_s);
+
+    QCOMPARE(e2ee->requests.size(), 1);
+    QCOMPARE(e2ee->requests.at(0).senderJid(), u"alice@example.org"_s);
+
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"alice@example.org"_s, u"me@example.org"_s));
+
+    // the order of the conversation is kept
+    QCOMPARE(delivered.size(), 3);
+    QCOMPARE(delivered.at(1), std::make_tuple(u"1"_s, DecryptionState::Decrypted, u"secret"_s));
+    QCOMPARE(delivered.at(2), std::make_tuple(u"2"_s, DecryptionState::NotEncrypted, u"plain"_s));
+
+    // the encrypted element is removed, elements of the public part are kept apart
+    QVERIFY(!decryptedMessage.extensions().contains<TestEncrypted>());
+    QVERIFY(!decryptedMessage.extensions().contains<Xml::Element>());
+    QVERIFY(decryptedMessage.publicExtensions().contains<Xml::Element>());
+    QCOMPARE(decryptedMessage.e2eeFallbackBody(), u"fallback"_s);
+    QCOMPARE(decryptedEncryption, TestEncryption);
+    QCOMPARE(decryptedMessage.e2eeMetadata()->encryption(), QXmpp::UnknownEncryption);
+}
+
+void tst_QXmppMessages::messagesDecryptSenderMismatch()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    QSignalSpy spy(&client, &QXmppClient::messageReceived);
+
+    std::optional<DecryptionState> state;
+    bool hasError = false, hasMetadata = false;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        state = context.decryptionState();
+        hasError = context.decryptionError().has_value();
+        hasMetadata = context.e2eeMetadata().has_value();
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"mallory@example.org"_s, u"me@example.org"_s));
+
+    QCOMPARE(state, DecryptionState::Failed);
+    QVERIFY(hasError);
+    QVERIFY(!hasMetadata);
+    QCOMPARE(spy.size(), 1);
+    const auto message = spy.at(0).at(0).value<QXmppMessage>();
+    QVERIFY(message.body().isEmpty());
+    QCOMPARE(message.e2eeFallbackBody(), u"fallback"_s);
+}
+
+void tst_QXmppMessages::messagesNoEnvelope()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        state = context.decryptionState();
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    e2ee->promises.at(0).finish(E2ee::NoEnvelope {});
+    QCOMPARE(state, DecryptionState::NoEnvelope);
+}
+
+void tst_QXmppMessages::messagesDecryptRecipientMismatch()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        state = context.decryptionState();
+        return HookResult::Continue;
+    });
+
+    // content encrypted for someone else and forwarded
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"alice@example.org"_s, u"carol@example.org"_s));
+    QCOMPARE(state, DecryptionState::Failed);
+}
+
+void tst_QXmppMessages::messagesDecryptWithoutContent()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    QSignalSpy spy(&client, &QXmppClient::messageReceived);
+
+    bool received = false;
+    client.hooks(&owner).add<Received>([&](Context &) {
+        received = true;
+        return HookResult::Continue;
+    });
+
+    // e.g. an OMEMO key exchange
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    e2ee->promises.at(0).finish(E2ee::Decrypted {});
+    QVERIFY(!received);
+    QCOMPARE(spy.size(), 0);
+}
+
+void tst_QXmppMessages::messagesUnsupported()
+{
+    TestClient client;
+    QObject owner;
+    QSignalSpy spy(&client, &QXmppClient::messageReceived);
+
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        state = context.decryptionState();
+        return HookResult::Continue;
+    });
+
+    // without provider, the message is parsed completely like before
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    QCOMPARE(state, DecryptionState::Unsupported);
+    QCOMPARE(spy.size(), 1);
+    QCOMPARE(spy.at(0).at(0).value<QXmppMessage>().body(), u"fallback"_s);
+}
+
+}  // namespace MessagesTests
+
+QXMPP_TEST_MAIN(Client::tst_QXmppClient, tst_QXmppNetworkMonitor, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq, HookTests::tst_QXmppHooks, MessagesTests::tst_QXmppMessages)
 
 #include "ClientBase.moc"
