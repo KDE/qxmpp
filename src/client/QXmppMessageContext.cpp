@@ -49,6 +49,10 @@ namespace QXmpp::Messages {
     across the asynchronous phases. Waiting for the confirmation of the delivery does not block
     the next message.
 
+    IQs sent via QXmppClient::sendSensitiveIq() and QXmppClient::reply() are encrypted with the
+    encryption selected by the SelectEncryption hook too. Encrypted IQ requests are decrypted by
+    the e2ee provider and passed to the extensions with their QXmppE2eeMetadata.
+
     \since QXmpp 1.18
 */
 
@@ -57,6 +61,10 @@ namespace QXmpp::Messages {
     \inmodule QXmpp
 
     Input and result of the SelectEncryption hook.
+
+    The hook runs for messages and for IQs sent via QXmppClient::sendSensitiveIq(),
+    QXmppClient::sendSensitive() and QXmppClient::reply(). For IQs, only the attributes of the
+    stanza are available, not the payload.
 
     The encryption is identified by its namespace (see QXmpp::E2ee), it is empty for sending the
     message unencrypted. QXmppClient::reply() presets the encryption of the message replied to,
@@ -87,7 +95,7 @@ namespace QXmpp::Messages {
 
     \code
     client->hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
-        if (isEncryptionEnabled(selection.message().to())) {
+        if (isEncryptionEnabled(selection.stanza().to())) {
             selection.setEncryption(QXmpp::E2ee::Omemo2);
         }
     });

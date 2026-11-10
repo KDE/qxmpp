@@ -20,6 +20,7 @@
 #define QXMPPCLIENT_P_H
 
 #include "QXmppE2eeExtension.h"
+#include "QXmppEncryptedIqs_p.h"
 #include "QXmppHooks_p.h"
 #include "QXmppIncomingMessages_p.h"
 #include "QXmppOutgoingClient.h"
@@ -62,6 +63,7 @@ public:
     QXmpp::Private::HookRegistry hookRegistry;
     QXmpp::Private::IncomingMessages incomingMessages;
     QXmpp::Private::OutgoingMessages outgoingMessages;
+    QXmpp::Private::EncryptedIqs encryptedIqs;
     QXmppLogger *logger;
     /*! Pointer to the XMPP stream */
     QXmppOutgoingClient *stream;

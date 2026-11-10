@@ -57,6 +57,12 @@ void TestClient::injectMessage(const QString &xml)
     d->incomingMessages.processElement(xmlToDom(xml), d->encryptionExtension);
 }
 
+void TestClient::injectStanza(const QString &xml)
+{
+    bool handled = false;
+    _q_elementReceived(xmlToDom(xml), handled);
+}
+
 void TestClient::inject(const QDomElement &element)
 {
     if (!d->stream->handleIqResponse(element)) {

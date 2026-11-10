@@ -40,8 +40,9 @@ class QXmppVCardManager;
 class QXmppVersionManager;
 
 namespace QXmpp::Private {
+class EncryptedIqs;
 struct SessionBegin;
-}
+}  // namespace QXmpp::Private
 
 /*!
     \inmodule QXmpp
@@ -449,6 +450,7 @@ private:
     friend class QXmppClientExtension;
     friend class QXmppCarbonManagerV2;
     friend class QXmppMamManager;
+    friend class QXmpp::Private::EncryptedIqs;
     friend class QXmppNetworkMonitor;
     friend class QXmppRegistrationManager;
     friend class TestClient;

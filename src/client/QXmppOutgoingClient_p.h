@@ -138,6 +138,8 @@ using IqResult = QXmppOutgoingClient::IqResult;
 struct IqState {
     QXmppPromise<IqResult> interface;
     QString jid;
+    // error responses are reported as element, e.g. to decrypt them first
+    bool rawErrors = false;
 
     explicit IqState(QString jid) : jid(std::move(jid)) { }
     IqState(IqState &&) = default;
@@ -154,7 +156,7 @@ public:
     ~OutgoingIqManager();
 
     QXmppTask<IqResult> sendIq(QXmppIq &&, const QString &to);
-    QXmppTask<IqResult> sendIq(QXmppPacket &&, const QString &id, const QString &to);
+    QXmppTask<IqResult> sendIq(QXmppPacket &&, const QString &id, const QString &to, bool rawErrors = false);
 
     bool hasId(const QString &id) const;
     bool isIdValid(const QString &id) const;

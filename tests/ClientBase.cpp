@@ -9,6 +9,8 @@
 // original test keeps its own namespace; main() runs them in turn.
 
 #include "QXmppAsync_p.h"
+#include "QXmppBitsOfBinaryContentId.h"
+#include "QXmppBitsOfBinaryIq.h"
 #include "QXmppClient.h"
 #include "QXmppClient_p.h"
 #include "QXmppColorGeneration.h"
@@ -49,6 +51,7 @@
 #include "QXmppStreamFeatures.h"
 #include "QXmppTask.h"
 #include "QXmppVCardManager.h"
+#include "QXmppVersionIq.h"
 #include "QXmppVersionManager.h"
 #include "QXmppXmlElement.h"
 #include "QXmppXmlRegistry.h"
@@ -72,6 +75,7 @@
 #include <QSslSocket>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QTextStream>
 
 namespace Client {
 
@@ -5524,9 +5528,33 @@ public:
                 auto task = promise.task();
                 encryptPromises.push_back(std::move(promise));
                 return task; },
+            // the "encrypted" data is the XML of the payload
+            .encryptIq = [this](E2ee::EncryptIqRequest request) {
+                QString payload;
+                QTextStream stream(&payload);
+                for (auto child = request.iq().firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
+                    child.save(stream, 0);
+                }
+                encryptedIqPayloads << payload;
+                encryptedIqRecipients << request.recipientJids();
+                Xml::Extensions elements;
+                elements.add(TestEncrypted { payload });
+                E2ee::Encrypted encrypted;
+                encrypted.setElements(std::move(elements));
+                return makeReadyTask<E2ee::EncryptResult>(std::move(encrypted)); },
+            .decryptIq = [](E2ee::DecryptIqRequest request) {
+                const auto data = request.iq().firstChildElement(u"encrypted"_s).attribute(u"data"_s);
+                if (data.isEmpty()) {
+                    return makeReadyTask<E2ee::DecryptResult>(QXmppError { u"No session"_s, {} });
+                }
+                E2ee::Decrypted decrypted;
+                decrypted.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'>"_s + data + u"</content>"_s));
+                return makeReadyTask<E2ee::DecryptResult>(std::move(decrypted)); },
         });
     }
 
+    QStringList encryptedIqPayloads;
+    QList<QList<QString>> encryptedIqRecipients;
     std::vector<E2ee::DecryptRequest> requests;
     std::vector<QXmppPromise<E2ee::DecryptResult>> promises;
     std::vector<E2ee::EncryptRequest> encryptRequests;
@@ -5592,6 +5620,11 @@ private:
     Q_SLOT void outgoingRequired();
     Q_SLOT void outgoingReply();
     Q_SLOT void outgoingConfirmDelivery();
+    Q_SLOT void iqEncrypted();
+    Q_SLOT void iqEncryptedError();
+    Q_SLOT void iqWithoutSelection();
+    Q_SLOT void iqIncoming();
+    Q_SLOT void iqIncomingNotDecrypted();
 };
 
 void tst_QXmppMessages::initTestCase()
@@ -5896,7 +5929,7 @@ void tst_QXmppMessages::outgoingEncrypted()
     // selected asynchronously, e.g. after a database query
     std::vector<QXmppPromise<void>> selections;
     client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
-        if (selection.message().body() == u"secret") {
+        if (selection.message()->body() == u"secret") {
             selection.setEncryption(TestEncryption);
         }
         selections.emplace_back();
@@ -6001,7 +6034,7 @@ void tst_QXmppMessages::outgoingEncryptionError()
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
-        selection.setEncryption(selection.message().body() == u"unknown" ? u"urn:test:unknown"_s : TestEncryption.toString());
+        selection.setEncryption(selection.message()->body() == u"unknown" ? u"urn:test:unknown"_s : TestEncryption.toString());
     });
 
     // no provider
@@ -6102,6 +6135,126 @@ void tst_QXmppMessages::outgoingConfirmDelivery()
     // without confirmation, the result of the stream is used
     confirmations.at(2).first.finish();
     QVERIFY(!task3.isFinished());
+}
+
+static QString encryptedIqResponse(const QString &type, const QString &payload)
+{
+    return u"<iq type='"_s + type + u"' id='qx1' from='alice@example.org/phone' to='me@example.org/res'>"
+                                    "<encrypted xmlns='urn:test:e2ee' data='"_s +
+        payload.toHtmlEscaped().replace(u'\'', u"&apos;"_s) + u"'/></iq>"_s;
+}
+
+void tst_QXmppMessages::iqEncrypted()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    bool isIq = false;
+    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
+        isIq = selection.iq() && !selection.message() && selection.isRequired();
+        selection.setEncryption(TestEncryption);
+    });
+
+    // the payload of the subclass is encrypted
+    const auto cid = QXmppBitsOfBinaryContentId::fromContentId(u"sha1+8f35fef110ffc5df08d579a50083ff9308fb6242@bob.xmpp.org"_s);
+    QXmppBitsOfBinaryIq request;
+    request.setTo(u"alice@example.org/phone"_s);
+    request.setCid(cid);
+    request.setId(u"qx1"_s);
+    auto task = client.sendSensitiveIq(std::move(request));
+    QVERIFY(isIq);
+    QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
+    QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(cid.toContentId()));
+    QCOMPARE(e2ee->encryptedIqRecipients.at(0), QList<QString> { u"alice@example.org"_s });
+
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"urn:test:e2ee"_s));
+    QVERIFY(!packet.contains(u"<data"_s));
+
+    // the response is decrypted
+    client.inject(encryptedIqResponse(u"result"_s, u"<query xmlns='jabber:iq:version'><name>Other</name></query>"_s));
+    auto response = expectFutureVariant<QDomElement>(task);
+    QXmppVersionIq responseIq;
+    responseIq.parse(response);
+    QCOMPARE(responseIq.name(), u"Other"_s);
+}
+
+void tst_QXmppMessages::iqEncryptedError()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestEncryption);
+    });
+
+    QXmppVersionIq request;
+    request.setTo(u"alice@example.org/phone"_s);
+    request.setId(u"qx1"_s);
+    auto task = client.sendSensitiveIq(std::move(request));
+    client.takePacket();
+
+    // the error is in the encrypted content
+    client.inject(encryptedIqResponse(u"error"_s, u"<error xmlns='jabber:client' type='cancel'><feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"_s));
+    auto error = expectFutureVariant<QXmppError>(task).value<QXmppStanza::Error>();
+    QVERIFY(error.has_value());
+    QCOMPARE(error->condition(), QXmppStanza::Error::FeatureNotImplemented);
+}
+
+void tst_QXmppMessages::iqWithoutSelection()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &) { });
+
+    // without encryption extension unencrypted like before, with the payload
+    QXmppBitsOfBinaryIq request;
+    request.setTo(u"alice@example.org/phone"_s);
+    request.setCid(QXmppBitsOfBinaryContentId::fromContentId(u"sha1+8f35fef110ffc5df08d579a50083ff9308fb6242@bob.xmpp.org"_s));
+    client.sendSensitiveIq(std::move(request));
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"urn:xmpp:bob"_s));
+    QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+}
+
+void tst_QXmppMessages::iqIncoming()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+
+    // decrypted and processed by the handlers, unknown requests are answered with an error
+    client.injectStanza(u"<iq type='get' id='req1' from='alice@example.org/phone' to='me@example.org/res'>"
+                        "<encrypted xmlns='urn:test:e2ee' data='&lt;query xmlns=&quot;urn:test:unknown&quot;/&gt;'/></iq>"_s);
+
+    // the response is encrypted like the request
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"req1"_s));
+    QVERIFY(packet.contains(u"urn:test:e2ee"_s));
+    QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
+    QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(u"feature-not-implemented"_s));
+}
+
+void tst_QXmppMessages::iqIncomingNotDecrypted()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+
+    client.injectStanza(u"<iq type='set' id='req2' from='alice@example.org/phone' to='me@example.org/res'>"
+                        "<encrypted xmlns='urn:test:e2ee' data=''/></iq>"_s);
+
+    // an unencrypted error, so the requester does not wait for a response
+    client.expect(u"<iq id='req2' to='alice@example.org/phone' type='error'>"
+                  "<error type='modify'>"
+                  "<not-acceptable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                  "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas' xml:lang='en'>The end-to-end encrypted request could not be decrypted.</text>"
+                  "</error></iq>"_s);
+    QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
 }
 
 }  // namespace MessagesTests

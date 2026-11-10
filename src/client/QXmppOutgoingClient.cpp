@@ -1367,13 +1367,16 @@ QXmppTask<IqResult> OutgoingIqManager::sendIq(QXmppIq &&iq, const QString &to)
     return sendIq(QXmppPacket(iq), iq.id(), to);
 }
 
-QXmppTask<IqResult> OutgoingIqManager::sendIq(QXmppPacket &&packet, const QString &id, const QString &to)
+QXmppTask<IqResult> OutgoingIqManager::sendIq(QXmppPacket &&packet, const QString &id, const QString &to, bool rawErrors)
 {
     auto task = start(id, to);
 
     // the task only finishes instantly if there was an error
     if (task.isFinished()) {
         return task;
+    }
+    if (auto itr = m_requests.find(id); itr != m_requests.end()) {
+        itr->second.rawErrors = rawErrors;
     }
 
     // send request IQ and report sending errors (sending success is not reported in any way)
@@ -1482,11 +1485,12 @@ bool OutgoingIqManager::handleStanza(const QDomElement &stanza)
     // Extract the promise and erase from the map before calling finish() to prevent
     // re-entrant double-finish if a continuation triggers cancelAll().
     auto promise = std::move(itr->second.interface);
+    const bool rawErrors = itr->second.rawErrors;
     m_requests.erase(itr);
 
     // report IQ errors as QXmppError (this makes it impossible to parse the full error IQ,
     // but that is okay for now)
-    if (iqType == u"error") {
+    if (iqType == u"error" && !rawErrors) {
         QXmppIq iq;
         iq.parse(stanza);
         if (auto err = iq.errorOptional()) {

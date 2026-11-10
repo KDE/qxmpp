@@ -102,6 +102,42 @@ private:
 
 using EncryptResult = std::variant<Encrypted, QXmppError>;
 
+class EncryptIqRequest
+{
+public:
+    // The complete IQ, the provider encrypts its child elements (the payload or the error).
+    const QDomElement &iq() const { return m_iq; }
+    void setIq(QDomElement iq) { m_iq = std::move(iq); }
+
+    // bare JIDs, the addressee or QXmppSendStanzaParams::encryptionJids()
+    const QList<QString> &recipientJids() const { return m_recipientJids; }
+    void setRecipientJids(QList<QString> jids) { m_recipientJids = std::move(jids); }
+
+    const QXmppSendStanzaParams &params() const { return m_params; }
+    void setParams(QXmppSendStanzaParams params) { m_params = std::move(params); }
+
+private:
+    QDomElement m_iq;
+    QList<QString> m_recipientJids;
+    QXmppSendStanzaParams m_params;
+};
+
+class DecryptIqRequest
+{
+public:
+    // the encrypted IQ
+    const QDomElement &iq() const { return m_iq; }
+    void setIq(QDomElement iq) { m_iq = std::move(iq); }
+
+    // bare JID of the sender
+    const QString &senderJid() const { return m_senderJid; }
+    void setSenderJid(const QString &jid) { m_senderJid = jid; }
+
+private:
+    QDomElement m_iq;
+    QString m_senderJid;
+};
+
 // Registered per encryption. Function members instead of virtuals, so it can be extended without
 // breaking the ABI.
 struct Provider {
@@ -110,6 +146,9 @@ struct Provider {
     QStringView encryption;
     std::function<QXmppTask<DecryptResult>(DecryptRequest)> decryptMessage;
     std::function<QXmppTask<EncryptResult>(EncryptRequest)> encryptMessage;
+    // Optional. The content of Decrypted replaces the child elements of the IQ.
+    std::function<QXmppTask<EncryptResult>(EncryptIqRequest)> encryptIq;
+    std::function<QXmppTask<DecryptResult>(DecryptIqRequest)> decryptIq;
 };
 
 // A view on the hooks of a client, e.g. Providers(hooks()) in an extension. A provider is removed

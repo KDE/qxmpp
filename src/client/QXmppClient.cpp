@@ -18,6 +18,7 @@
 #include "QXmppEntityTimeManager.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
+#include "QXmppMessages.h"
 #include "QXmppPacket_p.h"
 #include "QXmppPromise.h"
 #include "QXmppRosterManager.h"
@@ -60,6 +61,7 @@ QXmppClientPrivate::QXmppClientPrivate(QXmppClient *qq)
       stream(nullptr),
       incomingMessages(qq, Hooks(&hookRegistry, nullptr), &extensions),
       outgoingMessages(qq, this, Hooks(&hookRegistry, nullptr)),
+      encryptedIqs(qq, this, Hooks(&hookRegistry, nullptr)),
       encryptionExtension(nullptr),
       receivedConflict(false),
       reconnectionTries(0),
@@ -603,6 +605,9 @@ QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, co
     if (OutgoingMessages::isPipelineStanza(stanza)) {
         return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
     }
+    if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
+        return d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), {});
+    }
     if (d->encryptionExtension) {
         if (dynamic_cast<QXmppMessage *>(&stanza)) {
             return d->sendEncryptedMessage(d->encryptionExtension->encryptMessage(dynamic_cast<QXmppMessage &&>(stanza), params));
@@ -680,6 +685,13 @@ QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std:
         }
         return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive, std::move(encryption));
     }
+    if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && e2eeMetadata) {
+        // the encryption of the request is the default of SelectEncryption
+        auto provider = E2ee::Providers(hooks(nullptr)).find(e2eeMetadata->encryptionNamespace());
+        if (provider && provider->encryptIq) {
+            return d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), e2eeMetadata->encryptionNamespace());
+        }
+    }
     if (e2eeMetadata) {
         return sendSensitive(std::move(stanza), params);
     }
@@ -721,12 +733,22 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::op
     IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
     QXmppStanza::Error.
 
+    If there are handlers of the QXmpp::Messages::SelectEncryption hook, the IQ is encrypted with
+    the selected encryption via its e2ee provider (QXmpp::E2ee::Provider::encryptIq) and an
+    encrypted response, also an error, is decrypted. If no encryption is selected, the
+    encryption extension (setEncryptionExtension()) is used like in earlier versions.
+
     \since QXmpp 1.5
 
     \a params and \a iq.
 */
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &params)
 {
+    if (hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
+        // serialized before the IQ is copied, which would lose the payload of subclasses
+        auto element = Private::EncryptedIqs::serialize(iq);
+        return d->encryptedIqs.sendRequest(iq, std::move(element), params.value_or(QXmppSendStanzaParams()));
+    }
     return d->encryptionExtension ? d->sendSensitiveIq(std::move(iq), params) : d->stream->sendIq(std::move(iq));
 }
 
@@ -1098,6 +1120,11 @@ void QXmppClient::_q_elementReceived(const QDomElement &element, bool &handled)
 {
     // The stanza comes directly from the XMPP stream, so it's not end-to-end
     // encrypted and there's no e2ee metadata (std::nullopt).
+    // encrypted IQ requests are decrypted by the e2ee providers
+    if (d->encryptedIqs.processIncoming(element)) {
+        handled = true;
+        return;
+    }
     handled = StanzaPipeline::process(d->extensions, element, std::nullopt);
     if (!handled && element.tagName() == u"message") {
         // messages not handled by the legacy handleStanza() are always handled by the pipeline

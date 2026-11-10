@@ -7,6 +7,7 @@
 
 #include "QXmppError.h"
 #include "QXmppHooks.h"
+#include "QXmppIq.h"
 #include "QXmppMessage.h"
 #include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
@@ -72,12 +73,18 @@ struct Received {
 class EncryptionSelection
 {
 public:
-    EncryptionSelection(const QXmppMessage &message, bool required, QString encryption = {})
-        : m_message(&message), m_encryption(std::move(encryption)), m_required(required)
+    EncryptionSelection(const QXmppStanza &stanza, bool required, QString encryption = {})
+        : m_stanza(&stanza), m_encryption(std::move(encryption)), m_required(required)
     {
     }
 
-    const QXmppMessage &message() const { return *m_message; }
+    // The message or IQ to be sent. For IQs, only the attributes (e.g. 'to' and the type) are
+    // available, not the payload.
+    const QXmppStanza &stanza() const { return *m_stanza; }
+    // The message, null for IQs.
+    const QXmppMessage *message() const { return dynamic_cast<const QXmppMessage *>(m_stanza); }
+    // The IQ, null for messages.
+    const QXmppIq *iq() const { return dynamic_cast<const QXmppIq *>(m_stanza); }
 
     // see QXmppSendStanzaParams::isEncryptionRequired() and QXmppClient::sendSensitive()
     bool isRequired() const { return m_required; }
@@ -87,7 +94,7 @@ public:
     void setEncryption(QStringView encryption) { m_encryption = encryption.toString(); }
 
 private:
-    const QXmppMessage *m_message = nullptr;
+    const QXmppStanza *m_stanza = nullptr;
     QString m_encryption;
     bool m_required = false;
 };

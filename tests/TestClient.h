@@ -43,6 +43,8 @@ public:
     void inject(const QDomElement &element);
     // runs a message received from the stream through the message pipeline
     void injectMessage(const QString &xml);
+    // like a stanza received from the stream
+    void injectStanza(const QString &xml);
 
     void expect(QString &&packet);
     // compares packets, ignoring different IDs and order of sending

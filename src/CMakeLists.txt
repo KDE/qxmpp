@@ -302,6 +302,7 @@ set(SOURCE_FILES
     client/QXmppFileSharingManager.cpp
     client/QXmppHttpFileSharingProvider.cpp
     client/QXmppHttpUploadManager.cpp
+    client/QXmppEncryptedIqs.cpp
     client/QXmppIncomingMessages.cpp
     client/QXmppInvokable.cpp
     client/QXmppIqHandling.cpp
