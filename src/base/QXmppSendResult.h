@@ -21,11 +21,14 @@ namespace QXmpp {
     \value SocketWriteError The packet was written to the socket with no success (only happens when Stream Management is disabled).
     \value Disconnected The packet couldn't be sent because the connection hasn't been (re)established.
     \value EncryptionError The packet couldn't be sent because prior encryption failed.
+    \value Cancelled The packet was not sent because sending has been cancelled, e.g. by a
+    handler of the QXmpp::Messages::Prepare hook. (Since QXmpp 1.18)
 */
 enum class SendError : uint8_t {
     SocketWriteError,
     Disconnected,
     EncryptionError,
+    Cancelled,
 };
 
 /*!

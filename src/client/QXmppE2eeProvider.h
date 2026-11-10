@@ -9,6 +9,7 @@
 #include "QXmppError.h"
 #include "QXmppHooks.h"
 #include "QXmppMessage.h"
+#include "QXmppSendStanzaParams.h"
 #include "QXmppTask.h"
 
 #include <functional>
@@ -65,6 +66,42 @@ struct NoEnvelope { };
 
 using DecryptResult = std::variant<Decrypted, NoEnvelope, QXmppError>;
 
+class EncryptRequest
+{
+public:
+    // The provider encrypts the sensitive elements (SceSensitive). The own devices are not in
+    // recipientJids(), the provider encrypts for them too.
+    const QXmppMessage &message() const { return m_message; }
+    void setMessage(QXmppMessage message) { m_message = std::move(message); }
+
+    // bare JIDs, for MUCs the members supplied by the ResolveRecipients hook
+    const QList<QString> &recipientJids() const { return m_recipientJids; }
+    void setRecipientJids(QList<QString> jids) { m_recipientJids = std::move(jids); }
+
+    const QXmppSendStanzaParams &params() const { return m_params; }
+    void setParams(QXmppSendStanzaParams params) { m_params = std::move(params); }
+
+private:
+    QXmppMessage m_message;
+    QList<QString> m_recipientJids;
+    QXmppSendStanzaParams m_params;
+};
+
+class Encrypted
+{
+public:
+    // The encrypted element(s) added to the public message, e.g. QXmppOmemoElement. They must be
+    // registered as encrypted container (Xml::Registry::registerEncryptedContainer()), so they are
+    // serialized in the public part. The pipeline adds the EME element and the fallback body.
+    const QXmpp::Xml::Extensions &elements() const { return m_elements; }
+    void setElements(QXmpp::Xml::Extensions elements) { m_elements = std::move(elements); }
+
+private:
+    QXmpp::Xml::Extensions m_elements;
+};
+
+using EncryptResult = std::variant<Encrypted, QXmppError>;
+
 // Registered per encryption. Function members instead of virtuals, so it can be extended without
 // breaking the ABI.
 struct Provider {
@@ -72,6 +109,7 @@ struct Provider {
     // like the namespace of the encrypted container (see Xml::Registry::registerEncryptedContainer()).
     QStringView encryption;
     std::function<QXmppTask<DecryptResult>(DecryptRequest)> decryptMessage;
+    std::function<QXmppTask<EncryptResult>(EncryptRequest)> encryptMessage;
 };
 
 // A view on the hooks of a client, e.g. Providers(hooks()) in an extension. A provider is removed

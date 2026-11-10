@@ -23,6 +23,7 @@
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeProvider.h"
 #include "QXmppEntityCapsStorage.h"
+#include "QXmppFallback.h"
 #include "QXmppHooks.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
@@ -33,6 +34,7 @@
 #include "QXmppNetworkMonitor.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppOutgoingClient_p.h"
+#include "QXmppPresence.h"
 #include "QXmppPromise.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRegisterIq.h"
@@ -43,6 +45,7 @@
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSaslManager_p.h"
 #include "QXmppSasl_p.h"
+#include "QXmppSendStanzaParams.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppTask.h"
 #include "QXmppVCardManager.h"
@@ -5514,14 +5517,30 @@ public:
                 QXmppPromise<E2ee::DecryptResult> promise;
                 auto task = promise.task();
                 promises.push_back(std::move(promise));
-                return task;
-            },
+                return task; },
+            .encryptMessage = [this](E2ee::EncryptRequest request) {
+                encryptRequests.push_back(request);
+                QXmppPromise<E2ee::EncryptResult> promise;
+                auto task = promise.task();
+                encryptPromises.push_back(std::move(promise));
+                return task; },
         });
     }
 
     std::vector<E2ee::DecryptRequest> requests;
     std::vector<QXmppPromise<E2ee::DecryptResult>> promises;
+    std::vector<E2ee::EncryptRequest> encryptRequests;
+    std::vector<QXmppPromise<E2ee::EncryptResult>> encryptPromises;
 };
+
+static E2ee::Encrypted encrypted(const QString &data)
+{
+    Xml::Extensions elements;
+    elements.add(TestEncrypted { data });
+    E2ee::Encrypted result;
+    result.setElements(std::move(elements));
+    return result;
+}
 
 static E2ee::Decrypted decrypted(const QString &body, const QString &from, const QString &to)
 {
@@ -5564,6 +5583,14 @@ private:
     Q_SLOT void messagesDecryptRecipientMismatch();
     Q_SLOT void messagesDecryptWithoutContent();
     Q_SLOT void messagesUnsupported();
+    Q_SLOT void outgoingUnencrypted();
+    Q_SLOT void outgoingPrepareStop();
+    Q_SLOT void outgoingEncrypted();
+    Q_SLOT void outgoingEncryptionError();
+    Q_SLOT void outgoingAlreadyEncrypted();
+    Q_SLOT void outgoingStoreHint();
+    Q_SLOT void outgoingRequired();
+    Q_SLOT void outgoingReply();
 };
 
 void tst_QXmppMessages::initTestCase()
@@ -5815,6 +5842,226 @@ void tst_QXmppMessages::messagesUnsupported()
     QCOMPARE(state, DecryptionState::Unsupported);
     QCOMPARE(spy.size(), 1);
     QCOMPARE(spy.at(0).at(0).value<QXmppMessage>().body(), u"fallback"_s);
+}
+
+void tst_QXmppMessages::outgoingUnencrypted()
+{
+    TestClient client;
+    QObject owner;
+
+    QStringList calls;
+    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
+        calls << u"select:"_s + (selection.isRequired() ? u"required"_s : u"optional"_s);
+    });
+    client.hooks(&owner).add<Prepare>([&](OutgoingMessage &message) {
+        calls << u"prepare:"_s + message.encryption();
+        message.message().setThread(u"prepared"_s);
+        return HookResult::Continue;
+    });
+    client.hooks(&owner).add<ResolveRecipients>([&](OutgoingMessage &) { calls << u"recipients"_s; });
+
+    client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"<body>hello</body>"_s));
+    QVERIFY(packet.contains(u"<thread>prepared</thread>"_s));
+    // only for encrypted messages
+    QCOMPARE(calls, (QStringList { u"select:optional"_s, u"prepare:"_s }));
+
+    // IQs and presences are not processed
+    calls.clear();
+    client.send(QXmppPresence());
+    client.takePacket();
+    QVERIFY(calls.isEmpty());
+}
+
+void tst_QXmppMessages::outgoingPrepareStop()
+{
+    TestClient client;
+    QObject owner;
+    client.hooks(&owner).add<Prepare>([](OutgoingMessage &) { return HookResult::Stop; });
+
+    auto task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
+    auto error = expectFutureVariant<QXmppError>(task);
+    QCOMPARE(error.value<SendError>(), SendError::Cancelled);
+    client.expectNoPacket();
+}
+
+void tst_QXmppMessages::outgoingEncrypted()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+
+    // selected asynchronously, e.g. after a database query
+    std::vector<QXmppPromise<void>> selections;
+    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
+        if (selection.message().body() == u"secret") {
+            selection.setEncryption(TestEncryption);
+        }
+        selections.emplace_back();
+        return selections.back().task();
+    });
+    QString preparedEncryption;
+    client.hooks(&owner).add<Prepare>([&](OutgoingMessage &message) {
+        preparedEncryption = message.encryption();
+        return HookResult::Continue;
+    });
+    client.hooks(&owner).add<ResolveRecipients>([](OutgoingMessage &message) {
+        message.recipientJids().append(u"bob@example.org"_s);
+    });
+
+    auto message = QXmppMessage(u"me@example.org/res"_s, u"alice@example.org/phone"_s, u"secret"_s);
+    message.setFallbackMarkers({ QXmppFallback { u"urn:xmpp:reply:0"_s, { { QXmppFallback::Body, {} } } } });
+    client.send(std::move(message));
+    // the order of a conversation is kept
+    client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org/phone"_s, u"plain"_s));
+    // other conversations are not blocked
+    client.send(QXmppMessage(u"me@example.org/res"_s, u"bob@example.org"_s, u"other"_s));
+
+    QCOMPARE(selections.size(), 2);
+    selections.at(1).finish();
+    QVERIFY(client.takePacket().contains(u"<body>other</body>"_s));
+    client.expectNoPacket();
+
+    selections.at(0).finish();
+    QCOMPARE(preparedEncryption, TestEncryption);
+    QCOMPARE(e2ee->encryptRequests.size(), 1);
+    const auto &request = e2ee->encryptRequests.at(0);
+    QCOMPARE(request.message().body(), u"secret"_s);
+    QCOMPARE(request.recipientJids(), (QList<QString> { u"alice@example.org"_s, u"bob@example.org"_s }));
+    client.expectNoPacket();
+
+    e2ee->encryptPromises.at(0).finish(encrypted(u"ciphertext"_s));
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"<encrypted xmlns=\"urn:test:e2ee\" data=\"ciphertext\"/>"_s));
+    QVERIFY(!packet.contains(u"secret"_s));
+    QVERIFY(packet.contains(u"<body>This message is encrypted with urn:test:e2ee but could not be decrypted</body>"_s));
+    QVERIFY(packet.contains(u"<encryption xmlns=\"urn:xmpp:eme:0\" namespace=\"urn:test:e2ee\"/>"_s));
+    // the fallback marker of the reply is encrypted, the one of the fallback body is public
+    QVERIFY(!packet.contains(u"urn:xmpp:reply:0"_s));
+    QVERIFY(packet.contains(u"<fallback xmlns=\"urn:xmpp:fallback:0\" for=\"urn:test:e2ee\">"_s));
+
+    // the next message of the conversation is sent afterwards
+    QCOMPARE(selections.size(), 3);
+    selections.at(2).finish();
+    QVERIFY(client.takePacket().contains(u"<body>plain</body>"_s));
+    client.expectNoPacket();
+}
+
+void tst_QXmppMessages::outgoingAlreadyEncrypted()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestEncryption);
+    });
+
+    // e.g. a key exchange created by a provider
+    QXmppMessage message(u"me@example.org/res"_s, u"alice@example.org"_s);
+    message.extensions().add(TestEncrypted { u"key exchange"_s });
+    auto task = client.send(std::move(message), [] {
+        QXmppSendStanzaParams params;
+        params.setEncryptionRequired(true);
+        return params;
+    }());
+
+    // sent as it is, not encrypted again
+    QVERIFY(e2ee->encryptRequests.empty());
+    const auto packet = client.takePacket();
+    QCOMPARE(packet.count(u"<encrypted"_s), 1);
+    QVERIFY(packet.contains(u"key exchange"_s));
+}
+
+void tst_QXmppMessages::outgoingStoreHint()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestEncryption);
+    });
+
+    // messages without a body that should be archived are marked by the sender
+    QXmppMessage message(u"me@example.org/res"_s, u"alice@example.org"_s);
+    message.setAttentionRequested(true);
+    message.addHint(QXmppMessage::Store);
+    client.send(std::move(message));
+
+    QCOMPARE(e2ee->encryptRequests.size(), 1);
+    e2ee->encryptPromises.at(0).finish(E2ee::Encrypted());
+    // the hint is public
+    QVERIFY(client.takePacket().contains(u"<store xmlns=\"urn:xmpp:hints\"/>"_s));
+}
+
+void tst_QXmppMessages::outgoingEncryptionError()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(selection.message().body() == u"unknown" ? u"urn:test:unknown"_s : TestEncryption.toString());
+    });
+
+    // no provider
+    auto task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"unknown"_s));
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+
+    // the provider fails
+    task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
+    e2ee->encryptPromises.at(0).finish(QXmppError { u"No devices"_s, SendError::EncryptionError });
+    QCOMPARE(expectFutureVariant<QXmppError>(task).description, u"No devices"_s);
+    client.expectNoPacket();
+}
+
+void tst_QXmppMessages::outgoingRequired()
+{
+    TestClient client;
+    QObject owner;
+    bool required = false;
+    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
+        required = selection.isRequired();
+    });
+
+    QXmppSendStanzaParams params;
+    params.setEncryptionRequired(true);
+    auto task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s), params);
+    QVERIFY(required);
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+    client.expectNoPacket();
+
+    // like before: without encryption extension, sendSensitive() sends unencrypted
+    required = false;
+    client.sendSensitive(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
+    QVERIFY(required);
+    QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
+}
+
+void tst_QXmppMessages::outgoingReply()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+
+    QXmppE2eeMetadata metadata;
+    metadata.setEncryptionNamespace(TestEncryption.toString());
+
+    // without handler, replies are encrypted like the received message
+    client.reply(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s), metadata);
+    QCOMPARE(e2ee->encryptRequests.size(), 1);
+    e2ee->encryptPromises.at(0).finish(encrypted(u"x"_s));
+    QVERIFY(client.takePacket().contains(u"urn:test:e2ee"_s));
+
+    // a handler can override it
+    QObject owner;
+    QString preset;
+    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
+        preset = selection.encryption();
+        selection.setEncryption({});
+    });
+    client.reply(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s), metadata);
+    QCOMPARE(preset, TestEncryption);
+    QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
+    QCOMPARE(e2ee->encryptRequests.size(), 1);
 }
 
 }  // namespace MessagesTests

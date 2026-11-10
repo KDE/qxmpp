@@ -30,6 +30,9 @@ public:
     std::optional<QXmpp::TrustLevels> acceptedTrustLevels() const;
     void setAcceptedTrustLevels(std::optional<QXmpp::TrustLevels> trustLevels);
 
+    bool isEncryptionRequired() const;
+    void setEncryptionRequired(bool required);
+
 private:
     QSharedDataPointer<QXmppSendStanzaParamsPrivate> d;
 };

@@ -308,6 +308,7 @@ set(SOURCE_FILES
     client/QXmppJingleMessageInitiationManager.cpp
     client/QXmppMamManager.cpp
     client/QXmppMessageContext.cpp
+    client/QXmppOutgoingMessages.cpp
     client/QXmppMessageReceiptManager.cpp
     client/QXmppMixManager.cpp
     client/QXmppMovedManager.cpp

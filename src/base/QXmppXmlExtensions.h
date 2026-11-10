@@ -132,6 +132,7 @@ public:
     int size() const noexcept;
     bool isEmpty() const noexcept;
     void clear();
+    void append(const Extensions &other);
 
     // Internal: called from QXmppMessage::parseExtension / QXmppPresence::parseExtension.
     bool tryParseAndAdd(Scope scope, const QDomElement &el);

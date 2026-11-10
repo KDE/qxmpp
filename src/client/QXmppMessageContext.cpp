@@ -28,7 +28,90 @@ namespace QXmpp::Messages {
     Messages of the same conversation are processed in the order in which they were received,
     also across the asynchronous decryption.
 
+    Messages sent via QXmppClient::send(), QXmppClient::sendSensitive() and QXmppClient::reply()
+    run through these phases:
+    \list 1
+    \li SelectEncryption: asynchronous, usually the application selects the encryption with its
+        policy per contact.
+    \li Prepare: synchronous, handlers add elements or cancel sending.
+    \li ResolveRecipients: asynchronous, only for encrypted messages, e.g. MUC sets the
+        members of the room.
+    \li Encrypt: asynchronous, via the provider of the selected encryption
+        (QXmpp::E2ee::Provider). The public part of Explicit Message Encryption
+        (\xep{0380}{Explicit Message Encryption}) and a fallback body are added for messages
+        with a body.
+    \li Send.
+    \endlist
+
+    Outgoing messages to the same JID are sent in the order in which they were passed, also
+    across the asynchronous phases.
+
     \since QXmpp 1.18
+*/
+
+/*!
+    \class QXmpp::Messages::EncryptionSelection
+    \inmodule QXmpp
+
+    Input and result of the SelectEncryption hook.
+
+    The encryption is identified by its namespace (see QXmpp::E2ee), it is empty for sending the
+    message unencrypted. QXmppClient::reply() presets the encryption of the message replied to,
+    so replies to encrypted messages stay encrypted without a handler.
+
+    isRequired() is set for messages sent via QXmppClient::sendSensitive() and for messages with
+    QXmppSendStanzaParams::isEncryptionRequired().
+*/
+
+/*!
+    \class QXmpp::Messages::OutgoingMessage
+    \inmodule QXmpp
+
+    State of an outgoing message in the Prepare and ResolveRecipients hooks.
+*/
+
+/*!
+    \struct QXmpp::Messages::SelectEncryption
+    \inmodule QXmpp
+
+    Asynchronous hook selecting the end-to-end encryption of an outgoing message.
+
+    It runs for every message, also for messages sent by managers on their own (e.g. receipts),
+    except for messages that already contain encrypted elements, e.g. a key exchange created by
+    a provider. They are sent as they are.
+    Handlers run in order and may override the encryption set by earlier ones. Handlers that need
+    to wait, e.g. for a database, return a QXmppTask, others can return \c void:
+
+    \code
+    client->hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
+        if (isEncryptionEnabled(selection.message().to())) {
+            selection.setEncryption(QXmpp::E2ee::Omemo2);
+        }
+    });
+    \endcode
+
+    If no encryption is selected, messages sent via QXmppClient::sendSensitive() are encrypted
+    with the encryption extension (QXmppClient::setEncryptionExtension()) as in earlier versions.
+*/
+
+/*!
+    \struct QXmpp::Messages::Prepare
+    \inmodule QXmpp
+
+    Hook run synchronously for each outgoing message after the encryption has been selected.
+    Handlers can modify the message. Handlers returning QXmpp::HookResult::Stop cancel sending,
+    which then fails with the error set via QXmpp::Messages::OutgoingMessage::setError() or else
+    with QXmpp::SendError::Cancelled.
+*/
+
+/*!
+    \struct QXmpp::Messages::ResolveRecipients
+    \inmodule QXmpp
+
+    Asynchronous hook run for each outgoing message that is encrypted. The recipients are
+    QXmppSendStanzaParams::encryptionJids() or else the bare JID of the addressee. Handlers can
+    add recipients, e.g. the members of a MUC, and may wait for them to be retrieved. Handlers
+    can make sending fail with QXmpp::Messages::OutgoingMessage::setError().
 */
 
 /*!

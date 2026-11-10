@@ -14,6 +14,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppE2eeProvider.h"
 #include "QXmppEntityTimeManager.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
@@ -58,6 +59,7 @@ QXmppClientPrivate::QXmppClientPrivate(QXmppClient *qq)
       logger(nullptr),
       stream(nullptr),
       incomingMessages(qq, Hooks(&hookRegistry, nullptr), &extensions),
+      outgoingMessages(qq, this, Hooks(&hookRegistry, nullptr)),
       encryptionExtension(nullptr),
       receivedConflict(false),
       reconnectionTries(0),
@@ -583,6 +585,12 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
     If connection errors occur, the packet is resent if possible. If
     reconnecting is not possible, an error is reported.
 
+    Messages are sent via the message pipeline (see QXmpp::Messages) and end-to-end encrypted
+    with the encryption selected by the QXmpp::Messages::SelectEncryption hook. If no encryption
+    is selected, the encryption extension (setEncryptionExtension()) is used like in earlier
+    versions. Without encryption extension, the message is sent unencrypted, unless
+    QXmppSendStanzaParams::isEncryptionRequired() is set.
+
     Returns a QXmppTask that makes it possible to track the state of the packet.
 
     \since QXmpp 1.5
@@ -591,6 +599,10 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
 */
 QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
+    using Private::OutgoingMessages;
+    if (OutgoingMessages::isPipelineStanza(stanza)) {
+        return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
+    }
     if (d->encryptionExtension) {
         if (dynamic_cast<QXmppMessage *>(&stanza)) {
             return d->sendEncryptedMessage(d->encryptionExtension->encryptMessage(dynamic_cast<QXmppMessage &&>(stanza), params));
@@ -624,25 +636,33 @@ QXmppTask<QXmpp::SendResult> QXmppClientPrivate::sendEncryptedIq(QXmppTask<QXmpp
 }
 
 /*!
-    Sends a packet always without end-to-end-encryption.
+    Sends a packet.
 
-    This does the same as send(), but does not do any end-to-end encryption on
-    the \a stanza.
+    Messages are sent via the message pipeline (see QXmpp::Messages). They are only end-to-end
+    encrypted if an encryption is selected by the QXmpp::Messages::SelectEncryption hook. Other
+    stanzas are sent without end-to-end encryption.
 
-    Returns a QXmppTask that makes it possible to track the state of the packet.
+    Returns a QXmppTask that makes it possible to track the state of the \a stanza.
+
+    \a params.
 
     \since QXmpp 1.5
 */
-QXmppTask<QXmpp::SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &)
+QXmppTask<SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
+    using Private::OutgoingMessages;
+    if (OutgoingMessages::isPipelineStanza(stanza)) {
+        return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Default);
+    }
     return d->stream->streamAckManager().send(stanza);
 }
 
 /*!
     Sends the stanza with the same encryption as \a e2eeMetadata.
 
-    When there is no e2eeMetadata given this always sends the stanza without
-    end-to-end encryption.
+    When there is no e2eeMetadata given this sends the stanza like send(), otherwise like
+    sendSensitive(). For messages, the encryption of \a e2eeMetadata is the default selection of
+    the QXmpp::Messages::SelectEncryption hook if there is a provider for it.
     Intended to be used for replies to IQs and messages.
 
     \since QXmpp 1.5
@@ -651,8 +671,15 @@ QXmppTask<QXmpp::SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::
 */
 QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> &params)
 {
-    // This should pick the right e2ee manager as soon as multiple encryptions
-    // in parallel are supported.
+    using Private::OutgoingMessages;
+    if (e2eeMetadata && OutgoingMessages::isPipelineStanza(stanza)) {
+        // the encryption of the received message is the default of SelectEncryption
+        auto encryption = e2eeMetadata->encryptionNamespace();
+        if (!E2ee::Providers(hooks(nullptr)).contains(encryption)) {
+            encryption.clear();
+        }
+        return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive, std::move(encryption));
+    }
     if (e2eeMetadata) {
         return sendSensitive(std::move(stanza), params);
     }

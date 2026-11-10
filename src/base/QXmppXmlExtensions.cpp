@@ -83,6 +83,21 @@ void Extensions::clear()
 }
 
 /*!
+    Appends all values of \a other.
+
+    \since QXmpp 1.18
+*/
+void Extensions::append(const Extensions &other)
+{
+    if (&other == this) {
+        auto copy = other.d->items;
+        d->items.insert(d->items.end(), copy.begin(), copy.end());
+        return;
+    }
+    d->items.insert(d->items.end(), other.d->items.begin(), other.d->items.end());
+}
+
+/*!
     Parses \a el as a registered extension type and adds it to the container.
 
     If the registry has no matching registration for \a scope, the element is

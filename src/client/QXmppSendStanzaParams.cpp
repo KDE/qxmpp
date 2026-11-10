@@ -22,6 +22,7 @@ class QXmppSendStanzaParamsPrivate : public QSharedData
 public:
     TrustLevels acceptedTrustLevels;
     QList<QString> encryptionJids;
+    bool encryptionRequired = false;
 };
 
 QXmppSendStanzaParams::QXmppSendStanzaParams()
@@ -85,4 +86,31 @@ std::optional<TrustLevels> QXmppSendStanzaParams::acceptedTrustLevels() const
 void QXmppSendStanzaParams::setAcceptedTrustLevels(std::optional<TrustLevels> trustLevels)
 {
     d->acceptedTrustLevels = trustLevels.value_or(QXmpp::TrustLevels());
+}
+
+/*!
+    Returns whether sending a message fails if it can not be end-to-end encrypted.
+
+    \since QXmpp 1.18
+*/
+bool QXmppSendStanzaParams::isEncryptionRequired() const
+{
+    return d->encryptionRequired;
+}
+
+/*!
+    Sets whether sending a message fails if it can not be end-to-end encrypted.
+
+    If set, sending fails with QXmpp::SendError::EncryptionError if no encryption is selected by
+    the QXmpp::Messages::SelectEncryption hook, instead of sending the message unencrypted.
+    Messages sent by QXmppClient::sendSensitive() are still encrypted with the encryption
+    extension (QXmppClient::setEncryptionExtension()) if no encryption is selected.
+
+    \a required.
+
+    \since QXmpp 1.18
+*/
+void QXmppSendStanzaParams::setEncryptionRequired(bool required)
+{
+    d->encryptionRequired = required;
 }
