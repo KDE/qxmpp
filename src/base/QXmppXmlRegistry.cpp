@@ -20,7 +20,7 @@ using ErasedParser = std::function<std::optional<std::any>(const QDomElement &)>
 using ErasedSerializer = std::function<void(const std::any &, QXmlStreamWriter &)>;
 
 namespace {
-Q_LOGGING_CATEGORY(QXMPP_REGISTRY, "qxmpp.xml.registry")
+Q_LOGGING_CATEGORY(QXMPP_REGISTRY, "org.qxmpp.xml.registry")
 }  // namespace
 
 // Per-entry data stored in the parser map.
