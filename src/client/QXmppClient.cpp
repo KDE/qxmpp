@@ -713,8 +713,8 @@ QXmppTask<SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::optiona
     Intended to be used for replies to IQs and messages.
 
     \deprecated since QXmpp 1.18, use send() and select the encryption via the
-    QXmpp::Messages::SelectEncryption hook. Responses to IQ requests handled via
-    QXmpp::handleIqRequests() are encrypted like the request.
+    QXmpp::Messages::SelectEncryption hook. Replies to IQ requests handled via
+    QXmpp::Iq::Received are encrypted like the request.
 
     \since QXmpp 1.5
 

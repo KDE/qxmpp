@@ -51,8 +51,8 @@ namespace QXmpp::Messages {
 
     IQs sent via QXmppClient::sendSensitiveIq() are encrypted with the encryption selected by
     the SelectEncryption hook too. Encrypted IQ requests are decrypted by the e2ee provider and
-    passed to the extensions with their QXmppE2eeMetadata. Responses sent via
-    QXmpp::handleIqRequests() are encrypted like the request.
+    passed to the extensions with their QXmppE2eeMetadata. Replies of handlers added via
+    QXmpp::Iq::Received are encrypted like the request.
 
     \since QXmpp 1.18
 */
