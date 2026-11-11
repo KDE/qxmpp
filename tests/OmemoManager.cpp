@@ -472,16 +472,21 @@ void tst_QXmppOmemoManager::testMucMessage()
     QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_alice1.manager->devices({ configBob.jidBare() })).isEmpty(), 20'000);
     QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_bob.manager->devices({ configAlice.jidBare() })).isEmpty(), 20'000);
 
-    // non-anonymous room, as needed for OMEMO
+    // non-anonymous and members-only room, as recommended for OMEMO
     auto created = awaitTask(m_alice1.mucManager->createRoom(mucService, u"alice"_s, QXmppUtils::generateStanzaUuid().toLower()));
     auto room = expectVariant<QXmppMucRoomV2>(std::move(created));
     QTRY_VERIFY_WITH_TIMEOUT(room.roomConfig().value().has_value(), 20'000);
     auto config = *room.roomConfig().value();
     config.setWhoCanDiscoverJids(QXmppMucRoomConfig::WhoCanDiscoverJids::Anyone);
+    config.setMembersOnly(true);
     expectVariant<QXmpp::Success>(awaitTask(room.setRoomConfig(config)));
     auto cleanup = qScopeGuard([&] { awaitTask(room.destroyRoom()); });
+    QXmpp::Muc::Item member;
+    member.setJid(configBob.jidBare());
+    member.setAffiliation(QXmpp::Muc::Affiliation::Member);
+    expectVariant<QXmpp::Success>(awaitTask(room.setAffiliations({ member })));
 
-    expectVariant<QXmppMucRoomV2>(awaitTask(m_bob.mucManager->joinRoom(room.jid(), u"bob"_s)));
+    auto bobRoom = expectVariant<QXmppMucRoomV2>(awaitTask(m_bob.mucManager->joinRoom(room.jid(), u"bob"_s)));
     QTRY_VERIFY_WITH_TIMEOUT(room.participants().size() >= 2, 20'000);
 
     // the sender is resolved before the decryption
@@ -494,11 +499,14 @@ void tst_QXmppOmemoManager::testMucMessage()
         return QXmpp::HookResult::Continue;
     });
     QSignalSpy bobReceivedSpy(m_bob.mucManager, &QXmppMucManagerV2::messageReceived);
-    m_alice1.client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
-        selection.setEncryption(QXmpp::E2ee::Omemo2);
-    });
+    QSignalSpy aliceReceivedSpy(m_alice1.mucManager, &QXmppMucManagerV2::messageReceived);
+    for (auto *client : { &m_alice1.client, &m_bob.client }) {
+        client->hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+            selection.setEncryption(QXmpp::E2ee::Omemo2);
+        });
+    }
 
-    // encrypted for the occupants, finishes with the reflection of the room
+    // encrypted for the members, finishes with the reflection of the room
     QXmppMessage message;
     message.setBody(u"Hello room!"_s);
     expectVariant<QXmpp::Success>(awaitTask(room.sendMessage(std::move(message))));
@@ -510,6 +518,23 @@ void tst_QXmppOmemoManager::testMucMessage()
                              }),
                              20'000);
     QCOMPARE(bobSenders, QStringList { configAlice.jidBare() });
+
+    // members may retrieve the affiliation lists too
+    QStringList bobListRequests;
+    QObject::connect(&m_bob.logger, &QXmppLogger::message, &owner, [&](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage && text.contains(u"http://jabber.org/protocol/muc#admin"_s)) {
+            bobListRequests << text;
+        }
+    });
+    QXmppMessage reply;
+    reply.setBody(u"Hello Alice!"_s);
+    expectVariant<QXmpp::Success>(awaitTask(bobRoom.sendMessage(std::move(reply))));
+    QTRY_VERIFY_WITH_TIMEOUT(std::ranges::any_of(aliceReceivedSpy, [](const QList<QVariant> &arguments) {
+                                 const auto message = arguments.at(1).value<QXmppMessage>();
+                                 return message.e2eeMetadata() && message.body() == u"Hello Alice!";
+                             }),
+                             20'000);
+    QCOMPARE(bobListRequests.size(), 3);
 
     m_alice1.client.hooks(&owner).removeAll();
     m_bob.client.hooks(&owner).removeAll();

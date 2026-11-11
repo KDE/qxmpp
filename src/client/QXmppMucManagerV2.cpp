@@ -25,6 +25,7 @@
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
+#include <array>
 #include <unordered_map>
 
 #include <QProperty>
@@ -173,6 +174,16 @@ struct MucRoomData {
     QProperty<QStringList> avatarHashes;
     QProperty<std::optional<QXmpp::Muc::Avatar>> avatar;
     bool supportsOccupantIds = false;
+    // Bare JIDs of the members, admins and owners of members-only rooms, the recipients of
+    // encrypted messages (XEP-0384). Retrieved before the first encrypted message of a session
+    // and kept up to date by the presences and the messages of the room.
+    std::optional<std::unordered_map<QString, Muc::Affiliation>> affiliations;
+    // changes received while the lists are retrieved, applied to the result
+    std::unordered_map<QString, Muc::Affiliation> affiliationChanges;
+    // messages waiting for the lists, non-empty while they are retrieved
+    std::vector<QXmppPromise<Result<>>> affiliationWaiters;
+    // identifies the session the lists are retrieved for
+    uint64_t affiliationsGeneration = 0;
     // Whether the disco#info result for the current session has been received.
     bool roomInfoFetched = false;
     bool supportsVCard = false;
@@ -282,6 +293,24 @@ struct MucRoomData {
         selfPingInFlight = false;
         selfPingRetryCount = 0;
         lastActivity = {};
+        // the affiliations may change while not in the room
+        affiliations.reset();
+        affiliationChanges.clear();
+        affiliationWaiters.clear();
+        affiliationsGeneration++;
+    }
+
+    void updateAffiliation(const QString &jid, Muc::Affiliation affiliation)
+    {
+        const auto bareJid = QXmppUtils::jidToBareJid(jid);
+        if (bareJid.isEmpty()) {
+            return;
+        }
+        if (affiliations) {
+            (*affiliations)[bareJid] = affiliation;
+        } else if (!affiliationWaiters.empty()) {
+            affiliationChanges[bareJid] = affiliation;
+        }
     }
 };
 
@@ -801,6 +830,16 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
                 Q_EMIT invitationDeclined(bareFrom, *ue->decline());
                 return true;
             }
+            // Affiliation changes of users not in the room (XEP-0045 §9.3 ff.), only from the
+            // room itself.
+            if (const auto &ue = message.mucUserQuery(); ue && !ue->items().isEmpty() && QXmppUtils::jidToResource(message.from()).isEmpty()) {
+                for (const auto &item : ue->items()) {
+                    if (const auto affiliation = item.affiliation()) {
+                        data.updateAffiliation(item.jid(), *affiliation);
+                    }
+                }
+                return true;
+            }
         }
         return false;
     }
@@ -1029,6 +1068,14 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
     // XEP-0410: any presence on a joined room counts as activity.
     if (data.state == Joined) {
         data.lastActivity = std::chrono::steady_clock::now();
+    }
+
+    // affiliations of occupants, also when they leave
+    if (presence.type() != QXmppPresence::Error) {
+        const auto item = presence.mucParticipantItem();
+        if (const auto affiliation = item.affiliation()) {
+            data.updateAffiliation(item.jid(), *affiliation);
+        }
     }
 
     switch (data.state) {
@@ -1474,6 +1521,10 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     for (auto &[id, pending] : data->pendingMessages) {
         otherPromises.push_back(std::move(pending.promise));
     }
+    for (auto &waiter : data->affiliationWaiters) {
+        otherPromises.push_back(std::move(waiter));
+    }
+    data->affiliationWaiters.clear();
 
     // Reset per-session state (promises, timers, state flags). Participants and
     // permission bindings are intentionally preserved — they serve as a frozen
@@ -1545,6 +1596,10 @@ void QXmppMucManagerV2Private::deactivateAllRooms(const QString &errorText)
             otherPromises.push_back(std::move(pending.promise));
         }
         data->pendingMessages.clear();
+        for (auto &waiter : data->affiliationWaiters) {
+            otherPromises.push_back(std::move(waiter));
+        }
+        data->affiliationWaiters.clear();
         // Drain here so deactivateRoom() finds an empty vector and we can finish them
         // below, once every room is clean.
         for (auto &waiter : data->roomConfigWaiters) {
@@ -1937,19 +1992,114 @@ QXmppTask<void> QXmppMucManagerV2Private::resolveRecipients(Messages::OutgoingMe
     if (!data || outgoing.recipientJids() != QList<QString> { data->roomJid }) {
         co_return;
     }
+    if (!data->isNonAnonymous.value()) {
+        outgoing.setError(QXmppError { u"Messages to anonymous rooms can not be encrypted"_s, SendError::EncryptionError });
+        co_return;
+    }
 
-    // the occupants with a known real JID, in anonymous rooms there are none
+    const auto roomJid = data->roomJid;
+    if (data->isMembersOnly.value()) {
+        // also the members who are offline (XEP-0384)
+        if (auto result = co_await requestAffiliations(*data).withContext(q); std::holds_alternative<QXmppError>(result)) {
+            outgoing.setError(QXmppError { u"Could not retrieve the members of the room: "_s + std::get<QXmppError>(result).description, SendError::EncryptionError });
+            co_return;
+        }
+    }
+
+    // the room may have been left meanwhile
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end() || itr->second->state != MucRoomState::Joined) {
+        outgoing.setError(QXmppError { u"The room has been left"_s, SendError::Disconnected });
+        co_return;
+    }
+    data = itr->second.get();
+
+    const auto ownJid = q->client()->configuration().jidBare();
     QList<QString> recipients;
+    auto add = [&](const QString &jid) {
+        if (!jid.isEmpty() && jid != ownJid && !recipients.contains(jid)) {
+            recipients.append(jid);
+        }
+    };
+    if (data->affiliations) {
+        for (const auto &[jid, affiliation] : *data->affiliations) {
+            if (affiliation == Muc::Affiliation::Member || affiliation == Muc::Affiliation::Admin || affiliation == Muc::Affiliation::Owner) {
+                add(jid);
+            }
+        }
+    }
+    // the occupants, in open rooms they need no affiliation
     const auto self = data->selfParticipant.value();
     for (const auto &[_, participant] : data->participants) {
-        if (participant == self) {
-            continue;
-        }
-        if (auto jid = QXmppUtils::jidToBareJid(participant->jid.value()); !jid.isEmpty() && !recipients.contains(jid)) {
-            recipients.append(jid);
+        if (participant != self) {
+            add(QXmppUtils::jidToBareJid(participant->jid.value()));
         }
     }
     outgoing.recipientJids() = recipients;
+}
+
+// Waits until the affiliation lists of the current session have been retrieved.
+QXmppTask<Result<>> QXmppMucManagerV2Private::requestAffiliations(MucRoomData &data)
+{
+    if (data.affiliations) {
+        return makeReadyTask<Result<>>(Success());
+    }
+    QXmppPromise<Result<>> promise;
+    auto task = promise.task();
+    data.affiliationWaiters.push_back(std::move(promise));
+    if (data.affiliationWaiters.size() == 1) {
+        fetchAffiliations(data.roomJid, data.affiliationsGeneration);
+    }
+    return task;
+}
+
+QXmppTask<void> QXmppMucManagerV2Private::fetchAffiliations(QString roomJid, uint64_t generation)
+{
+    using Muc::Affiliation;
+    auto query = [&](Affiliation affiliation) {
+        Muc::Item item;
+        item.setAffiliation(affiliation);
+        return get<MucAdminQuery>(q->client(), roomJid, MucAdminQuery { .items = { item } });
+    };
+    // requested in parallel
+    std::array requests { std::pair { Affiliation::Owner, query(Affiliation::Owner) },
+                          std::pair { Affiliation::Admin, query(Affiliation::Admin) },
+                          std::pair { Affiliation::Member, query(Affiliation::Member) } };
+
+    std::unordered_map<QString, Affiliation> affiliations;
+    std::optional<QXmppError> error;
+    for (auto &[affiliation, request] : requests) {
+        auto result = co_await request.withContext(q);
+        if (auto *adminQuery = std::get_if<MucAdminQuery>(&result)) {
+            for (const auto &item : adminQuery->items) {
+                if (const auto jid = QXmppUtils::jidToBareJid(item.jid()); !jid.isEmpty()) {
+                    affiliations.emplace(jid, affiliation);
+                }
+            }
+        } else if (!error) {
+            error = std::get<QXmppError>(std::move(result));
+        }
+    }
+
+    auto itr = activeRooms.find(roomJid);
+    if (itr == activeRooms.end() || itr->second->affiliationsGeneration != generation) {
+        // the waiters have been finished when the session ended
+        co_return;
+    }
+    auto &data = *itr->second;
+    auto waiters = std::move(data.affiliationWaiters);
+    data.affiliationWaiters.clear();
+    if (!error) {
+        for (auto &[jid, affiliation] : data.affiliationChanges) {
+            affiliations[jid] = affiliation;
+        }
+        data.affiliations = std::move(affiliations);
+    }
+    data.affiliationChanges.clear();
+
+    for (auto &waiter : waiters) {
+        waiter.finish(error ? Result<>(*error) : Result<>(Success()));
+    }
 }
 
 // Waits for the reflection of a message sent to a joined room or an error.

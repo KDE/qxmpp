@@ -26,6 +26,8 @@
 #include "Algorithms.h"
 #include "TestClient.h"
 
+#include <map>
+
 #include <QRegularExpression>
 
 using namespace QXmpp;
@@ -83,6 +85,9 @@ private:
     Q_SLOT void sendMessageForgedReflection();
     Q_SLOT void sendMessageConsumedReflection();
     Q_SLOT void sendMessageEncrypted();
+    Q_SLOT void sendMessageEncryptedMembersOnly();
+    Q_SLOT void sendMessageEncryptedMembersError();
+    Q_SLOT void sendMessageEncryptedAnonymous();
     Q_SLOT void sendPrivateMessage();
     Q_SLOT void moderateMessage();
     Q_SLOT void messageRetractedReceived();
@@ -1550,6 +1555,148 @@ void tst_QXmppMuc::sendMessageEncrypted()
     QVERIFY(!originId.isEmpty());
     test.injectMessage(reflection(u"thirdwitch"_s, originId));
     expectFutureVariant<QXmpp::Success>(task);
+}
+
+// Answers the requests of the affiliation lists sent before an encrypted message.
+static void answerAffiliationLists(TestClient &test, const std::map<QString, QStringList> &lists, const QString &failing = {})
+{
+    static const QRegularExpression idRegex(uR"(id=["']([^"']+)["'])"_s);
+    static const QRegularExpression affiliationRegex(uR"(affiliation=["']([^"']+)["'])"_s);
+    QStringList requests;
+    for (int i = 0; i < 3; i++) {
+        requests << test.takePacket();
+    }
+    QStringList affiliations;
+    for (const auto &request : std::as_const(requests)) {
+        QVERIFY(request.contains(u"http://jabber.org/protocol/muc#admin"_s));
+        const auto id = idRegex.match(request).captured(1);
+        const auto affiliation = affiliationRegex.match(request).captured(1);
+        affiliations << affiliation;
+        if (affiliation == failing) {
+            test.inject(u"<iq id='"_s + id + u"' from='coven@chat.shakespeare.lit' type='error'><error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+            continue;
+        }
+        QString items;
+        if (auto itr = lists.find(affiliation); itr != lists.end()) {
+            for (const auto &jid : itr->second) {
+                items += u"<item affiliation='"_s + affiliation + u"' jid='"_s + jid + u"'/>"_s;
+            }
+        }
+        test.inject(u"<iq id='"_s + id + u"' from='coven@chat.shakespeare.lit' type='result'><query xmlns='http://jabber.org/protocol/muc#admin'>"_s + items + u"</query></iq>"_s);
+    }
+    std::ranges::sort(affiliations);
+    QCOMPARE(affiliations, (QStringList { u"admin"_s, u"member"_s, u"owner"_s }));
+}
+
+static void injectOccupant(TestClient &test, const QString &nick, const QString &jid, const QString &affiliation = u"member"_s)
+{
+    QXmppPresence presence;
+    parsePacket(presence, (u"<presence from='coven@chat.shakespeare.lit/"_s + nick + u"'><x xmlns='http://jabber.org/protocol/muc#user'><item affiliation='"_s + affiliation + u"' role='participant' jid='"_s + jid + u"'/></x></presence>"_s).toUtf8());
+    test.injectPresence(presence);
+}
+
+static QList<QString> sorted(QList<QString> list)
+{
+    std::ranges::sort(list);
+    return list;
+}
+
+void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *e2ee = test.addNewExtension<MucTestE2eeManager>();
+    auto room = joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, { u"muc_nonanonymous"_s, u"muc_membersonly"_s });
+    injectOccupant(test, u"firstwitch"_s, u"crone1@shakespeare.lit/desktop"_s);
+
+    QObject owner;
+    test.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+        selection.setEncryption(MucTestE2eeManager::Encryption);
+    });
+
+    QXmppMessage message;
+    message.setBody(u"Hi"_s);
+    auto task = room.sendMessage(QXmppMessage(message));
+
+    // a change while the lists are retrieved is applied afterwards
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit'><x xmlns='http://jabber.org/protocol/muc#user'>"
+                       "<item affiliation='none' jid='crone4@shakespeare.lit'/></x></message>"_s);
+    // the offline members are recipients too, not this account
+    answerAffiliationLists(test, { { u"owner"_s, { u"hecate@shakespeare.lit"_s } }, { u"member"_s, { u"crone1@shakespeare.lit"_s, u"crone3@shakespeare.lit"_s, u"crone4@shakespeare.lit"_s, u"hag66@shakespeare.lit"_s } } });
+    QCOMPARE(sorted(e2ee->recipientJids), (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone3@shakespeare.lit"_s, u"hecate@shakespeare.lit"_s }));
+    test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
+    expectFutureVariant<QXmpp::Success>(task);
+
+    // changes announced by the room and the presences of occupants are tracked
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit'><x xmlns='http://jabber.org/protocol/muc#user'>"
+                       "<item affiliation='none' jid='crone3@shakespeare.lit'/>"
+                       "<item affiliation='member' jid='crone5@shakespeare.lit'/></x></message>"_s);
+    // occupants can not announce changes
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch'><x xmlns='http://jabber.org/protocol/muc#user'>"
+                       "<item affiliation='member' jid='mallory@shakespeare.lit'/></x></message>"_s);
+    injectOccupant(test, u"secondwitch"_s, u"crone2@shakespeare.lit/laptop"_s, u"admin"_s);
+
+    // the lists are not requested again
+    task = room.sendMessage(QXmppMessage(message));
+    QCOMPARE(sorted(e2ee->recipientJids), (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone2@shakespeare.lit"_s, u"crone5@shakespeare.lit"_s, u"hecate@shakespeare.lit"_s }));
+    test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
+    expectFutureVariant<QXmpp::Success>(task);
+    test.expectNoPacket();
+}
+
+void tst_QXmppMuc::sendMessageEncryptedMembersError()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto *e2ee = test.addNewExtension<MucTestE2eeManager>();
+    auto room = joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, { u"muc_nonanonymous"_s, u"muc_membersonly"_s });
+
+    QObject owner;
+    test.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+        selection.setEncryption(MucTestE2eeManager::Encryption);
+    });
+
+    QXmppMessage message;
+    message.setBody(u"Hi"_s);
+    // the second message waits for the first one
+    auto first = room.sendMessage(QXmppMessage(message));
+    auto second = room.sendMessage(QXmppMessage(message));
+    answerAffiliationLists(test, {}, u"admin"_s);
+
+    // not sent without all members
+    QCOMPARE(expectFutureVariant<QXmppError>(first).value<QXmpp::SendError>(), QXmpp::SendError::EncryptionError);
+    QVERIFY(e2ee->recipientJids.isEmpty());
+
+    // the next message retries
+    answerAffiliationLists(test, { { u"member"_s, { u"crone1@shakespeare.lit"_s } } });
+    QCOMPARE(e2ee->recipientJids, (QList<QString> { u"crone1@shakespeare.lit"_s }));
+    test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
+    expectFutureVariant<QXmpp::Success>(second);
+}
+
+void tst_QXmppMuc::sendMessageEncryptedAnonymous()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    test.addNewExtension<MucTestE2eeManager>();
+    auto room = joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, { u"muc_semianonymous"_s, u"muc_membersonly"_s });
+
+    QObject owner;
+    test.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+        selection.setEncryption(MucTestE2eeManager::Encryption);
+    });
+
+    QXmppMessage message;
+    message.setBody(u"Hi"_s);
+    auto task = room.sendMessage(std::move(message));
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<QXmpp::SendError>(), QXmpp::SendError::EncryptionError);
+    test.expectNoPacket();
 }
 
 void tst_QXmppMuc::moderateMessage()

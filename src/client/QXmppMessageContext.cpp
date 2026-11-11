@@ -138,6 +138,12 @@ namespace QXmpp::Messages {
     QXmppSendStanzaParams::encryptionJids() or else the bare JID of the addressee. Handlers can
     add recipients, e.g. the members of a MUC, and may wait for them to be retrieved. Handlers
     can make sending fail with QXmpp::Messages::OutgoingMessage::setError().
+
+    QXmppMucManagerV2 encrypts messages to joined rooms for the real JIDs of the occupants. In
+    members-only rooms, all members, admins and owners are added, also if they are offline
+    (\xep{0384}{OMEMO Encryption}). The lists are retrieved before the first encrypted message
+    after joining and are kept up to date afterwards. Messages to anonymous rooms can not be
+    encrypted and fail.
 */
 
 /*!
@@ -176,9 +182,8 @@ namespace QXmpp::Messages {
 
     It is started as soon as the message has been received, not after earlier messages of the
     conversation have been processed, so handlers returning without waiting see the state at
-    the time the message was received if no earlier handler waits (e.g. the occupants of a MUC).
-    Handlers that need to wait, e.g. for a database, return a QXmppTask. Later messages of the
-    conversation wait for them.
+    the time the message was received if no earlier handler waits (e.g. the occupants of a MUC). Handlers that need to wait,
+    e.g. for a database, return a QXmppTask. Later messages of the conversation wait for them.
 */
 
 /*!
