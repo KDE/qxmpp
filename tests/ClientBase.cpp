@@ -5595,6 +5595,58 @@ static QString plainMessage(const QString &from, const QString &id)
     return u"<message from='"_s + from + u"' to='me@example.org/res' type='chat' id='"_s + id + u"'><body>plain</body></message>"_s;
 }
 
+// Encrypts only the body, like OMEMO 0.3.
+constexpr QStringView TestBodyEncryption = u"urn:test:body-e2ee";
+
+struct TestBodyEncrypted {
+    static constexpr std::tuple XmlTag = { u"encrypted", TestBodyEncryption };
+
+    QString data;
+
+    static std::optional<TestBodyEncrypted> fromDom(const QDomElement &el)
+    {
+        return TestBodyEncrypted { el.attribute(u"data"_s) };
+    }
+
+    void toXml(QXmlStreamWriter *w) const
+    {
+        w->writeStartElement(u"encrypted"_s);
+        w->writeDefaultNamespace(TestBodyEncryption.toString());
+        w->writeAttribute(u"data"_s, data);
+        w->writeEndElement();
+    }
+};
+
+// "Encrypts" by reversing the body.
+static QString reversed(QString text)
+{
+    std::reverse(text.begin(), text.end());
+    return text;
+}
+
+class TestBodyE2eeManager : public QXmppClientExtension
+{
+public:
+    TestBodyE2eeManager()
+    {
+        QXmpp::E2ee::Providers(hooks()).add(E2ee::Provider {
+            .encryption = TestBodyEncryption,
+            .contentEncryption = E2ee::ContentEncryption::BodyOnly,
+            .decryptMessage = [](E2ee::DecryptRequest request) {
+                const auto body = reversed(request.message().extensions().get<TestBodyEncrypted>()->data);
+                E2ee::Decrypted decrypted;
+                decrypted.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'><body xmlns='jabber:client'>"_s + body + u"</body></content>"_s));
+                return makeReadyTask<E2ee::DecryptResult>(std::move(decrypted)); },
+            .encryptMessage = [](E2ee::EncryptRequest request) {
+                Xml::Extensions elements;
+                elements.add(TestBodyEncrypted { reversed(request.message().body()) });
+                E2ee::Encrypted encrypted;
+                encrypted.setElements(std::move(elements));
+                return makeReadyTask<E2ee::EncryptResult>(std::move(encrypted)); },
+        });
+    }
+};
+
 class tst_QXmppMessages : public QObject
 {
     Q_OBJECT
@@ -5625,16 +5677,20 @@ private:
     Q_SLOT void iqWithoutSelection();
     Q_SLOT void iqIncoming();
     Q_SLOT void iqIncomingNotDecrypted();
+    Q_SLOT void bodyOnlyDecrypt();
+    Q_SLOT void bodyOnlyEncrypt();
 };
 
 void tst_QXmppMessages::initTestCase()
 {
     Xml::Registry::registerEncryptedContainer<TestEncrypted>(Xml::Scope::Message);
+    Xml::Registry::registerEncryptedContainer<TestBodyEncrypted>(Xml::Scope::Message);
 }
 
 void tst_QXmppMessages::cleanupTestCase()
 {
     Xml::Registry::unregisterElement<TestEncrypted>();
+    Xml::Registry::unregisterElement<TestBodyEncrypted>();
 }
 
 void tst_QXmppMessages::messagesUnencrypted()
@@ -6255,6 +6311,68 @@ void tst_QXmppMessages::iqIncomingNotDecrypted()
                   "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas' xml:lang='en'>The end-to-end encrypted request could not be decrypted.</text>"
                   "</error></iq>"_s);
     QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+}
+
+void tst_QXmppMessages::bodyOnlyDecrypt()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    client.addNewExtension<TestBodyE2eeManager>();
+
+    QObject owner;
+    std::optional<QXmppMessage> received;
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        received = context.message();
+        state = context.decryptionState();
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(u"<message from='alice@example.org/phone' to='me@example.org/res' type='chat' id='1'>"
+                         "<body>fallback</body>"
+                         "<encrypted xmlns='urn:test:body-e2ee' data='terces'/>"
+                         "<replace xmlns='urn:xmpp:message-correct:0' id='old'/>"
+                         "<fallback xmlns='urn:xmpp:fallback:0' for='urn:xmpp:reply:0'><body start='0' end='2'/></fallback>"
+                         "<fallback xmlns='urn:xmpp:fallback:0' for='urn:test:body-e2ee'><body/></fallback>"
+                         "</message>"_s);
+
+    QVERIFY(received);
+    QCOMPARE(state, DecryptionState::Decrypted);
+    QCOMPARE(received->body(), u"secret"_s);
+    QCOMPARE(received->e2eeFallbackBody(), u"fallback"_s);
+    // the other elements are sent in the clear
+    QCOMPARE(received->replaceId(), u"old"_s);
+    QVERIFY(received->publicExtensions().isEmpty());
+    // only the fallback marker of the encryption refers to the fallback body
+    QCOMPARE(received->fallbackMarkers().size(), 1);
+    QCOMPARE(received->fallbackMarkers().at(0).forNamespace(), u"urn:xmpp:reply:0"_s);
+    QCOMPARE(received->e2eeMetadata()->encryptionNamespace(), TestBodyEncryption);
+}
+
+void tst_QXmppMessages::bodyOnlyEncrypt()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    client.addNewExtension<TestBodyE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestBodyEncryption);
+    });
+
+    QXmppMessage message(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s);
+    message.setReplaceId(u"old"_s);
+    message.setFallbackMarkers({ QXmppFallback { u"urn:xmpp:reply:0"_s, { { QXmppFallback::Body, {} } } } });
+    client.send(std::move(message));
+
+    const auto packet = client.takePacket();
+    QVERIFY(!packet.contains(u">secret<"_s));
+    QVERIFY(packet.contains(u"<encrypted xmlns=\"urn:test:body-e2ee\" data=\"terces\"/>"_s));
+    QVERIFY(packet.contains(u"<body>This message is encrypted with urn:test:body-e2ee but could not be decrypted</body>"_s));
+    QVERIFY(packet.contains(u"<encryption xmlns=\"urn:xmpp:eme:0\" namespace=\"urn:test:body-e2ee\"/>"_s));
+    // the other elements are sent in the clear
+    QVERIFY(packet.contains(u"<replace xmlns=\"urn:xmpp:message-correct:0\" id=\"old\"/>"_s));
+    QVERIFY(packet.contains(u"for=\"urn:xmpp:reply:0\""_s));
+    QVERIFY(packet.contains(u"for=\"urn:test:body-e2ee\""_s));
 }
 
 }  // namespace MessagesTests

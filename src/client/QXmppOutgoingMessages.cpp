@@ -28,8 +28,32 @@ using namespace QXmpp::Messages;
 namespace QXmpp::Private {
 
 // Adds the encrypted elements and the public parts of Explicit Message Encryption (XEP-0380).
-static void applyEncrypted(QXmppMessage &message, const QString &encryption, const E2ee::Encrypted &encrypted)
+// Returns the part of the message to be sent.
+static SceMode applyEncrypted(QXmppMessage &message, const QString &encryption, const E2ee::Encrypted &encrypted, E2ee::ContentEncryption contentEncryption)
 {
+    // encryptions unknown to QXmpp have no name
+    auto fallbackBody = [&] {
+        const auto name = message.encryptionName().isEmpty() ? encryption : message.encryptionName();
+        return u"This message is encrypted with %1 but could not be decrypted"_s.arg(name);
+    };
+    const QXmppFallback fallbackMarker { encryption, { { QXmppFallback::Body, {} } } };
+
+    if (contentEncryption == E2ee::ContentEncryption::BodyOnly) {
+        // Only the body is encrypted, all other elements are sent in the clear. Their fallback
+        // markers (e.g. of a reply) are kept, they refer to the decrypted body.
+        if (!message.body().isEmpty()) {
+            message.setEncryptionMethodNs(encryption);
+            message.setBody(fallbackBody());
+            auto markers = message.fallbackMarkers();
+            markers.append(fallbackMarker);
+            message.setFallbackMarkers(markers);
+        }
+        message.extensions().append(message.publicExtensions());
+        message.publicExtensions().clear();
+        message.extensions().append(encrypted.elements());
+        return SceAll;
+    }
+
     // Fallback markers are serialized in the public part too. The ones of the sensitive part are
     // encrypted, so they must not be sent publicly.
     message.setFallbackMarkers({});
@@ -39,13 +63,12 @@ static void applyEncrypted(QXmppMessage &message, const QString &encryption, con
     // told apart from messages with a body.
     if (!message.body().isEmpty() || message.trustMessageElement()) {
         message.setEncryptionMethodNs(encryption);
-        // encryptions unknown to QXmpp have no name
-        const auto name = message.encryptionName().isEmpty() ? encryption : message.encryptionName();
-        message.setE2eeFallbackBody(u"This message is encrypted with %1 but could not be decrypted"_s.arg(name));
-        message.setFallbackMarkers({ QXmppFallback { encryption, { { QXmppFallback::Body, {} } } } });
+        message.setE2eeFallbackBody(fallbackBody());
+        message.setFallbackMarkers({ fallbackMarker });
     }
 
     message.extensions().append(encrypted.elements());
+    return ScePublic;
 }
 
 // State of a sent message until its delivery has been confirmed.
@@ -186,11 +209,11 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     }
 
     auto &message = outgoing.message();
-    applyEncrypted(message, outgoing.encryption(), std::get<E2ee::Encrypted>(result));
+    const auto part = applyEncrypted(message, outgoing.encryption(), std::get<E2ee::Encrypted>(result), provider->contentEncryption);
 
     QByteArray xml;
     QXmlStreamWriter writer(&xml);
-    message.toXml(&writer, ScePublic);
+    message.toXml(&writer, part);
     finishFront(conversationJid, m_clientPrivate->stream->streamAckManager().send(QXmppPacket(xml, true)), outgoingPtr);
 }
 

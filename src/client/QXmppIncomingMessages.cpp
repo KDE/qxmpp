@@ -6,6 +6,7 @@
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeProvider.h"
+#include "QXmppFallback.h"
 #include "QXmppHooks_p.h"
 #include "QXmppIncomingMessages_p.h"
 #include "QXmppMessage.h"
@@ -44,7 +45,7 @@ static void fail(Context &context, DecryptionState state, QString errorText = {}
 }
 
 // Merges the decrypted content into the message of the context.
-static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted)
+static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const E2ee::Provider &provider)
 {
     auto &d = MessageContextAccess::d(context);
     auto &message = d.message;
@@ -62,16 +63,28 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted)
         return;
     }
 
-    // The public part was parsed with ScePublic, so it contains no sensitive elements apart from
-    // the fallback body and publicExtensions(). Fallback markers of the public part refer to
-    // the fallback body and must not be applied to the decrypted body.
     if (decrypted.content().isNull()) {
         d.withoutContent = true;
     }
     message.extensions().removeIf([](const std::any &item) {
         return !Xml::Registry::encryption(item).isNull();
     });
-    message.setFallbackMarkers({});
+    if (provider.contentEncryption == E2ee::ContentEncryption::BodyOnly) {
+        // The other elements are sent in the clear and have been parsed completely. Only the
+        // body is replaced, the one of the public part is the fallback body. Fallback markers
+        // of other elements (e.g. replies) refer to the decrypted body.
+        if (message.e2eeFallbackBody().isEmpty()) {
+            message.setE2eeFallbackBody(message.body());
+        }
+        auto markers = message.fallbackMarkers();
+        markers.removeIf([&](const QXmppFallback &marker) { return marker.forNamespace() == provider.encryption; });
+        message.setFallbackMarkers(markers);
+    } else {
+        // The public part was parsed with ScePublic, so it contains no sensitive elements apart
+        // from the fallback body and publicExtensions(). Fallback markers of the public part
+        // refer to the fallback body and must not be applied to the decrypted body.
+        message.setFallbackMarkers({});
+    }
     message.parseExtensions(decrypted.content(), SceSensitive);
     message.setE2eeMetadata(decrypted.metadata());
 
@@ -90,9 +103,16 @@ IncomingMessages::ParsedMessage IncomingMessages::parse(const QDomElement &eleme
 {
     ParsedMessage parsed;
     parsed.encryption = Xml::Registry::encryption(element);
-    const bool hasProvider = !parsed.encryption.isNull() && E2ee::Providers(m_hooks).contains(parsed.encryption);
-    parsed.legacyEncrypted = !hasProvider && legacyEncryption && legacyEncryption->isEncrypted(element);
-    parsed.message.parse(element, hasProvider || parsed.legacyEncrypted ? ScePublic : SceAll);
+    const auto provider = parsed.encryption.isNull() ? std::nullopt : E2ee::Providers(m_hooks).find(parsed.encryption);
+    if (provider && provider->contentEncryption == E2ee::ContentEncryption::BodyOnly) {
+        // only the body is encrypted, the public one is its fallback
+        parsed.message.parse(element, SceAll);
+        parsed.message.setE2eeFallbackBody(parsed.message.body());
+        parsed.message.setBody({});
+        return parsed;
+    }
+    parsed.legacyEncrypted = !provider && legacyEncryption && legacyEncryption->isEncrypted(element);
+    parsed.message.parse(element, provider || parsed.legacyEncrypted ? ScePublic : SceAll);
     return parsed;
 }
 
@@ -201,7 +221,7 @@ QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryp
             metadata.setEncryptionNamespace(encryption.toString());
             decrypted->setMetadata(std::move(metadata));
         }
-        applyDecrypted(context, std::move(*decrypted));
+        applyDecrypted(context, std::move(*decrypted), *provider);
     } else if (std::holds_alternative<E2ee::NoEnvelope>(result)) {
         fail(context, DecryptionState::NoEnvelope);
     } else {

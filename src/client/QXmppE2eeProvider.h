@@ -138,12 +138,23 @@ private:
     QString m_senderJid;
 };
 
+// What an encryption encrypts of a message.
+enum class ContentEncryption {
+    // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
+    Sce,
+    // only the body, all other elements are sent in the clear, e.g. OMEMO 0.3
+    BodyOnly,
+};
+
 // Registered per encryption. Function members instead of virtuals, so it can be extended without
 // breaking the ABI.
 struct Provider {
     // Namespace of the encryption, e.g. QXmpp::E2ee::Omemo2. It must reference static storage,
     // like the namespace of the encrypted container (see Xml::Registry::registerEncryptedContainer()).
     QStringView encryption;
+    // With BodyOnly, the content of Decrypted contains only the body and encryptMessage() only
+    // encrypts the body, the pipeline sends the other elements in the clear.
+    ContentEncryption contentEncryption = ContentEncryption::Sce;
     std::function<QXmppTask<DecryptResult>(DecryptRequest)> decryptMessage;
     std::function<QXmppTask<EncryptResult>(EncryptRequest)> encryptMessage;
     // Optional. The content of Decrypted replaces the child elements of the IQ.
