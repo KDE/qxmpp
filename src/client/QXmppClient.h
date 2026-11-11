@@ -41,6 +41,7 @@ class QXmppVersionManager;
 
 namespace QXmpp::Private {
 class EncryptedIqs;
+struct LegacyE2ee;
 struct SessionBegin;
 }  // namespace QXmpp::Private
 
@@ -200,8 +201,12 @@ public:
     }
     bool insertExtension(int index, QXmppClientExtension *extension);
     bool removeExtension(QXmppClientExtension *extension);
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use QXmpp::E2ee::Provider")]]
     QXmppE2eeExtension *encryptionExtension() const;
+    [[deprecated("Use QXmpp::E2ee::Provider")]]
     void setEncryptionExtension(QXmppE2eeExtension *);
+#endif
 
     QList<QXmppClientExtension *> extensions() const;
 
@@ -282,9 +287,15 @@ public:
     State state() const;
     QXmppStanza::Error::Condition xmppStreamError();
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use send() and select the encryption via the QXmpp::Messages::SelectEncryption hook")]]
     QXmppTask<QXmpp::SendResult> sendSensitive(QXmppStanza &&, const std::optional<QXmppSendStanzaParams> & = {});
+#endif
     QXmppTask<QXmpp::SendResult> send(QXmppStanza &&, const std::optional<QXmppSendStanzaParams> & = {});
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use send() and select the encryption via the QXmpp::Messages::SelectEncryption hook")]]
     QXmppTask<QXmpp::SendResult> reply(QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> & = {});
+#endif
     QXmppTask<IqResult> sendIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
     QXmppTask<IqResult> sendSensitiveIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
     QXmppTask<EmptyResult> sendGenericIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
@@ -451,6 +462,7 @@ private:
     friend class QXmppCarbonManagerV2;
     friend class QXmppMamManager;
     friend class QXmpp::Private::EncryptedIqs;
+    friend struct QXmpp::Private::LegacyE2ee;
     friend class QXmppNetworkMonitor;
     friend class QXmppRegistrationManager;
     friend class TestClient;

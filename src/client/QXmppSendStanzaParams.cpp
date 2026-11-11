@@ -103,8 +103,9 @@ bool QXmppSendStanzaParams::isEncryptionRequired() const
 
     If set, sending fails with QXmpp::SendError::EncryptionError if no encryption is selected by
     the QXmpp::Messages::SelectEncryption hook, instead of sending the message unencrypted.
-    Messages sent by QXmppClient::sendSensitive() are still encrypted with the encryption
-    extension (QXmppClient::setEncryptionExtension()) if no encryption is selected.
+    Sensitive stanzas sent by QXmpp's managers (and via the deprecated
+    QXmppClient::sendSensitive()) are still encrypted with the deprecated encryption extension
+    (QXmppClient::setEncryptionExtension()) if no encryption is selected.
 
     \a required.
 

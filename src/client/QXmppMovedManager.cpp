@@ -4,6 +4,7 @@
 
 #include "QXmppMovedManager.h"
 
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
@@ -258,7 +259,7 @@ QXmppTask<QXmpp::SendResult> QXmppMovedManager::notifyContact(const QString &con
     packet.setType(QXmppPresence::Subscribe);
     packet.setStatusText(reason);
     packet.setOldJid(oldBareJid);
-    return sensitive ? client()->sendSensitive(std::move(packet)) : client()->send(std::move(packet));
+    return sensitive ? LegacyE2ee::sendSensitive(client(), std::move(packet)) : client()->send(std::move(packet));
 }
 
 void QXmppMovedManager::onRegistered(QXmppClient *client)

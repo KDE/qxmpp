@@ -374,6 +374,9 @@ void tst_QXmppMamManager::retrieveMessagesUnencrypted()
     QCOMPARE(retrieved.result.resultSetReply().first(), "28482-98726-73623");
 }
 
+// tests the deprecated API
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 void tst_QXmppMamManager::retrieveMessagesEncrypted()
 {
     TestClient test;
@@ -435,6 +438,7 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
     QCOMPARE(retrieved.messages.at(1).body(), "What man art thou that thus bescreen'd in night so stumblest on my counsel?");
     QCOMPARE(retrieved.result.resultSetReply().first(), "28482-98726-73623");
 }
+QT_WARNING_POP
 
 void tst_QXmppMamManager::retrieveMessagesPipeline()
 {

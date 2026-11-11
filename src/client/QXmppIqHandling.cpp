@@ -4,6 +4,8 @@
 
 #include "QXmppIqHandling.h"
 
+#include "QXmppClient_p.h"
+
 #include "StringLiterals.h"
 
 void QXmpp::Private::sendIqReply(QXmppClient *client,
@@ -25,7 +27,7 @@ void QXmpp::Private::sendIqReply(QXmppClient *client,
 
     iq.setTo(requestFrom);
     iq.setId(requestId);
-    client->reply(std::move(iq), e2eeMetadata);
+    LegacyE2ee::reply(client, std::move(iq), e2eeMetadata);
 }
 
 std::tuple<bool, QString, QString> QXmpp::Private::checkIsIqRequest(const QDomElement &el)

@@ -8,8 +8,10 @@
 #include "QXmppCarbonManagerV2.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppMessage.h"
+#include "QXmppMessages.h"
 #include "QXmppOmemoManager.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppUtils.h"
 
 #include <QCoreApplication>
 
@@ -25,8 +27,16 @@ EchoClientOmemo::EchoClientOmemo(QObject *parent)
 
     m_omemoManager = addNewExtension<QXmppOmemoManager>(&m_omemoStorage);
 
-    setEncryptionExtension(m_omemoManager);
     m_omemoManager->setSecurityPolicy(QXmpp::Toakafa);
+
+    // The encryption of outgoing messages is selected per contact: contacts that sent OMEMO
+    // encrypted messages get OMEMO encrypted replies. A real application would use a setting of
+    // the user per conversation instead.
+    hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
+        if (m_omemoContacts.contains(QXmppUtils::jidToBareJid(selection.stanza().to()))) {
+            selection.setEncryption(QXmpp::E2ee::Omemo2);
+        }
+    });
 
     // This example uses QXmppOmemoMemoryStorage and QXmppAtmTrustMemoryStorage,
     // which keep everything in memory only. load() will always fail on startup
@@ -71,8 +81,11 @@ void EchoClientOmemo::messageReceived(const QXmppMessage &message)
         return;
     }
 
-    reply(QXmppMessage({}, message.from(), u"Your message: " + message.body()),
-          message.e2eeMetadata());
+    if (const auto metadata = message.e2eeMetadata(); metadata && metadata->encryptionNamespace() == QXmpp::E2ee::Omemo2) {
+        m_omemoContacts.insert(QXmppUtils::jidToBareJid(message.from()));
+    }
+
+    send(QXmppMessage({}, message.from(), u"Your message: " + message.body()));
 }
 
 int main(int argc, char *argv[])

@@ -86,7 +86,7 @@ public:
     // The IQ, null for messages.
     const QXmppIq *iq() const { return dynamic_cast<const QXmppIq *>(m_stanza); }
 
-    // see QXmppSendStanzaParams::isEncryptionRequired() and QXmppClient::sendSensitive()
+    // see QXmppSendStanzaParams::isEncryptionRequired(), also set for sensitive stanzas of managers
     bool isRequired() const { return m_required; }
 
     // Namespace of the encryption (see QXmpp::E2ee), empty for sending unencrypted (default).

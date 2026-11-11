@@ -6,6 +6,7 @@
 
 #include "QXmppAccountMigrationManager.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
@@ -163,7 +164,7 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
     QXmppSendStanzaParams params;
     params.setEncryptionJids({ "alice@example.org", "bob@example.com" })
 
-    client->sendSensitive(std::move(message), params);
+    LegacyE2ee::sendSensitive(client, std::move(message), params);
     \endcode
 
     If you receive a message, you can check whether it contains an invitation to a MIX channel and
@@ -217,7 +218,7 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
     message.setBody(messageBody);
     }
 
-    client()->sendSensitive(std::move(message));
+    LegacyE2ee::sendSensitive(client(), std::move(message));
     \endcode
 
     In order to invite someone to a MIX channel that does not yet allow the invitee to participate,

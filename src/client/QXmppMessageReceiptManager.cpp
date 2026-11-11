@@ -6,6 +6,7 @@
 #include "QXmppMessageReceiptManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeMetadata.h"
@@ -54,7 +55,7 @@ bool QXmppMessageReceiptManager::handleMessage(const QXmppMessage &message)
         // Advise the server to store the receipt even if the message has no body.
         receipt.addHint(QXmppMessage::Store);
 
-        client()->reply(std::move(receipt), message.e2eeMetadata());
+        LegacyE2ee::reply(client(), std::move(receipt), message.e2eeMetadata());
     }
 
     // Continue processing.

@@ -375,7 +375,7 @@ QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(con
             }
         };
 
-        auto *e2eeExt = client()->encryptionExtension();
+        auto *e2eeExt = LegacyE2ee::encryptionExtension(client());
         auto &incomingMessages = client()->d->incomingMessages;
         const auto size = state.messages.size();
         for (qsizetype i = 0; i < size; i++) {

@@ -7,6 +7,7 @@
 #include "QXmppCarbonManager.h"
 #include "QXmppCarbonManagerV2.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppMessage.h"
@@ -399,5 +400,5 @@ QXmppTask<QXmpp::SendResult> QXmppAtmManager::sendTrustMessage(const QString &en
     QXmppSendStanzaParams params;
     params.setAcceptedTrustLevels(TrustLevel::Authenticated);
 
-    return client()->sendSensitive(std::move(message), params);
+    return LegacyE2ee::sendSensitive(client(), std::move(message), params);
 }

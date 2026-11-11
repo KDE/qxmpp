@@ -491,24 +491,46 @@ bool QXmppClient::removeExtension(QXmppClientExtension *extension)
 /*!
     Returns the currently used encryption extension.
 
+    \deprecated since QXmpp 1.18, end-to-end encryptions are QXmpp::E2ee::Provider registered via
+    QXmpp::E2ee::Providers.
+
     \since QXmpp 1.5
 */
+#if QXMPP_DEPRECATED_SINCE(1, 18)
 QXmppE2eeExtension *QXmppClient::encryptionExtension() const
 {
     return d->encryptionExtension;
+}
+#endif
+
+QXmppE2eeExtension *QXmpp::Private::LegacyE2ee::encryptionExtension(QXmppClient *client)
+{
+    return client->d->encryptionExtension;
+}
+
+void QXmpp::Private::LegacyE2ee::setEncryptionExtension(QXmppClient *client, QXmppE2eeExtension *extension)
+{
+    client->d->encryptionExtension = extension;
 }
 
 /*!
     Sets the extension to be used for end-to-end-encryption.
 
+    \deprecated since QXmpp 1.18, end-to-end encryptions are QXmpp::E2ee::Provider registered via
+    QXmpp::E2ee::Providers, e.g. QXmppOmemoManager. The encryption extension is
+    still used for sensitive stanzas sent by QXmpp's managers if no encryption is selected by the
+    QXmpp::Messages::SelectEncryption hook.
+
     \since QXmpp 1.5
 
     \a extension.
 */
+#if QXMPP_DEPRECATED_SINCE(1, 18)
 void QXmppClient::setEncryptionExtension(QXmppE2eeExtension *extension)
 {
     d->encryptionExtension = extension;
 }
+#endif
 
 /*! Returns a list containing all the client's extensions. */
 QList<QXmppClientExtension *> QXmppClient::extensions() const
@@ -595,27 +617,39 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
 
     Returns a QXmppTask that makes it possible to track the state of the packet.
 
+    \deprecated since QXmpp 1.18, use send() and select the encryption via the
+    QXmpp::Messages::SelectEncryption hook. With
+    QXmppSendStanzaParams::setEncryptionRequired(), sending fails if no encryption is selected.
+    IQ requests are encrypted via sendSensitiveIq().
+
     \since QXmpp 1.5
 
     \a params and \a stanza.
 */
+#if QXMPP_DEPRECATED_SINCE(1, 18)
 QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
+{
+    return Private::LegacyE2ee::sendSensitive(this, std::move(stanza), params);
+}
+#endif
+
+QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::sendSensitive(QXmppClient *client, QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
     using Private::OutgoingMessages;
     if (OutgoingMessages::isPipelineStanza(stanza)) {
-        return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
+        return client->d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
     }
-    if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
-        return d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), {});
+    if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && client->hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
+        return client->d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), {});
     }
-    if (d->encryptionExtension) {
+    if (client->d->encryptionExtension) {
         if (dynamic_cast<QXmppMessage *>(&stanza)) {
-            return d->sendEncryptedMessage(d->encryptionExtension->encryptMessage(dynamic_cast<QXmppMessage &&>(stanza), params));
+            return client->d->sendEncryptedMessage(client->d->encryptionExtension->encryptMessage(dynamic_cast<QXmppMessage &&>(stanza), params));
         } else if (dynamic_cast<QXmppIq *>(&stanza)) {
-            return d->sendEncryptedIq(d->encryptionExtension->encryptIq(dynamic_cast<QXmppIq &&>(stanza), params));
+            return client->d->sendEncryptedIq(client->d->encryptionExtension->encryptIq(dynamic_cast<QXmppIq &&>(stanza), params));
         }
     }
-    return d->stream->streamAckManager().send(stanza);
+    return client->d->stream->streamAckManager().send(stanza);
 }
 
 QXmppTask<QXmpp::SendResult> QXmppClientPrivate::sendEncryptedMessage(QXmppTask<QXmppE2eeExtension::MessageEncryptResult> task)
@@ -670,32 +704,43 @@ QXmppTask<SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::optiona
     the QXmpp::Messages::SelectEncryption hook if there is a provider for it.
     Intended to be used for replies to IQs and messages.
 
+    \deprecated since QXmpp 1.18, use send() and select the encryption via the
+    QXmpp::Messages::SelectEncryption hook. Responses to IQ requests handled via
+    QXmpp::handleIqRequests() are encrypted like the request.
+
     \since QXmpp 1.5
 
     \a params and \a stanza.
 */
+#if QXMPP_DEPRECATED_SINCE(1, 18)
 QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> &params)
+{
+    return Private::LegacyE2ee::reply(this, std::move(stanza), e2eeMetadata, params);
+}
+#endif
+
+QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::reply(QXmppClient *client, QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> &params)
 {
     using Private::OutgoingMessages;
     if (e2eeMetadata && OutgoingMessages::isPipelineStanza(stanza)) {
         // the encryption of the received message is the default of SelectEncryption
         auto encryption = e2eeMetadata->encryptionNamespace();
-        if (!E2ee::Providers(hooks(nullptr)).contains(encryption)) {
+        if (!E2ee::Providers(client->hooks(nullptr)).contains(encryption)) {
             encryption.clear();
         }
-        return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive, std::move(encryption));
+        return client->d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive, std::move(encryption));
     }
     if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && e2eeMetadata) {
         // the encryption of the request is the default of SelectEncryption
-        auto provider = E2ee::Providers(hooks(nullptr)).find(e2eeMetadata->encryptionNamespace());
+        auto provider = E2ee::Providers(client->hooks(nullptr)).find(e2eeMetadata->encryptionNamespace());
         if (provider && provider->encryptIq) {
-            return d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), e2eeMetadata->encryptionNamespace());
+            return client->d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), e2eeMetadata->encryptionNamespace());
         }
     }
     if (e2eeMetadata) {
-        return sendSensitive(std::move(stanza), params);
+        return sendSensitive(client, std::move(stanza), params);
     }
-    return send(std::move(stanza), params);
+    return client->send(std::move(stanza), params);
 }
 
 /*!
@@ -1088,7 +1133,7 @@ void QXmppClient::injectIq(const QDomElement &element, const std::optional<QXmpp
                 ? u"Feature not implemented or not supported with end-to-end encryption."_s
                 : u"Feature not implemented."_s;
             iq.setError(Err(Err::Cancel, Err::FeatureNotImplemented, errMessage));
-            reply(std::move(iq), e2eeMetadata);
+            Private::LegacyE2ee::reply(this, std::move(iq), e2eeMetadata);
         }
         // don't do anything for "result" and "error" IQs
     }

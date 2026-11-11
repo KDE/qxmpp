@@ -28,8 +28,8 @@ namespace QXmpp::Messages {
     Messages of the same conversation are processed in the order in which they were received,
     also across the asynchronous decryption.
 
-    Messages sent via QXmppClient::send(), QXmppClient::sendSensitive() and QXmppClient::reply()
-    run through these phases:
+    Messages sent via QXmppClient::send() (and the deprecated QXmppClient::sendSensitive() and
+    QXmppClient::reply()) run through these phases:
     \list 1
     \li SelectEncryption: asynchronous, usually the application selects the encryption with its
         policy per contact.
@@ -49,9 +49,10 @@ namespace QXmpp::Messages {
     across the asynchronous phases. Waiting for the confirmation of the delivery does not block
     the next message.
 
-    IQs sent via QXmppClient::sendSensitiveIq() and QXmppClient::reply() are encrypted with the
-    encryption selected by the SelectEncryption hook too. Encrypted IQ requests are decrypted by
-    the e2ee provider and passed to the extensions with their QXmppE2eeMetadata.
+    IQs sent via QXmppClient::sendSensitiveIq() are encrypted with the encryption selected by
+    the SelectEncryption hook too. Encrypted IQ requests are decrypted by the e2ee provider and
+    passed to the extensions with their QXmppE2eeMetadata. Responses sent via
+    QXmpp::handleIqRequests() are encrypted like the request.
 
     \since QXmpp 1.18
 */
@@ -62,16 +63,17 @@ namespace QXmpp::Messages {
 
     Input and result of the SelectEncryption hook.
 
-    The hook runs for messages and for IQs sent via QXmppClient::sendSensitiveIq(),
-    QXmppClient::sendSensitive() and QXmppClient::reply(). For IQs, only the attributes of the
-    stanza are available, not the payload.
+    The hook runs for messages and for IQs sent via QXmppClient::sendSensitiveIq() and as
+    responses to IQ requests. For IQs, only the attributes of the stanza are available, not the
+    payload.
 
     The encryption is identified by its namespace (see QXmpp::E2ee), it is empty for sending the
-    message unencrypted. QXmppClient::reply() presets the encryption of the message replied to,
-    so replies to encrypted messages stay encrypted without a handler.
+    message unencrypted. Replies of QXmpp's managers (e.g. delivery receipts) and responses to
+    IQ requests are preset with the encryption of the message or request replied to, so they
+    stay encrypted without a handler.
 
-    isRequired() is set for messages sent via QXmppClient::sendSensitive() and for messages with
-    QXmppSendStanzaParams::isEncryptionRequired().
+    isRequired() is set for sensitive stanzas sent by QXmpp's managers (e.g. roster subscription
+    requests) and for messages with QXmppSendStanzaParams::isEncryptionRequired().
 */
 
 /*!
@@ -101,8 +103,9 @@ namespace QXmpp::Messages {
     });
     \endcode
 
-    If no encryption is selected, messages sent via QXmppClient::sendSensitive() are encrypted
-    with the encryption extension (QXmppClient::setEncryptionExtension()) as in earlier versions.
+    If no encryption is selected, sensitive stanzas sent by QXmpp's managers (and via the
+    deprecated QXmppClient::sendSensitive()) are encrypted with the deprecated encryption
+    extension (QXmppClient::setEncryptionExtension()) as in earlier versions.
 */
 
 /*!

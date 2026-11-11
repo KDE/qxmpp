@@ -228,6 +228,9 @@ public:
     bool isEncrypted(const QXmppMessage &) override { return false; };
 };
 
+// tests the deprecated API
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 void tst_QXmppClient::testE2eeExtension()
 {
     QXmppClient client;
@@ -267,6 +270,7 @@ void tst_QXmppClient::testE2eeExtension()
     QVERIFY(encrypter.iqCalled);
     encrypter.iqCalled = false;
 }
+QT_WARNING_POP
 
 void tst_QXmppClient::testTaskDirect()
 {
@@ -6104,6 +6108,9 @@ void tst_QXmppMessages::outgoingEncryptionError()
     client.expectNoPacket();
 }
 
+// tests the deprecated API
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 void tst_QXmppMessages::outgoingRequired()
 {
     TestClient client;
@@ -6126,7 +6133,11 @@ void tst_QXmppMessages::outgoingRequired()
     QVERIFY(required);
     QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
 }
+QT_WARNING_POP
 
+// tests the deprecated API
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 void tst_QXmppMessages::outgoingReply()
 {
     TestClient client;
@@ -6153,6 +6164,7 @@ void tst_QXmppMessages::outgoingReply()
     QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
     QCOMPARE(e2ee->encryptRequests.size(), 1);
 }
+QT_WARNING_POP
 
 void tst_QXmppMessages::outgoingConfirmDelivery()
 {

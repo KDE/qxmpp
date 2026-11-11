@@ -232,11 +232,16 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
     client->addNewExtension<QXmppAtmManager>(trustStorage);
     \endcode
 
-    Afterwards, the OMEMO manager using its storage must be added to the client and activated to be
-    used for encryption:
+    Afterwards, the OMEMO manager using its storage must be added to the client. It decrypts and
+    encrypts as end-to-end encryption provider (QXmpp::E2ee::Provider). Messages are encrypted if
+    OMEMO is selected via the QXmpp::Messages::SelectEncryption hook:
     \code
-    auto *manager = client->addNewExtension<QXmppOmemoManager>(omemoStorage);
-    client->setEncryptionExtension(manager);
+    client->addNewExtension<QXmppOmemoManager>(omemoStorage);
+    client->hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
+        if (isOmemoEnabled(selection.stanza().to())) {
+            selection.setEncryption(QXmpp::E2ee::Omemo2);
+        }
+    });
     \endcode
 
     You can set a security policy used by OMEMO.

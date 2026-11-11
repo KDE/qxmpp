@@ -147,7 +147,7 @@ bool QXmppCarbonManagerV2::handleStanza(const QDomElement &element, const std::o
 
     // parsed like messages from the stream, so encrypted messages are only parsed publicly
     auto &incomingMessages = client()->d->incomingMessages;
-    auto parsed = incomingMessages.parse(messageElement, client()->encryptionExtension());
+    auto parsed = incomingMessages.parse(messageElement, LegacyE2ee::encryptionExtension(client()));
     parsed.message.setCarbonForwarded(true);
 
     incomingMessages.process(Messages::Context(std::move(parsed.message), origin), parsed.encryption);

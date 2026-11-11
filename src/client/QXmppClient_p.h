@@ -44,6 +44,19 @@ constexpr auto StableConnectionDuration = std::chrono::seconds(30);
 
 QXMPP_PRIVATE_EXPORT std::chrono::milliseconds reconnectionDelay(int tries, bool resumable);
 
+// The deprecated end-to-end encryption API (QXmppClient::sendSensitive(), reply() and the
+// encryption extension) for QXmpp's own managers, which keep using it as a fallback for
+// applications without a QXmpp::Messages::SelectEncryption handler.
+struct QXMPP_PRIVATE_EXPORT LegacyE2ee {
+    // Encrypts with the selected encryption or else with the encryption extension. Without both,
+    // the stanza is sent unencrypted.
+    static QXmppTask<SendResult> sendSensitive(QXmppClient *client, QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params = {});
+    // Sends with the encryption of \a e2eeMetadata, see sendSensitive().
+    static QXmppTask<SendResult> reply(QXmppClient *client, QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> &params = {});
+    static QXmppE2eeExtension *encryptionExtension(QXmppClient *client);
+    static void setEncryptionExtension(QXmppClient *client, QXmppE2eeExtension *extension);
+};
+
 }  // namespace QXmpp::Private
 
 class QXmppClientPrivate

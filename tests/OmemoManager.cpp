@@ -74,7 +74,10 @@ public:
 
             auto response = m_responseIq;
             response.setId(iq.id());
+            QT_WARNING_PUSH
+            QT_WARNING_DISABLE_DEPRECATED
             client()->reply(std::move(response), e2eeMetadata);
+            QT_WARNING_POP
             return true;
         }
 
@@ -167,7 +170,11 @@ void tst_QXmppOmemoManager::initOmemoUser(OmemoUser &omemoUser)
     omemoUser.omemoStorage = std::make_unique<QXmppOmemoMemoryStorage>();
     omemoUser.manager = new QXmppOmemoManager(omemoUser.omemoStorage.get());
     omemoUser.client.addExtension(omemoUser.manager);
+    // for the tests of the deprecated API
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     omemoUser.client.setEncryptionExtension(omemoUser.manager);
+    QT_WARNING_POP
 
     omemoUser.carbonManager = new QXmppCarbonManagerV2;
     omemoUser.client.addExtension(omemoUser.carbonManager);
@@ -296,6 +303,9 @@ static int devicesAdded(const QSignalSpy &spy, const QString &jid)
     }));
 }
 
+// tests the deprecated API
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 void tst_QXmppOmemoManager::testSendMessage()
 {
     SKIP_IF_INTEGRATION_TESTS_DISABLED()
@@ -375,6 +385,7 @@ void tst_QXmppOmemoManager::testSendMessage()
     finish(m_alice2);
     finish(m_bob);
 }
+QT_WARNING_POP
 
 void tst_QXmppOmemoManager::testSendIq()
 {

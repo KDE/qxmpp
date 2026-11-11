@@ -9,6 +9,8 @@
 #include "QXmppClient.h"
 #include "QXmppOmemoMemoryStorage.h"
 
+#include <QSet>
+
 class QXmppMessage;
 class QXmppOmemoManager;
 
@@ -27,6 +29,8 @@ private:
     QXmppOmemoMemoryStorage m_omemoStorage;
     QXmppOmemoManager *m_omemoManager = nullptr;
     bool m_omemoInitialized = false;
+    // contacts that sent OMEMO encrypted messages
+    QSet<QString> m_omemoContacts;
 };
 
 #endif  // EXAMPLE_1A_ECHOCLIENTOMEMO_H

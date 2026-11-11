@@ -6,8 +6,9 @@ SPDX-License-Identifier: CC0-1.0
 
 This is a minimal echo bot that demonstrates wiring up OMEMO encryption in
 QXmpp. It replies to any incoming message with "Your message: " followed by
-the body; if the incoming message was OMEMO-encrypted, the reply is
-OMEMO-encrypted as well (via QXmppClient::reply()).
+the body; once a contact has sent an OMEMO-encrypted message, the replies to
+that contact are OMEMO-encrypted as well. The encryption is selected via the
+`QXmpp::Messages::SelectEncryption` hook.
 
 **Important limitation:** this example uses the in-memory storage classes
 `QXmppOmemoMemoryStorage` and `QXmppAtmTrustMemoryStorage`. Nothing is

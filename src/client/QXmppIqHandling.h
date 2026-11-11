@@ -177,8 +177,8 @@ bool handleIqType(Handler handler,
 
     If you return an QXmppStanza::Error, a normal QXmppIq with the error will be sent.
 
-    The provided optional QXmppE2eeMetadata is set on the parsed IQ and used to correctly encrypt
-    the IQ response using QXmppClient::reply().
+    The provided optional QXmppE2eeMetadata is set on the parsed IQ and used to encrypt the IQ
+    response like the request.
 
     \a element is the DOM element that might contain an IQ. \a e2eeMetadata is the end-to-end
     encryption metadata that is used to encrypt the response correctly and to be set on the
