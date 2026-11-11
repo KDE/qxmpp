@@ -13,6 +13,7 @@
 #include "QXmppUtils.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QDateTime>
 #include <QDomElement>
@@ -20,6 +21,50 @@
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
+
+namespace {
+
+// XEP-0202: Entity Time
+struct EntityTime {
+    static constexpr std::tuple XmlTag = { u"time", ns_entity_time };
+
+    std::optional<QDateTime> utc;
+    int tzo = 0;
+
+    static std::optional<EntityTime> fromDom(const QDomElement &el)
+    {
+        // the content of requests is not needed
+        Q_UNUSED(el)
+        return EntityTime {};
+    }
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element {
+            XmlTag,
+            OptionalContent {
+                utc.has_value(),
+                [&] {
+                    w.write(TextElement { u"tzo", QXmppUtils::timezoneOffsetToString(tzo) });
+                    w.write(TextElement { u"utc", QXmppUtils::datetimeToString(*utc) });
+                },
+            },
+        });
+    }
+};
+
+EntityTime currentEntityTime()
+{
+    auto currentTime = QDateTime::currentDateTime();
+    const auto utc = currentTime.toUTC();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    currentTime.setTimeZone(QTimeZone::Initialization::UTC);
+#else
+    currentTime.setTimeZone(QTimeZone(0));
+#endif
+    return EntityTime { utc, int(utc.secsTo(currentTime)) };
+}
+
+}  // namespace
 
 /*!
     \typedef QXmppEntityTimeManager::EntityTimeResult
@@ -64,6 +109,9 @@ auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<
 QXmppEntityTimeManager::QXmppEntityTimeManager()
 {
     hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppEntityTimeManager::handleIncomingStanza));
+    hooks().add<Iq::Received<Iq::Get<EntityTime>>>([](Iq::Get<EntityTime> &&) {
+        return currentEntityTime();
+    });
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_entity_time);
     });
@@ -73,11 +121,7 @@ QXmppEntityTimeManager::~QXmppEntityTimeManager() = default;
 
 bool QXmppEntityTimeManager::handleIncomingStanza(const QDomElement &element)
 {
-    if (handleIqRequests<QXmppEntityTimeIq>(element, client(), this)) {
-        return true;
-    }
-
-    if (isIqElement<QXmppEntityTimeIq>(element)) {
+    if (isIqElement<QXmppEntityTimeIq>(element) && !isIqRequest(element)) {
         QXmppEntityTimeIq entityTime;
         entityTime.parse(element);
         Q_EMIT timeReceived(entityTime);

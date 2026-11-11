@@ -14,6 +14,14 @@
 
 namespace QXmpp::Private {
 
+// Returns whether the IQ is a request (get or set). Requests are answered by the handlers of
+// QXmpp::Iq::Received.
+inline bool isIqRequest(const QDomElement &iq)
+{
+    const auto type = iq.attribute(QStringLiteral("type"));
+    return type == u"get" || type == u"set";
+}
+
 // Adapts a function handling incoming stanzas to the QXmpp::Client::StanzaReceived hook. It
 // returns whether it has handled the stanza and gets no end-to-end encrypted stanzas, so it does
 // not reply unencrypted.

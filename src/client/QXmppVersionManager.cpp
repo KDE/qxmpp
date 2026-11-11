@@ -13,6 +13,7 @@
 #include "QXmppVersionIq.h"
 
 #include "StringLiterals.h"
+#include "XmlWriter.h"
 
 #include <QCoreApplication>
 #include <QDomElement>
@@ -20,6 +21,37 @@
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
+
+namespace {
+
+// XEP-0092: Software Version
+struct SoftwareVersion {
+    static constexpr std::tuple XmlTag = { u"query", ns_version };
+
+    QString name;
+    QString version;
+    QString os;
+
+    static std::optional<SoftwareVersion> fromDom(const QDomElement &el)
+    {
+        return SoftwareVersion {
+            el.firstChildElement(u"name"_s).text(),
+            el.firstChildElement(u"version"_s).text(),
+            el.firstChildElement(u"os"_s).text(),
+        };
+    }
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element {
+            XmlTag,
+            OptionalTextElement { u"name", name },
+            OptionalTextElement { u"os", os },
+            OptionalTextElement { u"version", version },
+        });
+    }
+};
+
+}  // namespace
 
 class QXmppVersionManagerPrivate
 {
@@ -33,6 +65,9 @@ QXmppVersionManager::QXmppVersionManager()
     : d(std::make_unique<QXmppVersionManagerPrivate>())
 {
     hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppVersionManager::handleIncomingStanza));
+    hooks().add<Iq::Received<Iq::Get<SoftwareVersion>>>([this](Iq::Get<SoftwareVersion> &&) {
+        return SoftwareVersion { d->clientName, d->clientVersion, d->clientOs };
+    });
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0092: Software Version
         features << staticString(ns_version);
@@ -122,11 +157,7 @@ QString QXmppVersionManager::clientOs() const
 
 bool QXmppVersionManager::handleIncomingStanza(const QDomElement &element)
 {
-    if (QXmpp::handleIqRequests<QXmppVersionIq>(element, client(), this)) {
-        return true;
-    }
-
-    if (isIqElement<QXmppVersionIq>(element)) {
+    if (isIqElement<QXmppVersionIq>(element) && !isIqRequest(element)) {
         QXmppVersionIq versionIq;
         versionIq.parse(element);
 
