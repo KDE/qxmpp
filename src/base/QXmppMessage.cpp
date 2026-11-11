@@ -2023,28 +2023,6 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
             return true;
         }
         if (element.tagName() == u"x") {
-            if (element.namespaceURI() == ns_legacy_delayed_delivery) {
-                // if XEP-0203 exists, XEP-0091 has no need to parse because XEP-0091
-                // is no more standard protocol)
-                if (d->stamp.isNull()) {
-                    // XEP-0091: Legacy Delayed Delivery
-                    d->stamp = QDateTime::fromString(
-                        element.attribute(u"stamp"_s),
-                        u"yyyyMMddThh:mm:ss"_s);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-                    d->stamp.setTimeZone(QTimeZone::Initialization::UTC);
-#else
-                    d->stamp.setTimeZone(QTimeZone(0));
-#endif
-                    d->stampType = LegacyDelayedDelivery;
-                }
-                return true;
-            }
-            // XEP-0045: Multi-User Chat
-            if (element.namespaceURI() == ns_muc_user) {
-                d->mucUserQuery = QXmpp::Muc::UserQuery::fromDom(element);
-                return true;
-            }
             // XEP-0045: Multi-User Chat voice request (muc#request form)
             if (element.namespaceURI() == ns_data) {
                 QXmppDataForm form;
@@ -2100,13 +2078,6 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
         }
         if (checkElement(element, u"request", ns_message_receipts)) {
             d->receiptRequested = true;
-            return true;
-        }
-        // XEP-0203: Delayed Delivery
-        if (checkElement(element, u"delay", ns_delayed_delivery)) {
-            d->stamp = QXmppUtils::datetimeFromString(
-                element.attribute(u"stamp"_s));
-            d->stampType = DelayedDelivery;
             return true;
         }
         // XEP-0224: Attention
@@ -2200,6 +2171,41 @@ bool QXmppMessage::parseExtension(const QDomElement &element, QXmpp::SceMode sce
     }
 
     // read from both public and private extensions:
+
+    // Added by servers, so also in the public part of encrypted messages, e.g. for messages
+    // stored while the recipient was offline.
+
+    // XEP-0203: Delayed Delivery
+    if (checkElement(element, u"delay", ns_delayed_delivery)) {
+        d->stamp = QXmppUtils::datetimeFromString(
+            element.attribute(u"stamp"_s));
+        d->stampType = DelayedDelivery;
+        return true;
+    }
+    if (element.tagName() == u"x") {
+        if (element.namespaceURI() == ns_legacy_delayed_delivery) {
+            // if XEP-0203 exists, XEP-0091 has no need to parse because XEP-0091
+            // is no more standard protocol)
+            if (d->stamp.isNull()) {
+                // XEP-0091: Legacy Delayed Delivery
+                d->stamp = QDateTime::fromString(
+                    element.attribute(u"stamp"_s),
+                    u"yyyyMMddThh:mm:ss"_s);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+                d->stamp.setTimeZone(QTimeZone::Initialization::UTC);
+#else
+                d->stamp.setTimeZone(QTimeZone(0));
+#endif
+                d->stampType = LegacyDelayedDelivery;
+            }
+            return true;
+        }
+        // XEP-0045: Multi-User Chat, e.g. status codes of the room
+        if (element.namespaceURI() == ns_muc_user) {
+            d->mucUserQuery = Muc::UserQuery::fromDom(element);
+            return true;
+        }
+    }
 
     // XEP-0428: Fallback Indication
     if (checkElement(element, u"fallback", ns_fallback_indication)) {

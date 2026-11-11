@@ -47,6 +47,7 @@ private:
     Q_SLOT void testDelay_data();
     Q_SLOT void testDelay();
     Q_SLOT void testDelayWithMultipleStamp();
+    Q_SLOT void testMucUserPublic();
     Q_SLOT void testExtendedAddresses();
     Q_SLOT void testMucInvitation();
     Q_SLOT void testState_data();
@@ -348,6 +349,22 @@ void tst_QXmppMessage::testDelay()
     parsePacket(message, xml);
     QCOMPARE(message.stamp(), stamp);
     serializePacket(message, xml);
+
+    // added by the server, so also in the public part of encrypted messages
+    QXmppMessage publicPart;
+    publicPart.parse(xmlToDom(xml), QXmpp::ScePublic);
+    QCOMPARE(publicPart.stamp(), stamp);
+}
+
+void tst_QXmppMessage::testMucUserPublic()
+{
+    // status codes added by the room are also in the public part of encrypted messages
+    QXmppMessage message;
+    message.parse(xmlToDom(QByteArrayLiteral("<message from='room@muc.example.org' type='groupchat'>"
+                                             "<x xmlns='http://jabber.org/protocol/muc#user'><status code='104'/></x>"
+                                             "</message>")),
+                  QXmpp::ScePublic);
+    QVERIFY(message.mucUserQuery().has_value());
 }
 
 void tst_QXmppMessage::testDelayWithMultipleStamp()
