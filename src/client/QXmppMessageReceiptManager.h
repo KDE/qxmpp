@@ -7,7 +7,7 @@
 #define QXMPPMESSAGERECEIPTMANAGER_H
 
 #include "QXmppClientExtension.h"
-#include "QXmppMessageHandler.h"
+#include "QXmppMessage.h"
 
 /*!
     \inmodule QXmpp
@@ -18,13 +18,13 @@
 
     \ingroup qxmpp-managers
 */
-class QXMPP_EXPORT QXmppMessageReceiptManager : public QXmppClientExtension, public QXmppMessageHandler
+class QXMPP_EXPORT QXmppMessageReceiptManager : public QXmppClientExtension
 {
     Q_OBJECT
 public:
     QXmppMessageReceiptManager();
 
-    bool handleMessage(const QXmppMessage &) override;
+    bool handleMessage(const QXmppMessage &);
 
     /*!
         This signal is emitted when receipt for the message with the

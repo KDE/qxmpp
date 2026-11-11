@@ -66,15 +66,23 @@ void TestClient::injectStanza(const QString &xml)
 void TestClient::inject(const QDomElement &element)
 {
     if (!d->stream->handleIqResponse(element)) {
-        for (auto *extension : std::as_const(d->extensions)) {
-            if (extension->handleStanza(element)) {
-                break;
-            }
-        }
+        handleStanza(element);
     }
     if (autoResetEnabled) {
         resetIdCount();
     }
+}
+
+bool TestClient::handleStanza(QXmppClientExtension *extension, const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
+{
+    auto *client = qobject_cast<QXmppClient *>(extension->parent());
+    Q_ASSERT_X(client, "TestClient::handleStanza", "the extension must be added to a client");
+    return client->d->handleStanza(element, e2eeMetadata);
+}
+
+bool TestClient::handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
+{
+    return d->handleStanza(element, e2eeMetadata);
 }
 
 void TestClient::expect(QString &&packet)

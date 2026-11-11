@@ -20,13 +20,12 @@ public:
     QBindable<bool> enabled() const;
     QXmppDiscoFeatureWatch watchServerSupport() const;
 
-    bool handleStanza(const QDomElement &, const std::optional<QXmppE2eeMetadata> &) override;
-
 protected:
     void onRegistered(QXmppClient *client) override;
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
     struct ConnectionState;
     QXmppTask<void> enableCarbons(std::shared_ptr<ConnectionState> state);
 

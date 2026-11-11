@@ -111,8 +111,6 @@ public:
 
     QList<QXmppUploadService> uploadServices() const;
 
-    bool handleStanza(const QDomElement &stanza) override;
-
     /*! Emitted when an upload \a slot was received. */
     Q_SIGNAL void slotReceived(const QXmppHttpUploadSlotIq &slot);
 
@@ -131,6 +129,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     void handleDiscoInfo(const QXmppDiscoveryIq &iq);
 
     const std::unique_ptr<QXmppUploadRequestManagerPrivate> d;

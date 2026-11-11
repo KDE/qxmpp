@@ -93,8 +93,6 @@ public:
     bool dtlsRequired() const;
     void setDtlsRequired(bool);
 
-    bool handleStanza(const QDomElement &element) override;
-
     Q_SIGNAL void callReceived(std::unique_ptr<QXmppCall> &call);
 
     std::unique_ptr<QXmppCall> call(const QString &jid, Media media = Media::Audio, const QString &proposedSid = {});
@@ -104,6 +102,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     void onCallDestroyed(QObject *object);
     void onDisconnected();
     using IncomingIqResult = std::variant<QXmppIq, QXmppStanza::Error, QXmppTask<std::variant<QXmppIq>>>;

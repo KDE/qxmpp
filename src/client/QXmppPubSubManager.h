@@ -159,9 +159,8 @@ public:
 
     static QString standardItemIdToString(StandardItemId itemId);
 
-    bool handleStanza(const QDomElement &element) override;
-
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     // for private requestFeatures() API
     friend class tst_QXmppPubSubManager;
     friend class QXmppOmemoManagerPrivate;

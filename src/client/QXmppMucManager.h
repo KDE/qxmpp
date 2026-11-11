@@ -60,8 +60,6 @@ public:
 
     QList<QXmppMucRoom *> rooms() const;
 
-    bool handleStanza(const QDomElement &element) override;
-
     /*!
         This signal is emitted when an invitation to a chat room is received.
 
@@ -77,6 +75,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     Q_SLOT void _q_messageReceived(const QXmppMessage &message);
     Q_SLOT void _q_roomDestroyed(QObject *object);
 

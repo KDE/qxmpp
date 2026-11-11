@@ -8,6 +8,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -22,6 +23,7 @@ using namespace QXmpp::Private;
 QXmppCarbonManager::QXmppCarbonManager()
     : m_carbonsEnabled(false)
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppCarbonManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_carbons);
     });
@@ -68,7 +70,7 @@ void QXmppCarbonManager::setCarbonsEnabled(bool enabled)
     }
 }
 
-bool QXmppCarbonManager::handleStanza(const QDomElement &element)
+bool QXmppCarbonManager::handleIncomingStanza(const QDomElement &element)
 {
     if (element.tagName() != u"message") {
         return false;

@@ -11,6 +11,7 @@
 #include "QXmppOmemoManager_p.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTrustManager.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -316,6 +317,7 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
 QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     : d(new ManagerPrivate(this, omemoStorage))
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppOmemoManager::handleIncomingStanza));
     d->ownDevice.label = DEVICE_LABEL;
     d->initOmemoLibrary();
     d->schedulePeriodicTasks();
@@ -1004,7 +1006,7 @@ bool QXmppOmemoManager::isEncrypted(const QXmppMessage &message)
     return message.omemoElement().has_value();
 }
 
-bool Manager::handleStanza(const QDomElement &stanza)
+bool Manager::handleIncomingStanza(const QDomElement &stanza)
 {
     if (stanza.tagName() != u"iq" || !QXmppOmemoIq::isOmemoIq(stanza)) {
         return false;

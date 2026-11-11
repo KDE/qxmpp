@@ -71,8 +71,6 @@ public:
 
     QXmppDiscoFeatureWatch watchAccountSupport() const;
 
-    bool handleStanza(const QDomElement &element) override;
-
     /*!
         This signal is emitted when an archived \a message is received
 
@@ -88,6 +86,7 @@ public:
     Q_SIGNAL void resultsRecieved(const QString &queryId, const QXmppResultSetReply &resultSetReply, bool complete);
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     std::unique_ptr<QXmppMamManagerPrivate> d;
 };
 

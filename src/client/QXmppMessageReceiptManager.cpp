@@ -11,6 +11,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppMessage.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
@@ -26,6 +27,8 @@ using namespace QXmpp::Private;
 QXmppMessageReceiptManager::QXmppMessageReceiptManager()
     : QXmppClientExtension()
 {
+    // after the handlers of applications, like the deprecated QXmppMessageHandler
+    hooks().add<Messages::Received>(Private::messageHandler(this, &QXmppMessageReceiptManager::handleMessage), HookSequence::Late);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_message_receipts.toString();
     });

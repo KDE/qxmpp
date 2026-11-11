@@ -12,10 +12,13 @@
 
 #include <QFuture>
 
-class QXMPP_EXPORT QXmppMessageHandler : public QXmppExtension
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+class [[deprecated("Use the QXmpp::Messages::Received hook")]]
+QXMPP_EXPORT QXmppMessageHandler : public QXmppExtension
 {
 public:
     virtual bool handleMessage(const QXmppMessage &) = 0;
 };
+#endif
 
 #endif  // QXMPPMESSAGEHANDLER_H

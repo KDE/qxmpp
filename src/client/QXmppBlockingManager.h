@@ -91,9 +91,9 @@ public:
 
     void onRegistered(QXmppClient *) override;
     void onUnregistered(QXmppClient *) override;
-    bool handleStanza(const QDomElement &, const std::optional<QXmppE2eeMetadata> &) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
     void onConnected();
 
     std::unique_ptr<QXmppBlockingManagerPrivate> d;

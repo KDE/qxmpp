@@ -60,9 +60,13 @@ public:
         : m_requestIq(requestIq),
           m_responseIq(responseIq)
     {
+        hooks().add<QXmpp::Client::StanzaReceived>([this](const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) {
+            return handleIncomingStanza(stanza, e2eeMetadata) ? QXmpp::HookResult::Stop : QXmpp::HookResult::Continue;
+        });
     }
 
-    bool handleStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) override
+private:
+    bool handleIncomingStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
     {
         if (isIqElement<QXmppBitsOfBinaryIq>(stanza)) {
             QXmppBitsOfBinaryIq iq;
@@ -72,6 +76,7 @@ public:
                 return false;
             }
 
+            // replied with the encryption of the request
             auto response = m_responseIq;
             response.setId(iq.id());
             QT_WARNING_PUSH
@@ -84,7 +89,6 @@ public:
         return false;
     }
 
-private:
     QXmppBitsOfBinaryIq m_requestIq;
     QXmppBitsOfBinaryIq m_responseIq;
 };

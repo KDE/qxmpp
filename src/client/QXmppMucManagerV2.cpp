@@ -317,6 +317,7 @@ struct MucRoomData {
 }  // namespace QXmpp::Private
 
 #include "QXmppMucManagerV2_p.h"
+#include "QXmppStanzaHandling_p.h"
 
 /*!
     \class QXmppMucManagerV2
@@ -449,6 +450,8 @@ struct MucRoomData {
 QXmppMucManagerV2::QXmppMucManagerV2()
     : d(std::make_unique<QXmppMucManagerV2Private>(this))
 {
+    // after the handlers of applications, like the deprecated QXmppMessageHandler
+    hooks().add<Messages::Received>(Private::messageHandler(this, &QXmppMucManagerV2::handleMessage), HookSequence::Late);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_muc.toString();
         // XEP-0424: Message Retraction (the manager handles incoming retractions in joined rooms)

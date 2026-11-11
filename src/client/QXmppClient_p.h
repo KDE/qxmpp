@@ -70,6 +70,10 @@ public:
     QXmppTask<QXmpp::SendResult> sendEncryptedIq(QXmppTask<QXmppE2eeExtension::IqEncryptResult> task);
     QXmppTask<QXmppClient::IqResult> sendSensitiveIq(QXmppIq iq, std::optional<QXmppSendStanzaParams> params);
 
+    // Runs QXmpp::Client::StanzaReceived and then the deprecated QXmppClientExtension::handleStanza()
+    // implementations. Returns whether the stanza has been handled.
+    QXMPP_PRIVATE_EXPORT bool handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
+
     /*! Current presence of the client */
     QXmppPresence clientPresence;
     QList<QXmppClientExtension *> extensions;

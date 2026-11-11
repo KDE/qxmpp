@@ -8,6 +8,10 @@
 
     Interface for handling messages.
 
+    \deprecated since QXmpp 1.18, add a handler to the QXmpp::Messages::Received hook instead.
+    Implementations are still called, after the handlers of the hook, but not for messages of
+    archive queries.
+
     \since QXmpp 1.5
 */
 

@@ -56,7 +56,7 @@ void tst_QXmppVersionManager::testSendRequest()
 
     auto id = verManager->requestVersion("juliet@capulet.com/balcony");
     test.expect("<iq id='qx1' to='juliet@capulet.com/balcony' type='get'><query xmlns='jabber:iq:version'/></iq>");
-    verManager->handleStanza(xmlToDom(R"(<iq type='result' from='juliet@capulet.com/balcony' id='qx1'>
+    TestClient::handleStanza(verManager, xmlToDom(R"(<iq type='result' from='juliet@capulet.com/balcony' id='qx1'>
   <query xmlns='jabber:iq:version'>
     <name>Exodus</name>
     <version>0.7.0.4</version>
@@ -81,7 +81,7 @@ void tst_QXmppVersionManager::testHandleRequest()
     verManager->setClientVersion("0.7.0.4");
     verManager->setClientOs("Windows-XP 5.01.2600");
 
-    verManager->handleStanza(xmlToDom(R"(<iq type='get' from='romeo@montague.net/orchard' to='juliet@capulet.com/balcony' id='version_1'>
+    TestClient::handleStanza(verManager, xmlToDom(R"(<iq type='get' from='romeo@montague.net/orchard' to='juliet@capulet.com/balcony' id='version_1'>
   <query xmlns='jabber:iq:version'/>
 </iq>)"));
     test.expect(R"(<iq id='version_1' to='romeo@montague.net/orchard' type='result'>)"
@@ -117,7 +117,7 @@ void tst_QXmppEntityTimeManager::testSendRequest()
 
     manager->requestTime("juliet@capulet.com/balcony");
     test.expect("<iq id='qx1' to='juliet@capulet.com/balcony' type='get'><time xmlns='urn:xmpp:time'/></iq>");
-    manager->handleStanza(xmlToDom(R"(<iq id='qx1' to='romeo@montague.net/orchard' from='juliet@capulet.com/balcony' type='result'>
+    TestClient::handleStanza(manager, xmlToDom(R"(<iq id='qx1' to='romeo@montague.net/orchard' from='juliet@capulet.com/balcony' type='result'>
   <time xmlns='urn:xmpp:time'>
     <tzo>-06:00</tzo>
     <utc>2006-12-19T17:58:35Z</utc>
@@ -137,7 +137,7 @@ void tst_QXmppEntityTimeManager::testHandleRequest()
 
     auto *manager = test.addNewExtension<QXmppEntityTimeManager>();
 
-    manager->handleStanza(xmlToDom(R"(<iq type='get' from='romeo@montague.net/orchard' to='juliet@capulet.com/balcony' id='time_1'>
+    TestClient::handleStanza(manager, xmlToDom(R"(<iq type='get' from='romeo@montague.net/orchard' to='juliet@capulet.com/balcony' id='time_1'>
   <time xmlns='urn:xmpp:time'/>
 </iq>)"));
 
@@ -242,14 +242,14 @@ void tst_QXmppUserTuneManager::testEvents()
 
     QSignalSpy spy(tuneManager, &QXmppUserTuneManager::itemReceived);
 
-    psManager->handleStanza(xmlToDom(QStringLiteral("<message from='stpeter@jabber.org' to='maineboy@jabber.org'>"
-                                                    "<event xmlns='http://jabber.org/protocol/pubsub#event'>"
-                                                    "<items node='http://jabber.org/protocol/tune'>"
-                                                    "<item id='bffe6584-0f9c-11dc-84ba-001143d5d5db'>"
-                                                    "<tune xmlns='http://jabber.org/protocol/tune'>"
-                                                    "<artist>Yes</artist><length>686</length><rating>8</rating><source>Yessongs</source><title>Heart of the Sunrise</title><track>3</track><uri>http://www.yesworld.com/lyrics/Fragile.html#9</uri>"
-                                                    "</tune></item></items>"
-                                                    "</event></message>")));
+    TestClient::handleStanza(psManager, xmlToDom(QStringLiteral("<message from='stpeter@jabber.org' to='maineboy@jabber.org'>"
+                                                                "<event xmlns='http://jabber.org/protocol/pubsub#event'>"
+                                                                "<items node='http://jabber.org/protocol/tune'>"
+                                                                "<item id='bffe6584-0f9c-11dc-84ba-001143d5d5db'>"
+                                                                "<tune xmlns='http://jabber.org/protocol/tune'>"
+                                                                "<artist>Yes</artist><length>686</length><rating>8</rating><source>Yessongs</source><title>Heart of the Sunrise</title><track>3</track><uri>http://www.yesworld.com/lyrics/Fragile.html#9</uri>"
+                                                                "</tune></item></items>"
+                                                                "</event></message>")));
 
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.constFirst().at(0).toString(), u"stpeter@jabber.org"_s);
@@ -372,7 +372,7 @@ void tst_QXmppUserLocationManager::testEvents()
                           "<lon>12.33</lon>"
                           "</geoloc></item></items>"
                           "</event></message>";
-    psManager->handleStanza(xmlToDom(event));
+    TestClient::handleStanza(psManager, xmlToDom(event));
 
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.constFirst().at(0).toString(), u"stpeter@jabber.org"_s);
@@ -402,7 +402,8 @@ private:
     // integration tests
     Q_SLOT void testSetClientVCard();
 
-    QXmppClient m_client;
+    // without the default vCard manager, which would handle the stanzas
+    QXmppClient m_client { QXmppClient::NoExtensions };
 };
 
 void tst_QXmppVCardManager::watchServerSupport()
@@ -444,6 +445,8 @@ void tst_QXmppVCardManager::testHandleStanza()
     // initialize new manager to clear internal values
     QXmppVCardManager *manager = new QXmppVCardManager();
     m_client.addExtension(manager);
+    // also deletes the manager
+    auto removeManager = qScopeGuard([&] { m_client.removeExtension(manager); });
 
     // sets own jid internally
     m_client.connectToServer("stpeter@jabber.org", {});
@@ -462,14 +465,11 @@ void tst_QXmppVCardManager::testHandleStanza()
         QCOMPARE(manager->clientVCard(), expectedIq);
     });
 
-    bool accepted = manager->handleStanza(writePacketToDom(expectedIq));
+    bool accepted = TestClient::handleStanza(manager, writePacketToDom(expectedIq));
 
     QVERIFY(accepted);
     QVERIFY(vCardReceived);
     QCOMPARE(clientVCardReceived, isClientVCard);
-
-    // clean up (client deletes manager)
-    m_client.removeExtension(manager);
 }
 
 void tst_QXmppVCardManager::fetchVCard()

@@ -79,8 +79,6 @@ public:
 
     QXmppDiscoFeatureWatch watchServerSupport() const;
 
-    bool handleStanza(const QDomElement &element) override;
-
     /*!
         This signal is emitted when the requested vCard is received
         after calling the requestVCard() function.
@@ -98,6 +96,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     const std::unique_ptr<QXmppVCardManagerPrivate> d;
 };
 

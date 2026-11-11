@@ -35,12 +35,11 @@ public:
     bool carbonsEnabled() const;
     void setCarbonsEnabled(bool enabled);
 
-    bool handleStanza(const QDomElement &element) override;
-
     Q_SIGNAL void messageReceived(const QXmppMessage &);
     Q_SIGNAL void messageSent(const QXmppMessage &);
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     bool m_carbonsEnabled;
 };
 

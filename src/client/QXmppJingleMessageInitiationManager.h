@@ -9,7 +9,7 @@
 #include "QXmppClientExtension.h"
 #include "QXmppError.h"
 #include "QXmppJingleIq.h"
-#include "QXmppMessageHandler.h"
+#include "QXmppMessage.h"
 #include "QXmppSendResult.h"
 #include "QXmppTask.h"
 
@@ -85,7 +85,7 @@ private:
     friend class tst_QXmppJingleMessageInitiationManager;
 };
 
-class QXMPP_EXPORT QXmppJingleMessageInitiationManager : public QXmppClientExtension, public QXmppMessageHandler
+class QXMPP_EXPORT QXmppJingleMessageInitiationManager : public QXmppClientExtension
 {
     Q_OBJECT
 public:
@@ -111,7 +111,7 @@ public:
         const QList<QXmppJingleRtpDescription> &descriptions);
 
 protected:
-    bool handleMessage(const QXmppMessage &) override;
+    bool handleMessage(const QXmppMessage &);
 
 private:
     QXmppTask<ProposeResult> propose(

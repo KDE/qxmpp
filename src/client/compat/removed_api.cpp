@@ -37,9 +37,8 @@ using namespace QXmpp::Private;
     End-to-end encrypted stanzas are not passed to this overload, for that
     purpose use the new overload instead.
 
-    \deprecated This is deprecated since QXmpp 1.5. Please use
-    QXmppClientExtension::handleStanza(const QDomElement &stanza,
-    const std::optional<QXmppE2eeMetadata> &e2eeMetadata).
+    \deprecated This is deprecated since QXmpp 1.5. Please add a handler to the
+    QXmpp::Client::StanzaReceived hook instead.
     Currently both methods are called by the client, so only implement one!
 */
 bool QXmppClientExtension::handleStanza(const QDomElement &)

@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
@@ -20,6 +21,7 @@ using namespace QXmpp::Private;
 
 QXmppArchiveManager::QXmppArchiveManager()
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppArchiveManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0036: Message Archiving
         features << staticString(ns_archive);
@@ -28,7 +30,7 @@ QXmppArchiveManager::QXmppArchiveManager()
 
 QXmppArchiveManager::~QXmppArchiveManager() = default;
 
-bool QXmppArchiveManager::handleStanza(const QDomElement &element)
+bool QXmppArchiveManager::handleIncomingStanza(const QDomElement &element)
 {
     auto tag = iqPayloadXmlTag(element);
 

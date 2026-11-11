@@ -1365,7 +1365,7 @@ void tst_QXmppPubSubManager::testEventNotifications()
     eventManager->m_node = "princely_musings";
     eventManager->m_serviceJid = "pubsub.shakespeare.lit";
 
-    QCOMPARE(psManager->handleStanza(event), accepted);
+    QCOMPARE(TestClient::handleStanza(psManager, event), accepted);
     if (accepted) {
         QCOMPARE(eventManager->m_events, 1u);
     } else {
@@ -1387,7 +1387,7 @@ void tst_QXmppPubSubManager::testLegacyEventHandler()
     auto [client, psManager] = Client();
     auto *legacyManager = client->addNewExtension<LegacyEventManager>();
 
-    QVERIFY(psManager->handleStanza(event));
+    QVERIFY(TestClient::handleStanza(psManager, event));
     QCOMPARE(legacyManager->m_events, QStringList { u"pubsub.shakespeare.lit/princely_musings"_s });
 
     // handlers of the hook are called first and can stop the processing
@@ -1395,7 +1395,7 @@ void tst_QXmppPubSubManager::testLegacyEventHandler()
     eventManager->m_node = u"princely_musings"_s;
     eventManager->m_serviceJid = u"pubsub.shakespeare.lit"_s;
 
-    QVERIFY(psManager->handleStanza(event));
+    QVERIFY(TestClient::handleStanza(psManager, event));
     QCOMPARE(eventManager->m_events, 1u);
     QCOMPARE(legacyManager->m_events.size(), 1);
 }

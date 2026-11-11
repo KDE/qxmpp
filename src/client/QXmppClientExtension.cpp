@@ -58,12 +58,44 @@ QList<QXmppDiscoIdentity> QXmppClientExtension::discoveryIdentities() const
     Returns true if the stanza was handled and no further processing should occur, or false to
     let other extensions process the stanza.
 
+    \deprecated since QXmpp 1.18, add a handler to the QXmpp::Client::StanzaReceived hook
+    instead. Implementations are still called, after the handlers of the hook.
+
     \since QXmpp 1.5
 */
 bool QXmppClientExtension::handleStanza(const QDomElement &, const std::optional<QXmppE2eeMetadata> &)
 {
     return false;
 }
+
+/*!
+    \namespace QXmpp::Client
+    \inmodule QXmpp
+
+    Hooks of QXmppClient.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \struct QXmpp::Client::StanzaReceived
+    \inmodule QXmpp
+
+    Hook run for each incoming stanza that is not handled by the stream itself, e.g. IQs,
+    presences and messages. Decrypted IQ requests are passed with their \c e2eeMetadata, it is
+    \c std::nullopt for stanzas that were not end-to-end encrypted. Handlers that only handle
+    unencrypted stanzas must ignore the others, so they do not reply unencrypted.
+
+    Handlers returning QXmpp::HookResult::Stop handle the stanza, it is not processed further.
+    Messages not handled by any handler are processed in the message pipeline (see
+    QXmpp::Messages), use QXmpp::Messages::Received to process parsed and decrypted messages.
+    For IQ requests not handled by any handler, an error is sent.
+
+    Implementations of the deprecated QXmppClientExtension::handleStanza() are called after
+    the handlers.
+
+    \since QXmpp 1.18
+*/
 
 /*! Returns the client which loaded this extension. */
 QXmppClient *QXmppClientExtension::client() const

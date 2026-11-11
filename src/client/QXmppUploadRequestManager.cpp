@@ -10,6 +10,7 @@
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppHttpUploadIq.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -99,6 +100,7 @@ public:
 QXmppUploadRequestManager::QXmppUploadRequestManager()
     : d(std::make_unique<QXmppUploadRequestManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppUploadRequestManager::handleIncomingStanza));
 }
 
 QXmppUploadRequestManager::~QXmppUploadRequestManager() = default;
@@ -261,7 +263,7 @@ QList<QXmppUploadService> QXmppUploadRequestManager::uploadServices() const
     return d->uploadServices;
 }
 
-bool QXmppUploadRequestManager::handleStanza(const QDomElement &element)
+bool QXmppUploadRequestManager::handleIncomingStanza(const QDomElement &element)
 {
     if (isIqElement<QXmppHttpUploadSlotIq>(element)) {
         QXmppHttpUploadSlotIq slot;

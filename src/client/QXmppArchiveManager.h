@@ -46,8 +46,6 @@ public:
     void retrieveCollection(const QString &jid, const QDateTime &start, const QXmppResultSetQuery &rsm = QXmppResultSetQuery());
     void retrieveCollection(const QString &jid, const QDateTime &start, int max);
 
-    bool handleStanza(const QDomElement &element) override;
-
     /*!
         This signal is emitted when archive list is received
         after calling listCollections()
@@ -63,6 +61,9 @@ public:
         \a rsm.
     */
     Q_SIGNAL void archiveChatReceived(const QXmppArchiveChat &, const QXmppResultSetReply &rsm = QXmppResultSetReply());
+
+private:
+    bool handleIncomingStanza(const QDomElement &stanza);
 };
 
 #endif

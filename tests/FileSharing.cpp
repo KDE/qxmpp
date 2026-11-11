@@ -75,7 +75,7 @@ static void addUploadService(QXmppClient &client)
         "</query>"
         "</iq>";
     auto *discovery = client.findExtension<QXmppDiscoveryManager>();
-    QVERIFY(discovery->handleStanza(xmlToDom(xml)));
+    QVERIFY(TestClient::handleStanza(discovery, xmlToDom(xml)));
 }
 
 class tst_QXmppHttpUploadManager : public QObject
@@ -226,7 +226,7 @@ void tst_QXmppHttpUploadManager::testHandleStanza()
         errorReceived = true;
     });
 
-    bool realAccepted = manager->handleStanza(xmlToDom(xml));
+    bool realAccepted = TestClient::handleStanza(manager, xmlToDom(xml));
 
     QCOMPARE(realAccepted, accepted);
     QCOMPARE(eventReceived, event);
@@ -310,7 +310,7 @@ void tst_QXmppHttpUploadManager::testDiscoveryService()
     auto *discovery = test.addNewExtension<QXmppDiscoveryManager>();
     auto *manager = test.addNewExtension<QXmppUploadRequestManager>();
 
-    bool accepted = discovery->handleStanza(xmlToDom(xml));
+    bool accepted = TestClient::handleStanza(discovery, xmlToDom(xml));
     QCOMPARE(accepted, true);
     QCOMPARE(manager->serviceFound(), discovered);
 

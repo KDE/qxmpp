@@ -174,8 +174,6 @@ public:
 
     QXmppDiscoInfo buildClientInfo() const;
 
-    bool handleStanza(const QDomElement &element) override;
-
 #if QXMPP_DEPRECATED_SINCE(1, 13)
     /*!
         This signal is emitted when an information response is received.
@@ -237,6 +235,7 @@ protected:
     void onUnregistered(QXmppClient *client);
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     friend class QXmppDiscoInfoWatch;
     friend class QXmppDiscoveryManagerPrivate;
     friend struct QXmpp::Private::DiscoInfoTracking;

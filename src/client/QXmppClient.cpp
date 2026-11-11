@@ -312,10 +312,15 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
     Q_EMIT q->errorOccurred(QXmppError { text, into<std::any>(std::move(err)) });
 }
 
-namespace QXmpp::Private::StanzaPipeline {
-
-bool process(const QList<QXmppClientExtension *> &extensions, const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
+bool QXmppClientPrivate::handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
 {
+    if (q->hooks(nullptr).run<Client::StanzaReceived>(element, e2eeMetadata) == HookResult::Stop) {
+        return true;
+    }
+
+    // extensions still implementing the deprecated interface
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     const bool unencrypted = !e2eeMetadata.has_value();
     for (auto *extension : extensions) {
         // e2e encrypted stanzas are not passed to the old handleStanza() overload, because such
@@ -326,10 +331,9 @@ bool process(const QList<QXmppClientExtension *> &extensions, const QDomElement 
             return true;
         }
     }
+    QT_WARNING_POP
     return false;
 }
-
-}  // namespace QXmpp::Private::StanzaPipeline
 
 /*!
     \typedef QXmppClient::IqResult
@@ -1120,7 +1124,7 @@ void QXmppClient::injectIq(const QDomElement &element, const std::optional<QXmpp
     if (element.tagName() != u"iq") {
         return;
     }
-    if (!StanzaPipeline::process(d->extensions, element, e2eeMetadata)) {
+    if (!d->handleStanza(element, e2eeMetadata)) {
         const auto iqType = element.attribute(u"type"_s);
         if (iqType == u"get" || iqType == u"set") {
             // send error IQ
@@ -1170,7 +1174,7 @@ void QXmppClient::_q_elementReceived(const QDomElement &element, bool &handled)
         handled = true;
         return;
     }
-    handled = StanzaPipeline::process(d->extensions, element, std::nullopt);
+    handled = d->handleStanza(element, std::nullopt);
     if (!handled && element.tagName() == u"message") {
         // messages not handled by the legacy handleStanza() are always handled by the pipeline
         d->incomingMessages.processElement(element, d->encryptionExtension);

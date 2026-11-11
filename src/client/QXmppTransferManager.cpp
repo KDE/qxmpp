@@ -10,6 +10,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppIbbIq.h"
 #include "QXmppSocks.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppStreamInitiationIq_p.h"
 #include "QXmppStun.h"
 #include "QXmppTask.h"
@@ -726,6 +727,7 @@ QXmppTransferOutgoingJob *QXmppTransferManagerPrivate::getOutgoingJobByRequestId
 QXmppTransferManager::QXmppTransferManager()
     : d(std::make_unique<QXmppTransferManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppTransferManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0047: In-Band Bytestreams
         features << staticString(ns_ibb);
@@ -842,7 +844,7 @@ void QXmppTransferManager::byteStreamSetReceived(const QXmppByteStreamIq &iq)
     job->connectToHosts(iq);
 }
 
-bool QXmppTransferManager::handleStanza(const QDomElement &element)
+bool QXmppTransferManager::handleIncomingStanza(const QDomElement &element)
 {
     auto tag = iqPayloadXmlTag(element);
 

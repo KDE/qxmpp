@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMucIq.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 
@@ -47,6 +48,7 @@ public:
 QXmppMucManager::QXmppMucManager()
     : d(std::make_unique<QXmppMucManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppMucManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0045: Multi-User Chat
         features << staticString(ns_muc);
@@ -84,7 +86,7 @@ QList<QXmppMucRoom *> QXmppMucManager::rooms() const
     return d->rooms.values();
 }
 
-bool QXmppMucManager::handleStanza(const QDomElement &element)
+bool QXmppMucManager::handleIncomingStanza(const QDomElement &element)
 {
     if (element.tagName() == u"iq") {
         if (QXmppMucAdminIq::isMucAdminIq(element)) {

@@ -158,7 +158,8 @@ private:
     Q_SLOT void retrieveMessagesPipeline();
 
     QXmppMamTestHelper m_helper;
-    QXmppMamManager m_manager;
+    TestClient m_client;
+    QXmppMamManager *m_manager = m_client.addNewExtension<QXmppMamManager>();
 };
 
 void tst_QXmppMamManager::watchAccountSupport()
@@ -168,10 +169,10 @@ void tst_QXmppMamManager::watchAccountSupport()
 
 void tst_QXmppMamManager::initTestCase()
 {
-    connect(&m_manager, &QXmppMamManager::archivedMessageReceived,
+    connect(m_manager, &QXmppMamManager::archivedMessageReceived,
             &m_helper, &QXmppMamTestHelper::archivedMessageReceived);
 
-    connect(&m_manager, &QXmppMamManager::resultsRecieved,
+    connect(m_manager, &QXmppMamManager::resultsRecieved,
             &m_helper, &QXmppMamTestHelper::resultsRecieved);
 }
 
@@ -256,7 +257,7 @@ void tst_QXmppMamManager::testHandleStanza()
     }
     m_helper.m_expectedQueryId = expectedQueryId;
 
-    bool accepted = m_manager.handleStanza(xmlToDom(xml));
+    bool accepted = TestClient::handleStanza(m_manager, xmlToDom(xml));
     QCOMPARE(accepted, accept);
     QCOMPARE(m_helper.m_signalTriggered, accept);
 }
@@ -315,7 +316,7 @@ void tst_QXmppMamManager::testHandleResultIq()
     }
     m_helper.m_expectedComplete = expectedComplete;
 
-    bool accepted = m_manager.handleStanza(xmlToDom(xml));
+    bool accepted = TestClient::handleStanza(m_manager, xmlToDom(xml));
     QCOMPARE(accepted, accept);
     QCOMPARE(m_helper.m_signalTriggered, accept);
 }
@@ -332,32 +333,32 @@ void tst_QXmppMamManager::retrieveMessagesUnencrypted()
                 "</x>"
                 "</query>"
                 "</iq>");
-    mam->handleStanza(xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
-                               "<forwarded xmlns='urn:xmpp:forward:0'>"
-                               "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
-                               "<message xmlns='jabber:client'"
-                               " to='juliet@capulet.lit/balcony'"
-                               " from='romeo@montague.lit/orchard'"
-                               " type='chat'>"
-                               "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
-                               "</message>"
-                               "</forwarded>"
-                               "</result>"
-                               "</message>"));
-    mam->handleStanza(xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
-                               "<forwarded xmlns='urn:xmpp:forward:0'>"
-                               "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
-                               "<message xmlns='jabber:client'"
-                               " to='romeo@montague.lit/orchard'"
-                               " from='juliet@capulet.lit/balcony'"
-                               " type='chat' id='8a54s'>"
-                               "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
-                               "</message>"
-                               "</forwarded>"
-                               "</result>"
-                               "</message>"));
+    TestClient::handleStanza(mam, xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
+                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
+                                           "<message xmlns='jabber:client'"
+                                           " to='juliet@capulet.lit/balcony'"
+                                           " from='romeo@montague.lit/orchard'"
+                                           " type='chat'>"
+                                           "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
+                                           "</message>"
+                                           "</forwarded>"
+                                           "</result>"
+                                           "</message>"));
+    TestClient::handleStanza(mam, xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
+                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
+                                           "<message xmlns='jabber:client'"
+                                           " to='romeo@montague.lit/orchard'"
+                                           " from='juliet@capulet.lit/balcony'"
+                                           " type='chat' id='8a54s'>"
+                                           "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
+                                           "</message>"
+                                           "</forwarded>"
+                                           "</result>"
+                                           "</message>"));
     test.inject("<iq type='result' id='qx1'>"
                 "<fin xmlns='urn:xmpp:mam:2'>"
                 "<set xmlns='http://jabber.org/protocol/rsm'>"
@@ -395,33 +396,33 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
                 "</x>"
                 "</query>"
                 "</iq>");
-    mam->handleStanza(xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
-                               "<forwarded xmlns='urn:xmpp:forward:0'>"
-                               "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
-                               "<message xmlns='jabber:client'"
-                               " to='juliet@capulet.lit/balcony'"
-                               " from='romeo@montague.lit/orchard'"
-                               " type='chat'>"
-                               "<test-encrypted/>"
-                               "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
-                               "</message>"
-                               "</forwarded>"
-                               "</result>"
-                               "</message>"));
-    mam->handleStanza(xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
-                               "<forwarded xmlns='urn:xmpp:forward:0'>"
-                               "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
-                               "<message xmlns='jabber:client'"
-                               " to='romeo@montague.lit/orchard'"
-                               " from='juliet@capulet.lit/balcony'"
-                               " type='chat' id='8a54s'>"
-                               "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
-                               "</message>"
-                               "</forwarded>"
-                               "</result>"
-                               "</message>"));
+    TestClient::handleStanza(mam, xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
+                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
+                                           "<message xmlns='jabber:client'"
+                                           " to='juliet@capulet.lit/balcony'"
+                                           " from='romeo@montague.lit/orchard'"
+                                           " type='chat'>"
+                                           "<test-encrypted/>"
+                                           "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
+                                           "</message>"
+                                           "</forwarded>"
+                                           "</result>"
+                                           "</message>"));
+    TestClient::handleStanza(mam, xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
+                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
+                                           "<message xmlns='jabber:client'"
+                                           " to='romeo@montague.lit/orchard'"
+                                           " from='juliet@capulet.lit/balcony'"
+                                           " type='chat' id='8a54s'>"
+                                           "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
+                                           "</message>"
+                                           "</forwarded>"
+                                           "</result>"
+                                           "</message>"));
     test.inject("<iq type='result' id='qx1'>"
                 "<fin xmlns='urn:xmpp:mam:2'>"
                 "<set xmlns='http://jabber.org/protocol/rsm'>"
@@ -464,12 +465,12 @@ void tst_QXmppMamManager::retrieveMessagesPipeline()
 
     auto task = mam->retrieveMessages();
     test.ignore();
-    mam->handleStanza(xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                 "<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body='secret'/></message>"_s)));
-    mam->handleStanza(xmlToDom(mamResult(u"2"_s, u"<message xmlns='jabber:client' to='romeo@montague.lit/orchard' from='juliet@capulet.lit/balcony' type='chat'>"
-                                                 "<body>sent</body></message>"_s)));
-    mam->handleStanza(xmlToDom(mamResult(u"3"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                 "<body>consumed</body></message>"_s)));
+    TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                             "<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body='secret'/></message>"_s)));
+    TestClient::handleStanza(mam, xmlToDom(mamResult(u"2"_s, u"<message xmlns='jabber:client' to='romeo@montague.lit/orchard' from='juliet@capulet.lit/balcony' type='chat'>"
+                                                             "<body>sent</body></message>"_s)));
+    TestClient::handleStanza(mam, xmlToDom(mamResult(u"3"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                             "<body>consumed</body></message>"_s)));
     test.inject(u"<iq type='result' id='qx1'><fin xmlns='urn:xmpp:mam:2'/></iq>"_s);
 
     auto retrieved = expectFutureVariant<QXmppMamManager::RetrievedMessages>(task);
@@ -575,13 +576,15 @@ public:
     bool m_signalTriggered;
 };
 
-class MessageHandler : public QXmppClientExtension, public QXmppMessageHandler
+class MessageHandler : public QXmppClientExtension
 {
 public:
-    bool handleMessage(const QXmppMessage &msg) override
+    MessageHandler()
     {
-        received.push_back(msg);
-        return false;
+        hooks().add<QXmpp::Messages::Received>([this](QXmpp::Messages::Context &context) {
+            received.push_back(context.message());
+            return QXmpp::HookResult::Continue;
+        });
     }
 
     std::vector<QXmppMessage> received;
@@ -609,6 +612,8 @@ private:
     QXmppCarbonManager *m_managerV1;
     QXmppCarbonManagerV2 *m_managerV2;
     QXmppClient client;
+    // separate, both managers handle the same stanzas
+    QXmppClient clientV1;
 };
 
 void tst_QXmppCarbonManager::watchServerSupport()
@@ -708,7 +713,8 @@ void tst_QXmppCarbonManager::enableCarbonsOncePerStream()
 void tst_QXmppCarbonManager::initTestCase()
 {
     client.configuration().setJid("romeo@montague.example");
-    m_managerV1 = client.addNewExtension<QXmppCarbonManager>();
+    clientV1.configuration().setJid("romeo@montague.example");
+    m_managerV1 = clientV1.addNewExtension<QXmppCarbonManager>();
     m_managerV2 = client.addNewExtension<QXmppCarbonManagerV2>();
     m_messageHandler = client.addNewExtension<MessageHandler>();
 
@@ -869,7 +875,7 @@ void tst_QXmppCarbonManager::testHandleStanza()
         m_helper.m_expectSent = sent;
         m_helper.m_signalTriggered = false;
 
-        bool accepted = m_managerV1->handleStanza(xmlToDom(xml));
+        bool accepted = TestClient::handleStanza(m_managerV1, xmlToDom(xml));
 
         QCOMPARE(accepted, accept);
         QCOMPARE(m_helper.m_signalTriggered, accept);
@@ -877,7 +883,7 @@ void tst_QXmppCarbonManager::testHandleStanza()
     {
         m_messageHandler->received.clear();
 
-        bool accepted = m_managerV2->handleStanza(xmlToDom(xml), {});
+        bool accepted = TestClient::handleStanza(m_managerV2, xmlToDom(xml), {});
         QCOMPARE(accepted, accept);
 
         if (accept) {
@@ -911,12 +917,11 @@ void tst_QXmppCarbonManager::pipeline()
     auto carbon = [](const QString &type, const QString &from, const QString &to, const QString &content) {
         return u"<message xmlns='jabber:client' from='juliet@capulet.lit' to='juliet@capulet.lit/balcony' type='chat'><%1 xmlns='urn:xmpp:carbons:2'><forwarded xmlns='urn:xmpp:forward:0'><message xmlns='jabber:client' from='%2' to='%3' type='chat'>%4</message></forwarded></%1></message>"_s.arg(type, from, to, content);
     };
-    carbons->handleStanza(xmlToDom(carbon(u"received"_s, u"romeo@montague.lit/orchard"_s, u"juliet@capulet.lit/chamber"_s, u"<body>hi</body>"_s)), std::nullopt);
-    carbons->handleStanza(xmlToDom(carbon(u"sent"_s, u"juliet@capulet.lit/chamber"_s, u"romeo@montague.lit/orchard"_s, u"<body>hello</body>"_s)), std::nullopt);
+    TestClient::handleStanza(carbons, xmlToDom(carbon(u"received"_s, u"romeo@montague.lit/orchard"_s, u"juliet@capulet.lit/chamber"_s, u"<body>hi</body>"_s)), std::nullopt);
+    TestClient::handleStanza(carbons, xmlToDom(carbon(u"sent"_s, u"juliet@capulet.lit/chamber"_s, u"romeo@montague.lit/orchard"_s, u"<body>hello</body>"_s)), std::nullopt);
     // encrypted without body, e.g. a reaction: the fallback body is not the body
-    carbons->handleStanza(xmlToDom(carbon(u"sent"_s, u"juliet@capulet.lit/chamber"_s, u"romeo@montague.lit/orchard"_s,
-                                          u"<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body=''/>"_s)),
-                          std::nullopt);
+    TestClient::handleStanza(carbons, xmlToDom(carbon(u"sent"_s, u"juliet@capulet.lit/chamber"_s, u"romeo@montague.lit/orchard"_s, u"<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body=''/>"_s)),
+                             std::nullopt);
 
     QCOMPARE(received, (QStringList {
                            QString::number(int(Origin::CarbonReceived)) + u" romeo@montague.lit romeo@montague.lit hi"_s,
@@ -1114,7 +1119,7 @@ void tst_QXmppAttentionManager::addToRoster(const QString &jid)
     iq.setType(QXmppIq::Set);
     iq.addItem(newItem);
 
-    rosterManager->handleStanza(writePacketToDom(iq));
+    TestClient::handleStanza(rosterManager, writePacketToDom(iq));
 }
 
 }  // namespace Attention

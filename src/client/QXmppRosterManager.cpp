@@ -16,6 +16,7 @@
 #include "QXmppRosterIq.h"
 #include "QXmppRosterMemoryStorage.h"
 #include "QXmppRosterStorage.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -228,6 +229,7 @@ void QXmppRosterManagerPrivate::clear()
 QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
     : d(std::make_unique<QXmppRosterManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppRosterManager::handleIncomingStanza));
     QXmppExportData::registerExtension<RosterData, RosterData::fromDom, serializeRosterData>(u"roster", ns_qxmpp_export);
     QXmppExportData::registerExtension<RosterData, RosterData::fromDomPie, serializeRosterDataPie>(QXmppExportData::Format::Xep0227, u"query", ns_roster);
 
@@ -375,7 +377,7 @@ void QXmppRosterManager::_q_disconnected()
     d->presences.clear();
 }
 
-bool QXmppRosterManager::handleStanza(const QDomElement &element)
+bool QXmppRosterManager::handleIncomingStanza(const QDomElement &element)
 {
     if (!isIqElement<QXmppRosterIq>(element)) {
         return false;

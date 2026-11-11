@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppPromise.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 
 #include <QUuid>
@@ -206,6 +207,8 @@ public:
 QXmppCallInviteManager::QXmppCallInviteManager()
     : d(std::make_unique<QXmppCallInviteManagerPrivate>())
 {
+    // after the handlers of applications, like the deprecated QXmppMessageHandler
+    hooks().add<Messages::Received>(Private::messageHandler(this, &QXmppCallInviteManager::handleMessage), HookSequence::Late);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_call_invites.toString();
     });

@@ -11,6 +11,7 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppOutgoingClient.h"
 #include "QXmppRegisterIq.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppUtils.h"
 
@@ -53,6 +54,7 @@ QXmppRegistrationManagerPrivate::QXmppRegistrationManagerPrivate()
 QXmppRegistrationManager::QXmppRegistrationManager()
     : d(std::make_unique<QXmppRegistrationManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppRegistrationManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_register.toString();
     });
@@ -205,7 +207,7 @@ void QXmppRegistrationManager::setRegisterOnConnectEnabled(bool enabled)
     }
 }
 
-bool QXmppRegistrationManager::handleStanza(const QDomElement &stanza)
+bool QXmppRegistrationManager::handleIncomingStanza(const QDomElement &stanza)
 {
     if (d->registerOnConnectEnabled && QXmppStreamFeatures::isStreamFeatures(stanza)) {
         QXmppStreamFeatures features;

@@ -1503,7 +1503,7 @@ void tst_QXmppCallManager::invalidSid()
     });
 
     // start first call
-    QVERIFY(manager->handleStanza(xmlToDom(xml.arg("abc1"))));
+    QVERIFY(TestClient::handleStanza(manager, xmlToDom(xml.arg("abc1"))));
     QCoreApplication::processEvents();
     client.expect(u"<iq id='ph37a419' to='romeo@montague.lit/orchard' type='result'/>"_s);
     client.expect(u"<iq id=\"qx3\" to=\"capulet.lit\" type=\"get\"><services xmlns=\"urn:xmpp:extdisco:2\"/></iq>"_s);

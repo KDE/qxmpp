@@ -15,6 +15,7 @@
 #include "QXmppPubSubSubscribeOptions.h"
 #include "QXmppPubSubSubscription.h"
 #include "QXmppStanza.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -227,6 +228,7 @@ using namespace QXmpp::Private;
 /*! Default constructor. */
 QXmppPubSubManager::QXmppPubSubManager()
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppPubSubManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_pubsub_rsm);
     });
@@ -895,7 +897,7 @@ QString QXmppPubSubManager::standardItemIdToString(StandardItemId itemId)
     return {};
 }
 
-bool QXmppPubSubManager::handleStanza(const QDomElement &element)
+bool QXmppPubSubManager::handleIncomingStanza(const QDomElement &element)
 {
     if (element.tagName() != u"message") {
         return false;

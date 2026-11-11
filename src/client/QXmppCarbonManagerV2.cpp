@@ -12,6 +12,7 @@
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
 #include "QXmppOutgoingClient.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -74,7 +75,7 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
     registered with the client, carbons are enabled without checking the support.
     Carbon copied messages from other devices of the same account and carbon copied messages from
     other accounts are injected into the QXmppClient. This way you can handle them like any other
-    incoming message by implementing QXmppMessageHandler or using QXmppClient::messageReceived().
+    incoming message via the QXmpp::Messages::Received hook or QXmppClient::messageReceived().
 
     Checks are done to ensure that the entity sending the carbon copy is allowed to send the
     forwarded message.
@@ -94,7 +95,11 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
     \since QXmpp 1.5
 */
 
-QXmppCarbonManagerV2::QXmppCarbonManagerV2() = default;
+QXmppCarbonManagerV2::QXmppCarbonManagerV2()
+{
+    hooks().add<Client::StanzaReceived>(Private::stanzaHandler(this, &QXmppCarbonManagerV2::handleIncomingStanza));
+}
+
 QXmppCarbonManagerV2::~QXmppCarbonManagerV2() = default;
 
 /*! Returns whether message carbons are currently enabled on the server. */
@@ -118,7 +123,7 @@ QXmppDiscoFeatureWatch QXmppCarbonManagerV2::watchServerSupport() const
     return watchServerFeature(client(), QXmpp::Namespace::Carbons2);
 }
 
-bool QXmppCarbonManagerV2::handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &)
+bool QXmppCarbonManagerV2::handleIncomingStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &)
 {
     if (element.tagName() != u"message") {
         return false;

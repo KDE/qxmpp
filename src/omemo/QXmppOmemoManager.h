@@ -134,8 +134,6 @@ public:
     bool isEncrypted(const QDomElement &) override;
     bool isEncrypted(const QXmppMessage &) override;
 
-    bool handleStanza(const QDomElement &stanza) override;
-
     Q_SIGNAL void trustLevelsChanged(const QMultiHash<QString, QByteArray> &modifiedKeys);
 
     Q_SIGNAL void deviceAdded(const QString &jid, uint32_t deviceId);
@@ -149,6 +147,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
 
     std::unique_ptr<QXmppOmemoManagerPrivate> d;

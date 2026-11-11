@@ -10,6 +10,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppError.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -89,6 +90,7 @@ public:
 QXmppVCardManager::QXmppVCardManager()
     : d(std::make_unique<QXmppVCardManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppVCardManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0054: vcard-temp
         features << staticString(ns_vcard);
@@ -189,7 +191,7 @@ QXmppDiscoFeatureWatch QXmppVCardManager::watchServerSupport() const
     return watchServerFeature(client(), QXmpp::Namespace::VCard);
 }
 
-bool QXmppVCardManager::handleStanza(const QDomElement &element)
+bool QXmppVCardManager::handleIncomingStanza(const QDomElement &element)
 {
     if (isIqElement<QXmppVCardIq>(element)) {
         QXmppVCardIq vCardIq;

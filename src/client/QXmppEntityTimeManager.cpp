@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppEntityTimeIq.h"
 #include "QXmppIqHandling.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 
 #include "StringLiterals.h"
@@ -62,6 +63,7 @@ auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<
 
 QXmppEntityTimeManager::QXmppEntityTimeManager()
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppEntityTimeManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_entity_time);
     });
@@ -69,7 +71,7 @@ QXmppEntityTimeManager::QXmppEntityTimeManager()
 
 QXmppEntityTimeManager::~QXmppEntityTimeManager() = default;
 
-bool QXmppEntityTimeManager::handleStanza(const QDomElement &element)
+bool QXmppEntityTimeManager::handleIncomingStanza(const QDomElement &element)
 {
     if (handleIqRequests<QXmppEntityTimeIq>(element, client(), this)) {
         return true;

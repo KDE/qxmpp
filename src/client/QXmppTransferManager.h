@@ -316,8 +316,6 @@ public:
     QXmppTransferJob::Methods supportedMethods() const;
     void setSupportedMethods(QXmppTransferJob::Methods methods);
 
-    bool handleStanza(const QDomElement &element) override;
-
     /*!
         This signal is emitted when a new file transfer offer is received.
 
@@ -348,6 +346,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     Q_SLOT void _q_iqReceived(const QXmppIq &);
     Q_SLOT void _q_jobDestroyed(QObject *object);
     Q_SLOT void _q_jobError(QXmppTransferJob::Error error);

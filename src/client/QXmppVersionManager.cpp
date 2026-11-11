@@ -8,6 +8,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppIqHandling.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppVersionIq.h"
 
@@ -31,6 +32,7 @@ public:
 QXmppVersionManager::QXmppVersionManager()
     : d(std::make_unique<QXmppVersionManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppVersionManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0092: Software Version
         features << staticString(ns_version);
@@ -118,7 +120,7 @@ QString QXmppVersionManager::clientOs() const
     return d->clientOs;
 }
 
-bool QXmppVersionManager::handleStanza(const QDomElement &element)
+bool QXmppVersionManager::handleIncomingStanza(const QDomElement &element)
 {
     if (QXmpp::handleIqRequests<QXmppVersionIq>(element, client(), this)) {
         return true;

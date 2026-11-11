@@ -376,7 +376,7 @@ void tst_QXmppRegistrationManager::testRegistrationResult()
     QXmppIq serverResult(isSuccess ? QXmppIq::Result : QXmppIq::Error);
     serverResult.setId(registrationRequestForm.id());
 
-    manager->handleStanza(writePacketToDom(serverResult));
+    TestClient::handleStanza(manager, writePacketToDom(serverResult));
 
     QCOMPARE(succeededSignalCalled, isSuccess);
     QCOMPARE(failedSignalCalled, !isSuccess);
@@ -435,7 +435,7 @@ void tst_QXmppRegistrationManager::testChangePasswordResult()
     QXmppIq serverResult(isSuccess ? QXmppIq::Result : QXmppIq::Error);
     serverResult.setId(changePasswordRequestIqId);
 
-    manager->handleStanza(writePacketToDom(serverResult));
+    TestClient::handleStanza(manager, writePacketToDom(serverResult));
 
     QVERIFY(resultSignalCalled);
     delete resultContext;
@@ -492,7 +492,7 @@ void tst_QXmppRegistrationManager::testDeleteAccountResult()
     QXmppIq serverResult(isSuccess ? QXmppIq::Result : QXmppIq::Error);
     serverResult.setId(deleteAccountRequestIqId);
 
-    manager->handleStanza(writePacketToDom(serverResult));
+    TestClient::handleStanza(manager, writePacketToDom(serverResult));
 
     QVERIFY(resultSignalCalled);
     delete resultContext;
@@ -512,7 +512,7 @@ void tst_QXmppRegistrationManager::testRegistrationFormReceived()
         QCOMPARE(iq.password(), u""_s);
     });
 
-    manager->handleStanza(writePacketToDom(iq));
+    TestClient::handleStanza(manager, writePacketToDom(iq));
 
     delete context;
 }
@@ -539,7 +539,7 @@ void tst_QXmppRegistrationManager::sendStreamFeaturesToManager(bool registration
         return xmlToDom(manipulatedXml);
     };
 
-    manager->handleStanza(writeFeaturesToDom());
+    TestClient::handleStanza(manager, writeFeaturesToDom());
 }
 
 void tst_QXmppRegistrationManager::setManagerConfig(const QString &username, const QString &server, const QString &password)
@@ -1564,7 +1564,7 @@ void tst_QXmppBlockingManager::pushBlocked()
     QSignalSpy unblockedSpy(m, &QXmppBlockingManager::unblocked);
 
     auto dom = xmlToDom("<iq to='juliet@capulet.com/balcony' type='set' id='push4'><unblock xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></unblock></iq>");
-    QVERIFY(m->handleStanza(dom, {}));
+    QVERIFY(TestClient::handleStanza(m, dom, {}));
 
     QCOMPARE(blockedSpy.size(), 0);
     QCOMPARE(unblockedSpy.size(), 1);
@@ -1574,7 +1574,7 @@ void tst_QXmppBlockingManager::pushBlocked()
     QCOMPARE(blocklist, QList<QString> { "iago@shakespeare.lit" });
 
     dom = xmlToDom("<iq to='juliet@capulet.com/balcony' type='set' id='push3'><block xmlns='urn:xmpp:blocking'><item jid='romeo@montague.net'/></block></iq>");
-    QVERIFY(m->handleStanza(dom, {}));
+    QVERIFY(TestClient::handleStanza(m, dom, {}));
 
     QCOMPARE(blockedSpy.size(), 1);
     QCOMPARE(blockedSpy[0][0].value<QList<QString>>(), QList<QString> { "romeo@montague.net" });

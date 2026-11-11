@@ -10,6 +10,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppMessage.h"
 #include "QXmppPromise.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 
 #include "StringLiterals.h"
@@ -307,6 +308,8 @@ public:
 QXmppJingleMessageInitiationManager::QXmppJingleMessageInitiationManager()
     : d(std::make_unique<QXmppJingleMessageInitiationManagerPrivate>())
 {
+    // after the handlers of applications, like the deprecated QXmppMessageHandler
+    hooks().add<Messages::Received>(Private::messageHandler(this, &QXmppJingleMessageInitiationManager::handleMessage), HookSequence::Late);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_jingle_message);
     });

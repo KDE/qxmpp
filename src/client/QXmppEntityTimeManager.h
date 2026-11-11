@@ -36,7 +36,6 @@ public:
     using EntityTimeResult = std::variant<QXmppEntityTimeIq, QXmppError>;
     QXmppTask<EntityTimeResult> requestEntityTime(const QString &jid);
 
-    bool handleStanza(const QDomElement &element) override;
     std::variant<QXmppEntityTimeIq, QXmppStanza::Error> handleIq(QXmppEntityTimeIq iq);
 
     /*!
@@ -44,6 +43,9 @@ public:
         emitted when the QFuture-based request is used.
     */
     Q_SIGNAL void timeReceived(const QXmppEntityTimeIq &);
+
+private:
+    bool handleIncomingStanza(const QDomElement &stanza);
 };
 
 #endif  // QXMPPENTITYTIMEMANAGER_H

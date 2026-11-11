@@ -6,6 +6,7 @@
 #define QXMPPCLIENTEXTENSION_H
 
 #include "QXmppDiscoveryIq.h"
+#include "QXmppE2eeMetadata.h"
 #include "QXmppExtension.h"
 #include "QXmppHooks.h"
 #include "QXmppLogger.h"
@@ -18,6 +19,15 @@ class QXmppClient;
 class QXmppClientExtensionPrivate;
 class QXmppMessage;
 
+namespace QXmpp::Client {
+
+struct StanzaReceived {
+    static constexpr QStringView Name = u"org.qxmpp.client.stanza-received";
+    using Signature = QXmpp::HookResult(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
+};
+
+}  // namespace QXmpp::Client
+
 /*!
     \inmodule QXmpp
 
@@ -26,7 +36,8 @@ class QXmppMessage;
 
     If you want to extend QXmppClient, for instance to support an IQ type
     which is not natively supported, you can subclass QXmppClientExtension
-    and implement handleStanza(). You can then add your extension to the
+    and add handlers to hooks, e.g. QXmpp::Client::StanzaReceived for incoming stanzas or
+    QXmpp::Messages::Received for incoming messages. You can then add your extension to the
     client instance using QXmppClient::addExtension().
 
     \ingroup qxmpp-core
@@ -45,7 +56,9 @@ public:
     [[deprecated("Use the QXmpp::Disco::CollectInfo hook")]]
     virtual QList<QXmppDiscoIdentity> discoveryIdentities() const;
 
+    [[deprecated("Use the QXmpp::Client::StanzaReceived hook")]]
     virtual bool handleStanza(const QDomElement &stanza);
+    [[deprecated("Use the QXmpp::Client::StanzaReceived hook")]]
     virtual bool handleStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
 
 protected:

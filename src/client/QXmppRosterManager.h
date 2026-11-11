@@ -119,8 +119,6 @@ public:
     QXmppTask<QXmpp::SendResult> subscribeTo(const QString &bareJid, const QString &reason = {});
     QXmppTask<QXmpp::SendResult> unsubscribeFrom(const QString &bareJid, const QString &reason = {});
 
-    bool handleStanza(const QDomElement &element) override;
-
     Q_SLOT bool acceptSubscription(const QString &bareJid, const QString &reason = {});
     Q_SLOT bool refuseSubscription(const QString &bareJid, const QString &reason = {});
     Q_SLOT bool addItem(const QString &bareJid, const QString &name = {}, const QSet<QString> &groups = {});
@@ -188,6 +186,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     using RosterResult = std::variant<QXmppRosterIq, QXmppError>;
 
     Q_SLOT void _q_connected();

@@ -8,7 +8,7 @@
 #include "QXmppClientExtension.h"
 #include "QXmppError.h"
 #include "QXmppJingleIq.h"
-#include "QXmppMessageHandler.h"
+#include "QXmppMessage.h"
 #include "QXmppSendResult.h"
 #include "QXmppTask.h"
 
@@ -70,7 +70,7 @@ private:
     friend class tst_QXmppCallInviteManager;
 };
 
-class QXMPP_EXPORT QXmppCallInviteManager : public QXmppClientExtension, public QXmppMessageHandler
+class QXMPP_EXPORT QXmppCallInviteManager : public QXmppClientExtension
 {
     Q_OBJECT
 public:
@@ -89,7 +89,7 @@ public:
     Q_SIGNAL void invited(const std::shared_ptr<QXmppCallInvite> &callInvite, const QString &id);
 
 protected:
-    bool handleMessage(const QXmppMessage &) override;
+    bool handleMessage(const QXmppMessage &);
 
 private:
     QXmppTask<QXmpp::SendResult> sendMessage(

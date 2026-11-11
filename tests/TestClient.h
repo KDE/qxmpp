@@ -41,6 +41,12 @@ public:
     void simulateDisconnected();
 
     void inject(const QDomElement &element);
+    // passes a stanza to the handlers of QXmpp::Client::StanzaReceived and the extensions,
+    // returns whether it has been handled
+    bool handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata = {});
+    bool handleStanza(const QString &xml) { return handleStanza(xmlToDom(xml)); }
+    // passes a stanza to the handlers of the client of \a extension, like handleStanza()
+    static bool handleStanza(QXmppClientExtension *extension, const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata = {});
     // runs a message received from the stream through the message pipeline
     void injectMessage(const QString &xml);
     // like a stanza received from the stream

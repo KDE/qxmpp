@@ -7,7 +7,7 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppDiscoveryIq.h"
-#include "QXmppMessageHandler.h"
+#include "QXmppMessage.h"
 #include "QXmppMucData.h"
 #include "QXmppMucForms.h"
 #include "QXmppSendResult.h"
@@ -32,7 +32,7 @@ class QXmppMucRoomV2;
 class QXmppMucParticipant;
 struct QXmppMucManagerV2Private;
 
-class QXMPP_EXPORT QXmppMucManagerV2 : public QXmppClientExtension, public QXmppMessageHandler
+class QXMPP_EXPORT QXmppMucManagerV2 : public QXmppClientExtension
 {
     Q_OBJECT
 
@@ -151,7 +151,7 @@ public:
     */
     Q_SIGNAL void directInvitationReceived(const QXmpp::Muc::DirectInvitation &invitation, const QString &from, const QXmppMessage &message);
 
-    bool handleMessage(const QXmppMessage &) override;
+    bool handleMessage(const QXmppMessage &);
 
     QXmppTask<QXmpp::SendResult> declineInvitation(const QString &roomJid, QXmpp::Muc::Decline decline);
 

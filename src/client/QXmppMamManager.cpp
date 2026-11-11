@@ -18,6 +18,7 @@
 #include "QXmppMessageContext.h"
 #include "QXmppMessages.h"
 #include "QXmppPromise.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -171,6 +172,7 @@ public:
 QXmppMamManager::QXmppMamManager()
     : d(std::make_unique<QXmppMamManagerPrivate>())
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppMamManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0313: Message Archive Management
         features << staticString(ns_mam);
@@ -194,7 +196,7 @@ QXmppDiscoFeatureWatch QXmppMamManager::watchAccountSupport() const
     return watchAccountFeature(client(), QXmpp::Namespace::Mam2);
 }
 
-bool QXmppMamManager::handleStanza(const QDomElement &element)
+bool QXmppMamManager::handleIncomingStanza(const QDomElement &element)
 {
     if (element.tagName() == u"message") {
         if (auto result = parseMamMessageResult(element)) {

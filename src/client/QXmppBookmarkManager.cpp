@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIq.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -75,6 +76,7 @@ public:
 QXmppBookmarkManager::QXmppBookmarkManager()
     : d(new QXmppBookmarkManagerPrivate)
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppBookmarkManager::handleIncomingStanza));
     d->bookmarksReceived = false;
 }
 
@@ -116,7 +118,7 @@ bool QXmppBookmarkManager::setBookmarks(const QXmppBookmarkSet &bookmarks)
     return true;
 }
 
-bool QXmppBookmarkManager::handleStanza(const QDomElement &stanza)
+bool QXmppBookmarkManager::handleIncomingStanza(const QDomElement &stanza)
 {
     if (stanza.tagName() == u"iq") {
         if (isIqElement<QXmppPrivateStorageIq>(stanza)) {

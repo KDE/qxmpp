@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppSpamReport.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -212,6 +213,7 @@ struct QXmppBlockingManagerPrivate {
 QXmppBlockingManager::QXmppBlockingManager()
     : d(new QXmppBlockingManagerPrivate)
 {
+    hooks().add<Client::StanzaReceived>(Private::stanzaHandler(this, &QXmppBlockingManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_blocking);
     });
@@ -375,7 +377,7 @@ void QXmppBlockingManager::onUnregistered(QXmppClient *oldClient)
     disconnect(oldClient, &QXmppClient::connected, this, &QXmppBlockingManager::onConnected);
 }
 
-bool QXmppBlockingManager::handleStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &)
+bool QXmppBlockingManager::handleIncomingStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &)
 {
     auto checkIqValidity = [this](QStringView from) -> std::optional<StanzaError> {
         // check permissions

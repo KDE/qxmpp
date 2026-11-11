@@ -32,8 +32,6 @@ public:
     QXmppBookmarkSet bookmarks() const;
     bool setBookmarks(const QXmppBookmarkSet &bookmarks);
 
-    bool handleStanza(const QDomElement &stanza) override;
-
     /*! This signal is emitted when \a bookmarks are received. */
     Q_SIGNAL void bookmarksReceived(const QXmppBookmarkSet &bookmarks);
 
@@ -42,6 +40,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     Q_SLOT void slotConnected();
     Q_SLOT void slotDisconnected();
 

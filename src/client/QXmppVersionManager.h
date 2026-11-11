@@ -40,13 +40,13 @@ public:
     QString clientVersion() const;
     QString clientOs() const;
 
-    bool handleStanza(const QDomElement &element) override;
     QXmppVersionIq handleIq(QXmppVersionIq &&iq);
 
     /*! \brief This signal is emitted when a version response is received. */
     Q_SIGNAL void versionReceived(const QXmppVersionIq &);
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     const std::unique_ptr<QXmppVersionManagerPrivate> d;
 };
 

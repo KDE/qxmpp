@@ -247,8 +247,6 @@ public:
     bool registerOnConnectEnabled() const;
     void setRegisterOnConnectEnabled(bool enabled);
 
-    bool handleStanza(const QDomElement &stanza) override;
-
 #if QXMPP_DEPRECATED_SINCE(1, 17)
     /*!
         Emitted, when supportedByServer() changed.
@@ -327,6 +325,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
+    bool handleIncomingStanza(const QDomElement &stanza);
     void handleAccountDeleted();
 
     const std::unique_ptr<QXmppRegistrationManagerPrivate> d;

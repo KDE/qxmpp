@@ -16,6 +16,7 @@
 #include "QXmppIqHandling.h"
 #include "QXmppJingleIq.h"
 #include "QXmppRosterManager.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -236,6 +237,7 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
 QXmppCallManager::QXmppCallManager()
     : d(std::make_unique<QXmppCallManagerPrivate>(this))
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppCallManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([this](QList<QString> &features, auto &) {
         features << staticString(ns_jingle)      // XEP-0166: Jingle
                  << staticString(ns_jingle_rtp)  // XEP-0167: Jingle RTP Sessions
@@ -295,7 +297,7 @@ void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &se
     d->fallbackTurnServer = server;
 }
 
-bool QXmppCallManager::handleStanza(const QDomElement &element)
+bool QXmppCallManager::handleIncomingStanza(const QDomElement &element)
 {
     return handleIqRequests<QXmppJingleIq>(element, client(), [this](auto &&iq) {
         return handleIq(std::move(iq));

@@ -30,6 +30,7 @@
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
+#include "QXmppMessageHandler.h"
 #include "QXmppMessageRetraction.h"
 #include "QXmppMessages.h"
 #include "QXmppMovedManager.h"
@@ -1738,7 +1739,7 @@ void tst_QXmppDiscoveryManager::testRequests()
     // so this test does not depend on either
     discoManager->setIdentities({ QXmppDiscoIdentity(u"client"_s, u"pc"_s, u"tst_QXmppDiscoveryManager"_s) });
 
-    discoManager->handleStanza(xmlToDom(R"(
+    TestClient::handleStanza(discoManager, xmlToDom(R"(
 <iq type='get' from='romeo@montague.net/orchard' to='user@qxmpp.org/a' id='info1'>
   <query xmlns='http://jabber.org/protocol/disco#info'/>
 </iq>)"));
@@ -3645,7 +3646,7 @@ void tst_QXmppRosterManager::testRenameItem()
     initialItems.addItem(createItem("stpeter@jabber.org"));
     initialItems.addItem(createItem("bob@qxmpp.org"));
 
-    QVERIFY(manager->handleStanza(writePacketToDom(initialItems)));
+    QVERIFY(TestClient::handleStanza(manager, writePacketToDom(initialItems)));
 
     // set a subscription state for bob (the subscription state MUST NOT be
     // sent when renaming an item, so we need to check that it's not)
@@ -3653,7 +3654,7 @@ void tst_QXmppRosterManager::testRenameItem()
     bobAsk.setType(QXmppIq::Set);
     bobAsk.addItem(createItem("bob@qxmpp.org", "subscribe"));
 
-    QVERIFY(manager->handleStanza(writePacketToDom(bobAsk)));
+    QVERIFY(TestClient::handleStanza(manager, writePacketToDom(bobAsk)));
     QCOMPARE(manager->getRosterEntry("bob@qxmpp.org").subscriptionStatus(), u"subscribe"_s);
 
     // rename bob
@@ -3772,7 +3773,7 @@ void tst_QXmppRosterManager::testMovedSubscriptionRequestReceived()
         QXmppRosterIq rosterIq;
         rosterIq.setType(QXmppIq::Set);
         rosterIq.setItems({ rosterItem });
-        rosterManager->handleStanza(writePacketToDom(rosterIq));
+        TestClient::handleStanza(rosterManager, writePacketToDom(rosterIq));
     }
 
     QXmppPresence presence;
@@ -3868,7 +3869,7 @@ void tst_QXmppRosterManager::testUpdateGroups()
     QXmppRosterIq initialItems;
     initialItems.setType(QXmppIq::Set);
     initialItems.addItem(item);
-    QVERIFY(rosterManager->handleStanza(writePacketToDom(initialItems)));
+    QVERIFY(TestClient::handleStanza(rosterManager, writePacketToDom(initialItems)));
     // discard the result IQ the manager sends in response to the push
     test.ignore();
 
@@ -3942,7 +3943,7 @@ void tst_QXmppRosterManager::testPushPersistsAdd()
     push.setVersion(u"v42"_s);
     push.addItem(item);
 
-    QVERIFY(rosterManager->handleStanza(writePacketToDom(push)));
+    QVERIFY(TestClient::handleStanza(rosterManager, writePacketToDom(push)));
 
     auto cache = rosterManager->storage()->load().takeResult();
     QCOMPARE(cache.version, u"v42"_s);
@@ -3965,7 +3966,7 @@ void tst_QXmppRosterManager::testPushPersistsRemove()
     add.setType(QXmppIq::Set);
     add.setVersion(u"v1"_s);
     add.addItem(item);
-    QVERIFY(rosterManager->handleStanza(writePacketToDom(add)));
+    QVERIFY(TestClient::handleStanza(rosterManager, writePacketToDom(add)));
 
     // Second push: remove Alice with a new version.
     QXmppRosterIq::Item removed;
@@ -3975,7 +3976,7 @@ void tst_QXmppRosterManager::testPushPersistsRemove()
     remove.setType(QXmppIq::Set);
     remove.setVersion(u"v2"_s);
     remove.addItem(removed);
-    QVERIFY(rosterManager->handleStanza(writePacketToDom(remove)));
+    QVERIFY(TestClient::handleStanza(rosterManager, writePacketToDom(remove)));
 
     auto cache = rosterManager->storage()->load().takeResult();
     QCOMPARE(cache.version, u"v2"_s);
@@ -3996,7 +3997,7 @@ void tst_QXmppRosterManager::testClearCache()
     push.setType(QXmppIq::Set);
     push.setVersion(u"v1"_s);
     push.addItem(item);
-    QVERIFY(rosterManager->handleStanza(writePacketToDom(push)));
+    QVERIFY(TestClient::handleStanza(rosterManager, writePacketToDom(push)));
 
     auto task = rosterManager->clearCache();
     QVERIFY(task.isFinished());
@@ -4911,6 +4912,8 @@ private:
     Q_SLOT void hooksSingleResponder();
     Q_SLOT void hooksSingleResponderAsync();
     Q_SLOT void hooksAdapted();
+    Q_SLOT void hooksStanzaReceived();
+    Q_SLOT void hooksMessageHandlerLegacy();
 };
 
 void tst_QXmppHooks::hooksRunAll()
@@ -5480,6 +5483,85 @@ void tst_QXmppHooks::hooksAdapted()
     QVERIFY(!hooks.hasHandlers<NumberRequest<1>>());
     hooks.removeAll();
     QVERIFY(!hooks.hasHandlers<NumberRequest<2>>());
+}
+
+// extensions still implementing the deprecated interfaces
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+class LegacyStanzaHandler : public QXmppClientExtension, public QXmppMessageHandler
+{
+public:
+    bool handleStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) override
+    {
+        stanzas << stanza.attribute(u"id"_s) + (e2eeMetadata ? u":encrypted"_s : QString());
+        return stanza.attribute(u"id"_s) == u"legacy";
+    }
+    bool handleMessage(const QXmppMessage &message) override
+    {
+        messages << message.id();
+        return message.id() == u"legacy";
+    }
+
+    QStringList stanzas;
+    QStringList messages;
+};
+QT_WARNING_POP
+
+void tst_QXmppHooks::hooksStanzaReceived()
+{
+    TestClient client;
+    auto *legacy = client.addNewExtension<LegacyStanzaHandler>();
+    QObject owner;
+
+    QStringList calls;
+    client.hooks(&owner).add<QXmpp::Client::StanzaReceived>([&](const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) {
+        calls << stanza.attribute(u"id"_s) + (e2eeMetadata ? u":encrypted"_s : QString());
+        return stanza.attribute(u"id"_s) == u"hook" ? HookResult::Stop : HookResult::Continue;
+    });
+
+    // handled by a handler of the hook, not passed to the deprecated handleStanza()
+    QVERIFY(client.handleStanza(u"<iq id='hook' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    QCOMPARE(calls, QStringList { u"hook"_s });
+    QVERIFY(legacy->stanzas.isEmpty());
+
+    // the deprecated handleStanza() is still called afterwards
+    QVERIFY(client.handleStanza(u"<iq id='legacy' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    QCOMPARE(calls, (QStringList { u"hook"_s, u"legacy"_s }));
+    QCOMPARE(legacy->stanzas, QStringList { u"legacy"_s });
+
+    // with the metadata of decrypted stanzas
+    QXmppE2eeMetadata metadata;
+    QVERIFY(!client.handleStanza(xmlToDom(u"<iq id='decrypted' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s), metadata));
+    QCOMPARE(calls.last(), u"decrypted:encrypted"_s);
+    QCOMPARE(legacy->stanzas.last(), u"decrypted:encrypted"_s);
+}
+
+void tst_QXmppHooks::hooksMessageHandlerLegacy()
+{
+    TestClient client;
+    auto *legacy = client.addNewExtension<LegacyStanzaHandler>();
+    QSignalSpy spy(&client, &QXmppClient::messageReceived);
+    QObject owner;
+
+    QStringList received;
+    client.hooks(&owner).add<Messages::Received>([&](Messages::Context &context) {
+        received << context.message().id();
+        return context.message().id() == u"hook" ? HookResult::Stop : HookResult::Continue;
+    });
+
+    // consumed by a handler of the hook, not passed to the deprecated handleMessage()
+    client.injectMessage(u"<message id='hook' from='alice@example.org/a' type='chat'><body>a</body></message>"_s);
+    QCOMPARE(received, QStringList { u"hook"_s });
+    QVERIFY(legacy->messages.isEmpty());
+    QCOMPARE(spy.size(), 0);
+
+    // the deprecated handleMessage() is still called afterwards
+    client.injectMessage(u"<message id='legacy' from='alice@example.org/a' type='chat'><body>b</body></message>"_s);
+    QCOMPARE(legacy->messages, QStringList { u"legacy"_s });
+    QCOMPARE(spy.size(), 0);
+    client.injectMessage(u"<message id='other' from='alice@example.org/a' type='chat'><body>c</body></message>"_s);
+    QCOMPARE(legacy->messages, (QStringList { u"legacy"_s, u"other"_s }));
+    QCOMPARE(spy.size(), 1);
 }
 
 }  // namespace HookTests

@@ -12,6 +12,7 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppPresence.h"
+#include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -52,6 +53,7 @@ QXmppEntityCapsStorage::~QXmppEntityCapsStorage() = default;
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {
+    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppDiscoveryManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_disco_info.toString();
     });
@@ -798,7 +800,7 @@ void QXmppDiscoveryManager::setEntityCapsStorage(std::shared_ptr<QXmppEntityCaps
     d->capsStorage = std::move(storage);
 }
 
-bool QXmppDiscoveryManager::handleStanza(const QDomElement &element)
+bool QXmppDiscoveryManager::handleIncomingStanza(const QDomElement &element)
 {
     if (handleIqRequests<GetIq<QXmppDiscoInfo>, GetIq<QXmppDiscoItems>>(element, client(), d.get())) {
         return true;
