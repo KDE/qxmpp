@@ -6,13 +6,13 @@
 
 #include "QXmppBindIq.h"
 #include "QXmppConstants_p.h"
+#include "QXmppIqStanza.h"
 #include "QXmppPasswordChecker.h"
 #include "QXmppSasl_p.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
-#include "Iq.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 #include "XmppSocket.h"
@@ -392,14 +392,14 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
             const auto id = nodeRecv.attribute(u"id"_s);
 
             if (isElement<BindElement>(nodeRecv.firstChildElement())) {
-                if (auto bindSet = SetIq<BindElement>::fromDom(nodeRecv)) {
+                if (auto bindSet = Iq::Set<BindElement>::fromDom(nodeRecv)) {
                     d->resource = bindSet->payload.resource.trimmed();
                     if (d->resource.isEmpty()) {
                         d->resource = QXmppUtils::generateStanzaHash();
                     }
                     d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
 
-                    sendData(serializeXml(ResultIq<BindElement> {
+                    sendData(serializeXml(Iq::Result<BindElement> {
                         bindSet->id,
                         {},
                         {},

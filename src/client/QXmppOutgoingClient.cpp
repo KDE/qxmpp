@@ -18,7 +18,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "Iq.h"
+#include "IqSending.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 
@@ -1094,12 +1094,9 @@ QXmppTask<BindManager::Result> BindManager::bindAddress(const QString &resource)
 
     m_promise = QXmppPromise<Result>();
     m_iqId = generateSequentialStanzaId();
-    m_socket->sendData(serializeXml(SetIq<BindElement> {
-        m_iqId,
-        {},
-        {},
-        {},
-        BindElement { {}, resource },
+    m_socket->sendData(serializeXml(Iq::Set<BindElement> {
+        .id = m_iqId,
+        .payload = BindElement { {}, resource },
     }));
 
     return m_promise->task();

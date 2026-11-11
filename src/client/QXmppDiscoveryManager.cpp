@@ -18,7 +18,7 @@
 
 #include "Algorithms.h"
 #include "Async.h"
-#include "Iq.h"
+#include "IqSending.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
@@ -37,15 +37,6 @@ inline uint qHash(const std::tuple<Ts...> &t, uint seed = 0) noexcept
         return seed;
     },
                       t);
-}
-
-template<typename Response, typename Payload>
-static QXmppTask<std::variant<Response, QXmppError>> get(QXmppClient *client, const QString &to, Payload &&payload)
-{
-    return chain<std::variant<Response, QXmppError>>(
-        client->sendIq(CompatIq { GetIq<Payload> { generateSequentialStanzaId(), {}, to, {}, std::move(payload) } }),
-        client,
-        parseIqResponseFlat<Response>);
 }
 
 QXmppEntityCapsStorage::~QXmppEntityCapsStorage() = default;
@@ -802,7 +793,7 @@ void QXmppDiscoveryManager::setEntityCapsStorage(std::shared_ptr<QXmppEntityCaps
 
 bool QXmppDiscoveryManager::handleIncomingStanza(const QDomElement &element)
 {
-    if (handleIqRequests<GetIq<QXmppDiscoInfo>, GetIq<QXmppDiscoItems>>(element, client(), d.get())) {
+    if (handleIqRequests<Iq::Get<QXmppDiscoInfo>, Iq::Get<QXmppDiscoItems>>(element, client(), d.get())) {
         return true;
     }
 
@@ -908,7 +899,7 @@ QXmppDiscoIdentity QXmppDiscoveryManagerPrivate::defaultIdentity()
     };
 }
 
-std::variant<CompatIq<QXmppDiscoInfo>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(GetIq<QXmppDiscoInfo> &&iq)
+std::variant<CompatIq<QXmppDiscoInfo>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(Iq::Get<QXmppDiscoInfo> &&iq)
 {
     if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
         return CompatIq { QXmppIq::Result, q->buildClientInfo() };
@@ -916,7 +907,7 @@ std::variant<CompatIq<QXmppDiscoInfo>, QXmppStanza::Error> QXmppDiscoveryManager
     return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
 }
 
-std::variant<CompatIq<QXmppDiscoItems>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(GetIq<QXmppDiscoItems> &&iq)
+std::variant<CompatIq<QXmppDiscoItems>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(Iq::Get<QXmppDiscoItems> &&iq)
 {
     if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
         return CompatIq { QXmppIq::Result, QXmppDiscoItems() };
@@ -1221,7 +1212,7 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::requestCapsInfo(
 {
     const auto node = caps.node + u'#' + QString::fromLatin1(caps.ver.toBase64());
     return chain<Result<QXmppDiscoInfo>>(
-        q->client()->sendIq(CompatIq { GetIq<QXmppDiscoInfo> { generateSequentialStanzaId(), {}, jid, {}, QXmppDiscoInfo { node } } }),
+        q->client()->sendIq(CompatIq { Iq::Get<QXmppDiscoInfo> { generateSequentialStanzaId(), {}, jid, {}, QXmppDiscoInfo { node } } }),
         q,
         [this, jid, caps](QXmppClient::IqResult &&response) -> Result<QXmppDiscoInfo> {
             const auto key = capsKey(caps);

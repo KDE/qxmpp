@@ -13,7 +13,7 @@
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
-#include "Iq.h"
+#include "IqSending.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -261,7 +261,7 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
     // send IQ request, if this is the first request
     if (d->openFetchBlocklistPromises.size() == 1) {
         auto iq = CompatIq {
-            GetIq<Blocking<List>> {
+            Iq::Get<Blocking<List>> {
                 generateSequentialStanzaId(),
             },
         };
@@ -308,7 +308,7 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QList<QString> jids)
 {
     return client()->sendGenericIq(CompatIq {
-        SetIq<Blocking<Block>> {
+        Iq::Set<Blocking<Block>> {
             generateSequentialStanzaId(), {}, {}, {}, { std::move(jids) } },
     });
 }
@@ -326,7 +326,7 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QList<QStrin
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::reportAndBlock(QString jid, QXmppSpamReport report)
 {
     return client()->sendGenericIq(CompatIq {
-        SetIq<BlockReport> {
+        Iq::Set<BlockReport> {
             generateSequentialStanzaId(), {}, {}, {}, { std::move(jid), std::move(report) } },
     });
 }
@@ -347,7 +347,7 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::reportAndBlock(QSt
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QList<QString> jids)
 {
     return client()->sendGenericIq(CompatIq {
-        SetIq<Blocking<Unblock>> {
+        Iq::Set<Blocking<Unblock>> {
             generateSequentialStanzaId(), {}, {}, {}, { std::move(jids) } },
     });
 }
@@ -403,7 +403,7 @@ bool QXmppBlockingManager::handleIncomingStanza(const QDomElement &stanza, const
         return {};
     };
 
-    auto handleBlock = [this, checkIqValidity](SetIq<Blocking<Block>> &&iq) -> std::variant<QXmppIq, StanzaError> {
+    auto handleBlock = [this, checkIqValidity](Iq::Set<Blocking<Block>> &&iq) -> std::variant<QXmppIq, StanzaError> {
         if (auto err = checkIqValidity(iq.from)) {
             return std::move(*err);
         }
@@ -416,7 +416,7 @@ bool QXmppBlockingManager::handleIncomingStanza(const QDomElement &stanza, const
         Q_EMIT blocked(iq.payload.jids);
         return QXmppIq(QXmppIq::Result);
     };
-    auto handleUnblock = [this, checkIqValidity](SetIq<Blocking<Unblock>> &&iq) -> std::variant<QXmppIq, StanzaError> {
+    auto handleUnblock = [this, checkIqValidity](Iq::Set<Blocking<Unblock>> &&iq) -> std::variant<QXmppIq, StanzaError> {
         if (auto err = checkIqValidity(iq.from)) {
             return std::move(*err);
         }
@@ -431,7 +431,7 @@ bool QXmppBlockingManager::handleIncomingStanza(const QDomElement &stanza, const
     };
 
     // e2ee is not supported (not needed with local server)
-    return handleIqRequests<SetIq<Blocking<Block>>, SetIq<Blocking<Unblock>>>(stanza, client(), overloaded { handleBlock, handleUnblock });
+    return handleIqRequests<Iq::Set<Blocking<Block>>, Iq::Set<Blocking<Unblock>>>(stanza, client(), overloaded { handleBlock, handleUnblock });
 }
 
 void QXmppBlockingManager::onConnected()

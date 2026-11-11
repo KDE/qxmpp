@@ -31,7 +31,6 @@
 #include "QXmppVCardIq.h"
 #include "QXmppVCardManager.h"
 
-#include "Iq.h"
 #include "StringLiterals.h"
 #include "TestClient.h"
 #include "util.h"

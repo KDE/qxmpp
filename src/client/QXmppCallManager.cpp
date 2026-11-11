@@ -24,7 +24,7 @@
 #include "Algorithms.h"
 #include "Async.h"
 #include "GstWrapper.h"
-#include "Iq.h"
+#include "IqSending.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -67,7 +67,7 @@ QXmppTask<ServiceResult> QXmpp::Private::requestCredentials(QXmppClient *client,
     s.setHost(host);
     s.setType(type);
 
-    CompatIq iq { GetIq<ExtDiscoCredentials> {
+    CompatIq iq { Iq::Get<ExtDiscoCredentials> {
         generateSequentialStanzaId(),
         {},
         jid,

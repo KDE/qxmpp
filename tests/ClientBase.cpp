@@ -58,7 +58,7 @@
 #include "QXmppXmlRegistry.h"
 
 #include "Algorithms.h"
-#include "Iq.h"
+#include "IqSending.h"
 #include "StringLiterals.h"
 #include "TestClient.h"
 #include "util.h"

@@ -11,9 +11,11 @@
 
 #include "QXmppDataForm.h"
 #include "QXmppIq.h"
+#include "QXmppIqStanza.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppPushEnableIq.h"
 #include "QXmppRpcIq.h"
+#include "QXmppUtils_p.h"
 
 #include "util.h"
 
@@ -50,6 +52,13 @@ class tst_QXmppIq : public QObject
 private:
     Q_SLOT void testBasic_data();
     Q_SLOT void testBasic();
+
+    // QXmpp::Iq::Stanza
+    Q_SLOT void stanzaRequest();
+    Q_SLOT void stanzaRequestInvalid_data();
+    Q_SLOT void stanzaRequestInvalid();
+    Q_SLOT void stanzaResult();
+    Q_SLOT void stanzaError();
 
     // NonSaslAuthIq
     Q_SLOT void nonSaslAuthGet();
@@ -114,6 +123,140 @@ void tst_QXmppIq::testBasic()
     QCOMPARE(iq.from(), u"bar@example.com/QXmpp"_s);
     QCOMPARE(int(iq.type()), type);
     serializePacket(iq, xml);
+}
+
+// payload of the typed IQ tests
+struct TestPayload {
+    static constexpr std::tuple XmlTag = { u"query", u"urn:test" };
+
+    QString value;
+
+    static std::optional<TestPayload> fromDom(const QDomElement &el)
+    {
+        if (el.tagName() != u"query" || el.namespaceURI() != u"urn:test") {
+            return {};
+        }
+        return TestPayload { el.attribute(u"value"_s) };
+    }
+    void toXml(QXmlStreamWriter *writer) const
+    {
+        writer->writeStartElement(u"query"_s);
+        writer->writeDefaultNamespace(u"urn:test"_s);
+        writer->writeAttribute(u"value"_s, value);
+        writer->writeEndElement();
+    }
+};
+
+void tst_QXmppIq::stanzaRequest()
+{
+    using namespace QXmpp;
+
+    const auto xml = u"<iq id='q1' from='a@example.org/r' to='b@example.org' type='get' xml:lang='en'>"
+                     "<query xmlns='urn:test' value='x'/></iq>"_s;
+    auto iq = Iq::Get<TestPayload>::fromDom(xmlToDom(xml));
+    QVERIFY(iq);
+    QCOMPARE(iq->id, u"q1"_s);
+    QCOMPARE(iq->from, u"a@example.org/r"_s);
+    QCOMPARE(iq->to, u"b@example.org"_s);
+    QCOMPARE(iq->lang, u"en"_s);
+    QCOMPARE(iq->payload.value, u"x"_s);
+    QCOMPARE(xmlToFormattedByteArray(Private::serializeXml(*iq)), xmlToFormattedByteArray(xml));
+
+    // other type
+    QVERIFY(!Iq::Set<TestPayload>::fromDom(xmlToDom(xml)));
+    QVERIFY(!Iq::Result<TestPayload>::fromDom(xmlToDom(xml)));
+
+    auto set = Iq::Set<TestPayload>::fromDom(xmlToDom(u"<iq id='q2' type='set'><query xmlns='urn:test' value='y'/></iq>"_s));
+    QVERIFY(set);
+    QCOMPARE(set->payload.value, u"y"_s);
+    QVERIFY(set->from.isEmpty());
+    QVERIFY(set->to.isEmpty());
+}
+
+void tst_QXmppIq::stanzaRequestInvalid_data()
+{
+    QTest::addColumn<QString>("xml");
+
+    QTest::newRow("no-id") << u"<iq type='get'><query xmlns='urn:test'/></iq>"_s;
+    QTest::newRow("empty-id") << u"<iq id='' type='get'><query xmlns='urn:test'/></iq>"_s;
+    QTest::newRow("no-type") << u"<iq id='q1'><query xmlns='urn:test'/></iq>"_s;
+    QTest::newRow("no-payload") << u"<iq id='q1' type='get'/>"_s;
+    QTest::newRow("two-payloads") << u"<iq id='q1' type='get'><query xmlns='urn:test'/><query xmlns='urn:test'/></iq>"_s;
+    QTest::newRow("other-payload") << u"<iq id='q1' type='get'><query xmlns='urn:other'/></iq>"_s;
+    QTest::newRow("no-iq") << u"<message id='q1' type='get'><query xmlns='urn:test'/></message>"_s;
+}
+
+void tst_QXmppIq::stanzaRequestInvalid()
+{
+    QFETCH(QString, xml);
+    QVERIFY(!QXmpp::Iq::Get<TestPayload>::fromDom(xmlToDom(xml)));
+}
+
+void tst_QXmppIq::stanzaResult()
+{
+    using namespace QXmpp;
+
+    // empty
+    const auto emptyXml = u"<iq id='r1' to='a@example.org/r' type='result'/>"_s;
+    auto empty = Iq::Result<>::fromDom(xmlToDom(emptyXml));
+    QVERIFY(empty);
+    QCOMPARE(empty->id, u"r1"_s);
+    QCOMPARE(xmlToFormattedByteArray(Private::serializeXml(*empty)), xmlToFormattedByteArray(emptyXml));
+    QVERIFY(!Iq::Result<TestPayload>::fromDom(xmlToDom(emptyXml)));
+
+    // with payload
+    const auto xml = u"<iq id='r2' to='a@example.org/r' type='result'><query xmlns='urn:test' value='x'/></iq>"_s;
+    auto result = Iq::Result<TestPayload>::fromDom(xmlToDom(xml));
+    QVERIFY(result);
+    QCOMPARE(result->payload.value, u"x"_s);
+    QCOMPARE(xmlToFormattedByteArray(Private::serializeXml(*result)), xmlToFormattedByteArray(xml));
+    // the payload may be ignored
+    QVERIFY(Iq::Result<>::fromDom(xmlToDom(xml)));
+
+    // at most one child element
+    const auto twoPayloads = u"<iq id='r3' type='result'><query xmlns='urn:test'/><query xmlns='urn:test'/></iq>"_s;
+    QVERIFY(!Iq::Result<>::fromDom(xmlToDom(twoPayloads)));
+    QVERIFY(!Iq::Result<TestPayload>::fromDom(xmlToDom(twoPayloads)));
+
+    // id required
+    QVERIFY(!Iq::Result<>::fromDom(xmlToDom(u"<iq type='result'/>"_s)));
+}
+
+void tst_QXmppIq::stanzaError()
+{
+    using namespace QXmpp;
+    using StanzaError = QXmppStanza::Error;
+
+    // only the error
+    const auto xml = u"<iq id='e1' to='a@example.org/r' type='error'>"
+                     "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s;
+    auto error = Iq::Error<TestPayload>::fromDom(xmlToDom(xml));
+    QVERIFY(error);
+    QCOMPARE(error->id, u"e1"_s);
+    QVERIFY(!error->payload);
+    QCOMPARE(error->error.type(), StanzaError::Cancel);
+    QCOMPARE(error->error.condition(), StanzaError::ServiceUnavailable);
+    QCOMPARE(xmlToFormattedByteArray(Private::serializeXml(*error)), xmlToFormattedByteArray(xml));
+    QVERIFY(Iq::Error<>::fromDom(xmlToDom(xml)));
+
+    // with the payload of the request
+    const auto xmlPayload = u"<iq id='e2' to='a@example.org/r' type='error'><query xmlns='urn:test' value='x'/>"
+                            "<error type='modify'><bad-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s;
+    auto errorPayload = Iq::Error<TestPayload>::fromDom(xmlToDom(xmlPayload));
+    QVERIFY(errorPayload);
+    QVERIFY(errorPayload->payload);
+    QCOMPARE(errorPayload->payload->value, u"x"_s);
+    QCOMPARE(errorPayload->error.condition(), StanzaError::BadRequest);
+    QCOMPARE(xmlToFormattedByteArray(Private::serializeXml(*errorPayload)), xmlToFormattedByteArray(xmlPayload));
+
+    // the error is required and must be the last child element
+    QVERIFY(!Iq::Error<>::fromDom(xmlToDom(u"<iq id='e3' type='error'/>"_s)));
+    QVERIFY(!Iq::Error<>::fromDom(xmlToDom(u"<iq id='e3' type='error'><query xmlns='urn:test'/></iq>"_s)));
+    QVERIFY(!Iq::Error<>::fromDom(xmlToDom(u"<iq id='e3' type='error'><error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                                           "<query xmlns='urn:test'/></iq>"_s)));
+    // at most the payload and the error
+    QVERIFY(!Iq::Error<>::fromDom(xmlToDom(u"<iq id='e3' type='error'><query xmlns='urn:test'/><query xmlns='urn:test'/>"
+                                           "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s)));
 }
 
 void tst_QXmppIq::nonSaslAuthGet()
