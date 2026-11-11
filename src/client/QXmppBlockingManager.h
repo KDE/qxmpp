@@ -93,7 +93,7 @@ public:
     void onUnregistered(QXmppClient *) override;
 
 private:
-    bool handleIncomingStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
+    std::variant<QXmpp::Success, QXmppStanza::Error> handlePush(const QString &from, bool encrypted, const QList<QString> &jids, bool block);
     void onConnected();
 
     std::unique_ptr<QXmppBlockingManagerPrivate> d;

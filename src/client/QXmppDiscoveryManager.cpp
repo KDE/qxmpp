@@ -45,6 +45,8 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {
     hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppDiscoveryManager::handleIncomingStanza));
+    hooks().add<Iq::Received<Iq::Get<QXmppDiscoInfo>>>(d.get(), &QXmppDiscoveryManagerPrivate::handleInfoRequest);
+    hooks().add<Iq::Received<Iq::Get<QXmppDiscoItems>>>(d.get(), &QXmppDiscoveryManagerPrivate::handleItemsRequest);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_disco_info.toString();
     });
@@ -793,10 +795,6 @@ void QXmppDiscoveryManager::setEntityCapsStorage(std::shared_ptr<QXmppEntityCaps
 
 bool QXmppDiscoveryManager::handleIncomingStanza(const QDomElement &element)
 {
-    if (handleIqRequests<Iq::Get<QXmppDiscoInfo>, Iq::Get<QXmppDiscoItems>>(element, client(), d.get())) {
-        return true;
-    }
-
     if (isIqElement<QXmppDiscoveryIq>(element)) {
         QT_WARNING_PUSH
         QT_WARNING_DISABLE_DEPRECATED
@@ -899,18 +897,18 @@ QXmppDiscoIdentity QXmppDiscoveryManagerPrivate::defaultIdentity()
     };
 }
 
-std::variant<CompatIq<QXmppDiscoInfo>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(Iq::Get<QXmppDiscoInfo> &&iq)
+std::variant<QXmppDiscoInfo, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleInfoRequest(Iq::Get<QXmppDiscoInfo> &&iq)
 {
     if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
-        return CompatIq { QXmppIq::Result, q->buildClientInfo() };
+        return q->buildClientInfo();
     }
     return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
 }
 
-std::variant<CompatIq<QXmppDiscoItems>, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleIq(Iq::Get<QXmppDiscoItems> &&iq)
+std::variant<QXmppDiscoItems, QXmppStanza::Error> QXmppDiscoveryManagerPrivate::handleItemsRequest(Iq::Get<QXmppDiscoItems> &&iq)
 {
     if (iq.payload.node().isEmpty() || iq.payload.node().startsWith(clientCapabilitiesNode)) {
-        return CompatIq { QXmppIq::Result, QXmppDiscoItems() };
+        return QXmppDiscoItems();
     }
     return StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound, u"Unknown node."_s);
 }

@@ -7,10 +7,10 @@
 
 #include "QXmppDiscoveryManager.h"
 #include "QXmppEntityCapsStorage.h"
+#include "QXmppIqStanza.h"
 #include "QXmppPromise.h"
 
 #include "Async.h"
-#include "IqSending.h"
 
 #include <map>
 #include <unordered_map>
@@ -176,8 +176,8 @@ public:
     static QString defaultApplicationName();
     static QXmppDiscoIdentity defaultIdentity();
 
-    std::variant<CompatIq<QXmppDiscoInfo>, StanzaError> handleIq(QXmpp::Iq::Get<QXmppDiscoInfo> &&iq);
-    std::variant<CompatIq<QXmppDiscoItems>, StanzaError> handleIq(QXmpp::Iq::Get<QXmppDiscoItems> &&iq);
+    std::variant<QXmppDiscoInfo, StanzaError> handleInfoRequest(QXmpp::Iq::Get<QXmppDiscoInfo> &&iq);
+    std::variant<QXmppDiscoItems, StanzaError> handleItemsRequest(QXmpp::Iq::Get<QXmppDiscoItems> &&iq);
 
     QXmppDiscoInfoWatch watchInfo(QXmppDiscoInfoWatch::Data::Key &&key);
     std::shared_ptr<DiscoInfoEntry> findEntry(const QString &jid, const QString &node) const;

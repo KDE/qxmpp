@@ -44,6 +44,12 @@ constexpr auto StableConnectionDuration = std::chrono::seconds(30);
 
 QXMPP_PRIVATE_EXPORT std::chrono::milliseconds reconnectionDelay(int tries, bool resumable);
 
+namespace IqRequests {
+// Runs the handler of QXmpp::Iq::Received for an IQ request and sends the reply. Returns
+// false if there is no handler.
+QXMPP_PRIVATE_EXPORT bool process(QXmppClient *client, const Hooks &hooks, const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
+}  // namespace IqRequests
+
 // The deprecated end-to-end encryption API (QXmppClient::sendSensitive(), reply() and the
 // encryption extension) for QXmpp's own managers, which keep using it as a fallback for
 // applications without a QXmpp::Messages::SelectEncryption handler.
@@ -70,8 +76,9 @@ public:
     QXmppTask<QXmpp::SendResult> sendEncryptedIq(QXmppTask<QXmppE2eeExtension::IqEncryptResult> task);
     QXmppTask<QXmppClient::IqResult> sendSensitiveIq(QXmppIq iq, std::optional<QXmppSendStanzaParams> params);
 
-    // Runs QXmpp::Client::StanzaReceived and then the deprecated QXmppClientExtension::handleStanza()
-    // implementations. Returns whether the stanza has been handled.
+    // Answers IQ requests with a handler of QXmpp::Iq::Received. Runs
+    // QXmpp::Client::StanzaReceived and then the deprecated QXmppClientExtension::handleStanza()
+    // implementations for other stanzas. Returns whether the stanza has been handled.
     QXMPP_PRIVATE_EXPORT bool handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
 
     /*! Current presence of the client */

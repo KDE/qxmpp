@@ -213,7 +213,12 @@ struct QXmppBlockingManagerPrivate {
 QXmppBlockingManager::QXmppBlockingManager()
     : d(new QXmppBlockingManagerPrivate)
 {
-    hooks().add<Client::StanzaReceived>(Private::stanzaHandler(this, &QXmppBlockingManager::handleIncomingStanza));
+    hooks().add<Iq::Received<Iq::Set<Blocking<Block>>>>([this](Iq::Set<Blocking<Block>> &&iq, const Iq::Context &context) {
+        return handlePush(iq.from, context.isEncrypted(), iq.payload.jids, true);
+    });
+    hooks().add<Iq::Received<Iq::Set<Blocking<Unblock>>>>([this](Iq::Set<Blocking<Unblock>> &&iq, const Iq::Context &context) {
+        return handlePush(iq.from, context.isEncrypted(), iq.payload.jids, false);
+    });
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_blocking);
     });
@@ -377,61 +382,39 @@ void QXmppBlockingManager::onUnregistered(QXmppClient *oldClient)
     disconnect(oldClient, &QXmppClient::connected, this, &QXmppBlockingManager::onConnected);
 }
 
-bool QXmppBlockingManager::handleIncomingStanza(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &)
+std::variant<Success, QXmppStanza::Error> QXmppBlockingManager::handlePush(const QString &from, bool encrypted, const QList<QString> &jids, bool block)
 {
-    auto checkIqValidity = [this](QStringView from) -> std::optional<StanzaError> {
-        // check permissions
-        // only server (user's account) is allowed to do blocklist pushes
-        if (!from.isEmpty() && from != client()->configuration().jidBare()) {
-            // deny
-            return StanzaError {
-                StanzaError::Cancel,
-                StanzaError::Forbidden,
-                u"Forbidden."_s
-            };
-        }
+    // only the own server sends blocklist pushes, they are never end-to-end encrypted
+    if (encrypted) {
+        return *Iq::Reply::encryptionNotSupported().error();
+    }
+    if (!from.isEmpty() && from != client()->configuration().jidBare()) {
+        return StanzaError {
+            StanzaError::Cancel,
+            StanzaError::Forbidden,
+            u"Forbidden."_s
+        };
+    }
+    if (!d->blocklist) {
+        return StanzaError {
+            StanzaError::Wait,
+            StanzaError::UnexpectedRequest,
+            u"Client is not subscribed to blocklist."_s
+        };
+    }
 
-        if (!d->blocklist) {
-            return StanzaError {
-                StanzaError::Wait,
-                StanzaError::UnexpectedRequest,
-                u"Client is not subscribed to blocklist."_s
-            };
-        }
-
-        // allow
-        return {};
-    };
-
-    auto handleBlock = [this, checkIqValidity](Iq::Set<Blocking<Block>> &&iq) -> std::variant<QXmppIq, StanzaError> {
-        if (auto err = checkIqValidity(iq.from)) {
-            return std::move(*err);
-        }
-
-        // store new jids
-        d->blocklist->append(iq.payload.jids);
+    if (block) {
+        d->blocklist->append(jids);
         // assure blocklist has no duplicates
         makeUnique(*d->blocklist);
-
-        Q_EMIT blocked(iq.payload.jids);
-        return QXmppIq(QXmppIq::Result);
-    };
-    auto handleUnblock = [this, checkIqValidity](Iq::Set<Blocking<Unblock>> &&iq) -> std::variant<QXmppIq, StanzaError> {
-        if (auto err = checkIqValidity(iq.from)) {
-            return std::move(*err);
-        }
-
-        // remove jids
-        for (const auto &jid : std::as_const(iq.payload.jids)) {
+        Q_EMIT blocked(jids);
+    } else {
+        for (const auto &jid : jids) {
             d->blocklist->removeOne(jid);
         }
-
-        Q_EMIT unblocked(iq.payload.jids);
-        return QXmppIq(QXmppIq::Result);
-    };
-
-    // e2ee is not supported (not needed with local server)
-    return handleIqRequests<Iq::Set<Blocking<Block>>, Iq::Set<Blocking<Unblock>>>(stanza, client(), overloaded { handleBlock, handleUnblock });
+        Q_EMIT unblocked(jids);
+    }
+    return Success();
 }
 
 void QXmppBlockingManager::onConnected()

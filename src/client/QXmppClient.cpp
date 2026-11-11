@@ -314,7 +314,11 @@ void QXmppClientPrivate::onErrorOccurred(const QString &text, const QXmppOutgoin
 
 bool QXmppClientPrivate::handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
 {
-    if (q->hooks(nullptr).run<Client::StanzaReceived>(element, e2eeMetadata) == HookResult::Stop) {
+    const auto hooks = q->hooks(nullptr);
+    if (IqRequests::process(q, hooks, element, e2eeMetadata)) {
+        return true;
+    }
+    if (hooks.run<Client::StanzaReceived>(element, e2eeMetadata) == HookResult::Stop) {
         return true;
     }
 

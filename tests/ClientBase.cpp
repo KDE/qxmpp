@@ -27,6 +27,8 @@
 #include "QXmppEntityCapsStorage.h"
 #include "QXmppFallback.h"
 #include "QXmppHooks.h"
+#include "QXmppIqHandling.h"
+#include "QXmppIqStanza.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
@@ -4914,6 +4916,13 @@ private:
     Q_SLOT void hooksAdapted();
     Q_SLOT void hooksStanzaReceived();
     Q_SLOT void hooksMessageHandlerLegacy();
+    Q_SLOT void hooksIqRequest();
+    Q_SLOT void hooksIqRequestError();
+    Q_SLOT void hooksIqRequestAsync();
+    Q_SLOT void hooksIqRequestOwnerDestroyed();
+    Q_SLOT void hooksIqRequestEncrypted();
+    Q_SLOT void hooksIqRequestSequence();
+    Q_SLOT void hooksIqRequestInvalid();
 };
 
 void tst_QXmppHooks::hooksRunAll()
@@ -5562,6 +5571,200 @@ void tst_QXmppHooks::hooksMessageHandlerLegacy()
     client.injectMessage(u"<message id='other' from='alice@example.org/a' type='chat'><body>c</body></message>"_s);
     QCOMPARE(legacy->messages, (QStringList { u"legacy"_s, u"other"_s }));
     QCOMPARE(spy.size(), 1);
+}
+
+// payload of an application, only serializable with QXmlStreamWriter
+struct TestQuery {
+    static constexpr std::tuple XmlTag = { u"query", u"urn:test" };
+
+    QString value;
+
+    static std::optional<TestQuery> fromDom(const QDomElement &el)
+    {
+        if (el.hasAttribute(u"invalid"_s)) {
+            return {};
+        }
+        return TestQuery { el.attribute(u"value"_s) };
+    }
+    void toXml(QXmlStreamWriter *writer) const
+    {
+        writer->writeStartElement(u"query"_s);
+        writer->writeDefaultNamespace(u"urn:test"_s);
+        if (!value.isEmpty()) {
+            writer->writeAttribute(u"value"_s, value);
+        }
+        writer->writeEndElement();
+    }
+};
+
+void tst_QXmppHooks::hooksIqRequest()
+{
+    TestClient client;
+    QObject owner;
+
+    QStringList stanzas;
+    client.hooks(&owner).add<QXmpp::Client::StanzaReceived>([&](const QDomElement &stanza, const auto &) {
+        stanzas << stanza.attribute(u"id"_s);
+        return HookResult::Continue;
+    });
+    // the request type is deduced for generic lambdas
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([](auto &&iq) {
+        return TestQuery { iq.payload.value + u"-pong"_s };
+    });
+    client.hooks(&owner).add<Iq::Received<Iq::Set<TestQuery>>>([](auto &&, const auto &) {
+        return Success();
+    });
+    QVERIFY(client.hooks(&owner).hasHandlers<Iq::Received<Iq::Get<TestQuery>>>());
+
+    QVERIFY(client.handleStanza(u"<iq id='q1' type='get' from='alice@example.org/a'><query xmlns='urn:test' value='ping'/></iq>"_s));
+    client.expect(u"<iq id='q1' to='alice@example.org/a' type='result'><query xmlns='urn:test' value='ping-pong'/></iq>"_s);
+
+    // empty result
+    QVERIFY(client.handleStanza(u"<iq id='q2' type='set' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    client.expect(u"<iq id='q2' to='alice@example.org/a' type='result'/>"_s);
+
+    // requests with a handler are not passed to StanzaReceived
+    QVERIFY(stanzas.isEmpty());
+
+    // other payloads and responses are passed to StanzaReceived
+    QVERIFY(!client.handleStanza(u"<iq id='q3' type='get' from='alice@example.org/a'><query xmlns='urn:other'/></iq>"_s));
+    QVERIFY(!client.handleStanza(u"<iq id='q4' type='result' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    QCOMPARE(stanzas, (QStringList { u"q3"_s, u"q4"_s }));
+    client.expectNoPacket();
+
+    // removed with the owner
+    client.hooks(&owner).removeAll();
+    QVERIFY(!client.handleStanza(u"<iq id='q5' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+}
+
+void tst_QXmppHooks::hooksIqRequestError()
+{
+    TestClient client;
+    QObject owner;
+
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([](Iq::Get<TestQuery> &&iq) -> std::variant<TestQuery, QXmppStanza::Error> {
+        if (iq.payload.value == u"forbidden") {
+            return QXmppStanza::Error(QXmppStanza::Error::Auth, QXmppStanza::Error::Forbidden);
+        }
+        return TestQuery {};
+    });
+
+    QVERIFY(client.handleStanza(u"<iq id='e1' type='get' from='alice@example.org/a'><query xmlns='urn:test' value='forbidden'/></iq>"_s));
+    client.expect(u"<iq id='e1' to='alice@example.org/a' type='error'><error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+
+    // payload that cannot be parsed
+    QVERIFY(client.handleStanza(u"<iq id='e2' type='get' from='alice@example.org/a'><query xmlns='urn:test' invalid='1'/></iq>"_s));
+    client.expect(u"<iq id='e2' to='alice@example.org/a' type='error'><error type='modify'><bad-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+}
+
+void tst_QXmppHooks::hooksIqRequestAsync()
+{
+    TestClient client;
+    QObject owner;
+
+    QXmppPromise<std::variant<TestQuery, QXmppStanza::Error>> promise;
+    QString from;
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([&](Iq::Get<TestQuery> &&, const Iq::Context &context) {
+        from = context.from();
+        return promise.task();
+    });
+
+    QVERIFY(client.handleStanza(u"<iq id='a1' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    QCOMPARE(from, u"alice@example.org/a"_s);
+    client.expectNoPacket();
+
+    promise.finish(TestQuery { u"later"_s });
+    client.expect(u"<iq id='a1' to='alice@example.org/a' type='result'><query xmlns='urn:test' value='later'/></iq>"_s);
+}
+
+void tst_QXmppHooks::hooksIqRequestOwnerDestroyed()
+{
+    TestClient client;
+    auto owner = std::make_unique<QObject>();
+
+    QXmppPromise<TestQuery> promise;
+    client.hooks(owner.get()).add<Iq::Received<Iq::Get<TestQuery>>>([&](Iq::Get<TestQuery> &&) {
+        return promise.task();
+    });
+
+    QVERIFY(client.handleStanza(u"<iq id='o1' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    client.expectNoPacket();
+
+    // the request is still answered
+    owner.reset();
+    client.expect(u"<iq id='o1' to='alice@example.org/a' type='error'><error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+}
+
+void tst_QXmppHooks::hooksIqRequestEncrypted()
+{
+    TestClient client;
+    QObject owner;
+
+    QList<bool> encrypted;
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([&](Iq::Get<TestQuery> &&iq, const Iq::Context &context) -> Iq::Reply {
+        encrypted << context.isEncrypted();
+        if (context.isEncrypted() && iq.payload.value == u"plain-only") {
+            return Iq::Reply::encryptionNotSupported();
+        }
+        return Iq::Reply::result(TestQuery { u"ok"_s });
+    });
+
+    // end-to-end encrypted requests are passed to the handler by default
+    QVERIFY(client.handleStanza(xmlToDom(u"<iq id='c1' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s), QXmppE2eeMetadata()));
+    client.expect(u"<iq id='c1' to='alice@example.org/a' type='result'><query xmlns='urn:test' value='ok'/></iq>"_s);
+
+    // handlers can refuse them
+    QVERIFY(client.handleStanza(xmlToDom(u"<iq id='c2' type='get' from='alice@example.org/a'><query xmlns='urn:test' value='plain-only'/></iq>"_s), QXmppE2eeMetadata()));
+    client.expect(u"<iq id='c2' to='alice@example.org/a' type='error'><error type='cancel'><feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/><text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas' xml:lang='en'>Not supported with end-to-end encryption.</text></error></iq>"_s);
+    QCOMPARE(encrypted, (QList<bool> { true, true }));
+}
+
+void tst_QXmppHooks::hooksIqRequestSequence()
+{
+    TestClient client;
+    QObject owner;
+
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([](Iq::Get<TestQuery> &&) {
+        return TestQuery { u"default"_s };
+    });
+
+    // a second handler replaces the first one with a lower sequence number
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(u".*org.qxmpp.iq.request-received.*"_s));
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([](Iq::Get<TestQuery> &&) {
+        return TestQuery { u"early"_s };
+    },
+                                                               HookSequence::Early);
+
+    QVERIFY(client.handleStanza(u"<iq id='s1' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    client.expect(u"<iq id='s1' to='alice@example.org/a' type='result'><query xmlns='urn:test' value='early'/></iq>"_s);
+}
+
+void tst_QXmppHooks::hooksIqRequestInvalid()
+{
+    TestClient client;
+    QObject owner;
+
+    QStringList stanzas;
+    client.hooks(&owner).add<QXmpp::Client::StanzaReceived>([&](const QDomElement &stanza, const auto &) {
+        stanzas << stanza.attribute(u"id"_s);
+        return HookResult::Continue;
+    });
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([](Iq::Get<TestQuery> &&) {
+        return TestQuery {};
+    });
+
+    // requests need exactly one payload
+    QVERIFY(client.handleStanza(u"<iq id='i1' type='get' from='alice@example.org/a'/>"_s));
+    client.expect(u"<iq id='i1' to='alice@example.org/a' type='error'><error type='modify'><bad-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/><text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas' xml:lang='en'>IQ requests must contain exactly one child element.</text></error></iq>"_s);
+    QVERIFY(client.handleStanza(u"<iq id='i2' type='get' from='alice@example.org/a'><query xmlns='urn:test'/><query xmlns='urn:test'/></iq>"_s));
+    client.expect(u"<iq id='i2' to='alice@example.org/a' type='error'><error type='modify'><bad-request xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/><text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas' xml:lang='en'>IQ requests must contain exactly one child element.</text></error></iq>"_s);
+
+    // requests without an id can't be answered and are dropped
+    QVERIFY(client.handleStanza(u"<iq type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    QVERIFY(client.handleStanza(u"<iq id='' type='get' from='alice@example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    client.expectNoPacket();
+
+    QVERIFY(stanzas.isEmpty());
 }
 
 }  // namespace HookTests
