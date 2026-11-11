@@ -162,6 +162,11 @@ std::optional<UserQuery> UserQuery::fromDom(const QDomElement &el)
     ue.m_invite = parseOptionalChildElement<Invite>(el);
     ue.m_password = firstChildElement(el, u"password").text();
     ue.m_decline = parseOptionalChildElement<Decline>(el);
+    for (const auto &itemEl : iterChildElements(el, u"item", ns_muc_user)) {
+        if (auto item = Item::fromDom(itemEl)) {
+            ue.m_items.append(std::move(*item));
+        }
+    }
     return ue;
 }
 
@@ -174,6 +179,7 @@ void UserQuery::toXml(QXmlStreamWriter *writer) const
         m_invite,
         OptionalTextElement { u"password", m_password },
         m_decline,
+        m_items,
     });
 }
 

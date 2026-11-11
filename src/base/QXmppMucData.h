@@ -393,6 +393,19 @@ public:
     /*! Sets the invitation \a decline. */
     void setDecline(std::optional<Decline> decline) { m_decline = std::move(decline); }
 
+    /*!
+        Returns the items, e.g. of an affiliation change announced by the room.
+
+        \since QXmpp 1.18
+    */
+    QList<Item> items() const { return m_items; }
+    /*!
+        Sets the \a items.
+
+        \since QXmpp 1.18
+    */
+    void setItems(QList<Item> items) { m_items = std::move(items); }
+
     static constexpr std::tuple XmlTag = { u"x", QXmpp::Private::ns_muc_user };
     static std::optional<UserQuery> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
@@ -402,6 +415,7 @@ private:
     std::optional<Invite> m_invite;
     QString m_password;
     std::optional<Decline> m_decline;
+    QList<Item> m_items;
 };
 
 }  // namespace Muc
