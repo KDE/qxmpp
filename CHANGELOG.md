@@ -32,6 +32,12 @@ QXmpp 1.18.0 (UNRELEASED)
  - Fix `isIqElement<QXmppBitsOfBinaryIq>()` (@lnj, !839)
  - E2EE providers can encrypt only the body (`QXmpp::E2ee::ContentEncryption::BodyOnly`), e.g. for OMEMO 0.3 (@lnj, !839)
  - Message: Parse delays and MUC status codes also in the public part of encrypted messages (@lnj, !839)
+ - Add the typed IQ stanzas `QXmpp::Iq::Stanza` with `QXmpp::Iq::Get`, `Set`, `Result` and `Error` (@lnj, !841)
+ - Add the hook `QXmpp::Iq::Received` for incoming IQ requests, handlers are added per type and payload and can reply asynchronously; replies to encrypted requests are encrypted (@lnj, !841)
+ - Deprecate `QXmpp::handleIqRequests()`, use `QXmpp::Iq::Received` (@lnj, !841)
+ - Add overloads of `QXmppClient::sendIq()` for typed requests (`QXmpp::Iq::Get`, `Set`) returning only the payload of the response, defined by `QXmpp::Iq::ResponseTraits`; end-to-end encryption is opt-in via `QXmpp::Iq::SendOptions` (@lnj, !841)
+ - Add the hook `QXmpp::Iq::SelectEncryption` selecting the end-to-end encryption of IQs (@lnj, !841)
+ - Fix the payload of `QXmppIq` subclasses getting lost when encrypted by the encryption extension, e.g. via `sendSensitiveIq()` (@lnj, !841)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
@@ -42,6 +48,12 @@ Breaking changes:
  - `QXmppClient::injectMessage()` always returns true and may deliver the message later (@lnj, !839)
  - `QXmppClient::send()` encrypts messages if an encryption is selected by a `SelectEncryption` handler (@lnj, !839)
  - `QXmppMamManager::retrieveMessages()` no longer returns messages consumed by a `Received` hook or encrypted messages without content, e.g. OMEMO key exchanges (@lnj, !839)
+ - IQ requests with a handler of `QXmpp::Iq::Received` (e.g. disco, version, entity time, roster and blocking pushes, Jingle) are no longer passed to `StanzaReceived` and `handleStanza()` (@lnj, !841)
+ - Roster pushes from other entities than the own server are answered with `service-unavailable` (@lnj, !841)
+ - Unsupported IQ requests are answered with `service-unavailable` instead of `feature-not-implemented` as required by RFC 6120 (@lnj, !841)
+ - IQ requests without exactly one child element are answered with `bad-request`, IQ requests without an id are ignored (@lnj, !841)
+ - The encryption of IQs is selected via `QXmpp::Iq::SelectEncryption` instead of `QXmpp::Messages::SelectEncryption`, IQs requiring encryption (`QXmppSendStanzaParams::isEncryptionRequired()`) fail without encryption (@lnj, !841)
+ - Disco, version and entity time requests are also answered if end-to-end encrypted (@lnj, !841)
 
 QXmpp 1.17.2 (November 9, 2026)
 -------------------------------
