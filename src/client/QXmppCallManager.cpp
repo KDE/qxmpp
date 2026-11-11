@@ -237,7 +237,21 @@ std::optional<TurnServer> QXmppCallManagerPrivate::turnServer() const
 QXmppCallManager::QXmppCallManager()
     : d(std::make_unique<QXmppCallManagerPrivate>(this))
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppCallManager::handleIncomingStanza));
+    hooks().add<Iq::Received<Iq::Set<LegacyIqRequest<QXmppJingleIq>>>>([this](Iq::Set<LegacyIqRequest<QXmppJingleIq>> &&request, const Iq::Context &context) -> QXmppTask<Iq::Reply> {
+        if (context.isEncrypted()) {
+            return makeReadyTask(Iq::Reply::encryptionNotSupported());
+        }
+        return std::visit(overloaded {
+                              [](QXmppIq &&iq) { return makeReadyTask(legacyIqReply(iq)); },
+                              [](QXmppStanza::Error &&error) { return makeReadyTask(Iq::Reply(std::move(error))); },
+                              [this](QXmppTask<std::variant<QXmppIq>> &&task) {
+                                  return chain<Iq::Reply>(std::move(task), this, [](std::variant<QXmppIq> &&iq) {
+                                      return legacyIqReply(std::get<QXmppIq>(iq));
+                                  });
+                              },
+                          },
+                          handleIq(std::move(request.payload.iq)));
+    });
     hooks().add<Disco::CollectInfo>([this](QList<QString> &features, auto &) {
         features << staticString(ns_jingle)      // XEP-0166: Jingle
                  << staticString(ns_jingle_rtp)  // XEP-0167: Jingle RTP Sessions
@@ -295,13 +309,6 @@ void QXmppCallManager::setFallbackTurnServer(const std::optional<TurnServer> &se
         }
     }
     d->fallbackTurnServer = server;
-}
-
-bool QXmppCallManager::handleIncomingStanza(const QDomElement &element)
-{
-    return handleIqRequests<QXmppJingleIq>(element, client(), [this](auto &&iq) {
-        return handleIq(std::move(iq));
-    });
 }
 
 void QXmppCallManager::onRegistered(QXmppClient *client)

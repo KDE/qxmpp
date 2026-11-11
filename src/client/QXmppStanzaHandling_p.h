@@ -7,12 +7,41 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppIqHandling.h"
 #include "QXmppMessageContext.h"
 #include "QXmppMessages.h"
 
 #include <QDomElement>
 
 namespace QXmpp::Private {
+
+// Payload of IQ requests parsed with a class derived from QXmppIq, for handlers of
+// QXmpp::Iq::Received not yet using a payload type.
+template<typename IqClass>
+    requires HasPayloadXmlTag<IqClass>
+struct LegacyIqRequest {
+    static constexpr auto XmlTag = PayloadXmlTag<IqClass>;
+
+    IqClass iq;
+
+    static std::optional<LegacyIqRequest> fromDom(const QDomElement &payload)
+    {
+        LegacyIqRequest request;
+        request.iq.parse(payload.parentNode().toElement());
+        return request;
+    }
+    // requests are never sent
+    void toXml(QXmlStreamWriter *) const { }
+};
+
+// Converts the result of a handler of the deprecated QXmpp::handleIqRequests() without payload.
+inline Iq::Reply legacyIqReply(const QXmppIq &iq)
+{
+    if (iq.type() == QXmppIq::Error) {
+        return Iq::Reply(iq.error());
+    }
+    return Iq::Reply();
+}
 
 // Returns whether the IQ is a request (get or set). Requests are answered by the handlers of
 // QXmpp::Iq::Received.

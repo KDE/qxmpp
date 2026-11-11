@@ -102,7 +102,6 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    bool handleIncomingStanza(const QDomElement &stanza);
     void onCallDestroyed(QObject *object);
     void onDisconnected();
     using IncomingIqResult = std::variant<QXmppIq, QXmppStanza::Error, QXmppTask<std::variant<QXmppIq>>>;
