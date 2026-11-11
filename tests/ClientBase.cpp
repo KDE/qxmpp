@@ -3644,7 +3644,7 @@ void tst_QXmppRosterManager::testRenameItem()
 
     // fill roster with initial contacts to rename
     QXmppRosterIq initialItems;
-    initialItems.setType(QXmppIq::Result);
+    initialItems.setType(QXmppIq::Set);
     initialItems.addItem(createItem("stpeter@jabber.org"));
     initialItems.addItem(createItem("bob@qxmpp.org"));
 

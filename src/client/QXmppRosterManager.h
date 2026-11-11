@@ -186,7 +186,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    bool handleIncomingStanza(const QDomElement &stanza);
+    std::variant<QXmpp::Success, QXmppStanza::Error> handlePush(const QString &from, bool encrypted, const QList<QXmppRosterIq::Item> &items, const QString &version);
     using RosterResult = std::variant<QXmppRosterIq, QXmppError>;
 
     Q_SLOT void _q_connected();

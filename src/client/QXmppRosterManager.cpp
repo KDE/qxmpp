@@ -11,6 +11,7 @@
 #include "QXmppClient.h"
 #include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
+#include "QXmppIqHandling.h"
 #include "QXmppMovedManager.h"
 #include "QXmppPresence.h"
 #include "QXmppRosterIq.h"
@@ -29,6 +30,30 @@
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
+
+namespace {
+
+// RFC 6121, 2.1.6: Roster Push
+struct RosterPush {
+    static constexpr std::tuple XmlTag = { u"query", ns_roster };
+
+    std::optional<QString> version;
+    QList<QXmppRosterIq::Item> items;
+
+    static std::optional<RosterPush> fromDom(const QDomElement &el)
+    {
+        return RosterPush {
+            el.hasAttribute(u"ver"_s) ? std::optional(el.attribute(u"ver"_s)) : std::nullopt,
+            parseChildElements<QList<QXmppRosterIq::Item>>(el),
+        };
+    }
+    void toXml(XmlWriter &w) const
+    {
+        w.write(Element { XmlTag, OptionalAttribute { u"ver", version }, items });
+    }
+};
+
+}  // namespace
 
 namespace QXmpp::Private {
 
@@ -229,7 +254,9 @@ void QXmppRosterManagerPrivate::clear()
 QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
     : d(std::make_unique<QXmppRosterManagerPrivate>())
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppRosterManager::handleIncomingStanza));
+    hooks().add<Iq::Received<Iq::Set<RosterPush>>>([this](Iq::Set<RosterPush> &&iq, const Iq::Context &context) {
+        return handlePush(iq.from, context.isEncrypted(), iq.payload.items, iq.payload.version.value_or(QString()));
+    });
     QXmppExportData::registerExtension<RosterData, RosterData::fromDom, serializeRosterData>(u"roster", ns_qxmpp_export);
     QXmppExportData::registerExtension<RosterData, RosterData::fromDomPie, serializeRosterDataPie>(QXmppExportData::Format::Xep0227, u"query", ns_roster);
 
@@ -377,58 +404,37 @@ void QXmppRosterManager::_q_disconnected()
     d->presences.clear();
 }
 
-bool QXmppRosterManager::handleIncomingStanza(const QDomElement &element)
+std::variant<Success, QXmppStanza::Error> QXmppRosterManager::handlePush(const QString &from, bool encrypted, const QList<QXmppRosterIq::Item> &items, const QString &newVersion)
 {
-    if (!isIqElement<QXmppRosterIq>(element)) {
-        return false;
+    using Error = QXmppStanza::Error;
+
+    // Security check: only the server sends roster pushes, 'from' is either empty or the bare
+    // JID of the user (RFC 6121, 2.1.6)
+    if (encrypted || (!from.isEmpty() && QXmppUtils::jidToBareJid(from) != client()->configuration().jidBare())) {
+        return Error(Error::Cancel, Error::ServiceUnavailable);
     }
 
-    // Security check: only server should send this iq
-    // from() should be either empty or bareJid of the user
-    const auto fromJid = element.attribute(u"from"_s);
-    if (!fromJid.isEmpty() && QXmppUtils::jidToBareJid(fromJid) != client()->configuration().jidBare()) {
-        return false;
-    }
-
-    QXmppRosterIq rosterIq;
-    rosterIq.parse(element);
-
-    switch (rosterIq.type()) {
-    case QXmppIq::Set: {
-        // send result iq
-        QXmppIq returnIq(QXmppIq::Result);
-        returnIq.setId(rosterIq.id());
-        client()->send(std::move(returnIq));
-
-        // store updated entries and notify changes
-        const auto items = rosterIq.items();
-        const auto newVersion = rosterIq.versionOpt().value_or(QString());
-        for (const auto &item : items) {
-            const QString bareJid = item.bareJid();
-            if (item.subscriptionType() == QXmppRosterIq::Item::Remove) {
-                if (d->entries.remove(bareJid)) {
-                    d->storage()->removeItem(newVersion, bareJid).then(this, []() { });
-                    Q_EMIT itemRemoved(bareJid);
-                }
+    // store updated entries and notify changes
+    for (const auto &item : items) {
+        const QString bareJid = item.bareJid();
+        if (item.subscriptionType() == QXmppRosterIq::Item::Remove) {
+            if (d->entries.remove(bareJid)) {
+                d->storage()->removeItem(newVersion, bareJid).then(this, []() { });
+                Q_EMIT itemRemoved(bareJid);
+            }
+        } else {
+            const bool added = !d->entries.contains(bareJid);
+            d->entries.insert(bareJid, item);
+            d->storage()->upsertItem(newVersion, item).then(this, []() { });
+            if (added) {
+                Q_EMIT itemAdded(bareJid);
             } else {
-                const bool added = !d->entries.contains(bareJid);
-                d->entries.insert(bareJid, item);
-                d->storage()->upsertItem(newVersion, item).then(this, []() { });
-                if (added) {
-                    Q_EMIT itemAdded(bareJid);
-                } else {
-                    Q_EMIT itemChanged(bareJid);
-                }
+                Q_EMIT itemChanged(bareJid);
             }
         }
-        d->cachedVersion = newVersion;
-        break;
     }
-    default:
-        break;
-    }
-
-    return true;
+    d->cachedVersion = newVersion;
+    return Success();
 }
 
 void QXmppRosterManager::_q_presenceReceived(const QXmppPresence &presence)
