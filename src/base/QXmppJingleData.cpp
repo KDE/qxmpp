@@ -354,7 +354,7 @@ void QXmppJingleIq::Content::setSenders(const QString &senders)
 
 /*!
     Returns the description as specified by
-    \xep{0167}{Jingle RTP Sessions} and RFC 3550.
+    \xep{0167}{Jingle RTP Sessions} and \rfc{3550}.
 
     \since QXmpp 0.9
 */
@@ -388,7 +388,7 @@ void QXmppJingleIq::Content::setDescriptionMedia(const QString &media)
 
 /*!
     Returns the description's 32-bit synchronization source for the media stream as specified by
-    \xep{0167}{Jingle RTP Sessions} and RFC 3550.
+    \xep{0167}{Jingle RTP Sessions} and \rfc{3550}.
 
     \since QXmpp 0.9
     \deprecated This method is deprecated since QXmpp 1.6. Use
@@ -437,7 +437,7 @@ void QXmppJingleIq::Content::setPayloadTypes(const QList<QXmppJinglePayloadType>
 
 /*!
     Returns whether multiplexing of RTP data and control packets on a single port is supported as
-    specified by \xep{0167}{Jingle RTP Sessions} and  RFC 5761.
+    specified by \xep{0167}{Jingle RTP Sessions} and \rfc{5761}.
 
     \since QXmpp 1.5
 */
@@ -449,7 +449,7 @@ bool QXmppJingleIq::Content::isRtpMultiplexingSupported() const
 /*!
     Sets via \a isRtpMultiplexingSupported whether multiplexing of RTP data and
     control packets on a single port is supported as specified by \xepn{0167}
-    (Jingle RTP Sessions) and RFC 5761.
+    (Jingle RTP Sessions) and \rfc{5761}.
 
     \since QXmpp 1.5
 */
@@ -1986,7 +1986,7 @@ public:
     \inmodule QXmpp
 
     \brief The QXmppSdpParameter class represents a Session Description Protocol (SDP) parameter
-    specified by RFC 4566 and used by several XEPs based on \xep{0166}{Jingle}.
+    specified by \rfc{4566} and used by several XEPs based on \xep{0166}{Jingle}.
 
     \since QXmpp 1.5
 */

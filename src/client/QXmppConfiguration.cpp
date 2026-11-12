@@ -712,7 +712,7 @@ void QXmppConfiguration::setSasl2UserAgent(const std::optional<QXmppSasl2UserAge
     (e.g. "en", "de-DE").
 
     The returned value is used as the \c xml:lang attribute on the XMPP stream element, as
-    specified in RFC 6120 Section 4.7.4.
+    specified in \rfcsection{6120}{4.7.4}.
 
     \since QXmpp 1.15
 */

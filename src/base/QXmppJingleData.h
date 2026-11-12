@@ -187,7 +187,7 @@ private:
     \inmodule QXmpp
 
     \brief The QXmppJinglePayloadType class represents a payload type
-    as specified by \xep{0167}{Jingle RTP Sessions} and RFC 5245.
+    as specified by \xep{0167}{Jingle RTP Sessions} and \rfc{5245}.
 */
 class QXMPP_EXPORT QXmppJinglePayloadType
 {

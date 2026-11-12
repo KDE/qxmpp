@@ -373,7 +373,7 @@ void QXmppMessage::setThread(const QString &thread)
 /*!
     Returns the optional parent thread of this message.
 
-    The possibility to create child threads was added in RFC6121.
+    The possibility to create child threads was added in \rfc{6121}.
 
     \since QXmpp 1.3
 */
@@ -385,7 +385,7 @@ QString QXmppMessage::parentThread() const
 /*!
     Sets the optional parent thread of this message.
 
-    The possibility to create child threads was added in RFC6121.
+    The possibility to create child threads was added in \rfc{6121}.
 
     \since QXmpp 1.3
 

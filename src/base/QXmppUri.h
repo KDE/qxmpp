@@ -136,7 +136,7 @@ struct CustomQuery {
     \inmodule QXmpp
     \brief Represents an XMPP URI as defined in \xep{0147}{XMPP URI Scheme Query Components}.
 
-    This class represents an XMPP URI as specified by RFC 5122 -  Internationalized Resource
+    This class represents an XMPP URI as specified by \rfc{5122} -  Internationalized Resource
     Identifiers (IRIs) and Uniform Resource Identifiers (URIs) for the Extensible Messaging and
     Presence Protocol (XMPP) and XEP-0147: XMPP URI Scheme Query Components.
 

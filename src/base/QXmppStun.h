@@ -173,7 +173,7 @@ private:
     \inmodule QXmpp
 
     \brief The QXmppIceComponent class represents a piece of a media stream
-    requiring a single transport address, as defined by RFC 5245
+    requiring a single transport address, as defined by \rfc{5245}
     (Interactive Connectivity Establishment).
 */
 class QXMPP_EXPORT QXmppIceComponent : public QXmppLoggable
@@ -228,7 +228,7 @@ private:
     \inmodule QXmpp
 
     \brief The QXmppIceConnection class represents a set of UDP sockets
-    capable of performing Interactive Connectivity Establishment (RFC 5245).
+    capable of performing Interactive Connectivity Establishment (\rfc{5245}).
 
     A typical example is:
 

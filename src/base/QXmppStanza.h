@@ -163,7 +163,7 @@ public:
             \value SubscriptionRequired The requester needs to subscribe first.
             \value UndefinedCondition An undefined condition was hit.
             \value UnexpectedRequest The request was unexpected.
-            \value PaymentRequired Payment is required to perform the request. \deprecated Removed in RFC 6120.
+            \value PaymentRequired Payment is required to perform the request. \deprecated Removed in \rfc{6120}.
             \value PolicyViolation The entity has violated a local server policy. \since QXmpp 1.3.
         */
         enum Condition {

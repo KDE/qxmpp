@@ -89,7 +89,7 @@ QString QXmppRosterIq::version() const
     Returns the roster version of the IQ.
 
     \c std::nullopt means no \c ver attribute was set. An empty string means \c ver="", which
-    is how clients advertise RFC 6121 §2.6 roster versioning support to the server.
+    is how clients advertise \rfcsection{6121}{2.6} roster versioning support to the server.
 
     \since QXmpp 1.16
 */

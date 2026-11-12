@@ -297,7 +297,7 @@ QXmppTask<void> QXmppRosterManager::clearCache()
     create a pre-approved subscription.
 
     \note Pre-approving subscription requests is only allowed, if the server
-    supports RFC6121 and advertises the 'urn:xmpp:features:pre-approval' stream
+    supports \rfc{6121} and advertises the 'urn:xmpp:features:pre-approval' stream
     feature.
 
     \sa QXmppStreamFeatures::preApprovedSubscriptionsSupported()

@@ -19,7 +19,7 @@ class QXmppTask;
     \class QXmppRosterStorage
     \inmodule QXmpp
     \brief Storage backend used by QXmppRosterManager to cache the roster between
-    sessions (RFC 6121 §2.6 Roster Versioning).
+    sessions (\rfcsection{6121}{2.6}, Roster Versioning).
 
     Implementations are responsible for persisting the version string returned by
     the server together with the current set of roster items. QXmppRosterManager

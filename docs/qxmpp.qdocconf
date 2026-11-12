@@ -86,6 +86,13 @@ macro.xep.DocBook       = "<link xlink:href=\"https://xmpp.org/extensions/xep-\1
 macro.xepn.HTML         = "<a href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1</a>"
 macro.xepn.DocBook      = "<link xlink:href=\"https://xmpp.org/extensions/xep-\1.html\">XEP-\1</link>"
 
+# Custom commands for RFC cross-links. \rfc{NNNN} is rendered as "RFC NNNN",
+# \rfcsection{NNNN}{X.Y} as "RFC NNNN, section X.Y" linking to the section.
+macro.rfc.HTML           = "<a href=\"https://www.rfc-editor.org/rfc/rfc\1\">RFC \1</a>"
+macro.rfc.DocBook        = "<link xlink:href=\"https://www.rfc-editor.org/rfc/rfc\1\">RFC \1</link>"
+macro.rfcsection.HTML    = "<a href=\"https://www.rfc-editor.org/rfc/rfc\1#section-\2\">RFC \1, section \2</a>"
+macro.rfcsection.DocBook = "<link xlink:href=\"https://www.rfc-editor.org/rfc/rfc\1#section-\2\">RFC \1, section \2</link>"
+
 navigation.homepage     = QXmpp
 navigation.landingpage  = QXmpp
 

@@ -229,7 +229,7 @@ void QXmppStreamFeatures::setPreApprovedSubscriptionsSupported(bool supported)
 }
 
 /*!
-    Returns whether roster versioning from RFC6121 is supported.
+    Returns whether roster versioning from \rfc{6121} is supported.
 
     \since QXmpp 1.3
 */
@@ -239,7 +239,7 @@ bool QXmppStreamFeatures::rosterVersioningSupported() const
 }
 
 /*!
-    Sets whether roster versioning from RFC6121 is supported.
+    Sets whether roster versioning from \rfc{6121} is supported.
 
     \since QXmpp 1.3
 

@@ -30,8 +30,8 @@ struct TurnServer;
     Session initiation is performed as described by \xep{0166}{Jingle}, \xep{0167}{Jingle RTP
     Sessions} and \xep{0176}{Jingle ICE-UDP Transport Method}.
 
-    The data stream is connected using Interactive Connectivity Establishment (RFC 5245) and data
-    is transferred using Real Time Protocol (RFC 3550) packets.
+    The data stream is connected using Interactive Connectivity Establishment (\rfc{5245}) and data
+    is transferred using Real Time Protocol (\rfc{3550}) packets.
 
     To make use of this manager, you need to instantiate it and load it into the QXmppClient
     instance as follows:
