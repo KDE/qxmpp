@@ -6019,6 +6019,7 @@ private:
     Q_SLOT void messagesResolveSenderAsync();
     Q_SLOT void messagesDecrypt();
     Q_SLOT void messagesDecryptSenderMismatch();
+    Q_SLOT void messagesDecryptWithoutFrom();
     Q_SLOT void messagesNoEnvelope();
     Q_SLOT void messagesDecryptRecipientMismatch();
     Q_SLOT void messagesDecryptWithoutContent();
@@ -6220,6 +6221,25 @@ void tst_QXmppMessages::messagesDecryptSenderMismatch()
     const auto message = spy.at(0).at(0).value<QXmppMessage>();
     QVERIFY(message.body().isEmpty());
     QCOMPARE(message.e2eeFallbackBody(), u"fallback"_s);
+}
+
+// A message without 'from' is sent by the own account.
+void tst_QXmppMessages::messagesDecryptWithoutFrom()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QSignalSpy spy(&client, &QXmppClient::messageReceived);
+
+    client.injectMessage(u"<message to='me@example.org/res' type='chat' id='1'>"
+                         "<encrypted xmlns='urn:test:e2ee' data='x'/>"
+                         "</message>"_s);
+    QCOMPARE(e2ee->requests.size(), 1);
+    QCOMPARE(e2ee->requests.at(0).senderJid(), u"me@example.org"_s);
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"me@example.org"_s, u"me@example.org"_s));
+
+    QCOMPARE(spy.size(), 1);
+    QCOMPARE(spy.at(0).at(0).value<QXmppMessage>().body(), u"secret"_s);
 }
 
 void tst_QXmppMessages::messagesNoEnvelope()

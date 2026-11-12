@@ -120,7 +120,12 @@ IncomingMessages::ParsedMessage IncomingMessages::parse(const QDomElement &eleme
 void IncomingMessages::processElement(const QDomElement &element, QXmppE2eeExtension *legacyEncryption)
 {
     auto parsed = parse(element, legacyEncryption);
-    process(Context(std::move(parsed.message), Origin::Stream), parsed.encryption, {});
+    Context context(std::move(parsed.message), Origin::Stream);
+    // Stanzas without 'from' are sent by the server on behalf of the account (RFC 6120 §8.1.2.1).
+    if (context.senderJid().isEmpty()) {
+        context.setSenderJid(m_client->configuration().jidBare());
+    }
+    process(std::move(context), parsed.encryption, {});
 }
 
 // Processes a message unwrapped or injected by an extension.
