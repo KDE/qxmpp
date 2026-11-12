@@ -27,6 +27,8 @@
 #include "QXmppOmemoMemoryStorage.h"
 #include "QXmppOmemoStorage.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppRosterManager.h"
+#include "QXmppRosterStorage.h"
 #include "QXmppUtils.h"
 
 #include "Async.h"
@@ -2012,6 +2014,10 @@ void tst_OmemoStorage::resetAll()
     storage.addSignedPreKey({ 1, "key", start });
     storage.addPreKeys({ { Version::Omemo0, 1, "key" } });
     storage.addDevice({ Version::Omemo0, u"alice@example.org"_s, 1 });
+    const Storage::Subscription subscription { Version::Omemo0, u"alice@example.org"_s, u"bob@example.org/phone"_s };
+    storage.addSubscription(subscription);
+    storage.addSubscription(subscription);
+    QCOMPARE(storage.allData().result().subscriptions, QList { subscription });
 
     storage.resetAll();
     const auto data = storage.allData().result();
@@ -2019,6 +2025,7 @@ void tst_OmemoStorage::resetAll()
     QVERIFY(data.signedPreKeys.isEmpty());
     QVERIFY(data.preKeys.isEmpty());
     QVERIFY(data.devices.isEmpty());
+    QVERIFY(data.subscriptions.isEmpty());
 }
 
 void tst_OmemoStorage::migrateFields()
@@ -2540,6 +2547,7 @@ struct Account {
         service.addClient(client);
         client.addNewExtension<QXmppDiscoveryManager>();
         client.addNewExtension<QXmppPubSubManager>();
+        roster = client.addNewExtension<QXmppRosterManager>(&client);
         trust = client.addNewExtension<QXmppAtmManager>(&trustStorage);
         manager = client.addNewExtension<Manager>(this->storage);
 
@@ -2615,6 +2623,7 @@ struct Account {
     TestClient client;
     QObject owner;
     QXmppAtmTrustMemoryStorage trustStorage;
+    QXmppRosterManager *roster;
     QXmppAtmManager *trust;
     std::shared_ptr<Storage> storage;
     FakePubSubService ownService;
@@ -2651,7 +2660,13 @@ private:
     Q_SLOT void ownDeviceListIsRepublishedAfterDeletion();
     Q_SLOT void contactDeviceLists();
     Q_SLOT void removedDevicesExpire();
-    Q_SLOT void supportedVersions();
+    Q_SLOT void devicesWithoutNetwork();
+    Q_SLOT void devicesChanged();
+    Q_SLOT void watchState();
+    Q_SLOT void watchSupportedVersions();
+    Q_SLOT void watchSubscriptions();
+    Q_SLOT void watchRosterContact_data();
+    Q_SLOT void watchRosterContact();
     Q_SLOT void republishOnLogin();
     Q_SLOT void messages_data();
     Q_SLOT void messages();
@@ -2665,8 +2680,8 @@ private:
     Q_SLOT void heartbeat();
     Q_SLOT void keyExchangeWithAnotherKey_data();
     Q_SLOT void keyExchangeWithAnotherKey();
-    Q_SLOT void devices_data();
-    Q_SLOT void devices();
+    Q_SLOT void watchDevices_data();
+    Q_SLOT void watchDevices();
     Q_SLOT void deviceLabel();
     Q_SLOT void enabledVersionsAtRuntime();
     Q_SLOT void defaultSecurityPolicy();
@@ -2754,8 +2769,8 @@ void tst_OmemoManager2::setUpKeepsOtherOwnDevices()
     QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 1111 }));
     QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 2222 }));
     QVERIFY(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s).contains(u"label=\"Laptop\""_s));
-    QCOMPARE(account.manager->deviceIds(Version::Omemo0, OWN_JID), QList<uint32_t> { 1111 });
-    QCOMPARE(account.manager->deviceIds(Version::Omemo2, OWN_JID), QList<uint32_t> { 2222 });
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, OWN_JID), QList<uint32_t> { 1111 });
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo2, OWN_JID), QList<uint32_t> { 2222 });
 }
 
 void tst_OmemoManager2::setUpReconfiguresNodes()
@@ -2789,7 +2804,7 @@ void tst_OmemoManager2::load()
     QVERIFY(account.isReady());
     QCOMPARE(account.manager->ownDeviceId().value(), id);
     QCOMPARE(account.manager->ownKey().value(), key);
-    QCOMPARE(account.manager->deviceIds(Version::Omemo2, OWN_JID), QList<uint32_t> { 2222 });
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo2, OWN_JID), QList<uint32_t> { 2222 });
 }
 
 void tst_OmemoManager2::ownDeviceIsRelisted()
@@ -2804,7 +2819,7 @@ void tst_OmemoManager2::ownDeviceIsRelisted()
     account.service.process();
 
     QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 1111 }));
-    QCOMPARE(account.manager->deviceIds(Version::Omemo0, OWN_JID), QList<uint32_t> { 1111 });
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, OWN_JID), QList<uint32_t> { 1111 });
 
     // the republished list does not lead to another publication
     account.service.resetRequestCounts();
@@ -2828,23 +2843,14 @@ void tst_OmemoManager2::contactDeviceLists()
 {
     Account account;
     expectVariant<Success>(account.setUp());
-    QSignalSpy spy(account.manager, &Manager::devicesChanged);
 
     account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 1, 2 })));
     account.client.inject(itemsEvent(CONTACT_JID, V2_DEVICE_LIST, v2List({ { 3, u"Phone"_s } })));
-    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), (QList<uint32_t> { 1, 2 }));
-    QCOMPARE(account.manager->deviceIds(Version::Omemo2, CONTACT_JID), QList<uint32_t> { 3 });
-    QCOMPARE(spy.size(), 2);
-    QCOMPARE(spy.at(0).at(0).value<Version>(), Version::Omemo0);
-    QCOMPARE(spy.at(0).at(1).toString(), CONTACT_JID);
-
-    // the same list again changes nothing
-    account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 1, 2 })));
-    QCOMPARE(spy.size(), 2);
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, CONTACT_JID), (QList<uint32_t> { 1, 2 }));
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo2, CONTACT_JID), QList<uint32_t> { 3 });
 
     account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 2 })));
-    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
-    QCOMPARE(spy.size(), 3);
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
 
     // stored
     const auto devices = account.storage->allData().result().devices;
@@ -2881,28 +2887,220 @@ void tst_OmemoManager2::removedDevicesExpire()
     account.manager->d->load();
     const auto devices = storage->allData().result().devices;
     QCOMPARE(std::ranges::count(devices, CONTACT_JID, &Storage::Device::jid), 1);
-    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
+    QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
 }
 
-void tst_OmemoManager2::supportedVersions()
+void tst_OmemoManager2::devicesWithoutNetwork()
 {
+    const auto otherJid = u"mercutio@verona.lit"_s;
+    auto storage = std::make_shared<MemoryStorage>();
+    storage->addDevice({ .version = Version::Omemo0, .jid = CONTACT_JID, .id = 1, .keyId = "key 1" });
+    storage->addDevice({ .version = Version::Omemo2, .jid = CONTACT_JID, .id = 2, .label = u"Phone"_s });
+    // removed from the device list
+    storage->addDevice({ .version = Version::Omemo2, .jid = CONTACT_JID, .id = 3, .removalFromDeviceListDate = QDateTime::currentDateTimeUtc() });
+    storage->addDevice({ .version = Version::Omemo2, .jid = otherJid, .id = 4 });
+
+    Account account(storage);
+    account.trust->setTrustLevel(versionNamespace(Version::Omemo0), { { CONTACT_JID, "key 1" } }, TrustLevel::Authenticated);
+
+    const QList<Device> contactDevices {
+        { Version::Omemo0, CONTACT_JID, 1, {}, "key 1", TrustLevel::Authenticated },
+        { Version::Omemo2, CONTACT_JID, 2, u"Phone"_s, {}, TrustLevel::Undecided },
+    };
+    QCOMPARE(awaitTask(account.manager->devices({ CONTACT_JID + u"/balcony"_s })), contactDevices);
+    QCOMPARE(awaitTask(account.manager->devices()), (QList<Device> { { Version::Omemo2, otherJid, 4 } } + contactDevices));
+
+    // A watch has the known devices without being logged in, too.
+    auto watch = account.manager->watchDevices(CONTACT_JID);
+    QTRY_COMPARE(watch.state().value(), DeviceWatch::State::Stale);
+    QCOMPARE(watch.devices().value(), contactDevices);
+    QVERIFY(!account.client.hasPacket());
+}
+
+void tst_OmemoManager2::devicesChanged()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+
+    QSignalSpy spy(alice.manager, &Manager::devicesChanged);
+    const auto changedJids = [&] {
+        QList<QString> jids;
+        for (const auto &arguments : std::as_const(spy)) {
+            jids.append(arguments.at(0).toString());
+        }
+        spy.clear();
+        return jids;
+    };
+
+    // changed device list
+    alice.client.inject(itemsEvent(CONTACT_JID, V2_DEVICE_LIST, v2List({ { 2, {} } })));
+    server.process();
+    QCOMPARE(changedJids(), QList { CONTACT_JID });
+    alice.client.inject(itemsEvent(CONTACT_JID, V2_DEVICE_LIST, v2List({ { 2, {} } })));
+    server.process();
+    QVERIFY(changedJids().isEmpty());
+
+    // trust level of a key
+    alice.trust->setTrustLevel(versionNamespace(Version::Omemo2), { { CONTACT_JID, "key" } }, TrustLevel::Authenticated);
+    QCOMPARE(changedJids(), QList { CONTACT_JID });
+
+    // The keys of Bob's devices become known when the sessions are built.
+    QVERIFY(std::ranges::all_of(awaitTask(alice.manager->devices({ bob.jid() })), [](const Device &device) { return device.keyId.isEmpty(); }));
+    auto watch = alice.manager->watchDevices(bob.jid());
+    server.process();
+    QVERIFY(changedJids().contains(bob.jid()));
+    const auto devices = awaitTask(alice.manager->devices({ bob.jid() }));
+    QCOMPARE(devices.size(), 2);
+    QVERIFY(std::ranges::none_of(devices, [](const Device &device) { return device.keyId.isEmpty(); }));
+
+    alice.manager->removeContactDevices(CONTACT_JID);
+    QCOMPARE(changedJids(), QList { CONTACT_JID });
+    QVERIFY(awaitTask(alice.manager->devices({ CONTACT_JID })).isEmpty());
+}
+
+void tst_OmemoManager2::watchState()
+{
+    const auto otherJid = u"mercutio@verona.lit"_s;
     Account account;
+    account.service.setItem(CONTACT_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2, {} } }));
+    account.service.setItem(otherJid, V2_DEVICE_LIST, u"current"_s, v2List({ { 3, {} } }));
+    expectVariant<Success>(account.setUp());
+
+    auto watch = account.manager->watchDevices(CONTACT_JID);
+    account.service.process();
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
+
+    // Notifications may be missed while being disconnected.
+    account.client.simulateDisconnected();
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Stale);
+
+    // changed without notification, so only visible when requested again
+    account.service.setItem(CONTACT_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2, {} }, { 5, {} } }));
+
+    // A watch created meanwhile is requested after resuming the stream, the others are up to date.
+    auto other = account.manager->watchDevices(otherJid);
+    QTRY_COMPARE(other.state().value(), DeviceWatch::State::Stale);
+    QVERIFY(other.devices().value().isEmpty());
+    account.client.setStreamManagementState(QXmppClient::ResumedStream);
+    account.client.simulateConnected();
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
+    account.service.process();
+    QCOMPARE(other.state().value(), DeviceWatch::State::Loaded);
+    QCOMPARE(other.devices().value().size(), 1);
+    QCOMPARE(watch.devices().value().size(), 1);
+
+    // all requested again on a new stream
+    account.client.simulateDisconnected();
+    expectVariant<Success>(account.setUp());
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
+    QCOMPARE(other.state().value(), DeviceWatch::State::Loaded);
+    QCOMPARE(watch.devices().value().size(), 2);
+}
+
+void tst_OmemoManager2::watchSupportedVersions()
+{
+    // Versions that are not enabled are reported, too.
+    Account account;
+    account.manager->setEnabledVersions({ Version::Omemo2 });
     expectVariant<Success>(account.setUp());
     account.service.setItem(CONTACT_JID, V0_DEVICE_LIST, u"current"_s, v0List({ 1 }));
 
-    auto task = account.manager->supportedVersions(CONTACT_JID);
+    auto watch = account.manager->watchDevices(CONTACT_JID + u"/garden"_s);
+    QCOMPARE(watch.jid(), CONTACT_JID);
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loading);
     account.service.process();
-    QCOMPARE(expectFutureVariant<QList<Version>>(task), QList { Version::Omemo0 });
-    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 1 });
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
+    QCOMPARE(watch.supportedVersions().value(), QList { Version::Omemo0 });
 
+    account.client.inject(itemsEvent(CONTACT_JID, V2_DEVICE_LIST, v2List({ { 2, {} } })));
+    account.service.process();
+    QCOMPARE(watch.supportedVersions().value(), (QList { Version::Omemo0, Version::Omemo2 }));
+    QCOMPARE(watch.devices().value().size(), 2);
+
+    // all watches on a JID share their state
+    QCOMPARE(account.manager->watchDevices(CONTACT_JID).supportedVersions().value(), (QList { Version::Omemo0, Version::Omemo2 }));
+
+    auto unknown = account.manager->watchDevices(u"mercutio@verona.lit"_s);
+    account.service.process();
+    QCOMPARE(unknown.state().value(), DeviceWatch::State::Loaded);
+    QVERIFY(unknown.supportedVersions().value().isEmpty());
+}
+
+void tst_OmemoManager2::watchSubscriptions()
+{
+    const QString fullJid = OWN_JID + u"/balcony"_s;
+    auto storage = std::make_shared<MemoryStorage>();
+    FakePubSubService server;
+    {
+        Account account(storage, &server);
+        expectVariant<Success>(account.setUp());
+
+        // Without presence subscription, the device lists are subscribed to explicitly.
+        {
+            auto watch = account.manager->watchDevices(CONTACT_JID);
+            server.process();
+            QCOMPARE(server.subscribers(CONTACT_JID, V0_DEVICE_LIST), QSet { fullJid });
+            QCOMPARE(server.subscribers(CONTACT_JID, V2_DEVICE_LIST), QSet { fullJid });
+            QCOMPARE(storage->allData().result().subscriptions.size(), 2);
+        }
+        server.process();
+        QVERIFY(server.subscribers(CONTACT_JID, V2_DEVICE_LIST).isEmpty());
+        QVERIFY(storage->allData().result().subscriptions.isEmpty());
+
+        // e.g. the application is closed without logging out
+        auto watch = account.manager->watchDevices(CONTACT_JID);
+        server.process();
+        account.client.simulateDisconnected();
+    }
+    QCOMPARE(server.subscribers(CONTACT_JID, V2_DEVICE_LIST), QSet { fullJid });
+
+    // removed on the next login with another resource
+    Account account(storage, &server, OWN_JID + u"/garden"_s);
+    expectVariant<Success>(account.setUp());
+    QVERIFY(server.subscribers(CONTACT_JID, V0_DEVICE_LIST).isEmpty());
+    QVERIFY(server.subscribers(CONTACT_JID, V2_DEVICE_LIST).isEmpty());
+    QVERIFY(storage->allData().result().subscriptions.isEmpty());
+}
+
+void tst_OmemoManager2::watchRosterContact_data()
+{
+    QTest::addColumn<QXmppRosterIq::Item::SubscriptionType>("subscriptionType");
+    QTest::addColumn<bool>("subscribed");
+
+    QTest::newRow("none") << QXmppRosterIq::Item::None << true;
+    QTest::newRow("from") << QXmppRosterIq::Item::From << true;
+    QTest::newRow("to") << QXmppRosterIq::Item::To << false;
+    QTest::newRow("both") << QXmppRosterIq::Item::Both << false;
+}
+
+void tst_OmemoManager2::watchRosterContact()
+{
+    // With a presence subscription, the device list notifications are received without
+    // subscribing to the device lists explicitly.
+    QFETCH(QXmppRosterIq::Item::SubscriptionType, subscriptionType);
+    QFETCH(bool, subscribed);
+
+    Account account;
+    QXmppRosterIq::Item item;
+    item.setBareJid(CONTACT_JID);
+    item.setSubscriptionType(subscriptionType);
+    account.roster->storage()->replaceAll({}, { item });
+    expectVariant<Success>(account.setUp());
+    QCOMPARE(account.roster->getRosterEntry(CONTACT_JID).subscriptionType(), subscriptionType);
     account.service.setItem(CONTACT_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2, {} } }));
-    task = account.manager->supportedVersions(CONTACT_JID);
-    account.service.process();
-    QCOMPARE(expectFutureVariant<QList<Version>>(task), (QList { Version::Omemo0, Version::Omemo2 }));
 
-    task = account.manager->supportedVersions(u"mercutio@verona.lit"_s);
+    auto watch = account.manager->watchDevices(CONTACT_JID);
     account.service.process();
-    QVERIFY(expectFutureVariant<QList<Version>>(task).isEmpty());
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
+    QCOMPARE(watch.devices().value().size(), 1);
+
+    const QSet<QString> subscribers = subscribed ? QSet { account.client.configuration().jid() } : QSet<QString>();
+    QCOMPARE(account.service.subscribers(CONTACT_JID, V0_DEVICE_LIST), subscribers);
+    QCOMPARE(account.service.subscribers(CONTACT_JID, V2_DEVICE_LIST), subscribers);
+    QCOMPARE(account.storage->allData().result().subscriptions.size(), subscribed ? 2 : 0);
 }
 
 void tst_OmemoManager2::republishOnLogin()
@@ -3037,13 +3235,13 @@ void tst_OmemoManager2::unlistedDevicesAreNotEncryptedFor()
     server.setItem(bob.jid(), version == Version::Omemo0 ? V0_DEVICE_LIST : V2_DEVICE_LIST, u"current"_s, version == Version::Omemo0 ? v0List({ 1 }) : v2List({ { 1, {} } }));
     server.setNotificationsEnabled(true);
     alice.client.inject(itemsEvent(bob.jid(), version == Version::Omemo0 ? V0_DEVICE_LIST : V2_DEVICE_LIST, version == Version::Omemo0 ? v0List({ 1 }) : v2List({ { 1, {} } })));
-    QVERIFY(!alice.manager->deviceIds(version, bob.jid()).contains(bob.manager->ownDeviceId().value()));
+    QVERIFY(!alice.manager->d->deviceIds(version, bob.jid()).contains(bob.manager->ownDeviceId().value()));
 
     // A message from the device is decrypted, but the device is still not encrypted for.
     const auto message = bob.sendMessage(alice.jid(), u"Hi"_s);
     QCOMPARE(alice.receive(bob, message).size(), 1);
     alice.takeMessage();
-    QVERIFY(!alice.manager->deviceIds(version, bob.jid()).contains(bob.manager->ownDeviceId().value()));
+    QVERIFY(!alice.manager->d->deviceIds(version, bob.jid()).contains(bob.manager->ownDeviceId().value()));
     QVERIFY(alice.sendMessage(bob.jid(), u"Hello"_s).isEmpty());
 }
 
@@ -3065,7 +3263,7 @@ void tst_OmemoManager2::ownDevicesReceiveCopies()
     expectVariant<Success>(bob.setUp());
     alice.encryption = version;
 
-    QCOMPARE(alice.manager->deviceIds(version, alice.jid()), QList { alicePhone.manager->ownDeviceId().value() });
+    QCOMPARE(alice.manager->d->deviceIds(version, alice.jid()), QList { alicePhone.manager->ownDeviceId().value() });
     const auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
 
     // e.g. a carbon copy
@@ -3143,12 +3341,12 @@ void tst_OmemoManager2::keyExchangeWithAnotherKey()
     QCOMPARE(received.constFirst().body(), u"Still here"_s);
 }
 
-void tst_OmemoManager2::devices_data()
+void tst_OmemoManager2::watchDevices_data()
 {
     addVersions();
 }
 
-void tst_OmemoManager2::devices()
+void tst_OmemoManager2::watchDevices()
 {
     QFETCH(Version, version);
 
@@ -3159,40 +3357,36 @@ void tst_OmemoManager2::devices()
     expectVariant<Success>(bob.setUp(u"Workshop"_s));
     alice.encryption = version;
 
-    auto devicesOf = [&](const QString &jid) {
-        auto task = alice.manager->devices({ jid });
-        server.process();
-        Q_ASSERT(task.isFinished());
-        auto devices = task.result();
-        devices.removeIf([&](const Manager::Device &device) { return device.version != version; });
+    auto watch = alice.manager->watchDevices(bob.jid());
+    auto devicesOf = [&](const DeviceWatch &watch) {
+        auto devices = watch.devices().value();
+        devices.removeIf([&](const Device &device) { return device.version != version; });
         return devices;
     };
-
-    auto supported = alice.manager->supportedVersions(bob.jid());
     server.process();
-    expectVariant<QList<Version>>(supported.result());
-    // The key is unknown before the first message.
-    const auto label = version == Version::Omemo2 ? u"Workshop"_s : QString();
-    QCOMPARE(devicesOf(bob.jid()), (QList<Manager::Device> { { version, bob.jid(), bob.manager->ownDeviceId().value(), label, {}, TrustLevel::Undecided } }));
 
-    QSignalSpy devicesSpy(alice.manager, &Manager::devicesChanged);
-    alice.sendMessage(bob.jid(), u"Hello"_s);
-    QCOMPARE(devicesSpy.size(), 1);
-    QCOMPARE(devicesSpy.constFirst().at(0).value<Version>(), version);
-    QCOMPARE(devicesSpy.constFirst().at(1).toString(), bob.jid());
-
+    // The session is built in advance, so the key is known.
+    const auto bobId = bob.deviceId();
     const auto bobKey = bob.manager->d->versions.at(version).sessions->ownIdentityKey();
-    QCOMPARE(devicesOf(bob.jid()), (QList<Manager::Device> { { version, bob.jid(), bob.manager->ownDeviceId().value(), label, bobKey, TrustLevel::AutomaticallyTrusted } }));
+    const auto label = version == Version::Omemo2 ? u"Workshop"_s : QString();
+    QCOMPARE(devicesOf(watch), (QList<Device> { { version, bob.jid(), bobId, label, bobKey, TrustLevel::AutomaticallyTrusted } }));
+    QVERIFY(alice.manager->d->versions.at(version).sessions->hasSession({ bob.jid(), bobId }));
 
-    QSignalSpy trustSpy(alice.manager, &Manager::trustLevelsChanged);
-    alice.manager->setTrustLevel(devicesOf(bob.jid()), TrustLevel::Authenticated);
-    QCOMPARE(trustSpy.size(), 1);
-    QCOMPARE(trustSpy.constFirst().at(0).value<Version>(), version);
-    QCOMPARE(trustSpy.constFirst().at(1).value<QList<Manager::Key>>(), (QList<Manager::Key> { { bob.jid(), bobKey } }));
-    QCOMPARE(devicesOf(bob.jid()).constFirst().trustLevel, TrustLevel::Authenticated);
+    // updated on trust changes
+    alice.manager->setTrustLevel(devicesOf(watch), TrustLevel::Authenticated);
+    server.process();
+    QCOMPARE(devicesOf(watch).constFirst().trustLevel, TrustLevel::Authenticated);
+
+    // The first message can be decrypted.
+    const auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    const auto received = bob.receive(alice, message);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.constFirst().body(), u"Hello"_s);
 
     // this device is not included
-    QVERIFY(devicesOf(alice.jid()).isEmpty());
+    auto own = alice.manager->watchDevices(alice.jid());
+    server.process();
+    QVERIFY(devicesOf(own).isEmpty());
 }
 
 void tst_OmemoManager2::deviceLabel()
@@ -3272,14 +3466,12 @@ void tst_OmemoManager2::removeContactDevices()
     account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 1, 2 })));
     account.client.inject(itemsEvent(CONTACT_JID, V2_DEVICE_LIST, v2List({ { 3, {} } })));
     account.trust->addKeys(E2ee::Omemo2.toString(), CONTACT_JID, { "key" }, TrustLevel::ManuallyTrusted);
-    QSignalSpy spy(account.manager, &Manager::devicesChanged);
 
     auto task = account.manager->removeContactDevices(CONTACT_JID);
     account.service.process();
     QVERIFY(task.isFinished());
-    QVERIFY(account.manager->deviceIds(Version::Omemo0, CONTACT_JID).isEmpty());
-    QVERIFY(account.manager->deviceIds(Version::Omemo2, CONTACT_JID).isEmpty());
-    QCOMPARE(spy.size(), 2);
+    QVERIFY(account.manager->d->deviceIds(Version::Omemo0, CONTACT_JID).isEmpty());
+    QVERIFY(account.manager->d->deviceIds(Version::Omemo2, CONTACT_JID).isEmpty());
     QVERIFY(account.storage->allData().result().devices.isEmpty());
     QVERIFY(account.trust->keys(E2ee::Omemo2.toString(), { CONTACT_JID }).result().isEmpty());
 }
@@ -3293,7 +3485,9 @@ void tst_OmemoManager2::resetOwnDevice()
     expectVariant<Success>(phone.setUp());
     const auto id = alice.manager->ownDeviceId().value();
     const auto phoneId = phone.manager->ownDeviceId().value();
-    QSignalSpy spy(alice.manager, &Manager::devicesChanged);
+    auto watch = alice.manager->watchDevices(alice.jid());
+    server.process();
+    QCOMPARE(watch.devices().value().size(), 2);
 
     auto task = alice.manager->resetOwnDevice();
     server.process();
@@ -3309,7 +3503,7 @@ void tst_OmemoManager2::resetOwnDevice()
     QVERIFY(server.itemPayload(alice.jid(), V2_BUNDLES, QString::number(id)).isEmpty());
     QVERIFY(!server.itemPayload(alice.jid(), V2_BUNDLES, QString::number(phoneId)).isEmpty());
     // the phone's devices are not known anymore
-    QCOMPARE(spy.size(), 2);
+    QVERIFY(watch.devices().value().isEmpty());
 
     const auto data = alice.storage->allData().result();
     QVERIFY(!data.ownDevice);

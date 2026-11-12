@@ -141,6 +141,7 @@ struct MemoryStoragePrivate {
     QMap<uint32_t, Storage::SignedPreKey> signedPreKeys;
     QMap<std::pair<Version, uint32_t>, QByteArray> preKeys;
     std::map<DeviceKey, Storage::Device> devices;
+    QList<Storage::Subscription> subscriptions;
 };
 
 MemoryStorage::MemoryStorage()
@@ -161,6 +162,7 @@ QXmppTask<Storage::Data> MemoryStorage::allData()
     for (const auto &[key, device] : d->devices) {
         data.devices.append(device);
     }
+    data.subscriptions = d->subscriptions;
     return makeReadyTask(std::move(data));
 }
 
@@ -211,6 +213,20 @@ QXmppTask<void> MemoryStorage::removeDevice(Version version, const QString &jid,
 QXmppTask<void> MemoryStorage::removeDevices(const QString &jid)
 {
     std::erase_if(d->devices, [&](const auto &entry) { return entry.first.jid == jid; });
+    return makeReadyTask();
+}
+
+QXmppTask<void> MemoryStorage::addSubscription(const Subscription &subscription)
+{
+    if (!d->subscriptions.contains(subscription)) {
+        d->subscriptions.append(subscription);
+    }
+    return makeReadyTask();
+}
+
+QXmppTask<void> MemoryStorage::removeSubscription(const Subscription &subscription)
+{
+    d->subscriptions.removeAll(subscription);
     return makeReadyTask();
 }
 

@@ -20,6 +20,7 @@
 #include <QProperty>
 
 class QXmppPubSubManager;
+class QXmppRosterManager;
 class QXmppTrustManager;
 
 namespace QXmpp::Omemo {
@@ -68,12 +69,46 @@ struct VersionStates {
     const VersionState &at(Version version) const { return states[std::size_t(version)]; }
 };
 
+struct DeviceWatch::Data {
+    QString jid;
+    std::function<void()> release;
+    QProperty<DeviceWatch::State> state { DeviceWatch::State::Loading };
+    // result of the last request in the current stream, unset if not requested yet
+    std::optional<DeviceWatch::State> result;
+    QProperty<QList<Device>> devices;
+    QProperty<QList<Version>> supportedVersions;
+
+    ~Data()
+    {
+        if (release) {
+            release();
+        }
+    }
+};
+
 class ManagerPrivate
 {
 public:
     ManagerPrivate(Manager *q, std::shared_ptr<Storage> storage, QList<Version> enabledVersions);
 
     QString ownJid() const;
+    QString ownFullJid() const;
+    QList<uint32_t> deviceIds(Version version, const QString &jid) const;
+    void devicesChanged(const QString &jid);
+    QXmppTask<QList<Device>> devices(QList<QString> jids);
+
+    // device watches
+    bool hasPresenceSubscription(const QString &jid) const;
+    QXmppTask<void> login();
+    void resume();
+    void disconnected();
+    DeviceWatch watch(const QString &jid);
+    QXmppTask<void> startWatch(QString jid);
+    QXmppTask<void> refreshWatch(QString jid);
+    QXmppTask<void> updateWatch(QString jid);
+    QXmppTask<void> buildSessions(QString jid);
+    void releaseWatch(const QString &jid);
+    void unsubscribe(const Storage::Subscription &subscription);
     bool isEnabled(Version version) const { return enabledVersions.contains(version); }
     QDateTime now() const { return fixedTime.isValid() ? fixedTime : QDateTime::currentDateTimeUtc(); }
     Private::Pep::Client pubSubClient(Version version) const { return { pubSub, version }; }
@@ -126,6 +161,7 @@ public:
     Manager *q;
     std::shared_ptr<Storage> storage;
     QXmppPubSubManager *pubSub = nullptr;
+    QXmppRosterManager *roster = nullptr;
     QXmppTrustManager *trustManager = nullptr;
     Private::SignalContext context;
     Private::KeyMaintenance::Config keyConfig;
@@ -143,6 +179,11 @@ public:
     Private::DeviceKeys device;
     // empty for the default label
     QString customLabel;
+
+    QHash<QString, std::weak_ptr<DeviceWatch::Data>> watches;
+    QList<Storage::Subscription> subscriptions;
+    QSet<QString> sessionBuildsRunning;
+    QSet<QString> sessionBuildsPending;
 
     QProperty<Manager::State> state { Manager::State::Loading };
     QProperty<uint32_t> ownDeviceId { 0 };

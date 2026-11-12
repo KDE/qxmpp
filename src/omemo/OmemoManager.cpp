@@ -6,6 +6,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppRosterManager.h"
 #include "QXmppTrustManager.h"
 #include "QXmppUtils.h"
 
@@ -129,6 +130,7 @@ QXmppTask<void> ManagerPrivate::loaded()
 QXmppTask<void> ManagerPrivate::load()
 {
     auto data = co_await storage->allData().withContext(q);
+    subscriptions = data.subscriptions;
 
     for (auto version : ALL_VERSIONS) {
         auto &state = versions.at(version);
@@ -435,7 +437,10 @@ void ManagerPrivate::storeDeviceListChanges(Version version, const QString &jid,
             update(id);
         }
     }
-    Q_EMIT q->devicesChanged(version, jid);
+    devicesChanged(jid);
+    if (!changes.added.isEmpty()) {
+        buildSessions(jid);
+    }
 }
 
 void ManagerPrivate::removeExpiredDevices()
@@ -451,11 +456,303 @@ void ManagerPrivate::removeExpiredDevices()
                 storage->removeDevice(version, jidIt.key(), id);
             }
             if (!expired.isEmpty()) {
-                Q_EMIT q->devicesChanged(version, jidIt.key());
+                devicesChanged(jidIt.key());
             }
             jidIt = jidIt->isEmpty() ? state.devices.erase(jidIt) : std::next(jidIt);
         }
     }
+}
+
+QString ManagerPrivate::ownFullJid() const
+{
+    return q->client()->configuration().jid();
+}
+
+// The IDs of the devices of the JID listed in its device list of the version, sorted. For the own
+// JID, this device is not included.
+QList<uint32_t> ManagerPrivate::deviceIds(Version version, const QString &jid) const
+{
+    QList<uint32_t> ids;
+    const auto devices = versions.at(version).devices.value(jid);
+    for (auto it = devices.cbegin(); it != devices.cend(); ++it) {
+        if (!it->removalFromDeviceListDate.isValid()) {
+            ids.append(it.key());
+        }
+    }
+    std::ranges::sort(ids);
+    return ids;
+}
+
+void ManagerPrivate::devicesChanged(const QString &jid)
+{
+    Q_EMIT q->devicesChanged(jid);
+    updateWatch(jid);
+}
+
+// The listed devices of the JIDs (all known JIDs if empty) with their trust levels, from the
+// local data.
+QXmppTask<QList<Device>> ManagerPrivate::devices(QList<QString> jids)
+{
+    co_await loaded().withContext(q);
+    if (!trustManager) {
+        co_return {};
+    }
+
+    if (jids.isEmpty()) {
+        for (auto version : ALL_VERSIONS) {
+            const auto &devices = versions.at(version).devices;
+            for (auto it = devices.keyBegin(); it != devices.keyEnd(); ++it) {
+                jids.append(*it);
+            }
+        }
+    } else {
+        for (auto &jid : jids) {
+            jid = QXmppUtils::jidToBareJid(jid);
+        }
+    }
+    std::ranges::sort(jids);
+    jids.erase(std::ranges::unique(jids).begin(), jids.end());
+
+    std::array<QHash<QString, QHash<QByteArray, TrustLevel>>, 2> trustLevels;
+    for (auto version : ALL_VERSIONS) {
+        trustLevels[std::size_t(version)] = co_await trustManager->keys(trustNamespace(version), jids).withContext(q);
+    }
+
+    QList<Device> devices;
+    for (const auto &jid : std::as_const(jids)) {
+        for (auto version : ALL_VERSIONS) {
+            const auto stored = versions.at(version).devices.value(jid);
+            const auto keys = trustLevels[std::size_t(version)].value(jid);
+            for (auto id : deviceIds(version, jid)) {
+                const auto &device = stored[id];
+                const auto trustLevel = device.keyId.isEmpty() ? TrustLevel::Undecided : keys.value(device.keyId, TrustLevel::Undecided);
+                devices.append({ version, jid, id, device.label, device.keyId, trustLevel });
+            }
+        }
+    }
+    co_return devices;
+}
+
+// Device list notifications require a presence subscription to the contact.
+bool ManagerPrivate::hasPresenceSubscription(const QString &jid) const
+{
+    if (!roster) {
+        return false;
+    }
+    const auto type = roster->getRosterEntry(jid).subscriptionType();
+    return type == QXmppRosterIq::Item::To || type == QXmppRosterIq::Item::Both;
+}
+
+QXmppTask<void> ManagerPrivate::login()
+{
+    co_await setUp().withContext(q);
+
+    // Subscriptions of earlier sessions, e.g. if the application has been closed without logging
+    // out, and of released watches.
+    const auto subscriberJid = ownFullJid();
+    const auto stored = subscriptions;
+    for (const auto &subscription : stored) {
+        if (subscription.subscriberJid != subscriberJid || watches.value(subscription.jid).expired()) {
+            unsubscribe(subscription);
+        }
+    }
+
+    const auto jids = watches.keys();
+    for (const auto &jid : jids) {
+        if (auto watch = watches.value(jid).lock()) {
+            watch->result.reset();
+        }
+    }
+    for (const auto &jid : jids) {
+        co_await refreshWatch(jid).withContext(q);
+    }
+}
+
+// The stream has been resumed, so no device list notification has been missed.
+void ManagerPrivate::resume()
+{
+    const auto jids = watches.keys();
+    for (const auto &jid : jids) {
+        if (auto watch = watches.value(jid).lock()) {
+            if (watch->result) {
+                watch->state = *watch->result;
+            } else if (watch->state != DeviceWatch::State::Loading) {
+                // not requested yet, e.g. created while being disconnected
+                refreshWatch(jid);
+            }
+        }
+    }
+}
+
+// Device list notifications may be missed until the next login.
+void ManagerPrivate::disconnected()
+{
+    for (auto it = watches.cbegin(); it != watches.cend(); ++it) {
+        if (auto watch = it->lock(); watch && watch->state != DeviceWatch::State::Loading) {
+            watch->state = DeviceWatch::State::Stale;
+        }
+    }
+}
+
+DeviceWatch ManagerPrivate::watch(const QString &jid)
+{
+    if (auto data = watches.value(jid).lock()) {
+        return DeviceWatch(data);
+    }
+
+    auto data = std::make_shared<DeviceWatch::Data>();
+    data->jid = jid;
+    data->release = [manager = QPointer(q), jid] {
+        if (manager) {
+            manager->d->releaseWatch(jid);
+        }
+    };
+    watches.insert(jid, data);
+    startWatch(jid);
+    return DeviceWatch(data);
+}
+
+QXmppTask<void> ManagerPrivate::startWatch(QString jid)
+{
+    co_await loaded().withContext(q);
+    co_await updateWatch(jid).withContext(q);
+    if (isLoggedIn) {
+        co_await refreshWatch(jid).withContext(q);
+    } else if (auto watch = watches.value(jid).lock()) {
+        watch->state = DeviceWatch::State::Stale;
+    }
+}
+
+// Requests the device lists of a watched JID and subscribes to them if needed.
+QXmppTask<void> ManagerPrivate::refreshWatch(QString jid)
+{
+    co_await loaded().withContext(q);
+    if (auto watch = watches.value(jid).lock()) {
+        watch->state = DeviceWatch::State::Loading;
+        watch->result.reset();
+    } else {
+        co_return;
+    }
+
+    const auto isOwnJid = jid == ownJid();
+    const auto subscribe = !isOwnJid && !hasPresenceSubscription(jid);
+    auto failed = false;
+    for (auto version : ALL_VERSIONS) {
+        // The own device lists of disabled versions would be republished with this device.
+        if (isOwnJid && (!isSetUp || !isEnabled(version))) {
+            continue;
+        }
+
+        const auto client = pubSubClient(version);
+        const Storage::Subscription subscription { version, jid, ownFullJid() };
+        if (subscribe && isEnabled(version) && !subscriptions.contains(subscription)) {
+            auto result = co_await client.subscribeToDeviceList(jid, subscription.subscriberJid).withContext(q);
+            if (auto *error = std::get_if<QXmppError>(&result)) {
+                q->warning(u"Could not subscribe to the device list of %1: %2"_s.arg(jid, error->description));
+            } else {
+                subscriptions.append(subscription);
+                storage->addSubscription(subscription);
+            }
+        }
+
+        auto list = co_await client.requestDeviceList(jid).withContext(q);
+        if (watches.value(jid).expired()) {
+            co_return;
+        }
+        if (auto *entries = std::get_if<QList<DeviceList::Entry>>(&list)) {
+            applyReceivedDeviceList(version, jid, *entries);
+        } else {
+            failed = true;
+        }
+    }
+
+    if (auto watch = watches.value(jid).lock()) {
+        // Requests fail on disconnection, they are sent again after resuming the stream.
+        if (isLoggedIn) {
+            watch->result = failed ? DeviceWatch::State::Error : DeviceWatch::State::Loaded;
+            watch->state = *watch->result;
+        } else {
+            watch->state = DeviceWatch::State::Stale;
+        }
+    }
+    co_await updateWatch(jid).withContext(q);
+    co_await buildSessions(jid).withContext(q);
+}
+
+// Updates the devices of a watch with the current trust levels.
+QXmppTask<void> ManagerPrivate::updateWatch(QString jid)
+{
+    if (watches.value(jid).expired()) {
+        co_return;
+    }
+
+    auto devices = co_await this->devices({ jid }).withContext(q);
+    auto watch = watches.value(jid).lock();
+    if (!watch) {
+        co_return;
+    }
+    QList<Version> supported;
+    for (const auto &device : std::as_const(devices)) {
+        if (!supported.contains(device.version)) {
+            supported.append(device.version);
+        }
+    }
+    watch->devices = devices;
+    watch->supportedVersions = supported;
+}
+
+// Builds the missing sessions with the devices of a watched JID.
+QXmppTask<void> ManagerPrivate::buildSessions(QString jid)
+{
+    if (!isSetUp || !isLoggedIn || watches.value(jid).expired()) {
+        co_return;
+    }
+    // Devices added meanwhile are handled by another run.
+    if (sessionBuildsRunning.contains(jid)) {
+        sessionBuildsPending.insert(jid);
+        co_return;
+    }
+    sessionBuildsRunning.insert(jid);
+    do {
+        sessionBuildsPending.remove(jid);
+        const auto enabled = enabledVersions;
+        for (auto version : enabled) {
+            for (auto id : deviceIds(version, jid)) {
+                if (!isSetUp || watches.value(jid).expired()) {
+                    break;
+                }
+                co_await prepareSession(version, jid, id, DEFAULT_ACCEPTED_TRUST_LEVELS).withContext(q);
+            }
+        }
+    } while (sessionBuildsPending.contains(jid));
+    sessionBuildsRunning.remove(jid);
+}
+
+void ManagerPrivate::releaseWatch(const QString &jid)
+{
+    watches.remove(jid);
+    // Otherwise, the subscriptions are removed on the next login.
+    if (!isLoggedIn) {
+        return;
+    }
+    const auto stored = subscriptions;
+    for (const auto &subscription : stored) {
+        if (subscription.jid == jid) {
+            unsubscribe(subscription);
+        }
+    }
+}
+
+void ManagerPrivate::unsubscribe(const Storage::Subscription &subscription)
+{
+    // removed before the request, so it is not used anymore
+    subscriptions.removeAll(subscription);
+    storage->removeSubscription(subscription);
+    pubSubClient(subscription.version).unsubscribeFromDeviceList(subscription.jid, subscription.subscriberJid).then(q, [this, jid = subscription.jid](Result<> &&result) {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            q->warning(u"Could not unsubscribe from the device list of %1: %2"_s.arg(jid, error->description));
+        }
+    });
 }
 
 /*!
@@ -623,87 +920,135 @@ QBindable<QByteArray> Manager::ownKey() const
 }
 
 /*!
-    Returns the IDs of the devices of \a jid listed in its device list of \a version, sorted. For
-    the own JID, this device is not included.
-*/
-QList<uint32_t> Manager::deviceIds(Version version, const QString &jid) const
-{
-    QList<uint32_t> ids;
-    const auto devices = d->versions.at(version).devices.value(jid);
-    for (auto it = devices.cbegin(); it != devices.cend(); ++it) {
-        if (!it->removalFromDeviceListDate.isValid()) {
-            ids.append(it.key());
-        }
-    }
-    std::ranges::sort(ids);
-    return ids;
-}
-
-/*!
-    \struct QXmpp::Omemo::Manager::Device
+    \struct QXmpp::Omemo::Device
     \inmodule QXmpp
 
     \brief A device of a JID listed in its device list of a version.
 
-    \var QXmpp::Omemo::Manager::Device::version
+    \since QXmpp 1.18
+
+    \var QXmpp::Omemo::Device::version
     OMEMO version of the device list
-    \var QXmpp::Omemo::Manager::Device::jid
+    \var QXmpp::Omemo::Device::jid
     bare JID of the device's owner
-    \var QXmpp::Omemo::Manager::Device::id
+    \var QXmpp::Omemo::Device::id
     device ID
-    \var QXmpp::Omemo::Manager::Device::label
+    \var QXmpp::Omemo::Device::label
     label of the device, only available with OMEMO 2
-    \var QXmpp::Omemo::Manager::Device::keyId
+    \var QXmpp::Omemo::Device::keyId
     public identity key in the format of the version (Curve25519 for OMEMO 0, Ed25519 for OMEMO
-    2), empty until a message has been exchanged with the device
-    \var QXmpp::Omemo::Manager::Device::trustLevel
+    2), empty until a session has been built with the device
+    \var QXmpp::Omemo::Device::trustLevel
     trust level of the key, \c Undecided while the key is unknown
 */
 
 /*!
-    \struct QXmpp::Omemo::Manager::Key
+    \class QXmpp::Omemo::DeviceWatch
     \inmodule QXmpp
 
-    \brief A public identity key of a JID.
+    \brief Handle to the devices of a JID, returned by Manager::watchDevices().
 
-    \var QXmpp::Omemo::Manager::Key::jid
-    bare JID of the key's owner
-    \var QXmpp::Omemo::Manager::Key::keyId
-    public identity key in the format of the version
+    Cheap to copy: all copies share the same state. While a copy exists, the device lists are
+    requested on each login, subscribed to if needed and sessions with trusted devices are built in
+    advance. Use it for open chats. To only show the known devices, e.g. in a list of keys, use
+    Manager::devices() instead, which does not access the network.
+
+    \since QXmpp 1.18
 */
 
 /*!
-    \fn void QXmpp::Omemo::Manager::trustLevelsChanged(QXmpp::Omemo::Version version, const QList<QXmpp::Omemo::Manager::Key> &modifiedKeys)
+    \enum QXmpp::Omemo::DeviceWatch::State
 
-    Emitted when the trust levels of \a modifiedKeys of \a version have changed.
+    \value Loading The devices are being loaded from the storage or the device lists are being
+    requested.
+    \value Stale The known devices are available, but the device lists have not been requested in
+    the current session or notifications may have been missed while being disconnected. They are
+    requested on the next login.
+    \value Loaded The device lists have been requested and are kept up to date.
+    \value Error A device list could not be requested. The known devices are still available.
 */
 
 /*!
-    Returns the devices of \a jids listed in their device lists of the enabled versions. For the
-    own JID, this device is not included.
-
-    The devices of contacts are known after a device list notification, which requires a presence
-    subscription, or after calling supportedVersions().
+    Constructs a watch without a JID.
 */
-QXmppTask<QList<Manager::Device>> Manager::devices(QList<QString> jids)
+DeviceWatch::DeviceWatch()
+    : d(std::make_shared<Data>())
 {
-    QList<Device> result;
-    const auto versions = d->enabledVersions;
-    for (auto version : versions) {
-        const auto keys = co_await d->trustManager->keys(ManagerPrivate::trustNamespace(version), jids).withContext(this);
-        for (const auto &jid : std::as_const(jids)) {
-            const auto stored = d->versions.at(version).devices.value(jid);
-            for (auto id : deviceIds(version, jid)) {
-                const auto &device = stored[id];
-                auto trustLevel = TrustLevel::Undecided;
-                if (!device.keyId.isEmpty()) {
-                    trustLevel = keys.value(jid).value(device.keyId, TrustLevel::Undecided);
-                }
-                result.append({ version, jid, id, device.label, device.keyId, trustLevel });
-            }
-        }
-    }
-    co_return result;
+}
+
+DeviceWatch::DeviceWatch(std::shared_ptr<Data> d)
+    : d(std::move(d))
+{
+}
+
+/*!
+    Returns the bare JID whose devices are watched.
+*/
+QString DeviceWatch::jid() const
+{
+    return d->jid;
+}
+
+/*!
+    Returns whether the device lists have been requested.
+*/
+QBindable<DeviceWatch::State> DeviceWatch::state() const
+{
+    return &d->state;
+}
+
+/*!
+    Returns the devices listed in the device lists of all versions, sorted by version and ID. For
+    the own JID, this device is not included.
+*/
+QBindable<QList<Device>> DeviceWatch::devices() const
+{
+    return &d->devices;
+}
+
+/*!
+    Returns the versions with listed devices, also versions that are not enabled. It can be used to
+    choose the version for a chat.
+*/
+QBindable<QList<Version>> DeviceWatch::supportedVersions() const
+{
+    return &d->supportedVersions;
+}
+
+/*!
+    Returns the devices of \a jids listed in the device lists of all versions with their keys and
+    trust levels, sorted by JID, version and ID. If \a jids is empty, the devices of all known JIDs
+    are returned. This device is not included.
+
+    Only the local data is used, the network is not accessed, so this also works while being
+    disconnected. devicesChanged() is emitted when the result changes. To keep the devices of a
+    JID up to date, e.g. while a chat is open, use watchDevices().
+*/
+QXmppTask<QList<Device>> Manager::devices(QList<QString> jids)
+{
+    return d->devices(std::move(jids));
+}
+
+/*!
+    \fn QXmpp::Omemo::Manager::devicesChanged(const QString &jid)
+
+    Emitted when the devices of \a jid returned by devices() have changed, i.e. their device
+    lists, keys or trust levels.
+*/
+
+/*!
+    Returns a watch on the devices of \a jid.
+
+    While a copy of the watch exists, the device lists of all versions are requested on each login.
+    Without presence subscription, i.e. without notifications about changed device lists, the
+    device lists of the enabled versions are subscribed to explicitly. Sessions with the devices
+    with accepted trust levels are built in advance, so the first message can be encrypted faster.
+
+    A chat should keep a watch while it is open.
+*/
+DeviceWatch Manager::watchDevices(const QString &jid)
+{
+    return d->watch(QXmppUtils::jidToBareJid(jid));
 }
 
 /*!
@@ -739,11 +1084,11 @@ QXmppTask<void> Manager::removeContactDevices(QString jid)
         co_return;
     }
 
-    QList<Version> changedVersions;
+    auto changed = false;
     for (auto version : ALL_VERSIONS) {
         auto &state = d->versions.at(version);
         if (state.devices.remove(jid)) {
-            changedVersions.append(version);
+            changed = true;
         }
         state.keys.sessions.removeIf([&](decltype(state.keys.sessions)::iterator it) { return it.key().jid == jid; });
         state.pendingSessionBuilds.removeIf([&](const Address &address) { return address.jid == jid; });
@@ -754,8 +1099,8 @@ QXmppTask<void> Manager::removeContactDevices(QString jid)
     for (auto version : ALL_VERSIONS) {
         co_await d->trustManager->removeKeys(ManagerPrivate::trustNamespace(version), jid).withContext(this);
     }
-    for (auto version : std::as_const(changedVersions)) {
-        Q_EMIT devicesChanged(version, jid);
+    if (changed) {
+        d->devicesChanged(jid);
     }
 }
 
@@ -798,15 +1143,15 @@ QXmppTask<Result<>> Manager::resetOwnDevice()
     Resets the OMEMO data of this device and the trust data of OMEMO without changing the data on
     the server. Use this after the account has been removed from the server.
 
-    devicesChanged() is emitted for all JIDs with known devices.
+    devicesChanged() is emitted for the JIDs with removed devices and the watches are updated.
 */
 QXmppTask<void> Manager::resetOwnDeviceLocally()
 {
-    QList<std::pair<Version, QString>> changed;
+    QSet<QString> changed;
     for (auto version : ALL_VERSIONS) {
         auto &state = d->versions.at(version);
-        for (auto it = state.devices.cbegin(); it != state.devices.cend(); ++it) {
-            changed.append({ version, it.key() });
+        for (auto it = state.devices.keyBegin(); it != state.devices.keyEnd(); ++it) {
+            changed.insert(*it);
         }
         state.keys = {};
         state.devices.clear();
@@ -825,8 +1170,8 @@ QXmppTask<void> Manager::resetOwnDeviceLocally()
     for (auto version : ALL_VERSIONS) {
         co_await d->trustManager->resetAll(ManagerPrivate::trustNamespace(version)).withContext(this);
     }
-    for (const auto &[version, jid] : std::as_const(changed)) {
-        Q_EMIT devicesChanged(version, jid);
+    for (const auto &jid : std::as_const(changed)) {
+        d->devicesChanged(jid);
     }
 }
 
@@ -871,29 +1216,6 @@ QXmppTask<Result<>> Manager::resetAll()
     co_return Success();
 }
 
-/*!
-    Requests the device lists of \a jid and returns the enabled versions it has devices for.
-
-    The application can use it to choose the version for a chat.
-*/
-QXmppTask<Result<QList<Version>>> Manager::supportedVersions(QString jid)
-{
-    QList<Version> supported;
-    for (auto version : std::as_const(d->enabledVersions)) {
-        auto result = co_await d->pubSubClient(version).requestDeviceList(jid).withContext(this);
-        if (auto *error = std::get_if<QXmppError>(&result)) {
-            co_return std::move(*error);
-        }
-        if (jid != d->ownJid()) {
-            d->applyReceivedDeviceList(version, jid, std::get<QList<DeviceList::Entry>>(result));
-        }
-        if (!deviceIds(version, jid).isEmpty()) {
-            supported.append(version);
-        }
-    }
-    co_return supported;
-}
-
 void Manager::onRegistered(QXmppClient *client)
 {
     d->pubSub = client->findExtension<QXmppPubSubManager>();
@@ -905,26 +1227,33 @@ void Manager::onRegistered(QXmppClient *client)
         qFatal("QXmppTrustManager is not available, it must be added to the client before QXmpp::Omemo::Manager");
     }
 
+    d->roster = client->findExtension<QXmppRosterManager>();
+
     connect(d->trustManager, &QXmppTrustManager::trustLevelsChanged, this, [this](const QHash<QString, QMultiHash<QString, QByteArray>> &modifiedKeys) {
+        QSet<QString> jids;
         for (auto version : ALL_VERSIONS) {
             if (auto it = modifiedKeys.find(ManagerPrivate::trustNamespace(version)); it != modifiedKeys.end()) {
-                QList<Key> keys;
-                for (auto keyIt = it->cbegin(); keyIt != it->cend(); ++keyIt) {
-                    keys.append({ keyIt.key(), keyIt.value() });
+                for (auto keyIt = it->keyBegin(); keyIt != it->keyEnd(); ++keyIt) {
+                    jids.insert(*keyIt);
                 }
-                Q_EMIT trustLevelsChanged(version, keys);
             }
+        }
+        for (const auto &jid : std::as_const(jids)) {
+            d->devicesChanged(jid);
         }
     });
 
     connect(client, &QXmppClient::connected, this, [this, client] {
         d->isLoggedIn = true;
-        if (client->streamManagementState() != QXmppClient::ResumedStream) {
-            d->setUp();
+        if (client->streamManagementState() == QXmppClient::ResumedStream) {
+            d->resume();
+        } else {
+            d->login();
         }
     });
     connect(client, &QXmppClient::disconnected, this, [this] {
         d->isLoggedIn = false;
+        d->disconnected();
     });
 
     if (!std::exchange(d->isLoadStarted, true)) {
@@ -941,11 +1270,12 @@ void Manager::onUnregistered(QXmppClient *client)
 HookResult Manager::handlePubSubEvent(const QDomElement &element, const QString &service, const QString &node)
 {
     const auto version = node == ns_omemo_devicelist ? Version::Omemo0 : Version::Omemo2;
-    if (!d->isSetUp || !d->isEnabled(version)) {
+    const auto jid = QXmppUtils::jidToBareJid(service);
+    // The own device list is only handled with an own device.
+    if (!d->isEnabled(version) || (jid == d->ownJid() && !d->isSetUp)) {
         return HookResult::Stop;
     }
 
-    const auto jid = QXmppUtils::jidToBareJid(service);
     QXmppPubSubEvent<Pep::DeviceListItem> event;
     event.parse(element);
 

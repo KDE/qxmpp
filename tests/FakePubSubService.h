@@ -11,6 +11,7 @@
 #include <QCoreApplication>
 #include <QDomElement>
 #include <QMap>
+#include <QSet>
 #include <QTextStream>
 
 // Answers the PubSub requests TestClients send, like the PEP services of their and other
@@ -92,6 +93,8 @@ public:
         }
         return {};
     }
+    // JIDs subscribed explicitly to the node
+    QSet<QString> subscribers(const QString &jid, const QString &nodeName) const { return m_subscriptions.value({ jid, nodeName }); }
     QList<QString> nodeNames(const QString &jid) const
     {
         QList<QString> names;
@@ -187,6 +190,12 @@ private:
             } else {
                 replyError(id, jid, u"item-not-found"_s);
             }
+        } else if (type == u"subscribe") {
+            m_subscriptions[{ jid, nodeName }].insert(request.attribute(u"jid"_s));
+            replyResult(id, jid);
+        } else if (type == u"unsubscribe") {
+            m_subscriptions[{ jid, nodeName }].remove(request.attribute(u"jid"_s));
+            replyResult(id, jid);
         } else {
             replyError(id, jid, u"feature-not-implemented"_s);
         }
@@ -282,6 +291,7 @@ private:
     TestClient *m_current = nullptr;
     QHash<TestClient *, QList<QString>> m_otherPackets;
     QMap<std::pair<QString, QString>, Node> m_nodes;
+    QMap<std::pair<QString, QString>, QSet<QString>> m_subscriptions;
     QMap<QString, QString> m_failures;
     QMap<QString, int> m_requestCounts;
     bool m_notify = true;

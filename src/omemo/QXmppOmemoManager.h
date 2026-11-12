@@ -165,29 +165,47 @@ namespace QXmpp::Omemo {
 
 class ManagerPrivate;
 
+struct Device {
+    Version version = Version::Omemo2;
+    QString jid;
+    uint32_t id = 0;
+    QString label;
+    QByteArray keyId;
+    QXmpp::TrustLevel trustLevel = QXmpp::TrustLevel::Undecided;
+
+    bool operator==(const Device &) const = default;
+};
+
+class QXMPPOMEMO_EXPORT DeviceWatch
+{
+public:
+    enum class State {
+        Loading,
+        Stale,
+        Loaded,
+        Error,
+    };
+
+    DeviceWatch();
+
+    QString jid() const;
+    QBindable<State> state() const;
+    QBindable<QList<Device>> devices() const;
+    QBindable<QList<Version>> supportedVersions() const;
+
+private:
+    friend class ManagerPrivate;
+    struct Data;
+    explicit DeviceWatch(std::shared_ptr<Data> d);
+
+    std::shared_ptr<Data> d;
+};
+
 class QXMPPOMEMO_EXPORT Manager : public QXmppClientExtension
 {
     Q_OBJECT
 
 public:
-    struct Key {
-        QString jid;
-        QByteArray keyId;
-
-        bool operator==(const Key &) const = default;
-    };
-
-    struct Device {
-        Version version = Version::Omemo2;
-        QString jid;
-        uint32_t id = 0;
-        QString label;
-        QByteArray keyId;
-        QXmpp::TrustLevel trustLevel = QXmpp::TrustLevel::Undecided;
-
-        bool operator==(const Device &) const = default;
-    };
-
     enum class State {
         Loading,
         NotSetUp,
@@ -210,9 +228,8 @@ public:
     QBindable<uint32_t> ownDeviceId() const;
     QBindable<QByteArray> ownKey() const;
 
-    QList<uint32_t> deviceIds(Version version, const QString &jid) const;
-    QXmppTask<QList<Device>> devices(QList<QString> jids);
-    QXmppTask<QXmpp::Result<QList<Version>>> supportedVersions(QString jid);
+    QXmppTask<QList<Device>> devices(QList<QString> jids = {});
+    DeviceWatch watchDevices(const QString &jid);
     QXmppTask<void> setTrustLevel(QList<Device> devices, QXmpp::TrustLevel trustLevel);
     QXmppTask<void> removeContactDevices(QString jid);
 
@@ -220,9 +237,8 @@ public:
     QXmppTask<void> resetOwnDeviceLocally();
     QXmppTask<QXmpp::Result<>> resetAll();
 
+    Q_SIGNAL void devicesChanged(const QString &jid);
     Q_SIGNAL void errorOccurred(const QXmppError &error);
-    Q_SIGNAL void devicesChanged(QXmpp::Omemo::Version version, const QString &jid);
-    Q_SIGNAL void trustLevelsChanged(QXmpp::Omemo::Version version, const QList<QXmpp::Omemo::Manager::Key> &modifiedKeys);
 
 protected:
     void onRegistered(QXmppClient *client) override;

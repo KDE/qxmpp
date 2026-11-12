@@ -222,11 +222,23 @@ public:
         bool operator==(const Device &) const = default;
     };
 
+    // A subscription to the device list of a JID without presence subscription, kept to remove it
+    // on the next login if the client has not been able to.
+    struct Subscription {
+        Version version = Version::Omemo2;
+        QString jid;
+        // full JID of this client
+        QString subscriberJid;
+
+        bool operator==(const Subscription &) const = default;
+    };
+
     struct Data {
         std::optional<OwnDevice> ownDevice;
         QList<SignedPreKey> signedPreKeys;
         QList<PreKey> preKeys;
         QList<Device> devices;
+        QList<Subscription> subscriptions;
     };
 
     virtual ~Storage() = default;
@@ -246,6 +258,9 @@ public:
     virtual QXmppTask<void> removeDevice(Version version, const QString &jid, uint32_t id) = 0;
     // all devices of the JID in all versions
     virtual QXmppTask<void> removeDevices(const QString &jid) = 0;
+
+    virtual QXmppTask<void> addSubscription(const Subscription &subscription) = 0;
+    virtual QXmppTask<void> removeSubscription(const Subscription &subscription) = 0;
 
     virtual QXmppTask<void> resetAll() = 0;
 

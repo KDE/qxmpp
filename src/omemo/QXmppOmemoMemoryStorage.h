@@ -59,6 +59,8 @@ public:
     QXmppTask<void> addDevice(const Device &device) override;
     QXmppTask<void> removeDevice(Version version, const QString &jid, uint32_t id) override;
     QXmppTask<void> removeDevices(const QString &jid) override;
+    QXmppTask<void> addSubscription(const Subscription &subscription) override;
+    QXmppTask<void> removeSubscription(const Subscription &subscription) override;
     QXmppTask<void> resetAll() override;
 
 private:

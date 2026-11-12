@@ -141,7 +141,7 @@ QXmppTask<bool> ManagerPrivate::prepareSession(Version version, QString jid, uin
     if (device->keyId.isEmpty()) {
         device->keyId = bundle.identityKey;
         storage->addDevice(*device);
-        Q_EMIT q->devicesChanged(version, jid);
+        devicesChanged(jid);
     }
 
     auto &sessions = *versions.at(version).sessions;
@@ -182,14 +182,14 @@ QXmppTask<Result<QList<Envelope>>> ManagerPrivate::encryptKey(Version version, Q
     for (const auto &jid : std::as_const(jids)) {
         // Device lists of contacts are subscribed, but they are unknown before the first message
         // or if only unlisted devices are known from their messages.
-        if (jid != own && q->deviceIds(version, jid).isEmpty()) {
+        if (jid != own && deviceIds(version, jid).isEmpty()) {
             auto result = co_await pubSubClient(version).requestDeviceList(jid).withContext(q);
             if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
                 applyReceivedDeviceList(version, jid, *list);
             }
         }
 
-        for (auto deviceId : q->deviceIds(version, jid)) {
+        for (auto deviceId : deviceIds(version, jid)) {
             if (!co_await prepareSession(version, jid, deviceId, acceptedTrustLevels).withContext(q)) {
                 continue;
             }
@@ -247,7 +247,7 @@ QXmppTask<Result<DecryptedKey>> ManagerPrivate::decryptKey(Version version, QStr
     if (isKeyExchange) {
         if (device->keyId.isEmpty()) {
             device->keyId = decrypted.senderIdentityKey;
-            Q_EMIT q->devicesChanged(version, jid);
+            devicesChanged(jid);
         }
         if (decrypted.usedPreKeyId) {
             refillPreKeysAndPublish(version);
