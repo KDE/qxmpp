@@ -5,23 +5,26 @@ SPDX-License-Identifier: CC0-1.0
 -->
 
 This is a minimal echo bot that demonstrates wiring up OMEMO encryption in
-QXmpp. It replies to any incoming message with "Your message: " followed by
-the body; once a contact has sent an OMEMO-encrypted message, the replies to
-that contact are OMEMO-encrypted as well. The encryption is selected via the
+QXmpp with `QXmpp::Omemo::Manager`. It replies to any incoming message with
+"Your message: " followed by the body; once a contact has sent an
+OMEMO-encrypted message (OMEMO 0.3 or OMEMO 2), the replies to that contact are
+encrypted with the same version. The encryption is selected via the
 `QXmpp::Messages::SelectEncryption` hook.
 
+The manager sets itself up: it loads its data from the storage, creates and
+publishes the own device on the first login and renews its keys on each
+further login.
+
 **Important limitation:** this example uses the in-memory storage classes
-`QXmppOmemoMemoryStorage` and `QXmppAtmTrustMemoryStorage`. Nothing is
+`QXmpp::Omemo::MemoryStorage` and `QXmppAtmTrustMemoryStorage`. Nothing is
 persisted across runs — the bot gets a new OMEMO device identity every time
 it starts, and all trust decisions are lost on exit. This is only
 appropriate for demos and testing.
 
 A real application must provide persistent implementations of
-`QXmppOmemoStorage` and `QXmppTrustStorage` so that the device, identity
-keys, pre-keys, sessions, and trust decisions survive across restarts. See
-the class documentation of `QXmppOmemoManager` for the recommended
-load()/setUp() flow in that case.
+`QXmpp::Omemo::Storage` and `QXmppTrustStorage` so that the device, identity
+keys, pre-keys, sessions, and trust decisions survive across restarts.
 
 How to run: edit the JID and password in `main()` to a test account on an
-XMPP server that supports OMEMO 2 (XEP-0384), then send it a message from a
-second account. OMEMO-encrypted messages will be echoed back OMEMO-encrypted.
+XMPP server that supports PEP, then send it a message from a second account.
+OMEMO-encrypted messages will be echoed back OMEMO-encrypted.
