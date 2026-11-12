@@ -13,6 +13,7 @@ set(OMEMO_INSTALL_HEADER_FILES
 )
 set(OMEMO_SOURCE_FILES
     OmemoCryptoProvider.cpp
+    OmemoSession.cpp
     Omemo0Data.cpp
     QXmppOmemoData.cpp
     QXmppOmemoManager.cpp
