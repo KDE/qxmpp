@@ -906,16 +906,17 @@ struct Device {
     Device(const SignalContext &context, QString jid, std::optional<IdentityKeyPair> identity = {})
         : jid(std::move(jid))
     {
-        keys.deviceId = *context.generateDeviceId();
-        keys.identity = identity ? *identity : *context.generateIdentityKeyPair();
-        keys.signedPreKeys.insert(SIGNED_PRE_KEY_ID, *context.generateSignedPreKey(keys.identity, SIGNED_PRE_KEY_ID, 0));
+        device.deviceId = *context.generateDeviceId();
+        device.identity = identity ? *identity : *context.generateIdentityKeyPair();
+        device.signedPreKeys.insert(SIGNED_PRE_KEY_ID, { *context.generateSignedPreKey(device.identity, SIGNED_PRE_KEY_ID, 0), {} });
         keys.preKeys = context.generatePreKeys(1, PRE_KEY_COUNT);
     }
 
-    Address address() const { return { jid, keys.deviceId }; }
+    Address address() const { return { jid, device.deviceId }; }
 
     QString jid;
-    KeyStore keys;
+    DeviceKeys device;
+    VersionKeys keys;
 };
 
 static SecureByteArray secure(QByteArrayView data)
@@ -984,6 +985,8 @@ void tst_OmemoSession::keyGeneration()
     QCOMPARE(preKeys.size(), 3);
     QVERIFY(preKeys.contains(10));
     QVERIFY(preKeys.contains(12));
+    QCOMPARE(m_context->generatePreKeys(0xFFFFFE, 1).size(), 1);
+    QVERIFY(m_context->generatePreKeys(0xFFFFFF, 1).isEmpty());
 
     QVERIFY(m_context->generateSignedPreKey(*identity, 1, 0));
     QVERIFY(!m_context->generateSignedPreKey(IdentityKeyPair {}, 1, 0));
@@ -999,7 +1002,7 @@ void tst_OmemoSession::bundleFormat()
     QFETCH(Version, version);
 
     Device device(*m_context, u"alice@example.org"_s);
-    SessionLayer layer(*m_context, version, device.keys);
+    SessionLayer layer(*m_context, version, device.device, device.keys);
 
     const auto bundle = expectVariant<Bundle>(layer.ownBundle(SIGNED_PRE_KEY_ID, 1));
     QCOMPARE(bundle.signedPreKeyId, SIGNED_PRE_KEY_ID);
@@ -1008,7 +1011,7 @@ void tst_OmemoSession::bundleFormat()
 
     if (version == Version::Omemo2) {
         // Ed25519 identity key, Curve25519 pre keys without prefix
-        QCOMPARE(bundle.identityKey, device.keys.identity.publicKey);
+        QCOMPARE(bundle.identityKey, device.device.identity.publicKey);
         QCOMPARE(bundle.signedPreKey.size(), 32);
         QCOMPARE(bundle.preKey.size(), 32);
     } else {
@@ -1056,8 +1059,8 @@ void tst_OmemoSession::roundtrip()
 
     Device aliceDevice(*m_context, u"alice@example.org"_s);
     Device bobDevice(*m_context, u"bob@example.org"_s);
-    SessionLayer alice(*m_context, version, aliceDevice.keys);
-    SessionLayer bob(*m_context, version, bobDevice.keys);
+    SessionLayer alice(*m_context, version, aliceDevice.device, aliceDevice.keys);
+    SessionLayer bob(*m_context, version, bobDevice.device, bobDevice.keys);
 
     const auto bundle = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 3));
     expectVariant<Success>(alice.buildSession(bobDevice.address(), bundle));
@@ -1072,7 +1075,7 @@ void tst_OmemoSession::roundtrip()
 
     const auto decrypted = expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), first.data, true));
     QCOMPARE(decrypted.data, secure("key 1"));
-    QCOMPARE(decrypted.senderIdentityKey, aliceDevice.keys.identity.publicKey);
+    QCOMPARE(decrypted.senderIdentityKey, alice.ownIdentityKey());
     QCOMPARE(decrypted.usedPreKeyId, std::optional<uint32_t>(3));
     QVERIFY(!bobDevice.keys.preKeys.contains(3));
     QCOMPARE(bobDevice.keys.preKeys.size(), int(PRE_KEY_COUNT - 1));
@@ -1115,10 +1118,10 @@ void tst_OmemoSession::sharedIdentity()
     alice2.keys.preKeys = m_context->generatePreKeys(1, PRE_KEY_COUNT);
     bob2.keys.preKeys = m_context->generatePreKeys(1, PRE_KEY_COUNT);
 
-    SessionLayer aliceLayer0(*m_context, Version::Omemo0, alice0.keys);
-    SessionLayer bobLayer0(*m_context, Version::Omemo0, bob0.keys);
-    SessionLayer aliceLayer2(*m_context, Version::Omemo2, alice2.keys);
-    SessionLayer bobLayer2(*m_context, Version::Omemo2, bob2.keys);
+    SessionLayer aliceLayer0(*m_context, Version::Omemo0, alice0.device, alice0.keys);
+    SessionLayer bobLayer0(*m_context, Version::Omemo0, bob0.device, bob0.keys);
+    SessionLayer aliceLayer2(*m_context, Version::Omemo2, alice2.device, alice2.keys);
+    SessionLayer bobLayer2(*m_context, Version::Omemo2, bob2.device, bob2.keys);
 
     establish(aliceLayer0, alice0, bobLayer0, bob0);
     establish(aliceLayer2, alice2, bobLayer2, bob2);
@@ -1129,12 +1132,12 @@ void tst_OmemoSession::sharedIdentity()
     QCOMPARE(bundle2.identityKey, bobIdentity.publicKey);
     QCOMPARE(bundle0.signedPreKey.mid(1), bundle2.signedPreKey);
 
-    // A key exchange reports the same identity key in both versions.
+    // A key exchange reports the identity key in the format of the version.
     Device carol0(*m_context, u"carol@example.org"_s);
     Device carol2 = carol0;
     carol2.keys.preKeys = m_context->generatePreKeys(1, PRE_KEY_COUNT);
-    SessionLayer carolLayer0(*m_context, Version::Omemo0, carol0.keys);
-    SessionLayer carolLayer2(*m_context, Version::Omemo2, carol2.keys);
+    SessionLayer carolLayer0(*m_context, Version::Omemo0, carol0.device, carol0.keys);
+    SessionLayer carolLayer2(*m_context, Version::Omemo2, carol2.device, carol2.keys);
 
     expectVariant<Success>(aliceLayer0.buildSession(carol0.address(), expectVariant<Bundle>(carolLayer0.ownBundle(SIGNED_PRE_KEY_ID, 1))));
     expectVariant<Success>(aliceLayer2.buildSession(carol2.address(), expectVariant<Bundle>(carolLayer2.ownBundle(SIGNED_PRE_KEY_ID, 1))));
@@ -1142,8 +1145,10 @@ void tst_OmemoSession::sharedIdentity()
     const auto message2 = expectVariant<EncryptedKey>(aliceLayer2.encrypt(carol2.address(), secure("v2")));
     const auto decrypted0 = expectVariant<DecryptedKey>(carolLayer0.decrypt(alice0.address(), message0.data, true));
     const auto decrypted2 = expectVariant<DecryptedKey>(carolLayer2.decrypt(alice2.address(), message2.data, true));
-    QCOMPARE(decrypted0.senderIdentityKey, aliceIdentity.publicKey);
+    QCOMPARE(decrypted0.senderIdentityKey, aliceLayer0.ownIdentityKey());
+    QCOMPARE(decrypted0.senderIdentityKey.size(), 33);
     QCOMPARE(decrypted2.senderIdentityKey, aliceIdentity.publicKey);
+    QCOMPARE(aliceLayer2.ownIdentityKey(), aliceIdentity.publicKey);
 }
 
 void tst_OmemoSession::outOfOrder_data()
@@ -1157,8 +1162,8 @@ void tst_OmemoSession::outOfOrder()
 
     Device aliceDevice(*m_context, u"alice@example.org"_s);
     Device bobDevice(*m_context, u"bob@example.org"_s);
-    SessionLayer alice(*m_context, version, aliceDevice.keys);
-    SessionLayer bob(*m_context, version, bobDevice.keys);
+    SessionLayer alice(*m_context, version, aliceDevice.device, aliceDevice.keys);
+    SessionLayer bob(*m_context, version, bobDevice.device, bobDevice.keys);
     establish(alice, aliceDevice, bob, bobDevice);
 
     QList<EncryptedKey> messages;
@@ -1174,8 +1179,8 @@ void tst_OmemoSession::duplicate()
 {
     Device aliceDevice(*m_context, u"alice@example.org"_s);
     Device bobDevice(*m_context, u"bob@example.org"_s);
-    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
-    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.device, aliceDevice.keys);
+    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.device, bobDevice.keys);
     establish(alice, aliceDevice, bob, bobDevice);
 
     const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("once")));
@@ -1194,8 +1199,8 @@ void tst_OmemoSession::invalidSignature()
 
     Device aliceDevice(*m_context, u"alice@example.org"_s);
     Device bobDevice(*m_context, u"bob@example.org"_s);
-    SessionLayer alice(*m_context, version, aliceDevice.keys);
-    SessionLayer bob(*m_context, version, bobDevice.keys);
+    SessionLayer alice(*m_context, version, aliceDevice.device, aliceDevice.keys);
+    SessionLayer bob(*m_context, version, bobDevice.device, bobDevice.keys);
 
     auto bundle = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1));
     bundle.signedPreKeySignature[0] = char(bundle.signedPreKeySignature.at(0) ^ 0x01);
@@ -1205,7 +1210,7 @@ void tst_OmemoSession::invalidSignature()
     // signed by another identity key
     auto otherBundle = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1));
     Device mallory(*m_context, u"mallory@example.org"_s);
-    SessionLayer malloryLayer(*m_context, version, mallory.keys);
+    SessionLayer malloryLayer(*m_context, version, mallory.device, mallory.keys);
     otherBundle.identityKey = expectVariant<Bundle>(malloryLayer.ownBundle(SIGNED_PRE_KEY_ID, 1)).identityKey;
     expectVariant<QXmppError>(alice.buildSession(bobDevice.address(), otherBundle));
 
@@ -1228,9 +1233,9 @@ void tst_OmemoSession::versionMismatch()
     const auto aliceIdentity = *m_context->generateIdentityKeyPair();
     Device aliceDevice(*m_context, u"alice@example.org"_s, aliceIdentity);
     Device bobDevice(*m_context, u"bob@example.org"_s);
-    SessionLayer alice(*m_context, Version::Omemo0, aliceDevice.keys);
-    SessionLayer bob0(*m_context, Version::Omemo0, bobDevice.keys);
-    SessionLayer bob2(*m_context, Version::Omemo2, bobDevice.keys);
+    SessionLayer alice(*m_context, Version::Omemo0, aliceDevice.device, aliceDevice.keys);
+    SessionLayer bob0(*m_context, Version::Omemo0, bobDevice.device, bobDevice.keys);
+    SessionLayer bob2(*m_context, Version::Omemo2, bobDevice.device, bobDevice.keys);
 
     expectVariant<Success>(alice.buildSession(bobDevice.address(), expectVariant<Bundle>(bob0.ownBundle(SIGNED_PRE_KEY_ID, 1))));
     const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("v0")));
@@ -1243,8 +1248,8 @@ void tst_OmemoSession::unknownPreKey()
 {
     Device aliceDevice(*m_context, u"alice@example.org"_s);
     Device bobDevice(*m_context, u"bob@example.org"_s);
-    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
-    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.device, aliceDevice.keys);
+    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.device, bobDevice.keys);
 
     expectVariant<Success>(alice.buildSession(bobDevice.address(), expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1))));
     const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("x")));
@@ -1256,8 +1261,8 @@ void tst_OmemoSession::noSession()
 {
     Device aliceDevice(*m_context, u"alice@example.org"_s);
     Device bobDevice(*m_context, u"bob@example.org"_s);
-    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
-    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.device, aliceDevice.keys);
+    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.device, bobDevice.keys);
     establish(alice, aliceDevice, bob, bobDevice);
 
     const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("x")));
@@ -1272,8 +1277,8 @@ void tst_OmemoSession::persistence()
     Device aliceDevice(*m_context, u"alice@example.org"_s);
     Device bobDevice(*m_context, u"bob@example.org"_s);
     {
-        SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
-        SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+        SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.device, aliceDevice.keys);
+        SessionLayer bob(*m_context, Version::Omemo2, bobDevice.device, bobDevice.keys);
         establish(alice, aliceDevice, bob, bobDevice);
     }
 
@@ -1281,8 +1286,8 @@ void tst_OmemoSession::persistence()
     SignalContext context;
     auto aliceKeys = aliceDevice.keys;
     auto bobKeys = bobDevice.keys;
-    SessionLayer alice(context, Version::Omemo2, aliceKeys);
-    SessionLayer bob(context, Version::Omemo2, bobKeys);
+    SessionLayer alice(context, Version::Omemo2, aliceDevice.device, aliceKeys);
+    SessionLayer bob(context, Version::Omemo2, bobDevice.device, bobKeys);
 
     const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("after restart")));
     QVERIFY(!message.isKeyExchange);
@@ -1296,10 +1301,10 @@ void tst_OmemoSession::callbacks()
 
     QHash<Address, QByteArray> stored;
     QList<uint32_t> removedPreKeys;
-    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.device, aliceDevice.keys);
     SessionLayer bob(*m_context,
                      Version::Omemo2,
-                     bobDevice.keys,
+                     bobDevice.device, bobDevice.keys,
                      {
                          [&](const Address &address, const QByteArray &session) { stored.insert(address, session); },
                          {},

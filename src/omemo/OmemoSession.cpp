@@ -226,6 +226,10 @@ QHash<uint32_t, SecureByteArray> SignalContext::generatePreKeys(uint32_t firstId
         if (session_pre_key_serialize(record.ptrRef(), preKey) < 0) {
             return {};
         }
+        // libomemo-c wraps IDs out of its range
+        if (session_pre_key_get_id(preKey) != firstId + uint32_t(keys.size())) {
+            return {};
+        }
         keys.insert(session_pre_key_get_id(preKey), toSecureByteArray(signal_buffer_data(record.get()), signal_buffer_len(record.get())));
     }
     return keys;
@@ -257,14 +261,14 @@ struct StoreCallbacks {
     {
         signal_protocol_identity_key_store store {};
         store.get_identity_key_pair = [](signal_buffer **publicData, signal_buffer **privateData, void *userData) {
-            const auto &identity = layer(userData)->m_keys.identity;
+            const auto &identity = layer(userData)->m_device.identity;
             if (const auto result = setBuffer(privateData, identity.privateKey.constData(), identity.privateKey.size()); result < 0) {
                 return result;
             }
             return setBuffer(publicData, identity.publicKey.constData(), identity.publicKey.size());
         };
         store.get_local_registration_id = [](void *userData, uint32_t *registrationId) {
-            *registrationId = layer(userData)->m_keys.deviceId;
+            *registrationId = layer(userData)->m_device.deviceId;
             return 0;
         };
         // Trust is handled by the trust manager, not by libomemo-c.
@@ -282,7 +286,7 @@ struct StoreCallbacks {
     {
         signal_protocol_signed_pre_key_store store {};
         store.load_signed_pre_key = [](signal_buffer **record, uint32_t id, void *userData) {
-            const auto key = layer(userData)->m_keys.signedPreKeys.value(id);
+            const auto key = layer(userData)->m_device.signedPreKeys.value(id).record;
             if (key.isEmpty()) {
                 return SG_ERR_INVALID_KEY_ID;
             }
@@ -293,7 +297,7 @@ struct StoreCallbacks {
             return 0;
         };
         store.contains_signed_pre_key = [](uint32_t id, void *userData) {
-            return layer(userData)->m_keys.signedPreKeys.contains(id) ? 1 : 0;
+            return layer(userData)->m_device.signedPreKeys.contains(id) ? 1 : 0;
         };
         store.remove_signed_pre_key = [](uint32_t, void *) {
             return 0;
@@ -408,8 +412,8 @@ struct StoreCallbacks {
     }
 };
 
-SessionLayer::SessionLayer(const SignalContext &context, Version version, KeyStore &keys, Callbacks callbacks)
-    : m_context(context), m_version(version), m_keys(keys), m_callbacks(std::move(callbacks))
+SessionLayer::SessionLayer(const SignalContext &context, Version version, const DeviceKeys &device, VersionKeys &keys, Callbacks callbacks)
+    : m_context(context), m_version(version), m_device(device), m_keys(keys), m_callbacks(std::move(callbacks))
 {
     if (signal_protocol_store_context_create(m_storeContext.ptrRef(), m_context.get()) < 0) {
         m_storeContext.reset(nullptr);
@@ -429,14 +433,20 @@ SessionLayer::SessionLayer(const SignalContext &context, Version version, KeySto
 
 SessionLayer::~SessionLayer() = default;
 
+QByteArray SessionLayer::ownIdentityKey() const
+{
+    const auto identityKeyPair = deserializeIdentityKeyPair(m_device.identity, m_context.get());
+    return identityKeyPair ? serializeIdentityKey(ratchet_identity_key_pair_get_public(identityKeyPair.get()), m_version) : QByteArray();
+}
+
 std::variant<Bundle, QXmppError> SessionLayer::ownBundle(uint32_t signedPreKeyId, uint32_t preKeyId) const
 {
-    const auto identityKeyPair = deserializeIdentityKeyPair(m_keys.identity, m_context.get());
+    const auto identityKeyPair = deserializeIdentityKeyPair(m_device.identity, m_context.get());
     if (!identityKeyPair) {
         return error(u"Own identity key pair could not be deserialized"_s);
     }
 
-    const auto signedRecord = m_keys.signedPreKeys.value(signedPreKeyId);
+    const auto signedRecord = m_device.signedPreKeys.value(signedPreKeyId).record;
     RefCountedPtr<session_signed_pre_key> signedPreKey;
     if (signedRecord.isEmpty() ||
         session_signed_pre_key_deserialize(signedPreKey.ptrRef(), bytes(signedRecord), size_t(signedRecord.size()), m_context.get()) < 0) {
@@ -566,7 +576,7 @@ std::variant<DecryptedKey, QXmppError> SessionLayer::decrypt(const Address &addr
         if (deserialized < 0) {
             return error(u"Key exchange of %1/%2 could not be parsed"_s.arg(address.jid).arg(address.deviceId));
         }
-        result.senderIdentityKey = BufferPtr(ec_public_key_get_ed(pre_key_signal_message_get_identity_key(message.get()))).toByteArray();
+        result.senderIdentityKey = serializeIdentityKey(pre_key_signal_message_get_identity_key(message.get()), m_version);
 
         m_removedPreKeyId.reset();
         status = session_cipher_decrypt_pre_key_signal_message(cipher.get(), message.get(), nullptr, plaintext.ptrRef());

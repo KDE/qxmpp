@@ -15,6 +15,7 @@
 #include <optional>
 #include <variant>
 
+#include <QDateTime>
 #include <QHash>
 #include <QRecursiveMutex>
 
@@ -75,7 +76,7 @@ public:
     std::optional<IdentityKeyPair> generateIdentityKeyPair() const;
     // device ID in the range [1, 2^31 - 1]
     std::optional<uint32_t> generateDeviceId() const;
-    // serialized pre key records, IDs from firstId to firstId + count - 1
+    // serialized pre key records, IDs from firstId to firstId + count - 1 (at most 0xFFFFFE)
     QHash<uint32_t, SecureByteArray> generatePreKeys(uint32_t firstId, uint32_t count) const;
     // serialized signed pre key record, signed for both versions
     std::optional<SecureByteArray> generateSignedPreKey(const IdentityKeyPair &identity, uint32_t id, uint64_t timestamp) const;
@@ -86,12 +87,24 @@ private:
     QRecursiveMutex m_mutex;
 };
 
-// Key material of the own device and the sessions of one version, as seen by libomemo-c.
-struct KeyStore {
+struct SignedPreKey {
+    // serialized by libomemo-c, signed for both versions
+    SecureByteArray record;
+    QDateTime creationDate;
+};
+
+// Key material of the own device, shared by all versions.
+struct DeviceKeys {
     uint32_t deviceId = 0;
     IdentityKeyPair identity;
-    QHash<uint32_t, SecureByteArray> signedPreKeys;
+    QHash<uint32_t, SignedPreKey> signedPreKeys;
+    uint32_t latestSignedPreKeyId = 0;
+};
+
+// Pre keys and sessions of one version.
+struct VersionKeys {
     QHash<uint32_t, SecureByteArray> preKeys;
+    uint32_t latestPreKeyId = 0;
     QHash<Address, QByteArray> sessions;
 };
 
@@ -102,14 +115,14 @@ struct EncryptedKey {
 
 struct DecryptedKey {
     SecureByteArray data;
-    // Ed25519 form, only set for key exchanges
+    // in the format of the version, only set for key exchanges
     QByteArray senderIdentityKey;
     // the pre key consumed by a key exchange, it has been removed from the key store
     std::optional<uint32_t> usedPreKeyId;
 };
 
 // Encrypts and decrypts the key material of messages with the double ratchet of libomemo-c for one
-// version. The state is kept in a KeyStore owned by the caller; changes are reported via
+// version. The state is owned by the caller; changes of the version keys are reported via
 // Callbacks so they can be persisted.
 class SessionLayer
 {
@@ -120,15 +133,17 @@ public:
         std::function<void(uint32_t preKeyId)> preKeyRemoved;
     };
 
-    SessionLayer(const SignalContext &context, Version version, KeyStore &keys, Callbacks callbacks = {});
+    SessionLayer(const SignalContext &context, Version version, const DeviceKeys &device, VersionKeys &keys, Callbacks callbacks = {});
     ~SessionLayer();
     Q_DISABLE_COPY_MOVE(SessionLayer)
 
     Version version() const { return m_version; }
+    // own public identity key in the format of the version
+    QByteArray ownIdentityKey() const;
 
     // The public part of the own bundle with the given keys in the format of the version.
     std::variant<Bundle, QXmppError> ownBundle(uint32_t signedPreKeyId, uint32_t preKeyId) const;
-    // public pre keys (without type prefix) of the key store
+    // public pre keys in the format of the version
     std::variant<QHash<uint32_t, QByteArray>, QXmppError> publicPreKeys() const;
 
     std::variant<QXmpp::Success, QXmppError> buildSession(const Address &address, const Bundle &bundle);
@@ -142,7 +157,8 @@ private:
 
     const SignalContext &m_context;
     Version m_version;
-    KeyStore &m_keys;
+    const DeviceKeys &m_device;
+    VersionKeys &m_keys;
     Callbacks m_callbacks;
     StoreContextPtr m_storeContext;
     std::optional<uint32_t> m_removedPreKeyId;
