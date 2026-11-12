@@ -29,6 +29,9 @@
 #undef max
 #undef interface
 
+// implementation of the deprecated QXmppOmemoManager
+QT_WARNING_DISABLE_DEPRECATED
+
 using namespace QXmpp;
 using namespace QXmpp::Private;
 using namespace QXmpp::Omemo::Private;

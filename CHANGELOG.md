@@ -47,6 +47,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - Blocking, Carbons, Disco, MucManagerV2, OMEMO: Reset the state of the session also when the stream can't be resumed with Stream Management enabled, and when the client is disconnected via `disconnectFromServer()` while waiting for resumption (@lnj, !848)
  - OMEMO: Add the new manager `QXmpp::Omemo::Manager` supporting OMEMO 2 and OMEMO 0.3 (`eu.siacs.conversations.axolotl`) with one device and one identity key for both versions, whose trust levels are shared between the versions; it sets itself up on login, and a `DeviceWatch` keeps the devices, trust levels and supported versions of a contact up to date, subscribes to its device lists if needed and builds sessions in advance, while `devices()` lists the known devices without network access; the application selects the version (@lnj, !842)
  - OMEMO: Add the storage `QXmpp::Omemo::Storage` with `MemoryStorage` for the new manager; `Storage::migrateFrom()` keeps the device, its fingerprint and the sessions of a `QXmppOmemoStorage` (@lnj, !842)
+ - OMEMO: Deprecate `QXmppOmemoManager`, `QXmppOmemoDevice`, `QXmppOmemoOwnDevice` and `QXmppOmemoMemoryStorage`, use `QXmpp::Omemo::Manager` and `QXmpp::Omemo::MemoryStorage` (@lnj, !842)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

@@ -20,7 +20,11 @@ class QXmppOmemoOwnDevicePrivate;
 class QXmppOmemoStorage;
 class tst_OmemoManager2;
 
-class QXMPPOMEMO_EXPORT QXmppOmemoOwnDevice
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+class [[deprecated("Use QXmpp::Omemo::Manager")]] QXMPPOMEMO_EXPORT QXmppOmemoOwnDevice
 {
 public:
     QXmppOmemoOwnDevice();
@@ -41,7 +45,7 @@ private:
     QSharedDataPointer<QXmppOmemoOwnDevicePrivate> d;
 };
 
-class QXMPPOMEMO_EXPORT QXmppOmemoDevice
+class [[deprecated("Use QXmpp::Omemo::Device")]] QXMPPOMEMO_EXPORT QXmppOmemoDevice
 {
 public:
     QXmppOmemoDevice();
@@ -68,7 +72,9 @@ private:
     QSharedDataPointer<QXmppOmemoDevicePrivate> d;
 };
 
-class QXMPPOMEMO_EXPORT QXmppOmemoManager : public QXmppClientExtension, public QXmppE2eeExtension
+class [[deprecated("Use QXmpp::Omemo::Manager")]]
+QXMPPOMEMO_EXPORT QXmppOmemoManager : public QXmppClientExtension,
+                                      public QXmppE2eeExtension
 {
     Q_OBJECT
 
@@ -160,6 +166,9 @@ private:
     friend class QXmppOmemoManagerPrivate;
     friend class tst_QXmppOmemoManager;
 };
+
+QT_WARNING_POP
+#endif
 
 namespace QXmpp::Omemo {
 

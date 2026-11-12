@@ -562,7 +562,7 @@ void QXmpp::Private::LegacyE2ee::setEncryptionExtension(QXmppClient *client, QXm
     Sets the extension to be used for end-to-end-encryption.
 
     \deprecated since QXmpp 1.18, end-to-end encryptions are QXmpp::E2ee::Provider registered via
-    QXmpp::E2ee::Providers, e.g. QXmppOmemoManager. The encryption extension is
+    QXmpp::E2ee::Providers, e.g. QXmpp::Omemo::Manager. The encryption extension is
     still used for sensitive stanzas sent by QXmpp's managers if no encryption is selected by the
     QXmpp::Messages::SelectEncryption or QXmpp::Iq::SelectEncryption hook.
 

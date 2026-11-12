@@ -19,6 +19,8 @@ using namespace QXmpp::Private;
     \xep{0384}{OMEMO Encryption} in the memory.
 
     \since QXmpp 1.5
+
+    \deprecated since QXmpp 1.18, use QXmpp::Omemo::MemoryStorage instead.
 */
 
 class QXmppOmemoMemoryStoragePrivate

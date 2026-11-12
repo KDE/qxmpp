@@ -16,6 +16,9 @@
     \xep{0384}{OMEMO Encryption}.
 
     \since QXmpp 1.5
+
+    It is used by the deprecated QXmppOmemoManager. QXmpp::Omemo::Storage::migrateFrom() copies its
+    data into the storage of QXmpp::Omemo::Manager.
 */
 
 /*!
