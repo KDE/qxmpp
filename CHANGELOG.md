@@ -39,6 +39,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - Add the hook `QXmpp::Iq::SelectEncryption` selecting the end-to-end encryption of IQs (@lnj, !841)
  - Fix the payload of `QXmppIq` subclasses getting lost when encrypted by the encryption extension, e.g. via `sendSensitiveIq()` (@lnj, !841)
  - MUC: Fix decrypting the discussion history of rooms with occupant IDs: messages received while joining wait for the room's disco#info result before their sender is resolved (@lnj)
+ - MucManagerV2: Rejoin joined rooms automatically after a connection loss without stream resumption and when MUC Self-Ping detects a ghosted room; room handles stay valid, only the changes of the occupants are reported, the history is requested since the last message and `joinRoom()` waits for a running rejoin (@lnj)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
@@ -56,6 +57,7 @@ Breaking changes:
  - The encryption of IQs is selected via `QXmpp::Iq::SelectEncryption` instead of `QXmpp::Messages::SelectEncryption`, IQs requiring encryption (`QXmppSendStanzaParams::isEncryptionRequired()`) fail without encryption (@lnj, !841)
  - Disco, version and entity time requests are also answered if end-to-end encrypted (@lnj, !841)
  - MucManagerV2: Messages of joined rooms are delivered via `QXmppClient::messageReceived()`; `QXmppMucManagerV2::messageReceived()` has been removed. Subject changes and status notifications without text are not delivered (@lnj)
+ - MucManagerV2: `removedFromRoom()` is no longer emitted with `ConnectionLost` when the connection is lost or a room is ghosted, but only when rejoining fails or after `QXmppClient::disconnectFromServer()` (@lnj)
 
 QXmpp 1.17.2 (November 9, 2026)
 -------------------------------

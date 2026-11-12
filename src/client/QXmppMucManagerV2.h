@@ -86,9 +86,13 @@ public:
 
         Not emitted for QXmppMucRoomV2::leave() and QXmppMucRoomV2::destroyRoom().
 
-        Also emitted with \c LeaveReason::ConnectionLost for each joined room when the connection
-        is lost and the stream is not resumed. Rooms still being joined are not reported, their
-        joinRoom() tasks fail instead.
+        Rooms are rejoined automatically when the connection is lost and the stream is not
+        resumed, see \l{Rejoining rooms}. If rejoining fails, it is emitted with the reason of the
+        failure, e.g. \c LeaveReason::Banned, or \c LeaveReason::ConnectionLost if the room did
+        not answer. Rooms still being joined are not rejoined, their joinRoom() tasks fail instead.
+
+        After QXmppClient::disconnectFromServer(), it is emitted with
+        \c LeaveReason::ConnectionLost for each joined room, and the rooms are not rejoined.
 
         To clean up whenever the room is no longer joined, including after leave() and
         destroyRoom(), use QXmppMucRoomV2::joined() instead.

@@ -184,6 +184,19 @@ struct MucRoomData {
     uint64_t affiliationsGeneration = 0;
     // Whether the disco#info result for the current session has been received.
     bool roomInfoFetched = false;
+    // the options of joinRoom(), used for rejoining
+    std::optional<Muc::HistoryOptions> history;
+    QString password;
+    // when the last message of the room was sent, the history of a rejoin starts there
+    std::optional<QDateTime> lastMessageTime;
+    // The room is rejoined after the connection was lost or the room was ghosted (XEP-0410).
+    // It stays tracked meanwhile, so its handles stay valid. The occupants before are kept to
+    // report only the changes after the rejoin.
+    bool rejoining = false;
+    std::unordered_map<QString, std::shared_ptr<MucParticipantData>> previousParticipants;
+    std::shared_ptr<MucParticipantData> previousSelfParticipant;
+    // joinRoom() calls waiting for the rejoin
+    std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> rejoinWaiters;
     // messages waiting in resolveSender() for the disco#info result while joining
     std::vector<QXmppPromise<void>> roomInfoWaiters;
     bool supportsVCard = false;
@@ -318,6 +331,85 @@ struct MucRoomData {
 
 }  // namespace QXmpp::Private
 
+// Pending requests of a room session. They are moved out before the session state is reset and
+// finished once the room state is clean, so that their tasks do not hang forever after a
+// leave/destroy/disconnect.
+struct MucSessionRequests {
+    std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
+    std::vector<QXmppPromise<Result<>>> otherPromises;
+    std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> configWaiters;
+    std::vector<QXmppPromise<void>> roomInfoWaiters;
+
+    explicit MucSessionRequests(MucRoomData &data)
+        : configWaiters(std::move(data.roomConfigWaiters)),
+          roomInfoWaiters(std::move(data.roomInfoWaiters))
+    {
+        data.roomConfigWaiters.clear();
+        data.roomInfoWaiters.clear();
+        for (auto *promise : { &data.joinPromise, &data.createPromise }) {
+            if (auto taken = std::exchange(*promise, {})) {
+                joinPromises.push_back(std::move(*taken));
+            }
+        }
+        for (auto *promise : { &data.leavePromise, &data.nickChangePromise }) {
+            if (auto taken = std::exchange(*promise, {})) {
+                otherPromises.push_back(std::move(*taken));
+            }
+        }
+        for (auto &[id, pending] : data.pendingMessages) {
+            otherPromises.push_back(std::move(pending.promise));
+        }
+        data.pendingMessages.clear();
+        for (auto &waiter : data.affiliationWaiters) {
+            otherPromises.push_back(std::move(waiter));
+        }
+        data.affiliationWaiters.clear();
+    }
+
+    void finish()
+    {
+        for (auto &p : configWaiters) {
+            p.finish(QXmppError { u"The room session ended before the configuration request completed."_s });
+        }
+        const auto error = QXmppError { u"The room session ended before the request completed."_s };
+        for (auto &p : joinPromises) {
+            p.finish(error);
+        }
+        for (auto &p : otherPromises) {
+            p.finish(error);
+        }
+        // the messages continue without the room
+        for (auto &p : roomInfoWaiters) {
+            p.finish();
+        }
+    }
+};
+
+// The reason reported when rejoining a room failed with \a error.
+static Muc::LeaveReason rejoinFailureReason(const QXmppError &error)
+{
+    if (const auto stanzaError = error.value<QXmppStanza::Error>()) {
+        switch (stanzaError->condition()) {
+        case QXmppStanza::Error::Forbidden:
+            return Muc::LeaveReason::Banned;
+        case QXmppStanza::Error::RegistrationRequired:
+            return Muc::LeaveReason::MembersOnly;
+        case QXmppStanza::Error::ItemNotFound:
+        case QXmppStanza::Error::Gone:
+            return Muc::LeaveReason::RoomDestroyed;
+        default:
+            break;
+        }
+    }
+    return Muc::LeaveReason::Error;
+}
+
+// When a message was sent, the local time for live messages.
+static QDateTime sentTime(const QXmppMessage &message)
+{
+    return message.stamp().isValid() ? message.stamp().toUTC() : QDateTime::currentDateTimeUtc();
+}
+
 #include "QXmppMucManagerV2_p.h"
 #include "QXmppStanzaHandling_p.h"
 
@@ -361,6 +453,20 @@ struct MucRoomData {
         // use r
     }
     \endcode
+
+    \section1 Rejoining rooms
+
+    Joined rooms are rejoined automatically when the connection is lost and the stream is not
+    resumed (\xep{0198}{Stream Management}), and when \xep{0410}{MUC Self-Ping} detects that the
+    client has been removed from the room silently. The room handles stay valid:
+    QXmppMucRoomV2::joined() is \c false until the room has been rejoined. Afterwards, only the
+    occupants that have joined or left meanwhile are reported via participantJoined() and
+    participantLeft(). The discussion history is requested from the last message received
+    before, unless no history was requested in joinRoom(), and delivered via
+    roomHistoryReceived(). It may contain the last message again.
+
+    joinRoom() waits for a running rejoin. If rejoining fails, removedFromRoom() is emitted.
+    After QXmppClient::disconnectFromServer(), the rooms are not rejoined.
 
     \section1 Receiving messages
 
@@ -550,7 +656,7 @@ std::chrono::milliseconds QXmppMucManagerV2::selfPingSilenceThreshold() const
     eviction ("ghosting"). Defaults to 5 minutes. Pass a zero duration to disable
     self-pinging entirely.
 
-    Ghosted rooms are surfaced via removedFromRoom() with \c LeaveReason::ConnectionLost.
+    Ghosted rooms are rejoined, see \l{Rejoining rooms}.
 
     \since QXmpp 1.16
 */
@@ -652,7 +758,8 @@ QXmppTask<Result<QString>> QXmppMucManagerV2::requestUniqueRoomName(QString serv
     \l{Reactive Properties}.
 
     If a join for the same room is already in progress the task fails immediately. If the room is
-    already joined the existing room handle is returned as a success.
+    already joined the existing room handle is returned as a success. If the room is rejoined after
+    a connection loss, the task finishes with the result of the rejoin, see \l{Rejoining rooms}.
 
     \a jid is the bare JID of the room (e.g. \c room\@conference.example.org).
     \a nickname is the desired nickname — must not be empty.
@@ -674,36 +781,26 @@ QXmppTask<Result<QXmppMucRoomV2>> QXmppMucManagerV2::joinRoom(const QString &jid
         if (itr->second->state == MucRoomState::Joined) {
             return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppMucRoomV2(itr->second));
         }
+        if (itr->second->rejoining) {
+            QXmppPromise<Result<QXmppMucRoomV2>> promise;
+            auto task = promise.task();
+            itr->second->rejoinWaiters.push_back(std::move(promise));
+            return task;
+        }
         return makeReadyTask<Result<QXmppMucRoomV2>>(QXmppError { u"Room join already in progress."_s });
     }
 
     // Create or revive the room (cached server state carries over a leave/rejoin cycle).
     auto roomData = d->createOrReviveRoom(jid);
-    roomData->state = MucRoomState::JoiningOccupantPresences;
     roomData->nickname = nickname;
-
-    // Fetch room features in parallel; updates roominfo properties when it arrives.
-    d->fetchRoomInfo(jid);
+    roomData->history = history;
+    roomData->password = password;
+    roomData->lastMessageTime.reset();
 
     QXmppPromise<Result<QXmppMucRoomV2>> promise;
     auto task = promise.task();
     roomData->joinPromise = std::move(promise);
-
-    QXmppPresence p;
-    p.setTo(jid + u'/' + nickname);
-    p.setMucSupported(true);
-    p.setMucHistory(history);
-    p.setMucPassword(password);
-    client()->send(std::move(p));
-
-    // start timeout timer
-    auto *timer = new QTimer();
-    timer->setSingleShot(true);
-    QObject::connect(timer, &QTimer::timeout, this, [this, roomJid = jid]() {
-        d->handleJoinTimeout(roomJid);
-    });
-    roomData->joinTimer.reset(timer);
-    timer->start(d->timeout);
+    d->startJoin(*roomData, history);
 
     return task;
 }
@@ -861,6 +958,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
     case MucRoomState::JoiningRoomHistory:
         if (!message.body().isEmpty()) {
             // Has body: history message — cache for delivery after join
+            data.lastMessageTime = sentTime(message);
             data.historyMessages.append(message);
         } else if (message.hasSubject()) {
             // Has <subject/> but no body: subject message, always the last stanza during joining (XEP-0045 §7.2.7)
@@ -877,6 +975,9 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
     case MucRoomState::Joined: {
         // XEP-0410: any incoming stanza on a joined room counts as activity.
         data.lastActivity = std::chrono::steady_clock::now();
+        if (!message.body().isEmpty()) {
+            data.lastMessageTime = sentTime(message);
+        }
         // Reflections of sent messages are handled by resolveSender().
         // XEP-0424: Message Retraction / XEP-0425: Moderated Message Retraction.
         // The retraction is signalled separately via messageRetracted(), but the message is
@@ -989,14 +1090,19 @@ void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
 void QXmppMucManagerV2::onConnected()
 {
     if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->handleConnectionLost();
+        d->suspendAllRooms();
+        d->rejoinRooms();
     }
 }
 
 void QXmppMucManagerV2::onDisconnected()
 {
-    if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
+    // After disconnectFromServer() the server has removed us from all rooms, and they are not
+    // rejoined.
+    if (client()->clientPresence().type() == QXmppPresence::Unavailable) {
         d->handleConnectionLost();
+    } else if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
+        d->suspendAllRooms();
     }
 }
 
@@ -1147,7 +1253,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                         QXmppDataForm cancelForm;
                         cancelForm.setType(QXmppDataForm::Cancel);
                         q->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = roomJid, .payload = MucOwnerQuery { .form = std::move(cancelForm) } });
-                        throwRoomError(roomJid, QXmppError { u"Room does not exist."_s });
+                        throwRoomError(roomJid, QXmppError { u"Room does not exist."_s }, Muc::LeaveReason::RoomDestroyed);
                     }
                 } else {
                     if (data.createPromise) {
@@ -1395,9 +1501,11 @@ void QXmppMucManagerV2Private::runSelfPing(const QString &roomJid)
             rescheduleSelfPing();
             break;
         case SelfPingOutcome::NotJoined:
-            // Synthesize a forcible removal — reuses the standard removedFromRoom cleanup path.
-            Q_EMIT q->removedFromRoom(roomJid, Muc::LeaveReason::ConnectionLost, std::nullopt);
-            deactivateRoom(roomJid);
+            // ghosted: the room is rejoined
+            suspendRoom(data);
+            if (auto itr = activeRooms.find(roomJid); itr != activeRooms.end() && itr->second->rejoining) {
+                startRejoin(*itr->second);
+            }
             rescheduleSelfPing();
             break;
         }
@@ -1435,7 +1543,7 @@ std::chrono::steady_clock::time_point QXmppMucManagerV2Private::testLastActivity
     return it != activeRooms.end() ? it->second->lastActivity : std::chrono::steady_clock::time_point {};
 }
 
-void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError &&error)
+void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError &&error, std::optional<Muc::LeaveReason> rejoinReason)
 {
     auto itr = activeRooms.find(roomJid);
     if (itr == activeRooms.end()) {
@@ -1444,13 +1552,22 @@ void QXmppMucManagerV2Private::throwRoomError(const QString &roomJid, QXmppError
 
     // Move promise out before deactivating so we can finish it cleanly after the
     // session state (including the promise slots) is reset.
-    auto promise = std::exchange(itr->second->joinPromise, {});
+    auto &data = *itr->second;
+    auto promise = std::exchange(data.joinPromise, {});
     if (!promise) {
-        promise = std::exchange(itr->second->createPromise, {});
+        promise = std::exchange(data.createPromise, {});
+    }
+    auto rejoinWaiters = std::move(data.rejoinWaiters);
+    data.rejoinWaiters.clear();
+    if (data.rejoining) {
+        Q_EMIT q->removedFromRoom(roomJid, rejoinReason.value_or(rejoinFailureReason(error)), std::nullopt);
     }
     deactivateRoom(roomJid);
     rescheduleSelfPing();
 
+    for (auto &waiter : rejoinWaiters) {
+        waiter.finish(error);
+    }
     if (promise) {
         promise->finish(std::move(error));
     }
@@ -1515,6 +1632,13 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     auto data = std::move(itr->second);
     activeRooms.erase(itr);
     DiscoInfoTracking::setTracked(q->client(), jid, false);
+    if (data->rejoining) {
+        // the last known occupants
+        data->participants = std::move(data->previousParticipants);
+        data->previousParticipants.clear();
+        data->previousSelfParticipant.reset();
+        data->rejoining = false;
+    }
     // occupant JIDs may refer to other users once we have left the room
     for (const auto &[nickname, participant] : data->participants) {
         DiscoInfoTracking::reset(q->client(), jid + u'/' + nickname);
@@ -1524,28 +1648,11 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     // once the room state is clean, e.g. after being removed from the room while
     // joining. Callers finishing them differently (throwRoomError(), leave,
     // deactivateAllRooms()) have already moved them out.
-    auto configWaiters = std::move(data->roomConfigWaiters);
-    auto roomInfoWaiters = std::move(data->roomInfoWaiters);
-    data->roomInfoWaiters.clear();
-    std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
-    std::vector<QXmppPromise<Result<>>> otherPromises;
-    for (auto *promise : { &data->joinPromise, &data->createPromise }) {
-        if (*promise) {
-            joinPromises.push_back(std::move(**promise));
-        }
+    MucSessionRequests requests(*data);
+    for (auto &waiter : data->rejoinWaiters) {
+        requests.joinPromises.push_back(std::move(waiter));
     }
-    for (auto *promise : { &data->leavePromise, &data->nickChangePromise }) {
-        if (*promise) {
-            otherPromises.push_back(std::move(**promise));
-        }
-    }
-    for (auto &[id, pending] : data->pendingMessages) {
-        otherPromises.push_back(std::move(pending.promise));
-    }
-    for (auto &waiter : data->affiliationWaiters) {
-        otherPromises.push_back(std::move(waiter));
-    }
-    data->affiliationWaiters.clear();
+    data->rejoinWaiters.clear();
 
     // Reset per-session state (promises, timers, state flags). Participants and
     // permission bindings are intentionally preserved — they serve as a frozen
@@ -1556,22 +1663,7 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     // same MucRoomData instance as long as any caller handle is still holding it.
     inactiveRooms[jid] = data;
 
-    // Finish any outstanding requests now that the room state is clean,
-    // so their tasks don't hang forever after a leave/destroy/disconnect.
-    for (auto &p : configWaiters) {
-        p.finish(QXmppError { u"The room session ended before the configuration request completed."_s });
-    }
-    const auto error = QXmppError { u"The room session ended before the request completed."_s };
-    for (auto &p : joinPromises) {
-        p.finish(error);
-    }
-    for (auto &p : otherPromises) {
-        p.finish(error);
-    }
-    // the messages continue without the room
-    for (auto &p : roomInfoWaiters) {
-        p.finish();
-    }
+    requests.finish();
 
     // data shared_ptr goes out of scope here. If no caller holds a handle, the data
     // is freed and the weak_ptr expires (pruned lazily on next lookup or threshold sweep).
@@ -1586,7 +1678,7 @@ void QXmppMucManagerV2Private::handleConnectionLost()
     // Collect first: handlers may change the rooms.
     QStringList joinedRooms;
     for (const auto &[jid, data] : activeRooms) {
-        if (data->joined) {
+        if (data->joined || data->rejoining) {
             joinedRooms.append(jid);
         }
     }
@@ -1594,6 +1686,162 @@ void QXmppMucManagerV2Private::handleConnectionLost()
         Q_EMIT q->removedFromRoom(jid, Muc::LeaveReason::ConnectionLost, std::nullopt);
     }
     deactivateAllRooms(u"Disconnected from server."_s);
+}
+
+// Prepares a joined room for rejoining it: the session ends, but the room stays tracked.
+void QXmppMucManagerV2Private::suspendRoom(MucRoomData &data)
+{
+    if (data.rejoining) {
+        // lost again while rejoining
+        data.participants = data.previousParticipants;
+    } else {
+        data.rejoining = true;
+        data.previousParticipants = data.participants;
+        data.previousSelfParticipant = data.selfParticipant.value();
+    }
+    DiscoInfoTracking::setTracked(q->client(), data.roomJid, false);
+
+    MucSessionRequests requests(data);
+    data.resetSessionState();
+    requests.finish();
+}
+
+// The connection has been lost: joined rooms are rejoined after connecting, the joins in
+// progress fail.
+void QXmppMucManagerV2Private::suspendAllRooms()
+{
+    // Collect first: handlers may change the rooms.
+    std::vector<QString> joinedRooms;
+    std::vector<QString> otherRooms;
+    for (const auto &[jid, data] : activeRooms) {
+        (data->state == MucRoomState::Joined || data->rejoining ? joinedRooms : otherRooms).push_back(jid);
+    }
+    for (const auto &jid : otherRooms) {
+        throwRoomError(jid, QXmppError { u"Disconnected from server."_s });
+    }
+    for (const auto &jid : joinedRooms) {
+        if (auto itr = activeRooms.find(jid); itr != activeRooms.end()) {
+            suspendRoom(*itr->second);
+        }
+    }
+    rescheduleSelfPing();
+}
+
+void QXmppMucManagerV2Private::rejoinRooms()
+{
+    std::vector<QString> rooms;
+    for (const auto &[jid, data] : activeRooms) {
+        if (data->rejoining && data->state == MucRoomState::NotJoined) {
+            rooms.push_back(jid);
+        }
+    }
+    for (const auto &jid : rooms) {
+        if (auto itr = activeRooms.find(jid); itr != activeRooms.end()) {
+            startRejoin(*itr->second);
+        }
+    }
+}
+
+void QXmppMucManagerV2Private::startRejoin(MucRoomData &data)
+{
+    // the occupants are received again
+    data.participants.clear();
+
+    // Only the messages since the last one are requested, unless the application did not request
+    // any history, e.g. because it uses the archive of the room.
+    auto history = data.history;
+    if (data.lastMessageTime && !(history && history->maxStanzas() == 0)) {
+        history = history.value_or(Muc::HistoryOptions {});
+        history->setSince(*data.lastMessageTime);
+        history->setSeconds(std::nullopt);
+    }
+
+    // the result is reported by finishJoin() and throwRoomError()
+    data.joinPromise = QXmppPromise<Result<QXmppMucRoomV2>>();
+    startJoin(data, history);
+}
+
+// Sends the presence joining the room.
+void QXmppMucManagerV2Private::startJoin(MucRoomData &data, const std::optional<Muc::HistoryOptions> &history)
+{
+    data.state = MucRoomState::JoiningOccupantPresences;
+
+    // Fetch room features in parallel; updates roominfo properties when it arrives.
+    fetchRoomInfo(data.roomJid);
+
+    QXmppPresence p;
+    p.setTo(data.roomJid + u'/' + data.nickname.value());
+    p.setMucSupported(true);
+    p.setMucHistory(history);
+    p.setMucPassword(data.password);
+    q->client()->send(std::move(p));
+
+    // start timeout timer
+    auto *timer = new QTimer();
+    timer->setSingleShot(true);
+    QObject::connect(timer, &QTimer::timeout, q, [this, roomJid = data.roomJid]() {
+        handleJoinTimeout(roomJid);
+    });
+    data.joinTimer.reset(timer);
+    timer->start(timeout);
+}
+
+// Keeps the participants of the previous session that are still in the room, so that their
+// handles stay valid. Returns the participants that have left and those that have joined.
+std::pair<std::vector<std::pair<QString, std::shared_ptr<MucParticipantData>>>, std::vector<std::shared_ptr<MucParticipantData>>>
+QXmppMucManagerV2Private::finishRejoin(MucRoomData &data)
+{
+    auto previous = std::move(data.previousParticipants);
+    auto previousSelf = std::move(data.previousSelfParticipant);
+    data.previousParticipants.clear();
+    data.rejoining = false;
+
+    auto isSameOccupant = [](const MucParticipantData &a, const MucParticipantData &b) {
+        if (!a.occupantId.isEmpty() && !b.occupantId.isEmpty()) {
+            return a.occupantId == b.occupantId;
+        }
+        const auto aJid = QXmppUtils::jidToBareJid(a.jid.value());
+        const auto bJid = QXmppUtils::jidToBareJid(b.jid.value());
+        if (!aJid.isEmpty() && !bJid.isEmpty()) {
+            return aJid == bJid;
+        }
+        // only the nickname is known
+        return true;
+    };
+
+    const auto self = data.selfParticipant.value();
+    std::vector<std::shared_ptr<MucParticipantData>> joined;
+    for (auto &[nickname, participant] : data.participants) {
+        std::shared_ptr<MucParticipantData> kept;
+        if (participant == self) {
+            // the own nickname may have been changed by the service
+            kept = previousSelf;
+        } else if (auto itr = previous.find(nickname);
+                   itr != previous.end() && itr->second != previousSelf && isSameOccupant(*itr->second, *participant)) {
+            kept = itr->second;
+        }
+        if (!kept) {
+            joined.push_back(participant);
+            continue;
+        }
+        std::erase_if(previous, [&](const auto &entry) { return entry.second == kept; });
+        kept->occupantId = participant->occupantId;
+        kept->setPresence(participant->presence.value());
+        participant = kept;
+    }
+    if (previousSelf && self) {
+        data.selfParticipant = previousSelf;
+    }
+
+    std::vector<std::pair<QString, std::shared_ptr<MucParticipantData>>> left;
+    for (auto &[nickname, participant] : previous) {
+        if (participant != previousSelf) {
+            // the occupant JID may refer to another user now
+            DiscoInfoTracking::reset(q->client(), data.roomJid + u'/' + nickname);
+            left.emplace_back(nickname, std::move(participant));
+        }
+    }
+    return { std::move(left), std::move(joined) };
 }
 
 void QXmppMucManagerV2Private::deactivateAllRooms(const QString &errorText)
@@ -1724,6 +1972,15 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
 
 void QXmppMucManagerV2Private::finishJoin(const QString &roomJid, MucRoomData &data)
 {
+    // the changes of the occupants since the room was joined before
+    std::vector<std::pair<QString, std::shared_ptr<MucParticipantData>>> left;
+    std::vector<std::shared_ptr<MucParticipantData>> joinedParticipants;
+    if (data.rejoining) {
+        std::tie(left, joinedParticipants) = finishRejoin(data);
+    }
+    auto rejoinWaiters = std::move(data.rejoinWaiters);
+    data.rejoinWaiters.clear();
+
     data.state = MucRoomState::Joined;
     data.joined = true;
     data.joinTimer.reset();
@@ -1742,10 +1999,20 @@ void QXmppMucManagerV2Private::finishJoin(const QString &roomJid, MucRoomData &d
             message.setMucOccupantId({});
         }
     }
+    const auto room = activeRooms.at(roomJid);
+    for (const auto &[nickname, participant] : left) {
+        Q_EMIT q->participantLeft(roomJid, QXmppMucParticipant(participant), Muc::LeaveReason::Left);
+    }
+    for (const auto &participant : joinedParticipants) {
+        Q_EMIT q->participantJoined(roomJid, QXmppMucParticipant(participant));
+    }
     if (!history.isEmpty()) {
         Q_EMIT q->roomHistoryReceived(roomJid, history);
     }
-    promise.finish(QXmppMucRoomV2(activeRooms[roomJid]));
+    promise.finish(QXmppMucRoomV2(room));
+    for (auto &waiter : rejoinWaiters) {
+        waiter.finish(QXmppMucRoomV2(room));
+    }
 }
 
 void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
@@ -1868,7 +2135,7 @@ void QXmppMucManagerV2Private::handleJoinTimeout(const QString &roomJid)
 {
     using namespace std::chrono;
     auto secs = duration_cast<seconds>(timeout).count();
-    throwRoomError(roomJid, QXmppError { u"Joining room timed out after %1 seconds."_s.arg(secs) });
+    throwRoomError(roomJid, QXmppError { u"Joining room timed out after %1 seconds."_s.arg(secs) }, Muc::LeaveReason::ConnectionLost);
 }
 
 void QXmppMucManagerV2Private::handleLeaveTimeout(const QString &roomJid)
@@ -2252,7 +2519,8 @@ QBindable<QString> QXmppMucRoomV2::nickname() const
 
     This becomes \c true when QXmppMucManagerV2::joinRoom() resolves, or after
     QXmppMucManagerV2::createRoom() once setRoomConfig() has unlocked the room. It becomes
-    \c false when leaving the room, being removed from it or losing the connection.
+    \c false when leaving the room, being removed from it or losing the connection. After a
+    connection loss it becomes \c true again once the room has been rejoined.
 */
 QBindable<bool> QXmppMucRoomV2::joined() const
 {
@@ -2846,6 +3114,11 @@ QXmppTask<Result<>> QXmppMucRoomV2::leave()
     auto &data = *m_data;
     if (data.leavePromise) {
         return makeReadyTask<Result<>>(QXmppError { u"Already leaving the room."_s });
+    }
+    if (data.state == MucRoomState::NotJoined) {
+        // not in the room while waiting for the connection to rejoin it
+        m_data->manager->d->deactivateRoom(m_data->roomJid);
+        return makeReadyTask<Result<>>(Success());
     }
 
     QXmppPresence p;

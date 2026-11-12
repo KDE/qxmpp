@@ -120,6 +120,10 @@ private:
     Q_SLOT void disconnectNoStreamManagement();
     Q_SLOT void disconnectResumedStream();
     Q_SLOT void disconnectNewStream();
+    Q_SLOT void disconnectFromServer();
+    Q_SLOT void rejoinAfterConnectionLoss();
+    Q_SLOT void rejoinFails();
+    Q_SLOT void rejoinLeaveWhileDisconnected();
 
     // Role and affiliation management
     Q_SLOT void setRole();
@@ -2849,18 +2853,40 @@ void tst_QXmppMuc::disconnectNoStreamManagement()
     QList<std::pair<QString, bool>> removed;
     watchRemovedFromRoom(muc, removed);
 
-    // Simulate disconnect without stream management (intentional disconnect)
+    // Simulate disconnect without stream management
     test.setStreamManagementState(QXmppClient::NoStreamManagement);
     test.simulateDisconnected();
 
-    // Room state must be cleared immediately
+    // the joined room waits for the connection to be rejoined
+    QVERIFY(!room.joined().value());
+    QVERIFY(removed.isEmpty());
+    QVERIFY(muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+    expectFutureVariant<QXmppError>(joinTask);
+    QVERIFY(!muc->d->testHasRoom(u"other@chat.shakespeare.lit"_s));
+
+    // rejoined on the next connect
+    test.simulateConnected();
+    test.expectPacketRandomOrder(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+    QVERIFY(removed.isEmpty());
+}
+
+void tst_QXmppMuc::disconnectFromServer()
+{
+    TestClient test(true);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto room = joinedRoom(test, muc);
+
+    QList<std::pair<QString, bool>> removed;
+    watchRemovedFromRoom(muc, removed);
+
+    // the server removes us from all rooms, they are not rejoined
+    test.disconnectFromServer();
+    test.simulateDisconnected();
     QVERIFY(!room.joined().value());
     QCOMPARE(removed, (QList<std::pair<QString, bool>> { { u"coven@chat.shakespeare.lit"_s, true } }));
-    expectFutureVariant<QXmppError>(joinTask);
-
-    // not reported again on the next connect
-    test.simulateConnected();
-    QCOMPARE(removed.size(), 1);
+    QVERIFY(!muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
 }
 
 void tst_QXmppMuc::disconnectResumedStream()
@@ -2912,9 +2938,173 @@ void tst_QXmppMuc::disconnectNewStream()
     // Simulate reconnect where stream resumption failed (NewStream)
     test.simulateConnected();
 
-    // Room must be cleared now — server no longer knows about our presence
+    // The server no longer knows about our presence: the room is rejoined
     QVERIFY(!room.joined().value());
-    QCOMPARE(removed, (QList<std::pair<QString, bool>> { { u"coven@chat.shakespeare.lit"_s, true } }));
+    QVERIFY(removed.isEmpty());
+    test.expectPacketRandomOrder(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+}
+
+static QXmppPresence occupantPresence(const QString &nickname, const QString &jid, const QString &role = u"participant"_s, bool self = false)
+{
+    QXmppPresence presence;
+    parsePacket(presence,
+                QStringLiteral("<presence from='coven@chat.shakespeare.lit/%1'>"
+                               "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                               "<item affiliation='member' role='%3' jid='%2'/>"
+                               "%4"
+                               "</x>"
+                               "</presence>")
+                    .arg(nickname, jid, role, self ? u"<status code='110'/>"_s : QString())
+                    .toUtf8());
+    return presence;
+}
+
+void tst_QXmppMuc::rejoinAfterConnectionLoss()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    const auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    auto room = joinedRoom(test, muc);
+    test.injectPresence(occupantPresence(u"firstwitch"_s, u"crone1@shakespeare.lit/desktop"_s));
+    test.injectPresence(occupantPresence(u"secondwitch"_s, u"wiccarocks@shakespeare.lit/laptop"_s));
+    std::optional<QXmppMucParticipant> firstwitch;
+    for (const auto &participant : room.participants()) {
+        if (participant.nickname().value() == u"firstwitch") {
+            firstwitch = participant;
+        }
+    }
+    QVERIFY(firstwitch);
+    QCOMPARE(firstwitch->role().value(), Muc::Role::Participant);
+
+    // the history of the rejoin starts at the last message
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                       "<body>Hi</body><delay xmlns='urn:xmpp:delay' stamp='2026-11-12T10:00:00Z'/>"
+                       "</message>"_s);
+
+    QStringList joined;
+    QStringList left;
+    bool removed = false;
+    QObject::connect(muc, &QXmppMucManagerV2::participantJoined, muc, [&](const QString &, const QXmppMucParticipant &participant) {
+        joined << participant.nickname().value();
+    });
+    QObject::connect(muc, &QXmppMucManagerV2::participantLeft, muc, [&](const QString &, const QXmppMucParticipant &participant, Muc::LeaveReason reason) {
+        QCOMPARE(reason, Muc::LeaveReason::Left);
+        left << participant.nickname().value();
+    });
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc, [&]() { removed = true; });
+
+    test.setStreamManagementState(QXmppClient::NoStreamManagement);
+    test.simulateDisconnected();
+    QVERIFY(!room.joined().value());
+    // the occupants are kept while waiting
+    QCOMPARE(room.participants().size(), 3);
+
+    // joinRoom() waits for the rejoin
+    auto joinTask = muc->joinRoom(roomJid, u"thirdwitch"_s);
+    QVERIFY(!joinTask.isFinished());
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+    test.expectPacketRandomOrder(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'>"
+                                 "<x xmlns='http://jabber.org/protocol/muc'><history since='2026-11-12T10:00:00Z'/></x>"
+                                 "</presence>"_s);
+    auto infoId = test.expectPacketRandomOrder(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+
+    // firstwitch is still there, now as moderator; secondwitch has left; fourthwitch has joined
+    test.injectPresence(occupantPresence(u"firstwitch"_s, u"crone1@shakespeare.lit/desktop"_s, u"moderator"_s));
+    test.injectPresence(occupantPresence(u"fourthwitch"_s, u"hecate@shakespeare.lit/broom"_s));
+    test.injectPresence(occupantPresence(u"thirdwitch"_s, u"hag66@shakespeare.lit/pda"_s, u"moderator"_s, true));
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/fourthwitch' type='groupchat'>"
+                       "<body>New</body><delay xmlns='urn:xmpp:delay' stamp='2026-11-12T10:05:00Z'/>"
+                       "</message>"_s);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>"_s);
+    QVERIFY(!joinTask.isFinished());
+
+    QList<QXmppMessage> history;
+    QObject::connect(muc, &QXmppMucManagerV2::roomHistoryReceived, muc, [&](const QString &, const QList<QXmppMessage> &messages) {
+        history = messages;
+    });
+    test.inject(u"<iq id='"_s + infoId + u"' from='coven@chat.shakespeare.lit' type='result'>"
+                                         "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                         "<identity category='conference' type='text'/>"
+                                         "<feature var='http://jabber.org/protocol/muc'/>"
+                                         "</query></iq>");
+
+    auto rejoined = expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QCOMPARE(rejoined.jid(), roomJid);
+    QVERIFY(room.joined().value());
+    QVERIFY(!removed);
+    QCOMPARE(joined, QStringList { u"fourthwitch"_s });
+    QCOMPARE(left, QStringList { u"secondwitch"_s });
+    QCOMPARE(room.participants().size(), 3);
+    // the handles of remaining occupants stay valid
+    QCOMPARE(firstwitch->role().value(), Muc::Role::Moderator);
+    QCOMPARE(history.size(), 1);
+    QCOMPARE(history.first().body(), u"New"_s);
+}
+
+void tst_QXmppMuc::rejoinFails()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    const auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    auto room = joinedRoom(test, muc);
+
+    std::optional<Muc::LeaveReason> reason;
+    QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc, [&](const QString &jid, Muc::LeaveReason r, const auto &) {
+        QCOMPARE(jid, roomJid);
+        reason = r;
+    });
+
+    test.setStreamManagementState(QXmppClient::NoStreamManagement);
+    test.simulateDisconnected();
+    auto joinTask = muc->joinRoom(roomJid, u"thirdwitch"_s);
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+    test.expectPacketRandomOrder(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
+
+    // banned meanwhile
+    QXmppPresence error;
+    parsePacket(error,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch' type='error'>"
+                "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                "</presence>");
+    test.injectPresence(error);
+
+    QCOMPARE(reason, Muc::LeaveReason::Banned);
+    expectFutureVariant<QXmppError>(joinTask);
+    QVERIFY(!room.joined().value());
+    QVERIFY(!muc->d->testHasRoom(roomJid));
+}
+
+void tst_QXmppMuc::rejoinLeaveWhileDisconnected()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    const auto roomJid = u"coven@chat.shakespeare.lit"_s;
+
+    auto room = joinedRoom(test, muc);
+    test.setStreamManagementState(QXmppClient::NoStreamManagement);
+    test.simulateDisconnected();
+    auto joinTask = muc->joinRoom(roomJid, u"thirdwitch"_s);
+
+    // not in the room: left immediately, without a rejoin
+    auto leaveTask = room.leave();
+    expectFutureVariant<QXmpp::Success>(leaveTask);
+    expectFutureVariant<QXmppError>(joinTask);
+    QVERIFY(!muc->d->testHasRoom(roomJid));
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+    QVERIFY(!muc->d->testHasRoom(roomJid));
 }
 
 void tst_QXmppMuc::setRole()
@@ -4436,10 +4626,11 @@ void tst_QXmppMuc::selfPingGhosted()
                 "<error type='cancel'><not-acceptable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
                 "</iq>"_s);
 
-    // Ghost detected: room erased and signal fired with ConnectionLost.
-    QCOMPARE(seenRoomJid, roomJid);
-    QCOMPARE(seenReason, Muc::LeaveReason::ConnectionLost);
-    QVERIFY(!muc->d->testHasRoom(roomJid));
+    // Ghost detected: the room is rejoined
+    QVERIFY(seenRoomJid.isEmpty());
+    QVERIFY(muc->d->testHasRoom(roomJid));
+    QVERIFY(!room.joined().value());
+    test.expectPacketRandomOrder(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 }
 
 void tst_QXmppMuc::selfPingInconclusiveRetry()
@@ -4535,9 +4726,9 @@ void tst_QXmppMuc::selfPingUnknownErrorCondition()
                 "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
                 "</iq>"_s);
 
-    QCOMPARE(seenRoomJid, roomJid);
-    QCOMPARE(seenReason, Muc::LeaveReason::ConnectionLost);
-    QVERIFY(!muc->d->testHasRoom(roomJid));
+    QVERIFY(seenRoomJid.isEmpty());
+    QVERIFY(muc->d->testHasRoom(roomJid));
+    test.expectPacketRandomOrder(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 }
 
 void tst_QXmppMuc::selfPingSkippedDuringNickChange()

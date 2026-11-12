@@ -18,10 +18,13 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include <QTimer>
 
 namespace QXmpp::Private {
+struct MucParticipantData;
 struct MucRoomData;
 
 constexpr auto MucJoinTimeout = std::chrono::seconds(30);
@@ -54,6 +57,13 @@ struct QXmppMucManagerV2Private {
     std::shared_ptr<QXmpp::Private::MucRoomData> createOrReviveRoom(const QString &jid);
     void deactivateRoom(const QString &jid);
     void handleConnectionLost();
+    void suspendRoom(QXmpp::Private::MucRoomData &data);
+    void suspendAllRooms();
+    void rejoinRooms();
+    void startRejoin(QXmpp::Private::MucRoomData &data);
+    void startJoin(QXmpp::Private::MucRoomData &data, const std::optional<QXmpp::Muc::HistoryOptions> &history);
+    std::pair<std::vector<std::pair<QString, std::shared_ptr<QXmpp::Private::MucParticipantData>>>, std::vector<std::shared_ptr<QXmpp::Private::MucParticipantData>>>
+    finishRejoin(QXmpp::Private::MucRoomData &data);
     void deactivateAllRooms(const QString &errorText);
     void pruneInactiveRooms();
 
@@ -67,7 +77,7 @@ struct QXmppMucManagerV2Private {
     void handlePresence(const QXmppPresence &);
     void handleRoomPresence(const QString &roomJid, QXmpp::Private::MucRoomData &data, QXmppPresence);
     void handleSelfUnavailable(const QString &roomJid, QXmpp::Private::MucRoomData &data, const QXmppPresence &presence);
-    void throwRoomError(const QString &roomJid, QXmppError &&error);
+    void throwRoomError(const QString &roomJid, QXmppError &&error, std::optional<QXmpp::Muc::LeaveReason> rejoinReason = {});
     void handleJoinTimeout(const QString &roomJid);
     void handleLeaveTimeout(const QString &roomJid);
     void handleNickChangeTimeout(const QString &roomJid);
