@@ -9,8 +9,8 @@
 #include "QXmppE2eeProvider.h"
 #include "QXmppEncryptedIqs_p.h"
 #include "QXmppHooks_p.h"
+#include "QXmppIqHandling.h"
 #include "QXmppLogger.h"
-#include "QXmppMessages.h"
 #include "QXmppOutgoingClient_p.h"
 #include "QXmppPacket_p.h"
 #include "QXmppStreamManagement_p.h"
@@ -23,7 +23,6 @@
 #include <QXmlStreamWriter>
 
 using namespace QXmpp;
-using namespace QXmpp::Messages;
 
 namespace QXmpp::Private {
 
@@ -50,6 +49,11 @@ static EncryptedIqs::IqResult mapResponse(QDomElement &&response)
         return iqResponseError(response);
     }
     return std::move(response);
+}
+
+static QXmppError notEncryptedError()
+{
+    return QXmppError { u"No end-to-end encryption has been selected for an IQ that must be encrypted"_s, SendError::EncryptionError };
 }
 
 static Iq::Type iqType(QXmppIq::Type type)
@@ -95,11 +99,11 @@ QXmppIq EncryptedIqs::deserialize(const OutgoingIq &iq)
     return result;
 }
 
-QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const OutgoingIq &iq, QString encryption)
+QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const OutgoingIq &iq, QString encryption, bool required)
 {
     // an IQ without 'to' is addressed to the own account (RFC 6120, section 10.3.3)
-    auto selection = EncryptionSelection::forIq(iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to, true, std::move(encryption));
-    co_await m_hooks.run<SelectEncryption>(selection).withContext(m_client);
+    Iq::EncryptionSelection selection(iq.type, iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to, required, std::move(encryption));
+    co_await m_hooks.run<Iq::SelectEncryption>(selection).withContext(m_client);
 
     if (selection.encryption().isEmpty()) {
         co_return QString();
@@ -187,7 +191,7 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
 
 QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(OutgoingIq iq, QXmppSendStanzaParams params)
 {
-    auto selection = co_await select(iq, {});
+    auto selection = co_await select(iq, {}, params.isEncryptionRequired());
     if (auto *error = std::get_if<QXmppError>(&selection)) {
         co_return std::move(*error);
     }
@@ -200,6 +204,9 @@ QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(OutgoingIq iq, QXmpp
         if (m_clientPrivate->encryptionExtension) {
             // deprecated encryption extension
             co_return co_await m_clientPrivate->sendSensitiveIq(deserialize(iq), params);
+        }
+        if (params.isEncryptionRequired()) {
+            co_return notEncryptedError();
         }
         co_return co_await stream->iqManager().sendIq(QXmppPacket(iq.toXml(), true), iq.id, to).withContext(m_client);
     }
@@ -228,7 +235,7 @@ QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(OutgoingIq iq, QXmpp
 
 QXmppTask<SendResult> EncryptedIqs::send(OutgoingIq iq, QXmppSendStanzaParams params, QString encryption)
 {
-    auto selection = co_await select(iq, std::move(encryption));
+    auto selection = co_await select(iq, std::move(encryption), params.isEncryptionRequired());
     if (auto *error = std::get_if<QXmppError>(&selection)) {
         co_return std::move(*error);
     }
@@ -239,6 +246,9 @@ QXmppTask<SendResult> EncryptedIqs::send(OutgoingIq iq, QXmppSendStanzaParams pa
         if (auto *legacyEncryption = m_clientPrivate->encryptionExtension) {
             // deprecated encryption extension
             co_return co_await m_clientPrivate->sendEncryptedIq(legacyEncryption->encryptIq(deserialize(iq), params));
+        }
+        if (params.isEncryptionRequired()) {
+            co_return notEncryptedError();
         }
         co_return co_await streamAckManager.send(QXmppPacket(iq.toXml(), true)).withContext(m_client);
     }

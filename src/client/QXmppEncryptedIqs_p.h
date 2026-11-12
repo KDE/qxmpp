@@ -23,7 +23,7 @@ class QXmppClientPrivate;
 namespace QXmpp::Private {
 
 // End-to-end encryption of IQs via the e2ee providers (QXmpp::E2ee::Provider::encryptIq() and
-// decryptIq()). The encryption is selected by the SelectEncryption hook, without selection the
+// decryptIq()). The encryption is selected by the QXmpp::Iq::SelectEncryption hook, without selection the
 // encryption extension is used like before.
 class EncryptedIqs
 {
@@ -55,7 +55,7 @@ private:
     using Selection = std::variant<QString, QXmppError>;
     using Encryption = std::variant<QByteArray, QXmppError>;
 
-    QXmppTask<Selection> select(const OutgoingIq &iq, QString encryption);
+    QXmppTask<Selection> select(const OutgoingIq &iq, QString encryption, bool required);
     QXmppTask<Encryption> encrypt(const OutgoingIq &iq, QString encryption, QXmppSendStanzaParams params);
     QXmppTask<IqResult> decrypt(QDomElement iq, QStringView encryption);
     QXmppTask<void> processIncomingAsync(QDomElement element, QStringView encryption);

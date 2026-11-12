@@ -5964,6 +5964,7 @@ private:
     Q_SLOT void iqEncrypted();
     Q_SLOT void iqEncryptedError();
     Q_SLOT void iqWithoutSelection();
+    Q_SLOT void iqRequired();
     Q_SLOT void iqIncoming();
     Q_SLOT void iqIncomingNotDecrypted();
     Q_SLOT void bodyOnlyDecrypt();
@@ -6274,7 +6275,7 @@ void tst_QXmppMessages::outgoingEncrypted()
     // selected asynchronously, e.g. after a database query
     std::vector<QXmppPromise<void>> selections;
     client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
-        if (selection.message()->body() == u"secret") {
+        if (selection.message().body() == u"secret") {
             selection.setEncryption(TestEncryption);
         }
         selections.emplace_back();
@@ -6380,7 +6381,7 @@ void tst_QXmppMessages::outgoingEncryptionError()
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
-        selection.setEncryption(selection.message()->body() == u"unknown" ? u"urn:test:unknown"_s : TestEncryption.toString());
+        selection.setEncryption(selection.message().body() == u"unknown" ? u"urn:test:unknown"_s : TestEncryption.toString());
     });
 
     // no provider
@@ -6504,10 +6505,10 @@ void tst_QXmppMessages::iqEncrypted()
     client.configuration().setJid(u"me@example.org/res"_s);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
-    bool isIq = false;
-    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
-        isIq = selection.isIq() && !selection.message() && selection.isRequired();
+    std::optional<Iq::EncryptionSelection> selected;
+    client.hooks(&owner).add<Iq::SelectEncryption>([&](Iq::EncryptionSelection &selection) {
         selection.setEncryption(TestEncryption);
+        selected = selection;
     });
 
     // the payload of the subclass is encrypted
@@ -6517,7 +6518,10 @@ void tst_QXmppMessages::iqEncrypted()
     request.setCid(cid);
     request.setId(u"qx1"_s);
     auto task = client.sendSensitiveIq(std::move(request));
-    QVERIFY(isIq);
+    QVERIFY(selected);
+    QCOMPARE(selected->type(), Iq::Type::Get);
+    QCOMPARE(selected->to(), u"alice@example.org/phone"_s);
+    QVERIFY(!selected->isRequired());
     QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
     QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(cid.toContentId()));
     QCOMPARE(e2ee->encryptedIqRecipients.at(0), QList<QString> { u"alice@example.org"_s });
@@ -6540,7 +6544,7 @@ void tst_QXmppMessages::iqEncryptedError()
     client.configuration().setJid(u"me@example.org/res"_s);
     client.addNewExtension<TestE2eeManager>();
     QObject owner;
-    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+    client.hooks(&owner).add<Iq::SelectEncryption>([](Iq::EncryptionSelection &selection) {
         selection.setEncryption(TestEncryption);
     });
 
@@ -6563,7 +6567,11 @@ void tst_QXmppMessages::iqWithoutSelection()
     client.configuration().setJid(u"me@example.org/res"_s);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
-    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &) { });
+    client.hooks(&owner).add<Iq::SelectEncryption>([](Iq::EncryptionSelection &) { });
+    // the encryption of messages is not used for IQs
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestEncryption);
+    });
 
     // without encryption extension unencrypted like before, with the payload
     QXmppBitsOfBinaryIq request;
@@ -6573,6 +6581,30 @@ void tst_QXmppMessages::iqWithoutSelection()
     const auto packet = client.takePacket();
     QVERIFY(packet.contains(u"urn:xmpp:bob"_s));
     QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+}
+
+void tst_QXmppMessages::iqRequired()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    bool required = false;
+    client.hooks(&owner).add<Iq::SelectEncryption>([&](Iq::EncryptionSelection &selection) {
+        required = selection.isRequired();
+    });
+
+    // fails without selection instead of sending unencrypted
+    QXmppSendStanzaParams params;
+    params.setEncryptionRequired(true);
+    QXmppVersionIq request;
+    request.setTo(u"alice@example.org/phone"_s);
+    auto task = client.sendSensitiveIq(std::move(request), params);
+    QVERIFY(required);
+    auto error = expectFutureVariant<QXmppError>(task);
+    QCOMPARE(error.value<SendError>(), SendError::EncryptionError);
+    QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+    client.expectNoPacket();
 }
 
 void tst_QXmppMessages::iqIncoming()
@@ -6833,7 +6865,7 @@ void tst_QXmppIqSending::encrypted()
     client.configuration().setJid(u"me@example.org/res"_s);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
-    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+    client.hooks(&owner).add<Iq::SelectEncryption>([](Iq::EncryptionSelection &selection) {
         selection.setEncryption(TestEncryption);
     });
 

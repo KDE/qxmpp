@@ -50,10 +50,12 @@ namespace QXmpp::Iq {
 */
 struct SendOptions {
     /*!
-        Whether the request and its response are end-to-end encrypted.
+        Whether the request and its response are end-to-end encrypted if possible.
 
-        The encryption is selected via the QXmpp::Messages::SelectEncryption hook. If no encryption
-        is selected, the encryption extension (QXmppClient::setEncryptionExtension()) is used.
+        The encryption is selected via the QXmpp::Iq::SelectEncryption hook. If no encryption is
+        selected, the encryption extension (QXmppClient::setEncryptionExtension()) is used.
+        Without encryption extension, the request is sent unencrypted, unless
+        QXmppSendStanzaParams::isEncryptionRequired() is set in \c params: sending fails then.
     */
     bool encrypted = false;
     /*! Parameters for the end-to-end encryption */

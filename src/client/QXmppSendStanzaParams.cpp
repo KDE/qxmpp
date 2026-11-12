@@ -89,7 +89,7 @@ void QXmppSendStanzaParams::setAcceptedTrustLevels(std::optional<TrustLevels> tr
 }
 
 /*!
-    Returns whether sending a message fails if it can not be end-to-end encrypted.
+    Returns whether sending a message or IQ fails if it can not be end-to-end encrypted.
 
     \since QXmpp 1.18
 */
@@ -99,10 +99,11 @@ bool QXmppSendStanzaParams::isEncryptionRequired() const
 }
 
 /*!
-    Sets whether sending a message fails if it can not be end-to-end encrypted.
+    Sets whether sending a message or IQ fails if it can not be end-to-end encrypted.
 
     If set, sending fails with QXmpp::SendError::EncryptionError if no encryption is selected by
-    the QXmpp::Messages::SelectEncryption hook, instead of sending the message unencrypted.
+    the QXmpp::Messages::SelectEncryption hook (or QXmpp::Iq::SelectEncryption for IQs), instead
+    of sending the stanza unencrypted.
     Sensitive stanzas sent by QXmpp's managers (and via the deprecated
     QXmppClient::sendSensitive()) are still encrypted with the deprecated encryption extension
     (QXmppClient::setEncryptionExtension()) if no encryption is selected.

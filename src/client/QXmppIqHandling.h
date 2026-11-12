@@ -99,6 +99,45 @@ private:
     std::optional<QXmppStanza::Error> m_error;
 };
 
+class EncryptionSelection
+{
+public:
+    /*! \internal */
+    EncryptionSelection(Type type, QString to, bool required, QString encryption = {})
+        : m_to(std::move(to)), m_encryption(std::move(encryption)), m_type(type), m_required(required)
+    {
+    }
+
+    /*! Returns the type of the IQ, requests and responses are encrypted. */
+    Type type() const { return m_type; }
+    /*! Returns the JID of the recipient, the own bare JID for IQs to the own account. */
+    const QString &to() const { return m_to; }
+    /*!
+        Returns whether sending fails if no encryption is selected (see
+        QXmppSendStanzaParams::isEncryptionRequired()).
+    */
+    bool isRequired() const { return m_required; }
+
+    /*!
+        Returns the namespace of the encryption (see QXmpp::E2ee), empty for sending the IQ
+        unencrypted.
+    */
+    const QString &encryption() const { return m_encryption; }
+    /*! Sets the namespace of the \a encryption. */
+    void setEncryption(QStringView encryption) { m_encryption = encryption.toString(); }
+
+private:
+    QString m_to;
+    QString m_encryption;
+    Type m_type;
+    bool m_required;
+};
+
+struct SelectEncryption {
+    static constexpr QStringView Name = u"org.qxmpp.iq.select-encryption";
+    using Signature = QXmppTask<void>(EncryptionSelection &selection);
+};
+
 }  // namespace QXmpp::Iq
 
 namespace QXmpp::Private {

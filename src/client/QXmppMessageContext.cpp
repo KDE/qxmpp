@@ -49,10 +49,7 @@ namespace QXmpp::Messages {
     across the asynchronous phases. Waiting for the confirmation of the delivery does not block
     the next message.
 
-    IQs sent via QXmppClient::sendSensitiveIq() are encrypted with the encryption selected by
-    the SelectEncryption hook too. Encrypted IQ requests are decrypted by the e2ee provider and
-    passed to the extensions with their QXmppE2eeMetadata. Replies of handlers added via
-    QXmpp::Iq::Received are encrypted like the request.
+    The encryption of IQs is selected via QXmpp::Iq::SelectEncryption.
 
     \since QXmpp 1.18
 */
@@ -63,15 +60,9 @@ namespace QXmpp::Messages {
 
     Input and result of the SelectEncryption hook.
 
-    The hook runs for messages and for IQs sent via QXmppClient::sendSensitiveIq(), typed IQs sent
-    encrypted via QXmppClient::sendIq() and responses to IQ requests. to() returns the recipient
-    of both, the own bare JID for IQs to the own account. Messages are available via message(),
-    isIq() is set for IQs. The payload of IQs is not available.
-
     The encryption is identified by its namespace (see QXmpp::E2ee), it is empty for sending the
-    message unencrypted. Replies of QXmpp's managers (e.g. delivery receipts) and responses to
-    IQ requests are preset with the encryption of the message or request replied to, so they
-    stay encrypted without a handler.
+    message unencrypted. Replies of QXmpp's managers (e.g. delivery receipts) are preset with the
+    encryption of the message replied to, so they stay encrypted without a handler.
 
     isRequired() is set for sensitive stanzas sent by QXmpp's managers (e.g. roster subscription
     requests) and for messages with QXmppSendStanzaParams::isEncryptionRequired().

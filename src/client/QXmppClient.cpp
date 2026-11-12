@@ -16,6 +16,7 @@
 #include "QXmppE2eeMetadata.h"
 #include "QXmppE2eeProvider.h"
 #include "QXmppEntityTimeManager.h"
+#include "QXmppIqHandling.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessages.h"
@@ -547,7 +548,7 @@ void QXmpp::Private::LegacyE2ee::setEncryptionExtension(QXmppClient *client, QXm
     \deprecated since QXmpp 1.18, end-to-end encryptions are QXmpp::E2ee::Provider registered via
     QXmpp::E2ee::Providers, e.g. QXmppOmemoManager. The encryption extension is
     still used for sensitive stanzas sent by QXmpp's managers if no encryption is selected by the
-    QXmpp::Messages::SelectEncryption hook.
+    QXmpp::Messages::SelectEncryption or QXmpp::Iq::SelectEncryption hook.
 
     \since QXmpp 1.5
 
@@ -667,7 +668,7 @@ QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::sendSensitive(QXmppClie
     if (OutgoingMessages::isPipelineStanza(stanza)) {
         return client->d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
     }
-    if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && client->hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
+    if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && client->hooks(nullptr).hasHandlers<Iq::SelectEncryption>()) {
         return client->d->encryptedIqs.send(Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), {});
     }
     if (client->d->encryptionExtension) {
@@ -734,7 +735,8 @@ QXmppTask<SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::optiona
 
     \deprecated since QXmpp 1.18, use send() and select the encryption via the
     QXmpp::Messages::SelectEncryption hook. Replies to IQ requests handled via
-    QXmpp::Iq::Received are encrypted like the request.
+    QXmpp::Iq::Received are encrypted like the request, the encryption can be changed via the
+    QXmpp::Iq::SelectEncryption hook.
 
     \since QXmpp 1.5
 
@@ -806,10 +808,12 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::op
     IQs of type 'error' are parsed automatically and returned as QXmppError with a contained
     QXmppStanza::Error.
 
-    If there are handlers of the QXmpp::Messages::SelectEncryption hook, the IQ is encrypted with
+    If there are handlers of the QXmpp::Iq::SelectEncryption hook, the IQ is encrypted with
     the selected encryption via its e2ee provider (QXmpp::E2ee::Provider::encryptIq) and an
     encrypted response, also an error, is decrypted. If no encryption is selected, the
-    encryption extension (setEncryptionExtension()) is used like in earlier versions.
+    encryption extension (setEncryptionExtension()) is used like in earlier versions. Without
+    encryption extension, the IQ is sent unencrypted, unless
+    QXmppSendStanzaParams::isEncryptionRequired() is set.
 
     \since QXmpp 1.5
 
@@ -817,7 +821,7 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendIq(QXmppIq &&iq, const std::op
 */
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &params)
 {
-    if (hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
+    if (hooks(nullptr).hasHandlers<Iq::SelectEncryption>()) {
         // serialized before the IQ is copied, which would lose the payload of subclasses
         return d->encryptedIqs.sendRequest(Private::EncryptedIqs::serialize(iq), params.value_or(QXmppSendStanzaParams()));
     }
@@ -930,7 +934,7 @@ QString QXmppClient::validIqId(QString id)
 QXmppTask<QXmppClient::IqResult> QXmppClient::sendOutgoingIq(OutgoingIq &&iq, Iq::SendOptions &&options)
 {
     if (options.encrypted) {
-        // the encryption is selected via SelectEncryption, without selection the deprecated
+        // the encryption is selected via Iq::SelectEncryption, without selection the deprecated
         // encryption extension is used
         return d->encryptedIqs.sendRequest(std::move(iq), std::move(options.params));
     }

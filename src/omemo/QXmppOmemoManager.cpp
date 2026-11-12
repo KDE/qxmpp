@@ -245,6 +245,11 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
     });
     \endcode
 
+    IQs sent via QXmppClient::sendSensitiveIq() or QXmppClient::sendIq() with
+    QXmpp::Iq::SendOptions::encrypted are encrypted if OMEMO is selected via the
+    QXmpp::Iq::SelectEncryption hook. Replies to OMEMO encrypted IQ requests are encrypted with
+    OMEMO without a handler.
+
     You can set a security policy used by OMEMO.
     Is is recommended to apply TOAKAFA for good security and usability when using
     \xep{0450}{Automatic Trust Management (ATM)}:

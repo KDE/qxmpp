@@ -76,22 +76,11 @@ public:
         : m_message(&message), m_encryption(std::move(encryption)), m_required(required)
     {
     }
-    // For an IQ to \a to.
-    static EncryptionSelection forIq(QString to, bool required, QString encryption = {})
-    {
-        EncryptionSelection selection;
-        selection.m_to = std::move(to);
-        selection.m_encryption = std::move(encryption);
-        selection.m_required = required;
-        return selection;
-    }
 
-    // JID of the recipient of the message or IQ.
-    QString to() const { return m_message ? m_message->to() : m_to; }
-    // The message, null for IQs.
-    const QXmppMessage *message() const { return m_message; }
-    // Whether an IQ is sent.
-    bool isIq() const { return !m_message; }
+    // The message to be sent.
+    const QXmppMessage &message() const { return *m_message; }
+    // JID of the recipient of the message.
+    QString to() const { return m_message->to(); }
 
     // see QXmppSendStanzaParams::isEncryptionRequired(), also set for sensitive stanzas of managers
     bool isRequired() const { return m_required; }
@@ -101,10 +90,7 @@ public:
     void setEncryption(QStringView encryption) { m_encryption = encryption.toString(); }
 
 private:
-    EncryptionSelection() = default;
-
-    const QXmppMessage *m_message = nullptr;
-    QString m_to;
+    const QXmppMessage *m_message;
     QString m_encryption;
     bool m_required = false;
 };

@@ -15,6 +15,50 @@
 namespace QXmpp::Iq {
 
 /*!
+    \class QXmpp::Iq::EncryptionSelection
+    \inmodule QXmpp
+
+    Input and result of the QXmpp::Iq::SelectEncryption hook.
+
+    The payload of the IQ is not available, it is only serialized when the IQ is encrypted.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \struct QXmpp::Iq::SelectEncryption
+    \inmodule QXmpp
+
+    Asynchronous hook selecting the end-to-end encryption of an outgoing IQ.
+
+    It runs for IQs that are end-to-end encrypted if possible: requests sent via
+    QXmppClient::sendSensitiveIq() or via QXmppClient::sendIq() with
+    QXmpp::Iq::SendOptions::encrypted, and replies to end-to-end encrypted requests. Other IQs are
+    always sent unencrypted. Messages are selected via QXmpp::Messages::SelectEncryption.
+
+    Replies to encrypted requests are preset with the encryption of the request, so they stay
+    encrypted without a handler. Handlers run in order and may override the encryption set by
+    earlier ones:
+
+    \code
+    client->hooks(this).add<QXmpp::Iq::SelectEncryption>([this](QXmpp::Iq::EncryptionSelection &selection) {
+        if (isEncryptionEnabled(selection.to())) {
+            selection.setEncryption(QXmpp::E2ee::Omemo2);
+        }
+    });
+    \endcode
+
+    If no encryption is selected, the deprecated encryption extension
+    (QXmppClient::setEncryptionExtension()) is used as in earlier versions. Without encryption
+    extension, the IQ is sent unencrypted, unless QXmpp::Iq::EncryptionSelection::isRequired() is
+    set: sending fails then with QXmpp::SendError::EncryptionError.
+
+    If there is no handler, QXmppClient::sendSensitiveIq() uses the encryption extension directly.
+
+    \since QXmpp 1.18
+*/
+
+/*!
     Returns an error reply for handlers not supporting end-to-end encrypted requests.
 */
 Reply Reply::encryptionNotSupported()

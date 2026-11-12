@@ -15,6 +15,7 @@
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppIqHandling.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
 #include "QXmppMessages.h"
@@ -426,7 +427,7 @@ void tst_QXmppOmemoManager::testSendIq()
 
     // Via the e2ee provider, selected by the SelectEncryption hook
     QObject owner;
-    m_alice1.client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+    m_alice1.client.hooks(&owner).add<QXmpp::Iq::SelectEncryption>([](QXmpp::Iq::EncryptionSelection &selection) {
         selection.setEncryption(QXmpp::E2ee::Omemo2);
     });
 

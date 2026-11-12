@@ -58,7 +58,7 @@ struct IqRequests {
 
 // The deprecated end-to-end encryption API (QXmppClient::sendSensitive(), reply() and the
 // encryption extension) for QXmpp's own managers, which keep using it as a fallback for
-// applications without a QXmpp::Messages::SelectEncryption handler.
+// applications without a QXmpp::Messages::SelectEncryption or QXmpp::Iq::SelectEncryption handler.
 struct QXMPP_PRIVATE_EXPORT LegacyE2ee {
     // Encrypts with the selected encryption or else with the encryption extension. Without both,
     // the stanza is sent unencrypted.
