@@ -72,7 +72,7 @@ struct QXmppMucManagerV2Private {
     void handleLeaveTimeout(const QString &roomJid);
     void handleNickChangeTimeout(const QString &roomJid);
     void handleMessageTimeout(const QString &roomJid, const QString &originId);
-    QXmpp::HookResult resolveSender(QXmpp::Messages::Context &context);
+    QXmppTask<QXmpp::HookResult> resolveSender(QXmpp::Messages::Context &context);
     QXmpp::Private::MucRoomData *joinedRoom(const QXmppMessage &message);
     QXmpp::HookResult prepareMessage(QXmpp::Messages::OutgoingMessage &message);
     QXmppTask<void> resolveRecipients(QXmpp::Messages::OutgoingMessage &message);

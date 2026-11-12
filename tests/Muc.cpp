@@ -198,6 +198,7 @@ private:
     Q_SLOT void occupantIdStrippedMessage();
     Q_SLOT void occupantIdAccessor();
     Q_SLOT void occupantIdMessageBeforeRoomInfo();
+    Q_SLOT void messagesContinueAfterFailedJoin();
 
     // Shared-ownership lifetime safety
     Q_SLOT void handleSurvivesLeave();
@@ -975,7 +976,7 @@ void tst_QXmppMuc::joinRoomWithHistoryMessages()
         }
     });
     int liveMessages = 0;
-    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &) {
+    QObject::connect(&test, &QXmppClient::messageReceived, muc, [&](const QXmppMessage &) {
         liveMessages++;
     });
 
@@ -990,33 +991,26 @@ void tst_QXmppMuc::joinRoomWithHistoryMessages()
     test.injectPresence(selfPresence);
 
     // Discussion history is replayed before the subject.
-    QXmppMessage firstHistoryMsg;
-    parsePacket(firstHistoryMsg,
-                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
-                "<body>Thrice the brinded cat hath mew'd.</body>"
-                "</message>");
-    QVERIFY(muc->handleMessage(firstHistoryMsg));
-    QXmppMessage secondHistoryMsg;
-    parsePacket(secondHistoryMsg,
-                "<message from='coven@chat.shakespeare.lit/secondwitch' type='groupchat'>"
-                "<body>Thrice and once the hedge-pig whined.</body>"
-                "</message>");
-    QVERIFY(muc->handleMessage(secondHistoryMsg));
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                       "<body>Thrice the brinded cat hath mew'd.</body>"
+                       "<delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/>"
+                       "</message>"_s);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/secondwitch' type='groupchat'>"
+                       "<body>Thrice and once the hedge-pig whined.</body>"
+                       "<delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:38Z'/>"
+                       "</message>"_s);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>"_s);
 
     // Nothing is delivered while the join is still running.
     QVERIFY(historyBodies.isEmpty());
     QVERIFY(!task.isFinished());
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Cauldron</subject></message>");
-    muc->handleMessage(subjectMsg);
 
     injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QCOMPARE(room.subject().value(), u"Cauldron"_s);
     QCOMPARE(historyRoomJid, u"coven@chat.shakespeare.lit"_s);
     QCOMPARE(historyBodies, QStringList({ u"Thrice the brinded cat hath mew'd."_s, u"Thrice and once the hedge-pig whined."_s }));
-    // History is not replayed a second time through messageReceived().
+    // History and subject are not delivered via QXmppClient::messageReceived().
     QCOMPARE(liveMessages, 0);
 }
 
@@ -1270,19 +1264,32 @@ void tst_QXmppMuc::receiveMessage()
     joinedRoom(test, muc);
 
     // Now receive a live message
-    QXmppMessage receivedMsg;
-    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &roomJid, const QXmppMessage &msg) {
-        QCOMPARE(roomJid, u"coven@chat.shakespeare.lit"_s);
-        receivedMsg = msg;
+    QList<QXmppMessage> received;
+    QObject::connect(&test, &QXmppClient::messageReceived, muc, [&](const QXmppMessage &msg) {
+        received << msg;
     });
 
-    QXmppMessage liveMsg;
-    parsePacket(liveMsg,
-                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
-                "<body>Thrice the brinded cat hath mew'd.</body>"
-                "</message>");
-    QVERIFY(muc->handleMessage(liveMsg));
-    QCOMPARE(receivedMsg.body(), u"Thrice the brinded cat hath mew'd."_s);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                       "<body>Thrice the brinded cat hath mew'd.</body>"
+                       "</message>"_s);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.first().from(), u"coven@chat.shakespeare.lit/firstwitch"_s);
+    QCOMPARE(received.first().body(), u"Thrice the brinded cat hath mew'd."_s);
+
+    // subject changes and status notifications of the room are handled by the manager
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'><subject>Fire</subject></message>"_s);
+    QCOMPARE(muc->findRoom(u"coven@chat.shakespeare.lit"_s)->subject().value(), u"Fire"_s);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit' type='groupchat'>"
+                       "<x xmlns='http://jabber.org/protocol/muc#user'><status code='170'/></x>"
+                       "</message>"_s);
+    QCOMPARE(received.size(), 1);
+
+    // messages of the room with text are delivered
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit' type='groupchat'>"
+                       "<body>This room is now logged.</body>"
+                       "<x xmlns='http://jabber.org/protocol/muc#user'><status code='170'/></x>"
+                       "</message>"_s);
+    QCOMPARE(received.size(), 2);
 }
 
 void tst_QXmppMuc::resolveSender()
@@ -1733,21 +1740,18 @@ void tst_QXmppMuc::messageRetractedReceived()
         QCOMPARE(roomJid, u"coven@chat.shakespeare.lit"_s);
         retracted = retraction;
     });
-    // The retraction must also flow through messageReceived().
+    // The retraction must also be delivered via QXmppClient::messageReceived().
     bool gotMessage = false;
-    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &msg) {
+    QObject::connect(&test, &QXmppClient::messageReceived, muc, [&](const QXmppMessage &msg) {
         gotMessage = msg.retraction().has_value();
     });
 
-    QXmppMessage retractMsg;
-    parsePacket(retractMsg,
-                "<message from='coven@chat.shakespeare.lit' type='groupchat'>"
-                "<retract xmlns='urn:xmpp:message-retract:1' id='stanza-id-1'>"
-                "<moderated xmlns='urn:xmpp:message-moderate:1' by='coven@chat.shakespeare.lit/secondwitch'/>"
-                "<reason>Spam</reason>"
-                "</retract>"
-                "</message>");
-    QVERIFY(muc->handleMessage(retractMsg));
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit' type='groupchat'>"
+                       "<retract xmlns='urn:xmpp:message-retract:1' id='stanza-id-1'>"
+                       "<moderated xmlns='urn:xmpp:message-moderate:1' by='coven@chat.shakespeare.lit/secondwitch'/>"
+                       "<reason>Spam</reason>"
+                       "</retract>"
+                       "</message>"_s);
 
     QVERIFY(retracted.has_value());
     QCOMPARE(retracted->retractedId(), u"stanza-id-1"_s);
@@ -1770,20 +1774,17 @@ void tst_QXmppMuc::messageRetractedSpoofed()
         retractedEmitted = true;
     });
     bool gotMessage = false;
-    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &) {
+    QObject::connect(&test, &QXmppClient::messageReceived, muc, [&](const QXmppMessage &) {
         gotMessage = true;
     });
 
     // A moderated retraction claiming to be from the service but actually sent by an occupant
     // (full JID with resource) must not trigger messageRetracted().
-    QXmppMessage spoofedMsg;
-    parsePacket(spoofedMsg,
-                "<message from='coven@chat.shakespeare.lit/secondwitch' type='groupchat'>"
-                "<retract xmlns='urn:xmpp:message-retract:1' id='stanza-id-1'>"
-                "<moderated xmlns='urn:xmpp:message-moderate:1' by='coven@chat.shakespeare.lit/secondwitch'/>"
-                "</retract>"
-                "</message>");
-    QVERIFY(muc->handleMessage(spoofedMsg));
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/secondwitch' type='groupchat'>"
+                       "<retract xmlns='urn:xmpp:message-retract:1' id='stanza-id-1'>"
+                       "<moderated xmlns='urn:xmpp:message-moderate:1' by='coven@chat.shakespeare.lit/secondwitch'/>"
+                       "</retract>"
+                       "</message>"_s);
 
     QVERIFY(!retractedEmitted);
     // The message is still delivered as a normal groupchat message.
@@ -5357,18 +5358,12 @@ void tst_QXmppMuc::occupantIdStrippedMessage()
     QObject::connect(muc, &QXmppMucManagerV2::roomHistoryReceived, muc, [&](const QString &, const QList<QXmppMessage> &messages) {
         history = messages;
     });
-    QXmppMessage historyMsg;
-    parsePacket(historyMsg,
-                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
-                "<body>Old</body>"
-                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
-                "<delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/>"
-                "</message>");
-    QVERIFY(muc->handleMessage(historyMsg));
-
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
-    muc->handleMessage(subjectMsg);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                       "<body>Old</body>"
+                       "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
+                       "<delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/>"
+                       "</message>"_s);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>"_s);
 
     // Inject disco#info WITHOUT occupant-id feature
     test.inject(u"<iq id='qx1' type='result' from='coven@chat.shakespeare.lit'>"
@@ -5383,17 +5378,14 @@ void tst_QXmppMuc::occupantIdStrippedMessage()
 
     // Receive a message with injected occupant-id — should be stripped
     QXmppMessage receivedMsg;
-    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &msg) {
+    QObject::connect(&test, &QXmppClient::messageReceived, muc, [&](const QXmppMessage &msg) {
         receivedMsg = msg;
     });
 
-    QXmppMessage liveMsg;
-    parsePacket(liveMsg,
-                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
-                "<body>Hello</body>"
-                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
-                "</message>");
-    QVERIFY(muc->handleMessage(liveMsg));
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                       "<body>Hello</body>"
+                       "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='injected-id'/>"
+                       "</message>"_s);
     QCOMPARE(receivedMsg.body(), u"Hello"_s);
     QVERIFY(receivedMsg.mucOccupantId().isEmpty());
 }
@@ -5463,6 +5455,15 @@ void tst_QXmppMuc::occupantIdMessageBeforeRoomInfo()
     test.ignore();  // disco#info
     test.ignore();  // presence
 
+    QXmppPresence occupantPresence;
+    parsePacket(occupantPresence,
+                "<presence from='coven@chat.shakespeare.lit/firstwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant' jid='crone1@shakespeare.lit/desktop'/>"
+                "</x>"
+                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='witch-1-id'/>"
+                "</presence>");
+    test.injectPresence(occupantPresence);
     QXmppPresence selfPresence;
     parsePacket(selfPresence,
                 "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
@@ -5473,32 +5474,86 @@ void tst_QXmppMuc::occupantIdMessageBeforeRoomInfo()
                 "</presence>");
     test.injectPresence(selfPresence);
 
-    QXmppMessage subjectMsg;
-    parsePacket(subjectMsg, "<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>");
-    muc->handleMessage(subjectMsg);
-
+    QObject owner;
+    QStringList senders;
+    test.hooks(&owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &context) {
+        senders << context.senderJid();
+        return QXmpp::HookResult::Continue;
+    });
+    QList<QXmppMessage> history;
+    QObject::connect(muc, &QXmppMucManagerV2::roomHistoryReceived, muc, [&](const QString &, const QList<QXmppMessage> &messages) {
+        QVERIFY(!joinTask.isFinished());
+        history = messages;
+    });
     QList<QXmppMessage> received;
-    QObject::connect(muc, &QXmppMucManagerV2::messageReceived, muc, [&](const QString &, const QXmppMessage &msg) {
+    QObject::connect(&test, &QXmppClient::messageReceived, muc, [&](const QXmppMessage &msg) {
         QVERIFY(joinTask.isFinished());
         received.append(msg);
     });
 
+    // The occupant ID of the history identifies the sender, once the disco#info result tells
+    // that the room supports occupant IDs. Until then, the messages wait.
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/oldnick' type='groupchat'>"
+                       "<body>Old</body>"
+                       "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='witch-1-id'/>"
+                       "<delay xmlns='urn:xmpp:delay' stamp='2002-10-13T23:58:37Z'/>"
+                       "</message>"_s);
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit' type='groupchat'><subject>Test</subject></message>"_s);
     // live message before disco#info: delivered after the join
-    QXmppMessage liveMsg;
-    parsePacket(liveMsg,
-                "<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
-                "<body>Hello</body>"
-                "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='witch-1-id'/>"
-                "</message>");
-    QVERIFY(muc->handleMessage(liveMsg));
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                       "<body>Hello</body>"
+                       "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='witch-1-id'/>"
+                       "</message>"_s);
     QVERIFY(!joinTask.isFinished());
-    QVERIFY(received.isEmpty());
+    QVERIFY(senders.isEmpty());
 
     injectRoomInfo(test, u"coven@chat.shakespeare.lit"_s, u"<feature var='urn:xmpp:occupant-id:0'/>"_s);
     expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QCOMPARE(senders, QStringList({ u"crone1@shakespeare.lit"_s, u"coven@chat.shakespeare.lit"_s, u"crone1@shakespeare.lit"_s }));
+    QCOMPARE(history.size(), 1);
+    QCOMPARE(history.first().body(), u"Old"_s);
     QCOMPARE(received.size(), 1);
     QCOMPARE(received.first().body(), u"Hello"_s);
     QCOMPARE(received.first().mucOccupantId(), u"witch-1-id"_s);
+}
+
+void tst_QXmppMuc::messagesContinueAfterFailedJoin()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+
+    auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    test.ignore();  // disco#info
+    test.ignore();  // presence
+
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence,
+                "<presence from='coven@chat.shakespeare.lit/thirdwitch'>"
+                "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                "<item affiliation='member' role='participant'/>"
+                "<status code='110'/>"
+                "</x>"
+                "</presence>");
+    test.injectPresence(selfPresence);
+
+    QObject owner;
+    int processed = 0;
+    test.hooks(&owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &) {
+        processed++;
+        return QXmpp::HookResult::Continue;
+    });
+
+    // waits for the disco#info result
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'><body>Hi</body></message>"_s);
+    QCOMPARE(processed, 0);
+
+    // the join fails: the message is not stuck
+    test.setStreamManagementState(QXmppClient::NoStreamManagement);
+    test.simulateDisconnected();
+    expectFutureVariant<QXmppError>(joinTask);
+    QCOMPARE(processed, 1);
 }
 
 //

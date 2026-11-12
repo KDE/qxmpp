@@ -38,6 +38,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - Add overloads of `QXmppClient::sendIq()` for typed requests (`QXmpp::Iq::Get`, `Set`) returning only the payload of the response, defined by `QXmpp::Iq::ResponseTraits`; end-to-end encryption is opt-in via `QXmpp::Iq::SendOptions` (@lnj, !841)
  - Add the hook `QXmpp::Iq::SelectEncryption` selecting the end-to-end encryption of IQs (@lnj, !841)
  - Fix the payload of `QXmppIq` subclasses getting lost when encrypted by the encryption extension, e.g. via `sendSensitiveIq()` (@lnj, !841)
+ - MUC: Fix decrypting the discussion history of rooms with occupant IDs: messages received while joining wait for the room's disco#info result before their sender is resolved (@lnj)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
@@ -54,6 +55,7 @@ Breaking changes:
  - IQ requests without exactly one child element are answered with `bad-request`, IQ requests without an id are ignored (@lnj, !841)
  - The encryption of IQs is selected via `QXmpp::Iq::SelectEncryption` instead of `QXmpp::Messages::SelectEncryption`, IQs requiring encryption (`QXmppSendStanzaParams::isEncryptionRequired()`) fail without encryption (@lnj, !841)
  - Disco, version and entity time requests are also answered if end-to-end encrypted (@lnj, !841)
+ - MucManagerV2: Messages of joined rooms are delivered via `QXmppClient::messageReceived()`; `QXmppMucManagerV2::messageReceived()` has been removed. Subject changes and status notifications without text are not delivered (@lnj)
 
 QXmpp 1.17.2 (November 9, 2026)
 -------------------------------

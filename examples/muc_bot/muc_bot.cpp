@@ -40,7 +40,7 @@ public:
         connect(&m_client, &QXmppClient::connected, this, &MucBot::onConnected);
         connect(&m_client, &QXmppClient::disconnected, this, []() { QCoreApplication::quit(); });
 
-        connect(m_muc, &QXmppMucManagerV2::messageReceived, this, &MucBot::onMessage);
+        connect(&m_client, &QXmppClient::messageReceived, this, &MucBot::onMessage);
         connect(m_muc, &QXmppMucManagerV2::participantJoined, this, &MucBot::onParticipantJoined);
         connect(m_muc, &QXmppMucManagerV2::participantLeft, this, &MucBot::onParticipantLeft);
         connect(m_muc, &QXmppMucManagerV2::removedFromRoom,
@@ -114,8 +114,13 @@ private:
         });
     }
 
-    void onMessage(const QString &roomJid, const QXmppMessage &message)
+    void onMessage(const QXmppMessage &message)
     {
+        // the messages of joined rooms are delivered by the client, together with all others
+        const auto roomJid = message.from().section(u'/', 0, 0);
+        if (message.type() != QXmppMessage::GroupChat || roomJid != m_roomJid || message.body().isEmpty()) {
+            return;
+        }
         const auto senderNick = message.from().section(u'/', 1);
 
         // Ignore own messages

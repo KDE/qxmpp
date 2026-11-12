@@ -139,8 +139,6 @@ struct MucRoomData {
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromise;
     std::optional<QXmppPromise<Result<QXmppMucRoomV2>>> createPromise;
     QList<QXmppMessage> historyMessages;
-    // Messages received in the JoiningRoomInfo state, handled again after the join.
-    QList<QXmppMessage> deferredMessages;
     std::unique_ptr<QTimer, DeleteLaterDeleter> joinTimer;
     std::unordered_map<QString, PendingMessage> pendingMessages;
     std::optional<QXmppPromise<Result<>>> nickChangePromise;
@@ -186,6 +184,8 @@ struct MucRoomData {
     uint64_t affiliationsGeneration = 0;
     // Whether the disco#info result for the current session has been received.
     bool roomInfoFetched = false;
+    // messages waiting in resolveSender() for the disco#info result while joining
+    std::vector<QXmppPromise<void>> roomInfoWaiters;
     bool supportsVCard = false;
     bool watchingAvatar = false;
     bool fetchingAvatar = false;
@@ -254,16 +254,19 @@ struct MucRoomData {
         });
     }
 
+    // Whether joining waits for the disco#info result, which tells whether occupant IDs are valid.
+    bool roomInfoPending() const
+    {
+        using enum MucRoomState;
+        return !roomInfoFetched && (state == JoiningOccupantPresences || state == JoiningRoomHistory || state == JoiningRoomInfo);
+    }
+
     // XEP-0421: occupant IDs are only valid if the room supports them, otherwise they could be
     // injected by participants. While joining they are kept until the disco#info result tells
     // whether they are valid. The join completes only after that.
     bool stripOccupantIds() const
     {
-        using enum MucRoomState;
-        if (supportsOccupantIds) {
-            return false;
-        }
-        return roomInfoFetched || !(state == JoiningOccupantPresences || state == JoiningRoomHistory || state == JoiningRoomInfo);
+        return !supportsOccupantIds && !roomInfoPending();
     }
 
     // Reset per-session state on leave. The participants map is intentionally kept
@@ -275,7 +278,6 @@ struct MucRoomData {
         joined = false;
         selfParticipant = nullptr;
         historyMessages.clear();
-        deferredMessages.clear();
         roomInfoFetched = false;
         joinPromise.reset();
         createPromise.reset();
@@ -359,6 +361,14 @@ struct MucRoomData {
         // use r
     }
     \endcode
+
+    \section1 Receiving messages
+
+    Messages of joined rooms are delivered via QXmppClient::messageReceived(), together with all
+    other messages. They run through the same pipeline, so they are decrypted and the real JID of
+    the sender is resolved (see QXmpp::Messages::Context::senderJid()). The discussion history
+    received while joining is delivered via roomHistoryReceived(). Subject changes are only
+    reported via QXmppMucRoomV2::subject().
 
     \section1 Sending messages
 
@@ -855,6 +865,8 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         } else if (message.hasSubject()) {
             // Has <subject/> but no body: subject message, always the last stanza during joining (XEP-0045 §7.2.7)
             data.subject = message.subject();
+            // Messages from the room wait in resolveSender() for the disco#info result, which
+            // is only missing here if the message has not been received via the client.
             if (data.roomInfoFetched) {
                 d->finishJoin(bareFrom, data);
             } else {
@@ -862,17 +874,15 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
             }
         }
         return true;
-    case MucRoomState::JoiningRoomInfo:
-        data.deferredMessages.append(message);
-        return true;
-    case MucRoomState::Joined:
+    case MucRoomState::Joined: {
         // XEP-0410: any incoming stanza on a joined room counts as activity.
         data.lastActivity = std::chrono::steady_clock::now();
         // Reflections of sent messages are handled by resolveSender().
         // XEP-0424: Message Retraction / XEP-0425: Moderated Message Retraction.
         // The retraction is signalled separately via messageRetracted(), but the message is
-        // intentionally not consumed here: it still flows through to messageReceived() below so
-        // that clients which want the raw stanza (e.g. for archiving) keep receiving it.
+        // intentionally not consumed here: it is still delivered via
+        // QXmppClient::messageReceived(), so that clients which want the raw stanza (e.g. for
+        // archiving) keep receiving it.
         if (const auto &retraction = message.retraction()) {
             // XEP-0425 security rule: moderated retractions are only legitimate when sent by the
             // room/service itself, i.e. from the bare room JID without an occupant resource.
@@ -881,11 +891,13 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
                 Q_EMIT messageRetracted(bareFrom, *retraction);
             }
         }
-        if (message.hasSubject() && message.body().isEmpty()) {
+        const auto isSubjectChange = message.hasSubject() && message.body().isEmpty();
+        if (isSubjectChange) {
             data.subject = message.subject();
         }
         // Status 104: room configuration changed — re-fetch roominfo and config (if subscribed)
-        if (message.mucUserQuery() && message.mucUserQuery()->statusCodes().contains(104)) {
+        const auto &userQuery = message.mucUserQuery();
+        if (userQuery && userQuery->statusCodes().contains(104)) {
             // requests sent before the change must not be used
             DiscoInfoTracking::invalidate(client(), bareFrom);
             d->fetchRoomInfo(bareFrom);
@@ -893,8 +905,12 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
                 d->fetchRoomConfigSubscribed(bareFrom);
             }
         }
-        Q_EMIT messageReceived(bareFrom, message);
-        return true;
+        // Status notifications of the room itself (XEP-0045 §10.2.1) without text are handled
+        // here, like subject changes. All other messages are delivered by the client.
+        const auto isStatusNotification = userQuery && !userQuery->statusCodes().isEmpty() &&
+            message.body().isEmpty() && QXmppUtils::jidToResource(message.from()).isEmpty();
+        return isSubjectChange || isStatusNotification;
+    }
     default:
         return false;
     }
@@ -1509,6 +1525,8 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     // joining. Callers finishing them differently (throwRoomError(), leave,
     // deactivateAllRooms()) have already moved them out.
     auto configWaiters = std::move(data->roomConfigWaiters);
+    auto roomInfoWaiters = std::move(data->roomInfoWaiters);
+    data->roomInfoWaiters.clear();
     std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
     std::vector<QXmppPromise<Result<>>> otherPromises;
     for (auto *promise : { &data->joinPromise, &data->createPromise }) {
@@ -1549,6 +1567,10 @@ void QXmppMucManagerV2Private::deactivateRoom(const QString &jid)
     }
     for (auto &p : otherPromises) {
         p.finish(error);
+    }
+    // the messages continue without the room
+    for (auto &p : roomInfoWaiters) {
+        p.finish();
     }
 
     // data shared_ptr goes out of scope here. If no caller holds a handle, the data
@@ -1687,8 +1709,15 @@ void QXmppMucManagerV2Private::fetchRoomInfo(const QString &roomJid)
                 participant->occupantId.clear();
             }
         }
+        auto waiters = std::move(data.roomInfoWaiters);
+        data.roomInfoWaiters.clear();
         if (data.state == MucRoomState::JoiningRoomInfo) {
             finishJoin(roomJid, data);
+        }
+        // the messages received meanwhile, in order: the discussion history, the subject that
+        // completes the join and live messages
+        for (auto &waiter : waiters) {
+            waiter.finish();
         }
     });
 }
@@ -1705,7 +1734,6 @@ void QXmppMucManagerV2Private::finishJoin(const QString &roomJid, MucRoomData &d
     rescheduleSelfPing();
 
     auto history = std::move(data.historyMessages);
-    auto deferred = std::move(data.deferredMessages);
     auto promise = std::move(*data.joinPromise);
     data.joinPromise.reset();
 
@@ -1718,9 +1746,6 @@ void QXmppMucManagerV2Private::finishJoin(const QString &roomJid, MucRoomData &d
         Q_EMIT q->roomHistoryReceived(roomJid, history);
     }
     promise.finish(QXmppMucRoomV2(activeRooms[roomJid]));
-    for (const auto &message : deferred) {
-        q->handleMessage(message);
-    }
 }
 
 void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
@@ -1885,84 +1910,110 @@ void QXmppMucManagerV2Private::handleNickChangeTimeout(const QString &roomJid)
 // Sets the real JID of the sender of messages from joined rooms, so they can be decrypted.
 // The nickname in 'from' is set by the room. Messages of occupants not known (anymore) keep the
 // room as sender.
-HookResult QXmppMucManagerV2Private::resolveSender(Messages::Context &context)
+QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context &context)
 {
     using enum HookResult;
 
     const auto &message = context.message();
     if (message.type() != QXmppMessage::GroupChat && message.type() != QXmppMessage::Error) {
-        return Continue;
+        co_return Continue;
     }
 
     const auto roomJid = QXmppUtils::jidToBareJid(message.from());
     auto roomItr = activeRooms.find(roomJid);
     if (roomItr == activeRooms.end()) {
-        return Continue;
+        co_return Continue;
     }
 
     // confirms the delivery of a sent message, see confirmDelivery()
-    auto &roomData = *roomItr->second;
-    if (auto pendingItr = roomData.pendingMessages.find(message.originId());
-        !message.originId().isEmpty() && pendingItr != roomData.pendingMessages.end()) {
+    auto *data = roomItr->second.get();
+    if (auto pendingItr = data->pendingMessages.find(message.originId());
+        !message.originId().isEmpty() && pendingItr != data->pendingMessages.end()) {
         if (message.type() == QXmppMessage::Error) {
             auto promise = std::move(pendingItr->second.promise);
-            roomData.pendingMessages.erase(pendingItr);
+            data->pendingMessages.erase(pendingItr);
             promise.finish(QXmppError { message.error().text(), message.error() });
             // the error is reported to the sender
-            return Stop;
+            co_return Stop;
         }
         // only the room reflects the message with the own nickname
-        if (context.origin() != Messages::Origin::Mam && QXmppUtils::jidToResource(message.from()) == roomData.nickname.value()) {
+        if (context.origin() != Messages::Origin::Mam && QXmppUtils::jidToResource(message.from()) == data->nickname.value()) {
             auto promise = std::move(pendingItr->second.promise);
-            roomData.pendingMessages.erase(pendingItr);
+            data->pendingMessages.erase(pendingItr);
             promise.finish(Success());
         }
     }
     if (message.type() != QXmppMessage::GroupChat) {
-        return Continue;
+        co_return Continue;
     }
     context.setConversationJid(roomJid);
 
+    // The occupant of the message is looked up now: the occupants may change until the
+    // disco#info result tells whether occupant IDs are valid.
     const auto nickname = QXmppUtils::jidToResource(message.from());
-    if (nickname.isEmpty()) {
-        // message from the room itself
-        return Continue;
-    }
-
-    const auto &data = *roomItr->second;
-    std::shared_ptr<MucParticipantData> participant;
-    if (const auto occupantId = message.mucOccupantId(); data.supportsOccupantIds && !occupantId.isEmpty()) {
-        // The occupant ID stays the same across nickname changes and is kept in the archive.
-        for (const auto &[_, candidate] : data.participants) {
-            if (candidate->occupantId == occupantId) {
-                participant = candidate;
-                break;
+    std::shared_ptr<MucParticipantData> byOccupantId;
+    std::shared_ptr<MucParticipantData> byNickname;
+    if (!nickname.isEmpty()) {
+        if (const auto occupantId = message.mucOccupantId(); !occupantId.isEmpty()) {
+            // The occupant ID stays the same across nickname changes and is kept in the archive.
+            for (const auto &[_, candidate] : data->participants) {
+                if (candidate->occupantId == occupantId) {
+                    byOccupantId = candidate;
+                    break;
+                }
             }
         }
-    } else if (context.origin() != Messages::Origin::Mam && !message.stamp().isValid()) {
-        // A nickname only identifies the current occupant: the nickname of an earlier message
-        // (room history or archive) may belong to someone else by now.
-        if (auto itr = data.participants.find(nickname); itr != data.participants.end()) {
-            participant = itr->second;
+        if (context.origin() != Messages::Origin::Mam && !message.stamp().isValid()) {
+            // A nickname only identifies the current occupant: the nickname of an earlier
+            // message (room history or archive) may belong to someone else by now.
+            if (auto itr = data->participants.find(nickname); itr != data->participants.end()) {
+                byNickname = itr->second;
+            }
         }
     }
+
+    if (data->roomInfoPending()) {
+        // Also messages without an occupant ID wait, so that all messages are handled in the
+        // order of their arrival after the join.
+        QXmppPromise<void> promise;
+        auto task = promise.task();
+        data->roomInfoWaiters.push_back(std::move(promise));
+        co_await task.withContext(q);
+
+        // the room may have been left meanwhile
+        roomItr = activeRooms.find(roomJid);
+        if (roomItr == activeRooms.end()) {
+            co_return Continue;
+        }
+        data = roomItr->second.get();
+    }
+
+    if (data->stripOccupantIds()) {
+        context.message().setMucOccupantId({});
+    }
+    if (nickname.isEmpty()) {
+        // message from the room itself
+        co_return Continue;
+    }
+
+    auto participant = data->supportsOccupantIds && !message.mucOccupantId().isEmpty() ? byOccupantId : byNickname;
     if (!participant) {
         // The archive of the room reports the real JID in non-anonymous rooms (XEP-0313), also of
         // occupants that have left. Only the room itself can be trusted for this.
         const auto *archive = context.attachment<Messages::ArchiveInfo>();
         if (context.origin() == Messages::Origin::Mam && archive && archive->archiveJid() == roomJid &&
-            data.isNonAnonymous.value() && !archive->occupantJid().isEmpty()) {
+            data->isNonAnonymous.value() && !archive->occupantJid().isEmpty()) {
             context.setSenderJid(QXmppUtils::jidToBareJid(archive->occupantJid()));
         }
-        return Continue;
+        co_return Continue;
     }
 
-    if (participant == data.selfParticipant.value()) {
+    if (participant == data->selfParticipant.value()) {
         context.setSenderJid(q->client()->configuration().jidBare());
     } else if (const auto jid = participant->jid.value(); !jid.isEmpty()) {
         context.setSenderJid(QXmppUtils::jidToBareJid(jid));
     }
-    return Continue;
+    co_return Continue;
 }
 
 // The joined room a groupchat message is sent to.

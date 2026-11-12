@@ -94,10 +94,14 @@ public:
         destroyRoom(), use QXmppMucRoomV2::joined() instead.
     */
     Q_SIGNAL void removedFromRoom(const QString &roomJid, QXmpp::Muc::LeaveReason reason, const std::optional<QXmpp::Muc::Destroy> &destroy);
-    /*! Emitted with the \a messages received for the room at \a roomJid during joining. */
+    /*!
+        Emitted with the discussion history \a messages received for the room at \a roomJid
+        during joining.
+
+        The messages have been decrypted like the messages received after joining, which are
+        delivered via QXmppClient::messageReceived().
+    */
     Q_SIGNAL void roomHistoryReceived(const QString &roomJid, const QList<QXmppMessage> &messages);
-    /*! Emitted when a groupchat \a message is received in the joined room at \a roomJid. */
-    Q_SIGNAL void messageReceived(const QString &roomJid, const QXmppMessage &message);
     /*!
         Emitted when a message in the joined room at \a roomJid is retracted via
         \xep{0424}{Message Retraction} or \xep{0425}{Moderated Message Retraction}.
@@ -108,7 +112,7 @@ public:
         retractions (claiming moderation but not sent by the room itself) never trigger this
         signal.
 
-        The retraction message is also delivered through messageReceived() (with its
+        The retraction message is also delivered via QXmppClient::messageReceived() (with its
         QXmppMessage::retraction() set), so clients that need the raw stanza still receive it.
 
         \since QXmpp 1.17

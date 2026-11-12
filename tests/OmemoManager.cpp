@@ -514,8 +514,8 @@ void tst_QXmppOmemoManager::testMucMessage()
         }
         return QXmpp::HookResult::Continue;
     });
-    QSignalSpy bobReceivedSpy(m_bob.mucManager, &QXmppMucManagerV2::messageReceived);
-    QSignalSpy aliceReceivedSpy(m_alice1.mucManager, &QXmppMucManagerV2::messageReceived);
+    QSignalSpy bobReceivedSpy(&m_bob.client, &QXmppClient::messageReceived);
+    QSignalSpy aliceReceivedSpy(&m_alice1.client, &QXmppClient::messageReceived);
     for (auto *client : { &m_alice1.client, &m_bob.client }) {
         client->hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
             selection.setEncryption(QXmpp::E2ee::Omemo2);
@@ -529,7 +529,7 @@ void tst_QXmppOmemoManager::testMucMessage()
 
     // Bob decrypts it with the keys of the real sender
     QTRY_VERIFY_WITH_TIMEOUT(std::ranges::any_of(bobReceivedSpy, [](const QList<QVariant> &arguments) {
-                                 const auto message = arguments.at(1).value<QXmppMessage>();
+                                 const auto message = arguments.at(0).value<QXmppMessage>();
                                  return message.e2eeMetadata() && message.body() == u"Hello room!";
                              }),
                              20'000);
@@ -546,7 +546,7 @@ void tst_QXmppOmemoManager::testMucMessage()
     reply.setBody(u"Hello Alice!"_s);
     expectVariant<QXmpp::Success>(awaitTask(bobRoom.sendMessage(std::move(reply))));
     QTRY_VERIFY_WITH_TIMEOUT(std::ranges::any_of(aliceReceivedSpy, [](const QList<QVariant> &arguments) {
-                                 const auto message = arguments.at(1).value<QXmppMessage>();
+                                 const auto message = arguments.at(0).value<QXmppMessage>();
                                  return message.e2eeMetadata() && message.body() == u"Hello Alice!";
                              }),
                              20'000);
