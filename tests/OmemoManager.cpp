@@ -3349,6 +3349,14 @@ void tst_OmemoManager2::ownDevicesReceiveCopies()
     auto received = alicePhone.receive(alice, message);
     QCOMPARE(received.size(), 1);
     QCOMPARE(received.constFirst().body(), u"Hello"_s);
+
+    // A message without 'from' is sent by the own account.
+    QSignalSpy spy(&alicePhone.client, &QXmppClient::messageReceived);
+    alicePhone.client.injectMessage(alice.sendMessage(bob.jid(), u"Without sender"_s));
+    server.process();
+    QCOMPARE(spy.size(), 1);
+    QCOMPARE(spy.constFirst().at(0).value<QXmppMessage>().body(), u"Without sender"_s);
+    QVERIFY(!alicePhone.manager->d->versions.at(version).devices.contains(QString()));
 }
 
 void tst_OmemoManager2::heartbeat_data()
