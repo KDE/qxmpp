@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2022 Melvin Keskin <melvo@olomono.de>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-// Combined test binary for the OMEMO manager and its storage. Merging
-// tst_QXmppOmemoManager and tst_QXmppOmemoMemoryStorage into one translation
-// unit parses the shared Qt/QXmpp headers once instead of once per file. Each
-// original test keeps its own namespace; main() runs them in turn.
+// Combined test binary for OMEMO: the managers, their storages and the components of the new
+// manager are tested in one translation unit, so the shared Qt/QXmpp headers are parsed once
+// instead of once per file. main() runs the test classes in turn.
 
 #include "QXmppAtmManager.h"
 #include "QXmppAtmTrustMemoryStorage.h"
@@ -29,6 +29,7 @@
 #include "QXmppUtils.h"
 
 #include "IntegrationTesting.h"
+#include "OmemoSession.h"
 #include "StringLiterals.h"
 #include "util.h"
 
@@ -37,6 +38,7 @@
 #include <QObject>
 #include <QScopeGuard>
 #include <QSignalSpy>
+#include <QTest>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -880,6 +882,437 @@ void tst_QXmppOmemoMemoryStorage::testResetAll()
     QVERIFY(result.devices.isEmpty());
 }
 
-QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage)
+// ============================================================
+
+namespace SessionLayerTests {
+
+// also declared by the managers
+using QXmpp::Omemo::Private::DecryptedKey;
+
+using namespace QXmpp;
+using namespace QXmpp::Omemo::Private;
+
+}  // namespace SessionLayerTests
+
+Q_DECLARE_METATYPE(SessionLayerTests::Version)
+
+namespace SessionLayerTests {
+
+constexpr uint32_t SIGNED_PRE_KEY_ID = 1;
+constexpr uint32_t PRE_KEY_COUNT = 5;
+
+struct Device {
+    Device(const SignalContext &context, QString jid, std::optional<IdentityKeyPair> identity = {})
+        : jid(std::move(jid))
+    {
+        keys.deviceId = *context.generateDeviceId();
+        keys.identity = identity ? *identity : *context.generateIdentityKeyPair();
+        keys.signedPreKeys.insert(SIGNED_PRE_KEY_ID, *context.generateSignedPreKey(keys.identity, SIGNED_PRE_KEY_ID, 0));
+        keys.preKeys = context.generatePreKeys(1, PRE_KEY_COUNT);
+    }
+
+    Address address() const { return { jid, keys.deviceId }; }
+
+    QString jid;
+    KeyStore keys;
+};
+
+static SecureByteArray secure(QByteArrayView data)
+{
+    return SecureByteArray(data.toByteArray());
+}
+
+class tst_OmemoSession : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void initTestCase();
+    Q_SLOT void keyGeneration();
+    Q_SLOT void bundleFormat_data();
+    Q_SLOT void bundleFormat();
+    Q_SLOT void roundtrip_data();
+    Q_SLOT void roundtrip();
+    Q_SLOT void sharedIdentity();
+    Q_SLOT void outOfOrder_data();
+    Q_SLOT void outOfOrder();
+    Q_SLOT void duplicate();
+    Q_SLOT void invalidSignature_data();
+    Q_SLOT void invalidSignature();
+    Q_SLOT void versionMismatch();
+    Q_SLOT void unknownPreKey();
+    Q_SLOT void noSession();
+    Q_SLOT void persistence();
+    Q_SLOT void callbacks();
+
+    void addVersions();
+    void establish(SessionLayer &alice, Device &aliceDevice, SessionLayer &bob, Device &bobDevice);
+
+    std::unique_ptr<SignalContext> m_context;
+};
+
+void tst_OmemoSession::initTestCase()
+{
+    m_context = std::make_unique<SignalContext>();
+    QVERIFY(m_context->isValid());
+}
+
+void tst_OmemoSession::addVersions()
+{
+    QTest::addColumn<Version>("version");
+    QTest::newRow("omemo0") << Version::Omemo0;
+    QTest::newRow("omemo2") << Version::Omemo2;
+}
+
+void tst_OmemoSession::keyGeneration()
+{
+    const auto identity = m_context->generateIdentityKeyPair();
+    QVERIFY(identity);
+    QCOMPARE(identity->publicKey.size(), 32);
+    QVERIFY(!identity->privateKey.isEmpty());
+    QVERIFY(identity->publicKey != m_context->generateIdentityKeyPair()->publicKey);
+
+    for (int i = 0; i < 100; ++i) {
+        const auto id = m_context->generateDeviceId();
+        QVERIFY(id);
+        QVERIFY(*id >= 1);
+        QVERIFY(*id <= uint32_t(std::numeric_limits<int32_t>::max()));
+    }
+
+    const auto preKeys = m_context->generatePreKeys(10, 3);
+    QCOMPARE(preKeys.size(), 3);
+    QVERIFY(preKeys.contains(10));
+    QVERIFY(preKeys.contains(12));
+
+    QVERIFY(m_context->generateSignedPreKey(*identity, 1, 0));
+    QVERIFY(!m_context->generateSignedPreKey(IdentityKeyPair {}, 1, 0));
+}
+
+void tst_OmemoSession::bundleFormat_data()
+{
+    addVersions();
+}
+
+void tst_OmemoSession::bundleFormat()
+{
+    QFETCH(Version, version);
+
+    Device device(*m_context, u"alice@example.org"_s);
+    SessionLayer layer(*m_context, version, device.keys);
+
+    const auto bundle = expectVariant<Bundle>(layer.ownBundle(SIGNED_PRE_KEY_ID, 1));
+    QCOMPARE(bundle.signedPreKeyId, SIGNED_PRE_KEY_ID);
+    QCOMPARE(bundle.preKeyId, 1u);
+    QCOMPARE(bundle.signedPreKeySignature.size(), 64);
+
+    if (version == Version::Omemo2) {
+        // Ed25519 identity key, Curve25519 pre keys without prefix
+        QCOMPARE(bundle.identityKey, device.keys.identity.publicKey);
+        QCOMPARE(bundle.signedPreKey.size(), 32);
+        QCOMPARE(bundle.preKey.size(), 32);
+    } else {
+        // Curve25519 keys with type prefix
+        QCOMPARE(bundle.identityKey.size(), 33);
+        QCOMPARE(bundle.identityKey.at(0), char(0x05));
+        QCOMPARE(bundle.signedPreKey.size(), 33);
+        QCOMPARE(bundle.signedPreKey.at(0), char(0x05));
+        QCOMPARE(bundle.preKey.size(), 33);
+        QCOMPARE(bundle.preKey.at(0), char(0x05));
+    }
+
+    const auto preKeys = expectVariant<QHash<uint32_t, QByteArray>>(layer.publicPreKeys());
+    QCOMPARE(preKeys.size(), int(PRE_KEY_COUNT));
+    QCOMPARE(preKeys.value(1), bundle.preKey);
+
+    QVERIFY(std::holds_alternative<QXmppError>(layer.ownBundle(SIGNED_PRE_KEY_ID + 1, 1)));
+    QVERIFY(std::holds_alternative<QXmppError>(layer.ownBundle(SIGNED_PRE_KEY_ID, PRE_KEY_COUNT + 1)));
+}
+
+void tst_OmemoSession::establish(SessionLayer &alice, Device &aliceDevice, SessionLayer &bob, Device &bobDevice)
+{
+    const auto bundle = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 2));
+    expectVariant<Success>(alice.buildSession(bobDevice.address(), bundle));
+
+    const auto keyExchange = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("hello")));
+    QVERIFY(keyExchange.isKeyExchange);
+    const auto decrypted = expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), keyExchange.data, true));
+    QCOMPARE(decrypted.data, secure("hello"));
+
+    // Bob answers, so Alice stops sending key exchanges.
+    const auto answer = expectVariant<EncryptedKey>(bob.encrypt(aliceDevice.address(), secure("hi")));
+    QVERIFY(!answer.isKeyExchange);
+    QCOMPARE(expectVariant<DecryptedKey>(alice.decrypt(bobDevice.address(), answer.data, false)).data, secure("hi"));
+}
+
+void tst_OmemoSession::roundtrip_data()
+{
+    addVersions();
+}
+
+void tst_OmemoSession::roundtrip()
+{
+    QFETCH(Version, version);
+
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    SessionLayer alice(*m_context, version, aliceDevice.keys);
+    SessionLayer bob(*m_context, version, bobDevice.keys);
+
+    const auto bundle = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 3));
+    expectVariant<Success>(alice.buildSession(bobDevice.address(), bundle));
+    QVERIFY(alice.hasSession(bobDevice.address()));
+    QVERIFY(!bob.hasSession(aliceDevice.address()));
+
+    // Key exchanges are sent until the other device answered.
+    const auto first = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("key 1")));
+    const auto second = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("key 2")));
+    QVERIFY(first.isKeyExchange);
+    QVERIFY(second.isKeyExchange);
+
+    const auto decrypted = expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), first.data, true));
+    QCOMPARE(decrypted.data, secure("key 1"));
+    QCOMPARE(decrypted.senderIdentityKey, aliceDevice.keys.identity.publicKey);
+    QCOMPARE(decrypted.usedPreKeyId, std::optional<uint32_t>(3));
+    QVERIFY(!bobDevice.keys.preKeys.contains(3));
+    QCOMPARE(bobDevice.keys.preKeys.size(), int(PRE_KEY_COUNT - 1));
+    QVERIFY(bob.hasSession(aliceDevice.address()));
+
+    // The second key exchange uses the same pre key, which is already consumed.
+    const auto decrypted2 = expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), second.data, true));
+    QCOMPARE(decrypted2.data, secure("key 2"));
+    QCOMPARE(decrypted2.usedPreKeyId, std::nullopt);
+
+    const auto answer = expectVariant<EncryptedKey>(bob.encrypt(aliceDevice.address(), secure("key 3")));
+    QVERIFY(!answer.isKeyExchange);
+    const auto decryptedAnswer = expectVariant<DecryptedKey>(alice.decrypt(bobDevice.address(), answer.data, false));
+    QCOMPARE(decryptedAnswer.data, secure("key 3"));
+    QVERIFY(decryptedAnswer.senderIdentityKey.isEmpty());
+
+    const auto third = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("key 4")));
+    QVERIFY(!third.isKeyExchange);
+    QCOMPARE(expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), third.data, false)).data, secure("key 4"));
+
+    // 32 bytes as used by OMEMO 0 (key and GCM tag) and 48 bytes as used by OMEMO 2 (key and HMAC)
+    for (const auto size : { 32, 48 }) {
+        const auto key = SecureByteArray(QByteArray(size, 'k'));
+        const auto encrypted = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), key));
+        QCOMPARE(expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), encrypted.data, false)).data, key);
+    }
+}
+
+void tst_OmemoSession::sharedIdentity()
+{
+    // One device uses the same identity key and signed pre key for both versions, with separate
+    // pre keys and sessions.
+    const auto aliceIdentity = *m_context->generateIdentityKeyPair();
+    const auto bobIdentity = *m_context->generateIdentityKeyPair();
+
+    Device alice0(*m_context, u"alice@example.org"_s, aliceIdentity);
+    Device bob0(*m_context, u"bob@example.org"_s, bobIdentity);
+    Device alice2 = alice0;
+    Device bob2 = bob0;
+    alice2.keys.preKeys = m_context->generatePreKeys(1, PRE_KEY_COUNT);
+    bob2.keys.preKeys = m_context->generatePreKeys(1, PRE_KEY_COUNT);
+
+    SessionLayer aliceLayer0(*m_context, Version::Omemo0, alice0.keys);
+    SessionLayer bobLayer0(*m_context, Version::Omemo0, bob0.keys);
+    SessionLayer aliceLayer2(*m_context, Version::Omemo2, alice2.keys);
+    SessionLayer bobLayer2(*m_context, Version::Omemo2, bob2.keys);
+
+    establish(aliceLayer0, alice0, bobLayer0, bob0);
+    establish(aliceLayer2, alice2, bobLayer2, bob2);
+
+    // Both bundles carry the same identity key in different forms.
+    const auto bundle0 = expectVariant<Bundle>(bobLayer0.ownBundle(SIGNED_PRE_KEY_ID, 1));
+    const auto bundle2 = expectVariant<Bundle>(bobLayer2.ownBundle(SIGNED_PRE_KEY_ID, 1));
+    QCOMPARE(bundle2.identityKey, bobIdentity.publicKey);
+    QCOMPARE(bundle0.signedPreKey.mid(1), bundle2.signedPreKey);
+
+    // A key exchange reports the same identity key in both versions.
+    Device carol0(*m_context, u"carol@example.org"_s);
+    Device carol2 = carol0;
+    carol2.keys.preKeys = m_context->generatePreKeys(1, PRE_KEY_COUNT);
+    SessionLayer carolLayer0(*m_context, Version::Omemo0, carol0.keys);
+    SessionLayer carolLayer2(*m_context, Version::Omemo2, carol2.keys);
+
+    expectVariant<Success>(aliceLayer0.buildSession(carol0.address(), expectVariant<Bundle>(carolLayer0.ownBundle(SIGNED_PRE_KEY_ID, 1))));
+    expectVariant<Success>(aliceLayer2.buildSession(carol2.address(), expectVariant<Bundle>(carolLayer2.ownBundle(SIGNED_PRE_KEY_ID, 1))));
+    const auto message0 = expectVariant<EncryptedKey>(aliceLayer0.encrypt(carol0.address(), secure("v0")));
+    const auto message2 = expectVariant<EncryptedKey>(aliceLayer2.encrypt(carol2.address(), secure("v2")));
+    const auto decrypted0 = expectVariant<DecryptedKey>(carolLayer0.decrypt(alice0.address(), message0.data, true));
+    const auto decrypted2 = expectVariant<DecryptedKey>(carolLayer2.decrypt(alice2.address(), message2.data, true));
+    QCOMPARE(decrypted0.senderIdentityKey, aliceIdentity.publicKey);
+    QCOMPARE(decrypted2.senderIdentityKey, aliceIdentity.publicKey);
+}
+
+void tst_OmemoSession::outOfOrder_data()
+{
+    addVersions();
+}
+
+void tst_OmemoSession::outOfOrder()
+{
+    QFETCH(Version, version);
+
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    SessionLayer alice(*m_context, version, aliceDevice.keys);
+    SessionLayer bob(*m_context, version, bobDevice.keys);
+    establish(alice, aliceDevice, bob, bobDevice);
+
+    QList<EncryptedKey> messages;
+    for (int i = 0; i < 3; ++i) {
+        messages.append(expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure(QByteArray::number(i)))));
+    }
+    for (const auto i : { 2, 0, 1 }) {
+        QCOMPARE(expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), messages.at(i).data, false)).data, secure(QByteArray::number(i)));
+    }
+}
+
+void tst_OmemoSession::duplicate()
+{
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
+    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+    establish(alice, aliceDevice, bob, bobDevice);
+
+    const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("once")));
+    expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), message.data, false));
+    expectVariant<QXmppError>(bob.decrypt(aliceDevice.address(), message.data, false));
+}
+
+void tst_OmemoSession::invalidSignature_data()
+{
+    addVersions();
+}
+
+void tst_OmemoSession::invalidSignature()
+{
+    QFETCH(Version, version);
+
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    SessionLayer alice(*m_context, version, aliceDevice.keys);
+    SessionLayer bob(*m_context, version, bobDevice.keys);
+
+    auto bundle = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1));
+    bundle.signedPreKeySignature[0] = char(bundle.signedPreKeySignature.at(0) ^ 0x01);
+    expectVariant<QXmppError>(alice.buildSession(bobDevice.address(), bundle));
+    QVERIFY(!alice.hasSession(bobDevice.address()));
+
+    // signed by another identity key
+    auto otherBundle = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1));
+    Device mallory(*m_context, u"mallory@example.org"_s);
+    SessionLayer malloryLayer(*m_context, version, mallory.keys);
+    otherBundle.identityKey = expectVariant<Bundle>(malloryLayer.ownBundle(SIGNED_PRE_KEY_ID, 1)).identityKey;
+    expectVariant<QXmppError>(alice.buildSession(bobDevice.address(), otherBundle));
+
+    auto truncated = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1));
+    truncated.preKey.chop(1);
+    expectVariant<QXmppError>(alice.buildSession(bobDevice.address(), truncated));
+
+    // keys in the format of the other version
+    auto otherFormat = expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1));
+    if (version == Version::Omemo2) {
+        otherFormat.preKey.prepend(char(0x05));
+    } else {
+        otherFormat.preKey.remove(0, 1);
+    }
+    expectVariant<QXmppError>(alice.buildSession(bobDevice.address(), otherFormat));
+}
+
+void tst_OmemoSession::versionMismatch()
+{
+    const auto aliceIdentity = *m_context->generateIdentityKeyPair();
+    Device aliceDevice(*m_context, u"alice@example.org"_s, aliceIdentity);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    SessionLayer alice(*m_context, Version::Omemo0, aliceDevice.keys);
+    SessionLayer bob0(*m_context, Version::Omemo0, bobDevice.keys);
+    SessionLayer bob2(*m_context, Version::Omemo2, bobDevice.keys);
+
+    expectVariant<Success>(alice.buildSession(bobDevice.address(), expectVariant<Bundle>(bob0.ownBundle(SIGNED_PRE_KEY_ID, 1))));
+    const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("v0")));
+    expectVariant<QXmppError>(bob2.decrypt(aliceDevice.address(), message.data, true));
+    QVERIFY(!bob2.hasSession(aliceDevice.address()));
+    QVERIFY(bobDevice.keys.preKeys.contains(1));
+}
+
+void tst_OmemoSession::unknownPreKey()
+{
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
+    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+
+    expectVariant<Success>(alice.buildSession(bobDevice.address(), expectVariant<Bundle>(bob.ownBundle(SIGNED_PRE_KEY_ID, 1))));
+    const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("x")));
+    bobDevice.keys.preKeys.remove(1);
+    expectVariant<QXmppError>(bob.decrypt(aliceDevice.address(), message.data, true));
+}
+
+void tst_OmemoSession::noSession()
+{
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
+    SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+    establish(alice, aliceDevice, bob, bobDevice);
+
+    const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("x")));
+    bobDevice.keys.sessions.clear();
+    expectVariant<QXmppError>(bob.decrypt(aliceDevice.address(), message.data, false));
+    expectVariant<QXmppError>(bob.decrypt(aliceDevice.address(), QByteArray("garbage"), false));
+    expectVariant<QXmppError>(bob.decrypt(aliceDevice.address(), QByteArray("garbage"), true));
+}
+
+void tst_OmemoSession::persistence()
+{
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+    {
+        SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
+        SessionLayer bob(*m_context, Version::Omemo2, bobDevice.keys);
+        establish(alice, aliceDevice, bob, bobDevice);
+    }
+
+    // The serialized state is enough to continue, also with a new context.
+    SignalContext context;
+    auto aliceKeys = aliceDevice.keys;
+    auto bobKeys = bobDevice.keys;
+    SessionLayer alice(context, Version::Omemo2, aliceKeys);
+    SessionLayer bob(context, Version::Omemo2, bobKeys);
+
+    const auto message = expectVariant<EncryptedKey>(alice.encrypt(bobDevice.address(), secure("after restart")));
+    QVERIFY(!message.isKeyExchange);
+    QCOMPARE(expectVariant<DecryptedKey>(bob.decrypt(aliceDevice.address(), message.data, false)).data, secure("after restart"));
+}
+
+void tst_OmemoSession::callbacks()
+{
+    Device aliceDevice(*m_context, u"alice@example.org"_s);
+    Device bobDevice(*m_context, u"bob@example.org"_s);
+
+    QHash<Address, QByteArray> stored;
+    QList<uint32_t> removedPreKeys;
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice.keys);
+    SessionLayer bob(*m_context,
+                     Version::Omemo2,
+                     bobDevice.keys,
+                     {
+                         [&](const Address &address, const QByteArray &session) { stored.insert(address, session); },
+                         {},
+                         [&](uint32_t id) { removedPreKeys.append(id); },
+                     });
+
+    establish(alice, aliceDevice, bob, bobDevice);
+    QCOMPARE(removedPreKeys, QList<uint32_t> { 2 });
+    QCOMPARE(stored.keys(), QList<Address> { aliceDevice.address() });
+    QCOMPARE(stored.value(aliceDevice.address()), bobDevice.keys.sessions.value(aliceDevice.address()));
+}
+
+}  // namespace SessionLayerTests
+
+QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession)
 
 #include "OmemoManager.moc"
