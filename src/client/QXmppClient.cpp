@@ -821,7 +821,11 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, cons
         // serialized before the IQ is copied, which would lose the payload of subclasses
         return d->encryptedIqs.sendRequest(Private::EncryptedIqs::serialize(iq), params.value_or(QXmppSendStanzaParams()));
     }
-    return d->encryptionExtension ? d->sendSensitiveIq(std::move(iq), params) : d->stream->sendIq(std::move(iq));
+    if (d->encryptionExtension) {
+        // the private overload copies the IQ, which would lose the payload of subclasses
+        return d->sendSensitiveIq(Private::EncryptedIqs::deserialize(Private::EncryptedIqs::serialize(iq)), params);
+    }
+    return d->stream->sendIq(std::move(iq));
 }
 
 QXmppTask<QXmppClient::IqResult> QXmppClientPrivate::sendSensitiveIq(QXmppIq iq, std::optional<QXmppSendStanzaParams> params)

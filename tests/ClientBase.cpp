@@ -204,6 +204,7 @@ class EncryptionExtension : public QXmppE2eeExtension
 public:
     bool messageCalled = false;
     bool iqCalled = false;
+    QStringList iqs;
 
     QXmppTask<MessageEncryptResult> encryptMessage(QXmppMessage &&, const std::optional<QXmppSendStanzaParams> &) override
     {
@@ -215,9 +216,10 @@ public:
         co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
 
-    QXmppTask<IqEncryptResult> encryptIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> &) override
+    QXmppTask<IqEncryptResult> encryptIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &) override
     {
         iqCalled = true;
+        iqs << QString::fromUtf8(packetToXml(iq));
         co_return QXmppError { "it's only a test", QXmpp::SendError::EncryptionError };
     }
 
@@ -6717,6 +6719,7 @@ private:
     Q_SLOT void responseTraits();
     Q_SLOT void ownAccount();
     Q_SLOT void encrypted();
+    Q_SLOT void encryptedLegacy();
 };
 
 void tst_QXmppIqSending::initTestCase()
@@ -6851,6 +6854,41 @@ void tst_QXmppIqSending::encrypted()
     client.inject(u"<iq type='result' id='qx1' from='alice@example.org/phone' to='me@example.org/res'>"
                   "<encrypted xmlns='urn:test:e2ee' data='&lt;query xmlns=&apos;urn:test&apos; value=&apos;answer&apos;/&gt;'/></iq>"_s);
     QCOMPARE(expectFutureVariant<TestQuery>(task).value, u"answer"_s);
+}
+
+void tst_QXmppIqSending::encryptedLegacy()
+{
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    ::Client::EncryptionExtension encrypter;
+    client.setEncryptionExtension(&encrypter);
+    QT_WARNING_POP
+
+    // the payload of subclasses is passed to the encryption extension
+    QXmppVersionIq versionIq;
+    versionIq.setType(QXmppIq::Get);
+    versionIq.setTo(u"alice@example.org/phone"_s);
+    versionIq.setName(u"subclass-payload"_s);
+    client.sendSensitiveIq(std::move(versionIq));
+    QCOMPARE(encrypter.iqs.size(), 1);
+    QVERIFY(encrypter.iqs.at(0).contains(u"subclass-payload"_s));
+
+    // typed requests
+    client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/phone"_s, .payload = TestQuery { u"typed-payload"_s } }, { .encrypted = true });
+    QCOMPARE(encrypter.iqs.size(), 2);
+    QVERIFY(encrypter.iqs.at(1).contains(u"typed-payload"_s));
+
+    // replies to encrypted requests
+    QObject owner;
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([](auto &&) {
+        return TestQuery { u"reply-payload"_s };
+    });
+    QVERIFY(client.handleStanza(xmlToDom(u"<iq id='r1' type='get' from='alice@example.org/phone'><query xmlns='urn:test'/></iq>"_s), QXmppE2eeMetadata()));
+    QCoreApplication::processEvents();
+    QCOMPARE(encrypter.iqs.size(), 3);
+    QVERIFY(encrypter.iqs.at(2).contains(u"reply-payload"_s));
 }
 
 }  // namespace IqSendingTests
