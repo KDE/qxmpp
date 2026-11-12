@@ -7,8 +7,8 @@ SPDX-License-Identifier: CC0-1.0
 QXmpp OMEMO module
 ==================
 
-The QXmpp OMEMO module adds support for OMEMO (v0.8+) end-to-end encryption by
-providing the `QXmppOmemoManager`.
+The QXmpp OMEMO module adds support for OMEMO 0 (`eu.siacs.conversations.axolotl`, v0.3)
+and OMEMO 2 (`urn:xmpp:omemo:2`, v0.8+) end-to-end encryption by providing `QXmpp::OmemoManager`.
 
 Dependencies
 ------------

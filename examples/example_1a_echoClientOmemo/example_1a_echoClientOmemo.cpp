@@ -10,6 +10,7 @@
 #include "QXmppMessage.h"
 #include "QXmppMessages.h"
 #include "QXmppOmemoManager.h"
+#include "QXmppOmemoMemoryStorage.h"
 #include "QXmppPubSubManager.h"
 
 #include <QCoreApplication>
@@ -21,54 +22,25 @@ EchoClientOmemo::EchoClientOmemo(QObject *parent)
 
     addNewExtension<QXmppPubSubManager>();
     addNewExtension<QXmppCarbonManagerV2>();
-
     addNewExtension<QXmppAtmManager>(&m_trustStorage);
 
-    m_omemoManager = addNewExtension<QXmppOmemoManager>(&m_omemoStorage);
-
-    m_omemoManager->setSecurityPolicy(QXmpp::Toakafa);
-
-    // The encryption of outgoing messages is selected per contact: contacts that sent OMEMO
-    // encrypted messages get OMEMO encrypted replies. A real application would use a setting of
-    // the user per conversation instead.
-    hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
-        if (m_omemoContacts.contains(selection.to().bare())) {
-            selection.setEncryption(QXmpp::E2ee::Omemo2);
-        }
-    });
-
-    // This example uses QXmppOmemoMemoryStorage and QXmppAtmTrustMemoryStorage,
-    // which keep everything in memory only. load() will always fail on startup
-    // (nothing persisted), so setUp() runs on every launch and the client gets a
-    // new OMEMO device identity each time.
+    // The memory storage keeps everything in memory only: the bot gets a new OMEMO device on every
+    // start. A real application implements QXmpp::OmemoStorage persistently.
     //
-    // A real application must implement persistent QXmppOmemoStorage and
-    // QXmppTrustStorage subclasses. The typical flow is:
-    //   1. Call load() before connecting.
-    //   2. If load() returned true, OMEMO is already initialized.
-    //   3. If load() returned false, call setUp() after `connected` to perform
-    //      the one-time device registration, and persist the state.
-
-    m_omemoManager->load().then(this, [](bool success) {
-        if (success) {
-            qDebug() << "OMEMO keys loaded successfully.";
-        } else {
-            qWarning() << "Failed to load OMEMO keys!";
-        }
+    // The manager loads its data from the storage and creates and publishes the own device on the
+    // first login. OMEMO 0 and OMEMO 2 are both enabled by default.
+    auto *omemoManager = addNewExtension<QXmpp::OmemoManager>(std::make_shared<QXmpp::OmemoMemoryStorage>());
+    connect(omemoManager, &QXmpp::OmemoManager::errorOccurred, this, [](const QXmppError &error) {
+        qWarning() << "OMEMO error:" << error.description;
     });
 
-    connect(this, &QXmppClient::connected, this, [this]() {
-        if (m_omemoInitialized) {
-            return;
+    // The encryption of outgoing messages is selected per contact: replies use the encryption of
+    // the last message of the contact. A real application would use a setting of the user per
+    // conversation instead.
+    hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
+        if (const auto encryption = m_encryptions.value(selection.to().bare()); !encryption.isEmpty()) {
+            selection.setEncryption(encryption);
         }
-        m_omemoManager->setUp().then(this, [this](bool success) {
-            if (success) {
-                m_omemoInitialized = true;
-                qDebug() << "OMEMO keys set up successfully.";
-            } else {
-                qWarning() << "Failed to set up OMEMO keys!";
-            }
-        });
     });
 }
 
@@ -80,9 +52,13 @@ void EchoClientOmemo::messageReceived(const QXmppMessage &message)
         return;
     }
 
-    if (const auto metadata = message.e2eeMetadata(); metadata && metadata->encryptionNamespace() == QXmpp::E2ee::Omemo2) {
-        if (auto from = QXmpp::Jid::fromString(message.from())) {
-            m_omemoContacts.insert(from->bare());
+    const auto metadata = message.e2eeMetadata();
+    const auto encryption = metadata ? metadata->encryptionNamespace() : QString();
+    if (auto from = QXmpp::Jid::fromString(message.from())) {
+        if (encryption == QXmpp::E2ee::Omemo0 || encryption == QXmpp::E2ee::Omemo2) {
+            m_encryptions.insert(from->bare(), encryption);
+        } else {
+            m_encryptions.remove(from->bare());
         }
     }
 

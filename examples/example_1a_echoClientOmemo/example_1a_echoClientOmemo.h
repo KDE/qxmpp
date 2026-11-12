@@ -8,12 +8,10 @@
 #include "QXmppAtmTrustMemoryStorage.h"
 #include "QXmppClient.h"
 #include "QXmppJid.h"
-#include "QXmppOmemoMemoryStorage.h"
 
-#include <QSet>
+#include <QHash>
 
 class QXmppMessage;
-class QXmppOmemoManager;
 
 class EchoClientOmemo : public QXmppClient
 {
@@ -27,11 +25,8 @@ public:
 
 private:
     QXmppAtmTrustMemoryStorage m_trustStorage;
-    QXmppOmemoMemoryStorage m_omemoStorage;
-    QXmppOmemoManager *m_omemoManager = nullptr;
-    bool m_omemoInitialized = false;
-    // contacts that sent OMEMO encrypted messages
-    QSet<QXmpp::Jid> m_omemoContacts;
+    // encryption of the last message per contact
+    QHash<QXmpp::Jid, QString> m_encryptions;
 };
 
 #endif  // EXAMPLE_1A_ECHOCLIENTOMEMO_H
