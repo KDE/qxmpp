@@ -2542,8 +2542,6 @@ struct Account {
         client.addNewExtension<QXmppPubSubManager>();
         trust = client.addNewExtension<QXmppAtmManager>(&trustStorage);
         manager = client.addNewExtension<Manager>(this->storage);
-        trust->setSecurityPolicy(E2ee::Omemo0.toString(), Toakafa);
-        trust->setSecurityPolicy(E2ee::Omemo2.toString(), Toakafa);
 
         // the version is selected by the test
         client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
@@ -2671,6 +2669,7 @@ private:
     Q_SLOT void devices();
     Q_SLOT void deviceLabel();
     Q_SLOT void enabledVersionsAtRuntime();
+    Q_SLOT void defaultSecurityPolicy();
     Q_SLOT void removeContactDevices();
     Q_SLOT void resetOwnDevice();
     Q_SLOT void resetAll();
@@ -3186,7 +3185,7 @@ void tst_OmemoManager2::devices()
     QCOMPARE(devicesOf(bob.jid()), (QList<Manager::Device> { { version, bob.jid(), bob.manager->ownDeviceId().value(), label, bobKey, TrustLevel::AutomaticallyTrusted } }));
 
     QSignalSpy trustSpy(alice.manager, &Manager::trustLevelsChanged);
-    alice.trust->setTrustLevel(versionNamespace(version), { { bob.jid(), bobKey } }, TrustLevel::Authenticated);
+    alice.manager->setTrustLevel(devicesOf(bob.jid()), TrustLevel::Authenticated);
     QCOMPARE(trustSpy.size(), 1);
     QCOMPARE(trustSpy.constFirst().at(0).value<Version>(), version);
     QCOMPARE(trustSpy.constFirst().at(1).value<QList<Manager::Key>>(), (QList<Manager::Key> { { bob.jid(), bobKey } }));
@@ -3251,6 +3250,19 @@ void tst_OmemoManager2::enabledVersionsAtRuntime()
     expectVariant<Success>(account.setUp());
     QVERIFY(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)).isEmpty());
     QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), QList { id });
+}
+
+void tst_OmemoManager2::defaultSecurityPolicy()
+{
+    Account account;
+    expectVariant<Success>(account.setUp());
+    QCOMPARE(account.trust->securityPolicy(E2ee::Omemo0.toString()).result(), Toakafa);
+    QCOMPARE(account.trust->securityPolicy(E2ee::Omemo2.toString()).result(), Toakafa);
+
+    // a policy chosen by the user is kept
+    account.trust->setSecurityPolicy(E2ee::Omemo2.toString(), NoSecurityPolicy);
+    account.manager->d->load();
+    QCOMPARE(account.trust->securityPolicy(E2ee::Omemo2.toString()).result(), NoSecurityPolicy);
 }
 
 void tst_OmemoManager2::removeContactDevices()

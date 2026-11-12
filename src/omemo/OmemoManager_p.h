@@ -79,6 +79,7 @@ public:
     Private::Pep::Client pubSubClient(Version version) const { return { pubSub, version }; }
 
     void setUpSessionLayers();
+    QXmppTask<void> setOwnTrustKey(Version version, QByteArray key);
     Storage::OwnDevice storedOwnDevice() const;
     QString label() const;
 

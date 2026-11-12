@@ -70,9 +70,19 @@ void ManagerPrivate::setUpSessionLayers()
         };
         state.sessions = std::make_unique<SessionLayer>(context, version, device, state.keys, std::move(callbacks));
         if (trustManager) {
-            trustManager->setOwnKey(trustNamespace(version), state.sessions->ownIdentityKey());
+            setOwnTrustKey(version, state.sessions->ownIdentityKey());
         }
     }
+}
+
+// Without an own key, the trust data of the version is new: TOAKAFA is used by default.
+QXmppTask<void> ManagerPrivate::setOwnTrustKey(Version version, QByteArray key)
+{
+    const auto encryption = trustNamespace(version);
+    if ((co_await trustManager->ownKey(encryption).withContext(q)).isEmpty()) {
+        co_await trustManager->setSecurityPolicy(encryption, Toakafa).withContext(q);
+    }
+    co_await trustManager->setOwnKey(encryption, key).withContext(q);
 }
 
 Storage::OwnDevice ManagerPrivate::storedOwnDevice() const
@@ -463,6 +473,8 @@ void ManagerPrivate::removeExpiredDevices()
     stream), it renews the keys and publishes the data again.
 
     QXmppPubSubManager and a QXmppTrustManager must be added to the client before this manager.
+    New trust data uses the security policy TOAKAFA, see QXmpp::TrustSecurityPolicy. The trust
+    manager can be used to change it.
 
     \since QXmpp 1.18
 */
@@ -692,6 +704,25 @@ QXmppTask<QList<Manager::Device>> Manager::devices(QList<QString> jids)
         }
     }
     co_return result;
+}
+
+/*!
+    Sets the trust level of the keys of \a devices to \a trustLevel, e.g. after the user has
+    verified them. Devices with unknown keys are skipped.
+*/
+QXmppTask<void> Manager::setTrustLevel(QList<Device> devices, QXmpp::TrustLevel trustLevel)
+{
+    for (auto version : ALL_VERSIONS) {
+        QMultiHash<QString, QByteArray> keys;
+        for (const auto &device : std::as_const(devices)) {
+            if (device.version == version && !device.keyId.isEmpty()) {
+                keys.insert(device.jid, device.keyId);
+            }
+        }
+        if (!keys.isEmpty()) {
+            co_await d->trustManager->setTrustLevel(ManagerPrivate::trustNamespace(version), keys, trustLevel).withContext(this);
+        }
+    }
 }
 
 /*!

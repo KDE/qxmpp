@@ -213,6 +213,7 @@ public:
     QList<uint32_t> deviceIds(Version version, const QString &jid) const;
     QXmppTask<QList<Device>> devices(QList<QString> jids);
     QXmppTask<QXmpp::Result<QList<Version>>> supportedVersions(QString jid);
+    QXmppTask<void> setTrustLevel(QList<Device> devices, QXmpp::TrustLevel trustLevel);
     QXmppTask<void> removeContactDevices(QString jid);
 
     QXmppTask<QXmpp::Result<>> resetOwnDevice();
