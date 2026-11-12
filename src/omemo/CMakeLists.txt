@@ -16,6 +16,7 @@ set(OMEMO_SOURCE_FILES
     OmemoDeviceList.cpp
     OmemoKeyMaintenance.cpp
     OmemoPayloadCipher.cpp
+    OmemoPubSub.cpp
     OmemoSession.cpp
     Omemo0Data.cpp
     QXmppOmemoData.cpp

@@ -252,6 +252,7 @@ inline constexpr QStringView ns_eme = u"urn:xmpp:eme:0";
 inline constexpr QStringView ns_spoiler = u"urn:xmpp:spoiler:0";
 // XEP-0384: OMEMO Encryption
 inline constexpr QStringView ns_omemo = u"eu.siacs.conversations.axolotl";
+inline constexpr QStringView ns_omemo_devicelist = u"eu.siacs.conversations.axolotl.devicelist";
 inline constexpr QStringView ns_omemo_1 = u"urn:xmpp:omemo:1";
 inline constexpr QStringView ns_omemo_2 = u"urn:xmpp:omemo:2";
 inline constexpr QStringView ns_omemo_2_bundles = u"urn:xmpp:omemo:2:bundles";

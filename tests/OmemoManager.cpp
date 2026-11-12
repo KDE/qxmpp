@@ -32,8 +32,10 @@
 #include "OmemoDeviceList.h"
 #include "OmemoKeyMaintenance.h"
 #include "OmemoPayloadCipher.h"
+#include "OmemoPubSub.h"
 #include "OmemoSession.h"
 #include "StringLiterals.h"
+#include "TestClient.h"
 #include "util.h"
 
 #include <QCoreApplication>
@@ -2112,6 +2114,337 @@ void tst_OmemoStorage::migrateKeepsSession()
 
 }  // namespace StorageTests
 
-QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList, StorageTests::tst_OmemoStorage)
+// ============================================================
+
+namespace PubSubTests {
+
+using namespace QXmpp;
+using namespace QXmpp::Omemo;
+using namespace QXmpp::Omemo::Private;
+namespace OmemoPubSub = QXmpp::Omemo::Private::Pep;
+
+using Entries = QList<DeviceList::Entry>;
+
+static const auto PUBLISH_OPTIONS_OPEN = u"<publish-options><x xmlns='jabber:x:data' type='submit'>"
+                                         "<field type='hidden' var='FORM_TYPE'><value>http://jabber.org/protocol/pubsub#publish-options</value></field>"
+                                         "<field type='list-single' var='pubsub#access_model'><value>open</value></field>"
+                                         "</x></publish-options>"_s;
+
+static const auto V0_DEVICE_LIST_PUBLISH =
+    u"<iq id='qx1' to='juliet@capulet.lit' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+    "<publish node='eu.siacs.conversations.axolotl.devicelist'><item id='current'>"
+    "<list xmlns='eu.siacs.conversations.axolotl'><device id='1'/><device id='2'/></list>"
+    "</item></publish>"_s +
+    PUBLISH_OPTIONS_OPEN + u"</pubsub></iq>"_s;
+
+static const auto V0_BUNDLE =
+    u"<bundle xmlns='eu.siacs.conversations.axolotl'>"
+    "<signedPreKeyPublic signedPreKeyId='1'>c3Br</signedPreKeyPublic>"
+    "<signedPreKeySignature>c2ln</signedPreKeySignature>"
+    "<identityKey>aWs=</identityKey>"
+    "<prekeys><preKeyPublic preKeyId='3'>cGsz</preKeyPublic></prekeys>"
+    "</bundle>"_s;
+
+static const auto V2_BUNDLE =
+    u"<bundle xmlns='urn:xmpp:omemo:2'><ik>aWs=</ik><spk id='1'>c3Br</spk><spks>c2ln</spks>"
+    "<prekeys><pk id='3'>cGsz</pk></prekeys></bundle>"_s;
+
+static const OmemoPubSub::PublicBundle BUNDLE { "ik", 1, "spk", "sig", { { 3, "pk3" } } };
+
+struct Fixture {
+    Fixture()
+    {
+        test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+        pubSub = test.addNewExtension<QXmppPubSubManager>();
+    }
+
+    TestClient test;
+    QXmppPubSubManager *pubSub;
+};
+
+class tst_OmemoPubSub : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void nodes();
+    Q_SLOT void deviceListItem();
+    Q_SLOT void requestDeviceList_data();
+    Q_SLOT void requestDeviceList();
+    Q_SLOT void requestDeviceListWithoutCurrentItem();
+    Q_SLOT void requestDeviceListNotFound();
+    Q_SLOT void requestDeviceListError();
+    Q_SLOT void requestBundle_data();
+    Q_SLOT void requestBundle();
+    Q_SLOT void publishDeviceList();
+    Q_SLOT void publishBundle_data();
+    Q_SLOT void publishBundle();
+    Q_SLOT void publishReconfiguresNode();
+    Q_SLOT void publishError();
+    Q_SLOT void deleteBundle_data();
+    Q_SLOT void deleteBundle();
+};
+
+void tst_OmemoPubSub::nodes()
+{
+    QCOMPARE(OmemoPubSub::deviceListNode(Version::Omemo0), u"eu.siacs.conversations.axolotl.devicelist"_s);
+    QCOMPARE(OmemoPubSub::deviceListNode(Version::Omemo2), u"urn:xmpp:omemo:2:devices"_s);
+    QCOMPARE(OmemoPubSub::bundleNode(Version::Omemo0, 42), u"eu.siacs.conversations.axolotl.bundles:42"_s);
+    QCOMPARE(OmemoPubSub::bundleNode(Version::Omemo2, 42), u"urn:xmpp:omemo:2:bundles"_s);
+}
+
+void tst_OmemoPubSub::deviceListItem()
+{
+    auto parse = [](const QString &xml) {
+        OmemoPubSub::DeviceListItem item;
+        item.parse(xmlToDom(xml));
+        return item;
+    };
+
+    const auto v0 = parse(u"<item id='current'><list xmlns='eu.siacs.conversations.axolotl'><device id='1'/><device id='2'/></list></item>"_s);
+    QCOMPARE(v0.version, std::optional(Version::Omemo0));
+    QCOMPARE(v0.devices, (Entries { { 1, {} }, { 2, {} } }));
+
+    const auto v2 = parse(u"<item id='current'><devices xmlns='urn:xmpp:omemo:2'><device id='1' label='Phone'/></devices></item>"_s);
+    QCOMPARE(v2.version, std::optional(Version::Omemo2));
+    QCOMPARE(v2.devices, (Entries { { 1, u"Phone"_s } }));
+
+    QVERIFY(!parse(u"<item id='current'><list xmlns='urn:xmpp:omemo:2'/></item>"_s).version);
+}
+
+void tst_OmemoPubSub::requestDeviceList_data()
+{
+    QTest::addColumn<Version>("version");
+    QTest::addColumn<QString>("request");
+    QTest::addColumn<QString>("items");
+    QTest::addColumn<Entries>("expected");
+
+    QTest::newRow("omemo0")
+        << Version::Omemo0
+        << u"<iq id='qx1' to='romeo@montague.lit' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+           "<items node='eu.siacs.conversations.axolotl.devicelist'/></pubsub></iq>"_s
+        << u"<items node='eu.siacs.conversations.axolotl.devicelist'><item id='current'>"
+           "<list xmlns='eu.siacs.conversations.axolotl'><device id='1'/><device id='2'/></list>"
+           "</item></items>"_s
+        << Entries { { 1, {} }, { 2, {} } };
+    QTest::newRow("omemo2")
+        << Version::Omemo2
+        << u"<iq id='qx1' to='romeo@montague.lit' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+           "<items node='urn:xmpp:omemo:2:devices'/></pubsub></iq>"_s
+        << u"<items node='urn:xmpp:omemo:2:devices'><item id='current'>"
+           "<devices xmlns='urn:xmpp:omemo:2'><device id='1' label='Phone'/><device id='2'/></devices>"
+           "</item></items>"_s
+        << Entries { { 1, u"Phone"_s }, { 2, {} } };
+}
+
+void tst_OmemoPubSub::requestDeviceList()
+{
+    QFETCH(Version, version);
+    QFETCH(QString, request);
+    QFETCH(QString, items);
+    QFETCH(Entries, expected);
+
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, version).requestDeviceList(u"romeo@montague.lit"_s);
+    f.test.expect(std::move(request));
+    f.test.inject(u"<iq id='qx1' from='romeo@montague.lit' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"_s +
+                  items + u"</pubsub></iq>"_s);
+    QCOMPARE(expectFutureVariant<Entries>(task), expected);
+}
+
+void tst_OmemoPubSub::requestDeviceListWithoutCurrentItem()
+{
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, Version::Omemo0).requestDeviceList(u"romeo@montague.lit"_s);
+    f.test.ignore();
+    f.test.inject(
+        u"<iq id='qx1' from='romeo@montague.lit' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+        "<items node='eu.siacs.conversations.axolotl.devicelist'>"
+        "<item id='old'><list xmlns='eu.siacs.conversations.axolotl'><device id='1'/></list></item>"
+        "<item id='new'><list xmlns='eu.siacs.conversations.axolotl'><device id='2'/></list></item>"
+        "</items></pubsub></iq>"_s);
+    QCOMPARE(expectFutureVariant<Entries>(task), (Entries { { 2, {} } }));
+}
+
+void tst_OmemoPubSub::requestDeviceListNotFound()
+{
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, Version::Omemo2).requestDeviceList(u"romeo@montague.lit"_s);
+    f.test.ignore();
+    f.test.inject(u"<iq id='qx1' from='romeo@montague.lit' type='error'>"
+                  "<error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+    QVERIFY(expectFutureVariant<Entries>(task).isEmpty());
+}
+
+void tst_OmemoPubSub::requestDeviceListError()
+{
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, Version::Omemo2).requestDeviceList(u"romeo@montague.lit"_s);
+    f.test.ignore();
+    f.test.inject(u"<iq id='qx1' from='romeo@montague.lit' type='error'>"
+                  "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+    expectFutureVariant<QXmppError>(task);
+}
+
+void tst_OmemoPubSub::requestBundle_data()
+{
+    QTest::addColumn<Version>("version");
+    QTest::addColumn<QString>("request");
+    QTest::addColumn<QString>("items");
+
+    // OMEMO 0 has no fixed item ID: all items are requested and 'current' or the last one is used.
+    const auto v0Request = u"<iq id='qx1' to='romeo@montague.lit' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                           "<items node='eu.siacs.conversations.axolotl.bundles:5'/></pubsub></iq>"_s;
+    QTest::newRow("omemo0")
+        << Version::Omemo0
+        << v0Request
+        << u"<items node='eu.siacs.conversations.axolotl.bundles:5'><item id='current'>"_s + V0_BUNDLE + u"</item></items>"_s;
+    // e.g. Dino
+    QTest::newRow("omemo0-random-id")
+        << Version::Omemo0
+        << v0Request
+        << u"<items node='eu.siacs.conversations.axolotl.bundles:5'><item id='5f3c8a2e'>"_s + V0_BUNDLE + u"</item></items>"_s;
+    QTest::newRow("omemo0-current-and-others")
+        << Version::Omemo0
+        << v0Request
+        << u"<items node='eu.siacs.conversations.axolotl.bundles:5'><item id='current'>"_s + V0_BUNDLE + u"</item><item id='old'><bundle xmlns='eu.siacs.conversations.axolotl'/></item></items>"_s;
+    QTest::newRow("omemo2")
+        << Version::Omemo2
+        << u"<iq id='qx1' to='romeo@montague.lit' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+           "<items node='urn:xmpp:omemo:2:bundles'><item id='5'/></items></pubsub></iq>"_s
+        << u"<items node='urn:xmpp:omemo:2:bundles'><item id='5'>"_s + V2_BUNDLE + u"</item></items>"_s;
+}
+
+void tst_OmemoPubSub::requestBundle()
+{
+    QFETCH(Version, version);
+    QFETCH(QString, request);
+    QFETCH(QString, items);
+
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, version).requestBundle(u"romeo@montague.lit"_s, 5);
+    f.test.expect(std::move(request));
+    f.test.inject(u"<iq id='qx1' from='romeo@montague.lit' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"_s +
+                  items + u"</pubsub></iq>"_s);
+    QCOMPARE(expectFutureVariant<OmemoPubSub::PublicBundle>(task), BUNDLE);
+}
+
+void tst_OmemoPubSub::publishDeviceList()
+{
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, Version::Omemo0).publishDeviceList({ { 1, u"Phone"_s }, { 2, {} } });
+    f.test.expect(QString(V0_DEVICE_LIST_PUBLISH));
+    f.test.inject(u"<iq id='qx1' from='juliet@capulet.lit' type='result'/>"_s);
+    expectFutureVariant<Success>(task);
+
+    task = OmemoPubSub::Client(f.pubSub, Version::Omemo2).publishDeviceList({ { 1, u"Phone"_s }, { 2, {} } });
+    f.test.expect(u"<iq id='qx1' to='juliet@capulet.lit' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                  "<publish node='urn:xmpp:omemo:2:devices'><item id='current'>"
+                  "<devices xmlns='urn:xmpp:omemo:2'><device id='1' label='Phone'/><device id='2'/></devices>"
+                  "</item></publish>"_s +
+                  PUBLISH_OPTIONS_OPEN + u"</pubsub></iq>"_s);
+    f.test.inject(u"<iq id='qx1' from='juliet@capulet.lit' type='result'/>"_s);
+    expectFutureVariant<Success>(task);
+}
+
+void tst_OmemoPubSub::publishBundle_data()
+{
+    QTest::addColumn<Version>("version");
+    QTest::addColumn<QString>("request");
+
+    QTest::newRow("omemo0")
+        << Version::Omemo0
+        << u"<iq id='qx1' to='juliet@capulet.lit' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+           "<publish node='eu.siacs.conversations.axolotl.bundles:5'><item id='current'>"_s +
+            V0_BUNDLE + u"</item></publish>"_s + PUBLISH_OPTIONS_OPEN + u"</pubsub></iq>"_s;
+    QTest::newRow("omemo2")
+        << Version::Omemo2
+        << u"<iq id='qx1' to='juliet@capulet.lit' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+           "<publish node='urn:xmpp:omemo:2:bundles'><item id='5'>"_s +
+            V2_BUNDLE +
+            u"</item></publish><publish-options><x xmlns='jabber:x:data' type='submit'>"
+            "<field type='hidden' var='FORM_TYPE'><value>http://jabber.org/protocol/pubsub#publish-options</value></field>"
+            "<field type='list-single' var='pubsub#access_model'><value>open</value></field>"
+            "<field type='text-single' var='pubsub#max_items'><value>max</value></field>"
+            "</x></publish-options></pubsub></iq>"_s;
+}
+
+void tst_OmemoPubSub::publishBundle()
+{
+    QFETCH(Version, version);
+    QFETCH(QString, request);
+
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, version).publishBundle(5, BUNDLE);
+    f.test.expect(std::move(request));
+    f.test.inject(u"<iq id='qx1' from='juliet@capulet.lit' type='result'/>"_s);
+    expectFutureVariant<Success>(task);
+}
+
+void tst_OmemoPubSub::publishReconfiguresNode()
+{
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, Version::Omemo0).publishDeviceList({ { 1, {} }, { 2, {} } });
+    f.test.expect(QString(V0_DEVICE_LIST_PUBLISH));
+    f.test.inject(u"<iq id='qx1' from='juliet@capulet.lit' type='error'><error type='cancel'>"
+                  "<conflict xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                  "<precondition-not-met xmlns='http://jabber.org/protocol/pubsub#errors'/>"
+                  "</error></iq>"_s);
+
+    f.test.expect(u"<iq id='qx2' to='juliet@capulet.lit' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub#owner'>"
+                  "<configure node='eu.siacs.conversations.axolotl.devicelist'><x xmlns='jabber:x:data' type='submit'>"
+                  "<field type='hidden' var='FORM_TYPE'><value>http://jabber.org/protocol/pubsub#node_config</value></field>"
+                  "<field type='list-single' var='pubsub#access_model'><value>open</value></field>"
+                  "</x></configure></pubsub></iq>"_s);
+    f.test.inject(u"<iq id='qx2' from='juliet@capulet.lit' type='result'/>"_s);
+
+    f.test.expect(QString(V0_DEVICE_LIST_PUBLISH));
+    f.test.inject(u"<iq id='qx1' from='juliet@capulet.lit' type='result'/>"_s);
+    expectFutureVariant<Success>(task);
+}
+
+void tst_OmemoPubSub::publishError()
+{
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, Version::Omemo0).publishDeviceList({ { 1, {} }, { 2, {} } });
+    f.test.expect(QString(V0_DEVICE_LIST_PUBLISH));
+    f.test.inject(u"<iq id='qx1' from='juliet@capulet.lit' type='error'><error type='cancel'>"
+                  "<feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+                  "</error></iq>"_s);
+    expectFutureVariant<QXmppError>(task);
+    f.test.expectNoPacket();
+}
+
+void tst_OmemoPubSub::deleteBundle_data()
+{
+    QTest::addColumn<Version>("version");
+    QTest::addColumn<QString>("request");
+
+    // OMEMO 0 has a node per device
+    QTest::newRow("omemo0")
+        << Version::Omemo0
+        << u"<iq id='qx1' to='juliet@capulet.lit' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub#owner'>"
+           "<delete node='eu.siacs.conversations.axolotl.bundles:5'/></pubsub></iq>"_s;
+    QTest::newRow("omemo2")
+        << Version::Omemo2
+        << u"<iq id='qx1' to='juliet@capulet.lit' type='set'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+           "<retract node='urn:xmpp:omemo:2:bundles'><item id='5'/></retract></pubsub></iq>"_s;
+}
+
+void tst_OmemoPubSub::deleteBundle()
+{
+    QFETCH(Version, version);
+    QFETCH(QString, request);
+
+    Fixture f;
+    auto task = OmemoPubSub::Client(f.pubSub, version).deleteBundle(5);
+    f.test.expect(std::move(request));
+    f.test.inject(u"<iq id='qx1' from='juliet@capulet.lit' type='result'/>"_s);
+    expectFutureVariant<Success>(task);
+}
+
+}  // namespace PubSubTests
+
+QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList, StorageTests::tst_OmemoStorage, PubSubTests::tst_OmemoPubSub)
 
 #include "OmemoManager.moc"
