@@ -435,7 +435,7 @@ void tst_QXmppOmemoManager::testSendIq()
     auto result = awaitTask(m_alice1.client.sendSensitiveIq(std::move(request)));
     auto stanzaError = expectVariant<QXmppError>(std::move(result)).value<QXmppStanza::Error>();
     QVERIFY(stanzaError.has_value());
-    QCOMPARE(stanzaError->condition(), QXmppStanza::Error::FeatureNotImplemented);
+    QCOMPARE(stanzaError->condition(), QXmppStanza::Error::ServiceUnavailable);
 
     // Bob handles the request and replies with the encrypted result.
     auto *iqHandler = new OmemoIqHandler(requestIq, responseIq);

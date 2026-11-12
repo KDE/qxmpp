@@ -6589,7 +6589,7 @@ void tst_QXmppMessages::iqIncoming()
     QVERIFY(packet.contains(u"req1"_s));
     QVERIFY(packet.contains(u"urn:test:e2ee"_s));
     QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
-    QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(u"feature-not-implemented"_s));
+    QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(u"service-unavailable"_s));
 }
 
 void tst_QXmppMessages::iqIncomingNotDecrypted()

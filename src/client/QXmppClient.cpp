@@ -1131,16 +1131,16 @@ void QXmppClient::injectIq(const QDomElement &element, const std::optional<QXmpp
     if (!d->handleStanza(element, e2eeMetadata)) {
         const auto iqType = element.attribute(u"type"_s);
         if (iqType == u"get" || iqType == u"set") {
-            // send error IQ
+            // unsupported payload namespace (RFC 6120, section 8.4)
             using Err = QXmppStanza::Error;
 
             QXmppIq iq(QXmppIq::Error);
             iq.setTo(element.attribute(u"from"_s));
             iq.setId(element.attribute(u"id"_s));
             const auto errMessage = e2eeMetadata.has_value()
-                ? u"Feature not implemented or not supported with end-to-end encryption."_s
-                : u"Feature not implemented."_s;
-            iq.setError(Err(Err::Cancel, Err::FeatureNotImplemented, errMessage));
+                ? u"Not supported or not supported with end-to-end encryption."_s
+                : u"Not supported."_s;
+            iq.setError(Err(Err::Cancel, Err::ServiceUnavailable, errMessage));
             Private::LegacyE2ee::reply(this, std::move(iq), e2eeMetadata);
         }
         // don't do anything for "result" and "error" IQs

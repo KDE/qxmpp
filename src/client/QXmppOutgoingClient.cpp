@@ -981,13 +981,13 @@ bool QXmppOutgoingClient::handleStanza(const QDomElement &stanza)
             Q_EMIT iqReceived(iqPacket);
             return true;
         } else if (type == u"get" || type == u"set") {
-            // respond with error if we didn't understand the iq request
+            // respond with error if we didn't understand the iq request (RFC 6120, section 8.4)
             QXmppIq iq(QXmppIq::Error);
             iq.setId(stanza.attribute(u"id"_s));
             iq.setTo(stanza.attribute(u"from"_s));
             iq.setError(QXmppStanza::Error {
                 QXmppStanza::Error::Cancel,
-                QXmppStanza::Error::FeatureNotImplemented,
+                QXmppStanza::Error::ServiceUnavailable,
             });
             d->streamAckManager.send(iq);
             return true;
