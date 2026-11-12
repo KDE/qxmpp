@@ -49,7 +49,9 @@ int hmac_sha256_final_func(void *hmac_context, signal_buffer **output, void *use
 
     auto result = mac->result();
     if (!(*output = signal_buffer_create(reinterpret_cast<const uint8_t *>(result.constData()), result.size()))) {
-        d->warning(u"Message authentication code could not be loaded"_s);
+        if (d) {
+            d->warning(u"Message authentication code could not be loaded"_s);
+        }
         return -1;
     }
 
@@ -82,7 +84,9 @@ int sha512_digest_final_func(void *digest_context, signal_buffer **output, void 
 
     auto hash = hashGenerator->result();
     if (!(*output = signal_buffer_create(reinterpret_cast<const uint8_t *>(hash.constData()), hash.size()))) {
-        d->warning(u"Hash could not be loaded"_s);
+        if (d) {
+            d->warning(u"Hash could not be loaded"_s);
+        }
         return -1;
     }
 
@@ -126,7 +130,9 @@ int encrypt_func(signal_buffer **output,
     }
 
     if (!(*output = signal_buffer_create(reinterpret_cast<const uint8_t *>(encryptedData.constData()), encryptedData.size()))) {
-        d->warning(u"Encrypted data could not be loaded"_s);
+        if (d) {
+            d->warning(u"Encrypted data could not be loaded"_s);
+        }
         return -4;
     }
 
@@ -164,7 +170,9 @@ int decrypt_func(signal_buffer **output,
     }
 
     if (!(*output = signal_buffer_create(reinterpret_cast<const uint8_t *>(decryptedData.constData()), decryptedData.size()))) {
-        d->warning(u"Decrypted data could not be loaded"_s);
+        if (d) {
+            d->warning(u"Decrypted data could not be loaded"_s);
+        }
         return -4;
     }
 
