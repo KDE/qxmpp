@@ -2687,6 +2687,8 @@ private:
     Q_SLOT void unlistedDevicesAreNotEncryptedFor();
     Q_SLOT void ownDevicesReceiveCopies_data();
     Q_SLOT void ownDevicesReceiveCopies();
+    Q_SLOT void maxDevicesPerStanza_data();
+    Q_SLOT void maxDevicesPerStanza();
     Q_SLOT void heartbeat_data();
     Q_SLOT void heartbeat();
     Q_SLOT void keyExchangeWithAnotherKey_data();
@@ -3366,6 +3368,39 @@ void tst_OmemoManager2::ownDevicesReceiveCopies()
     QCOMPARE(spy.size(), 1);
     QCOMPARE(spy.constFirst().at(0).value<QXmppMessage>().body(), u"Without sender"_s);
     QVERIFY(!alicePhone.manager->d->versions.at(version).devices.contains(QString()));
+}
+
+void tst_OmemoManager2::maxDevicesPerStanza_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::maxDevicesPerStanza()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account alicePhone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobPhone(nullptr, &server, u"bob@builder.lit/phone"_s);
+    for (auto *account : { &alice, &alicePhone, &bob, &bobPhone }) {
+        expectVariant<Success>(account->setUp());
+    }
+    alice.encryption = version;
+    alice.manager->d->maxDevicesPerStanza = 2;
+
+    // the own devices first, then the devices of the recipients ordered by ID
+    const auto bobIds = alice.manager->d->deviceIds(version, bob.jid());
+    QCOMPARE(bobIds.size(), 2);
+    auto &first = bobIds.constFirst() == bob.deviceId() ? bob : bobPhone;
+    auto &second = &first == &bob ? bobPhone : bob;
+
+    const auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    QCOMPARE(message.count(u"rid="_s), 2);
+    QCOMPARE(alicePhone.receive(alice, message).value(0).body(), u"Hello"_s);
+    QCOMPARE(first.receive(alice, message).value(0).body(), u"Hello"_s);
+    QVERIFY(second.receive(alice, message).value(0).body() != u"Hello"_s);
 }
 
 void tst_OmemoManager2::heartbeat_data()

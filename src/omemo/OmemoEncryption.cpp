@@ -204,18 +204,24 @@ QXmppTask<bool> ManagerPrivate::prepareSession(Version version, QString jid, uin
     co_return true;
 }
 
-// Encrypts the key material for all listed devices of the JIDs and the other own devices.
+// Encrypts the key material for all listed devices of the JIDs and the other own devices, but at
+// most for maxDevicesPerStanza devices, the own ones first.
 QXmppTask<Result<QList<Envelope>>> ManagerPrivate::encryptKey(Version version, QList<QString> jids, SecureByteArray keyMaterial, TrustLevels acceptedTrustLevels)
 {
     const auto own = ownJid();
     const auto hasRecipients = std::ranges::any_of(jids, [&](const QString &jid) { return jid != own; });
-    if (!jids.contains(own)) {
-        jids.append(own);
-    }
+    jids.removeAll(own);
+    jids.prepend(own);
 
     QList<Envelope> envelopes;
     auto hasRecipientEnvelope = false;
+    qsizetype skippedCount = 0;
     for (const auto &jid : std::as_const(jids)) {
+        if (envelopes.size() >= maxDevicesPerStanza) {
+            skippedCount += deviceIds(version, jid).size();
+            continue;
+        }
+
         // Device lists of contacts are subscribed, but they are unknown before the first message
         // or if only unlisted devices are known from their messages.
         if (jid != own && deviceIds(version, jid).isEmpty()) {
@@ -226,6 +232,10 @@ QXmppTask<Result<QList<Envelope>>> ManagerPrivate::encryptKey(Version version, Q
         }
 
         for (auto deviceId : deviceIds(version, jid)) {
+            if (envelopes.size() >= maxDevicesPerStanza) {
+                skippedCount++;
+                continue;
+            }
             if (!co_await prepareSession(version, jid, deviceId, acceptedTrustLevels).withContext(q)) {
                 continue;
             }
@@ -247,6 +257,9 @@ QXmppTask<Result<QList<Envelope>>> ManagerPrivate::encryptKey(Version version, Q
         }
     }
 
+    if (skippedCount) {
+        q->warning(u"Not encrypted for %1 devices above the maximum of %2 devices per stanza"_s.arg(QString::number(skippedCount), QString::number(maxDevicesPerStanza)));
+    }
     if (hasRecipients && !hasRecipientEnvelope) {
         co_return QXmppError { u"There is no device of the recipients with an accepted trust level"_s, SendError::EncryptionError };
     }
