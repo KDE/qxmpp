@@ -1,6 +1,12 @@
 // SPDX-FileCopyrightText: 2022 Melvin Keskin <melvo@olomono.de>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
+
+#include "QXmppOmemoStorage.h"
+
+#include <algorithm>
+#include <tuple>
 
 /*!
     \class QXmppOmemoStorage
@@ -79,3 +85,71 @@
 
     Resets all data.
 */
+
+namespace QXmpp::Omemo {
+
+/*!
+    \class QXmpp::Omemo::Storage
+    \inmodule QXmpp
+
+    \brief The Storage class stores the data of the \xep{0384}{OMEMO Encryption} manager for all
+    supported versions.
+
+    The identity key and the signed pre keys are shared by all versions. Pre keys and devices are
+    stored per version.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    Converts the data of a QXmppOmemoStorage to the data of this storage, so the device, its
+    identity key, its sessions and the trust in it are kept when switching to the new manager. All
+    pre keys and devices are assigned to OMEMO 2.
+*/
+Storage::Data Storage::migrate(const QXmppOmemoStorage::OmemoData &data)
+{
+    Data result;
+
+    if (data.ownDevice) {
+        const auto &device = *data.ownDevice;
+        result.ownDevice = OwnDevice {
+            device.id,
+            device.privateIdentityKey,
+            device.publicIdentityKey,
+            device.latestSignedPreKeyId,
+            { { Version::Omemo2, device.latestPreKeyId } },
+        };
+    }
+
+    for (auto it = data.signedPreKeyPairs.cbegin(); it != data.signedPreKeyPairs.cend(); ++it) {
+        result.signedPreKeys.append({ it.key(), it->data, it->creationDate });
+    }
+    for (auto it = data.preKeyPairs.cbegin(); it != data.preKeyPairs.cend(); ++it) {
+        result.preKeys.append({ Version::Omemo2, it.key(), it.value() });
+    }
+    for (auto jidIt = data.devices.cbegin(); jidIt != data.devices.cend(); ++jidIt) {
+        for (auto it = jidIt->cbegin(); it != jidIt->cend(); ++it) {
+            result.devices.append({
+                Version::Omemo2,
+                jidIt.key(),
+                it.key(),
+                it->label,
+                it->keyId,
+                it->session,
+                it->unrespondedSentStanzasCount,
+                it->unrespondedReceivedStanzasCount,
+                it->removalFromDeviceListDate,
+            });
+        }
+    }
+
+    // deterministic order
+    std::ranges::sort(result.signedPreKeys, {}, &SignedPreKey::id);
+    std::ranges::sort(result.preKeys, {}, &PreKey::id);
+    std::ranges::sort(result.devices, [](const Device &a, const Device &b) {
+        return std::tie(a.jid, a.id) < std::tie(b.jid, b.id);
+    });
+    return result;
+}
+
+}  // namespace QXmpp::Omemo

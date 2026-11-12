@@ -894,13 +894,8 @@ namespace SessionLayerTests {
 using QXmpp::Omemo::Private::DecryptedKey;
 
 using namespace QXmpp;
+using namespace QXmpp::Omemo;
 using namespace QXmpp::Omemo::Private;
-
-}  // namespace SessionLayerTests
-
-Q_DECLARE_METATYPE(SessionLayerTests::Version)
-
-namespace SessionLayerTests {
 
 constexpr uint32_t SIGNED_PRE_KEY_ID = 1;
 constexpr uint32_t PRE_KEY_COUNT = 5;
@@ -1326,6 +1321,7 @@ void tst_OmemoSession::callbacks()
 
 namespace PayloadCipherTests {
 
+using namespace QXmpp::Omemo;
 using namespace QXmpp::Omemo::Private;
 namespace PC = QXmpp::Omemo::Private::PayloadCipher;
 
@@ -1501,6 +1497,7 @@ using QXmpp::Omemo::Private::DecryptedKey;
 using QXmpp::Omemo::Private::KeyMaintenance::PRE_KEY_ID_MAX;
 
 using namespace QXmpp;
+using namespace QXmpp::Omemo;
 using namespace QXmpp::Omemo::Private;
 using namespace QXmpp::Omemo::Private::KeyMaintenance;
 using namespace std::chrono_literals;
@@ -1906,6 +1903,215 @@ void tst_OmemoDeviceList::listToPublish()
 
 }  // namespace DeviceListTests
 
-QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList)
+// ============================================================
+
+namespace StorageTests {
+
+// also declared by the managers
+using QXmpp::Omemo::Private::DecryptedKey;
+
+using namespace QXmpp;
+using namespace QXmpp::Omemo;
+using namespace QXmpp::Omemo::Private;
+
+using StorageDevice = Storage::Device;
+
+static const auto start = QDateTime(QDate(2026, 1, 1), QTime(12, 0), QTimeZone::UTC);
+
+class tst_OmemoStorage : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void ownDevice();
+    Q_SLOT void signedPreKeys();
+    Q_SLOT void preKeysPerVersion();
+    Q_SLOT void devicesPerVersion();
+    Q_SLOT void resetAll();
+    Q_SLOT void migrateFields();
+    Q_SLOT void migrateKeepsSession();
+};
+
+void tst_OmemoStorage::ownDevice()
+{
+    MemoryStorage storage;
+    QVERIFY(!storage.allData().result().ownDevice);
+
+    const Storage::OwnDevice device { 123, "private", "public", 4, { { Version::Omemo0, 7 }, { Version::Omemo2, 9 } } };
+    storage.setOwnDevice(device);
+    QCOMPARE(storage.allData().result().ownDevice, device);
+
+    storage.setOwnDevice({});
+    QVERIFY(!storage.allData().result().ownDevice);
+}
+
+void tst_OmemoStorage::signedPreKeys()
+{
+    MemoryStorage storage;
+    storage.addSignedPreKey({ 1, "one", start });
+    storage.addSignedPreKey({ 2, "two", start.addDays(1) });
+    storage.addSignedPreKey({ 1, "one again", start.addDays(2) });
+    QCOMPARE(storage.allData().result().signedPreKeys,
+             (QList<Storage::SignedPreKey> { { 1, "one again", start.addDays(2) }, { 2, "two", start.addDays(1) } }));
+
+    storage.removeSignedPreKey(1);
+    QCOMPARE(storage.allData().result().signedPreKeys, (QList<Storage::SignedPreKey> { { 2, "two", start.addDays(1) } }));
+}
+
+void tst_OmemoStorage::preKeysPerVersion()
+{
+    MemoryStorage storage;
+    storage.addPreKeys({ { Version::Omemo0, 1, "v0 1" }, { Version::Omemo0, 2, "v0 2" } });
+    storage.addPreKeys({ { Version::Omemo2, 1, "v2 1" } });
+
+    QCOMPARE(storage.allData().result().preKeys,
+             (QList<Storage::PreKey> { { Version::Omemo0, 1, "v0 1" }, { Version::Omemo0, 2, "v0 2" }, { Version::Omemo2, 1, "v2 1" } }));
+
+    storage.removePreKey(Version::Omemo2, 1);
+    storage.removePreKey(Version::Omemo2, 2);
+    QCOMPARE(storage.allData().result().preKeys,
+             (QList<Storage::PreKey> { { Version::Omemo0, 1, "v0 1" }, { Version::Omemo0, 2, "v0 2" } }));
+}
+
+void tst_OmemoStorage::devicesPerVersion()
+{
+    MemoryStorage storage;
+    const StorageDevice alice0 { Version::Omemo0, u"alice@example.org"_s, 1, {}, "key", "session 0", 1, 2, {} };
+    const StorageDevice alice2 { Version::Omemo2, u"alice@example.org"_s, 1, u"Phone"_s, "key", "session 2", 0, 0, {} };
+    const StorageDevice bob2 { Version::Omemo2, u"bob@example.org"_s, 5, {}, "bob key", {}, 0, 0, start };
+
+    storage.addDevice(alice0);
+    storage.addDevice(alice2);
+    storage.addDevice(bob2);
+    QCOMPARE(storage.allData().result().devices, (QList<StorageDevice> { alice0, alice2, bob2 }));
+
+    auto updated = alice2;
+    updated.session = "new session";
+    storage.addDevice(updated);
+    QCOMPARE(storage.allData().result().devices, (QList<StorageDevice> { alice0, updated, bob2 }));
+
+    storage.removeDevice(Version::Omemo0, u"alice@example.org"_s, 1);
+    QCOMPARE(storage.allData().result().devices, (QList<StorageDevice> { updated, bob2 }));
+
+    storage.addDevice(alice0);
+    storage.removeDevices(u"alice@example.org"_s);
+    QCOMPARE(storage.allData().result().devices, QList<StorageDevice> { bob2 });
+}
+
+void tst_OmemoStorage::resetAll()
+{
+    MemoryStorage storage;
+    storage.setOwnDevice(Storage::OwnDevice { 1 });
+    storage.addSignedPreKey({ 1, "key", start });
+    storage.addPreKeys({ { Version::Omemo0, 1, "key" } });
+    storage.addDevice({ Version::Omemo0, u"alice@example.org"_s, 1 });
+
+    storage.resetAll();
+    const auto data = storage.allData().result();
+    QVERIFY(!data.ownDevice);
+    QVERIFY(data.signedPreKeys.isEmpty());
+    QVERIFY(data.preKeys.isEmpty());
+    QVERIFY(data.devices.isEmpty());
+}
+
+void tst_OmemoStorage::migrateFields()
+{
+    QXmppOmemoStorage::OmemoData old;
+    old.ownDevice = QXmppOmemoStorage::OwnDevice { 123, u"Phone"_s, "private", "public", 3, 42 };
+    old.signedPreKeyPairs.insert(3, { start, "signed" });
+    old.preKeyPairs.insert(41, "pre 41");
+    old.preKeyPairs.insert(42, "pre 42");
+    old.devices[u"bob@example.org"_s].insert(5, { u"Laptop"_s, "bob key", "session", 2, 3, start });
+    old.devices[u"alice@example.org"_s].insert(7, { {}, "alice key", {}, 0, 0, {} });
+
+    const auto data = Storage::migrate(old);
+    QCOMPARE(data.ownDevice, (Storage::OwnDevice { 123, "private", "public", 3, { { Version::Omemo2, 42 } } }));
+    QCOMPARE(data.signedPreKeys, (QList<Storage::SignedPreKey> { { 3, "signed", start } }));
+    QCOMPARE(data.preKeys, (QList<Storage::PreKey> { { Version::Omemo2, 41, "pre 41" }, { Version::Omemo2, 42, "pre 42" } }));
+    QCOMPARE(data.devices,
+             (QList<StorageDevice> {
+                 { Version::Omemo2, u"alice@example.org"_s, 7, {}, "alice key", {}, 0, 0, {} },
+                 { Version::Omemo2, u"bob@example.org"_s, 5, u"Laptop"_s, "bob key", "session", 2, 3, start },
+             }));
+
+    QVERIFY(!Storage::migrate({}).ownDevice);
+}
+
+void tst_OmemoStorage::migrateKeepsSession()
+{
+    // Data of the current manager has the same format as libomemo-c uses, so the migrated keys
+    // and sessions continue to work, also for OMEMO 0.
+    SignalContext context;
+    const auto aliceJid = u"alice@example.org"_s;
+    const auto bobJid = u"bob@example.org"_s;
+
+    DeviceKeys alice { 1111, *context.generateIdentityKeyPair(), {}, 0 };
+    VersionKeys aliceKeys;
+    DeviceKeys bob { 2222, *context.generateIdentityKeyPair(), {}, 0 };
+    VersionKeys bobKeys;
+    expectVariant<KeyMaintenance::SignedPreKeyChanges>(KeyMaintenance::rotateSignedPreKey(context, alice, start));
+    expectVariant<KeyMaintenance::SignedPreKeyChanges>(KeyMaintenance::rotateSignedPreKey(context, bob, start));
+    expectVariant<QList<uint32_t>>(KeyMaintenance::refillPreKeys(context, aliceKeys));
+    expectVariant<QList<uint32_t>>(KeyMaintenance::refillPreKeys(context, bobKeys));
+
+    {
+        SessionLayer aliceLayer(context, Version::Omemo2, alice, aliceKeys);
+        SessionLayer bobLayer(context, Version::Omemo2, bob, bobKeys);
+        expectVariant<Success>(bobLayer.buildSession({ aliceJid, alice.deviceId }, expectVariant<Bundle>(aliceLayer.ownBundle(1, 1))));
+        const auto message = expectVariant<EncryptedKey>(bobLayer.encrypt({ aliceJid, alice.deviceId }, SecureByteArray(QByteArray("hi"))));
+        expectVariant<DecryptedKey>(aliceLayer.decrypt({ bobJid, bob.deviceId }, message.data, true));
+    }
+
+    // Alice's data as stored by the current manager
+    QXmppOmemoStorage::OmemoData old;
+    old.ownDevice = QXmppOmemoStorage::OwnDevice { alice.deviceId, {}, alice.identity.privateKey.toByteArray(), alice.identity.publicKey, 1, aliceKeys.latestPreKeyId };
+    old.signedPreKeyPairs.insert(1, { start, alice.signedPreKeys.value(1).record.toByteArray() });
+    for (auto it = aliceKeys.preKeys.cbegin(); it != aliceKeys.preKeys.cend(); ++it) {
+        old.preKeyPairs.insert(it.key(), it->toByteArray());
+    }
+    old.devices[bobJid].insert(bob.deviceId, { {}, bob.identity.publicKey, aliceKeys.sessions.value({ bobJid, bob.deviceId }), 0, 0, {} });
+
+    const auto data = Storage::migrate(old);
+
+    DeviceKeys migrated { data.ownDevice->id,
+                          { SecureByteArray(data.ownDevice->privateIdentityKey), data.ownDevice->publicIdentityKey },
+                          {},
+                          data.ownDevice->latestSignedPreKeyId };
+    for (const auto &key : data.signedPreKeys) {
+        migrated.signedPreKeys.insert(key.id, { SecureByteArray(key.data), key.creationDate });
+    }
+    VersionKeys migrated2;
+    for (const auto &key : data.preKeys) {
+        migrated2.preKeys.insert(key.id, SecureByteArray(key.data));
+    }
+    for (const auto &device : data.devices) {
+        migrated2.sessions.insert({ device.jid, device.id }, device.session);
+    }
+
+    // existing OMEMO 2 session
+    {
+        SessionLayer aliceLayer(context, Version::Omemo2, migrated, migrated2);
+        SessionLayer bobLayer(context, Version::Omemo2, bob, bobKeys);
+        const auto message = expectVariant<EncryptedKey>(aliceLayer.encrypt({ bobJid, bob.deviceId }, SecureByteArray(QByteArray("after migration"))));
+        QVERIFY(!message.isKeyExchange);
+        QCOMPARE(expectVariant<DecryptedKey>(bobLayer.decrypt({ aliceJid, alice.deviceId }, message.data, false)).data, SecureByteArray(QByteArray("after migration")));
+    }
+
+    // new OMEMO 0 session with the migrated identity and signed pre key
+    VersionKeys migrated0;
+    expectVariant<QList<uint32_t>>(KeyMaintenance::refillPreKeys(context, migrated0));
+    VersionKeys bobKeys0;
+    SessionLayer aliceLayer0(context, Version::Omemo0, migrated, migrated0);
+    SessionLayer bobLayer0(context, Version::Omemo0, bob, bobKeys0);
+    expectVariant<Success>(bobLayer0.buildSession({ aliceJid, alice.deviceId }, expectVariant<Bundle>(aliceLayer0.ownBundle(1, 1))));
+    const auto message = expectVariant<EncryptedKey>(bobLayer0.encrypt({ aliceJid, alice.deviceId }, SecureByteArray(QByteArray("legacy"))));
+    const auto decrypted = expectVariant<DecryptedKey>(aliceLayer0.decrypt({ bobJid, bob.deviceId }, message.data, true));
+    QCOMPARE(decrypted.data, SecureByteArray(QByteArray("legacy")));
+    QCOMPARE(decrypted.senderIdentityKey, bobLayer0.ownIdentityKey());
+}
+
+}  // namespace StorageTests
+
+QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList, StorageTests::tst_OmemoStorage)
 
 #include "OmemoManager.moc"

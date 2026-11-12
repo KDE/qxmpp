@@ -6,6 +6,7 @@
 #define OMEMOSESSION_H
 
 #include "QXmppError.h"
+#include "QXmppOmemoStorage.h"
 
 #include "Crypto.h"
 #include "OmemoLibWrappers.h"
@@ -22,15 +23,6 @@
 namespace QXmpp::Omemo::Private {
 
 using SecureByteArray = QXmpp::Private::Crypto::SecureByteArray;
-
-// Wire format of the OMEMO version. Both versions use the same identity key and signed pre keys,
-// but different pre keys and sessions.
-enum class Version {
-    // XEP-0384 v0.3, eu.siacs.conversations.axolotl
-    Omemo0,
-    // XEP-0384 v0.8+, urn:xmpp:omemo:2
-    Omemo2,
-};
 
 struct Address {
     QString jid;
