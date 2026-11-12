@@ -2997,19 +2997,23 @@ void tst_QXmppMuc::rejoinAfterConnectionLoss()
     QObject::connect(muc, &QXmppMucManagerV2::removedFromRoom, muc, [&]() { removed = true; });
 
     test.setStreamManagementState(QXmppClient::NoStreamManagement);
+    QVERIFY(!room.joining().value());
     test.simulateDisconnected();
     QVERIFY(!room.joined().value());
+    QVERIFY(room.joining().value());
     // the occupants are kept while waiting
     QCOMPARE(room.participants().size(), 3);
 
-    // joinRoom() waits for the rejoin
+    // joinRoom() waits for the rejoin, but not with another nickname
     auto joinTask = muc->joinRoom(roomJid, u"thirdwitch"_s);
     QVERIFY(!joinTask.isFinished());
+    auto otherNicknameTask = muc->joinRoom(roomJid, u"fifthwitch"_s);
+    expectFutureVariant<QXmppError>(otherNicknameTask);
 
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
     test.expectPacketRandomOrder(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'>"
-                                 "<x xmlns='http://jabber.org/protocol/muc'><history since='2026-11-12T10:00:00Z'/></x>"
+                                 "<x xmlns='http://jabber.org/protocol/muc'><history since='2026-11-12T09:58:00Z'/></x>"
                                  "</presence>"_s);
     auto infoId = test.expectPacketRandomOrder(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
 
@@ -3036,6 +3040,7 @@ void tst_QXmppMuc::rejoinAfterConnectionLoss()
     auto rejoined = expectFutureVariant<QXmppMucRoomV2>(joinTask);
     QCOMPARE(rejoined.jid(), roomJid);
     QVERIFY(room.joined().value());
+    QVERIFY(!room.joining().value());
     QVERIFY(!removed);
     QCOMPARE(joined, QStringList { u"fourthwitch"_s });
     QCOMPARE(left, QStringList { u"secondwitch"_s });
@@ -3079,6 +3084,7 @@ void tst_QXmppMuc::rejoinFails()
     test.injectPresence(error);
 
     QCOMPARE(reason, Muc::LeaveReason::Banned);
+    QVERIFY(!room.joining().value());
     expectFutureVariant<QXmppError>(joinTask);
     QVERIFY(!room.joined().value());
     QVERIFY(!muc->d->testHasRoom(roomJid));

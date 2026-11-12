@@ -38,6 +38,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - Add overloads of `QXmppClient::sendIq()` for typed requests (`QXmpp::Iq::Get`, `Set`) returning only the payload of the response, defined by `QXmpp::Iq::ResponseTraits`; end-to-end encryption is opt-in via `QXmpp::Iq::SendOptions` (@lnj, !841)
  - Add the hook `QXmpp::Iq::SelectEncryption` selecting the end-to-end encryption of IQs (@lnj, !841)
  - Fix the payload of `QXmppIq` subclasses getting lost when encrypted by the encryption extension, e.g. via `sendSensitiveIq()` (@lnj, !841)
+ - MucManagerV2: Add `QXmppMucRoomV2::joining()`, which is true while the room is joined or waits to be rejoined (@lnj)
  - MUC: Fix decrypting the discussion history of rooms with occupant IDs: messages received while joining wait for the room's disco#info result before their sender is resolved (@lnj)
  - MucManagerV2: Rejoin joined rooms automatically after a connection loss without stream resumption and when MUC Self-Ping detects a ghosted room; room handles stay valid, only the changes of the occupants are reported, the history is requested since the last message and `joinRoom()` waits for a running rejoin (@lnj)
 

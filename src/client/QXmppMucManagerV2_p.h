@@ -18,16 +18,17 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
-#include <utility>
-#include <vector>
 
 #include <QTimer>
 
 namespace QXmpp::Private {
-struct MucParticipantData;
+struct MucOccupantChanges;
+struct MucRejoinState;
 struct MucRoomData;
 
 constexpr auto MucJoinTimeout = std::chrono::seconds(30);
+// how much earlier the history of a rejoin starts, the time of live messages is the local time
+constexpr auto MucRejoinClockTolerance = std::chrono::minutes(2);
 constexpr auto MucSelfPingDefaultThreshold = std::chrono::minutes(5);
 constexpr int MucSelfPingMaxRetries = 4;
 }  // namespace QXmpp::Private
@@ -62,8 +63,7 @@ struct QXmppMucManagerV2Private {
     void rejoinRooms();
     void startRejoin(QXmpp::Private::MucRoomData &data);
     void startJoin(QXmpp::Private::MucRoomData &data, const std::optional<QXmpp::Muc::HistoryOptions> &history);
-    std::pair<std::vector<std::pair<QString, std::shared_ptr<QXmpp::Private::MucParticipantData>>>, std::vector<std::shared_ptr<QXmpp::Private::MucParticipantData>>>
-    finishRejoin(QXmpp::Private::MucRoomData &data);
+    QXmpp::Private::MucOccupantChanges finishRejoin(QXmpp::Private::MucRoomData &data, QXmpp::Private::MucRejoinState &&rejoin);
     void deactivateAllRooms(const QString &errorText);
     void pruneInactiveRooms();
 

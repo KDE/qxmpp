@@ -248,6 +248,7 @@ public:
     QBindable<QString> subject() const;
     QBindable<QString> nickname() const;
     QBindable<bool> joined() const;
+    QBindable<bool> joining() const;
     QList<QXmppMucParticipant> participants() const;
     std::optional<QXmppMucParticipant> selfParticipant() const;
 
