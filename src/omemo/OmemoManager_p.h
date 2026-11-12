@@ -49,6 +49,10 @@ constexpr int MAX_DEVICES_PER_JID = 200;
 // Maximum number of devices per JID and version that are not in the device list, e.g. only known
 // from received stanzas. Stanzas of further unknown devices are not decrypted.
 constexpr int MAX_UNLISTED_DEVICES_PER_JID = 20;
+// Maximum number of devices a stanza is encrypted for. A key exchange takes about 300 bytes, so
+// the stanza stays below the default size limits of ejabberd and Prosody (256 KiB). Servers
+// close the stream for larger stanzas.
+constexpr int MAX_DEVICES_PER_STANZA = 500;
 // Encryption for a device is stopped after this number of sent stanzas without an answer.
 constexpr int UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS = 106;
 // An empty message is sent after this number of received stanzas without sending one.
@@ -189,6 +193,7 @@ public:
     QProperty<QList<Version>> enabledVersions;
     // the own device exists
     bool isSetUp = false;
+    int maxDevicesPerStanza = MAX_DEVICES_PER_STANZA;
     bool isSettingUp = false;
     bool isLoggedIn = false;
     bool isLoadStarted = false;

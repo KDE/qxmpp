@@ -831,6 +831,9 @@ namespace QXmpp {
     New trust data uses the security policy TOAKAFA, see QXmpp::TrustSecurityPolicy. The trust
     manager can be used to change it.
 
+    A stanza is encrypted for at most 500 devices, the other own devices first, so that it stays
+    below the stanza size limit of servers. Devices above the limit cannot decrypt it.
+
     \since QXmpp 1.18
 */
 
