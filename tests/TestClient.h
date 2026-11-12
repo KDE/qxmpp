@@ -61,6 +61,7 @@ public:
     QString takePacket();
     QString takeLastPacket();
     void expectNoPacket() const;
+    bool hasPacket() const { return !m_sentPackets.isEmpty(); }
     void ignore();
 
     void resetIdCount();

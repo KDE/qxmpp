@@ -26,7 +26,9 @@ TestClient::TestClient(bool enableDebug, bool enableAutoReset)
     d->stream->enableStreamManagement(true);
     // tests use local servers in place of remote ones
     d->loopbackIgnoresNetwork = false;
-    // setup logging (for expect())
+    // setup logging (for expect()), with an own logger, so clients do not see the packets of
+    // other clients
+    setLogger(new QXmppLogger(this));
     logger()->setLoggingType(QXmppLogger::SignalLogging);
     connect(logger(), &QXmppLogger::message, this, &TestClient::onLoggerMessage);
     // In all case, start with a 0 default id
