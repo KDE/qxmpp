@@ -14,7 +14,12 @@
 
 class QXmppOmemoMemoryStoragePrivate;
 
-class QXMPPOMEMO_EXPORT QXmppOmemoMemoryStorage : public QXmppOmemoStorage
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+class [[deprecated("Use QXmpp::OmemoMemoryStorage")]]
+QXMPPOMEMO_EXPORT QXmppOmemoMemoryStorage : public QXmppOmemoStorage
 {
 public:
     QXmppOmemoMemoryStorage();
@@ -39,6 +44,9 @@ public:
 private:
     std::unique_ptr<QXmppOmemoMemoryStoragePrivate> d;
 };
+
+QT_WARNING_POP
+#endif
 
 namespace QXmpp::Omemo::Private {
 struct OmemoMemoryStoragePrivate;

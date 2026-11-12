@@ -19,7 +19,13 @@ using namespace QXmpp::Private;
     \xep{0384}{OMEMO Encryption} in the memory.
 
     \since QXmpp 1.5
+
+    \deprecated since QXmpp 1.18, use QXmpp::OmemoMemoryStorage instead.
 */
+
+// implementation of the deprecated QXmppOmemoMemoryStorage
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 
 class QXmppOmemoMemoryStoragePrivate
 {
@@ -115,6 +121,8 @@ QXmppTask<void> QXmppOmemoMemoryStorage::resetAll()
     d.reset(new QXmppOmemoMemoryStoragePrivate());
     co_return;
 }
+
+QT_WARNING_POP
 
 namespace QXmpp::Omemo::Private {
 

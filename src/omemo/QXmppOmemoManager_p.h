@@ -143,6 +143,9 @@ struct OmemoEnvelopeData {
 using namespace QXmpp::Private;
 using namespace QXmpp::Omemo::Private;
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
 class QXmppOmemoManagerPrivate
 {
 public:
@@ -345,5 +348,7 @@ public:
 
     void warning(const QString &msg) const;
 };
+
+QT_WARNING_POP
 
 #endif  // QXMPPOMEMOMANAGER_P_H

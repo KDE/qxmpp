@@ -16,7 +16,8 @@
 #include <QList>
 #include <QMap>
 
-class QXMPPOMEMO_EXPORT QXmppOmemoStorage
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+class [[deprecated("Use QXmpp::OmemoStorage")]] QXMPPOMEMO_EXPORT QXmppOmemoStorage
 {
 public:
     /*!
@@ -159,6 +160,7 @@ public:
 
     virtual QXmppTask<void> resetAll() = 0;
 };
+#endif
 
 namespace QXmpp::Omemo {
 

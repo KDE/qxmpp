@@ -25,6 +25,9 @@
 #undef max
 #undef interface
 
+// implementation of the deprecated QXmppOmemoManager
+QT_WARNING_DISABLE_DEPRECATED
+
 using namespace QXmpp;
 using namespace QXmpp::Private;
 using namespace QXmpp::Omemo::Private;
@@ -48,6 +51,8 @@ public:
 
     \brief The QXmppOmemoOwnDevice class represents the \xep{0384}{OMEMO Encryption} device of this
     client instance.
+
+    \deprecated since QXmpp 1.18, use QXmpp::OmemoManager instead.
 */
 
 /*! Constructs an OMEMO device for this client instance. */
@@ -117,6 +122,8 @@ public:
     \inmodule QXmpp
 
     \brief The QXmppOmemoDevice class represents a \xep{0384}{OMEMO Encryption} device.
+
+    \deprecated since QXmpp 1.18, use QXmpp::Omemo::Device instead.
 */
 
 /*! Constructs an OMEMO device. */
@@ -209,6 +216,9 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
     \inmodule QXmpp
 
     The QXmppOmemoManager class manages OMEMO encryption as defined in \xep{0384}{OMEMO Encryption}.
+
+    \deprecated since QXmpp 1.18, use QXmpp::OmemoManager instead, which also supports OMEMO 0
+    and sets itself up.
 
     OMEMO uses \xep{0060}{Publish-Subscribe} (PubSub) and \xep{0163}{Personal Eventing Protocol}
     (PEP).

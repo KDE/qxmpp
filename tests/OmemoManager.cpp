@@ -58,6 +58,10 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
+// tests of the deprecated QXmppOmemoManager and QXmppOmemoMemoryStorage
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
 struct OmemoUser {
     QXmppClient client;
     QXmppLogger logger;
@@ -896,6 +900,8 @@ void tst_QXmppOmemoMemoryStorage::testResetAll()
     QVERIFY(result.preKeyPairs.isEmpty());
     QVERIFY(result.devices.isEmpty());
 }
+
+QT_WARNING_POP
 
 // ============================================================
 
