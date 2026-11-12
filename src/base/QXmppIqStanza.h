@@ -9,6 +9,8 @@
 #include "QXmppStanza.h"
 #include "QXmppUtils_p.h"
 
+#include <functional>
+#include <memory>
 #include <optional>
 #include <variant>
 
@@ -104,6 +106,47 @@ void writeIqPayload(QXmlStreamWriter *writer, const Payload &payload)
         IqPayloadWriter<Payload>::write(writer, payload);
     }
 }
+
+// Writes the payload of an outgoing IQ: at most one element, exactly one in requests. Empty if
+// the IQ has no payload.
+using IqPayloadWriterFunction = std::function<void(QXmlStreamWriter *)>;
+
+// Keeps the payload until the IQ is written, without the payload type.
+template<typename Payload>
+IqPayloadWriterFunction makeIqPayloadWriter(Payload &&payload)
+{
+    using P = std::decay_t<Payload>;
+    if constexpr (std::is_same_v<P, std::monostate>) {
+        return {};
+    } else {
+        // shared, so the writer can be copied without copying the payload
+        auto shared = std::make_shared<const P>(std::forward<Payload>(payload));
+        return [shared](QXmlStreamWriter *writer) { writeIqPayload(writer, *shared); };
+    }
+}
+
+// Writes already serialized XML, e.g. the payload of a QXmppIq.
+QXMPP_EXPORT IqPayloadWriterFunction makeRawXmlWriter(QByteArray xml);
+
+// An IQ to be sent. The payload is kept type-erased and only serialized when the IQ is written,
+// so the IQ can be sent, encrypted or passed on without the original payload type.
+struct OutgoingIq {
+    Iq::Type type = Iq::Type::Get;
+    QString id;
+    QString from;
+    QString to;
+    QString lang;
+    IqPayloadWriterFunction payload;
+    std::optional<QXmppStanza::Error> error;
+
+    // Serializes the complete IQ.
+    QXMPP_EXPORT QByteArray toXml() const;
+};
+
+// Writes the child elements of an IQ (the payload and the error). Unlike inside of an IQ, the
+// error declares its namespace, so the content can be written elsewhere, e.g. into an SCE
+// envelope.
+QXMPP_EXPORT void writeIqContent(QXmlStreamWriter *writer, const IqPayloadWriterFunction &payload, const std::optional<QXmppStanza::Error> &error);
 
 }  // namespace QXmpp::Private
 
@@ -260,6 +303,53 @@ struct Stanza<Type::Error, Payload> {
         error.toXml(writer);
         Private::writeIqEnd(writer);
     }
+};
+
+/*!
+    \struct QXmpp::Iq::DefaultResponse
+    \inmodule QXmpp
+
+    \brief Selects the response payload of QXmpp::Iq::ResponseTraits when sending an IQ request.
+
+    \sa QXmppClient::sendIq()
+
+    \since QXmpp 1.18
+*/
+struct DefaultResponse { };
+
+/*!
+    \struct QXmpp::Iq::ResponseTraits
+    \inmodule QXmpp
+
+    \brief Defines the payload of the response to the IQ request \c Request.
+
+    The member type \c Payload is the payload of the IQ result, \c void stands for an empty result.
+    By default, the result of a get request contains the same payload as the request and the result
+    of a set request is empty.
+
+    Specialize the traits for requests with different responses:
+    \code
+    template<>
+    struct QXmpp::Iq::ResponseTraits<QXmpp::Iq::Get<MyQuery>> {
+        using Payload = MyQueryResult;
+    };
+    \endcode
+
+    \sa QXmppClient::sendIq()
+
+    \since QXmpp 1.18
+*/
+template<typename Request>
+struct ResponseTraits;
+
+template<typename RequestPayload>
+struct ResponseTraits<Get<RequestPayload>> {
+    using Payload = RequestPayload;
+};
+
+template<typename RequestPayload>
+struct ResponseTraits<Set<RequestPayload>> {
+    using Payload = void;
 };
 
 }  // namespace QXmpp::Iq

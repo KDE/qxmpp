@@ -239,7 +239,7 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
     \code
     client->addNewExtension<QXmppOmemoManager>(omemoStorage);
     client->hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
-        if (isOmemoEnabled(selection.stanza().to())) {
+        if (isOmemoEnabled(selection.to())) {
             selection.setEncryption(QXmpp::E2ee::Omemo2);
         }
     });
@@ -327,7 +327,7 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
         .encryption = E2ee::Omemo2,
         .decryptMessage = [this](E2ee::DecryptRequest request) { return d->decryptMessageContent(request.message(), request.senderJid()); },
         .encryptMessage = [this](E2ee::EncryptRequest request) { return d->encryptMessageContent(request.message(), request.recipientJids(), request.params().acceptedTrustLevels().value_or(ACCEPTED_TRUST_LEVELS)); },
-        .encryptIq = [this](E2ee::EncryptIqRequest request) { return d->encryptIqContent(request.iq(), request.recipientJids(), request.params().acceptedTrustLevels().value_or(ACCEPTED_TRUST_LEVELS)); },
+        .encryptIq = [this](E2ee::EncryptIqRequest request) { return d->encryptIqContent(request, request.params().acceptedTrustLevels().value_or(ACCEPTED_TRUST_LEVELS)); },
         .decryptIq = [this](E2ee::DecryptIqRequest request) { return d->decryptIqContent(request.iq(), request.senderJid()); },
     });
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {

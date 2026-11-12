@@ -9,11 +9,13 @@
 
 #include "QXmppConfiguration.h"
 #include "QXmppHooks.h"
+#include "QXmppIqStanza.h"
 #include "QXmppLogger.h"
 #include "QXmppPresence.h"
 #include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
 #include "QXmppStreamError.h"
+#include "QXmppTask.h"
 
 #include <memory>
 #include <variant>
@@ -21,9 +23,6 @@
 #include <QAbstractSocket>
 #include <QObject>
 #include <QSslError>
-
-template<typename T>
-class QXmppTask;
 
 class QXmppE2eeExtension;
 class QXmppClientExtension;
@@ -39,10 +38,63 @@ class QXmppRosterManager;
 class QXmppVCardManager;
 class QXmppVersionManager;
 
+namespace QXmpp::Iq {
+
+/*!
+    \struct QXmpp::Iq::SendOptions
+    \inmodule QXmpp
+
+    \brief Options for sending an IQ request via QXmppClient::sendIq().
+
+    \since QXmpp 1.18
+*/
+struct SendOptions {
+    /*!
+        Whether the request and its response are end-to-end encrypted.
+
+        The encryption is selected via the QXmpp::Messages::SelectEncryption hook. If no encryption
+        is selected, the encryption extension (QXmppClient::setEncryptionExtension()) is used.
+    */
+    bool encrypted = false;
+    /*! Parameters for the end-to-end encryption */
+    QXmppSendStanzaParams params;
+};
+
+}  // namespace QXmpp::Iq
+
 namespace QXmpp::Private {
+
 class EncryptedIqs;
+struct IqRequests;
 struct LegacyE2ee;
 struct SessionBegin;
+
+template<typename Response, typename Request>
+using IqResponsePayload = std::conditional_t<std::is_same_v<Response, Iq::DefaultResponse>, typename Iq::ResponseTraits<Request>::Payload, Response>;
+
+template<typename Payload>
+using IqResponseResult = QXmpp::Result<std::conditional_t<std::is_void_v<Payload>, QXmpp::Success, Payload>>;
+
+// Creates the error for a response that is not a valid IQ result.
+QXMPP_EXPORT QXmppError iqResponseError(const QDomElement &response);
+
+template<typename Payload>
+IqResponseResult<Payload> parseIqResult(std::variant<QDomElement, QXmppError> &&response)
+{
+    if (auto *error = std::get_if<QXmppError>(&response)) {
+        return std::move(*error);
+    }
+    const auto &element = std::get<QDomElement>(response);
+    if (auto result = Iq::Result<Payload>::fromDom(element)) {
+        if constexpr (std::is_void_v<Payload>) {
+            return QXmpp::Success();
+        } else {
+            return std::move(result->payload);
+        }
+    }
+    return iqResponseError(element);
+}
+
 }  // namespace QXmpp::Private
 
 /*!
@@ -300,6 +352,16 @@ public:
     QXmppTask<IqResult> sendSensitiveIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
     QXmppTask<EmptyResult> sendGenericIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> & = {});
 
+    template<typename Response = QXmpp::Iq::DefaultResponse, QXmpp::Iq::Type T, typename Payload>
+        requires(T == QXmpp::Iq::Type::Get || T == QXmpp::Iq::Type::Set)
+    auto sendIq(QXmpp::Iq::Stanza<T, Payload> iq, QXmpp::Iq::SendOptions options = {})
+    {
+        using ResponsePayload = QXmpp::Private::IqResponsePayload<Response, QXmpp::Iq::Stanza<T, Payload>>;
+        return sendIqStanza(std::move(iq), std::move(options)).then(this, [](IqResult &&response) {
+            return QXmpp::Private::parseIqResult<ResponsePayload>(std::move(response));
+        });
+    }
+
     /*!
         This signal is emitted when the client connects successfully to the
         XMPP server i.e. when a successful XMPP connection is established.
@@ -446,6 +508,23 @@ public:
 
 private:
     QXmppOutgoingClient *stream() const;
+    template<QXmpp::Iq::Type T, typename Payload>
+    QXmppTask<IqResult> sendIqStanza(QXmpp::Iq::Stanza<T, Payload> &&iq, QXmpp::Iq::SendOptions &&options)
+    {
+        return sendOutgoingIq(
+            QXmpp::Private::OutgoingIq {
+                T,
+                validIqId(std::move(iq.id)),
+                std::move(iq.from),
+                std::move(iq.to),
+                std::move(iq.lang),
+                QXmpp::Private::makeIqPayloadWriter(std::move(iq.payload)),
+                {},
+            },
+            std::move(options));
+    }
+    QString validIqId(QString id);
+    QXmppTask<IqResult> sendOutgoingIq(QXmpp::Private::OutgoingIq &&iq, QXmpp::Iq::SendOptions &&options);
     void injectIq(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
     bool injectMessage(QXmppMessage &&message);
 
@@ -460,8 +539,12 @@ private:
 
     friend class QXmppClientExtension;
     friend class QXmppCarbonManagerV2;
+    // TODO: remove once sendIq() has an overload returning the complete response, the caps
+    // verification needs the response element
+    friend class QXmppDiscoveryManagerPrivate;
     friend class QXmppMamManager;
     friend class QXmpp::Private::EncryptedIqs;
+    friend struct QXmpp::Private::IqRequests;
     friend struct QXmpp::Private::LegacyE2ee;
     friend class QXmppNetworkMonitor;
     friend class QXmppRegistrationManager;

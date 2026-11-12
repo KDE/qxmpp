@@ -461,7 +461,14 @@ void QXmppStanza::Error::parse(const QDomElement &errorElement)
 
 void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
 {
-    if (d->condition == NoCondition && d->type == NoType) {
+    StanzaErrorWriter::write(writer, *this, {});
+}
+
+void StanzaErrorWriter::write(QXmlStreamWriter *writer, const QXmppStanza::Error &error, QStringView xmlns)
+{
+    using Error = QXmppStanza::Error;
+    const auto &d = error.d;
+    if (d->condition == Error::NoCondition && d->type == Error::NoType) {
         return;
     }
 
@@ -469,47 +476,54 @@ void QXmppStanza::Error::toXml(QXmlStreamWriter *writer) const
         return n > 0 ? std::make_optional(n) : std::nullopt;
     };
 
-    XmlWriter(writer).write(Element {
-        u"error",
-        OptionalAttribute { u"by", d->by },
-        OptionalAttribute { u"type", d->type },
-        OptionalAttribute { u"code", optionalInt(d->code) },
-        OptionalContent {
-            d->condition != NoCondition,
-            Element {
-                Tag { d->condition, ns_stanza },
-                OptionalContent {
-                    !d->redirectionUri.isEmpty() && (d->condition == Gone || d->condition == Redirect),
-                    Characters { d->redirectionUri },
+    auto writeError = [&](auto tag) {
+        XmlWriter(writer).write(Element {
+            std::move(tag),
+            OptionalAttribute { u"by", d->by },
+            OptionalAttribute { u"type", d->type },
+            OptionalAttribute { u"code", optionalInt(d->code) },
+            OptionalContent {
+                d->condition != Error::NoCondition,
+                Element {
+                    Tag { d->condition, ns_stanza },
+                    OptionalContent {
+                        !d->redirectionUri.isEmpty() && (d->condition == Error::Gone || d->condition == Error::Redirect),
+                        Characters { d->redirectionUri },
+                    },
                 },
             },
-        },
-        OptionalContent {
-            !d->text.isEmpty(),
-            Element {
-                { u"text", ns_stanza },
-                Attribute { u"xml:lang", u"en"_s },
-                Characters { d->text },
+            OptionalContent {
+                !d->text.isEmpty(),
+                Element {
+                    { u"text", ns_stanza },
+                    Attribute { u"xml:lang", u"en"_s },
+                    Characters { d->text },
+                },
             },
-        },
-        // XEP-0166: Jingle
-        OptionalEnumElement { d->jingleErrorCondition, ns_jingle_errors },
-        // XEP-0363: HTTP File Upload
-        OptionalContent {
-            d->fileTooLarge,
-            Element {
-                { u"file-too-large", ns_http_upload },
-                TextElement { u"max-file-size", d->maxFileSize },
+            // XEP-0166: Jingle
+            OptionalEnumElement { d->jingleErrorCondition, ns_jingle_errors },
+            // XEP-0363: HTTP File Upload
+            OptionalContent {
+                d->fileTooLarge,
+                Element {
+                    { u"file-too-large", ns_http_upload },
+                    TextElement { u"max-file-size", d->maxFileSize },
+                },
             },
-        },
-        OptionalContent {
-            d->retryDate.isValid(),
-            Element {
-                { u"retry", ns_http_upload },
-                Attribute { u"stamp", d->retryDate },
+            OptionalContent {
+                d->retryDate.isValid(),
+                Element {
+                    { u"retry", ns_http_upload },
+                    Attribute { u"stamp", d->retryDate },
+                },
             },
-        },
-    });
+        });
+    };
+    if (xmlns.isEmpty()) {
+        writeError(QStringView(u"error"));
+    } else {
+        writeError(Tag<QStringView, QStringView> { u"error", xmlns });
+    }
 }
 
 /*!

@@ -27,6 +27,10 @@
 class QXmppE2eeMetadata;
 class QXmppExtendedAddressPrivate;
 
+namespace QXmpp::Private {
+struct StanzaErrorWriter;
+}
+
 namespace QXmpp {
 
 /*!
@@ -245,6 +249,7 @@ public:
 
     private:
         friend class QXmppStanza;
+        friend struct QXmpp::Private::StanzaErrorWriter;
 
         QSharedDataPointer<QXmppStanzaErrorPrivate> d;
     };

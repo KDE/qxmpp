@@ -4,6 +4,8 @@
 
 #include "QXmppE2eeProvider.h"
 
+#include "QXmppIqStanza.h"
+
 namespace QXmpp::E2ee {
 
 namespace {
@@ -17,6 +19,11 @@ struct ProviderLookup {
 };
 
 }  // namespace
+
+void EncryptIqRequest::writeContent(QXmlStreamWriter *writer) const
+{
+    Private::writeIqContent(writer, m_payload, m_error);
+}
 
 /*!
     \class QXmpp::E2ee::Providers

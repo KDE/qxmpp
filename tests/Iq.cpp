@@ -59,6 +59,7 @@ private:
     Q_SLOT void stanzaRequestInvalid();
     Q_SLOT void stanzaResult();
     Q_SLOT void stanzaError();
+    Q_SLOT void outgoingIq();
 
     // NonSaslAuthIq
     Q_SLOT void nonSaslAuthGet();
@@ -257,6 +258,46 @@ void tst_QXmppIq::stanzaError()
     // at most the payload and the error
     QVERIFY(!Iq::Error<>::fromDom(xmlToDom(u"<iq id='e3' type='error'><query xmlns='urn:test'/><query xmlns='urn:test'/>"
                                            "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s)));
+}
+
+void tst_QXmppIq::outgoingIq()
+{
+    using namespace QXmpp;
+    using namespace QXmpp::Private;
+    using StanzaError = QXmppStanza::Error;
+
+    // typed payload, written when the IQ is serialized
+    OutgoingIq iq { Iq::Type::Get, u"q1"_s, {}, u"a@example.org"_s, {}, makeIqPayloadWriter(TestPayload { u"x"_s }), {} };
+    QCOMPARE(xmlToFormattedByteArray(QString::fromUtf8(iq.toXml())),
+             xmlToFormattedByteArray(u"<iq id='q1' to='a@example.org' type='get'><query xmlns='urn:test' value='x'/></iq>"_s));
+    QVERIFY(!makeIqPayloadWriter(std::monostate()));
+
+    // already serialized payload
+    OutgoingIq raw { Iq::Type::Set, u"q2"_s, {}, {}, {}, makeRawXmlWriter("<query xmlns='urn:test' value='y'/>"), {} };
+    QCOMPARE(xmlToFormattedByteArray(QString::fromUtf8(raw.toXml())),
+             xmlToFormattedByteArray(u"<iq id='q2' type='set'><query xmlns='urn:test' value='y'/></iq>"_s));
+    QVERIFY(!makeRawXmlWriter({}));
+
+    // writers without device
+    QString string;
+    QXmlStreamWriter stringWriter(&string);
+    stringWriter.writeStartElement(u"content"_s);
+    stringWriter.writeDefaultNamespace(u"urn:xmpp:sce:1"_s);
+    raw.payload(&stringWriter);
+    stringWriter.writeEndElement();
+    QCOMPARE(xmlToFormattedByteArray(string),
+             xmlToFormattedByteArray(u"<content xmlns='urn:xmpp:sce:1'><query xmlns='urn:test' value='y'/></content>"_s));
+
+    // the error declares its namespace outside of the IQ
+    QByteArray content;
+    QXmlStreamWriter writer(&content);
+    writer.writeStartElement(u"content"_s);
+    writer.writeDefaultNamespace(u"urn:xmpp:sce:1"_s);
+    writeIqContent(&writer, iq.payload, StanzaError(StanzaError::Cancel, StanzaError::ItemNotFound));
+    writer.writeEndElement();
+    QCOMPARE(xmlToFormattedByteArray(QString::fromUtf8(content)),
+             xmlToFormattedByteArray(u"<content xmlns='urn:xmpp:sce:1'><query xmlns='urn:test' value='x'/>"
+                                     "<error xmlns='jabber:client' type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></content>"_s));
 }
 
 void tst_QXmppIq::nonSaslAuthGet()

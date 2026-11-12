@@ -29,36 +29,6 @@ namespace QXmpp::Private {
 
 namespace {
 
-// Serializes the payload of a reply created by a handler of QXmpp::Iq::Received.
-class ReplyIq : public QXmppIq
-{
-public:
-    explicit ReplyIq(Iq::Reply reply)
-        : QXmppIq(reply.error() ? QXmppIq::Error : QXmppIq::Result), m_reply(std::move(reply))
-    {
-        if (const auto &error = m_reply.error()) {
-            setError(*error);
-        }
-    }
-
-protected:
-    void toXmlElementFromChild(QXmlStreamWriter *writer) const override
-    {
-        m_reply.writePayload(writer);
-    }
-
-private:
-    Iq::Reply m_reply;
-};
-
-void sendReply(QXmppClient *client, const QDomElement &request, Iq::Reply &&reply, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
-{
-    ReplyIq iq(std::move(reply));
-    iq.setId(request.attribute(u"id"_s));
-    iq.setTo(request.attribute(u"from"_s));
-    LegacyE2ee::reply(client, std::move(iq), e2eeMetadata);
-}
-
 QXmppTask<void> answerIqRequest(QPointer<QXmppClient> client, Hooks hooks, IqRequestKey key, QDomElement element, Iq::Context context)
 {
     auto reply = co_await hooks.run<IqRequestReceived>(key, element, context);
@@ -68,7 +38,7 @@ QXmppTask<void> answerIqRequest(QPointer<QXmppClient> client, Hooks hooks, IqReq
 
     // the owner of the handler has been destroyed or the handler has dropped its task
     using Error = QXmppStanza::Error;
-    sendReply(client, element, reply ? std::move(*reply) : Iq::Reply(Error(Error::Cancel, Error::ServiceUnavailable)), context.e2eeMetadata());
+    IqRequests::sendReply(client, element, reply ? std::move(*reply) : Iq::Reply(Error(Error::Cancel, Error::ServiceUnavailable)), context.e2eeMetadata());
 }
 
 }  // namespace
@@ -108,6 +78,26 @@ bool IqRequests::process(QXmppClient *client, const Hooks &hooks, const QDomElem
 
     answerIqRequest(client, hooks, std::move(key), element, Iq::Context(element.attribute(u"from"_s), e2eeMetadata));
     return true;
+}
+
+void IqRequests::sendReply(QXmppClient *client, const QDomElement &request, Iq::Reply &&reply, const std::optional<QXmppE2eeMetadata> &e2eeMetadata)
+{
+    auto error = reply.error();
+    IqPayloadWriterFunction payload;
+    if (!error) {
+        payload = std::move(reply.m_payload);
+    }
+
+    OutgoingIq iq {
+        error ? Iq::Type::Error : Iq::Type::Result,
+        request.attribute(u"id"_s),
+        {},
+        request.attribute(u"from"_s),
+        {},
+        std::move(payload),
+        std::move(error),
+    };
+    client->d->encryptedIqs.sendResponse(std::move(iq), e2eeMetadata);
 }
 
 // helpers of handleIqRequests()

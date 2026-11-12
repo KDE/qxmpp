@@ -17,12 +17,10 @@
 #include "QXmppTrustMessageElement.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
-#include "QXmppXmlElement.h"
 
 #include "Async.h"
 #include "OmemoCryptoProvider.h"
 #include "StringLiterals.h"
-#include "XmlWriter.h"
 
 #include <protocol.h>
 
@@ -990,7 +988,7 @@ QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessageContent(QXmppMessag
 }
 
 // Encrypts the payload of an IQ for the provider.
-QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptIqContent(QDomElement iq, QList<QString> recipientJids, TrustLevels acceptedTrustLevels)
+QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptIqContent(E2ee::EncryptIqRequest request, TrustLevels acceptedTrustLevels)
 {
     if (!initialized) {
         co_return QXmppError {
@@ -999,7 +997,7 @@ QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptIqContent(QDomElement iq, 
         };
     }
 
-    auto omemoElement = co_await encryptStanza(SerializedIq { iq }, recipientJids, acceptedTrustLevels);
+    auto omemoElement = co_await encryptStanza(IqContent { request }, request.recipientJids(), acceptedTrustLevels);
     if (!omemoElement) {
         co_return QXmppError {
             u"OMEMO element could not be created"_s,
@@ -1339,12 +1337,9 @@ QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
     sceEnvelopeWriter.writeContent([&writer, &stanza] {
         if constexpr (std::is_same_v<T, QXmppMessage>) {
             stanza.serializeExtensions(&writer, SceSensitive, staticString(ns_client));
-        } else if constexpr (std::is_same_v<T, SerializedIq>) {
-            // the payload or the error
-            XmlWriter w(&writer);
-            for (auto child = stanza.element.firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
-                Xml::Element::fromDom(child).toXml(w);
-            }
+        } else if constexpr (std::is_same_v<T, IqContent>) {
+            // the payload and/or the error
+            stanza.request.writeContent(&writer);
         } else {
             // If the IQ stanza contains an error (i.e., it is an error response), that error is
             // serialized instead of actual content.

@@ -8,6 +8,7 @@
 #include "QXmppError.h"
 #include "QXmppHooks.h"
 #include "QXmppIq.h"
+#include "QXmppIqStanza.h"
 #include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
 #include "QXmppTask.h"
@@ -33,13 +34,18 @@ public:
 
     // Serializes the IQ including its payload, so it can be processed after the object passed
     // by the user is gone.
-    static QDomElement serialize(const QXmppIq &iq);
+    static OutgoingIq serialize(const QXmppIq &iq);
+    // Creates an IQ containing the payload as extensions for the deprecated encryption extension.
+    // Unlike the IQ passed by the user, it can be copied without losing the payload of subclasses.
+    static QXmppIq deserialize(const OutgoingIq &iq);
 
     // Sends a request and decrypts the response.
-    QXmppTask<IqResult> sendRequest(QXmppIq header, QDomElement iq, QXmppSendStanzaParams params);
+    QXmppTask<IqResult> sendRequest(OutgoingIq iq, QXmppSendStanzaParams params);
     // Sends an IQ without waiting for a response, e.g. a response. \a encryption is the default
     // selection, e.g. the encryption of the request.
-    QXmppTask<SendResult> send(QXmppIq header, QDomElement iq, QXmppSendStanzaParams params, QString encryption);
+    QXmppTask<SendResult> send(OutgoingIq iq, QXmppSendStanzaParams params, QString encryption);
+    // Sends the response to a request, encrypted like the request if \a requestMetadata is set.
+    QXmppTask<SendResult> sendResponse(OutgoingIq iq, const std::optional<QXmppE2eeMetadata> &requestMetadata);
 
     // Decrypts an incoming encrypted request and processes it like an injected IQ. Returns false
     // if there is no provider for it.
@@ -49,8 +55,8 @@ private:
     using Selection = std::variant<QString, QXmppError>;
     using Encryption = std::variant<QByteArray, QXmppError>;
 
-    QXmppTask<Selection> select(const QXmppIq &header, QString encryption);
-    QXmppTask<Encryption> encrypt(QDomElement iq, QString encryption, QXmppSendStanzaParams params);
+    QXmppTask<Selection> select(const OutgoingIq &iq, QString encryption);
+    QXmppTask<Encryption> encrypt(const OutgoingIq &iq, QString encryption, QXmppSendStanzaParams params);
     QXmppTask<IqResult> decrypt(QDomElement iq, QStringView encryption);
     QXmppTask<void> processIncomingAsync(QDomElement element, QStringView encryption);
 

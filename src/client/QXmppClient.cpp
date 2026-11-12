@@ -19,6 +19,7 @@
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessages.h"
+#include "QXmppOutgoingClient_p.h"
 #include "QXmppPacket_p.h"
 #include "QXmppPromise.h"
 #include "QXmppRosterManager.h"
@@ -137,6 +138,25 @@ static bool isTemporaryStreamError(StreamError error)
     default:
         return false;
     }
+}
+
+QXmppError iqResponseError(const QDomElement &response)
+{
+    using StanzaError = QXmppStanza::Error;
+
+    if (auto error = Iq::Error<>::fromDom(response)) {
+        auto text = error->error.text();
+        return QXmppError { std::move(text), std::move(error->error) };
+    }
+
+    const auto type = response.attribute(u"type"_s);
+    if (type == u"result") {
+        return QXmppError { u"Failed to parse IQ result payload"_s, StanzaError(StanzaError::Cancel, StanzaError::UndefinedCondition) };
+    }
+    if (type == u"error") {
+        return QXmppError { u"Failed to parse error response"_s, {} };
+    }
+    return QXmppError { u"Received unexpected IQ type"_s, {} };
 }
 
 }  // namespace QXmpp::Private
@@ -648,7 +668,7 @@ QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::sendSensitive(QXmppClie
         return client->d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
     }
     if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && client->hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
-        return client->d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), {});
+        return client->d->encryptedIqs.send(Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), {});
     }
     if (client->d->encryptionExtension) {
         if (dynamic_cast<QXmppMessage *>(&stanza)) {
@@ -742,7 +762,7 @@ QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::reply(QXmppClient *clie
         // the encryption of the request is the default of SelectEncryption
         auto provider = E2ee::Providers(client->hooks(nullptr)).find(e2eeMetadata->encryptionNamespace());
         if (provider && provider->encryptIq) {
-            return client->d->encryptedIqs.send(*iq, Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), e2eeMetadata->encryptionNamespace());
+            return client->d->encryptedIqs.send(Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), e2eeMetadata->encryptionNamespace());
         }
     }
     if (e2eeMetadata) {
@@ -799,8 +819,7 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendSensitiveIq(QXmppIq &&iq, cons
 {
     if (hooks(nullptr).hasHandlers<Messages::SelectEncryption>()) {
         // serialized before the IQ is copied, which would lose the payload of subclasses
-        auto element = Private::EncryptedIqs::serialize(iq);
-        return d->encryptedIqs.sendRequest(iq, std::move(element), params.value_or(QXmppSendStanzaParams()));
+        return d->encryptedIqs.sendRequest(Private::EncryptedIqs::serialize(iq), params.value_or(QXmppSendStanzaParams()));
     }
     return d->encryptionExtension ? d->sendSensitiveIq(std::move(iq), params) : d->stream->sendIq(std::move(iq));
 }
@@ -857,6 +876,64 @@ QXmppTask<QXmppClient::EmptyResult>
 QXmppClient::sendGenericIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaParams> &)
 {
     co_return mapToSuccess(co_await sendIq(std::move(iq)));
+}
+
+/*!
+    \fn template<typename Response, QXmpp::Iq::Type T, typename Payload> auto QXmppClient::sendIq(QXmpp::Iq::Stanza<T, Payload> iq, QXmpp::Iq::SendOptions options)
+
+    Sends the IQ request \a iq and returns the payload of the response as
+    \c {QXmppTask<QXmpp::Result<ResponsePayload>>}.
+
+    The payload of the response is defined by QXmpp::Iq::ResponseTraits: the result of a get
+    request contains the same payload as the request, the result of a set request is empty and
+    returned as QXmpp::Success. The traits can be specialized for requests with other responses.
+    Pass another payload type as \c Response to override the traits at the call site, \c void
+    for an empty result:
+    \code
+    // QXmppTask<QXmpp::Result<VersionQuery>>
+    client->sendIq(QXmpp::Iq::Get<VersionQuery> { .to = u"example.org"_s });
+
+    // QXmppTask<QXmpp::Result<>>
+    client->sendIq(QXmpp::Iq::Set<MyQuery> { .to = u"example.org"_s, .payload = MyQuery { ... } });
+
+    // QXmppTask<QXmpp::Result<MyResponse>>
+    client->sendIq<MyResponse>(QXmpp::Iq::Get<MyRequest> { .to = u"example.org"_s });
+    \endcode
+
+    An empty id is replaced by a generated one, an empty recipient stands for the own bare JID
+    (\rfcsection{6120}{10.3.3}).
+
+    Errors received from the other entity are returned as QXmppError containing the
+    QXmppStanza::Error. An invalid result is reported as QXmppError, too.
+
+    The IQ is only end-to-end encrypted if this is enabled in \a options.
+
+    \since QXmpp 1.18
+*/
+
+QString QXmppClient::validIqId(QString id)
+{
+    if (id.isEmpty()) {
+        id = generateSequentialStanzaId();
+    }
+    if (d->stream->iqManager().hasId(id)) {
+        warning(u"QXmpp: sendIq() error: The IQ's ID (\"%1\") is already in use. Using random ID."_s.arg(id));
+        return QXmppUtils::generateStanzaUuid();
+    }
+    return id;
+}
+
+QXmppTask<QXmppClient::IqResult> QXmppClient::sendOutgoingIq(OutgoingIq &&iq, Iq::SendOptions &&options)
+{
+    if (options.encrypted) {
+        // the encryption is selected via SelectEncryption, without selection the deprecated
+        // encryption extension is used
+        return d->encryptedIqs.sendRequest(std::move(iq), std::move(options.params));
+    }
+
+    // If 'to' is empty the user's bare JID is meant implicitly (RFC 6120, section 10.3.3).
+    const auto to = iq.to.isEmpty() ? configuration().jidBare() : iq.to;
+    return d->stream->iqManager().sendIq(QXmppPacket(iq.toXml(), true), iq.id, to);
 }
 
 /*!

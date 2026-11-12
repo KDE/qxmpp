@@ -63,9 +63,10 @@ namespace QXmpp::Messages {
 
     Input and result of the SelectEncryption hook.
 
-    The hook runs for messages and for IQs sent via QXmppClient::sendSensitiveIq() and as
-    responses to IQ requests. For IQs, only the attributes of the stanza are available, not the
-    payload.
+    The hook runs for messages and for IQs sent via QXmppClient::sendSensitiveIq(), typed IQs sent
+    encrypted via QXmppClient::sendIq() and responses to IQ requests. to() returns the recipient
+    of both, the own bare JID for IQs to the own account. Messages are available via message(),
+    isIq() is set for IQs. The payload of IQs is not available.
 
     The encryption is identified by its namespace (see QXmpp::E2ee), it is empty for sending the
     message unencrypted. Replies of QXmpp's managers (e.g. delivery receipts) and responses to
@@ -97,7 +98,7 @@ namespace QXmpp::Messages {
 
     \code
     client->hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
-        if (isEncryptionEnabled(selection.stanza().to())) {
+        if (isEncryptionEnabled(selection.to())) {
             selection.setEncryption(QXmpp::E2ee::Omemo2);
         }
     });

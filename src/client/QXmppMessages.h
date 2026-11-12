@@ -7,7 +7,6 @@
 
 #include "QXmppError.h"
 #include "QXmppHooks.h"
-#include "QXmppIq.h"
 #include "QXmppMessage.h"
 #include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
@@ -73,18 +72,26 @@ struct Received {
 class EncryptionSelection
 {
 public:
-    EncryptionSelection(const QXmppStanza &stanza, bool required, QString encryption = {})
-        : m_stanza(&stanza), m_encryption(std::move(encryption)), m_required(required)
+    EncryptionSelection(const QXmppMessage &message, bool required, QString encryption = {})
+        : m_message(&message), m_encryption(std::move(encryption)), m_required(required)
     {
     }
+    // For an IQ to \a to.
+    static EncryptionSelection forIq(QString to, bool required, QString encryption = {})
+    {
+        EncryptionSelection selection;
+        selection.m_to = std::move(to);
+        selection.m_encryption = std::move(encryption);
+        selection.m_required = required;
+        return selection;
+    }
 
-    // The message or IQ to be sent. For IQs, only the attributes (e.g. 'to' and the type) are
-    // available, not the payload.
-    const QXmppStanza &stanza() const { return *m_stanza; }
+    // JID of the recipient of the message or IQ.
+    QString to() const { return m_message ? m_message->to() : m_to; }
     // The message, null for IQs.
-    const QXmppMessage *message() const { return dynamic_cast<const QXmppMessage *>(m_stanza); }
-    // The IQ, null for messages.
-    const QXmppIq *iq() const { return dynamic_cast<const QXmppIq *>(m_stanza); }
+    const QXmppMessage *message() const { return m_message; }
+    // Whether an IQ is sent.
+    bool isIq() const { return !m_message; }
 
     // see QXmppSendStanzaParams::isEncryptionRequired(), also set for sensitive stanzas of managers
     bool isRequired() const { return m_required; }
@@ -94,7 +101,10 @@ public:
     void setEncryption(QStringView encryption) { m_encryption = encryption.toString(); }
 
 private:
-    const QXmppStanza *m_stanza = nullptr;
+    EncryptionSelection() = default;
+
+    const QXmppMessage *m_message = nullptr;
+    QString m_to;
     QString m_encryption;
     bool m_required = false;
 };

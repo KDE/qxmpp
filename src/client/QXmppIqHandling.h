@@ -21,6 +21,10 @@
 
 #include <QDomElement>
 
+namespace QXmpp::Private {
+struct IqRequests;
+}
+
 namespace QXmpp::Iq {
 
 /*!
@@ -79,9 +83,7 @@ public:
     static Reply result(Payload payload)
     {
         Reply reply;
-        reply.m_payloadWriter = [payload = std::move(payload)](QXmlStreamWriter *writer) {
-            Private::IqPayloadWriter<Payload>::write(writer, payload);
-        };
+        reply.m_payload = Private::makeIqPayloadWriter(std::move(payload));
         return reply;
     }
 
@@ -90,16 +92,10 @@ public:
     /*! Returns the error, if this is an error reply. */
     const std::optional<QXmppStanza::Error> &error() const { return m_error; }
 
-    /*! \internal Writes the payload of a result. */
-    void writePayload(QXmlStreamWriter *writer) const
-    {
-        if (m_payloadWriter) {
-            m_payloadWriter(writer);
-        }
-    }
-
 private:
-    std::function<void(QXmlStreamWriter *)> m_payloadWriter;
+    friend struct Private::IqRequests;
+
+    Private::IqPayloadWriterFunction m_payload;
     std::optional<QXmppStanza::Error> m_error;
 };
 

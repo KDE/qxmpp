@@ -33,7 +33,7 @@ EchoClientOmemo::EchoClientOmemo(QObject *parent)
     // encrypted messages get OMEMO encrypted replies. A real application would use a setting of
     // the user per conversation instead.
     hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
-        if (m_omemoContacts.contains(QXmppUtils::jidToBareJid(selection.stanza().to()))) {
+        if (m_omemoContacts.contains(QXmppUtils::jidToBareJid(selection.to()))) {
             selection.setEncryption(QXmpp::E2ee::Omemo2);
         }
     });

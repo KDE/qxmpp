@@ -15,11 +15,9 @@
 #include "QXmppPacket_p.h"
 #include "QXmppStreamManagement_p.h"
 #include "QXmppUtils.h"
-#include "QXmppXmlElement.h"
 #include "QXmppXmlRegistry.h"
 
 #include "StringLiterals.h"
-#include "XmlWriter.h"
 
 #include <QDomDocument>
 #include <QXmlStreamWriter>
@@ -34,49 +32,39 @@ struct DecryptedIq {
     QXmppE2eeMetadata metadata;
 };
 
-static QByteArray toXml(const QDomElement &element)
-{
-    QByteArray xml;
-    QXmlStreamWriter writer(&xml);
-    XmlWriter w(&writer);
-    Xml::Element::fromDom(element).toXml(w);
-    return xml;
-}
-
 // The IQ with its child elements replaced by \a children.
-static QByteArray toXml(const QDomElement &iq, const Xml::Extensions &children)
+static QByteArray toXml(const OutgoingIq &iq, const Xml::Extensions &children)
 {
     QByteArray xml;
     QXmlStreamWriter writer(&xml);
-    writer.writeStartElement(u"iq"_s);
-    const auto attributes = iq.attributes();
-    for (int i = 0; i < attributes.size(); i++) {
-        const auto attribute = attributes.item(i).toAttr();
-        writer.writeAttribute(attribute.nodeName(), attribute.value());
-    }
+    writeIqStart(&writer, iq.type, iq.id, iq.from, iq.to, iq.lang);
     children.toXml(&writer);
-    writer.writeEndElement();
+    writeIqEnd(&writer);
     return xml;
-}
-
-static QString recipient(const QDomElement &iq)
-{
-    return QXmppUtils::jidToBareJid(iq.attribute(u"to"_s));
 }
 
 // Maps an IQ response like QXmppClient::sendIq() does.
 static EncryptedIqs::IqResult mapResponse(QDomElement &&response)
 {
     if (response.attribute(u"type"_s) == u"error") {
-        QXmppIq iq;
-        iq.parse(response);
-        if (auto error = iq.errorOptional()) {
-            return QXmppError { error->text(), *error };
-        }
-        using Error = QXmppStanza::Error;
-        return QXmppError { u"IQ error"_s, Error(Error::Cancel, Error::UndefinedCondition) };
+        return iqResponseError(response);
     }
     return std::move(response);
+}
+
+static Iq::Type iqType(QXmppIq::Type type)
+{
+    switch (type) {
+    case QXmppIq::Get:
+        return Iq::Type::Get;
+    case QXmppIq::Set:
+        return Iq::Type::Set;
+    case QXmppIq::Result:
+        return Iq::Type::Result;
+    case QXmppIq::Error:
+        return Iq::Type::Error;
+    }
+    Q_UNREACHABLE();
 }
 
 EncryptedIqs::EncryptedIqs(QXmppClient *client, QXmppClientPrivate *clientPrivate, Hooks hooks)
@@ -84,28 +72,33 @@ EncryptedIqs::EncryptedIqs(QXmppClient *client, QXmppClientPrivate *clientPrivat
 {
 }
 
-QDomElement EncryptedIqs::serialize(const QXmppIq &iq)
+OutgoingIq EncryptedIqs::serialize(const QXmppIq &iq)
+{
+    QByteArray payload;
+    QXmlStreamWriter writer(&payload);
+    iq.toXmlElementFromChild(&writer);
+    return OutgoingIq { iqType(iq.type()), iq.id(), iq.from(), iq.to(), {}, makeRawXmlWriter(std::move(payload)), iq.errorOptional() };
+}
+
+QXmppIq EncryptedIqs::deserialize(const OutgoingIq &iq)
 {
     // the wrapper sets the namespace of elements without own namespace, e.g. <error/>
-    QByteArray xml;
-    QXmlStreamWriter writer(&xml);
-    writer.writeStartElement(u"wrapper"_s);
-    writer.writeDefaultNamespace(ns_client.toString());
-    iq.toXml(&writer);
-    writer.writeEndElement();
-
     QDomDocument document;
+    const auto xml = "<wrapper xmlns='jabber:client'>" + iq.toXml() + "</wrapper>";
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     document.setContent(xml, QDomDocument::ParseOption::UseNamespaceProcessing);
 #else
     document.setContent(xml, true);
 #endif
-    return document.documentElement().firstChildElement();
+    QXmppIq result;
+    result.parse(document.documentElement().firstChildElement());
+    return result;
 }
 
-QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const QXmppIq &header, QString encryption)
+QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const OutgoingIq &iq, QString encryption)
 {
-    EncryptionSelection selection(header, true, std::move(encryption));
+    // an IQ without 'to' is addressed to the own account (RFC 6120, section 10.3.3)
+    auto selection = EncryptionSelection::forIq(iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to, true, std::move(encryption));
     co_await m_hooks.run<SelectEncryption>(selection).withContext(m_client);
 
     if (selection.encryption().isEmpty()) {
@@ -118,20 +111,24 @@ QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const QXmppIq &header, Q
     co_return selection.encryption();
 }
 
-QXmppTask<EncryptedIqs::Encryption> EncryptedIqs::encrypt(QDomElement iq, QString encryption, QXmppSendStanzaParams params)
+QXmppTask<EncryptedIqs::Encryption> EncryptedIqs::encrypt(const OutgoingIq &iq, QString encryption, QXmppSendStanzaParams params)
 {
     auto provider = E2ee::Providers(m_hooks).find(encryption);
     if (!provider || !provider->encryptIq) {
         co_return QXmppError { u"No end-to-end encryption provider for IQs encrypted with "_s + encryption, SendError::EncryptionError };
     }
 
+    // an IQ without 'to' is addressed to the own account (RFC 6120, section 10.3.3)
+    auto to = iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to;
     auto recipients = params.encryptionJids();
     if (recipients.isEmpty()) {
-        recipients.append(recipient(iq));
+        recipients.append(QXmppUtils::jidToBareJid(to));
     }
 
     E2ee::EncryptIqRequest request;
-    request.setIq(iq);
+    request.setTo(std::move(to));
+    request.setPayload(iq.payload);
+    request.setError(iq.error);
     request.setRecipientJids(std::move(recipients));
     request.setParams(std::move(params));
 
@@ -188,24 +185,23 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
     co_return DecryptedIq { decryptedIq, metadata };
 }
 
-QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(QXmppIq header, QDomElement iq, QXmppSendStanzaParams params)
+QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(OutgoingIq iq, QXmppSendStanzaParams params)
 {
-    auto selection = co_await select(header, {});
+    auto selection = co_await select(iq, {});
     if (auto *error = std::get_if<QXmppError>(&selection)) {
         co_return std::move(*error);
     }
 
     auto *stream = m_clientPrivate->stream;
-    const auto id = iq.attribute(u"id"_s);
-    const auto to = iq.attribute(u"to"_s).isEmpty() ? m_client->configuration().jidBare() : iq.attribute(u"to"_s);
+    const auto to = iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to;
 
     const auto &encryption = std::get<QString>(selection);
     if (encryption.isEmpty()) {
         if (m_clientPrivate->encryptionExtension) {
-            // like before
-            co_return co_await m_clientPrivate->sendSensitiveIq(std::move(header), params);
+            // deprecated encryption extension
+            co_return co_await m_clientPrivate->sendSensitiveIq(deserialize(iq), params);
         }
-        co_return co_await stream->iqManager().sendIq(QXmppPacket(toXml(iq), true), id, to).withContext(m_client);
+        co_return co_await stream->iqManager().sendIq(QXmppPacket(iq.toXml(), true), iq.id, to).withContext(m_client);
     }
 
     auto encrypted = co_await encrypt(iq, encryption, params);
@@ -214,7 +210,7 @@ QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(QXmppIq header, QDom
     }
 
     // error responses are encrypted too, so they are mapped after the decryption
-    auto response = co_await stream->iqManager().sendIq(QXmppPacket(std::get<QByteArray>(encrypted), true), id, to, true).withContext(m_client);
+    auto response = co_await stream->iqManager().sendIq(QXmppPacket(std::get<QByteArray>(encrypted), true), iq.id, to, true).withContext(m_client);
     if (auto *error = std::get_if<QXmppError>(&response)) {
         co_return std::move(*error);
     }
@@ -230,9 +226,9 @@ QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(QXmppIq header, QDom
     co_return mapResponse(std::move(responseIq));
 }
 
-QXmppTask<SendResult> EncryptedIqs::send(QXmppIq header, QDomElement iq, QXmppSendStanzaParams params, QString encryption)
+QXmppTask<SendResult> EncryptedIqs::send(OutgoingIq iq, QXmppSendStanzaParams params, QString encryption)
 {
-    auto selection = co_await select(header, std::move(encryption));
+    auto selection = co_await select(iq, std::move(encryption));
     if (auto *error = std::get_if<QXmppError>(&selection)) {
         co_return std::move(*error);
     }
@@ -241,10 +237,10 @@ QXmppTask<SendResult> EncryptedIqs::send(QXmppIq header, QDomElement iq, QXmppSe
     const auto &selected = std::get<QString>(selection);
     if (selected.isEmpty()) {
         if (auto *legacyEncryption = m_clientPrivate->encryptionExtension) {
-            // like before
-            co_return co_await m_clientPrivate->sendEncryptedIq(legacyEncryption->encryptIq(std::move(header), params));
+            // deprecated encryption extension
+            co_return co_await m_clientPrivate->sendEncryptedIq(legacyEncryption->encryptIq(deserialize(iq), params));
         }
-        co_return co_await streamAckManager.send(QXmppPacket(toXml(iq), true)).withContext(m_client);
+        co_return co_await streamAckManager.send(QXmppPacket(iq.toXml(), true)).withContext(m_client);
     }
 
     auto encrypted = co_await encrypt(iq, selected, params);
@@ -252,6 +248,20 @@ QXmppTask<SendResult> EncryptedIqs::send(QXmppIq header, QDomElement iq, QXmppSe
         co_return std::move(*error);
     }
     co_return co_await streamAckManager.send(QXmppPacket(std::get<QByteArray>(encrypted), true)).withContext(m_client);
+}
+
+QXmppTask<SendResult> EncryptedIqs::sendResponse(OutgoingIq iq, const std::optional<QXmppE2eeMetadata> &requestMetadata)
+{
+    if (!requestMetadata) {
+        return m_clientPrivate->stream->streamAckManager().send(QXmppPacket(iq.toXml(), true));
+    }
+
+    // the encryption of the request is the default of SelectEncryption
+    auto encryption = requestMetadata->encryptionNamespace();
+    if (auto provider = E2ee::Providers(m_hooks).find(encryption); !provider || !provider->encryptIq) {
+        encryption.clear();
+    }
+    return send(std::move(iq), {}, std::move(encryption));
 }
 
 bool EncryptedIqs::processIncoming(const QDomElement &element)

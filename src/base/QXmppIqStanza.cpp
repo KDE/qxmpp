@@ -5,11 +5,14 @@
 #include "QXmppIqStanza.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppStanza_p.h"
+#include "QXmppXmlElement.h"
 
 #include "Enums.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
+#include <QDomDocument>
 #include <QXmlStreamWriter>
 
 /*!
@@ -89,6 +92,59 @@ void writeXmlWriterPayload(QXmlStreamWriter *writer, const void *payload, void (
 {
     XmlWriter w(writer);
     write(w, payload);
+}
+
+IqPayloadWriterFunction makeRawXmlWriter(QByteArray xml)
+{
+    if (xml.isEmpty()) {
+        return {};
+    }
+    return [xml = std::move(xml)](QXmlStreamWriter *writer) {
+        if (auto *device = writer->device()) {
+            // closes an open start tag, so the XML can be written to the device directly
+            writer->writeCharacters(QString());
+            device->write(xml);
+            return;
+        }
+
+        // writers without device, e.g. writing into a QString
+        QDomDocument document;
+        const auto wrapped = "<wrapper xmlns='jabber:client'>" + xml + "</wrapper>";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+        document.setContent(wrapped, QDomDocument::ParseOption::UseNamespaceProcessing);
+#else
+        document.setContent(wrapped, true);
+#endif
+        XmlWriter w(writer);
+        for (const auto &child : iterChildElements(document.documentElement())) {
+            Xml::Element::fromDom(child).toXml(w);
+        }
+    };
+}
+
+QByteArray OutgoingIq::toXml() const
+{
+    QByteArray data;
+    QXmlStreamWriter writer(&data);
+    writeIqStart(&writer, type, id, from, to, lang);
+    if (payload) {
+        payload(&writer);
+    }
+    if (error) {
+        error->toXml(&writer);
+    }
+    writeIqEnd(&writer);
+    return data;
+}
+
+void writeIqContent(QXmlStreamWriter *writer, const IqPayloadWriterFunction &payload, const std::optional<QXmppStanza::Error> &error)
+{
+    if (payload) {
+        payload(writer);
+    }
+    if (error) {
+        StanzaErrorWriter::write(writer, *error, ns_client);
+    }
 }
 
 // Checks the type, the id and the child elements according to RFC 6120, section 8.2.3.

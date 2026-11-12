@@ -24,6 +24,12 @@
 
 namespace QXmpp::Private {
 
+struct StanzaErrorWriter {
+    // Writes the error, with the namespace \a xmlns if it is not empty, e.g. if the error is not
+    // written inside a stanza.
+    QXMPP_PRIVATE_EXPORT static void write(QXmlStreamWriter *writer, const QXmppStanza::Error &error, QStringView xmlns);
+};
+
 template<>
 struct Enums::Data<QXmppStanza::Error::Condition> {
     using enum QXmppStanza::Error::Condition;

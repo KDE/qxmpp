@@ -5819,11 +5819,10 @@ public:
                 return task; },
             // the "encrypted" data is the XML of the payload
             .encryptIq = [this](E2ee::EncryptIqRequest request) {
-                QString payload;
-                QTextStream stream(&payload);
-                for (auto child = request.iq().firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
-                    child.save(stream, 0);
-                }
+                QByteArray content;
+                QXmlStreamWriter writer(&content);
+                request.writeContent(&writer);
+                const auto payload = QString::fromUtf8(content);
                 encryptedIqPayloads << payload;
                 encryptedIqRecipients << request.recipientJids();
                 Xml::Extensions elements;
@@ -6313,7 +6312,8 @@ void tst_QXmppMessages::outgoingEncrypted()
     e2ee->encryptPromises.at(0).finish(encrypted(u"ciphertext"_s));
     const auto packet = client.takePacket();
     QVERIFY(packet.contains(u"<encrypted xmlns=\"urn:test:e2ee\" data=\"ciphertext\"/>"_s));
-    QVERIFY(!packet.contains(u"secret"_s));
+    // the test encryption only escapes the payload
+    QVERIFY(!packet.contains(u"<query"_s));
     QVERIFY(packet.contains(u"<body>This message is encrypted with urn:test:e2ee but could not be decrypted</body>"_s));
     QVERIFY(packet.contains(u"<encryption xmlns=\"urn:xmpp:eme:0\" namespace=\"urn:test:e2ee\"/>"_s));
     // the fallback marker of the reply is encrypted, the one of the fallback body is public
@@ -6505,7 +6505,7 @@ void tst_QXmppMessages::iqEncrypted()
     QObject owner;
     bool isIq = false;
     client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
-        isIq = selection.iq() && !selection.message() && selection.isRequired();
+        isIq = selection.isIq() && !selection.message() && selection.isRequired();
         selection.setEncryption(TestEncryption);
     });
 
@@ -6674,6 +6674,188 @@ void tst_QXmppMessages::bodyOnlyEncrypt()
 
 }  // namespace MessagesTests
 
-QXMPP_TEST_MAIN(Client::tst_QXmppClient, tst_QXmppNetworkMonitor, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq, HookTests::tst_QXmppHooks, MessagesTests::tst_QXmppMessages)
+namespace IqSendingTests {
+
+using namespace QXmpp;
+using namespace QXmpp::Messages;
+using HookTests::TestQuery;
+using MessagesTests::TestE2eeManager;
+using MessagesTests::TestEncrypted;
+using MessagesTests::TestEncryption;
+
+// request with a response different from the request
+struct TestRequest {
+    static constexpr std::tuple XmlTag = { u"request", u"urn:test" };
+
+    static std::optional<TestRequest> fromDom(const QDomElement &) { return TestRequest {}; }
+    void toXml(QXmlStreamWriter *writer) const
+    {
+        writer->writeStartElement(u"request"_s);
+        writer->writeDefaultNamespace(u"urn:test"_s);
+        writer->writeEndElement();
+    }
+};
+
+}  // namespace IqSendingTests
+
+template<>
+struct QXmpp::Iq::ResponseTraits<QXmpp::Iq::Get<IqSendingTests::TestRequest>> {
+    using Payload = IqSendingTests::TestQuery;
+};
+
+namespace IqSendingTests {
+
+class tst_QXmppIqSending : public QObject
+{
+    Q_OBJECT
+private:
+    Q_SLOT void initTestCase();
+    Q_SLOT void cleanupTestCase();
+    Q_SLOT void get();
+    Q_SLOT void set();
+    Q_SLOT void error();
+    Q_SLOT void invalidResult();
+    Q_SLOT void responseTraits();
+    Q_SLOT void ownAccount();
+    Q_SLOT void encrypted();
+};
+
+void tst_QXmppIqSending::initTestCase()
+{
+    Xml::Registry::registerEncryptedContainer<TestEncrypted>(Xml::Scope::Message);
+}
+
+void tst_QXmppIqSending::cleanupTestCase()
+{
+    Xml::Registry::unregisterElement<TestEncrypted>();
+}
+
+void tst_QXmppIqSending::get()
+{
+    TestClient client;
+    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s, .payload = TestQuery { u"ping"_s } });
+    static_assert(std::is_same_v<decltype(task), QXmppTask<Result<TestQuery>>>);
+
+    client.expect(u"<iq id='qx1' to='alice@example.org/a' type='get'><query xmlns='urn:test' value='ping'/></iq>"_s);
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'><query xmlns='urn:test' value='pong'/></iq>"_s);
+    QCOMPARE(expectFutureVariant<TestQuery>(task).value, u"pong"_s);
+
+    // the id is kept
+    task = client.sendIq(Iq::Get<TestQuery> { .id = u"custom"_s, .to = u"alice@example.org/a"_s });
+    client.expect(u"<iq id='custom' to='alice@example.org/a' type='get'><query xmlns='urn:test'/></iq>"_s);
+}
+
+void tst_QXmppIqSending::set()
+{
+    TestClient client;
+    auto task = client.sendIq(Iq::Set<TestQuery> { .to = u"alice@example.org/a"_s, .payload = TestQuery { u"value"_s } });
+    static_assert(std::is_same_v<decltype(task), QXmppTask<Result<>>>);
+
+    client.expect(u"<iq id='qx1' to='alice@example.org/a' type='set'><query xmlns='urn:test' value='value'/></iq>"_s);
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'/>"_s);
+    expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppIqSending::error()
+{
+    TestClient client;
+    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    client.expect(u"<iq id='qx1' to='alice@example.org/a' type='get'><query xmlns='urn:test'/></iq>"_s);
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='error'><query xmlns='urn:test'/>"
+                  "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+
+    auto error = expectFutureVariant<QXmppError>(task).value<QXmppStanza::Error>();
+    QVERIFY(error.has_value());
+    QCOMPARE(error->condition(), QXmppStanza::Error::ServiceUnavailable);
+}
+
+void tst_QXmppIqSending::invalidResult()
+{
+    TestClient client;
+
+    // payload that cannot be parsed
+    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    client.takePacket();
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'><query xmlns='urn:test' invalid='1'/></iq>"_s);
+    auto error = expectFutureVariant<QXmppError>(task).value<QXmppStanza::Error>();
+    QVERIFY(error.has_value());
+    QCOMPARE(error->condition(), QXmppStanza::Error::UndefinedCondition);
+
+    // missing payload
+    task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    client.takePacket();
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'/>"_s);
+    expectFutureVariant<QXmppError>(task);
+}
+
+void tst_QXmppIqSending::responseTraits()
+{
+    TestClient client;
+
+    // specialization of the traits
+    auto task = client.sendIq(Iq::Get<TestRequest> { .to = u"alice@example.org/a"_s });
+    static_assert(std::is_same_v<decltype(task), QXmppTask<Result<TestQuery>>>);
+    client.expect(u"<iq id='qx1' to='alice@example.org/a' type='get'><request xmlns='urn:test'/></iq>"_s);
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'><query xmlns='urn:test' value='response'/></iq>"_s);
+    QCOMPARE(expectFutureVariant<TestQuery>(task).value, u"response"_s);
+
+    // overridden on the call site
+    auto emptyTask = client.sendIq<void>(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    static_assert(std::is_same_v<decltype(emptyTask), QXmppTask<Result<>>>);
+    client.takePacket();
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'/>"_s);
+    expectFutureVariant<Success>(emptyTask);
+
+    auto queryTask = client.sendIq<TestQuery>(Iq::Set<TestRequest> { .to = u"alice@example.org/a"_s });
+    static_assert(std::is_same_v<decltype(queryTask), QXmppTask<Result<TestQuery>>>);
+    client.takePacket();
+    client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'><query xmlns='urn:test' value='set'/></iq>"_s);
+    QCOMPARE(expectFutureVariant<TestQuery>(queryTask).value, u"set"_s);
+}
+
+void tst_QXmppIqSending::ownAccount()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+
+    // an empty recipient is the own bare JID
+    auto task = client.sendIq(Iq::Set<TestQuery> {});
+    client.expect(u"<iq id='qx1' type='set'><query xmlns='urn:test'/></iq>"_s);
+    client.inject(u"<iq id='qx1' from='me@example.org' type='result'/>"_s);
+    expectFutureVariant<Success>(task);
+}
+
+void tst_QXmppIqSending::encrypted()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestEncryption);
+    });
+
+    // not encrypted by default
+    auto plainTask = client.sendIq(Iq::Get<TestQuery> { .id = u"plain"_s, .to = u"alice@example.org/phone"_s });
+    client.expect(u"<iq id='plain' to='alice@example.org/phone' type='get'><query xmlns='urn:test'/></iq>"_s);
+    QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+
+    auto task = client.sendIq(Iq::Get<TestQuery> { .id = u"qx1"_s, .to = u"alice@example.org/phone"_s, .payload = TestQuery { u"secret"_s } }, { .encrypted = true });
+    QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
+    QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(u"value=\"secret\""_s));
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"urn:test:e2ee"_s));
+    // the test encryption only escapes the payload
+    QVERIFY(!packet.contains(u"<query"_s));
+
+    // the response is decrypted
+    client.inject(u"<iq type='result' id='qx1' from='alice@example.org/phone' to='me@example.org/res'>"
+                  "<encrypted xmlns='urn:test:e2ee' data='&lt;query xmlns=&apos;urn:test&apos; value=&apos;answer&apos;/&gt;'/></iq>"_s);
+    QCOMPARE(expectFutureVariant<TestQuery>(task).value, u"answer"_s);
+}
+
+}  // namespace IqSendingTests
+
+QXMPP_TEST_MAIN(Client::tst_QXmppClient, tst_QXmppNetworkMonitor, Discovery::tst_QXmppDiscoveryManager, Roster::tst_QXmppRosterManager, RosterMemoryStorage::tst_QXmppRosterMemoryStorage, DiscoveryIq::tst_QXmppDiscoveryIq, RosterIq::tst_QXmppRosterIq, HookTests::tst_QXmppHooks, MessagesTests::tst_QXmppMessages, IqSendingTests::tst_QXmppIqSending)
 
 #include "ClientBase.moc"

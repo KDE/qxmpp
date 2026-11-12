@@ -37,6 +37,10 @@ class QXmppClientExtension;
 class QXmppLogger;
 class QTimer;
 
+namespace QXmpp::Iq {
+class Reply;
+}
+
 namespace QXmpp::Private {
 
 // Minimum duration a connection needs to have lasted for the reconnection backoff to be reset
@@ -44,11 +48,13 @@ constexpr auto StableConnectionDuration = std::chrono::seconds(30);
 
 QXMPP_PRIVATE_EXPORT std::chrono::milliseconds reconnectionDelay(int tries, bool resumable);
 
-namespace IqRequests {
-// Runs the handler of QXmpp::Iq::Received for an IQ request and sends the reply. Returns
-// false if there is no handler.
-QXMPP_PRIVATE_EXPORT bool process(QXmppClient *client, const Hooks &hooks, const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
-}  // namespace IqRequests
+struct IqRequests {
+    // Runs the handler of QXmpp::Iq::Received for an IQ request and sends the reply. Returns
+    // false if there is no handler.
+    QXMPP_PRIVATE_EXPORT static bool process(QXmppClient *client, const Hooks &hooks, const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
+    // Sends the reply to a request, encrypted like the request.
+    static void sendReply(QXmppClient *client, const QDomElement &request, Iq::Reply &&reply, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
+};
 
 // The deprecated end-to-end encryption API (QXmppClient::sendSensitive(), reply() and the
 // encryption extension) for QXmpp's own managers, which keep using it as a fallback for

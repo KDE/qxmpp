@@ -17,6 +17,8 @@
 
 #include <QDomElement>
 
+class QXmlStreamWriter;
+
 namespace QXmpp::E2ee {
 
 // Classes with getters and setters, so fields can be added in a source compatible way.
@@ -105,9 +107,28 @@ using EncryptResult = std::variant<Encrypted, QXmppError>;
 class EncryptIqRequest
 {
 public:
-    // The complete IQ, the provider encrypts its child elements (the payload or the error).
-    const QDomElement &iq() const { return m_iq; }
-    void setIq(QDomElement iq) { m_iq = std::move(iq); }
+    // JID of the recipient of the IQ, the own bare JID for IQs to the own account
+    const QString &to() const { return m_to; }
+    void setTo(QString to) { m_to = std::move(to); }
+
+    // Writes the payload of the IQ: at most one element, exactly one in requests. The payload is
+    // only serialized when it is written.
+    void writePayload(QXmlStreamWriter *writer) const
+    {
+        if (m_payload) {
+            m_payload(writer);
+        }
+    }
+    void setPayload(std::function<void(QXmlStreamWriter *)> payload) { m_payload = std::move(payload); }
+
+    // The error of an error response.
+    const std::optional<QXmppStanza::Error> &error() const { return m_error; }
+    void setError(std::optional<QXmppStanza::Error> error) { m_error = std::move(error); }
+
+    // Writes the content to be encrypted: the payload and the error. The error declares the
+    // namespace 'jabber:client', so the content can be written outside of the IQ, e.g. into an
+    // SCE envelope.
+    QXMPP_EXPORT void writeContent(QXmlStreamWriter *writer) const;
 
     // bare JIDs, the addressee or QXmppSendStanzaParams::encryptionJids()
     const QList<QString> &recipientJids() const { return m_recipientJids; }
@@ -117,7 +138,9 @@ public:
     void setParams(QXmppSendStanzaParams params) { m_params = std::move(params); }
 
 private:
-    QDomElement m_iq;
+    QString m_to;
+    std::function<void(QXmlStreamWriter *)> m_payload;
+    std::optional<QXmppStanza::Error> m_error;
     QList<QString> m_recipientJids;
     QXmppSendStanzaParams m_params;
 };
