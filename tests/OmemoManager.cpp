@@ -25,6 +25,7 @@
 #include "QXmppOmemoManager.h"
 #include "QXmppOmemoManager_p.h"
 #include "QXmppOmemoMemoryStorage.h"
+#include "QXmppOmemoStorage.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppUtils.h"
 
@@ -1935,6 +1936,7 @@ private:
     Q_SLOT void resetAll();
     Q_SLOT void migrateFields();
     Q_SLOT void migrateKeepsSession();
+    Q_SLOT void migrateFromOldStorage();
 };
 
 void tst_OmemoStorage::ownDevice()
@@ -2113,6 +2115,36 @@ void tst_OmemoStorage::migrateKeepsSession()
     const auto decrypted = expectVariant<DecryptedKey>(aliceLayer0.decrypt({ bobJid, bob.deviceId }, message.data, true));
     QCOMPARE(decrypted.data, SecureByteArray(QByteArray("legacy")));
     QCOMPARE(decrypted.senderIdentityKey, bobLayer0.ownIdentityKey());
+}
+
+void tst_OmemoStorage::migrateFromOldStorage()
+{
+    QXmppOmemoMemoryStorage old;
+    // nothing to migrate
+    MemoryStorage empty;
+    QVERIFY(!empty.migrateFrom(&old).result());
+    QVERIFY(!empty.allData().result().ownDevice);
+
+    old.setOwnDevice(QXmppOmemoStorage::OwnDevice { 123, u"Phone"_s, "private", "public", 3, 42 });
+    old.addSignedPreKeyPair(3, { start, "signed" });
+    old.addPreKeyPairs({ { 41, "pre 41" }, { 42, "pre 42" } });
+    old.addDevice(u"bob@example.org"_s, 5, { u"Laptop"_s, "bob key", "session", 2, 3, start });
+
+    MemoryStorage storage;
+    QVERIFY(storage.migrateFrom(&old).result());
+    const auto data = storage.allData().result();
+    const auto expected = Storage::migrate(old.allData().result());
+    QCOMPARE(data.ownDevice, expected.ownDevice);
+    QCOMPARE(data.signedPreKeys, expected.signedPreKeys);
+    QCOMPARE(data.preKeys.size(), 2);
+    QCOMPARE(data.devices, expected.devices);
+    // the old storage is kept
+    QVERIFY(old.allData().result().ownDevice);
+
+    // existing data is not overwritten
+    old.setOwnDevice(QXmppOmemoStorage::OwnDevice { 999, {}, "other", "other", 1, 1 });
+    QVERIFY(!storage.migrateFrom(&old).result());
+    QCOMPARE(storage.allData().result().ownDevice->id, 123u);
 }
 
 }  // namespace StorageTests

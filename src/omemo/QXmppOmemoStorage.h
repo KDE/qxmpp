@@ -250,6 +250,7 @@ public:
     virtual QXmppTask<void> resetAll() = 0;
 
     static Data migrate(const QXmppOmemoStorage::OmemoData &data);
+    QXmppTask<bool> migrateFrom(QXmppOmemoStorage *oldStorage);
 };
 
 }  // namespace QXmpp::Omemo

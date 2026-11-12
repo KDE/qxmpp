@@ -152,4 +152,34 @@ Storage::Data Storage::migrate(const QXmppOmemoStorage::OmemoData &data)
     return result;
 }
 
+/*!
+    Copies the data of \a oldStorage into this storage using migrate().
+
+    Nothing is changed and \c false is returned if \a oldStorage has no own device or if this
+    storage already has one. Returns \c true if the data has been copied. The old storage is not
+    modified, so it can be kept as backup.
+
+    Trust is not part of the storage. The trust keys of OMEMO 2 are kept as they are, so the same
+    trust storage must be used with the new manager. OMEMO 0 starts without trusted keys.
+*/
+QXmppTask<bool> Storage::migrateFrom(QXmppOmemoStorage *oldStorage)
+{
+    const auto oldData = co_await oldStorage->allData();
+    if (!oldData.ownDevice || (co_await allData()).ownDevice) {
+        co_return false;
+    }
+
+    const auto data = migrate(oldData);
+    for (const auto &key : data.signedPreKeys) {
+        co_await addSignedPreKey(key);
+    }
+    co_await addPreKeys(data.preKeys);
+    for (const auto &device : data.devices) {
+        co_await addDevice(device);
+    }
+    // last, so an interrupted migration is repeated
+    co_await setOwnDevice(data.ownDevice);
+    co_return true;
+}
+
 }  // namespace QXmpp::Omemo
