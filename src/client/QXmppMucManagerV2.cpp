@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
+#include "QXmppIqStanza.h"
 #include "QXmppMessageContext.h"
 #include "QXmppMessageRetraction.h"
 #include "QXmppMucForms.h"
@@ -20,7 +21,6 @@
 
 #include "Enums.h"
 #include "Global.h"
-#include "IqSending.h"
 #include "Ping.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
@@ -618,7 +618,7 @@ QXmppTask<Result<bool>> QXmppMucManagerV2::isMucRoom(const QString &jid)
 */
 QXmppTask<Result<QString>> QXmppMucManagerV2::requestUniqueRoomName(QString serviceJid)
 {
-    auto result = co_await get<MucUniqueQuery>(client(), serviceJid, MucUniqueQuery {}).withContext(this);
+    auto result = co_await client()->sendIq(Iq::Get<MucUniqueQuery> { .to = serviceJid }).withContext(this);
     if (auto *q = std::get_if<MucUniqueQuery>(&result)) {
         if (q->name.isEmpty()) {
             co_return QXmppError { u"MUC service did not return a unique room name."_s };
@@ -1130,7 +1130,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
                         // Send cancel IQ to destroy the locked room and fail the join.
                         QXmppDataForm cancelForm;
                         cancelForm.setType(QXmppDataForm::Cancel);
-                        set(q->client(), roomJid, MucOwnerQuery { .form = std::move(cancelForm) });
+                        q->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = roomJid, .payload = MucOwnerQuery { .form = std::move(cancelForm) } });
                         throwRoomError(roomJid, QXmppError { u"Room does not exist."_s });
                     }
                 } else {
@@ -1320,7 +1320,7 @@ void QXmppMucManagerV2Private::runSelfPing(const QString &roomJid)
     data.selfPingInFlight = true;
     const QString occupantJid = roomJid + u'/' + data.nickname.value();
 
-    getEmpty(q->client(), occupantJid, Ping {}).then(q, [this, roomJid](Result<> &&result) {
+    q->client()->sendIq(Iq::Get<Ping> { .to = occupantJid }).then(q, [this, roomJid](Result<> &&result) {
         auto it = activeRooms.find(roomJid);
         if (it == activeRooms.end()) {
             return;
@@ -1767,7 +1767,7 @@ void QXmppMucManagerV2Private::fetchAvatar(const QString &roomJid)
 
 QXmppTask<Result<MucOwnerQuery>> QXmppMucManagerV2Private::sendOwnerFormRequest(const QString &roomJid)
 {
-    return get<MucOwnerQuery>(q->client(), roomJid, MucOwnerQuery {});
+    return q->client()->sendIq(Iq::Get<MucOwnerQuery> { .to = roomJid });
 }
 
 void QXmppMucManagerV2Private::fetchConfigForm(const QString &roomJid)
@@ -2062,7 +2062,7 @@ QXmppTask<void> QXmppMucManagerV2Private::fetchAffiliations(QString roomJid, uin
     auto query = [&](Affiliation affiliation) {
         Muc::Item item;
         item.setAffiliation(affiliation);
-        return get<MucAdminQuery>(q->client(), roomJid, MucAdminQuery { .items = { item } });
+        return q->client()->sendIq(Iq::Get<MucAdminQuery> { .to = roomJid, .payload = MucAdminQuery { .items = { item } } });
     };
     // requested in parallel
     std::array requests { std::pair { Affiliation::Owner, query(Affiliation::Owner) },
@@ -2840,7 +2840,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participa
     item.setRole(role);
     item.setReason(reason);
 
-    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } });
+    return m_data->manager->client()->sendIq(Iq::Set<MucAdminQuery> { .to = m_data->roomJid, .payload = MucAdminQuery { .items = { item } } });
 }
 
 /*!
@@ -2853,7 +2853,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRole(const QXmppMucParticipant &participa
 */
 QXmppTask<Result<>> QXmppMucRoomV2::setRoles(const QList<Muc::Item> &items)
 {
-    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = items });
+    return m_data->manager->client()->sendIq(Iq::Set<MucAdminQuery> { .to = m_data->roomJid, .payload = MucAdminQuery { .items = items } });
 }
 
 /*!
@@ -2864,7 +2864,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoles(const QList<Muc::Item> &items)
 */
 QXmppTask<Result<>> QXmppMucRoomV2::moderateMessage(const QString &stanzaId, const QString &reason)
 {
-    return set(m_data->manager->client(), m_data->roomJid, MucModerateQuery { .stanzaId = stanzaId, .reason = reason });
+    return m_data->manager->client()->sendIq(Iq::Set<MucModerateQuery> { .to = m_data->roomJid, .payload = MucModerateQuery { .stanzaId = stanzaId, .reason = reason } });
 }
 
 /*!
@@ -2881,7 +2881,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
     item.setAffiliation(affiliation);
     item.setReason(reason);
 
-    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } });
+    return m_data->manager->client()->sendIq(Iq::Set<MucAdminQuery> { .to = m_data->roomJid, .payload = MucAdminQuery { .items = { item } } });
 }
 
 /*!
@@ -2894,7 +2894,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setAffiliation(const QString &jid, QXmpp::Mu
 */
 QXmppTask<Result<>> QXmppMucRoomV2::setAffiliations(const QList<Muc::Item> &items)
 {
-    return set(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = items });
+    return m_data->manager->client()->sendIq(Iq::Set<MucAdminQuery> { .to = m_data->roomJid, .payload = MucAdminQuery { .items = items } });
 }
 
 /*!
@@ -2911,7 +2911,7 @@ QXmppTask<Result<QList<Muc::Item>>> QXmppMucRoomV2::requestAffiliationList(QXmpp
     Muc::Item item;
     item.setAffiliation(affiliation);
 
-    auto result = co_await get<MucAdminQuery>(m_data->manager->client(), m_data->roomJid, MucAdminQuery { .items = { item } }).withContext(m_data->manager);
+    auto result = co_await m_data->manager->client()->sendIq(Iq::Get<MucAdminQuery> { .to = m_data->roomJid, .payload = MucAdminQuery { .items = { item } } }).withContext(m_data->manager);
     if (auto *q = std::get_if<MucAdminQuery>(&result)) {
         co_return std::move(q->items);
     }
@@ -2946,7 +2946,7 @@ QXmppTask<Result<QString>> QXmppMucRoomV2::requestReservedNickname()
 */
 QXmppTask<Result<QXmppDataForm>> QXmppMucRoomV2::requestRegistrationForm()
 {
-    auto result = co_await get<MucRegisterQuery>(m_data->manager->client(), m_data->roomJid, MucRegisterQuery {}).withContext(m_data->manager);
+    auto result = co_await m_data->manager->client()->sendIq(Iq::Get<MucRegisterQuery> { .to = m_data->roomJid }).withContext(m_data->manager);
     if (auto *q = std::get_if<MucRegisterQuery>(&result)) {
         if (q->form) {
             co_return std::move(*q->form);
@@ -2965,7 +2965,7 @@ QXmppTask<Result<QXmppDataForm>> QXmppMucRoomV2::requestRegistrationForm()
 */
 QXmppTask<Result<>> QXmppMucRoomV2::submitRegistration(const QXmppDataForm &form)
 {
-    return set(m_data->manager->client(), m_data->roomJid, MucRegisterQuery { .form = form });
+    return m_data->manager->client()->sendIq(Iq::Set<MucRegisterQuery> { .to = m_data->roomJid, .payload = MucRegisterQuery { .form = form } });
 }
 
 /*!
@@ -3099,7 +3099,7 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
         }
     }
 
-    auto result = co_await get<MucOwnerQuery>(m_data->manager->client(), m_data->roomJid, MucOwnerQuery {}).withContext(m_data->manager);
+    auto result = co_await m_data->manager->client()->sendIq(Iq::Get<MucOwnerQuery> { .to = m_data->roomJid }).withContext(m_data->manager);
     if (auto *e = std::get_if<QXmppError>(&result)) {
         co_return std::move(*e);
     }
@@ -3134,7 +3134,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
     form.setType(QXmppDataForm::Submit);
 
     const bool wasCreating = (m_data->state == Creating);
-    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .form = std::move(form) }).withContext(m_data->manager);
+    auto result = co_await m_data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = m_data->roomJid, .payload = MucOwnerQuery { .form = std::move(form) } }).withContext(m_data->manager);
     // Re-check the state: a disconnect during the await may have deactivated the room
     // (state reset to NotJoined), in which case we must not stomp it back to Joined.
     if (std::holds_alternative<Success>(result) && wasCreating && m_data->state == Creating) {
@@ -3173,7 +3173,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
     QXmppDataForm cancelForm;
     cancelForm.setType(QXmppDataForm::Cancel);
 
-    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .form = std::move(cancelForm) }).withContext(m_data->manager);
+    auto result = co_await m_data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = m_data->roomJid, .payload = MucOwnerQuery { .form = std::move(cancelForm) } }).withContext(m_data->manager);
     // Only tear down if still the creating session — a disconnect during the await may
     // have already deactivated (and a subsequent rejoin revived) the room.
     if (std::holds_alternative<Success>(result) && m_data->state == MucRoomState::Creating) {
@@ -3203,7 +3203,7 @@ QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QSt
     }
 
     m_data->destroying = true;
-    auto result = co_await set(m_data->manager->client(), m_data->roomJid, MucOwnerQuery { .destroy = MucOwnerDestroy { .alternateJid = alternateJid, .reason = reason } }).withContext(m_data->manager);
+    auto result = co_await m_data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = m_data->roomJid, .payload = MucOwnerQuery { .destroy = MucOwnerDestroy { .alternateJid = alternateJid, .reason = reason } } }).withContext(m_data->manager);
     m_data->destroying = false;
     // Only tear down if still joined — a disconnect during the await may have already
     // deactivated (and a subsequent rejoin revived) the room.

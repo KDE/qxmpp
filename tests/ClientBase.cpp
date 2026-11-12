@@ -60,7 +60,6 @@
 #include "QXmppXmlRegistry.h"
 
 #include "Algorithms.h"
-#include "IqSending.h"
 #include "StringLiterals.h"
 #include "TestClient.h"
 #include "util.h"
@@ -252,7 +251,7 @@ void tst_QXmppClient::testE2eeExtension()
     QVERIFY(!encrypter.iqCalled);
 
     auto createRequest = []() {
-        CompatIq iq { QXmppIq::Get, QXmppDiscoInfo {} };
+        QXmppVersionIq iq;
         iq.setTo(u"component.qxmpp.org"_s);
         return iq;
     };

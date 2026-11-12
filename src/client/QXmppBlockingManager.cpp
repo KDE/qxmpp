@@ -8,12 +8,12 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppIqStanza.h"
 #include "QXmppSpamReport.h"
 #include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
-#include "IqSending.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -265,16 +265,11 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
 
     // send IQ request, if this is the first request
     if (d->openFetchBlocklistPromises.size() == 1) {
-        auto iq = CompatIq {
-            Iq::Get<Blocking<List>> {
-                generateSequentialStanzaId(),
-            },
-        };
-        client()->sendIq(std::move(iq)).then(this, [this](QXmppClient::IqResult &&result) {
-            // parse into QXmppBlocklist/Error variant
+        client()->sendIq(Iq::Get<Blocking<List>> {}).then(this, [this](QXmpp::Result<Blocking<List>> &&result) {
+            // convert into QXmppBlocklist/Error variant
             auto blocklistResult = map<BlocklistResult>(
                 [](Blocking<List> &&list) { return QXmppBlocklist(list.jids); },
-                parseIqResponseFlat<Blocking<List>>(std::move(result)));
+                std::move(result));
 
             // store blocklist on success
             if (!d->blocklist) {
@@ -312,10 +307,7 @@ QXmppTask<QXmppBlockingManager::BlocklistResult> QXmppBlockingManager::fetchBloc
 */
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QList<QString> jids)
 {
-    return client()->sendGenericIq(CompatIq {
-        Iq::Set<Blocking<Block>> {
-            generateSequentialStanzaId(), {}, {}, {}, { std::move(jids) } },
-    });
+    return client()->sendIq(Iq::Set<Blocking<Block>> { .payload = { std::move(jids) } });
 }
 
 /*!
@@ -330,10 +322,7 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::block(QList<QStrin
 */
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::reportAndBlock(QString jid, QXmppSpamReport report)
 {
-    return client()->sendGenericIq(CompatIq {
-        Iq::Set<BlockReport> {
-            generateSequentialStanzaId(), {}, {}, {}, { std::move(jid), std::move(report) } },
-    });
+    return client()->sendIq(Iq::Set<BlockReport> { .payload = { std::move(jid), std::move(report) } });
 }
 
 /*!
@@ -351,10 +340,7 @@ QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::reportAndBlock(QSt
 */
 QXmppTask<QXmppBlockingManager::Result> QXmppBlockingManager::unblock(QList<QString> jids)
 {
-    return client()->sendGenericIq(CompatIq {
-        Iq::Set<Blocking<Unblock>> {
-            generateSequentialStanzaId(), {}, {}, {}, { std::move(jids) } },
-    });
+    return client()->sendIq(Iq::Set<Blocking<Unblock>> { .payload = { std::move(jids) } });
 }
 
 /*!

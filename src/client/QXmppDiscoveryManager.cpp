@@ -11,6 +11,7 @@
 #include "QXmppDiscoveryIq_p.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppIqStanza.h"
 #include "QXmppPresence.h"
 #include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
@@ -18,7 +19,6 @@
 
 #include "Algorithms.h"
 #include "Async.h"
-#include "IqSending.h"
 #include "StringLiterals.h"
 
 #include <QCoreApplication>
@@ -114,7 +114,7 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
         [this, entry](const auto &key) {
             auto &[jid, node, generation] = key;
             return chain<Result<QXmppDiscoInfo>>(
-                get<QXmppDiscoInfo>(client(), jid, QXmppDiscoInfo { node }),
+                client()->sendIq(Iq::Get<QXmppDiscoInfo> { .to = jid, .payload = QXmppDiscoInfo { node } }),
                 this,
                 [this, entry, generation](auto &&result) -> Result<QXmppDiscoInfo> {
                     // Only cache successful responses for now (permanent errors could also be
@@ -148,7 +148,7 @@ QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QStr
         [this](const auto &key) {
             auto &[jid, node] = key;
             return chain<Result<QList<QXmppDiscoItem>>>(
-                get<QXmppDiscoItems>(client(), jid, QXmppDiscoItems { node }),
+                client()->sendIq(Iq::Get<QXmppDiscoItems> { .to = jid, .payload = QXmppDiscoItems { node } }),
                 this,
                 [this, jid, node](auto &&result) -> Result<QList<QXmppDiscoItem>> {
                     if (auto *itemsPayload = std::get_if<QXmppDiscoItems>(&result)) {
@@ -1210,13 +1210,14 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::requestCapsInfo(
 {
     const auto node = caps.node + u'#' + QString::fromLatin1(caps.ver.toBase64());
     return chain<Result<QXmppDiscoInfo>>(
-        q->client()->sendIq(CompatIq { Iq::Get<QXmppDiscoInfo> { generateSequentialStanzaId(), {}, jid, {}, QXmppDiscoInfo { node } } }),
+        // the response element is needed for the verification of the caps
+        q->client()->sendIqStanza(Iq::Get<QXmppDiscoInfo> { .to = jid, .payload = QXmppDiscoInfo { node } }, {}),
         q,
         [this, jid, caps](QXmppClient::IqResult &&response) -> Result<QXmppDiscoInfo> {
             const auto key = capsKey(caps);
             const auto iqElement = std::holds_alternative<QDomElement>(response) ? std::get<QDomElement>(response) : QDomElement();
 
-            auto result = parseIqResponseFlat<QXmppDiscoInfo>(std::move(response));
+            auto result = parseIqResult<QXmppDiscoInfo>(std::move(response));
             if (!hasValue(result)) {
                 if (key) {
                     finishCapsRequest(*key, {});

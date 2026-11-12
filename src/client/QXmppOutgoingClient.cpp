@@ -8,6 +8,7 @@
 
 #include "QXmppAsync_p.h"
 #include "QXmppConstants_p.h"
+#include "QXmppIqStanza.h"
 #include "QXmppMessage.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppOutgoingClient_p.h"
@@ -18,7 +19,6 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
-#include "IqSending.h"
 #include "Stream.h"
 #include "StringLiterals.h"
 
@@ -1133,7 +1133,7 @@ HandleElementResult BindManager::handleElement(const QDomElement &el)
                     return ProtocolError { error.description };
                 },
             },
-            parseIqResponse<BindElement>(el)));
+            parseIqResult<BindElement>(el)));
         return Finished;
     }
     return Rejected;

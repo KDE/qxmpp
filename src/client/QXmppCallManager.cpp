@@ -14,6 +14,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppIqHandling.h"
+#include "QXmppIqStanza.h"
 #include "QXmppJingleIq.h"
 #include "QXmppRosterManager.h"
 #include "QXmppStanzaHandling_p.h"
@@ -24,7 +25,6 @@
 #include "Algorithms.h"
 #include "Async.h"
 #include "GstWrapper.h"
-#include "IqSending.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
@@ -67,18 +67,8 @@ QXmppTask<ServiceResult> QXmpp::Private::requestCredentials(QXmppClient *client,
     s.setHost(host);
     s.setType(type);
 
-    CompatIq iq { Iq::Get<ExtDiscoCredentials> {
-        generateSequentialStanzaId(),
-        {},
-        jid,
-        {},
-        { std::move(s) },
-    } };
-
-    return chain<ServiceResult>(client->sendIq(std::move(iq)), client, [](QXmppClient::IqResult result) {
-        return map<ServiceResult>(
-            [](ExtDiscoCredentials &&c) { return c.service; },
-            parseIqResponseFlat<ExtDiscoCredentials>(std::move(result)));
+    return chain<ServiceResult>(client->sendIq(Iq::Get<ExtDiscoCredentials> { .to = jid, .payload = { std::move(s) } }), client, [](Result<ExtDiscoCredentials> &&result) {
+        return map<ServiceResult>([](ExtDiscoCredentials &&c) { return c.service; }, std::move(result));
     });
 }
 

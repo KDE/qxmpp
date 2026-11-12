@@ -6,6 +6,7 @@
 #define QXMPP_PING_H
 
 #include "QXmppConstants_p.h"
+#include "QXmppIqStanza.h"
 #include "QXmppUtils.h"
 
 #include "XmlWriter.h"
@@ -35,5 +36,11 @@ struct Ping {
 };
 
 }  // namespace QXmpp::Private
+
+// the response to a ping is empty
+template<>
+struct QXmpp::Iq::ResponseTraits<QXmpp::Iq::Get<QXmpp::Private::Ping>> {
+    using Payload = void;
+};
 
 #endif  // QXMPP_PING_H
