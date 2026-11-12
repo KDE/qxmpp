@@ -29,6 +29,7 @@
 #include "QXmppUtils.h"
 
 #include "IntegrationTesting.h"
+#include "OmemoPayloadCipher.h"
 #include "OmemoSession.h"
 #include "StringLiterals.h"
 #include "util.h"
@@ -1313,6 +1314,176 @@ void tst_OmemoSession::callbacks()
 
 }  // namespace SessionLayerTests
 
-QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession)
+// ============================================================
+
+namespace PayloadCipherTests {
+
+using namespace QXmpp::Omemo::Private;
+namespace PC = QXmpp::Omemo::Private::PayloadCipher;
+
+// Test vectors created with pyca/cryptography.
+constexpr QByteArrayView plaintext = "Hello from an independent implementation!";
+constexpr auto omemo0Ciphertext = "520722c9b422de88f4537771e8ea428254ed089afccdb834804fd8facc9e929edf922645ff7148ffab";
+constexpr auto omemo0Tag = "d6b97de42d242fca2f10886719574267";
+// 16 byte IV (bytes 50 to 65), tag appended
+constexpr auto omemo0LegacyIvCiphertext = "66432903869a4d98de5c392750cd855cf55d6f9c6968d948011622f5143545dd95c3dfaf80a43ee56e4589e1e61e4f358108238dba71d6b9d4";
+constexpr auto omemo2Ciphertext = "087bc0697b25c1e372654e73642179b75bdb94f676a36a746002e39ac6f6c860bad0f90cff9e575264a2e380643ff713";
+constexpr auto omemo2Mac = "fa1c0336fc3db14eda70778fd87a96e6";
+
+static QByteArray range(int first, int count)
+{
+    QByteArray data(count, Qt::Uninitialized);
+    for (int i = 0; i < count; ++i) {
+        data[i] = char(first + i);
+    }
+    return data;
+}
+
+static SecureByteArray secure(const QByteArray &data)
+{
+    return SecureByteArray(data);
+}
+
+class tst_OmemoPayloadCipher : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void omemo0Vector();
+    Q_SLOT void omemo2Vector();
+    Q_SLOT void roundtrip_data();
+    Q_SLOT void roundtrip();
+    Q_SLOT void tampering_data();
+    Q_SLOT void tampering();
+    Q_SLOT void omemo0LegacyFormats();
+    Q_SLOT void invalidSizes();
+};
+
+void tst_OmemoPayloadCipher::omemo0Vector()
+{
+    const auto key = range(0, 16);
+    const auto iv = range(100, 12);
+
+    const auto encrypted = expectVariant<PC::Encrypted>(PC::encrypt(Version::Omemo0, plaintext.toByteArray(), secure(key), iv));
+    QCOMPARE(encrypted.ciphertext.toHex(), QByteArray(omemo0Ciphertext));
+    QCOMPARE(encrypted.keyMaterial.toByteArray().toHex(), QByteArray(key + QByteArray::fromHex(omemo0Tag)).toHex());
+    QCOMPARE(encrypted.iv, iv);
+
+    const auto decrypted = expectVariant<QByteArray>(PC::decrypt(Version::Omemo0, encrypted.keyMaterial, iv, QByteArray::fromHex(omemo0Ciphertext)));
+    QCOMPARE(decrypted, plaintext.toByteArray());
+}
+
+void tst_OmemoPayloadCipher::omemo2Vector()
+{
+    const auto key = range(32, 32);
+
+    const auto encrypted = expectVariant<PC::Encrypted>(PC::encrypt(Version::Omemo2, plaintext.toByteArray(), secure(key), {}));
+    QCOMPARE(encrypted.ciphertext.toHex(), QByteArray(omemo2Ciphertext));
+    QCOMPARE(encrypted.keyMaterial.toByteArray().toHex(), QByteArray(key + QByteArray::fromHex(omemo2Mac)).toHex());
+    QVERIFY(encrypted.iv.isEmpty());
+
+    const auto decrypted = expectVariant<QByteArray>(PC::decrypt(Version::Omemo2, encrypted.keyMaterial, {}, QByteArray::fromHex(omemo2Ciphertext)));
+    QCOMPARE(decrypted, plaintext.toByteArray());
+}
+
+void tst_OmemoPayloadCipher::roundtrip_data()
+{
+    QTest::addColumn<Version>("version");
+    QTest::addColumn<QByteArray>("plaintext");
+    QTest::addColumn<int>("keyMaterialSize");
+
+    for (const auto &[name, version, size] : { std::tuple { "omemo0", Version::Omemo0, 32 }, std::tuple { "omemo2", Version::Omemo2, 48 } }) {
+        QTest::addRow("%s-empty", name) << version << QByteArray() << size;
+        QTest::addRow("%s-block", name) << version << QByteArray(16, 'a') << size;
+        QTest::addRow("%s-long", name) << version << QByteArray(1000, 'b') << size;
+    }
+}
+
+void tst_OmemoPayloadCipher::roundtrip()
+{
+    QFETCH(Version, version);
+    QFETCH(QByteArray, plaintext);
+    QFETCH(int, keyMaterialSize);
+
+    const auto encrypted = expectVariant<PC::Encrypted>(PC::encrypt(version, plaintext));
+    QCOMPARE(encrypted.keyMaterial.size(), keyMaterialSize);
+    QCOMPARE(encrypted.iv.size(), version == Version::Omemo0 ? 12 : 0);
+    QCOMPARE(expectVariant<QByteArray>(PC::decrypt(version, encrypted.keyMaterial, encrypted.iv, encrypted.ciphertext)), plaintext);
+
+    // random keys
+    const auto other = expectVariant<PC::Encrypted>(PC::encrypt(version, plaintext));
+    QVERIFY(other.keyMaterial != encrypted.keyMaterial);
+}
+
+void tst_OmemoPayloadCipher::tampering_data()
+{
+    QTest::addColumn<Version>("version");
+    QTest::addColumn<QString>("part");
+
+    for (const auto &[name, version] : { std::pair { "omemo0", Version::Omemo0 }, std::pair { "omemo2", Version::Omemo2 } }) {
+        QTest::addRow("%s-ciphertext", name) << version << u"ciphertext"_s;
+        QTest::addRow("%s-key", name) << version << u"key"_s;
+        QTest::addRow("%s-tag", name) << version << u"tag"_s;
+        QTest::addRow("%s-truncated", name) << version << u"truncated"_s;
+    }
+    QTest::addRow("omemo0-iv") << Version::Omemo0 << u"iv"_s;
+}
+
+void tst_OmemoPayloadCipher::tampering()
+{
+    QFETCH(Version, version);
+    QFETCH(QString, part);
+
+    const auto encrypted = expectVariant<PC::Encrypted>(PC::encrypt(version, QByteArray(40, 'x')));
+    auto keyMaterial = encrypted.keyMaterial.toByteArray();
+    auto iv = encrypted.iv;
+    auto ciphertext = encrypted.ciphertext;
+
+    if (part == u"ciphertext") {
+        ciphertext[5] = char(ciphertext.at(5) ^ 0x01);
+    } else if (part == u"key") {
+        keyMaterial[0] = char(keyMaterial.at(0) ^ 0x01);
+    } else if (part == u"tag") {
+        keyMaterial[keyMaterial.size() - 1] = char(keyMaterial.back() ^ 0x01);
+    } else if (part == u"truncated") {
+        ciphertext.chop(1);
+    } else if (part == u"iv") {
+        iv[0] = char(iv.at(0) ^ 0x01);
+    }
+
+    expectVariant<QXmppError>(PC::decrypt(version, secure(keyMaterial), iv, ciphertext));
+}
+
+void tst_OmemoPayloadCipher::omemo0LegacyFormats()
+{
+    const auto key = range(0, 16);
+
+    // tag appended to the ciphertext, only the key as key material
+    const auto withTag = QByteArray::fromHex(omemo0Ciphertext) + QByteArray::fromHex(omemo0Tag);
+    QCOMPARE(expectVariant<QByteArray>(PC::decrypt(Version::Omemo0, secure(key), range(100, 12), withTag)), plaintext.toByteArray());
+
+    // 16 byte IV
+    QCOMPARE(expectVariant<QByteArray>(PC::decrypt(Version::Omemo0, secure(key), range(50, 16), QByteArray::fromHex(omemo0LegacyIvCiphertext))), plaintext.toByteArray());
+}
+
+void tst_OmemoPayloadCipher::invalidSizes()
+{
+    const auto data = QByteArray(32, 'x');
+
+    expectVariant<QXmppError>(PC::encrypt(Version::Omemo0, data, secure(range(0, 32)), range(0, 12)));
+    expectVariant<QXmppError>(PC::encrypt(Version::Omemo0, data, secure(range(0, 16)), range(0, 16)));
+    expectVariant<QXmppError>(PC::encrypt(Version::Omemo2, data, secure(range(0, 16)), {}));
+    expectVariant<QXmppError>(PC::encrypt(Version::Omemo2, data, secure(range(0, 32)), range(0, 16)));
+
+    expectVariant<QXmppError>(PC::decrypt(Version::Omemo0, secure(range(0, 24)), range(0, 12), data));
+    expectVariant<QXmppError>(PC::decrypt(Version::Omemo0, secure(range(0, 32)), range(0, 8), data));
+    expectVariant<QXmppError>(PC::decrypt(Version::Omemo0, secure(range(0, 16)), range(0, 12), range(0, 8)));
+    expectVariant<QXmppError>(PC::decrypt(Version::Omemo2, secure(range(0, 32)), {}, data));
+    expectVariant<QXmppError>(PC::decrypt(Version::Omemo2, SecureByteArray(), {}, data));
+}
+
+}  // namespace PayloadCipherTests
+
+QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher)
 
 #include "OmemoManager.moc"
