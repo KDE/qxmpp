@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022 Melvin Keskin <melvo@olomono.de>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -78,4 +79,17 @@
     \fn QXmppOmemoStorage::resetAll()
 
     Resets all data.
+*/
+
+/*!
+    \class QXmpp::OmemoStorage
+    \inmodule QXmpp
+
+    \brief The OmemoStorage class stores the data of the \xep{0384}{OMEMO Encryption} manager for all
+    supported versions.
+
+    The identity key and the signed pre keys are shared by all versions. Pre keys and devices are
+    stored per version.
+
+    \since QXmpp 1.18
 */

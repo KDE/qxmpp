@@ -1,10 +1,13 @@
 // SPDX-FileCopyrightText: 2022 Melvin Keskin <melvo@olomono.de>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppOmemoMemoryStorage.h"
 
 #include "Async.h"
+
+#include <map>
 
 using namespace QXmpp::Private;
 
@@ -112,3 +115,115 @@ QXmppTask<void> QXmppOmemoMemoryStorage::resetAll()
     d.reset(new QXmppOmemoMemoryStoragePrivate());
     co_return;
 }
+
+namespace QXmpp::Omemo::Private {
+
+struct OmemoMemoryStoragePrivate {
+    struct DeviceKey {
+        Version version;
+        QString jid;
+        uint32_t id;
+
+        auto operator<=>(const DeviceKey &) const = default;
+    };
+
+    std::optional<OmemoStorage::OwnDevice> ownDevice;
+    QMap<uint32_t, OmemoStorage::SignedPreKey> signedPreKeys;
+    QMap<std::pair<Version, uint32_t>, QByteArray> preKeys;
+    std::map<DeviceKey, OmemoStorage::Device> devices;
+};
+
+}  // namespace QXmpp::Omemo::Private
+
+using namespace QXmpp::Omemo;
+
+namespace QXmpp {
+
+/*!
+    \class QXmpp::OmemoMemoryStorage
+    \inmodule QXmpp
+
+    \brief The OmemoMemoryStorage class stores the data of the \xep{0384}{OMEMO Encryption} manager in
+    the memory.
+
+    \since QXmpp 1.18
+*/
+
+OmemoMemoryStorage::OmemoMemoryStorage()
+    : d(std::make_unique<Omemo::Private::OmemoMemoryStoragePrivate>())
+{
+}
+
+OmemoMemoryStorage::~OmemoMemoryStorage() = default;
+
+QXmppTask<OmemoStorage::Data> OmemoMemoryStorage::allData()
+{
+    Data data;
+    data.ownDevice = d->ownDevice;
+    data.signedPreKeys = d->signedPreKeys.values();
+    for (auto it = d->preKeys.cbegin(); it != d->preKeys.cend(); ++it) {
+        data.preKeys.append({ it.key().first, it.key().second, it.value() });
+    }
+    for (const auto &[key, device] : d->devices) {
+        data.devices.append(device);
+    }
+    return makeReadyTask(std::move(data));
+}
+
+QXmppTask<void> OmemoMemoryStorage::setOwnDevice(const std::optional<OwnDevice> &device)
+{
+    d->ownDevice = device;
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::addSignedPreKey(const SignedPreKey &key)
+{
+    d->signedPreKeys.insert(key.id, key);
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::removeSignedPreKey(uint32_t id)
+{
+    d->signedPreKeys.remove(id);
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::addPreKeys(const QList<PreKey> &keys)
+{
+    for (const auto &key : keys) {
+        d->preKeys.insert({ key.version, key.id }, key.data);
+    }
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::removePreKey(Version version, uint32_t id)
+{
+    d->preKeys.remove({ version, id });
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::addDevice(const Device &device)
+{
+    d->devices.insert_or_assign({ device.version, device.jid, device.id }, device);
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::removeDevice(Version version, const QString &jid, uint32_t id)
+{
+    d->devices.erase({ version, jid, id });
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::removeDevices(const QString &jid)
+{
+    std::erase_if(d->devices, [&](const auto &entry) { return entry.first.jid == jid; });
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::resetAll()
+{
+    *d = {};
+    return makeReadyTask();
+}
+
+}  // namespace QXmpp

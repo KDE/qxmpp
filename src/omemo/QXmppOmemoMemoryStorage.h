@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022 Melvin Keskin <melvo@olomono.de>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -38,5 +39,34 @@ public:
 private:
     std::unique_ptr<QXmppOmemoMemoryStoragePrivate> d;
 };
+
+namespace QXmpp::Omemo::Private {
+struct OmemoMemoryStoragePrivate;
+}
+
+namespace QXmpp {
+
+class QXMPPOMEMO_EXPORT OmemoMemoryStorage : public OmemoStorage
+{
+public:
+    OmemoMemoryStorage();
+    ~OmemoMemoryStorage() override;
+
+    QXmppTask<Data> allData() override;
+    QXmppTask<void> setOwnDevice(const std::optional<OwnDevice> &device) override;
+    QXmppTask<void> addSignedPreKey(const SignedPreKey &key) override;
+    QXmppTask<void> removeSignedPreKey(uint32_t id) override;
+    QXmppTask<void> addPreKeys(const QList<PreKey> &keys) override;
+    QXmppTask<void> removePreKey(Omemo::Version version, uint32_t id) override;
+    QXmppTask<void> addDevice(const Device &device) override;
+    QXmppTask<void> removeDevice(Omemo::Version version, const QString &jid, uint32_t id) override;
+    QXmppTask<void> removeDevices(const QString &jid) override;
+    QXmppTask<void> resetAll() override;
+
+private:
+    std::unique_ptr<Omemo::Private::OmemoMemoryStoragePrivate> d;
+};
+
+}  // namespace QXmpp
 
 #endif  // QXMPPOMEMOMEMORYSTORAGE_H
