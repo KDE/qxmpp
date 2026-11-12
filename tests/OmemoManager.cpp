@@ -29,6 +29,7 @@
 #include "QXmppUtils.h"
 
 #include "IntegrationTesting.h"
+#include "OmemoKeyMaintenance.h"
 #include "OmemoPayloadCipher.h"
 #include "OmemoSession.h"
 #include "StringLiterals.h"
@@ -38,6 +39,7 @@
 #include <QDeadlineTimer>
 #include <QObject>
 #include <QScopeGuard>
+#include <QSet>
 #include <QSignalSpy>
 #include <QTest>
 
@@ -1489,6 +1491,241 @@ void tst_OmemoPayloadCipher::invalidSizes()
 
 }  // namespace PayloadCipherTests
 
-QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher)
+// ============================================================
+
+namespace KeyMaintenanceTests {
+
+// also declared by the managers
+using QXmpp::Omemo::Private::DecryptedKey;
+using QXmpp::Omemo::Private::KeyMaintenance::PRE_KEY_ID_MAX;
+
+using namespace QXmpp;
+using namespace QXmpp::Omemo::Private;
+using namespace QXmpp::Omemo::Private::KeyMaintenance;
+using namespace std::chrono_literals;
+
+static const auto start = QDateTime(QDate(2026, 1, 1), QTime(12, 0), QTimeZone::UTC);
+constexpr auto week = 24h * 7;
+
+static QDateTime after(std::chrono::seconds duration)
+{
+    return start.addSecs(duration.count());
+}
+
+class tst_OmemoKeyMaintenance : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void initTestCase();
+    Q_SLOT void keyIds();
+    Q_SLOT void initialSignedPreKey();
+    Q_SLOT void signedPreKeyRotation();
+    Q_SLOT void signedPreKeyIdWrap();
+    Q_SLOT void graceAllowsPendingKeyExchanges();
+    Q_SLOT void preKeyRefill();
+    Q_SLOT void preKeyIdWrap();
+
+    DeviceKeys createDevice() const;
+
+    std::unique_ptr<SignalContext> m_context;
+};
+
+void tst_OmemoKeyMaintenance::initTestCase()
+{
+    m_context = std::make_unique<SignalContext>();
+    QVERIFY(m_context->isValid());
+}
+
+DeviceKeys tst_OmemoKeyMaintenance::createDevice() const
+{
+    DeviceKeys device;
+    device.deviceId = 1234;
+    device.identity = *m_context->generateIdentityKeyPair();
+    return device;
+}
+
+void tst_OmemoKeyMaintenance::keyIds()
+{
+    const QSet<uint32_t> none;
+    QCOMPARE(nextKeyId(0, none), 1u);
+    QCOMPARE(nextKeyId(5, none), 6u);
+    QCOMPARE(nextKeyId(KEY_ID_MAX, none), 1u);
+    QCOMPARE(nextKeyId(KEY_ID_MAX + 10u, none), 1u);
+
+    const QSet<uint32_t> used { 1, 2, 6 };
+    QCOMPARE(nextKeyId(5, used), 7u);
+    QCOMPARE(nextKeyId(KEY_ID_MAX, used), 3u);
+    QCOMPARE(nextKeyId(KEY_ID_MAX - 1, QSet<uint32_t> { KEY_ID_MAX }), 1u);
+}
+
+void tst_OmemoKeyMaintenance::initialSignedPreKey()
+{
+    auto device = createDevice();
+    QVERIFY(!nextSignedPreKeyCheck(device).isValid());
+
+    const auto changes = expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, start));
+    QCOMPARE(changes.addedId, std::optional<uint32_t>(1));
+    QVERIFY(changes.removedIds.isEmpty());
+    QCOMPARE(device.latestSignedPreKeyId, 1u);
+    QCOMPARE(device.signedPreKeys.value(1).creationDate, start);
+    QVERIFY(!device.signedPreKeys.value(1).record.isEmpty());
+    QCOMPARE(nextSignedPreKeyCheck(device), after(4 * week));
+
+    // usable for both versions
+    VersionKeys keys;
+    keys.preKeys = m_context->generatePreKeys(1, 1);
+    for (const auto version : { Version::Omemo0, Version::Omemo2 }) {
+        SessionLayer layer(*m_context, version, device, keys);
+        expectVariant<Bundle>(layer.ownBundle(1, 1));
+    }
+
+    // invalid identity
+    DeviceKeys invalid;
+    expectVariant<QXmppError>(rotateSignedPreKey(*m_context, invalid, start));
+    QVERIFY(invalid.signedPreKeys.isEmpty());
+}
+
+void tst_OmemoKeyMaintenance::signedPreKeyRotation()
+{
+    auto device = createDevice();
+    expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, start));
+
+    // nothing to do before the renewal interval
+    QVERIFY(expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, after(4 * week - 1s))).isEmpty());
+
+    // a new key, the previous one stays for the grace period
+    auto changes = expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, after(4 * week)));
+    QCOMPARE(changes.addedId, std::optional<uint32_t>(2));
+    QVERIFY(changes.removedIds.isEmpty());
+    QCOMPARE(device.latestSignedPreKeyId, 2u);
+    QCOMPARE(device.signedPreKeys.keys().size(), 2);
+    QCOMPARE(nextSignedPreKeyCheck(device), after(8 * week));
+
+    QVERIFY(expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, after(8 * week - 1s))).isEmpty());
+
+    // The renewal of key 2 and the removal of key 1 are due at the same time; key 2 stays.
+    changes = expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, after(8 * week)));
+    QCOMPARE(changes.addedId, std::optional<uint32_t>(3));
+    QCOMPARE(changes.removedIds, QList<uint32_t> { 1 });
+    QVERIFY(device.signedPreKeys.contains(2));
+    QVERIFY(device.signedPreKeys.contains(3));
+
+    // with a shorter grace period, the removal is due before the renewal
+    const Config config { .signedPreKeyGracePeriod = 1 * week };
+    QCOMPARE(nextSignedPreKeyCheck(device, config), after(9 * week));
+    changes = expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, after(9 * week), config));
+    QCOMPARE(changes.addedId, std::nullopt);
+    QCOMPARE(changes.removedIds, QList<uint32_t> { 2 });
+    QCOMPARE(device.signedPreKeys.keys(), QList<uint32_t> { 3 });
+    QCOMPARE(nextSignedPreKeyCheck(device, config), after(12 * week));
+
+    // after a long time offline, the old key is replaced, but kept for the grace period
+    changes = expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, after(52 * week)));
+    QCOMPARE(changes.addedId, std::optional<uint32_t>(4));
+    QVERIFY(changes.removedIds.isEmpty());
+    QCOMPARE(device.signedPreKeys.size(), 2);
+}
+
+void tst_OmemoKeyMaintenance::signedPreKeyIdWrap()
+{
+    // Older versions reused ID 1 after the maximum ID and overwrote that key.
+    auto device = createDevice();
+    device.latestSignedPreKeyId = KEY_ID_MAX;
+    device.signedPreKeys.insert(KEY_ID_MAX, { *m_context->generateSignedPreKey(device.identity, KEY_ID_MAX, 0), start });
+    device.signedPreKeys.insert(1, { *m_context->generateSignedPreKey(device.identity, 1, 0), start.addSecs(-1) });
+    const auto key1 = device.signedPreKeys.value(1).record;
+
+    const auto changes = expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, after(4 * week)));
+    QCOMPARE(changes.addedId, std::optional<uint32_t>(2));
+    QVERIFY(device.signedPreKeys.value(2).record != key1);
+    // key 1 was replaced by the key with the maximum ID four weeks ago
+    QCOMPARE(changes.removedIds, QList<uint32_t> { 1 });
+}
+
+void tst_OmemoKeyMaintenance::graceAllowsPendingKeyExchanges()
+{
+    // Alice uses Bob's bundle with the old signed pre key while Bob rotates it.
+    auto bobDevice = createDevice();
+    VersionKeys bobKeys;
+    expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, bobDevice, start));
+    expectVariant<QList<uint32_t>>(refillPreKeys(*m_context, bobKeys));
+    SessionLayer bob(*m_context, Version::Omemo2, bobDevice, bobKeys);
+    const auto oldBundle = expectVariant<Bundle>(bob.ownBundle(1, 1));
+
+    auto aliceDevice = createDevice();
+    aliceDevice.deviceId = 5678;
+    VersionKeys aliceKeys;
+    SessionLayer alice(*m_context, Version::Omemo2, aliceDevice, aliceKeys);
+    const Address aliceAddress { u"alice@example.org"_s, aliceDevice.deviceId };
+    const Address bobAddress { u"bob@example.org"_s, bobDevice.deviceId };
+
+    expectVariant<Success>(alice.buildSession(bobAddress, oldBundle));
+    const auto pending = expectVariant<EncryptedKey>(alice.encrypt(bobAddress, SecureByteArray(QByteArray("pending"))));
+
+    expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, bobDevice, after(4 * week)));
+    QCOMPARE(bobDevice.latestSignedPreKeyId, 2u);
+    QCOMPARE(expectVariant<DecryptedKey>(bob.decrypt(aliceAddress, pending.data, true)).data, SecureByteArray(QByteArray("pending")));
+
+    // After the grace period, key exchanges with the old bundle fail.
+    const auto changes = expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, bobDevice, after(8 * week - 1s)));
+    QVERIFY(changes.isEmpty());
+    expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, bobDevice, after(8 * week)));
+    QVERIFY(!bobDevice.signedPreKeys.contains(1));
+
+    auto carolDevice = createDevice();
+    carolDevice.deviceId = 9012;
+    VersionKeys carolKeys;
+    SessionLayer carol(*m_context, Version::Omemo2, carolDevice, carolKeys);
+    expectVariant<Success>(carol.buildSession(bobAddress, oldBundle));
+    const auto late = expectVariant<EncryptedKey>(carol.encrypt(bobAddress, SecureByteArray(QByteArray("late"))));
+    expectVariant<QXmppError>(bob.decrypt({ u"carol@example.org"_s, carolDevice.deviceId }, late.data, true));
+}
+
+void tst_OmemoKeyMaintenance::preKeyRefill()
+{
+    VersionKeys keys;
+    auto added = expectVariant<QList<uint32_t>>(refillPreKeys(*m_context, keys));
+    QCOMPARE(added.size(), 100);
+    QCOMPARE(added.first(), 1u);
+    QCOMPARE(added.last(), 100u);
+    QCOMPARE(keys.preKeys.size(), 100);
+    QCOMPARE(keys.latestPreKeyId, 100u);
+
+    QVERIFY(expectVariant<QList<uint32_t>>(refillPreKeys(*m_context, keys)).isEmpty());
+
+    // consumed keys are replaced with new IDs
+    keys.preKeys.remove(3);
+    keys.preKeys.remove(50);
+    added = expectVariant<QList<uint32_t>>(refillPreKeys(*m_context, keys));
+    QCOMPARE(added, (QList<uint32_t> { 101, 102 }));
+    QVERIFY(!keys.preKeys.contains(3));
+
+    // the keys are distinct and usable
+    DeviceKeys device = createDevice();
+    expectVariant<SignedPreKeyChanges>(rotateSignedPreKey(*m_context, device, start));
+    SessionLayer layer(*m_context, Version::Omemo0, device, keys);
+    const auto publicKeys = expectVariant<QHash<uint32_t, QByteArray>>(layer.publicPreKeys());
+    QCOMPARE(publicKeys.size(), 100);
+    QCOMPARE(QSet<QByteArray>(publicKeys.cbegin(), publicKeys.cend()).size(), 100);
+}
+
+void tst_OmemoKeyMaintenance::preKeyIdWrap()
+{
+    VersionKeys keys;
+    keys.preKeys = m_context->generatePreKeys(PRE_KEY_ID_MAX - 1, 1);
+    keys.preKeys.insert(2, m_context->generatePreKeys(2, 1).value(2));
+    keys.latestPreKeyId = PRE_KEY_ID_MAX - 1;
+    const auto key2 = keys.preKeys.value(2);
+
+    const auto added = expectVariant<QList<uint32_t>>(refillPreKeys(*m_context, keys, Config { .preKeyCount = 5 }));
+    QCOMPARE(added, (QList<uint32_t> { PRE_KEY_ID_MAX, 1, 3 }));
+    QCOMPARE(keys.preKeys.value(2), key2);
+    QCOMPARE(keys.latestPreKeyId, 3u);
+}
+
+}  // namespace KeyMaintenanceTests
+
+QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance)
 
 #include "OmemoManager.moc"
