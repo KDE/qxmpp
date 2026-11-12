@@ -29,6 +29,7 @@
 #include "QXmppUtils.h"
 
 #include "IntegrationTesting.h"
+#include "OmemoDeviceList.h"
 #include "OmemoKeyMaintenance.h"
 #include "OmemoPayloadCipher.h"
 #include "OmemoSession.h"
@@ -1726,6 +1727,185 @@ void tst_OmemoKeyMaintenance::preKeyIdWrap()
 
 }  // namespace KeyMaintenanceTests
 
-QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance)
+// ============================================================
+
+namespace DeviceListTests {
+
+using namespace QXmpp::Omemo::Private;
+using namespace QXmpp::Omemo::Private::DeviceList;
+using namespace std::chrono_literals;
+
+using Ids = QList<uint32_t>;
+using Devices = QHash<uint32_t, DeviceInfo>;
+
+static const auto start = QDateTime(QDate(2026, 1, 1), QTime(12, 0), QTimeZone::UTC);
+constexpr auto week = 24h * 7;
+
+static QDateTime after(std::chrono::seconds duration)
+{
+    return start.addSecs(duration.count());
+}
+
+class tst_OmemoDeviceList : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void addAndChange();
+    Q_SLOT void removalAndReturn();
+    Q_SLOT void removalDateNotRefreshed();
+    Q_SLOT void invalidEntries();
+    Q_SLOT void maximum();
+    Q_SLOT void ownList_data();
+    Q_SLOT void ownList();
+    Q_SLOT void clearList();
+    Q_SLOT void expiry();
+    Q_SLOT void listToPublish();
+};
+
+void tst_OmemoDeviceList::addAndChange()
+{
+    Devices devices;
+    auto changes = apply(devices, { { 1, u"Phone"_s }, { 2, {} } }, start, 10);
+    QCOMPARE(changes.added, (Ids { 1, 2 }));
+    QVERIFY(changes.changed.isEmpty());
+    QVERIFY(changes.removed.isEmpty());
+    QVERIFY(!changes.republishOwnList);
+    QCOMPARE(devices.value(1), (DeviceInfo { u"Phone"_s, {} }));
+    QCOMPARE(devices.value(2), (DeviceInfo {}));
+
+    // same list
+    QVERIFY(apply(devices, { { 2, {} }, { 1, u"Phone"_s } }, start, 10).isEmpty());
+
+    // new label
+    changes = apply(devices, { { 1, u"Laptop"_s }, { 2, {} } }, start, 10);
+    QCOMPARE(changes.changed, Ids { 1 });
+    QCOMPARE(devices.value(1).label, u"Laptop"_s);
+}
+
+void tst_OmemoDeviceList::removalAndReturn()
+{
+    Devices devices;
+    apply(devices, { { 1, {} }, { 2, {} } }, start, 10);
+
+    auto changes = apply(devices, { { 2, {} } }, after(1 * week), 10);
+    QCOMPARE(changes.removed, Ids { 1 });
+    QCOMPARE(devices.value(1).removalDate, after(1 * week));
+    QVERIFY(devices.contains(1));
+
+    // listed again
+    changes = apply(devices, { { 1, {} }, { 2, {} } }, after(2 * week), 10);
+    QCOMPARE(changes.changed, Ids { 1 });
+    QVERIFY(!devices.value(1).removalDate.isValid());
+}
+
+void tst_OmemoDeviceList::removalDateNotRefreshed()
+{
+    // Older versions set the removal date again with every update of the list, so devices of
+    // users with frequently changing lists were never removed.
+    Devices devices;
+    apply(devices, { { 1, {} }, { 2, {} } }, start, 10);
+    apply(devices, { { 2, {} } }, after(1 * week), 10);
+
+    const auto changes = apply(devices, { { 2, {} }, { 3, {} } }, after(5 * week), 10);
+    QVERIFY(changes.removed.isEmpty());
+    QCOMPARE(devices.value(1).removalDate, after(1 * week));
+    QCOMPARE(expired(devices, after(13 * week)), Ids { 1 });
+}
+
+void tst_OmemoDeviceList::invalidEntries()
+{
+    Devices devices;
+    const auto changes = apply(devices, { { 0, {} }, { 1, u"first"_s }, { 1, u"second"_s } }, start, 10);
+    QCOMPARE(changes.added, Ids { 1 });
+    QCOMPARE(devices.size(), 1);
+    QCOMPARE(devices.value(1).label, u"first"_s);
+    QVERIFY(!changes.republishOwnList);
+}
+
+void tst_OmemoDeviceList::maximum()
+{
+    Devices devices;
+    const auto changes = apply(devices, { { 5, {} }, { 4, {} }, { 3, {} }, { 2, {} } }, start, 2);
+    QCOMPARE(changes.added, (Ids { 4, 5 }));
+    QCOMPARE(changes.ignoredCount, 2);
+    QCOMPARE(devices.size(), 2);
+
+    // known devices beyond the maximum are treated as removed
+    Devices known;
+    apply(known, { { 1, {} }, { 2, {} }, { 3, {} } }, start, 10);
+    QCOMPARE(apply(known, { { 1, {} }, { 2, {} }, { 3, {} } }, start, 2).removed, Ids { 3 });
+}
+
+void tst_OmemoDeviceList::ownList_data()
+{
+    QTest::addColumn<QList<Entry>>("list");
+    QTest::addColumn<std::optional<QString>>("ownLabel");
+    QTest::addColumn<bool>("republish");
+
+    const auto own = Entry { 7, u"This"_s };
+    QTest::newRow("correct") << QList<Entry> { { 1, {} }, own } << std::optional<QString>(u"This"_s) << false;
+    QTest::newRow("missing") << QList<Entry> { { 1, {} } } << std::optional<QString>(u"This"_s) << true;
+    QTest::newRow("empty") << QList<Entry> {} << std::optional<QString>(u"This"_s) << true;
+    QTest::newRow("wrong-label") << QList<Entry> { { 7, u"Other"_s } } << std::optional<QString>(u"This"_s) << true;
+    QTest::newRow("duplicate") << QList<Entry> { own, { 1, {} }, { 1, {} } } << std::optional<QString>(u"This"_s) << true;
+    QTest::newRow("duplicate-own") << QList<Entry> { own, own } << std::optional<QString>(u"This"_s) << true;
+    QTest::newRow("omemo0-label-ignored") << QList<Entry> { { 7, {} } } << std::optional<QString>() << false;
+}
+
+void tst_OmemoDeviceList::ownList()
+{
+    QFETCH(QList<Entry>, list);
+    QFETCH(std::optional<QString>, ownLabel);
+    QFETCH(bool, republish);
+
+    Devices devices;
+    const auto changes = apply(devices, list, start, 10, OwnDevice { 7, ownLabel });
+    QCOMPARE(changes.republishOwnList, republish);
+    QVERIFY(!devices.contains(7));
+}
+
+void tst_OmemoDeviceList::clearList()
+{
+    Devices devices;
+    apply(devices, { { 1, {} }, { 2, {} } }, start, 10);
+    apply(devices, { { 2, {} } }, after(1 * week), 10);
+
+    const auto changes = clear(devices, after(2 * week));
+    QCOMPARE(changes.removed, Ids { 2 });
+    QCOMPARE(devices.value(1).removalDate, after(1 * week));
+    QCOMPARE(devices.value(2).removalDate, after(2 * week));
+}
+
+void tst_OmemoDeviceList::expiry()
+{
+    Devices devices;
+    QVERIFY(!nextExpiry(devices).isValid());
+
+    apply(devices, { { 1, {} }, { 2, {} }, { 3, {} } }, start, 10);
+    apply(devices, { { 2, {} }, { 3, {} } }, after(1 * week), 10);
+    apply(devices, { { 3, {} } }, after(2 * week), 10);
+
+    QCOMPARE(nextExpiry(devices), after(13 * week));
+    QVERIFY(expired(devices, after(13 * week - 1s)).isEmpty());
+    QCOMPARE(expired(devices, after(13 * week)), Ids { 1 });
+    QCOMPARE(expired(devices, after(14 * week)), (Ids { 1, 2 }));
+    QCOMPARE(expired(devices, after(2 * week), 1 * week), Ids { 1 });
+}
+
+void tst_OmemoDeviceList::listToPublish()
+{
+    Devices devices;
+    apply(devices, { { 9, u"Tablet"_s }, { 3, u"Laptop"_s }, { 4, {} } }, start, 10, OwnDevice { 7, u"Phone"_s });
+    apply(devices, { { 9, u"Tablet"_s }, { 3, u"Laptop"_s } }, after(1 * week), 10, OwnDevice { 7, u"Phone"_s });
+
+    QCOMPARE(DeviceList::ownList(devices, OwnDevice { 7, u"Phone"_s }),
+             (QList<Entry> { { 7, u"Phone"_s }, { 3, u"Laptop"_s }, { 9, u"Tablet"_s } }));
+    QCOMPARE(DeviceList::ownList({}, OwnDevice { 7, std::nullopt }), (QList<Entry> { { 7, {} } }));
+}
+
+}  // namespace DeviceListTests
+
+QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList)
 
 #include "OmemoManager.moc"
