@@ -9,6 +9,7 @@
 #include <session_builder.h>
 #include <session_cipher.h>
 #include <signal_protocol.h>
+#include <utility>
 
 #include <QByteArray>
 
@@ -21,6 +22,7 @@ class OmemoLibPtr
 public:
     OmemoLibPtr(T *ptr = nullptr) : m_ptr(ptr) { }
     OmemoLibPtr(const OmemoLibPtr &) = delete;
+    OmemoLibPtr(OmemoLibPtr &&other) noexcept : m_ptr(std::exchange(other.m_ptr, nullptr)) { }
     ~OmemoLibPtr()
     {
         if (m_ptr) {
@@ -28,6 +30,11 @@ public:
         }
     }
     OmemoLibPtr &operator=(const OmemoLibPtr &) = delete;
+    OmemoLibPtr &operator=(OmemoLibPtr &&other) noexcept
+    {
+        reset(std::exchange(other.m_ptr, nullptr));
+        return *this;
+    }
     OmemoLibPtr<T, destruct> &operator=(T *ptr)
     {
         reset(ptr);
