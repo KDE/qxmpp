@@ -140,11 +140,16 @@ public:
     // public pre keys in the format of the version
     std::variant<QHash<uint32_t, QByteArray>, QXmppError> publicPreKeys() const;
 
+    // Whether the signed pre key (in the format of the version) has been signed with the identity
+    // key, as checked when building a session. A bundle with an invalid signature can not be used.
+    bool isSignedPreKeyValid(const QByteArray &identityKey, const QByteArray &signedPreKey, const QByteArray &signature) const;
     std::variant<QXmpp::Success, QXmppError> buildSession(const Address &address, const Bundle &bundle);
     bool hasSession(const Address &address) const;
 
     std::variant<EncryptedKey, QXmppError> encrypt(const Address &address, const SecureByteArray &key);
-    std::variant<DecryptedKey, QXmppError> decrypt(const Address &address, const QByteArray &data, bool isKeyExchange);
+    // A key exchange with another identity key than expectedIdentityKey (in the format of the
+    // version, if set) is rejected without changing the session.
+    std::variant<DecryptedKey, QXmppError> decrypt(const Address &address, const QByteArray &data, bool isKeyExchange, const QByteArray &expectedIdentityKey = {});
 
 private:
     friend struct StoreCallbacks;

@@ -498,6 +498,18 @@ std::variant<QHash<uint32_t, QByteArray>, QXmppError> SessionLayer::publicPreKey
     return keys;
 }
 
+bool SessionLayer::isSignedPreKeyValid(const QByteArray &identityKey, const QByteArray &signedPreKey, const QByteArray &signature) const
+{
+    const auto decodedIdentityKey = decodeIdentityKey(identityKey, m_version, m_context.get());
+    const auto decodedSignedPreKey = decodePreKey(signedPreKey, m_version, m_context.get());
+    if (!decodedIdentityKey || !decodedSignedPreKey) {
+        return false;
+    }
+    // signed in the serialized form of the version, like libomemo-c checks it
+    const auto serialized = serializePreKey(decodedSignedPreKey.get(), m_version);
+    return curve_verify_signature(decodedIdentityKey.get(), bytes(serialized), size_t(serialized.size()), bytes(signature), size_t(signature.size())) == 1;
+}
+
 std::variant<Success, QXmppError> SessionLayer::buildSession(const Address &address, const Bundle &bundle)
 {
     const auto identityKey = decodeIdentityKey(bundle.identityKey, m_version, m_context.get());
@@ -565,7 +577,7 @@ std::variant<EncryptedKey, QXmppError> SessionLayer::encrypt(const Address &addr
     };
 }
 
-std::variant<DecryptedKey, QXmppError> SessionLayer::decrypt(const Address &address, const QByteArray &data, bool isKeyExchange)
+std::variant<DecryptedKey, QXmppError> SessionLayer::decrypt(const Address &address, const QByteArray &data, bool isKeyExchange, const QByteArray &expectedIdentityKey)
 {
     const LibAddress libAddress(address);
     SessionCipherPtr cipher;
@@ -587,6 +599,9 @@ std::variant<DecryptedKey, QXmppError> SessionLayer::decrypt(const Address &addr
             return error(u"Key exchange of %1/%2 could not be parsed"_s.arg(address.jid).arg(address.deviceId));
         }
         result.senderIdentityKey = serializeIdentityKey(pre_key_signal_message_get_identity_key(message.get()), m_version);
+        if (!expectedIdentityKey.isEmpty() && result.senderIdentityKey != expectedIdentityKey) {
+            return error(u"Key exchange of %1/%2 uses another identity key than before"_s.arg(address.jid).arg(address.deviceId));
+        }
 
         m_removedPreKeyId.reset();
         status = session_cipher_decrypt_pre_key_signal_message(cipher.get(), message.get(), nullptr, plaintext.ptrRef());

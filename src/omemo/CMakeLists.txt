@@ -14,6 +14,7 @@ set(OMEMO_INSTALL_HEADER_FILES
 set(OMEMO_SOURCE_FILES
     OmemoCryptoProvider.cpp
     OmemoDeviceList.cpp
+    OmemoEncryption.cpp
     OmemoKeyMaintenance.cpp
     OmemoManager.cpp
     OmemoPayloadCipher.cpp

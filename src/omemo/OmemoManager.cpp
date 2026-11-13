@@ -7,6 +7,7 @@
 #include "QXmppJid_p.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppTrustManager.h"
 
 #include "Async.h"
 #include "OmemoManager_p.h"
@@ -46,7 +47,13 @@ void OmemoManagerPrivate::setUpSessionLayers()
         SessionLayer::Callbacks callbacks {
             .sessionStored = [this, version](const Address &address, const QByteArray &session) {
                 auto &devices = versions.at(version).devices[address.jid];
+                const auto isNew = !devices.contains(address.deviceId);
                 auto &stored = devices[address.deviceId];
+                // Devices only known from a key exchange are not encrypted for until they are
+                // listed.
+                if (isNew) {
+                    stored.removalFromDeviceListDate = now();
+                }
                 stored.version = version;
                 stored.jid = address.jid;
                 stored.id = address.deviceId;
@@ -62,7 +69,20 @@ void OmemoManagerPrivate::setUpSessionLayers()
             .preKeyRemoved = [this, version](uint32_t id) { storage->removePreKey(version, id); },
         };
         state.sessions = std::make_unique<SessionLayer>(context, version, device, state.keys, std::move(callbacks));
+        if (trustManager) {
+            setOwnTrustKey(version, state.sessions->ownIdentityKey());
+        }
     }
+}
+
+// Without an own key, the trust data of the version is new: TOAKAFA is used by default.
+QXmppTask<void> OmemoManagerPrivate::setOwnTrustKey(Version version, QByteArray key)
+{
+    const auto encryption = trustNamespace(version);
+    if ((co_await trustManager->ownKey(encryption).withContext(q)).isEmpty()) {
+        co_await trustManager->setSecurityPolicy(encryption, Toakafa).withContext(q);
+    }
+    co_await trustManager->setOwnKey(encryption, key).withContext(q);
 }
 
 OmemoStorage::OwnDevice OmemoManagerPrivate::storedOwnDevice() const
@@ -213,6 +233,12 @@ QXmppTask<void> OmemoManagerPrivate::setUp()
     storage->setOwnDevice(storedOwnDevice());
 
     for (auto version : ALL_VERSIONS) {
+        auto &state = versions.at(version);
+        state.refreshedDeviceLists.clear();
+        state.receivedDeviceLists.clear();
+    }
+
+    for (auto version : ALL_VERSIONS) {
         // A version may have been disabled while being logged out.
         auto result = isEnabled(version) ? co_await setUpVersion(version).withContext(q)
                                          : co_await unpublishOwnDevice(version).withContext(q);
@@ -342,6 +368,7 @@ static QHash<uint32_t, DeviceList::DeviceInfo> deviceInfos(const QHash<uint32_t,
 
 void OmemoManagerPrivate::applyDeviceList(Version version, const QString &jid, const QList<DeviceList::Entry> &list)
 {
+    versions.at(version).receivedDeviceLists.insert(jid);
     const auto isOwnJid = jid == ownJid();
     auto infos = deviceInfos(versions.at(version).devices.value(jid));
 
@@ -455,7 +482,9 @@ namespace QXmpp {
     it creates the own device and publishes it. On each further login (not after resuming the
     stream), it renews the keys and publishes the data again.
 
-    QXmppPubSubManager must be added to the client before this manager.
+    QXmppPubSubManager and a QXmppTrustManager must be added to the client before this manager.
+    New trust data uses the security policy TOAKAFA, see QXmpp::TrustSecurityPolicy. The trust
+    manager can be used to change it.
 
     \since QXmpp 1.18
 */
@@ -487,6 +516,7 @@ OmemoManager::OmemoManager(std::shared_ptr<OmemoStorage> storage, QList<Version>
         d->isLoggedIn = true;
         d->setUp();
     });
+    d->registerProviders();
 }
 
 OmemoManager::~OmemoManager() = default;
@@ -624,6 +654,10 @@ void OmemoManager::onRegistered(QXmppClient *client)
     if (!d->pubSub) {
         qFatal("QXmppPubSubManager is not available, it must be added to the client before QXmpp::OmemoManager");
     }
+    d->trustManager = client->findExtension<QXmppTrustManager>();
+    if (!d->trustManager) {
+        qFatal("QXmppTrustManager is not available, it must be added to the client before QXmpp::OmemoManager");
+    }
 
     // A resumed stream continues the session, SessionStarted is only run for new sessions.
     connect(client, &QXmppClient::connected, this, [this] {
@@ -641,6 +675,7 @@ void OmemoManager::onRegistered(QXmppClient *client)
 void OmemoManager::onUnregistered(QXmppClient *client)
 {
     disconnect(client, nullptr, this, nullptr);
+    disconnect(d->trustManager, nullptr, this, nullptr);
 }
 
 HookResult OmemoManager::handlePubSubEvent(const QDomElement &element, const Jid &service, const QString &node)
