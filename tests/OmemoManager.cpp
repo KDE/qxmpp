@@ -2660,6 +2660,8 @@ private:
     Q_SLOT void ownDeviceListIsRepublishedAfterDeletion();
     Q_SLOT void contactDeviceLists();
     Q_SLOT void removedDevicesExpire();
+    Q_SLOT void sharedTrust();
+    Q_SLOT void sharedTrustOfNewKeys();
     Q_SLOT void devicesWithoutNetwork();
     Q_SLOT void devicesChanged();
     Q_SLOT void watchState();
@@ -2888,6 +2890,83 @@ void tst_OmemoManager2::removedDevicesExpire()
     const auto devices = storage->allData().result().devices;
     QCOMPARE(std::ranges::count(devices, CONTACT_JID, &Storage::Device::jid), 1);
     QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
+}
+
+void tst_OmemoManager2::sharedTrust()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+
+    // The sessions of both versions are built, so both keys of Bob's device are known.
+    auto watch = alice.manager->watchDevices(bob.jid());
+    server.process();
+    const auto devices = watch.devices().value();
+    QCOMPARE(devices.size(), 2);
+    const auto &v0 = devices.at(0);
+    const auto &v2 = devices.at(1);
+    QCOMPARE(v0.keyId, QXmpp::Omemo::Private::omemo0IdentityKey(v2.keyId));
+    const auto trustLevel = [&](const Device &device) {
+        return awaitTask(alice.trust->trustLevel(versionNamespace(device.version), bob.jid(), device.keyId));
+    };
+
+    alice.manager->setTrustLevel({ v2 }, TrustLevel::Authenticated);
+    QTRY_COMPARE(trustLevel(v0), TrustLevel::Authenticated);
+
+    // also changes by the trust manager, e.g. by trust messages
+    alice.trust->setTrustLevel(versionNamespace(Version::Omemo0), { { bob.jid(), v0.keyId } }, TrustLevel::ManuallyDistrusted);
+    QTRY_COMPARE(trustLevel(v2), TrustLevel::ManuallyDistrusted);
+    QCOMPARE(trustLevel(v0), TrustLevel::ManuallyDistrusted);
+}
+
+void tst_OmemoManager2::sharedTrustOfNewKeys()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    bob.manager->setEnabledVersions({ Version::Omemo0 });
+    expectVariant<Success>(bob.setUp());
+
+    auto watch = alice.manager->watchDevices(bob.jid());
+    server.process();
+    QCOMPARE(watch.devices().value().size(), 1);
+    alice.manager->setTrustLevel(watch.devices().value(), TrustLevel::Authenticated);
+    server.process();
+
+    // Another device is not trusted automatically, since a key of Bob has been authenticated, even
+    // in another version.
+    Account bob2(nullptr, &server, u"bob@builder.lit/home"_s);
+    bob2.manager->setEnabledVersions({ Version::Omemo2 });
+    expectVariant<Success>(bob2.setUp());
+    server.process();
+    QTRY_COMPARE(watch.devices().value().size(), 2);
+    const auto deviceOf = [&](Version version, uint32_t id) {
+        for (const auto &device : watch.devices().value()) {
+            if (device.version == version && device.id == id) {
+                return device;
+            }
+        }
+        return Device {};
+    };
+    const auto other = deviceOf(Version::Omemo2, bob2.deviceId());
+    QCOMPARE(other.trustLevel, TrustLevel::AutomaticallyDistrusted);
+    QVERIFY(alice.manager->d->sameIdentityKeys(Version::Omemo2, bob.jid(), other.keyId).isEmpty());
+
+    // The OMEMO 2 key of the first device gets the trust level of its OMEMO 0 key.
+    bob.manager->setEnabledVersions({ Version::Omemo0, Version::Omemo2 });
+    server.process();
+    QTRY_COMPARE(deviceOf(Version::Omemo2, bob.deviceId()).trustLevel, TrustLevel::Authenticated);
+
+    // The trust level of the other device is not shared with the first device.
+
+    alice.manager->setTrustLevel({ other }, TrustLevel::ManuallyDistrusted);
+    server.process();
+    for (const auto &device : watch.devices().value()) {
+        QCOMPARE(device.trustLevel, device.id == bob2.deviceId() ? TrustLevel::ManuallyDistrusted : TrustLevel::Authenticated);
+    }
 }
 
 void tst_OmemoManager2::devicesWithoutNetwork()

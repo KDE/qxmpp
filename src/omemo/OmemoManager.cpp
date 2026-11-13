@@ -489,6 +489,29 @@ void ManagerPrivate::devicesChanged(const QString &jid)
     updateWatch(jid);
 }
 
+// Applies changed trust levels to the same identity keys in the other version, so a device has to
+// be authenticated only once.
+QXmppTask<void> ManagerPrivate::mirrorTrustLevels(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys)
+{
+    for (auto version : ALL_VERSIONS) {
+        const auto keys = modifiedKeys.value(trustNamespace(version));
+        const auto otherEncryption = trustNamespace(version == Version::Omemo0 ? Version::Omemo2 : Version::Omemo0);
+        for (auto it = keys.cbegin(); it != keys.cend(); ++it) {
+            const auto sameKeys = sameIdentityKeys(version, it.key(), it.value());
+            if (sameKeys.isEmpty()) {
+                continue;
+            }
+            const auto level = co_await trustManager->trustLevel(trustNamespace(version), it.key(), it.value()).withContext(q);
+            for (const auto &sameKey : sameKeys) {
+                // The trust level is equal afterwards, so the resulting change is not mirrored back.
+                if (co_await trustManager->trustLevel(otherEncryption, it.key(), sameKey).withContext(q) != level) {
+                    co_await trustManager->setTrustLevel(otherEncryption, { { it.key(), sameKey } }, level).withContext(q);
+                }
+            }
+        }
+    }
+}
+
 // The listed devices of the JIDs (all known JIDs if empty) with their trust levels, from the
 // local data.
 QXmppTask<QList<Device>> ManagerPrivate::devices(QList<QString> jids)
@@ -1230,6 +1253,7 @@ void Manager::onRegistered(QXmppClient *client)
     d->roster = client->findExtension<QXmppRosterManager>();
 
     connect(d->trustManager, &QXmppTrustManager::trustLevelsChanged, this, [this](const QHash<QString, QMultiHash<QString, QByteArray>> &modifiedKeys) {
+        d->mirrorTrustLevels(modifiedKeys);
         QSet<QString> jids;
         for (auto version : ALL_VERSIONS) {
             if (auto it = modifiedKeys.find(ManagerPrivate::trustNamespace(version)); it != modifiedKeys.end()) {

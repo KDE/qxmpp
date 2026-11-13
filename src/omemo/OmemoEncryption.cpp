@@ -81,7 +81,13 @@ Storage::Device *ManagerPrivate::storedDevice(Version version, const QString &ji
     return it == jidIt->end() ? nullptr : &*it;
 }
 
-// The trust level of a key. A new key is stored with the trust level of the security policy.
+static Version otherVersion(Version version)
+{
+    return version == Version::Omemo0 ? Version::Omemo2 : Version::Omemo0;
+}
+
+// The trust level of a key. A new key gets the trust level of the same identity key in the other
+// version, otherwise the one of the security policy.
 QXmppTask<TrustLevel> ManagerPrivate::trustLevel(Version version, QString jid, QByteArray key)
 {
     const auto encryption = trustNamespace(version);
@@ -90,14 +96,43 @@ QXmppTask<TrustLevel> ManagerPrivate::trustLevel(Version version, QString jid, Q
         co_return level;
     }
 
-    // Trust on first use until a key of the JID has been authenticated (TOAKAFA).
+    const auto otherEncryption = trustNamespace(otherVersion(version));
+    for (const auto &sameKey : sameIdentityKeys(version, jid, key)) {
+        level = co_await trustManager->trustLevel(otherEncryption, jid, sameKey).withContext(q);
+        if (level != TrustLevel::Undecided) {
+            co_await trustManager->addKeys(encryption, jid, { key }, level).withContext(q);
+            co_return level;
+        }
+    }
+
+    // Trust on first use until a key of the JID has been authenticated in any version (TOAKAFA).
     level = TrustLevel::AutomaticallyDistrusted;
     if (co_await trustManager->securityPolicy(encryption).withContext(q) == Toakafa &&
-        !co_await trustManager->hasKey(encryption, jid, TrustLevel::Authenticated).withContext(q)) {
+        !co_await trustManager->hasKey(encryption, jid, TrustLevel::Authenticated).withContext(q) &&
+        !co_await trustManager->hasKey(otherEncryption, jid, TrustLevel::Authenticated).withContext(q)) {
         level = TrustLevel::AutomaticallyTrusted;
     }
     co_await trustManager->addKeys(encryption, jid, { key }, level).withContext(q);
     co_return level;
+}
+
+// The known keys of the JID's devices in the other version with the same identity key. The device
+// IDs are not compared, they are not authenticated.
+QList<QByteArray> ManagerPrivate::sameIdentityKeys(Version version, const QString &jid, const QByteArray &key) const
+{
+    const auto curveKey = version == Version::Omemo2 ? omemo0IdentityKey(key) : key;
+    if (curveKey.isEmpty()) {
+        return {};
+    }
+    const auto other = otherVersion(version);
+    QList<QByteArray> keys;
+    for (const auto &device : versions.at(other).devices.value(jid)) {
+        if (!device.keyId.isEmpty() && !keys.contains(device.keyId) &&
+            (other == Version::Omemo0 ? device.keyId : omemo0IdentityKey(device.keyId)) == curveKey) {
+            keys.append(device.keyId);
+        }
+    }
+    return keys;
 }
 
 // Builds a session with the device if there is none. Returns whether the device can be encrypted
@@ -130,18 +165,19 @@ QXmppTask<bool> ManagerPrivate::prepareSession(Version version, QString jid, uin
         q->warning(u"The bundle of %1/%2 has another identity key than before"_s.arg(jid, QString::number(deviceId)));
         co_return false;
     }
-
-    if (!acceptedTrustLevels.testFlag(co_await trustLevel(version, jid, bundle.identityKey).withContext(q))) {
-        co_return false;
-    }
+    const auto trust = co_await trustLevel(version, jid, bundle.identityKey).withContext(q);
     device = storedDevice(version, jid, deviceId);
     if (!device) {
         co_return false;
     }
+    // also stored if the device is not trusted, so the key can be authenticated
     if (device->keyId.isEmpty()) {
         device->keyId = bundle.identityKey;
         storage->addDevice(*device);
         devicesChanged(jid);
+    }
+    if (!acceptedTrustLevels.testFlag(trust)) {
+        co_return false;
     }
 
     auto &sessions = *versions.at(version).sessions;
