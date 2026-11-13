@@ -5,8 +5,10 @@
 #ifndef OMEMOMANAGER_P_H
 #define OMEMOMANAGER_P_H
 
+#include "QXmppE2eeProvider.h"
 #include "QXmppOmemoManager.h"
 #include "QXmppPromise.h"
+#include "QXmppTrustLevel.h"
 
 #include "OmemoDeviceList.h"
 #include "OmemoKeyMaintenance.h"
@@ -18,11 +20,30 @@
 #include <QProperty>
 
 class QXmppPubSubManager;
+class QXmppTrustManager;
 
 namespace QXmpp::Omemo {
 
 // maximum number of devices per JID and version
 constexpr int MAX_DEVICES_PER_JID = 200;
+// Encryption for a device is stopped after this number of sent stanzas without an answer.
+constexpr int UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_IS_STOPPED = 106;
+// An empty message is sent after this number of received stanzas without sending one.
+constexpr int UNRESPONDED_STANZAS_UNTIL_HEARTBEAT = 53;
+constexpr auto DEFAULT_ACCEPTED_TRUST_LEVELS = TrustLevel::AutomaticallyTrusted | TrustLevel::ManuallyTrusted | TrustLevel::Authenticated;
+
+struct Envelope {
+    QString jid;
+    uint32_t deviceId = 0;
+    QByteArray data;
+    bool isKeyExchange = false;
+};
+
+struct DecryptedKey {
+    Private::SecureByteArray data;
+    // in the format of the version
+    QByteArray senderKey;
+};
 
 struct VersionState {
     Version version;
@@ -30,6 +51,13 @@ struct VersionState {
     // devices of other JIDs and other own devices
     QHash<QString, QHash<uint32_t, Storage::Device>> devices;
     std::unique_ptr<Private::SessionLayer> sessions;
+    // a bundle publication is running / another one is needed after it
+    bool isPublishingBundle = false;
+    bool isBundleOutdated = false;
+    // JIDs whose device list has been requested again since the login because of an unlisted device
+    QSet<QString> refreshedDeviceLists;
+    // devices a session is being built with after receiving a message without session
+    QSet<Private::Address> pendingSessionBuilds;
 };
 
 // states of all versions, indexed by the version
@@ -73,9 +101,30 @@ public:
     void storeDeviceListChanges(Version version, const QString &jid, const QHash<uint32_t, Private::DeviceList::DeviceInfo> &infos, const Private::DeviceList::Changes &changes);
     void removeExpiredDevices();
 
+    // encryption, see OmemoEncryption.cpp
+    static QString trustNamespace(Version version);
+    void registerProviders();
+    QXmppTask<TrustLevel> trustLevel(Version version, QString jid, QByteArray key);
+    QXmppTask<bool> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);
+    QXmppTask<Result<QList<Envelope>>> encryptKey(Version version, QList<QString> jids, Private::SecureByteArray keyMaterial, TrustLevels acceptedTrustLevels);
+    QXmppTask<Result<DecryptedKey>> decryptKey(Version version, QString jid, uint32_t deviceId, QByteArray data, bool isKeyExchange, bool isMessage);
+    void refreshDeviceList(Version version, const QString &jid);
+    void sendEmptyMessage(Version version, const QString &jid, uint32_t deviceId);
+    void buildSessionAndSendEmptyMessage(Version version, const QString &jid, uint32_t deviceId);
+    void refillPreKeysAndPublish(Version version);
+    Storage::Device *storedDevice(Version version, const QString &jid, uint32_t deviceId);
+
+    QXmppTask<E2ee::EncryptResult> encryptMessage2(E2ee::EncryptRequest request);
+    QXmppTask<E2ee::EncryptResult> encryptIq2(E2ee::EncryptIqRequest request);
+    QXmppTask<E2ee::DecryptResult> decryptMessage2(E2ee::DecryptRequest request);
+    QXmppTask<E2ee::DecryptResult> decryptIq2(E2ee::DecryptIqRequest request);
+    QXmppTask<E2ee::EncryptResult> encryptMessage0(E2ee::EncryptRequest request);
+    QXmppTask<E2ee::DecryptResult> decryptMessage0(E2ee::DecryptRequest request);
+
     Manager *q;
     std::shared_ptr<Storage> storage;
     QXmppPubSubManager *pubSub = nullptr;
+    QXmppTrustManager *trustManager = nullptr;
     Private::SignalContext context;
     Private::KeyMaintenance::Config keyConfig;
     // replaces the current time in tests

@@ -555,7 +555,7 @@ std::variant<EncryptedKey, QXmppError> SessionLayer::encrypt(const Address &addr
     };
 }
 
-std::variant<DecryptedKey, QXmppError> SessionLayer::decrypt(const Address &address, const QByteArray &data, bool isKeyExchange)
+std::variant<DecryptedKey, QXmppError> SessionLayer::decrypt(const Address &address, const QByteArray &data, bool isKeyExchange, const QByteArray &expectedIdentityKey)
 {
     const LibAddress libAddress(address);
     SessionCipherPtr cipher;
@@ -577,6 +577,9 @@ std::variant<DecryptedKey, QXmppError> SessionLayer::decrypt(const Address &addr
             return error(u"Key exchange of %1/%2 could not be parsed"_s.arg(address.jid).arg(address.deviceId));
         }
         result.senderIdentityKey = serializeIdentityKey(pre_key_signal_message_get_identity_key(message.get()), m_version);
+        if (!expectedIdentityKey.isEmpty() && result.senderIdentityKey != expectedIdentityKey) {
+            return error(u"Key exchange of %1/%2 uses another identity key than before"_s.arg(address.jid).arg(address.deviceId));
+        }
 
         m_removedPreKeyId.reset();
         status = session_cipher_decrypt_pre_key_signal_message(cipher.get(), message.get(), nullptr, plaintext.ptrRef());

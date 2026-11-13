@@ -142,7 +142,9 @@ public:
     bool hasSession(const Address &address) const;
 
     std::variant<EncryptedKey, QXmppError> encrypt(const Address &address, const SecureByteArray &key);
-    std::variant<DecryptedKey, QXmppError> decrypt(const Address &address, const QByteArray &data, bool isKeyExchange);
+    // A key exchange with another identity key than expectedIdentityKey (in the format of the
+    // version, if set) is rejected without changing the session.
+    std::variant<DecryptedKey, QXmppError> decrypt(const Address &address, const QByteArray &data, bool isKeyExchange, const QByteArray &expectedIdentityKey = {});
 
 private:
     friend struct StoreCallbacks;

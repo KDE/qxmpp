@@ -6,6 +6,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppTrustManager.h"
 #include "QXmppUtils.h"
 
 #include "Async.h"
@@ -46,7 +47,13 @@ void ManagerPrivate::setUpSessionLayers()
         SessionLayer::Callbacks callbacks {
             .sessionStored = [this, version](const Address &address, const QByteArray &session) {
                 auto &devices = versions.at(version).devices[address.jid];
+                const auto isNew = !devices.contains(address.deviceId);
                 auto &stored = devices[address.deviceId];
+                // Devices only known from a key exchange are not encrypted for until they are
+                // listed.
+                if (isNew) {
+                    stored.removalFromDeviceListDate = now();
+                }
                 stored.version = version;
                 stored.jid = address.jid;
                 stored.id = address.deviceId;
@@ -62,6 +69,9 @@ void ManagerPrivate::setUpSessionLayers()
             .preKeyRemoved = [this, version](uint32_t id) { storage->removePreKey(version, id); },
         };
         state.sessions = std::make_unique<SessionLayer>(context, version, device, state.keys, std::move(callbacks));
+        if (trustManager) {
+            trustManager->setOwnKey(trustNamespace(version), state.sessions->ownIdentityKey());
+        }
     }
 }
 
@@ -211,6 +221,11 @@ QXmppTask<void> ManagerPrivate::setUp()
         storage->removeSignedPreKey(id);
     }
     storage->setOwnDevice(storedOwnDevice());
+
+    for (auto version : ALL_VERSIONS) {
+        auto &state = versions.at(version);
+        state.refreshedDeviceLists.clear();
+    }
 
     for (auto version : ALL_VERSIONS) {
         // A version may have been disabled while being logged out.
@@ -437,7 +452,7 @@ void ManagerPrivate::removeExpiredDevices()
     it creates the own device and publishes it. On each further login (not after resuming the
     stream), it renews the keys and publishes the data again.
 
-    QXmppPubSubManager must be added to the client before this manager.
+    QXmppPubSubManager and a QXmppTrustManager must be added to the client before this manager.
 
     \since QXmpp 1.18
 */
@@ -465,6 +480,7 @@ Manager::Manager(std::shared_ptr<Storage> storage, QList<Version> versions)
             features << deviceListNodeName(version) + u"+notify";
         }
     });
+    d->registerProviders();
 }
 
 Manager::~Manager() = default;
@@ -630,6 +646,10 @@ void Manager::onRegistered(QXmppClient *client)
     if (!d->pubSub) {
         qFatal("QXmppPubSubManager is not available, it must be added to the client before QXmpp::Omemo::Manager");
     }
+    d->trustManager = client->findExtension<QXmppTrustManager>();
+    if (!d->trustManager) {
+        qFatal("QXmppTrustManager is not available, it must be added to the client before QXmpp::Omemo::Manager");
+    }
 
     connect(client, &QXmppClient::connected, this, [this, client] {
         d->isLoggedIn = true;
@@ -649,6 +669,7 @@ void Manager::onRegistered(QXmppClient *client)
 void Manager::onUnregistered(QXmppClient *client)
 {
     disconnect(client, nullptr, this, nullptr);
+    disconnect(d->trustManager, nullptr, this, nullptr);
 }
 
 HookResult Manager::handlePubSubEvent(const QDomElement &element, const QString &service, const QString &node)

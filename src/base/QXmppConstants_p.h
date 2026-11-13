@@ -281,6 +281,8 @@ inline constexpr QStringView ns_mix_node_config = u"urn:xmpp:mix:nodes:config";
 inline constexpr QStringView ns_mix_misc = u"urn:xmpp:mix:misc:0";
 // XEP-0410: MUC Self-Ping (Schrödinger's Chat)
 inline constexpr QStringView ns_muc_self_ping = u"http://jabber.org/protocol/muc#self-ping-optimization";
+// XEP-0420: Stanza Content Encryption
+inline constexpr QStringView ns_sce = u"urn:xmpp:sce:1";
 // XEP-0421: Occupant identifiers for semi-anonymous MUCs
 inline constexpr QStringView ns_muc_occupant_id = u"urn:xmpp:occupant-id:0";
 // XEP-0424: Message Retraction

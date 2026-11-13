@@ -28,6 +28,7 @@
 #include "QXmppPubSubManager.h"
 #include "QXmppUtils.h"
 
+#include "Async.h"
 #include "FakePubSubService.h"
 #include "IntegrationTesting.h"
 #include "OmemoDeviceList.h"
@@ -2507,7 +2508,18 @@ struct Account {
         service.addClient(client);
         client.addNewExtension<QXmppDiscoveryManager>();
         client.addNewExtension<QXmppPubSubManager>();
+        trust = client.addNewExtension<QXmppAtmManager>(&trustStorage);
         manager = client.addNewExtension<Manager>(this->storage);
+        trust->setSecurityPolicy(E2ee::Omemo0.toString(), Toakafa);
+        trust->setSecurityPolicy(E2ee::Omemo2.toString(), Toakafa);
+
+        // the version is selected by the test
+        client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
+            if (encryption) {
+                selection.setEncryption(*encryption == Version::Omemo0 ? E2ee::Omemo0 : E2ee::Omemo2);
+            }
+            return QXmpp::Private::makeReadyTask();
+        });
     }
 
     ~Account() { service.removeClient(client); }
@@ -2533,12 +2545,66 @@ struct Account {
 
     QString jid() { return client.configuration().jidBare(); }
 
+    // Sends a message with the selected encryption and returns the sent XML.
+    QString sendMessage(const QString &to, const QString &body)
+    {
+        QXmppMessage message;
+        message.setTo(to);
+        message.setBody(body);
+        auto task = client.send(std::move(message));
+        service.process();
+        // Without a stream, the task only finishes on errors.
+        if (auto *error = task.isFinished() ? std::get_if<QXmppError>(&task.result()) : nullptr) {
+            sendError = error->description;
+            return {};
+        }
+        return takeMessage();
+    }
+
+    // the last message sent by the client
+    QString takeMessage()
+    {
+        const auto packets = service.takeOtherPackets(client);
+        return packets.isEmpty() ? QString() : packets.constLast();
+    }
+
+    // Injects a message sent by another account and returns the received messages.
+    QList<QXmppMessage> receive(Account &sender, QString xml)
+    {
+        QSignalSpy spy(&client, &QXmppClient::messageReceived);
+        xml.replace(u"<message "_s, u"<message from='"_s + sender.client.configuration().jid() + u"' "_s);
+        client.injectMessage(xml);
+        service.process();
+        QList<QXmppMessage> messages;
+        for (const auto &arguments : std::as_const(spy)) {
+            messages.append(arguments.at(0).value<QXmppMessage>());
+        }
+        return messages;
+    }
+
     TestClient client;
+    QObject owner;
+    QXmppAtmTrustMemoryStorage trustStorage;
+    QXmppAtmManager *trust;
     std::shared_ptr<Storage> storage;
     FakePubSubService ownService;
     FakePubSubService &service;
     Manager *manager;
+    std::optional<Version> encryption;
+    QString sendError;
 };
+
+static QString versionNamespace(Version version)
+{
+    return version == Version::Omemo0 ? E2ee::Omemo0.toString() : E2ee::Omemo2.toString();
+}
+
+static void addVersions()
+{
+    QTest::addColumn<Version>("version");
+    QTest::newRow("omemo0") << Version::Omemo0;
+    QTest::newRow("omemo2") << Version::Omemo2;
+}
 
 class tst_OmemoManager2 : public QObject
 {
@@ -2557,6 +2623,18 @@ private:
     Q_SLOT void removedDevicesExpire();
     Q_SLOT void supportedVersions();
     Q_SLOT void republishOnLogin();
+    Q_SLOT void messages_data();
+    Q_SLOT void messages();
+    Q_SLOT void untrustedDevicesAreSkipped_data();
+    Q_SLOT void untrustedDevicesAreSkipped();
+    Q_SLOT void unlistedDevicesAreNotEncryptedFor_data();
+    Q_SLOT void unlistedDevicesAreNotEncryptedFor();
+    Q_SLOT void ownDevicesReceiveCopies_data();
+    Q_SLOT void ownDevicesReceiveCopies();
+    Q_SLOT void heartbeat_data();
+    Q_SLOT void heartbeat();
+    Q_SLOT void keyExchangeWithAnotherKey_data();
+    Q_SLOT void keyExchangeWithAnotherKey();
     Q_SLOT void deviceLabel();
     Q_SLOT void enabledVersionsAtRuntime();
 };
@@ -2812,6 +2890,221 @@ void tst_OmemoManager2::republishOnLogin()
     account.client.simulateConnected();
     account.service.process();
     QCOMPARE(account.service.requestCount(u"publish"_s), 0);
+}
+
+void tst_OmemoManager2::messages_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::messages()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = version;
+    bob.encryption = version;
+
+    // The first message is a key exchange.
+    const auto first = alice.sendMessage(bob.jid(), u"Hello Bob"_s);
+    QVERIFY2(!first.isEmpty(), qPrintable(alice.sendError));
+    QVERIFY(!first.contains(u"Hello Bob"_s));
+    QVERIFY(first.contains(versionNamespace(version)));
+    QVERIFY(first.contains(u"prekey=\"true\""_s) || first.contains(u"kex=\"true\""_s));
+
+    server.resetRequestCounts();
+    auto received = bob.receive(alice, first);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.constFirst().body(), u"Hello Bob"_s);
+    // The used pre key is replaced in the bundle.
+    QCOMPARE(server.requestCount(u"publish"_s), 1);
+    const auto metadata = *received.constFirst().e2eeMetadata();
+    QCOMPARE(metadata.encryptionNamespace(), versionNamespace(version));
+    QCOMPARE(metadata.senderKey(), alice.manager->d->versions.at(version).sessions->ownIdentityKey());
+    QCOMPARE(bob.trust->trustLevel(versionNamespace(version), alice.jid(), metadata.senderKey()).result(), TrustLevel::AutomaticallyTrusted);
+
+    // Bob completes the key exchange with an empty message, which is not delivered.
+    const auto empty = bob.takeMessage();
+    QVERIFY(!empty.isEmpty());
+    QVERIFY(alice.receive(bob, empty).isEmpty());
+
+    // no key exchange anymore
+    const auto second = alice.sendMessage(bob.jid(), u"How are you?"_s);
+    QVERIFY(!second.contains(u"prekey=\"true\""_s) && !second.contains(u"kex=\"true\""_s));
+    received = bob.receive(alice, second);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.constFirst().body(), u"How are you?"_s);
+
+    // answer
+    const auto answer = bob.sendMessage(alice.jid(), u"Fine"_s);
+    QVERIFY2(!answer.isEmpty(), qPrintable(bob.sendError));
+    received = alice.receive(bob, answer);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.constFirst().body(), u"Fine"_s);
+
+    // the replaced pre key is stored
+    const auto preKeys = bob.storage->allData().result().preKeys;
+    QCOMPARE(std::ranges::count(preKeys, version, &Storage::PreKey::version), 100);
+}
+
+void tst_OmemoManager2::untrustedDevicesAreSkipped_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::untrustedDevicesAreSkipped()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = version;
+
+    // Alice has authenticated another key of Bob, so new keys are distrusted.
+    alice.trust->addKeys(versionNamespace(version), bob.jid(), { "other key" }, TrustLevel::Authenticated);
+    QVERIFY(alice.sendMessage(bob.jid(), u"Hello"_s).isEmpty());
+    QCOMPARE(alice.sendError, u"There is no device of the recipients with an accepted trust level"_s);
+
+    // trusted manually
+    const auto bobKey = bob.manager->d->versions.at(version).sessions->ownIdentityKey();
+    QCOMPARE(alice.trust->trustLevel(versionNamespace(version), bob.jid(), bobKey).result(), TrustLevel::AutomaticallyDistrusted);
+    alice.trust->setTrustLevel(versionNamespace(version), { { bob.jid(), bobKey } }, TrustLevel::ManuallyTrusted);
+    QVERIFY(!alice.sendMessage(bob.jid(), u"Hello"_s).isEmpty());
+}
+
+void tst_OmemoManager2::unlistedDevicesAreNotEncryptedFor_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::unlistedDevicesAreNotEncryptedFor()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = version;
+    bob.encryption = version;
+
+    // Bob's device is removed from his device list, but its bundle is still there.
+    server.setNotificationsEnabled(false);
+    server.setItem(bob.jid(), version == Version::Omemo0 ? V0_DEVICE_LIST : V2_DEVICE_LIST, u"current"_s, version == Version::Omemo0 ? v0List({ 1 }) : v2List({ { 1, {} } }));
+    server.setNotificationsEnabled(true);
+    alice.client.inject(itemsEvent(bob.jid(), version == Version::Omemo0 ? V0_DEVICE_LIST : V2_DEVICE_LIST, version == Version::Omemo0 ? v0List({ 1 }) : v2List({ { 1, {} } })));
+    QVERIFY(!alice.manager->deviceIds(version, bob.jid()).contains(bob.manager->ownDeviceId().value()));
+
+    // A message from the device is decrypted, but the device is still not encrypted for.
+    const auto message = bob.sendMessage(alice.jid(), u"Hi"_s);
+    QCOMPARE(alice.receive(bob, message).size(), 1);
+    alice.takeMessage();
+    QVERIFY(!alice.manager->deviceIds(version, bob.jid()).contains(bob.manager->ownDeviceId().value()));
+    QVERIFY(alice.sendMessage(bob.jid(), u"Hello"_s).isEmpty());
+}
+
+void tst_OmemoManager2::ownDevicesReceiveCopies_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::ownDevicesReceiveCopies()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account alicePhone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(alicePhone.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = version;
+
+    QCOMPARE(alice.manager->deviceIds(version, alice.jid()), QList { alicePhone.manager->ownDeviceId().value() });
+    const auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+
+    // e.g. a carbon copy
+    auto received = alicePhone.receive(alice, message);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.constFirst().body(), u"Hello"_s);
+}
+
+void tst_OmemoManager2::heartbeat_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::heartbeat()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = version;
+
+    // the key exchange is answered
+    bob.receive(alice, alice.sendMessage(bob.jid(), u"0"_s));
+    alice.receive(bob, bob.takeMessage());
+
+    for (int i = 1; i < UNRESPONDED_STANZAS_UNTIL_HEARTBEAT; ++i) {
+        bob.receive(alice, alice.sendMessage(bob.jid(), QString::number(i)));
+        QVERIFY(bob.takeMessage().isEmpty());
+    }
+    bob.receive(alice, alice.sendMessage(bob.jid(), u"last"_s));
+    QVERIFY(!bob.takeMessage().isEmpty());
+}
+
+void tst_OmemoManager2::keyExchangeWithAnotherKey_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::keyExchangeWithAnotherKey()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = version;
+    bob.encryption = version;
+    bob.receive(alice, alice.sendMessage(bob.jid(), u"Hello"_s));
+    alice.receive(bob, bob.takeMessage());
+    const auto bobKey = alice.manager->d->storedDevice(version, bob.jid(), bob.manager->ownDeviceId().value())->keyId;
+    QVERIFY(!bobKey.isEmpty());
+
+    // Another device, e.g. created by the server, uses the ID of Bob's device with another
+    // identity key.
+    Account mallory(nullptr, &server, u"bob@builder.lit/mallory"_s);
+    expectVariant<Success>(mallory.setUp());
+    mallory.encryption = version;
+    mallory.manager->d->device.deviceId = bob.manager->ownDeviceId().value();
+    const auto forged = mallory.sendMessage(alice.jid(), u"Forged"_s);
+    QVERIFY2(!forged.isEmpty(), qPrintable(mallory.sendError));
+    for (const auto &message : alice.receive(mallory, forged)) {
+        QVERIFY(message.body() != u"Forged"_s);
+    }
+    QCOMPARE(alice.manager->d->storedDevice(version, bob.jid(), bob.manager->ownDeviceId().value())->keyId, bobKey);
+
+    // The session with Bob's device is kept.
+    const auto message = bob.sendMessage(alice.jid(), u"Still here"_s);
+    const auto received = alice.receive(bob, message);
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received.constFirst().body(), u"Still here"_s);
 }
 
 void tst_OmemoManager2::deviceLabel()
