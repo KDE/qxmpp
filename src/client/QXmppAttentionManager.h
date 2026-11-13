@@ -6,11 +6,11 @@
 #define QXMPPATTENTIONMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppMessage.h"
 
 #include <QTime>
 
 class QXmppAttentionManagerPrivate;
-class QXmppMessage;
 
 class QXMPP_EXPORT QXmppAttentionManager : public QXmppClientExtension
 {
