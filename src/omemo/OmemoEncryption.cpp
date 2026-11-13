@@ -141,6 +141,7 @@ QXmppTask<bool> ManagerPrivate::prepareSession(Version version, QString jid, uin
     if (device->keyId.isEmpty()) {
         device->keyId = bundle.identityKey;
         storage->addDevice(*device);
+        Q_EMIT q->devicesChanged(version, jid);
     }
 
     auto &sessions = *versions.at(version).sessions;
@@ -184,7 +185,7 @@ QXmppTask<Result<QList<Envelope>>> ManagerPrivate::encryptKey(Version version, Q
         if (jid != own && q->deviceIds(version, jid).isEmpty()) {
             auto result = co_await pubSubClient(version).requestDeviceList(jid).withContext(q);
             if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
-                applyDeviceList(version, jid, *list);
+                applyReceivedDeviceList(version, jid, *list);
             }
         }
 
@@ -278,7 +279,7 @@ void ManagerPrivate::refreshDeviceList(Version version, const QString &jid)
 {
     pubSubClient(version).requestDeviceList(jid).then(q, [this, version, jid](Result<QList<DeviceList::Entry>> &&result) {
         if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
-            applyDeviceList(version, jid, *list);
+            applyReceivedDeviceList(version, jid, *list);
         }
     });
 }

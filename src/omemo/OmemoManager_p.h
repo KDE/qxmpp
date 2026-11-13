@@ -96,7 +96,8 @@ public:
     QXmppTask<Result<>> publishBundle(Version version);
     QXmppTask<Result<>> publishOwnDeviceList(Version version);
 
-    void applyDeviceList(Version version, const QString &jid, const QList<Private::DeviceList::Entry> &list);
+    QXmppTask<Result<>> applyDeviceList(Version version, const QString &jid, const QList<Private::DeviceList::Entry> &list);
+    void applyReceivedDeviceList(Version version, const QString &jid, const QList<Private::DeviceList::Entry> &list);
     void clearDeviceList(Version version, const QString &jid);
     void storeDeviceListChanges(Version version, const QString &jid, const QHash<uint32_t, Private::DeviceList::DeviceInfo> &infos, const Private::DeviceList::Changes &changes);
     void removeExpiredDevices();

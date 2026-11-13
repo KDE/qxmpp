@@ -10,6 +10,7 @@
 #include "QXmppError.h"
 #include "QXmppOmemoStorage.h"
 #include "QXmppTask.h"
+#include "QXmppTrustLevel.h"
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
@@ -169,6 +170,24 @@ class QXMPPOMEMO_EXPORT Manager : public QXmppClientExtension
     Q_OBJECT
 
 public:
+    struct Key {
+        QString jid;
+        QByteArray keyId;
+
+        bool operator==(const Key &) const = default;
+    };
+
+    struct Device {
+        Version version = Version::Omemo2;
+        QString jid;
+        uint32_t id = 0;
+        QString label;
+        QByteArray keyId;
+        QXmpp::TrustLevel trustLevel = QXmpp::TrustLevel::Undecided;
+
+        bool operator==(const Device &) const = default;
+    };
+
     enum class State {
         Loading,
         NotSetUp,
@@ -192,10 +211,17 @@ public:
     QBindable<QByteArray> ownKey() const;
 
     QList<uint32_t> deviceIds(Version version, const QString &jid) const;
+    QXmppTask<QList<Device>> devices(QList<QString> jids);
     QXmppTask<QXmpp::Result<QList<Version>>> supportedVersions(QString jid);
+    QXmppTask<void> removeContactDevices(QString jid);
+
+    QXmppTask<QXmpp::Result<>> resetOwnDevice();
+    QXmppTask<void> resetOwnDeviceLocally();
+    QXmppTask<QXmpp::Result<>> resetAll();
 
     Q_SIGNAL void errorOccurred(const QXmppError &error);
     Q_SIGNAL void devicesChanged(QXmpp::Omemo::Version version, const QString &jid);
+    Q_SIGNAL void trustLevelsChanged(QXmpp::Omemo::Version version, const QList<QXmpp::Omemo::Manager::Key> &modifiedKeys);
 
 protected:
     void onRegistered(QXmppClient *client) override;

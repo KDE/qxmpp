@@ -2635,8 +2635,13 @@ private:
     Q_SLOT void heartbeat();
     Q_SLOT void keyExchangeWithAnotherKey_data();
     Q_SLOT void keyExchangeWithAnotherKey();
+    Q_SLOT void devices_data();
+    Q_SLOT void devices();
     Q_SLOT void deviceLabel();
     Q_SLOT void enabledVersionsAtRuntime();
+    Q_SLOT void removeContactDevices();
+    Q_SLOT void resetOwnDevice();
+    Q_SLOT void resetAll();
 };
 
 void tst_OmemoManager2::discoFeatures()
@@ -3107,6 +3112,58 @@ void tst_OmemoManager2::keyExchangeWithAnotherKey()
     QCOMPARE(received.constFirst().body(), u"Still here"_s);
 }
 
+void tst_OmemoManager2::devices_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::devices()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp(u"Workshop"_s));
+    alice.encryption = version;
+
+    auto devicesOf = [&](const QString &jid) {
+        auto task = alice.manager->devices({ jid });
+        server.process();
+        Q_ASSERT(task.isFinished());
+        auto devices = task.result();
+        devices.removeIf([&](const Manager::Device &device) { return device.version != version; });
+        return devices;
+    };
+
+    auto supported = alice.manager->supportedVersions(bob.jid());
+    server.process();
+    expectVariant<QList<Version>>(supported.result());
+    // The key is unknown before the first message.
+    const auto label = version == Version::Omemo2 ? u"Workshop"_s : QString();
+    QCOMPARE(devicesOf(bob.jid()), (QList<Manager::Device> { { version, bob.jid(), bob.manager->ownDeviceId().value(), label, {}, TrustLevel::Undecided } }));
+
+    QSignalSpy devicesSpy(alice.manager, &Manager::devicesChanged);
+    alice.sendMessage(bob.jid(), u"Hello"_s);
+    QCOMPARE(devicesSpy.size(), 1);
+    QCOMPARE(devicesSpy.constFirst().at(0).value<Version>(), version);
+    QCOMPARE(devicesSpy.constFirst().at(1).toString(), bob.jid());
+
+    const auto bobKey = bob.manager->d->versions.at(version).sessions->ownIdentityKey();
+    QCOMPARE(devicesOf(bob.jid()), (QList<Manager::Device> { { version, bob.jid(), bob.manager->ownDeviceId().value(), label, bobKey, TrustLevel::AutomaticallyTrusted } }));
+
+    QSignalSpy trustSpy(alice.manager, &Manager::trustLevelsChanged);
+    alice.trust->setTrustLevel(versionNamespace(version), { { bob.jid(), bobKey } }, TrustLevel::Authenticated);
+    QCOMPARE(trustSpy.size(), 1);
+    QCOMPARE(trustSpy.constFirst().at(0).value<Version>(), version);
+    QCOMPARE(trustSpy.constFirst().at(1).value<QList<Manager::Key>>(), (QList<Manager::Key> { { bob.jid(), bobKey } }));
+    QCOMPARE(devicesOf(bob.jid()).constFirst().trustLevel, TrustLevel::Authenticated);
+
+    // this device is not included
+    QVERIFY(devicesOf(alice.jid()).isEmpty());
+}
+
 void tst_OmemoManager2::deviceLabel()
 {
     QCoreApplication::setApplicationName(u"Wonderland"_s);
@@ -3162,6 +3219,95 @@ void tst_OmemoManager2::enabledVersionsAtRuntime()
     expectVariant<Success>(account.setUp());
     QVERIFY(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)).isEmpty());
     QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), QList { id });
+}
+
+void tst_OmemoManager2::removeContactDevices()
+{
+    Account account;
+    expectVariant<Success>(account.setUp());
+    account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 1, 2 })));
+    account.client.inject(itemsEvent(CONTACT_JID, V2_DEVICE_LIST, v2List({ { 3, {} } })));
+    account.trust->addKeys(E2ee::Omemo2.toString(), CONTACT_JID, { "key" }, TrustLevel::ManuallyTrusted);
+    QSignalSpy spy(account.manager, &Manager::devicesChanged);
+
+    auto task = account.manager->removeContactDevices(CONTACT_JID);
+    account.service.process();
+    QVERIFY(task.isFinished());
+    QVERIFY(account.manager->deviceIds(Version::Omemo0, CONTACT_JID).isEmpty());
+    QVERIFY(account.manager->deviceIds(Version::Omemo2, CONTACT_JID).isEmpty());
+    QCOMPARE(spy.size(), 2);
+    QVERIFY(account.storage->allData().result().devices.isEmpty());
+    QVERIFY(account.trust->keys(E2ee::Omemo2.toString(), { CONTACT_JID }).result().isEmpty());
+}
+
+void tst_OmemoManager2::resetOwnDevice()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account phone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(phone.setUp());
+    const auto id = alice.manager->ownDeviceId().value();
+    const auto phoneId = phone.manager->ownDeviceId().value();
+    QSignalSpy spy(alice.manager, &Manager::devicesChanged);
+
+    auto task = alice.manager->resetOwnDevice();
+    server.process();
+    QVERIFY(task.isFinished());
+    expectVariant<Success>(task.result());
+
+    QVERIFY(!alice.isReady());
+    QCOMPARE(alice.manager->ownDeviceId().value(), 0u);
+    QCOMPARE(listedIds(server.itemPayload(alice.jid(), V0_DEVICE_LIST, u"current"_s)), QList { phoneId });
+    QCOMPARE(listedIds(server.itemPayload(alice.jid(), V2_DEVICE_LIST, u"current"_s)), QList { phoneId });
+    QVERIFY(!server.node(alice.jid(), u"eu.siacs.conversations.axolotl.bundles:"_s + QString::number(id)));
+    QVERIFY(server.node(alice.jid(), u"eu.siacs.conversations.axolotl.bundles:"_s + QString::number(phoneId)));
+    QVERIFY(server.itemPayload(alice.jid(), V2_BUNDLES, QString::number(id)).isEmpty());
+    QVERIFY(!server.itemPayload(alice.jid(), V2_BUNDLES, QString::number(phoneId)).isEmpty());
+    // the phone's devices are not known anymore
+    QCOMPARE(spy.size(), 2);
+
+    const auto data = alice.storage->allData().result();
+    QVERIFY(!data.ownDevice);
+    QVERIFY(data.devices.isEmpty());
+    QVERIFY(data.preKeys.isEmpty());
+
+    // a new device can be set up
+    expectVariant<Success>(alice.setUp());
+    QVERIFY(alice.isReady());
+}
+
+void tst_OmemoManager2::resetAll()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account phone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(phone.setUp());
+    const auto id = alice.manager->ownDeviceId().value();
+    const auto phoneId = phone.manager->ownDeviceId().value();
+
+    server.setNotificationsEnabled(false);
+    auto task = alice.manager->resetAll();
+    server.process();
+    QVERIFY(task.isFinished());
+    expectVariant<Success>(task.result());
+
+    QVERIFY(!alice.isReady());
+    QVERIFY(!alice.storage->allData().result().ownDevice);
+    QVERIFY(!server.node(alice.jid(), V0_DEVICE_LIST));
+    QVERIFY(!server.node(alice.jid(), V2_DEVICE_LIST));
+    QVERIFY(!server.node(alice.jid(), V2_BUNDLES));
+    QVERIFY(!server.node(alice.jid(), u"eu.siacs.conversations.axolotl.bundles:"_s + QString::number(id)));
+    QVERIFY(!server.node(alice.jid(), u"eu.siacs.conversations.axolotl.bundles:"_s + QString::number(phoneId)));
+
+    // Other own devices publish their data again when notified.
+    server.setNotificationsEnabled(true);
+    phone.client.inject(u"<message from='alice@wonderland.lit' to='alice@wonderland.lit/phone' type='headline'>"
+                        "<event xmlns='http://jabber.org/protocol/pubsub#event'><delete node='urn:xmpp:omemo:2:devices'/></event></message>"_s);
+    server.process();
+    QCOMPARE(listedIds(server.itemPayload(alice.jid(), V2_DEVICE_LIST, u"current"_s)), QList { phoneId });
+    QVERIFY(!server.itemPayload(alice.jid(), V2_BUNDLES, QString::number(phoneId)).isEmpty());
 }
 
 QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList, StorageTests::tst_OmemoStorage, PubSubTests::tst_OmemoPubSub, tst_OmemoManager2)

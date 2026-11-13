@@ -342,8 +342,7 @@ QXmppTask<Result<>> ManagerPrivate::publishOwnDeviceList(Version version)
         co_return std::move(*error);
     }
 
-    applyDeviceList(version, ownJid(), std::get<QList<DeviceList::Entry>>(result));
-    co_return Success();
+    co_return co_await applyDeviceList(version, ownJid(), std::get<QList<DeviceList::Entry>>(result)).withContext(q);
 }
 
 static QHash<uint32_t, DeviceList::DeviceInfo> deviceInfos(const QHash<uint32_t, Storage::Device> &devices)
@@ -355,7 +354,8 @@ static QHash<uint32_t, DeviceList::DeviceInfo> deviceInfos(const QHash<uint32_t,
     return infos;
 }
 
-void ManagerPrivate::applyDeviceList(Version version, const QString &jid, const QList<DeviceList::Entry> &list)
+// Returns the publication of the own device list if it must be republished.
+QXmppTask<Result<>> ManagerPrivate::applyDeviceList(Version version, const QString &jid, const QList<DeviceList::Entry> &list)
 {
     const auto isOwnJid = jid == ownJid();
     auto infos = deviceInfos(versions.at(version).devices.value(jid));
@@ -372,20 +372,30 @@ void ManagerPrivate::applyDeviceList(Version version, const QString &jid, const 
     storeDeviceListChanges(version, jid, infos, changes);
 
     if (changes.republishOwnList) {
-        const auto ownList = DeviceList::ownList(infos, *ownDevice);
-        pubSubClient(version).publishDeviceList(ownList).then(q, [this](Result<> &&result) {
-            if (auto *error = std::get_if<QXmppError>(&result)) {
-                q->warning(u"Could not publish the own device list: "_s + error->description);
-            }
-        });
+        return pubSubClient(version).publishDeviceList(DeviceList::ownList(infos, *ownDevice));
     }
+    return makeReadyTask<Result<>>(Success());
+}
+
+void ManagerPrivate::applyReceivedDeviceList(Version version, const QString &jid, const QList<DeviceList::Entry> &list)
+{
+    applyDeviceList(version, jid, list).then(q, [this](Result<> &&result) {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            q->warning(u"Could not publish the own device list: "_s + error->description);
+        }
+    });
 }
 
 void ManagerPrivate::clearDeviceList(Version version, const QString &jid)
 {
     if (jid == ownJid()) {
-        // the own device list has been removed: publish it again
-        applyDeviceList(version, jid, {});
+        // The own device list has been removed, e.g. by resetting all devices on another device:
+        // publish the own data again.
+        publishOwnData(version).then(q, [this](Result<> &&result) {
+            if (auto *error = std::get_if<QXmppError>(&result)) {
+                q->warning(u"Could not publish the OMEMO data: "_s + error->description);
+            }
+        });
         return;
     }
 
@@ -618,6 +628,219 @@ QList<uint32_t> Manager::deviceIds(Version version, const QString &jid) const
 }
 
 /*!
+    \struct QXmpp::Omemo::Manager::Device
+    \inmodule QXmpp
+
+    \brief A device of a JID listed in its device list of a version.
+
+    \var QXmpp::Omemo::Manager::Device::version
+    OMEMO version of the device list
+    \var QXmpp::Omemo::Manager::Device::jid
+    bare JID of the device's owner
+    \var QXmpp::Omemo::Manager::Device::id
+    device ID
+    \var QXmpp::Omemo::Manager::Device::label
+    label of the device, only available with OMEMO 2
+    \var QXmpp::Omemo::Manager::Device::keyId
+    public identity key in the format of the version (Curve25519 for OMEMO 0, Ed25519 for OMEMO
+    2), empty until a message has been exchanged with the device
+    \var QXmpp::Omemo::Manager::Device::trustLevel
+    trust level of the key, \c Undecided while the key is unknown
+*/
+
+/*!
+    \struct QXmpp::Omemo::Manager::Key
+    \inmodule QXmpp
+
+    \brief A public identity key of a JID.
+
+    \var QXmpp::Omemo::Manager::Key::jid
+    bare JID of the key's owner
+    \var QXmpp::Omemo::Manager::Key::keyId
+    public identity key in the format of the version
+*/
+
+/*!
+    \fn void QXmpp::Omemo::Manager::trustLevelsChanged(QXmpp::Omemo::Version version, const QList<QXmpp::Omemo::Manager::Key> &modifiedKeys)
+
+    Emitted when the trust levels of \a modifiedKeys of \a version have changed.
+*/
+
+/*!
+    Returns the devices of \a jids listed in their device lists of the enabled versions. For the
+    own JID, this device is not included.
+
+    The devices of contacts are known after a device list notification, which requires a presence
+    subscription, or after calling supportedVersions().
+*/
+QXmppTask<QList<Manager::Device>> Manager::devices(QList<QString> jids)
+{
+    QList<Device> result;
+    const auto versions = d->enabledVersions;
+    for (auto version : versions) {
+        const auto keys = co_await d->trustManager->keys(ManagerPrivate::trustNamespace(version), jids).withContext(this);
+        for (const auto &jid : std::as_const(jids)) {
+            const auto stored = d->versions.at(version).devices.value(jid);
+            for (auto id : deviceIds(version, jid)) {
+                const auto &device = stored[id];
+                auto trustLevel = TrustLevel::Undecided;
+                if (!device.keyId.isEmpty()) {
+                    trustLevel = keys.value(jid).value(device.keyId, TrustLevel::Undecided);
+                }
+                result.append({ version, jid, id, device.label, device.keyId, trustLevel });
+            }
+        }
+    }
+    co_return result;
+}
+
+/*!
+    Removes the devices of \a jid, their sessions and the trust levels of their keys. This should be
+    called after removing a contact. The own JID must not be passed, see resetAll().
+
+    If the presence subscription of the contact persists, its devices are added again on the next
+    device list notification.
+*/
+QXmppTask<void> Manager::removeContactDevices(QString jid)
+{
+    if (jid == d->ownJid()) {
+        warning(u"The own devices cannot be removed as a contact's devices"_s);
+        co_return;
+    }
+
+    QList<Version> changedVersions;
+    for (auto version : ALL_VERSIONS) {
+        auto &state = d->versions.at(version);
+        if (state.devices.remove(jid)) {
+            changedVersions.append(version);
+        }
+        state.keys.sessions.removeIf([&](decltype(state.keys.sessions)::iterator it) { return it.key().jid == jid; });
+        state.pendingSessionBuilds.removeIf([&](const Address &address) { return address.jid == jid; });
+        state.refreshedDeviceLists.remove(jid);
+    }
+
+    co_await d->storage->removeDevices(jid).withContext(this);
+    for (auto version : ALL_VERSIONS) {
+        co_await d->trustManager->removeKeys(ManagerPrivate::trustNamespace(version), jid).withContext(this);
+    }
+    for (auto version : std::as_const(changedVersions)) {
+        Q_EMIT devicesChanged(version, jid);
+    }
+}
+
+/*!
+    Removes this device from the own device lists and its bundles from the server, and resets its
+    local data like resetOwnDeviceLocally(). The data is only reset if the server data has been
+    removed. The user must be logged in.
+
+    Call this when the account is removed from this device. A new device is created on the next
+    login.
+*/
+QXmppTask<Result<>> Manager::resetOwnDevice()
+{
+    co_await d->loaded().withContext(this);
+    if (!d->isSetUp) {
+        co_return Success();
+    }
+
+    // The own device list notifications would add this device again.
+    d->isSetUp = false;
+    const auto ownId = d->device.deviceId;
+    const auto versions = d->enabledVersions;
+    for (auto version : versions) {
+        auto result = co_await d->unpublishOwnDevice(version).withContext(this);
+        if (!std::holds_alternative<QXmppError>(result)) {
+            // also if this device was not listed
+            result = co_await d->pubSubClient(version).deleteBundle(ownId).withContext(this);
+        }
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            d->isSetUp = true;
+            co_return std::move(*error);
+        }
+    }
+
+    co_await resetOwnDeviceLocally();
+    co_return Success();
+}
+
+/*!
+    Resets the OMEMO data of this device and the trust data of OMEMO without changing the data on
+    the server. Use this after the account has been removed from the server.
+
+    devicesChanged() is emitted for all JIDs with known devices.
+*/
+QXmppTask<void> Manager::resetOwnDeviceLocally()
+{
+    QList<std::pair<Version, QString>> changed;
+    for (auto version : ALL_VERSIONS) {
+        auto &state = d->versions.at(version);
+        for (auto it = state.devices.cbegin(); it != state.devices.cend(); ++it) {
+            changed.append({ version, it.key() });
+        }
+        state.keys = {};
+        state.devices.clear();
+        state.isPublishingBundle = false;
+        state.isBundleOutdated = false;
+        state.refreshedDeviceLists.clear();
+        state.pendingSessionBuilds.clear();
+    }
+    d->isSetUp = false;
+    d->device = {};
+    d->ownDeviceId = 0;
+    d->ownKey = QByteArray();
+    d->state = State::NotSetUp;
+
+    co_await d->storage->resetAll().withContext(this);
+    for (auto version : ALL_VERSIONS) {
+        co_await d->trustManager->resetAll(ManagerPrivate::trustNamespace(version)).withContext(this);
+    }
+    for (const auto &[version, jid] : std::as_const(changed)) {
+        Q_EMIT devicesChanged(version, jid);
+    }
+}
+
+/*!
+    Deletes the device lists and bundles of all own devices of the enabled versions from the server
+    and resets the data of this device like resetOwnDeviceLocally(). The other own devices publish
+    their data again when they are notified about it or on their next login. The user must be
+    logged in.
+
+    Use this only if the OMEMO setup of the account cannot be recovered otherwise.
+*/
+QXmppTask<Result<>> Manager::resetAll()
+{
+    co_await d->loaded().withContext(this);
+    d->isSetUp = false;
+    const auto versions = d->enabledVersions;
+    for (auto version : versions) {
+        const auto client = d->pubSubClient(version);
+        auto list = co_await client.requestDeviceList(d->ownJid()).withContext(this);
+        if (auto *error = std::get_if<QXmppError>(&list)) {
+            co_return std::move(*error);
+        }
+
+        QList<uint32_t> ids;
+        if (d->device.deviceId) {
+            ids.append(d->device.deviceId);
+        }
+        ids += d->versions.at(version).devices.value(d->ownJid()).keys();
+        for (const auto &entry : std::get<QList<DeviceList::Entry>>(list)) {
+            ids.append(entry.id);
+        }
+        std::ranges::sort(ids);
+        ids.erase(std::ranges::unique(ids).begin(), ids.end());
+
+        auto result = co_await client.deleteAll(ids).withContext(this);
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            co_return std::move(*error);
+        }
+    }
+
+    co_await resetOwnDeviceLocally();
+    co_return Success();
+}
+
+/*!
     Requests the device lists of \a jid and returns the enabled versions it has devices for.
 
     The application can use it to choose the version for a chat.
@@ -631,7 +854,7 @@ QXmppTask<Result<QList<Version>>> Manager::supportedVersions(QString jid)
             co_return std::move(*error);
         }
         if (jid != d->ownJid()) {
-            d->applyDeviceList(version, jid, std::get<QList<DeviceList::Entry>>(result));
+            d->applyReceivedDeviceList(version, jid, std::get<QList<DeviceList::Entry>>(result));
         }
         if (!deviceIds(version, jid).isEmpty()) {
             supported.append(version);
@@ -650,6 +873,18 @@ void Manager::onRegistered(QXmppClient *client)
     if (!d->trustManager) {
         qFatal("QXmppTrustManager is not available, it must be added to the client before QXmpp::Omemo::Manager");
     }
+
+    connect(d->trustManager, &QXmppTrustManager::trustLevelsChanged, this, [this](const QHash<QString, QMultiHash<QString, QByteArray>> &modifiedKeys) {
+        for (auto version : ALL_VERSIONS) {
+            if (auto it = modifiedKeys.find(ManagerPrivate::trustNamespace(version)); it != modifiedKeys.end()) {
+                QList<Key> keys;
+                for (auto keyIt = it->cbegin(); keyIt != it->cend(); ++keyIt) {
+                    keys.append({ keyIt.key(), keyIt.value() });
+                }
+                Q_EMIT trustLevelsChanged(version, keys);
+            }
+        }
+    });
 
     connect(client, &QXmppClient::connected, this, [this, client] {
         d->isLoggedIn = true;
@@ -692,7 +927,7 @@ HookResult Manager::handlePubSubEvent(const QDomElement &element, const QString 
     case QXmppPubSubEventBase::Items:
         if (const auto items = event.items(); !items.isEmpty()) {
             if (const auto &item = Pep::currentItem(items); item.version == version) {
-                d->applyDeviceList(version, jid, item.devices);
+                d->applyReceivedDeviceList(version, jid, item.devices);
             }
         }
         break;
