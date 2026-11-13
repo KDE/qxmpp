@@ -157,6 +157,16 @@ RefCountedPtr<ratchet_identity_key_pair> deserializeIdentityKeyPair(const Identi
 
 }  // namespace
 
+// The Curve25519 form with type prefix of an Ed25519 identity key, empty if the key is invalid.
+// The conversion is unambiguous, the opposite direction is not (sign of the x-coordinate).
+QByteArray omemo0IdentityKey(const QByteArray &omemo2Key)
+{
+    if (auto key = decodeIdentityKey(omemo2Key, Version::Omemo2, nullptr)) {
+        return serializeIdentityKey(key.get(), Version::Omemo0);
+    }
+    return {};
+}
+
 SignalContext::SignalContext()
 {
     if (signal_context_create(m_context.ptrRef(), this) < 0) {

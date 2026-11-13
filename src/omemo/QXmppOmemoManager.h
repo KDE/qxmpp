@@ -7,7 +7,10 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
+#include "QXmppError.h"
 #include "QXmppJid.h"
+#include "QXmppOmemoStorage.h"
+#include "QXmppTask.h"
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
@@ -15,6 +18,7 @@ class QXmppOmemoDevicePrivate;
 class QXmppOmemoManagerPrivate;
 class QXmppOmemoOwnDevicePrivate;
 class QXmppOmemoStorage;
+class tst_OmemoManager2;
 
 class QXMPPOMEMO_EXPORT QXmppOmemoOwnDevice
 {
@@ -156,5 +160,59 @@ private:
     friend class QXmppOmemoManagerPrivate;
     friend class tst_QXmppOmemoManager;
 };
+
+namespace QXmpp::Omemo::Private {
+class OmemoManagerPrivate;
+}
+
+namespace QXmpp::Omemo {
+
+}  // namespace QXmpp::Omemo
+
+namespace QXmpp {
+
+class QXMPPOMEMO_EXPORT OmemoManager : public QXmppClientExtension
+{
+    Q_OBJECT
+
+public:
+    enum class State {
+        Loading,
+        NotSetUp,
+        SettingUp,
+        Ready,
+    };
+    Q_ENUM(State)
+
+    explicit OmemoManager(std::shared_ptr<OmemoStorage> storage, QList<Omemo::Version> versions = { Omemo::Version::Omemo0, Omemo::Version::Omemo2 });
+    ~OmemoManager() override;
+
+    QBindable<QList<Omemo::Version>> enabledVersions() const;
+    void setEnabledVersions(QList<Omemo::Version> versions);
+
+    QString deviceLabel() const;
+    void setDeviceLabel(const QString &label);
+    static QString defaultDeviceLabel();
+
+    QBindable<State> state() const;
+    QBindable<uint32_t> ownDeviceId() const;
+    QBindable<QByteArray> ownKey(Omemo::Version version = Omemo::Version::Omemo2) const;
+
+    Q_SIGNAL void errorOccurred(const QXmppError &error);
+
+protected:
+    void onRegistered(QXmppClient *client) override;
+    void onUnregistered(QXmppClient *client) override;
+
+private:
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &service, const QString &node);
+
+    std::unique_ptr<Omemo::Private::OmemoManagerPrivate> d;
+
+    friend class Omemo::Private::OmemoManagerPrivate;
+    friend class ::tst_OmemoManager2;
+};
+
+}  // namespace QXmpp
 
 #endif  // QXMPPOMEMOMANAGER_H

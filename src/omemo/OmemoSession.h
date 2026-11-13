@@ -54,6 +54,8 @@ struct Bundle {
     QByteArray preKey;
 };
 
+QByteArray omemo0IdentityKey(const QByteArray &omemo2Key);
+
 // Owns the libomemo-c context. All sessions using it must be destroyed before.
 class SignalContext
 {

@@ -77,6 +77,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - Add `QXmppSendStanzaParams::setForcedEncryption()` to force the end-to-end encryption of a message or IQ instead of selecting it via the `SelectEncryption` hooks, also for sending it unencrypted (@lnj, !842)
  - Add `QXmpp::E2ee::name()` returning the name of an encryption by its namespace (@lnj, !842)
  - OMEMO: Add the storage `QXmpp::OmemoStorage` with `OmemoMemoryStorage` for the new manager (@lnj, !842)
+ - OMEMO: Add the new manager `QXmpp::OmemoManager` supporting OMEMO 2 and OMEMO 0 (`eu.siacs.conversations.axolotl`) with one device and one identity key for both versions; the application selects the version (@lnj, !842)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
