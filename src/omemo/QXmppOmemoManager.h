@@ -198,6 +198,12 @@ public:
     QBindable<uint32_t> ownDeviceId() const;
     QBindable<QByteArray> ownKey(Omemo::Version version = Omemo::Version::Omemo2) const;
 
+    QXmppTask<void> removeContactDevices(QXmpp::Jid jid);
+
+    QXmppTask<QXmpp::Result<>> resetOwnDevice();
+    QXmppTask<void> resetOwnDeviceLocally();
+    QXmppTask<QXmpp::Result<>> resetAll();
+
     Q_SIGNAL void errorOccurred(const QXmppError &error);
 
 protected:

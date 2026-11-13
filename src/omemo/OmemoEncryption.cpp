@@ -194,7 +194,7 @@ QXmppTask<Result<QList<Envelope>>> OmemoManagerPrivate::encryptKey(Version versi
         if (jid != own && deviceIds(version, jid).isEmpty() && !versions.at(version).receivedDeviceLists.contains(jid)) {
             auto result = co_await pubSubClient(version).requestDeviceList(jid).withContext(q);
             if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
-                applyDeviceList(version, jid, *list);
+                applyReceivedDeviceList(version, jid, *list);
             }
         }
 
@@ -287,7 +287,7 @@ void OmemoManagerPrivate::refreshDeviceList(Version version, const QString &jid)
 {
     pubSubClient(version).requestDeviceList(jid).then(q, [this, version, jid](Result<QList<DeviceList::Entry>> &&result) {
         if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
-            applyDeviceList(version, jid, *list);
+            applyReceivedDeviceList(version, jid, *list);
         }
     });
 }

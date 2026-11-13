@@ -77,7 +77,10 @@ public:
     // reconfigured and the item published again.
     QXmppTask<Result<Success>> publishDeviceList(const QList<DeviceList::Entry> &devices) const;
     QXmppTask<Result<Success>> publishBundle(uint32_t deviceId, const PublicBundle &bundle) const;
+    // A missing node or item is no error.
     QXmppTask<Result<Success>> deleteBundle(uint32_t deviceId) const;
+    // Deletes the device list node and the bundles of the devices.
+    QXmppTask<Result<Success>> deleteAll(QList<uint32_t> deviceIds) const;
 
 private:
     template<typename Item>

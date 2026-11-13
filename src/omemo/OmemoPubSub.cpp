@@ -288,12 +288,40 @@ QXmppTask<Result<Success>> Client::publishBundle(uint32_t deviceId, const Public
     return publishItem(m_pubSub, node, item, options, config);
 }
 
+static Result<Success> ignoreItemNotFound(Result<Success> &&result)
+{
+    if (auto *error = std::get_if<QXmppError>(&result); error && isItemNotFound(*error)) {
+        return Success();
+    }
+    return std::move(result);
+}
+
 QXmppTask<Result<Success>> Client::deleteBundle(uint32_t deviceId) const
 {
     if (m_version == Version::Omemo0) {
-        return m_pubSub->deleteOwnPepNode(bundleNode(m_version, deviceId));
+        co_return ignoreItemNotFound(co_await m_pubSub->deleteOwnPepNode(bundleNode(m_version, deviceId)).withContext(m_pubSub));
     }
-    return m_pubSub->retractOwnPepItem(bundleNode(m_version, deviceId), bundleItemId(m_version, deviceId));
+    co_return ignoreItemNotFound(co_await m_pubSub->retractOwnPepItem(bundleNode(m_version, deviceId), bundleItemId(m_version, deviceId)).withContext(m_pubSub));
+}
+
+QXmppTask<Result<Success>> Client::deleteAll(QList<uint32_t> deviceIds) const
+{
+    QList<QString> nodes { deviceListNode(m_version) };
+    if (m_version == Version::Omemo0) {
+        for (auto id : std::as_const(deviceIds)) {
+            nodes.append(bundleNode(m_version, id));
+        }
+    } else {
+        nodes.append(bundleNode(m_version, 0));
+    }
+
+    for (const auto &node : std::as_const(nodes)) {
+        auto result = ignoreItemNotFound(co_await m_pubSub->deleteOwnPepNode(node).withContext(m_pubSub));
+        if (std::holds_alternative<QXmppError>(result)) {
+            co_return result;
+        }
+    }
+    co_return Success();
 }
 
 }  // namespace QXmpp::Omemo::Private::Pep
