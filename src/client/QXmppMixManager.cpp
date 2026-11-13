@@ -19,6 +19,7 @@
 #include "QXmppMixInvitation.h"
 #include "QXmppMixIq.h"
 #include "QXmppMixIq_p.h"
+#include "QXmppMucManagerV2.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
@@ -55,11 +56,13 @@ struct MixChannelParticipants {
 class QXmppMixManagerPrivate
 {
 public:
+    QXmppTask<HookResult> resolveSender(Messages::Context &context);
     QXmppTask<void> resolveRecipients(Messages::OutgoingMessage &outgoing);
     QXmppTask<Result<QList<QString>>> requestParticipantJids(const QString &channelJid);
     QXmppTask<void> fetchParticipantJids(QString channelJid, uint64_t generation);
     void updateParticipant(const QString &channelJid, const QString &participantId, std::optional<QString> jid);
-    bool isJoinedChannel(const QString &channelJid);
+    QXmppTask<bool> isJoinedChannel(QString jid);
+    void finishRosterWaiters();
     void removeChannel(const QString &channelJid);
     void removeAllChannels();
     static void finishWaiters(MixChannelParticipants &channel, const QXmppError &error);
@@ -68,6 +71,8 @@ public:
     QXmppClient *client = nullptr;
     QXmppPubSubManager *pubSubManager = nullptr;
     QXmppRosterManager *rosterManager = nullptr;
+    // waiting for the roster of the current stream
+    std::vector<QXmppPromise<void>> rosterWaiters;
     // Participants of the channels encrypted messages have been sent to in this session. Retrieved
     // before the first encrypted message and kept up to date by the events of the participants
     // node.
@@ -196,6 +201,11 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
     Requirements}, which requires the QXmppRosterManager. Messages to channels hiding the JIDs of
     their participants cannot be encrypted. If the JIDs to encrypt for are set via
     QXmppSendStanzaParams::setEncryptionJids(), they are used instead.
+
+    The real JID of the sender of a received channel message is taken from the stamp of the
+    channel, but only for channels in the roster. If a MUC room with the same JID is joined via
+    QXmppMucManagerV2 (e.g., of a service providing both), its messages are handled by the MUC
+    manager.
 
     If you receive a message, you can check whether it contains an invitation to a MIX channel and
     use that invitation to join the channel:
@@ -490,13 +500,7 @@ QXmppMixManager::QXmppMixManager()
         hooks().add<PubSub::EventReceived>(node, this, &QXmppMixManager::handlePubSubEvent);
     }
     // The channel stamps the real JID of the sender of channel messages (XEP-0405).
-    hooks().add<Messages::ResolveSender>([](Messages::Context &context) {
-        const auto &message = context.message();
-        if (message.type() == QXmppMessage::GroupChat && !message.mixUserJid().isEmpty()) {
-            context.setSenderJid(QXmppUtils::jidToBareJid(message.mixUserJid()));
-        }
-        return HookResult::Continue;
-    });
+    hooks().add<Messages::ResolveSender>(d.get(), &QXmppMixManagerPrivate::resolveSender);
     // Encrypted messages are encrypted for all participants of the channel.
     hooks().add<Messages::ResolveRecipients>(d.get(), &QXmppMixManagerPrivate::resolveRecipients);
 }
@@ -1184,6 +1188,9 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
             d->removeAllChannels();
         }
     });
+    connect(client, &QXmppClient::disconnected, this, [this] {
+        d->finishRosterWaiters();
+    });
 
     // data import/export
     if (auto manager = client->findExtension<QXmppAccountMigrationManager>()) {
@@ -1256,6 +1263,7 @@ void QXmppMixManager::onUnregistered(QXmppClient *client)
         d->rosterManager = nullptr;
     }
     d->removeAllChannels();
+    d->finishRosterWaiters();
     d->client = nullptr;
     d->servicesNotifier = {};
     d->services = QList<Service>();
@@ -1514,7 +1522,11 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
     }
     const auto channelJid = QXmppUtils::jidToBareJid(message.to());
     // recipients set by the sender are kept
-    if (outgoing.recipientJids() != QList<QString> { channelJid } || !isJoinedChannel(channelJid)) {
+    if (outgoing.recipientJids() != QList<QString> { channelJid }) {
+        co_return;
+    }
+    const auto joined = co_await isJoinedChannel(channelJid).withContext(q);
+    if (!joined) {
         co_return;
     }
 
@@ -1539,20 +1551,65 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
     outgoing.recipientJids() = recipients;
 }
 
-// Whether the own account is a participant of the channel, i.e., it is in the roster.
-bool QXmppMixManagerPrivate::isJoinedChannel(const QString &channelJid)
+// The channel stamps the real JID of the sender of channel messages (XEP-0405).
+QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &context)
 {
+    const auto &message = context.message();
+    if (message.type() != QXmppMessage::GroupChat || message.mixUserJid().isEmpty()) {
+        co_return HookResult::Continue;
+    }
+    // Only the channel can stamp the sender, anybody else (e.g., an occupant of a MUC room) could
+    // add the element to their message.
+    const auto senderJid = QXmppUtils::jidToBareJid(message.mixUserJid());
+    const auto joined = co_await isJoinedChannel(QXmppUtils::jidToBareJid(message.from())).withContext(q);
+    if (joined) {
+        context.setSenderJid(senderJid);
+    }
+    co_return HookResult::Continue;
+}
+
+// Whether the own account is a participant of the MIX channel \a jid, i.e., it is in the roster.
+// A MUC room joined by this client is handled by QXmppMucManagerV2 instead, even if the account is
+// also a participant of a MIX channel with the same JID (e.g., of a service providing both).
+QXmppTask<bool> QXmppMixManagerPrivate::isJoinedChannel(QString jid)
+{
+    if (!client) {
+        co_return false;
+    }
+    if (auto *mucManager = client->findExtension<QXmppMucManagerV2>(); mucManager && mucManager->findRoom(jid)) {
+        co_return false;
+    }
     if (!rosterManager) {
         rosterManager = client->findExtension<QXmppRosterManager>();
         if (!rosterManager) {
-            return false;
+            co_return false;
         }
         // the participants of a left or rejoined channel are retrieved again
         auto remove = [this](const QString &jid) { removeChannel(jid); };
         QObject::connect(rosterManager, &QXmppRosterManager::itemAdded, q, remove);
         QObject::connect(rosterManager, &QXmppRosterManager::itemRemoved, q, remove);
+        QObject::connect(rosterManager, &QXmppRosterManager::rosterReceived, q, [this] { finishRosterWaiters(); });
     }
-    return rosterManager->getRosterEntry(channelJid).isMixChannel();
+    // messages may be sent and received before the roster of a new stream
+    if (!rosterManager->isRosterReceived() && client->isAuthenticated()) {
+        QXmppPromise<void> promise;
+        auto task = promise.task();
+        rosterWaiters.push_back(std::move(promise));
+        co_await task.withContext(q);
+        if (!client || !rosterManager) {
+            co_return false;
+        }
+    }
+    co_return rosterManager->getRosterEntry(jid).isMixChannel();
+}
+
+void QXmppMixManagerPrivate::finishRosterWaiters()
+{
+    auto waiters = std::move(rosterWaiters);
+    rosterWaiters.clear();
+    for (auto &waiter : waiters) {
+        waiter.finish();
+    }
 }
 
 static QList<QString> participantJids(const std::unordered_map<QString, QString> &jids)

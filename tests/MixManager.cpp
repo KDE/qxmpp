@@ -5,12 +5,14 @@
 #include "QXmppAsync_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeProvider.h"
+#include "QXmppMessageContext.h"
 #include "QXmppMessages.h"
 #include "QXmppMixInfoItem.h"
 #include "QXmppMixInvitation.h"
 #include "QXmppMixIq.h"
 #include "QXmppMixManager.h"
 #include "QXmppMixParticipantItem.h"
+#include "QXmppMucManagerV2.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
@@ -84,6 +86,8 @@ private:
     Q_SLOT void testSendMessageEncryptedNoChannel();
     Q_SLOT void testSendMessageEncryptedError();
     Q_SLOT void testSendMessageEncryptedHiddenJids();
+    Q_SLOT void testResolveSender();
+    Q_SLOT void testMucRoomWithChannelJid();
 
     template<typename T>
     void testErrorFromChannel(QXmppTask<T> &task, TestClient &client);
@@ -1877,6 +1881,74 @@ void tst_QXmppMixManager::testSendMessageEncryptedHiddenJids()
     tester.answerParticipants({ { u"123456"_s, u"hag66@shakespeare.example"_s }, { u"123457"_s, {} } });
     QCOMPARE(expectFutureVariant<QXmppError>(task).value<QXmpp::SendError>(), QXmpp::SendError::EncryptionError);
     QVERIFY(tester.e2ee->recipientJids.isEmpty());
+    client.expectNoPacket();
+}
+
+// the sender of a received message resolved by the message pipeline
+static QString receivedSender(TestClient &client, const QString &from)
+{
+    QObject owner;
+    QString sender;
+    client.hooks(&owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &context) {
+        sender = context.senderJid();
+        return QXmpp::HookResult::Stop;
+    });
+    client.injectMessage(u"<message from='"_s + from + u"' to='hag66@shakespeare.example' type='groupchat'>"
+                                                       "<body>Hi</body>"
+                                                       "<mix xmlns='urn:xmpp:mix:core:1'><nick>thirdwitch</nick><jid>hag67@shakespeare.example</jid></mix>"
+                                                       "</message>"_s);
+    return sender;
+}
+
+void tst_QXmppMixManager::testResolveSender()
+{
+    EncryptionTester tester;
+    auto &client = tester.client;
+
+    // the channel stamps the sender
+    QCOMPARE(receivedSender(client, u"coven@mix.shakespeare.example/123457"_s), u"hag67@shakespeare.example"_s);
+    // anybody else could add the element, e.g., an occupant of a MUC room
+    QCOMPARE(receivedSender(client, u"room@muc.shakespeare.example/firstwitch"_s), u"room@muc.shakespeare.example"_s);
+    QCOMPARE(receivedSender(client, u"mallory@shakespeare.example/desktop"_s), u"mallory@shakespeare.example"_s);
+}
+
+void tst_QXmppMixManager::testMucRoomWithChannelJid()
+{
+    EncryptionTester tester;
+    auto &client = tester.client;
+    auto *muc = client.addNewExtension<QXmppMucManagerV2>();
+
+    // a service provides a MUC room and a MIX channel with the same JID, the room is joined
+    auto joinTask = muc->joinRoom(u"coven@mix.shakespeare.example"_s, u"thirdwitch"_s);
+    const auto infoId = client.expectPacketRandomOrder(
+        u"<iq id='qx1' to='coven@mix.shakespeare.example' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    client.ignore();  // presence
+    client.inject(u"<iq id='"_s + infoId + u"' from='coven@mix.shakespeare.example' type='result'>"
+                                           "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                           "<identity category='conference' type='text'/>"
+                                           "<feature var='http://jabber.org/protocol/muc'/>"
+                                           "<feature var='muc_nonanonymous'/>"
+                                           "</query></iq>"_s);
+    QXmppPresence selfPresence;
+    parsePacket(selfPresence, "<presence from='coven@mix.shakespeare.example/thirdwitch'>"
+                              "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                              "<item affiliation='member' role='participant'/><status code='110'/>"
+                              "</x></presence>");
+    client.injectPresence(selfPresence);
+    client.injectMessage(u"<message from='coven@mix.shakespeare.example' type='groupchat'><subject>Test</subject></message>"_s);
+    expectFutureVariant<QXmppMucRoomV2>(joinTask);
+    QXmppPresence occupant;
+    parsePacket(occupant, "<presence from='coven@mix.shakespeare.example/firstwitch'>"
+                          "<x xmlns='http://jabber.org/protocol/muc#user'>"
+                          "<item affiliation='member' role='participant' jid='crone1@shakespeare.example/desktop'/>"
+                          "</x></presence>");
+    client.injectPresence(occupant);
+
+    // the room is handled by the MUC manager: the occupants are the sender and the recipients
+    QCOMPARE(receivedSender(client, u"coven@mix.shakespeare.example/firstwitch"_s), u"crone1@shakespeare.example"_s);
+    auto task = tester.send();
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"crone1@shakespeare.example"_s }));
+    tester.expectSent(task);
     client.expectNoPacket();
 }
 
