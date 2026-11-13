@@ -28,9 +28,11 @@
 #include "QXmppPubSubManager.h"
 #include "QXmppUtils.h"
 
+#include "FakePubSubService.h"
 #include "IntegrationTesting.h"
 #include "OmemoDeviceList.h"
 #include "OmemoKeyMaintenance.h"
+#include "OmemoManager_p.h"
 #include "OmemoPayloadCipher.h"
 #include "OmemoPubSub.h"
 #include "OmemoSession.h"
@@ -2445,6 +2447,430 @@ void tst_OmemoPubSub::deleteBundle()
 
 }  // namespace PubSubTests
 
-QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList, StorageTests::tst_OmemoStorage, PubSubTests::tst_OmemoPubSub)
+// ============================================================
+
+using namespace QXmpp;
+using namespace QXmpp::Omemo;
+
+static const auto OWN_JID = u"juliet@capulet.lit"_s;
+static const auto CONTACT_JID = u"romeo@montague.lit"_s;
+static const auto V0_DEVICE_LIST = u"eu.siacs.conversations.axolotl.devicelist"_s;
+static const auto V2_DEVICE_LIST = u"urn:xmpp:omemo:2:devices"_s;
+static const auto V2_BUNDLES = u"urn:xmpp:omemo:2:bundles"_s;
+
+static QString v0Bundles(uint32_t id)
+{
+    return u"eu.siacs.conversations.axolotl.bundles:"_s + QString::number(id);
+}
+
+static QString v0List(const QList<uint32_t> &ids)
+{
+    QString list = u"<list xmlns='eu.siacs.conversations.axolotl'>"_s;
+    for (auto id : ids) {
+        list += u"<device id='"_s + QString::number(id) + u"'/>"_s;
+    }
+    return list + u"</list>"_s;
+}
+
+static QString v2List(const QList<std::pair<uint32_t, QString>> &devices)
+{
+    QString list = u"<devices xmlns='urn:xmpp:omemo:2'>"_s;
+    for (const auto &[id, label] : devices) {
+        list += u"<device id='"_s + QString::number(id) + u"'"_s + (label.isEmpty() ? QString() : u" label='"_s + label + u"'"_s) + u"/>"_s;
+    }
+    return list + u"</devices>"_s;
+}
+
+static QString itemsEvent(const QString &from, const QString &node, const QString &payload)
+{
+    return u"<message from='"_s + from + u"' to='juliet@capulet.lit/balcony' type='headline'>"
+                                         "<event xmlns='http://jabber.org/protocol/pubsub#event'><items node='"_s +
+        node + u"'><item id='current'>"_s + payload + u"</item></items></event></message>"_s;
+}
+
+// device IDs in a device list payload
+static QList<uint32_t> listedIds(const QString &payload)
+{
+    QList<uint32_t> ids;
+    const auto list = xmlToDom(payload);
+    for (auto device = list.firstChildElement(u"device"_s); !device.isNull(); device = device.nextSiblingElement(u"device"_s)) {
+        ids.append(device.attribute(u"id"_s).toUInt());
+    }
+    return ids;
+}
+
+struct Account {
+    Account(std::shared_ptr<Storage> storage = {}, FakePubSubService *sharedService = nullptr, const QString &jid = OWN_JID + u"/balcony"_s)
+        : storage(storage ? storage : std::make_shared<MemoryStorage>()), service(sharedService ? *sharedService : ownService)
+    {
+        client.configuration().setJid(jid);
+        service.addClient(client);
+        client.addNewExtension<QXmppDiscoveryManager>();
+        client.addNewExtension<QXmppPubSubManager>();
+        manager = client.addNewExtension<Manager>(this->storage);
+    }
+
+    ~Account() { service.removeClient(client); }
+
+    // Logs in, which sets up the manager.
+    Result<> setUp(const QString &label = {})
+    {
+        if (!label.isEmpty()) {
+            manager->setDeviceLabel(label);
+        }
+        QSignalSpy errors(manager, &Manager::errorOccurred);
+        client.setStreamManagementState(QXmppClient::NewStream);
+        client.simulateConnected();
+        service.process();
+        if (!errors.isEmpty()) {
+            return errors.constFirst().at(0).value<QXmppError>();
+        }
+        return isReady() ? Result<>(Success()) : Result<>(QXmppError { u"not ready"_s, {} });
+    }
+
+    bool isReady() const { return manager->state().value() == Manager::State::Ready; }
+    uint32_t deviceId() const { return manager->ownDeviceId().value(); }
+
+    QString jid() { return client.configuration().jidBare(); }
+
+    TestClient client;
+    std::shared_ptr<Storage> storage;
+    FakePubSubService ownService;
+    FakePubSubService &service;
+    Manager *manager;
+};
+
+class tst_OmemoManager2 : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void discoFeatures();
+    Q_SLOT void setUpPublishes();
+    Q_SLOT void setUpOnlyEnabledVersions();
+    Q_SLOT void setUpKeepsOtherOwnDevices();
+    Q_SLOT void setUpReconfiguresNodes();
+    Q_SLOT void load();
+    Q_SLOT void ownDeviceIsRelisted();
+    Q_SLOT void ownDeviceListIsRepublishedAfterDeletion();
+    Q_SLOT void contactDeviceLists();
+    Q_SLOT void removedDevicesExpire();
+    Q_SLOT void supportedVersions();
+    Q_SLOT void republishOnLogin();
+    Q_SLOT void deviceLabel();
+    Q_SLOT void enabledVersionsAtRuntime();
+};
+
+void tst_OmemoManager2::discoFeatures()
+{
+    Account account;
+    auto features = account.client.findExtension<QXmppDiscoveryManager>()->buildClientInfo().features();
+    QVERIFY(features.contains(V0_DEVICE_LIST + u"+notify"_s));
+    QVERIFY(features.contains(V2_DEVICE_LIST + u"+notify"_s));
+
+    account.manager->setEnabledVersions({ Version::Omemo2 });
+    features = account.client.findExtension<QXmppDiscoveryManager>()->buildClientInfo().features();
+    QVERIFY(!features.contains(V0_DEVICE_LIST + u"+notify"_s));
+    QVERIFY(features.contains(V2_DEVICE_LIST + u"+notify"_s));
+}
+
+void tst_OmemoManager2::setUpPublishes()
+{
+    Account account;
+    expectVariant<Success>(account.setUp(u"Phone"_s));
+
+    const auto id = account.manager->ownDeviceId().value();
+    QVERIFY(id > 0);
+    QVERIFY(account.isReady());
+    QCOMPARE(account.manager->ownKey().value().size(), 32);
+
+    // device lists
+    auto &service = account.service;
+    QCOMPARE(listedIds(service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), QList { id });
+    QCOMPARE(listedIds(service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), QList { id });
+    QVERIFY(service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s).contains(u"label=\"Phone\""_s));
+    QCOMPARE(service.node(OWN_JID, V0_DEVICE_LIST)->accessModel, u"open"_s);
+    QCOMPARE(service.node(OWN_JID, V2_DEVICE_LIST)->accessModel, u"open"_s);
+
+    // bundles
+    const auto v0Bundle = xmlToDom(service.itemPayload(OWN_JID, v0Bundles(id), u"current"_s));
+    QCOMPARE(v0Bundle.firstChildElement(u"prekeys"_s).childNodes().size(), 100);
+    QCOMPARE(QByteArray::fromBase64(v0Bundle.firstChildElement(u"identityKey"_s).text().toLatin1()).size(), 33);
+    QCOMPARE(service.node(OWN_JID, v0Bundles(id))->accessModel, u"open"_s);
+
+    const auto v2Bundle = xmlToDom(service.itemPayload(OWN_JID, V2_BUNDLES, QString::number(id)));
+    QCOMPARE(v2Bundle.firstChildElement(u"prekeys"_s).childNodes().size(), 100);
+    QCOMPARE(QByteArray::fromBase64(v2Bundle.firstChildElement(u"ik"_s).text().toLatin1()), account.manager->ownKey().value());
+    QCOMPARE(service.node(OWN_JID, V2_BUNDLES)->accessModel, u"open"_s);
+    QCOMPARE(service.node(OWN_JID, V2_BUNDLES)->maxItems, u"max"_s);
+
+    // storage
+    const auto data = account.storage->allData().result();
+    QCOMPARE(data.ownDevice->id, id);
+    QCOMPARE(data.signedPreKeys.size(), 1);
+    QCOMPARE(std::ranges::count(data.preKeys, Version::Omemo0, &Storage::PreKey::version), 100);
+    QCOMPARE(std::ranges::count(data.preKeys, Version::Omemo2, &Storage::PreKey::version), 100);
+
+    // set up again: nothing new is created
+    expectVariant<Success>(account.setUp());
+    QCOMPARE(account.manager->ownDeviceId().value(), id);
+    QCOMPARE(account.storage->allData().result().preKeys, data.preKeys);
+}
+
+void tst_OmemoManager2::setUpOnlyEnabledVersions()
+{
+    Account account;
+    account.manager->setEnabledVersions({ Version::Omemo0 });
+    expectVariant<Success>(account.setUp());
+
+    QCOMPARE(account.service.nodeNames(OWN_JID), (QList { v0Bundles(account.manager->ownDeviceId().value()), V0_DEVICE_LIST }));
+    const auto data = account.storage->allData().result();
+    QCOMPARE(std::ranges::count(data.preKeys, Version::Omemo2, &Storage::PreKey::version), 0);
+}
+
+void tst_OmemoManager2::setUpKeepsOtherOwnDevices()
+{
+    Account account;
+    account.service.setItem(OWN_JID, V0_DEVICE_LIST, u"current"_s, v0List({ 1111 }));
+    account.service.setItem(OWN_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2222, u"Laptop"_s } }));
+    expectVariant<Success>(account.setUp());
+
+    const auto id = account.manager->ownDeviceId().value();
+    QVERIFY(id != 1111 && id != 2222);
+    QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 1111 }));
+    QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 2222 }));
+    QVERIFY(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s).contains(u"label=\"Laptop\""_s));
+    QCOMPARE(account.manager->deviceIds(Version::Omemo0, OWN_JID), QList<uint32_t> { 1111 });
+    QCOMPARE(account.manager->deviceIds(Version::Omemo2, OWN_JID), QList<uint32_t> { 2222 });
+}
+
+void tst_OmemoManager2::setUpReconfiguresNodes()
+{
+    // nodes created by other clients with the default access model
+    Account account;
+    account.service.createNode(OWN_JID, V0_DEVICE_LIST, u"presence"_s, u"1"_s);
+    account.service.createNode(OWN_JID, V2_DEVICE_LIST, u"presence"_s, u"1"_s);
+    expectVariant<Success>(account.setUp());
+
+    QCOMPARE(account.service.node(OWN_JID, V0_DEVICE_LIST)->accessModel, u"open"_s);
+    QCOMPARE(account.service.node(OWN_JID, V2_DEVICE_LIST)->accessModel, u"open"_s);
+}
+
+void tst_OmemoManager2::load()
+{
+    auto storage = std::make_shared<MemoryStorage>();
+    uint32_t id;
+    QByteArray key;
+    {
+        Account account(storage);
+        account.service.setItem(OWN_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2222, {} } }));
+        QCOMPARE(account.manager->state().value(), Manager::State::NotSetUp);
+        expectVariant<Success>(account.setUp());
+        id = account.manager->ownDeviceId().value();
+        key = account.manager->ownKey().value();
+    }
+
+    // loaded when added to the client
+    Account account(storage);
+    QVERIFY(account.isReady());
+    QCOMPARE(account.manager->ownDeviceId().value(), id);
+    QCOMPARE(account.manager->ownKey().value(), key);
+    QCOMPARE(account.manager->deviceIds(Version::Omemo2, OWN_JID), QList<uint32_t> { 2222 });
+}
+
+void tst_OmemoManager2::ownDeviceIsRelisted()
+{
+    Account account;
+    expectVariant<Success>(account.setUp());
+    const auto id = account.manager->ownDeviceId().value();
+
+    // another client publishes a device list without this device
+    account.service.setItem(OWN_JID, V0_DEVICE_LIST, u"current"_s, v0List({ 1111 }));
+    account.client.inject(itemsEvent(OWN_JID, V0_DEVICE_LIST, v0List({ 1111 })));
+    account.service.process();
+
+    QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 1111 }));
+    QCOMPARE(account.manager->deviceIds(Version::Omemo0, OWN_JID), QList<uint32_t> { 1111 });
+
+    // the republished list does not lead to another publication
+    account.service.resetRequestCounts();
+    account.service.process();
+    QCOMPARE(account.service.requestCount(u"publish"_s), 0);
+}
+
+void tst_OmemoManager2::ownDeviceListIsRepublishedAfterDeletion()
+{
+    Account account;
+    expectVariant<Success>(account.setUp());
+
+    account.client.inject(u"<message from='juliet@capulet.lit' to='juliet@capulet.lit/balcony' type='headline'>"
+                          "<event xmlns='http://jabber.org/protocol/pubsub#event'><delete node='urn:xmpp:omemo:2:devices'/></event></message>"_s);
+    account.service.resetRequestCounts();
+    account.service.process();
+    QCOMPARE(account.service.requestCount(u"publish"_s), 1);
+}
+
+void tst_OmemoManager2::contactDeviceLists()
+{
+    Account account;
+    expectVariant<Success>(account.setUp());
+    QSignalSpy spy(account.manager, &Manager::devicesChanged);
+
+    account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 1, 2 })));
+    account.client.inject(itemsEvent(CONTACT_JID, V2_DEVICE_LIST, v2List({ { 3, u"Phone"_s } })));
+    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), (QList<uint32_t> { 1, 2 }));
+    QCOMPARE(account.manager->deviceIds(Version::Omemo2, CONTACT_JID), QList<uint32_t> { 3 });
+    QCOMPARE(spy.size(), 2);
+    QCOMPARE(spy.at(0).at(0).value<Version>(), Version::Omemo0);
+    QCOMPARE(spy.at(0).at(1).toString(), CONTACT_JID);
+
+    // the same list again changes nothing
+    account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 1, 2 })));
+    QCOMPARE(spy.size(), 2);
+
+    account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 2 })));
+    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
+    QCOMPARE(spy.size(), 3);
+
+    // stored
+    const auto devices = account.storage->allData().result().devices;
+    QCOMPARE(std::ranges::count(devices, CONTACT_JID, &Storage::Device::jid), 3);
+
+    // nothing is published for contacts
+    account.service.resetRequestCounts();
+    account.service.process();
+    QCOMPARE(account.service.requestCount(u"publish"_s), 0);
+}
+
+void tst_OmemoManager2::removedDevicesExpire()
+{
+    auto storage = std::make_shared<MemoryStorage>();
+    QDateTime start = QDateTime::currentDateTimeUtc();
+    {
+        Account account(storage);
+        expectVariant<Success>(account.setUp());
+        account.manager->d->fixedTime = start;
+        account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 1, 2 })));
+        account.client.inject(itemsEvent(CONTACT_JID, V0_DEVICE_LIST, v0List({ 2 })));
+    }
+
+    // not yet expired
+    {
+        Account account(storage);
+        account.manager->d->fixedTime = start.addDays(7 * 12 - 1);
+        account.manager->d->load();
+        QCOMPARE(std::ranges::count(storage->allData().result().devices, CONTACT_JID, &Storage::Device::jid), 2);
+    }
+
+    Account account(storage);
+    account.manager->d->fixedTime = start.addDays(7 * 12);
+    account.manager->d->load();
+    const auto devices = storage->allData().result().devices;
+    QCOMPARE(std::ranges::count(devices, CONTACT_JID, &Storage::Device::jid), 1);
+    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
+}
+
+void tst_OmemoManager2::supportedVersions()
+{
+    Account account;
+    expectVariant<Success>(account.setUp());
+    account.service.setItem(CONTACT_JID, V0_DEVICE_LIST, u"current"_s, v0List({ 1 }));
+
+    auto task = account.manager->supportedVersions(CONTACT_JID);
+    account.service.process();
+    QCOMPARE(expectFutureVariant<QList<Version>>(task), QList { Version::Omemo0 });
+    QCOMPARE(account.manager->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 1 });
+
+    account.service.setItem(CONTACT_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2, {} } }));
+    task = account.manager->supportedVersions(CONTACT_JID);
+    account.service.process();
+    QCOMPARE(expectFutureVariant<QList<Version>>(task), (QList { Version::Omemo0, Version::Omemo2 }));
+
+    task = account.manager->supportedVersions(u"mercutio@verona.lit"_s);
+    account.service.process();
+    QVERIFY(expectFutureVariant<QList<Version>>(task).isEmpty());
+}
+
+void tst_OmemoManager2::republishOnLogin()
+{
+    Account account;
+    expectVariant<Success>(account.setUp());
+    const auto id = account.manager->ownDeviceId().value();
+
+    // e.g. removed by another client
+    account.service.setNotificationsEnabled(false);
+    account.service.setItem(OWN_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2222, {} } }));
+
+    account.client.setStreamManagementState(QXmppClient::NewStream);
+    account.client.simulateConnected();
+    account.service.process();
+    QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 2222 }));
+
+    // not after resuming the stream
+    account.service.resetRequestCounts();
+    account.client.setStreamManagementState(QXmppClient::ResumedStream);
+    account.client.simulateConnected();
+    account.service.process();
+    QCOMPARE(account.service.requestCount(u"publish"_s), 0);
+}
+
+void tst_OmemoManager2::deviceLabel()
+{
+    QCoreApplication::setApplicationName(u"Wonderland"_s);
+    QVERIFY(Manager::defaultDeviceLabel().startsWith(u"Wonderland ("_s));
+    // the display name of a QGuiApplication is preferred
+    qApp->setProperty("applicationDisplayName", u"Wonderland Gardens"_s);
+    QVERIFY(Manager::defaultDeviceLabel().startsWith(u"Wonderland Gardens ("_s));
+    qApp->setProperty("applicationDisplayName", QVariant());
+    QVERIFY(Manager::defaultDeviceLabel().startsWith(u"Wonderland ("_s));
+
+    FakePubSubService server;
+    const auto published = [&] { return server.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s); };
+    auto storage = std::make_shared<MemoryStorage>();
+    {
+        Account account(storage, &server);
+        expectVariant<Success>(account.setUp());
+        QCOMPARE(account.manager->deviceLabel(), Manager::defaultDeviceLabel());
+        QVERIFY(published().contains(u"label=\""_s + Manager::defaultDeviceLabel() + u'"'));
+
+        // published immediately while being logged in
+        account.manager->setDeviceLabel(u"Laptop"_s);
+        server.process();
+        QVERIFY(published().contains(u"label=\"Laptop\""_s));
+    }
+
+    // The label is not stored, the default label is published again on the next login.
+    Account account(storage, &server);
+    expectVariant<Success>(account.setUp());
+    QVERIFY(published().contains(u"label=\""_s + Manager::defaultDeviceLabel() + u'"'));
+}
+
+void tst_OmemoManager2::enabledVersionsAtRuntime()
+{
+    Account account;
+    account.manager->setEnabledVersions({ Version::Omemo2 });
+    expectVariant<Success>(account.setUp());
+    const auto id = account.deviceId();
+    QVERIFY(!account.service.node(OWN_JID, V0_DEVICE_LIST));
+
+    account.manager->setEnabledVersions({ Version::Omemo0, Version::Omemo2 });
+    account.service.process();
+    QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), QList { id });
+    QVERIFY(account.service.node(OWN_JID, v0Bundles(id)));
+
+    account.manager->setEnabledVersions({ Version::Omemo0 });
+    account.service.process();
+    QVERIFY(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)).isEmpty());
+    QVERIFY(account.service.itemPayload(OWN_JID, V2_BUNDLES, QString::number(id)).isEmpty());
+
+    // disabled while being logged out
+    account.client.simulateDisconnected();
+    account.manager->setEnabledVersions({ Version::Omemo2 });
+    expectVariant<Success>(account.setUp());
+    QVERIFY(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)).isEmpty());
+    QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), QList { id });
+}
+
+QXMPP_TEST_MAIN(tst_QXmppOmemoManager, tst_QXmppOmemoMemoryStorage, SessionLayerTests::tst_OmemoSession, PayloadCipherTests::tst_OmemoPayloadCipher, KeyMaintenanceTests::tst_OmemoKeyMaintenance, DeviceListTests::tst_OmemoDeviceList, StorageTests::tst_OmemoStorage, PubSubTests::tst_OmemoPubSub, tst_OmemoManager2)
 
 #include "OmemoManager.moc"

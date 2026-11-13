@@ -7,6 +7,9 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
+#include "QXmppError.h"
+#include "QXmppOmemoStorage.h"
+#include "QXmppTask.h"
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
@@ -14,6 +17,7 @@ class QXmppOmemoDevicePrivate;
 class QXmppOmemoManagerPrivate;
 class QXmppOmemoOwnDevicePrivate;
 class QXmppOmemoStorage;
+class tst_OmemoManager2;
 
 class QXMPPOMEMO_EXPORT QXmppOmemoOwnDevice
 {
@@ -155,5 +159,57 @@ private:
     friend class QXmppOmemoManagerPrivate;
     friend class tst_QXmppOmemoManager;
 };
+
+namespace QXmpp::Omemo {
+
+class ManagerPrivate;
+
+class QXMPPOMEMO_EXPORT Manager : public QXmppClientExtension
+{
+    Q_OBJECT
+
+public:
+    enum class State {
+        Loading,
+        NotSetUp,
+        SettingUp,
+        Ready,
+    };
+    Q_ENUM(State)
+
+    explicit Manager(std::shared_ptr<Storage> storage, QList<Version> versions = { Version::Omemo0, Version::Omemo2 });
+    ~Manager() override;
+
+    QList<Version> enabledVersions() const;
+    void setEnabledVersions(QList<Version> versions);
+
+    QString deviceLabel() const;
+    void setDeviceLabel(const QString &label);
+    static QString defaultDeviceLabel();
+
+    QBindable<State> state() const;
+    QBindable<uint32_t> ownDeviceId() const;
+    QBindable<QByteArray> ownKey() const;
+
+    QList<uint32_t> deviceIds(Version version, const QString &jid) const;
+    QXmppTask<QXmpp::Result<QList<Version>>> supportedVersions(QString jid);
+
+    Q_SIGNAL void errorOccurred(const QXmppError &error);
+    Q_SIGNAL void devicesChanged(QXmpp::Omemo::Version version, const QString &jid);
+
+protected:
+    void onRegistered(QXmppClient *client) override;
+    void onUnregistered(QXmppClient *client) override;
+
+private:
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &service, const QString &node);
+
+    std::unique_ptr<ManagerPrivate> d;
+
+    friend class ManagerPrivate;
+    friend class ::tst_OmemoManager2;
+};
+
+}  // namespace QXmpp::Omemo
 
 #endif  // QXMPPOMEMOMANAGER_H
