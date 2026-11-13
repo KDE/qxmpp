@@ -667,7 +667,9 @@ void tst_QXmppPubSubForms::publishOptions()
     serializePacket(form, xml);
 
     // node configuration forms are not accepted
-    form.fields()[0].setValue(u"http://jabber.org/protocol/pubsub#node_config"_s);
+    auto fields = form.constFields();
+    fields[0].setValue(u"http://jabber.org/protocol/pubsub#node_config"_s);
+    form.setFields(fields);
     QVERIFY(!QXmppPubSubPublishOptions::fromDataForm(form).has_value());
 }
 
