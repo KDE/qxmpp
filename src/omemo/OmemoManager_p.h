@@ -158,6 +158,8 @@ public:
     static QString trustNamespace(Version version);
     void registerProviders();
     QXmppTask<TrustLevel> trustLevel(Version version, QString jid, QByteArray key);
+    QList<QByteArray> sameIdentityKeys(Version version, const QString &jid, const QByteArray &key) const;
+    QXmppTask<void> mirrorTrustLevels(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys);
     QXmppTask<bool> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);
     QXmppTask<Result<QList<Envelope>>> encryptKey(Version version, QList<Jid> recipientJids, SecureByteArray keyMaterial, TrustLevels acceptedTrustLevels);
     QXmppTask<Result<DecryptedEnvelope>> decryptKey(Version version, QString jid, uint32_t deviceId, QByteArray data, bool isKeyExchange, bool isMessage);
