@@ -31,6 +31,8 @@
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
+#include <unordered_map>
+
 #include <QDomElement>
 
 using namespace QXmpp;
@@ -38,10 +40,39 @@ using namespace QXmpp::Private;
 
 using enum QXmppMixManager::Support;
 
+// Participants of a MIX channel the own account is in, the recipients of encrypted messages.
+struct MixChannelParticipants {
+    // bare JIDs by participant ID, empty if the channel hides the JID; set once retrieved
+    std::optional<std::unordered_map<QString, QString>> jids;
+    // changes received while the participants are retrieved, applied to the result (nullopt: left)
+    std::unordered_map<QString, std::optional<QString>> changes;
+    // messages waiting for the participants, non-empty while they are retrieved
+    std::vector<QXmppPromise<Result<QList<QString>>>> waiters;
+    // identifies this entry, a retrieval for a removed entry is discarded
+    uint64_t generation = 0;
+};
+
 class QXmppMixManagerPrivate
 {
 public:
+    QXmppTask<void> resolveRecipients(Messages::OutgoingMessage &outgoing);
+    QXmppTask<Result<QList<QString>>> requestParticipantJids(const QString &channelJid);
+    QXmppTask<void> fetchParticipantJids(QString channelJid, uint64_t generation);
+    void updateParticipant(const QString &channelJid, const QString &participantId, std::optional<QString> jid);
+    bool isJoinedChannel(const QString &channelJid);
+    void removeChannel(const QString &channelJid);
+    void removeAllChannels();
+    static void finishWaiters(MixChannelParticipants &channel, const QXmppError &error);
+
+    QXmppMixManager *q = nullptr;
+    QXmppClient *client = nullptr;
     QXmppPubSubManager *pubSubManager = nullptr;
+    QXmppRosterManager *rosterManager = nullptr;
+    // Participants of the channels encrypted messages have been sent to in this session. Retrieved
+    // before the first encrypted message and kept up to date by the events of the participants
+    // node.
+    std::unordered_map<QString, MixChannelParticipants> channels;
+    uint64_t nextGeneration = 0;
     QXmppDiscoveryManager *discoveryManager = nullptr;
     QXmppDiscoFeatureWatch participantSupportWatch;
     QXmppDiscoFeatureWatch messageArchivingSupportWatch;
@@ -156,16 +187,15 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
     client->send(std::move(message));
     \endcode
 
-    Example for an encrypted message decryptable by Alice and Bob:
-    \code
-    message->setType(QXmppMessage::GroupChat);
-    message->setTo("group@mix.example.org")
-
-    QXmppSendStanzaParams params;
-    params.setEncryptionJids({ "alice@example.org", "bob@example.com" })
-
-    LegacyE2ee::sendSensitive(client, std::move(message), params);
-    \endcode
+    If an end-to-end encryption is selected for a message to a channel via
+    QXmpp::Messages::SelectEncryption, the message is encrypted for all participants of the channel.
+    For that, the manager retrieves the participants before the first encrypted message to a channel
+    of a session and keeps them up to date via the events of the participants node. Thus, the
+    participants node must be subscribed to (the default of joinChannel()). The channel must be in
+    the roster as specified in \xep{0405}{Mediated Information eXchange (MIX): Participant Server
+    Requirements}, which requires the QXmppRosterManager. Messages to channels hiding the JIDs of
+    their participants cannot be encrypted. If the JIDs to encrypt for are set via
+    QXmppSendStanzaParams::setEncryptionJids(), they are used instead.
 
     If you receive a message, you can check whether it contains an invitation to a MIX channel and
     use that invitation to join the channel:
@@ -450,6 +480,7 @@ constexpr QStringView MIX_SERVICE_DISCOVERY_NODE = u"mix";
 QXmppMixManager::QXmppMixManager()
     : d(new QXmppMixManagerPrivate())
 {
+    d->q = this;
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_mix);
     });
@@ -466,6 +497,8 @@ QXmppMixManager::QXmppMixManager()
         }
         return HookResult::Continue;
     });
+    // Encrypted messages are encrypted for all participants of the channel.
+    hooks().add<Messages::ResolveRecipients>(d.get(), &QXmppMixManagerPrivate::resolveRecipients);
 }
 
 QXmppMixManager::~QXmppMixManager() = default;
@@ -1101,6 +1134,7 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::deleteChannel(const QString
 
 void QXmppMixManager::onRegistered(QXmppClient *client)
 {
+    d->client = client;
     d->discoveryManager = client->findExtension<QXmppDiscoveryManager>();
     Q_ASSERT_X(d->discoveryManager, "QXmppMixManager", "QXmppDiscoveryManager is missing");
 
@@ -1143,6 +1177,13 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
 
     d->pubSubManager = client->findExtension<QXmppPubSubManager>();
     Q_ASSERT_X(d->pubSubManager, "QXmppMixManager", "QXmppPubSubManager is missing");
+
+    // participant events may have been missed without a resumed stream
+    connect(client, &QXmppClient::connected, this, [this] {
+        if (this->client()->streamManagementState() != QXmppClient::ResumedStream) {
+            d->removeAllChannels();
+        }
+    });
 
     // data import/export
     if (auto manager = client->findExtension<QXmppAccountMigrationManager>()) {
@@ -1209,6 +1250,13 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
 
 void QXmppMixManager::onUnregistered(QXmppClient *client)
 {
+    disconnect(client, nullptr, this, nullptr);
+    if (d->rosterManager) {
+        disconnect(d->rosterManager, nullptr, this, nullptr);
+        d->rosterManager = nullptr;
+    }
+    d->removeAllChannels();
+    d->client = nullptr;
     d->servicesNotifier = {};
     d->services = QList<Service>();
     d->servicesWatch = {};
@@ -1351,6 +1399,7 @@ HookResult QXmppMixManager::handlePubSubEvent(const QDomElement &element, const 
         case QXmppPubSubEventBase::Items: {
             const auto items = event.items();
             for (const auto &item : items) {
+                d->updateParticipant(pubSubService, item.id(), QXmppUtils::jidToBareJid(item.jid()));
                 Q_EMIT participantReceived(pubSubService, item);
             }
             break;
@@ -1359,6 +1408,7 @@ HookResult QXmppMixManager::handlePubSubEvent(const QDomElement &element, const 
         case QXmppPubSubEventBase::Retract: {
             const auto ids = event.retractIds();
             for (const auto &id : ids) {
+                d->updateParticipant(pubSubService, id, std::nullopt);
                 Q_EMIT participantLeft(pubSubService, id);
             }
             break;
@@ -1367,6 +1417,7 @@ HookResult QXmppMixManager::handlePubSubEvent(const QDomElement &element, const 
         case QXmppPubSubEventBase::Purge:
         // The whole node is deleted.
         case QXmppPubSubEventBase::Delete:
+            d->removeChannel(pubSubService);
             Q_EMIT channelDeleted(pubSubService);
             break;
         case QXmppPubSubEventBase::Configuration:
@@ -1452,4 +1503,168 @@ QXmppTask<QXmppMixManager::JidResult> QXmppMixManager::requestJids(const QString
 QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::addJidToNode(const QString &channelJid, const QString &node, const QString &jid)
 {
     co_return mapToSuccess(co_await d->pubSubManager->publishItem(channelJid, node, QXmppPubSubBaseItem { jid }).withContext(this));
+}
+
+// Sets the participants of a joined channel as recipients of an encrypted message.
+QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMessage &outgoing)
+{
+    const auto &message = outgoing.message();
+    if (message.type() != QXmppMessage::GroupChat) {
+        co_return;
+    }
+    const auto channelJid = QXmppUtils::jidToBareJid(message.to());
+    // recipients set by the sender are kept
+    if (outgoing.recipientJids() != QList<QString> { channelJid } || !isJoinedChannel(channelJid)) {
+        co_return;
+    }
+
+    // also the participants who are offline
+    auto result = co_await requestParticipantJids(channelJid).withContext(q);
+    if (auto *error = std::get_if<QXmppError>(&result)) {
+        outgoing.setError(QXmppError { u"Could not retrieve the participants of the channel: "_s + error->description, SendError::EncryptionError });
+        co_return;
+    }
+
+    const auto ownJid = client->configuration().jidBare();
+    QList<QString> recipients;
+    for (const auto &jid : std::get<QList<QString>>(result)) {
+        if (jid.isEmpty()) {
+            outgoing.setError(QXmppError { u"Messages to channels hiding the JIDs of their participants can not be encrypted"_s, SendError::EncryptionError });
+            co_return;
+        }
+        if (jid != ownJid && !recipients.contains(jid)) {
+            recipients.append(jid);
+        }
+    }
+    outgoing.recipientJids() = recipients;
+}
+
+// Whether the own account is a participant of the channel, i.e., it is in the roster.
+bool QXmppMixManagerPrivate::isJoinedChannel(const QString &channelJid)
+{
+    if (!rosterManager) {
+        rosterManager = client->findExtension<QXmppRosterManager>();
+        if (!rosterManager) {
+            return false;
+        }
+        // the participants of a left or rejoined channel are retrieved again
+        auto remove = [this](const QString &jid) { removeChannel(jid); };
+        QObject::connect(rosterManager, &QXmppRosterManager::itemAdded, q, remove);
+        QObject::connect(rosterManager, &QXmppRosterManager::itemRemoved, q, remove);
+    }
+    return rosterManager->getRosterEntry(channelJid).isMixChannel();
+}
+
+static QList<QString> participantJids(const std::unordered_map<QString, QString> &jids)
+{
+    return transform<QList<QString>>(jids, [](const auto &entry) { return entry.second; });
+}
+
+// The bare JIDs of the participants of the channel (empty if hidden), retrieved once per session.
+QXmppTask<Result<QList<QString>>> QXmppMixManagerPrivate::requestParticipantJids(const QString &channelJid)
+{
+    auto itr = channels.find(channelJid);
+    if (itr == channels.end()) {
+        itr = channels.emplace(channelJid, MixChannelParticipants { .generation = nextGeneration++ }).first;
+    }
+    auto &channel = itr->second;
+    if (channel.jids) {
+        return makeReadyTask<Result<QList<QString>>>(participantJids(*channel.jids));
+    }
+    QXmppPromise<Result<QList<QString>>> promise;
+    auto task = promise.task();
+    channel.waiters.push_back(std::move(promise));
+    if (channel.waiters.size() == 1) {
+        fetchParticipantJids(channelJid, channel.generation);
+    }
+    return task;
+}
+
+QXmppTask<void> QXmppMixManagerPrivate::fetchParticipantJids(QString channelJid, uint64_t generation)
+{
+    auto result = co_await q->requestParticipants(channelJid).withContext(q);
+
+    auto itr = channels.find(channelJid);
+    if (itr == channels.end() || itr->second.generation != generation) {
+        // the waiters have been finished when the channel was removed
+        co_return;
+    }
+    auto &channel = itr->second;
+
+    if (auto *error = std::get_if<QXmppError>(&result)) {
+        // the next message retries
+        auto removed = std::move(channel);
+        channels.erase(itr);
+        finishWaiters(removed, *error);
+        co_return;
+    }
+
+    std::unordered_map<QString, QString> jids;
+    for (const auto &participant : std::get<QList<QXmppMixParticipantItem>>(result)) {
+        jids.insert_or_assign(participant.id(), QXmppUtils::jidToBareJid(participant.jid()));
+    }
+    for (auto &[id, jid] : channel.changes) {
+        if (jid) {
+            jids.insert_or_assign(id, *jid);
+        } else {
+            jids.erase(id);
+        }
+    }
+    channel.changes.clear();
+    channel.jids = std::move(jids);
+
+    const auto participants = participantJids(*channel.jids);
+    auto waiters = std::move(channel.waiters);
+    channel.waiters.clear();
+    for (auto &waiter : waiters) {
+        waiter.finish(participants);
+    }
+}
+
+// Applies a participant event, \a jid is nullopt if the participant left.
+void QXmppMixManagerPrivate::updateParticipant(const QString &channelJid, const QString &participantId, std::optional<QString> jid)
+{
+    auto itr = channels.find(QXmppUtils::jidToBareJid(channelJid));
+    if (itr == channels.end() || participantId.isEmpty()) {
+        return;
+    }
+    auto &channel = itr->second;
+    if (channel.jids) {
+        if (jid) {
+            channel.jids->insert_or_assign(participantId, *jid);
+        } else {
+            channel.jids->erase(participantId);
+        }
+    } else {
+        channel.changes.insert_or_assign(participantId, std::move(jid));
+    }
+}
+
+void QXmppMixManagerPrivate::removeChannel(const QString &channelJid)
+{
+    auto itr = channels.find(QXmppUtils::jidToBareJid(channelJid));
+    if (itr == channels.end()) {
+        return;
+    }
+    auto removed = std::move(itr->second);
+    channels.erase(itr);
+    finishWaiters(removed, QXmppError { u"The participants of the channel changed"_s, SendError::EncryptionError });
+}
+
+void QXmppMixManagerPrivate::removeAllChannels()
+{
+    auto removed = std::move(channels);
+    channels.clear();
+    for (auto &[_, channel] : removed) {
+        finishWaiters(channel, QXmppError { u"The session has ended"_s, SendError::Disconnected });
+    }
+}
+
+void QXmppMixManagerPrivate::finishWaiters(MixChannelParticipants &channel, const QXmppError &error)
+{
+    auto waiters = std::move(channel.waiters);
+    channel.waiters.clear();
+    for (auto &waiter : waiters) {
+        waiter.finish(error);
+    }
 }

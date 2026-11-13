@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppAsync_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppE2eeProvider.h"
+#include "QXmppMessages.h"
 #include "QXmppMixInfoItem.h"
 #include "QXmppMixInvitation.h"
 #include "QXmppMixIq.h"
@@ -10,6 +13,7 @@
 #include "QXmppMixParticipantItem.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
+#include "QXmppRosterManager.h"
 
 #include "TestClient.h"
 
@@ -76,6 +80,10 @@ private:
     Q_SLOT void testRequestParticipants();
     Q_SLOT void testLeaveChannel();
     Q_SLOT void testDeleteChannel();
+    Q_SLOT void testSendMessageEncrypted();
+    Q_SLOT void testSendMessageEncryptedNoChannel();
+    Q_SLOT void testSendMessageEncryptedError();
+    Q_SLOT void testSendMessageEncryptedHiddenJids();
 
     template<typename T>
     void testErrorFromChannel(QXmppTask<T> &task, TestClient &client);
@@ -1659,6 +1667,217 @@ void tst_QXmppMixManager::testDeleteChannel()
     expectFutureVariant<QXmpp::Success>(task);
 
     testError(task = call(), client, u"qx1"_s, u"mix.shakespeare.example"_s);
+}
+
+// encrypts nothing, records the recipients
+class MixTestE2eeManager : public QXmppClientExtension
+{
+    Q_OBJECT
+public:
+    static constexpr QStringView Encryption = u"urn:test:mix-e2ee";
+
+    MixTestE2eeManager()
+    {
+        QXmpp::E2ee::Providers(hooks()).add(QXmpp::E2ee::Provider {
+            .encryption = Encryption,
+            .encryptMessage = [this](QXmpp::E2ee::EncryptRequest request) {
+                recipientJids = request.recipientJids();
+                std::ranges::sort(recipientJids);
+                return QXmpp::Private::makeReadyTask<QXmpp::E2ee::EncryptResult>(QXmpp::E2ee::Encrypted());
+            },
+        });
+    }
+
+    QList<QString> recipientJids;
+};
+
+struct EncryptionTester : Tester {
+    EncryptionTester()
+        : Tester(u"hag66@shakespeare.example/pda"_s)
+    {
+        client.addNewExtension<QXmppRosterManager>(&client);
+        e2ee = client.addNewExtension<MixTestE2eeManager>();
+        client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([](QXmpp::Messages::EncryptionSelection &selection) {
+            selection.setEncryption(MixTestE2eeManager::Encryption);
+        });
+
+        // the joined channel is in the roster
+        client.inject(u"<iq id='push1' type='set'><query xmlns='jabber:iq:roster'>"
+                      "<item jid='coven@mix.shakespeare.example' subscription='both'>"
+                      "<channel xmlns='urn:xmpp:mix:roster:0' participant-id='123456'/>"
+                      "</item></query></iq>"_s);
+        client.ignore();
+    }
+
+    QXmppTask<QXmpp::SendResult> send(const QString &to = u"coven@mix.shakespeare.example"_s, QXmppSendStanzaParams params = {})
+    {
+        QXmppMessage message(u"hag66@shakespeare.example/pda"_s, to, u"Hi"_s);
+        message.setType(QXmppMessage::GroupChat);
+        return client.send(std::move(message), params);
+    }
+
+    // returns the ID of the request
+    QString expectParticipantsRequest()
+    {
+        return client.expectPacketRandomOrder(
+            u"<iq id='qx1' to='coven@mix.shakespeare.example' type='get'>"
+            "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+            "<items node='urn:xmpp:mix:nodes:participants'/>"
+            "</pubsub></iq>"_s);
+    }
+
+    // answers the request of the participants with the participants (participant ID, JID)
+    void answerParticipants(const std::vector<std::pair<QString, QString>> &participants)
+    {
+        const auto id = expectParticipantsRequest();
+        QString items;
+        for (const auto &[participantId, jid] : participants) {
+            items += u"<item id='"_s + participantId + u"'><participant xmlns='urn:xmpp:mix:core:1'>"_s +
+                (jid.isEmpty() ? QString() : u"<jid>"_s + jid + u"</jid>"_s) + u"</participant></item>"_s;
+        }
+        client.inject(u"<iq id='"_s + id + u"' from='coven@mix.shakespeare.example' type='result'>"
+                                           "<pubsub xmlns='http://jabber.org/protocol/pubsub'>"
+                                           "<items node='urn:xmpp:mix:nodes:participants'>"_s +
+                      items + u"</items></pubsub></iq>"_s);
+    }
+
+    // the encrypted message has been sent, the stream acknowledges it later
+    void expectSent(const QXmppTask<QXmpp::SendResult> &task)
+    {
+        const auto packet = client.takePacket();
+        QVERIFY2(packet.startsWith(u"<message"_s), qPrintable(packet));
+        QVERIFY(!task.isFinished());
+    }
+
+    void injectParticipantEvent(const QString &content, const QString &from = u"coven@mix.shakespeare.example"_s)
+    {
+        client.inject(u"<message from='"_s + from + u"' to='hag66@shakespeare.example'>"
+                                                    "<event xmlns='http://jabber.org/protocol/pubsub#event'>"_s +
+                      content + u"</event></message>"_s);
+    }
+
+    void injectParticipantJoined(const QString &participantId, const QString &jid, const QString &from = u"coven@mix.shakespeare.example"_s)
+    {
+        injectParticipantEvent(u"<items node='urn:xmpp:mix:nodes:participants'><item id='"_s + participantId +
+                                   u"'><participant xmlns='urn:xmpp:mix:core:1'><jid>"_s + jid + u"</jid></participant></item></items>"_s,
+                               from);
+    }
+
+    void injectParticipantLeft(const QString &participantId)
+    {
+        injectParticipantEvent(u"<items node='urn:xmpp:mix:nodes:participants'><retract id='"_s + participantId + u"'/></items>"_s);
+    }
+
+    QObject owner;
+    MixTestE2eeManager *e2ee;
+};
+
+void tst_QXmppMixManager::testSendMessageEncrypted()
+{
+    EncryptionTester tester;
+    auto &client = tester.client;
+
+    auto task = tester.send();
+    // changes received while the participants are retrieved are applied afterwards
+    tester.injectParticipantJoined(u"123459"_s, u"hag69@shakespeare.example"_s);
+    tester.injectParticipantLeft(u"123457"_s);
+    // the offline participants are recipients too, not this account
+    tester.answerParticipants({ { u"123456"_s, u"hag66@shakespeare.example"_s },
+                                { u"123457"_s, u"hag67@shakespeare.example"_s },
+                                { u"123458"_s, u"hag68@shakespeare.example/desktop"_s } });
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag68@shakespeare.example"_s, u"hag69@shakespeare.example"_s }));
+    tester.expectSent(task);
+
+    // the events of the participants node are tracked
+    tester.injectParticipantJoined(u"123460"_s, u"hag70@shakespeare.example"_s);
+    tester.injectParticipantLeft(u"123458"_s);
+    // only the channel can publish its participants
+    tester.injectParticipantJoined(u"123461"_s, u"mallory@shakespeare.example"_s, u"hag67@shakespeare.example"_s);
+
+    // the participants are not requested again
+    task = tester.send();
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag69@shakespeare.example"_s, u"hag70@shakespeare.example"_s }));
+    tester.expectSent(task);
+    client.expectNoPacket();
+
+    // recipients set by the sender are kept
+    QXmppSendStanzaParams params;
+    params.setEncryptionJids({ u"hag70@shakespeare.example"_s });
+    task = tester.send(u"coven@mix.shakespeare.example"_s, params);
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag70@shakespeare.example"_s }));
+    tester.expectSent(task);
+
+    // events may have been missed in a new stream
+    client.setStreamManagementState(QXmppClient::NewStream);
+    Q_EMIT client.connected();
+    // the requests of the server features
+    client.ignore();
+    client.ignore();
+    task = tester.send();
+    tester.answerParticipants({ { u"123457"_s, u"hag67@shakespeare.example"_s } });
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag67@shakespeare.example"_s }));
+    tester.expectSent(task);
+
+    // the participants of a rejoined channel are requested again
+    client.inject(u"<iq id='push2' type='set'><query xmlns='jabber:iq:roster'>"
+                  "<item jid='coven@mix.shakespeare.example' subscription='remove'/>"
+                  "</query></iq>"_s);
+    client.inject(u"<iq id='push3' type='set'><query xmlns='jabber:iq:roster'>"
+                  "<item jid='coven@mix.shakespeare.example' subscription='both'>"
+                  "<channel xmlns='urn:xmpp:mix:roster:0' participant-id='123462'/>"
+                  "</item></query></iq>"_s);
+    client.ignore();
+    client.ignore();
+    task = tester.send();
+    tester.answerParticipants({ { u"123458"_s, u"hag68@shakespeare.example"_s } });
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag68@shakespeare.example"_s }));
+    tester.expectSent(task);
+}
+
+void tst_QXmppMixManager::testSendMessageEncryptedNoChannel()
+{
+    EncryptionTester tester;
+    auto &client = tester.client;
+
+    // not a joined channel
+    auto task = tester.send(u"group@mix.shakespeare.example"_s);
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"group@mix.shakespeare.example"_s }));
+    tester.expectSent(task);
+    client.expectNoPacket();
+}
+
+void tst_QXmppMixManager::testSendMessageEncryptedError()
+{
+    EncryptionTester tester;
+    auto &client = tester.client;
+
+    // the second message waits for the first one
+    auto first = tester.send();
+    auto second = tester.send();
+    const auto id = tester.expectParticipantsRequest();
+    client.inject(u"<iq id='"_s + id + u"' from='coven@mix.shakespeare.example' type='error'>"
+                                       "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+
+    // not sent without all participants
+    QCOMPARE(expectFutureVariant<QXmppError>(first).value<QXmpp::SendError>(), QXmpp::SendError::EncryptionError);
+    QVERIFY(tester.e2ee->recipientJids.isEmpty());
+
+    // the next message retries
+    tester.answerParticipants({ { u"123457"_s, u"hag67@shakespeare.example"_s } });
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag67@shakespeare.example"_s }));
+    tester.expectSent(second);
+}
+
+void tst_QXmppMixManager::testSendMessageEncryptedHiddenJids()
+{
+    EncryptionTester tester;
+    auto &client = tester.client;
+
+    auto task = tester.send();
+    tester.answerParticipants({ { u"123456"_s, u"hag66@shakespeare.example"_s }, { u"123457"_s, {} } });
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<QXmpp::SendError>(), QXmpp::SendError::EncryptionError);
+    QVERIFY(tester.e2ee->recipientJids.isEmpty());
+    client.expectNoPacket();
 }
 
 template<typename T>
