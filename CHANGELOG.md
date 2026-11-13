@@ -49,10 +49,11 @@ QXmpp 1.18.0 (UNRELEASED)
  - ATM: Trust messages are encrypted with the encryption they refer to, independent of the `SelectEncryption` hook; it must encrypt the whole content (OMEMO 2), else sending fails (@lnj, !846)
  - ATM: Add the store hint to trust messages (@lnj, !846)
  - Uri: Add OMEMO fingerprints in the format of Conversations (`omemo-sid-<device ID>=<key ID>`) via `QXmppUri::omemoFingerprints()`; URIs with only fingerprints and no query type can be parsed now (@lnj, !849)
- - MixManager: Encrypt messages to joined channels for all participants, also offline ones; they are retrieved before the first encrypted message of a session and kept up to date via the participants node (@lnj)
+ - MixManager: Encrypt messages to joined channels for all participants, also offline ones; they are retrieved before the first encrypted message of a session and kept up to date via the participants node (@lnj, !845)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
+ - MixManager: The real sender stamped by a channel is only used for channels in the roster, which requires the QXmppRosterManager; messages of MUC rooms joined via QXmppMucManagerV2 with the JID of a channel are left to the MUC manager (@lnj, !845)
  - The managers of QXmpp no longer override `discoveryFeatures()`/`discoveryIdentities()` and `handleStanza()` and no longer implement `QXmppPubSubEventHandler` and `QXmppMessageHandler`; calling `handleStanza()` of a manager directly has no effect anymore, the `handleMessage()` functions stay (@lnj, !839)
  - Handlers of the `StanzaReceived` hook, i.e. the managers of QXmpp, run before implementations of `handleStanza()` (@lnj, !839)
  - XmlRegistry: The logging category is now `org.qxmpp.xml.registry` (@lnj, !839)

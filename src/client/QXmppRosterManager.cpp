@@ -207,6 +207,7 @@ public:
     QXmppRosterManagerPrivate();
 
     void clear();
+    void finishSyncWaiters();
 
     // map of bareJid and its rosterEntry
     QMap<QString, QXmppRosterIq::Item> entries;
@@ -216,6 +217,12 @@ public:
 
     // flag to store that the roster has been populated
     bool isRosterReceived;
+    // set while the roster of the current stream is loaded and requested
+    bool syncing = false;
+    // identifies the sync of the current stream
+    uint64_t syncGeneration = 0;
+    // waiting for the end of the sync, see waitForSync()
+    std::vector<QXmppPromise<void>> syncWaiters;
 
     // RFC 6121 §2.6: Roster Versioning
     QString cachedVersion;
@@ -246,6 +253,16 @@ void QXmppRosterManagerPrivate::clear()
     cachedVersion.clear();
 }
 
+void QXmppRosterManagerPrivate::finishSyncWaiters()
+{
+    syncing = false;
+    auto waiters = std::move(syncWaiters);
+    syncWaiters.clear();
+    for (auto &waiter : waiters) {
+        waiter.finish();
+    }
+}
+
 /*!
     Constructs a roster manager.
 
@@ -263,9 +280,21 @@ QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
     // The cache must survive the end of a session, that is the whole point of roster
     // versioning: the next session re-syncs via initRosterFromCacheAndSync(). On stream
     // resumption the in-memory state is already in sync, pushes are replayed.
-    hooks().add<Connection::SessionStarted>([this] { initRosterFromCacheAndSync(); });
-    // presences are only received during the session
-    hooks().add<Connection::SessionEnded>([this] { d->presences.clear(); });
+    hooks().add<Connection::SessionStarted>([this] {
+        // the roster of the previous session is outdated until the sync has finished
+        d->isRosterReceived = false;
+        d->syncing = true;
+        initRosterFromCacheAndSync().then(this, [this, generation = ++d->syncGeneration] {
+            if (generation == d->syncGeneration) {
+                d->finishSyncWaiters();
+            }
+        });
+    });
+    hooks().add<Connection::SessionEnded>([this] {
+        // presences are only received during the session
+        d->presences.clear();
+        d->finishSyncWaiters();
+    });
 
     connect(client, &QXmppClient::presenceReceived,
             this, &QXmppRosterManager::_q_presenceReceived);
@@ -339,6 +368,18 @@ bool QXmppRosterManager::acceptSubscription(const QString &bareJid, const QStrin
     presence.setType(QXmppPresence::Subscribed);
     presence.setStatusText(reason);
     return client()->sendLegacy(presence);
+}
+
+// Finishes when the roster of the current stream has been received or its request failed.
+QXmppTask<void> QXmppRosterManager::waitForSync()
+{
+    if (!d->syncing) {
+        return makeReadyTask();
+    }
+    QXmppPromise<void> promise;
+    auto task = promise.task();
+    d->syncWaiters.push_back(std::move(promise));
+    return task;
 }
 
 QXmppTask<void> QXmppRosterManager::initRosterFromCacheAndSync()
@@ -804,6 +845,7 @@ void QXmppRosterManager::onUnregistered(QXmppClient *client)
     if (auto manager = client->findExtension<QXmppAccountMigrationManager>()) {
         manager->unregisterExportData<RosterData>();
     }
+    d->finishSyncWaiters();
 }
 
 /*!

@@ -193,11 +193,13 @@ private:
 
     void handleSubscriptionRequest(const QString &bareJid, const QXmppPresence &presence);
     QXmppTask<void> initRosterFromCacheAndSync();
+    QXmppTask<void> waitForSync();
     QXmppTask<RosterResult> requestRoster(std::optional<QString> version = {});
 
     const std::unique_ptr<QXmppRosterManagerPrivate> d;
 
     friend class QXmppMixManager;
+    friend class QXmppMixManagerPrivate;
 };
 
 #endif  // QXMPPROSTER_H
