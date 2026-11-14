@@ -66,6 +66,13 @@ struct Envelope {
     bool isKeyExchange = false;
 };
 
+// a device a message is encrypted for
+struct Recipient {
+    Version version;
+    QString jid;
+    uint32_t deviceId = 0;
+};
+
 struct DecryptedEnvelope {
     SecureByteArray data;
     // in the format of the version
@@ -164,8 +171,11 @@ public:
     QXmppTask<TrustLevel> trustLevel(Version version, QString jid, QByteArray key);
     QList<QByteArray> sameIdentityKeys(Version version, const QString &jid, const QByteArray &key) const;
     QXmppTask<void> mirrorTrustLevels(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys);
+    bool usesOmemo2(const QString &jid, uint32_t omemo0DeviceId) const;
+    bool isSticky(const OmemoStorage::Device &omemo2Device) const;
     QXmppTask<bool> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);
-    QXmppTask<Result<QList<Envelope>>> encryptKey(Version version, QList<Jid> recipientJids, SecureByteArray keyMaterial, TrustLevels acceptedTrustLevels);
+    QXmppTask<Result<QList<Recipient>>> selectDevices(QList<Version> versions, QList<Jid> recipientJids, TrustLevels acceptedTrustLevels);
+    QList<Envelope> encryptKey(Version version, const QList<Recipient> &recipients, const SecureByteArray &keyMaterial);
     QXmppTask<Result<DecryptedEnvelope>> decryptKey(Version version, QString jid, uint32_t deviceId, QByteArray data, bool isKeyExchange, bool isMessage);
     void refreshDeviceList(Version version, const QString &jid);
     void sendEmptyMessage(Version version, const QString &jid, uint32_t deviceId);
@@ -179,6 +189,7 @@ public:
     QXmppTask<E2ee::DecryptResult> decryptIq2(E2ee::DecryptIqRequest request);
     QXmppTask<E2ee::EncryptResult> encryptMessage0(E2ee::EncryptRequest request);
     QXmppTask<E2ee::DecryptResult> decryptMessage0(E2ee::DecryptRequest request);
+    QXmppTask<E2ee::EncryptResult> encryptMessageAutomatic(E2ee::EncryptRequest request);
 
     OmemoManager *q;
     std::shared_ptr<OmemoStorage> storage;

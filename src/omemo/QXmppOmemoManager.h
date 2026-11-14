@@ -168,6 +168,8 @@ class OmemoManagerPrivate;
 
 namespace QXmpp::Omemo {
 
+inline constexpr QStringView Automatic = u"org.qxmpp.omemo-auto";
+
 struct Device {
     Version version = Version::Omemo2;
     QXmpp::Jid jid {};
