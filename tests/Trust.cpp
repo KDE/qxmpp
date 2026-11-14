@@ -6,15 +6,20 @@
 // unit so the shared Qt/QXmpp headers are parsed once instead of N times.
 // main() runs each test class in turn via QTest::qExec().
 
+#include "QXmppAsync_p.h"
 #include "QXmppAtmManager.h"
 #include "QXmppAtmTrustMemoryStorage.h"
 #include "QXmppCarbonManager.h"
 #include "QXmppClient.h"
+#include "QXmppClientExtension.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppE2eeProvider.h"
 #include "QXmppMessage.h"
+#include "QXmppMessages.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppTrustMessageKeyOwner.h"
 #include "QXmppUtils.h"
+#include "QXmppXmlRegistry.h"
 
 #include "util.h"
 
@@ -32,6 +37,60 @@ constexpr int UNEXPECTED_TRUST_MESSAGE_WAITING_TIMEOUT = 1000;
 static const char *ns_atm = "urn:xmpp:atm:1";
 static const char *ns_omemo = "eu.siacs.conversations.axolotl";
 static const char *ns_ox = "urn:xmpp:openpgp:0";
+
+// Element of the test encryption containing the whole message encoded in Base64.
+struct TestEncrypted {
+    static constexpr std::tuple XmlTag = { u"encrypted", u"urn:test:atm" };
+
+    QString data;
+
+    static std::optional<TestEncrypted> fromDom(const QDomElement &el)
+    {
+        return TestEncrypted { el.attribute(u"data"_s) };
+    }
+
+    void toXml(QXmlStreamWriter *w) const
+    {
+        w->writeStartElement(u"encrypted"_s);
+        w->writeDefaultNamespace(u"urn:test:atm"_s);
+        w->writeAttribute(u"data"_s, data);
+        w->writeEndElement();
+    }
+};
+
+// Test provider for ns_omemo, it "encrypts" by encoding the message.
+class TestE2ee : public QXmppClientExtension
+{
+public:
+    TestE2ee()
+    {
+        E2ee::Providers(hooks()).add(E2ee::Provider {
+            .encryption = u"eu.siacs.conversations.axolotl",
+            .encryptMessage = [this](E2ee::EncryptRequest request) {
+                acceptedTrustLevels = request.params().acceptedTrustLevels();
+                Xml::Extensions elements;
+                elements.add(TestEncrypted { QString::fromUtf8(packetToXml(request.message()).toBase64()) });
+                E2ee::Encrypted encrypted;
+                encrypted.setElements(std::move(elements));
+                return QXmpp::Private::makeReadyTask<E2ee::EncryptResult>(std::move(encrypted)); },
+        });
+    }
+
+    std::optional<TrustLevels> acceptedTrustLevels;
+};
+
+// Parses the message encrypted by TestE2ee.
+static QXmppMessage decryptSentMessage(const QString &xml)
+{
+    const auto encrypted = xmlToDom(xml).firstChildElement(u"encrypted"_s);
+    if (encrypted.namespaceURI() != u"urn:test:atm") {
+        qWarning() << "Message has not been encrypted:" << xml;
+        return {};
+    }
+    QXmppMessage message;
+    parsePacket(message, QByteArray::fromBase64(encrypted.attribute(u"data"_s).toUtf8()));
+    return message;
+}
 
 class tst_QXmppTrustManager : public QObject
 {
@@ -55,6 +114,7 @@ private:
     // AtmManager
     Q_SLOT void initTestCase();
     Q_SLOT void testSendTrustMessage();
+    Q_SLOT void testSendTrustMessageEncryption();
     Q_SLOT void testMakePostponedTrustDecisions();
     Q_SLOT void testDistrustAutomaticallyTrustedKeys();
     Q_SLOT void testDistrust();
@@ -83,6 +143,7 @@ private:
     QXmppAtmTrustMemoryStorage m_trustStorage;
     QXmppAtmManager m_manager { &m_trustStorage };
     QXmppCarbonManager *m_carbonManager;
+    TestE2ee *m_e2ee;
 };
 
 void tst_QXmppTrustManager::memoryStorageSecurityPolicy()
@@ -1054,6 +1115,8 @@ void tst_QXmppTrustManager::atmStorageResetAll()
 
 void tst_QXmppTrustManager::initTestCase()
 {
+    Xml::Registry::registerEncryptedContainer<TestEncrypted>(Xml::Scope::Message);
+    m_e2ee = m_client.addNewExtension<TestE2ee>();
     m_client.addExtension(&m_manager);
     m_client.configuration().setJid("alice@example.org/phone");
 
@@ -1089,8 +1152,7 @@ void tst_QXmppTrustManager::testSendTrustMessage()
         if (type == QXmppLogger::SentMessage) {
             isMessageSent = true;
 
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             const std::optional<QXmppTrustMessageElement> trustMessageElement = message.trustMessageElement();
 
@@ -1119,6 +1181,42 @@ void tst_QXmppTrustManager::testSendTrustMessage()
     m_manager.sendTrustMessage(ns_omemo, { keyOwnerAlice, keyOwnerBob }, u"alice@example.org"_s);
 
     QVERIFY(isMessageSent);
+}
+
+void tst_QXmppTrustManager::testSendTrustMessageEncryption()
+{
+    QXmppTrustMessageKeyOwner keyOwner;
+    keyOwner.setJid(u"bob@example.com"_s);
+    keyOwner.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("0RcVsGk3LnpEFsqqztTzAgCDgVXlfa03paSqJFOOWOU=")) });
+
+    // the application's choice does not matter
+    QObject owner;
+    int selections = 0;
+    m_client.hooks(&owner).add<Messages::SelectEncryption>([&](Messages::EncryptionSelection &) { selections++; });
+
+    QStringList sent;
+    connect(&m_logger, &QXmppLogger::message, &owner, [&](QXmppLogger::MessageType type, const QString &text) {
+        if (type == QXmppLogger::SentMessage) {
+            sent << text;
+        }
+    });
+
+    m_e2ee->acceptedTrustLevels.reset();
+    m_manager.sendTrustMessage(ns_omemo, { keyOwner }, u"bob@example.com"_s);
+    QCOMPARE(selections, 0);
+    QCOMPARE(m_e2ee->acceptedTrustLevels, std::optional(TrustLevels { TrustLevel::Authenticated }));
+    QCOMPARE(sent.size(), 1);
+    QVERIFY(!sent.at(0).contains(u"urn:xmpp:tm:1"_s));
+    const auto trustMessageElement = decryptSentMessage(sent.at(0)).trustMessageElement();
+    QVERIFY(trustMessageElement);
+    QCOMPARE(trustMessageElement->encryption(), QString(ns_omemo));
+
+    // never sent unencrypted
+    sent.clear();
+    auto task = m_manager.sendTrustMessage(ns_ox, { keyOwner }, u"bob@example.com"_s);
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+    QVERIFY(sent.isEmpty());
+    QCOMPARE(selections, 0);
 }
 
 void tst_QXmppTrustManager::testMakePostponedTrustDecisions()
@@ -2065,8 +2163,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeys()
     // trust message for own keys to Bob
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"bob@example.com") {
                 sentMessagesCount++;
@@ -2094,8 +2191,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeys()
     // trust message for own keys to Carol
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"carol@example.net") {
                 sentMessagesCount++;
@@ -2123,8 +2219,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeys()
     // trust message for all keys to own endpoints
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 sentMessagesCount++;
@@ -2204,8 +2299,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpoints()
     // trust message for own keys to Bob
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"bob@example.com") {
                 sentMessagesCount++;
@@ -2233,8 +2327,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpoints()
     // trust message for own keys to Carol
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"carol@example.net") {
                 sentMessagesCount++;
@@ -2262,8 +2355,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpoints()
     // trust message for contacts' keys to own endpoints
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 sentMessagesCount++;
@@ -2341,8 +2433,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpointsWithAuthe
     // trust message for own keys to Bob
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"bob@example.com") {
                 sentMessagesCount++;
@@ -2370,8 +2461,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpointsWithAuthe
     // trust message for own keys to Carol
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"carol@example.net") {
                 sentMessagesCount++;
@@ -2399,8 +2489,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoOwnEndpointsWithAuthe
     // trust message for all keys to own endpoints
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 sentMessagesCount++;
@@ -2476,8 +2565,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoContactsWithAuthentic
     // trust message for own keys to own endpoints with authenticated keys
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 const auto trustMessageElement = message.trustMessageElement();
@@ -2503,8 +2591,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsOwnKeysNoContactsWithAuthentic
     // trust message for own keys to own endpoints
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 const auto trustMessageElement = message.trustMessageElement();
@@ -2576,8 +2663,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsSoleOwnKeyDistrusted()
     // trust message for own key to Bob
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"bob@example.com") {
                 sentMessagesCount++;
@@ -2603,8 +2689,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsSoleOwnKeyDistrusted()
     // trust message for own key to Carol
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"carol@example.net") {
                 sentMessagesCount++;
@@ -2630,8 +2715,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsSoleOwnKeyDistrusted()
     // unexpected trust message for contacts' keys to own endpoint
     connect(&m_logger, &QXmppLogger::message, &context, [this](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 Q_EMIT unexpectedTrustMessageSent();
@@ -2703,8 +2787,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeys()
     // trust message for Bob's keys to own endpoints
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 sentMessagesCount++;
@@ -2732,8 +2815,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeys()
     // trust message for own keys to Bob
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"bob@example.com") {
                 sentMessagesCount++;
@@ -2761,8 +2843,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeys()
     // unexpected trust message to Carol
     connect(&m_logger, &QXmppLogger::message, &context, [this](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"carol@example.net") {
                 Q_EMIT unexpectedTrustMessageSent();
@@ -2812,8 +2893,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeysNoOwnEndpoints()
     // unexpected trust message
     connect(&m_logger, &QXmppLogger::message, &context, [this](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             Q_EMIT unexpectedTrustMessageSent();
         }
@@ -2863,8 +2943,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeysNoOwnEndpointsWithA
     // trust message for own key to Bob
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"bob@example.com") {
                 sentMessagesCount++;
@@ -2890,8 +2969,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsContactKeysNoOwnEndpointsWithA
     // unexpected trust message
     connect(&m_logger, &QXmppLogger::message, &context, [this](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() != u"bob@example.com") {
                 Q_EMIT unexpectedTrustMessageSent();
@@ -2947,8 +3025,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsSoleContactKeyDistrusted()
     // trust message for Bob's key to own endpoints
     connect(&m_logger, &QXmppLogger::message, &context, [&](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() == u"alice@example.org") {
                 sentMessagesCount++;
@@ -2974,8 +3051,7 @@ void tst_QXmppTrustManager::testMakeTrustDecisionsSoleContactKeyDistrusted()
     // unexpected trust message
     connect(&m_logger, &QXmppLogger::message, &context, [this](QXmppLogger::MessageType type, const QString &text) {
         if (type == QXmppLogger::SentMessage) {
-            QXmppMessage message;
-            parsePacket(message, text.toUtf8());
+            const auto message = decryptSentMessage(text);
 
             if (message.to() != u"alice@example.org") {
                 Q_EMIT unexpectedTrustMessageSent();

@@ -139,18 +139,28 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
         return !Xml::Registry::encryption(item).isNull();
     });
 
-    const bool required = pending.mode == Mode::Sensitive || pending.params.isEncryptionRequired();
+    const bool fixed = pending.mode == Mode::Fixed;
+    const bool required = pending.mode != Mode::Default || pending.params.isEncryptionRequired();
     EncryptionSelection selection(pending.message, required, pending.encryption);
-    if (!encrypted) {
+    if (!encrypted && !fixed) {
         co_await m_hooks.run<SelectEncryption>(selection).withContext(m_client);
+    }
+
+    if (fixed && !encrypted && selection.encryption().isEmpty()) {
+        finishFront(conversationJid, QXmppError { u"No end-to-end encryption has been given for a message that must be encrypted"_s, SendError::EncryptionError });
+        co_return;
     }
 
     std::optional<E2ee::Provider> provider;
     if (!selection.encryption().isEmpty()) {
         provider = E2ee::Providers(m_hooks).find(selection.encryption());
         if (!provider || !provider->encryptMessage) {
-            finishFront(conversationJid, QXmppError { u"No end-to-end encryption provider for "_s + selection.encryption(), SendError::EncryptionError });
-            co_return;
+            provider.reset();
+            // a fixed encryption may still be provided by the encryption extension
+            if (!fixed || !m_clientPrivate->encryptionExtension) {
+                finishFront(conversationJid, QXmppError { u"No end-to-end encryption provider for "_s + selection.encryption(), SendError::EncryptionError });
+                co_return;
+            }
         }
     }
 
@@ -164,7 +174,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
 
     if (!provider) {
         auto *legacyEncryption = m_clientPrivate->encryptionExtension;
-        if (pending.mode == Mode::Sensitive && legacyEncryption && !encrypted) {
+        if (pending.mode != Mode::Default && legacyEncryption && !encrypted) {
             // like before the pipeline existed
             auto result = co_await legacyEncryption->encryptMessage(std::move(outgoing.message()), pending.params).withContext(m_client);
             if (auto *error = std::get_if<QXmppError>(&result)) {
@@ -179,7 +189,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
             }
             co_return;
         }
-        if (pending.params.isEncryptionRequired() && !encrypted) {
+        if ((fixed || pending.params.isEncryptionRequired()) && !encrypted) {
             finishFront(conversationJid, QXmppError { u"No end-to-end encryption has been selected for a message that must be encrypted"_s, SendError::EncryptionError });
             co_return;
         }

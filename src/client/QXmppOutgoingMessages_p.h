@@ -36,6 +36,9 @@ public:
         Default,
         // QXmppClient::sendSensitive() and reply(): falls back to the encryption extension
         Sensitive,
+        // Encrypted with the given encryption without running SelectEncryption, falls back to
+        // the encryption extension if there is no provider for it; never sent unencrypted
+        Fixed,
     };
 
     OutgoingMessages(QXmppClient *client, QXmppClientPrivate *clientPrivate, Hooks hooks);

@@ -5756,6 +5756,7 @@ private:
     Q_SLOT void outgoingAlreadyEncrypted();
     Q_SLOT void outgoingStoreHint();
     Q_SLOT void outgoingRequired();
+    Q_SLOT void outgoingFixed();
     Q_SLOT void outgoingReply();
     Q_SLOT void outgoingConfirmDelivery();
     Q_SLOT void iqEncrypted();
@@ -6214,6 +6215,61 @@ void tst_QXmppMessages::outgoingRequired()
     client.sendSensitive(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
     QVERIFY(required);
     QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
+}
+QT_WARNING_POP
+
+// tests the deprecated encryption extension as fallback
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+void tst_QXmppMessages::outgoingFixed()
+{
+    using QXmpp::Private::FixedE2ee;
+
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    int selections = 0;
+    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &) { selections++; });
+    QString preparedEncryption;
+    client.hooks(&owner).add<Prepare>([&](OutgoingMessage &message) {
+        preparedEncryption = message.encryption();
+        return HookResult::Continue;
+    });
+
+    // encrypted with the given encryption, the application is not asked
+    QXmppSendStanzaParams params;
+    params.setAcceptedTrustLevels(TrustLevel::Authenticated);
+    auto task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), params, TestEncryption.toString());
+    QCOMPARE(selections, 0);
+    QCOMPARE(preparedEncryption, TestEncryption);
+    QCOMPARE(e2ee->encryptRequests.size(), 1);
+    const auto &request = e2ee->encryptRequests.at(0);
+    QVERIFY(request.params().isEncryptionRequired());
+    QCOMPARE(request.params().acceptedTrustLevels(), TrustLevels { TrustLevel::Authenticated });
+    QCOMPARE(request.recipientJids(), QList<QString> { u"alice@example.org"_s });
+    e2ee->encryptPromises.at(0).finish(encrypted(u"ciphertext"_s));
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"<encrypted xmlns=\"urn:test:e2ee\" data=\"ciphertext\"/>"_s));
+    QVERIFY(!packet.contains(u"secret"_s));
+
+    // never sent unencrypted
+    task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, u"urn:test:unknown"_s);
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+    client.expectNoPacket();
+
+    task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, {});
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+    client.expectNoPacket();
+    QCOMPARE(selections, 0);
+
+    // without provider, the encryption extension encrypts
+    ::Client::EncryptionExtension encrypter;
+    client.setEncryptionExtension(&encrypter);
+    task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, u"urn:test:unknown"_s);
+    QVERIFY(encrypter.messageCalled);
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+    client.expectNoPacket();
+    client.setEncryptionExtension(nullptr);
 }
 QT_WARNING_POP
 

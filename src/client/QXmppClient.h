@@ -42,6 +42,7 @@ class QXmppVersionManager;
 namespace QXmpp::Private {
 class EncryptedIqs;
 struct LegacyE2ee;
+struct FixedE2ee;
 struct SessionBegin;
 }  // namespace QXmpp::Private
 
@@ -463,6 +464,7 @@ private:
     friend class QXmppMamManager;
     friend class QXmpp::Private::EncryptedIqs;
     friend struct QXmpp::Private::LegacyE2ee;
+    friend struct QXmpp::Private::FixedE2ee;
     friend class QXmppNetworkMonitor;
     friend class QXmppRegistrationManager;
     friend class TestClient;

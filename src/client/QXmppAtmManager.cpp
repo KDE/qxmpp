@@ -53,6 +53,10 @@ using namespace QXmpp::Private;
 
     In addition, archiving via MAM must be enabled on the server.
 
+    Trust messages are always encrypted with the encryption they refer to, the
+    QXmpp::Messages::SelectEncryption hook is not run for them. They are only sent to keys that
+    have been authenticated.
+
     \ingroup qxmpp-managers
 
     \since QXmpp 1.5
@@ -385,6 +389,11 @@ QXmppTask<void> QXmppAtmManager::makePostponedTrustDecisions(QString encryption,
 
     \a encryption is the namespace of the encryption. \a keyOwners contains the key owners with
     the data for authentication or distrusting. \a recipientJid is the JID of the recipient.
+
+    The message is encrypted with \a encryption via its end-to-end encryption provider
+    (QXmpp::E2ee::Provider), or else via the encryption extension
+    (QXmppClient::setEncryptionExtension()). If it can not be encrypted, sending fails with
+    QXmpp::SendError::EncryptionError.
 */
 QXmppTask<QXmpp::SendResult> QXmppAtmManager::sendTrustMessage(const QString &encryption, const QList<QXmppTrustMessageKeyOwner> &keyOwners, const QString &recipientJid)
 {
@@ -400,5 +409,6 @@ QXmppTask<QXmpp::SendResult> QXmppAtmManager::sendTrustMessage(const QString &en
     QXmppSendStanzaParams params;
     params.setAcceptedTrustLevels(TrustLevel::Authenticated);
 
-    return LegacyE2ee::sendSensitive(client(), std::move(message), params);
+    // only meaningful with the encryption it refers to, independent of the application's choice
+    return FixedE2ee::send(client(), std::move(message), std::move(params), encryption);
 }

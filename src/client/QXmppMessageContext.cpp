@@ -91,7 +91,9 @@ namespace QXmpp::Messages {
 
     It runs for every message, also for messages sent by managers on their own (e.g. receipts),
     except for messages that already contain encrypted elements, e.g. a key exchange created by
-    a provider. They are sent as they are.
+    a provider. They are sent as they are. Messages of managers that are only meaningful with a
+    specific encryption, e.g. the trust messages of QXmppAtmManager, are encrypted with it and do
+    not run through this hook either.
     Handlers run in order and may override the encryption set by earlier ones. Handlers that need
     to wait, e.g. for a database, return a QXmppTask, others can return \c void:
 

@@ -32,6 +32,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - Fix `isIqElement<QXmppBitsOfBinaryIq>()` (@lnj, !839)
  - E2EE providers can encrypt only the body (`QXmpp::E2ee::ContentEncryption::BodyOnly`), e.g. for OMEMO 0.3 (@lnj, !839)
  - Message: Parse delays and MUC status codes also in the public part of encrypted messages (@lnj, !839)
+ - ATM: Trust messages are encrypted with the encryption they refer to, independent of the `SelectEncryption` hook (@lnj, !846)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

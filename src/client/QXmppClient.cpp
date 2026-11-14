@@ -656,6 +656,12 @@ QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::sendSensitive(QXmppClie
     return client->d->stream->streamAckManager().send(stanza);
 }
 
+QXmppTask<QXmpp::SendResult> QXmpp::Private::FixedE2ee::send(QXmppClient *client, QXmppMessage &&message, QXmppSendStanzaParams params, QString encryption)
+{
+    params.setEncryptionRequired(true);
+    return client->d->outgoingMessages.send(std::move(message), std::move(params), OutgoingMessages::Mode::Fixed, std::move(encryption));
+}
+
 QXmppTask<QXmpp::SendResult> QXmppClientPrivate::sendEncryptedMessage(QXmppTask<QXmppE2eeExtension::MessageEncryptResult> task)
 {
     auto result = co_await task.withContext(q);
