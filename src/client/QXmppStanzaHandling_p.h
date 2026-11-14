@@ -73,15 +73,11 @@ auto stanzaHandler(Object *object, bool (Object::*function)(const QDomElement &,
 }
 
 // Adapts a function handling incoming messages to the QXmpp::Messages::Received hook. It returns
-// whether it has handled the message. Like the deprecated QXmppMessageHandler, it gets no
-// messages of archive queries.
+// whether it has handled the message.
 template<typename Object>
 auto messageHandler(Object *object, bool (Object::*function)(const QXmppMessage &))
 {
     return [object, function](Messages::Context &context) {
-        if (context.origin() == Messages::Origin::Mam) {
-            return HookResult::Continue;
-        }
         return (object->*function)(context.message()) ? HookResult::Stop : HookResult::Continue;
     };
 }

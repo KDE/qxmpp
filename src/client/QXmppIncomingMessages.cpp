@@ -234,8 +234,9 @@ QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryp
 
 void IncomingMessages::finish(Context &&context, std::optional<QXmppPromise<CollectResult>> &result)
 {
+    // messages of archive queries are only returned to the caller of the query
     const bool delivered = !MessageContextAccess::d(context).withoutContent &&
-        m_hooks.run<Received>(context) == HookResult::Continue;
+        (context.origin() == Origin::Mam || m_hooks.run<Received>(context) == HookResult::Continue);
 
     if (result) {
         result->finish(delivered ? CollectResult(std::move(context)) : CollectResult());

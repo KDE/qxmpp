@@ -16,6 +16,7 @@
 #include "QXmppMamIq.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
+#include "QXmppMessageContext_p.h"
 #include "QXmppMessages.h"
 #include "QXmppPromise.h"
 #include "QXmppStanzaHandling_p.h"
@@ -107,38 +108,146 @@ static QString occupantJid(const QDomElement &messageElement)
 }
 
 struct RetrieveRequestState {
-    QXmppPromise<QXmppMamManager::RetrieveResult> promise;
+    QXmppPromise<Mam::RetrieveResult> promise;
     QXmppMamResultIq iq;
     // bare JID of the queried archive
     QString archiveJid;
-    QList<MamMessage> messages;
-    // empty for messages consumed by the message pipeline
-    QList<std::optional<QXmppMessage>> processedMessages;
-    uint runningDecryptionJobs = 0;
+    // processed messages in the order of the archive, empty for dropped or consumed messages and
+    // messages still being processed
+    std::vector<std::optional<Context>> messages;
+    // messages still being processed by the message pipeline
+    uint runningJobs = 0;
+    // the result IQ has been received
+    bool resultReceived = false;
 
     void finish()
     {
-        Q_ASSERT(messages.count() == processedMessages.count());
-        QList<QXmppMessage> results;
-        results.reserve(processedMessages.size());
-        for (auto &message : processedMessages) {
-            if (message) {
-                results.append(std::move(*message));
+        std::vector<Context> results;
+        results.reserve(messages.size());
+        for (auto &context : messages) {
+            if (context) {
+                results.push_back(std::move(*context));
             }
         }
-        promise.finish(
-            QXmppMamManager::RetrievedMessages {
-                std::move(iq),
-                std::move(results) });
+        promise.finish(Mam::Page { std::move(iq), std::move(results) });
     }
 };
 
 class QXmppMamManagerPrivate
 {
 public:
+    explicit QXmppMamManagerPrivate(QXmppMamManager *q) : q(q) { }
+
+    void processMessage(const QString &queryId, RetrieveRequestState &state, MamMessage &&message);
+    QXmppTask<std::optional<Context>> decryptLegacy(QXmppE2eeExtension *e2eeExt, Context context, MamMessage message);
+    void finishMessage(const QString &queryId, size_t index, std::optional<Context> &&context);
+
+    QXmppMamManager *q;
     // std::string because older Qt 5 versions don't add std::hash support for QString
     std::unordered_map<std::string, RetrieveRequestState> ongoingRequests;
 };
+
+/*!
+    \namespace QXmpp::Mam
+    \inmodule QXmpp
+
+    Types of \xep{0313}{Message Archive Management}, see QXmppMamManager.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \struct QXmpp::Mam::Query
+    \inmodule QXmpp
+
+    Archive query of QXmppMamManager::retrieve().
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::to
+
+    The archive to query, empty for the archive of the own account.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::node
+
+    The PubSub node to query, usually empty.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::with
+
+    Only returns messages exchanged with this JID if set.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::start
+
+    Only returns messages after this time if valid.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::end
+
+    Only returns messages before this time if valid.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::resultSetQuery
+
+    Limits the number of results and pages through the archive (\xep{0059}{Result Set Management}).
+*/
+
+/*!
+    \struct QXmpp::Mam::Page
+    \inmodule QXmpp
+
+    Result of QXmppMamManager::retrieve().
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Mam::Page::result
+
+    The result IQ of the query, it contains the result set reply for paging.
+*/
+
+/*!
+    \variable QXmpp::Mam::Page::messages
+
+    The processed messages in the order of the archive. Messages consumed by a handler of
+    QXmpp::Mam::MessageReceived are not contained.
+*/
+
+/*!
+    \typedef QXmpp::Mam::RetrieveResult
+
+    Page or QXmppError.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \struct QXmpp::Mam::MessageReceived
+    \inmodule QXmpp
+
+    Hook run for each message of a query of QXmppMamManager::retrieve() as soon as it has been
+    processed by the message pipeline (see QXmpp::Messages), i.e. before the query has finished.
+    This way, the messages can be shown while further ones are still retrieved. The
+    QXmpp::Messages::ArchiveInfo attachment of the context contains the ID of the query.
+
+    Messages of a conversation are passed in the order of the archive. Handlers returning
+    QXmpp::HookResult::Stop consume the message, it is then not contained in the result of the
+    query. If the query fails, the hook is still run for the messages received before.
+
+    The QXmpp::Messages::Received hook is not run for archived messages.
+
+    \since QXmpp 1.18
+*/
 
 /*!
     \struct QXmppMamManager::RetrievedMessages
@@ -170,7 +279,7 @@ public:
 */
 
 QXmppMamManager::QXmppMamManager()
-    : d(std::make_unique<QXmppMamManagerPrivate>())
+    : d(std::make_unique<QXmppMamManagerPrivate>(this))
 {
     hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppMamManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
@@ -204,8 +313,8 @@ bool QXmppMamManager::handleIncomingStanza(const QDomElement &element)
 
             auto itr = d->ongoingRequests.find(queryId.toStdString());
             if (itr != d->ongoingRequests.end()) {
-                // future-based API
-                itr->second.messages.append(std::move(message));
+                // task-based API
+                d->processMessage(queryId, itr->second, std::move(message));
             } else {
                 // signal-based API
                 Q_EMIT archivedMessageReceived(queryId, parseMamMessage(message, Unencrypted));
@@ -307,7 +416,8 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
 /*!
     Retrieves archived messages and reports all messages at once via a QFuture.
 
-    This function tries to decrypt encrypted messages.
+    This function tries to decrypt encrypted messages. Use retrieve() to get the result of the
+    decryption and the resolved sender of the messages.
 
     The number of results may be limited by the server.
 
@@ -324,17 +434,49 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
 */
 QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(const QString &to, const QString &node, const QString &jid, const QDateTime &start, const QDateTime &end, const QXmppResultSetQuery &resultSetQuery)
 {
-    auto queryIq = buildRequest(to, node, jid, start, end, resultSetQuery);
+    return retrieve(Mam::Query { to, node, jid, start, end, resultSetQuery }).then(this, [](Mam::RetrieveResult &&result) -> RetrieveResult {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            return std::move(*error);
+        }
+        auto &page = std::get<Mam::Page>(result);
+        QList<QXmppMessage> messages;
+        messages.reserve(page.messages.size());
+        for (auto &context : page.messages) {
+            messages.append(std::move(context.message()));
+        }
+        return RetrievedMessages { std::move(page.result), std::move(messages) };
+    });
+}
+
+/*!
+    Retrieves archived messages and returns them with their context.
+
+    The messages are processed by the message pipeline (see QXmpp::Messages): The real sender is
+    resolved (QXmpp::Messages::ResolveSender) and encrypted messages are decrypted. The
+    QXmpp::Messages::Received hook is not run for them and they are not delivered via
+    QXmppClient::messageReceived(). Each context has the origin QXmpp::Messages::Origin::Mam
+    and a QXmpp::Messages::ArchiveInfo attachment. Messages without content after the decryption
+    (e.g. key exchanges) are not returned. To process the messages while the query is still
+    running, use the QXmpp::Mam::MessageReceived hook.
+
+    The number of results may be limited by the server, see \a query's result set query for
+    paging through the archive.
+
+    \since QXmpp 1.18
+*/
+QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query)
+{
+    auto queryIq = buildRequest(query.to, query.node, query.with, query.start, query.end, query.resultSetQuery);
     auto queryId = queryIq.queryId();
 
-    auto [itr, inserted] = d->ongoingRequests.insert({ queryIq.queryId().toStdString(), RetrieveRequestState() });
+    auto [itr, inserted] = d->ongoingRequests.insert({ queryId.toStdString(), RetrieveRequestState() });
     Q_ASSERT(inserted);
-    itr->second.archiveJid = QXmppUtils::jidToBareJid(to.isEmpty() ? client()->configuration().jidBare() : to);
+    itr->second.archiveJid = QXmppUtils::jidToBareJid(query.to.isEmpty() ? client()->configuration().jidBare() : query.to);
 
     // create task here; promise could finish immediately after client()->sendIq()
     auto task = itr->second.promise.task();
 
-    // retrieve messages
+    // the messages are processed as they arrive, see handleIncomingStanza()
     client()->sendIq(std::move(queryIq)).then(this, [this, queryId](QXmppClient::IqResult result) {
         auto itr = d->ongoingRequests.find(queryId.toStdString());
         if (itr == d->ongoingRequests.end()) {
@@ -349,73 +491,92 @@ QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(con
             return;
         }
 
-        // parse IQ
-        auto &iq = state.iq;
-        iq.parse(getValue(result));
-
-        // process the messages in the message pipeline, they may be decrypted asynchronously
-        state.processedMessages.resize(state.messages.size());
-        state.runningDecryptionJobs = state.messages.size();
-        if (state.messages.isEmpty()) {
+        state.iq.parse(getValue(result));
+        state.resultReceived = true;
+        if (state.runningJobs == 0) {
             state.finish();
             d->ongoingRequests.erase(itr);
-            return;
-        }
-
-        auto finishJob = [this, queryId](qsizetype i, std::optional<QXmppMessage> message) {
-            auto itr = d->ongoingRequests.find(queryId.toStdString());
-            Q_ASSERT(itr != d->ongoingRequests.end());
-            auto &state = itr->second;
-
-            state.processedMessages[i] = std::move(message);
-
-            // finish promise on last job
-            state.runningDecryptionJobs--;
-            if (state.runningDecryptionJobs == 0) {
-                state.finish();
-                d->ongoingRequests.erase(itr);
-            }
-        };
-
-        auto *e2eeExt = LegacyE2ee::encryptionExtension(client());
-        auto &incomingMessages = client()->d->incomingMessages;
-        const auto size = state.messages.size();
-        for (qsizetype i = 0; i < size; i++) {
-            const auto mamMessage = state.messages.at(i);
-            auto parsed = incomingMessages.parse(mamMessage.element, e2eeExt);
-            if (mamMessage.delay) {
-                parsed.message.setStamp(*mamMessage.delay);
-            }
-
-            if (parsed.legacyEncrypted) {
-                // encryption without provider
-                e2eeExt->decryptMessage(std::move(parsed.message)).then(this, [this, i, mamMessage, finishJob](auto result) {
-                    if (std::holds_alternative<QXmppMessage>(result)) {
-                        finishJob(i, std::get<QXmppMessage>(std::move(result)));
-                    } else {
-                        warning(u"Error decrypting message."_s);
-                        finishJob(i, parseMamMessage(mamMessage, Unencrypted));
-                    }
-                });
-                continue;
-            }
-
-            Context context(std::move(parsed.message), Origin::Mam);
-            if (context.senderJid() == client()->configuration().jidBare()) {
-                // sent by this account
-                context.setConversationJid(QXmppUtils::jidToBareJid(context.message().to()));
-            }
-            ArchiveInfo info;
-            info.setArchiveJid(state.archiveJid);
-            info.setId(mamMessage.id);
-            info.setOccupantJid(occupantJid(mamMessage.element));
-            context.attach(std::move(info));
-
-            incomingMessages.collect(std::move(context), parsed.encryption).then(this, [i, finishJob](std::optional<Context> &&context) {
-                finishJob(i, context ? std::optional(std::move(context->message())) : std::nullopt);
-            });
         }
     });
 
     return task;
+}
+
+// Processes a message of a task-based query in the message pipeline, it may be decrypted
+// asynchronously.
+void QXmppMamManagerPrivate::processMessage(const QString &queryId, RetrieveRequestState &state, MamMessage &&message)
+{
+    const auto index = state.messages.size();
+    state.messages.emplace_back();
+    state.runningJobs++;
+
+    auto *client = q->client();
+    auto *e2eeExt = LegacyE2ee::encryptionExtension(client);
+    auto &incomingMessages = client->d->incomingMessages;
+    auto parsed = incomingMessages.parse(message.element, e2eeExt);
+    if (message.delay) {
+        parsed.message.setStamp(*message.delay);
+    }
+
+    Context context(std::move(parsed.message), Origin::Mam);
+    if (context.senderJid() == client->configuration().jidBare()) {
+        // sent by this account
+        context.setConversationJid(QXmppUtils::jidToBareJid(context.message().to()));
+    }
+    ArchiveInfo info;
+    info.setArchiveJid(state.archiveJid);
+    info.setId(message.id);
+    info.setQueryId(queryId);
+    info.setOccupantJid(occupantJid(message.element));
+    context.attach(std::move(info));
+
+    auto task = parsed.legacyEncrypted
+        ? decryptLegacy(e2eeExt, std::move(context), std::move(message))
+        : incomingMessages.collect(std::move(context), parsed.encryption);
+    task.then(q, [this, queryId, index](std::optional<Context> &&context) {
+        finishMessage(queryId, index, std::move(context));
+    });
+}
+
+// Decrypts a message via the deprecated encryption extension, the hooks of the pipeline are not
+// run.
+QXmppTask<std::optional<Context>> QXmppMamManagerPrivate::decryptLegacy(QXmppE2eeExtension *e2eeExt, Context context, MamMessage message)
+{
+    auto result = co_await e2eeExt->decryptMessage(std::move(context.message())).withContext(q);
+
+    auto &d = MessageContextAccess::d(context);
+    if (auto *decrypted = std::get_if<QXmppMessage>(&result)) {
+        d.message = std::move(*decrypted);
+        d.e2eeMetadata = d.message.e2eeMetadata();
+        d.decryptionState = DecryptionState::Decrypted;
+    } else if (auto *error = std::get_if<QXmppError>(&result)) {
+        q->warning(u"Error decrypting message."_s);
+        d.message = parseMamMessage(message, Unencrypted);
+        d.decryptionState = DecryptionState::Failed;
+        d.decryptionError = std::move(*error);
+    } else {
+        d.message = parseMamMessage(message, Unencrypted);
+    }
+    co_return std::move(context);
+}
+
+// Passes a processed message to the hook and finishes the query after its last message.
+void QXmppMamManagerPrivate::finishMessage(const QString &queryId, size_t index, std::optional<Context> &&context)
+{
+    if (context && q->hooks().run<Mam::MessageReceived>(*context) == HookResult::Stop) {
+        context.reset();
+    }
+
+    auto itr = ongoingRequests.find(queryId.toStdString());
+    if (itr == ongoingRequests.end()) {
+        // the query failed
+        return;
+    }
+    auto &state = itr->second;
+    state.messages[index] = std::move(context);
+    state.runningJobs--;
+    if (state.resultReceived && state.runningJobs == 0) {
+        state.finish();
+        ongoingRequests.erase(itr);
+    }
 }

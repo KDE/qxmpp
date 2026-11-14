@@ -1432,15 +1432,8 @@ void tst_QXmppMuc::resolveSenderArchive()
     joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s,
                nonAnonymous ? QStringList { u"muc_nonanonymous"_s } : QStringList());
 
-    QObject owner;
-    QStringList senders;
-    test.hooks(&owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &context) {
-        senders << context.senderJid();
-        return QXmpp::HookResult::Continue;
-    });
-
     // the occupant has left the room
-    auto task = mam->retrieveMessages(archiveJid);
+    auto task = mam->retrieve({ .to = archiveJid });
     const auto request = test.takePacket();
     const auto id = QRegularExpression(u"id=[\"']([^\"']*)"_s).match(request).captured(1);
     TestClient::handleStanza(mam, xmlToDom(u"<message to='hag66@shakespeare.lit/pda' from='"_s + archiveJid + u"'>"
@@ -1451,9 +1444,10 @@ void tst_QXmppMuc::resolveSenderArchive()
                                                 "<body>Hi</body>"_s +
                                            items + u"</message></forwarded></result></message>"_s));
     test.inject(u"<iq type='result' id='"_s + id + u"' from='"_s + archiveJid + u"'><fin xmlns='urn:xmpp:mam:2'/></iq>"_s);
-    expectFutureVariant<QXmppMamManager::RetrievedMessages>(task);
+    auto page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
 
-    QCOMPARE(senders, QStringList { expectedSender });
+    QCOMPARE(page.messages.size(), 1);
+    QCOMPARE(page.messages.front().senderJid(), expectedSender);
 }
 
 // encrypts nothing, records the recipients

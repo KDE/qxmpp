@@ -45,6 +45,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - RosterManager: Keep the presences of contacts while the stream can be resumed (@lnj, !848)
  - UploadRequestManager: Keep the upload services on stream resumption, they were not discovered again (@lnj, !848)
  - Blocking, Carbons, Disco, MucManagerV2, OMEMO: Reset the state of the session also when the stream can't be resumed with Stream Management enabled, and when the client is disconnected via `disconnectFromServer()` while waiting for resumption (@lnj, !848)
+ - MAM: Add `retrieve()` returning the `QXmpp::Messages::Context` of the messages (decryption state, real sender) and the `QXmpp::Mam::MessageReceived` hook to process them while the query is running; `ArchiveInfo` has the query ID; `QXmpp::Messages::Received` is not run for archived messages (@lnj, !847)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
@@ -54,7 +55,7 @@ Breaking changes:
  - XmlRegistry: Registered elements are sensitive by default, i.e. only sent encrypted in encrypted messages; in the public part of received ones they are added to `publicExtensions()` (@lnj, !839)
  - `QXmppClient::injectMessage()` always returns true and may deliver the message later (@lnj, !839)
  - `QXmppClient::send()` encrypts messages if an encryption is selected by a `SelectEncryption` handler (@lnj, !839)
- - `QXmppMamManager::retrieveMessages()` no longer returns messages consumed by a `Received` hook or encrypted messages without content, e.g. OMEMO key exchanges (@lnj, !839)
+ - `QXmppMamManager::retrieveMessages()` no longer returns messages consumed by a `QXmpp::Mam::MessageReceived` hook or encrypted messages without content, e.g. OMEMO key exchanges (@lnj, !839, !847)
  - IQ requests with a handler of `QXmpp::Iq::Received` (e.g. disco, version, entity time, roster and blocking pushes, Jingle) are no longer passed to `StanzaReceived` and `handleStanza()` (@lnj, !841)
  - Roster pushes from other entities than the own server are answered with `service-unavailable` (@lnj, !841)
  - Unsupported IQ requests are answered with `service-unavailable` instead of `feature-not-implemented` as required by RFC 6120 (@lnj, !841)

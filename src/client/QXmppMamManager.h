@@ -8,10 +8,13 @@
 #include "QXmppClientExtension.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppError.h"
+#include "QXmppHooks.h"
 #include "QXmppMamIq.h"
+#include "QXmppMessageContext.h"
 #include "QXmppResultSet.h"
 
 #include <variant>
+#include <vector>
 
 #include <QDateTime>
 
@@ -19,6 +22,31 @@ template<typename T>
 class QXmppTask;
 class QXmppMessage;
 class QXmppMamManagerPrivate;
+
+namespace QXmpp::Mam {
+
+struct Query {
+    QString to;
+    QString node;
+    QString with;
+    QDateTime start;
+    QDateTime end;
+    QXmppResultSetQuery resultSetQuery;
+};
+
+struct Page {
+    QXmppMamResultIq result;
+    std::vector<QXmpp::Messages::Context> messages;
+};
+
+using RetrieveResult = std::variant<Page, QXmppError>;
+
+struct MessageReceived {
+    static constexpr QStringView Name = u"org.qxmpp.mam.message-received";
+    using Signature = QXmpp::HookResult(QXmpp::Messages::Context &context);
+};
+
+}  // namespace QXmpp::Mam
 
 /*!
     \inmodule QXmpp
@@ -68,6 +96,7 @@ public:
                                                const QDateTime &start = QDateTime(),
                                                const QDateTime &end = QDateTime(),
                                                const QXmppResultSetQuery &resultSetQuery = QXmppResultSetQuery());
+    QXmppTask<QXmpp::Mam::RetrieveResult> retrieve(const QXmpp::Mam::Query &query);
 
     QXmppDiscoFeatureWatch watchAccountSupport() const;
 
@@ -87,6 +116,8 @@ public:
 
 private:
     bool handleIncomingStanza(const QDomElement &stanza);
+
+    friend class QXmppMamManagerPrivate;
     std::unique_ptr<QXmppMamManagerPrivate> d;
 };
 

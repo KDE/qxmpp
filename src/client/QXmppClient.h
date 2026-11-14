@@ -544,7 +544,7 @@ private:
     // TODO: remove once sendIq() has an overload returning the complete response, the caps
     // verification needs the response element
     friend class QXmppDiscoveryManagerPrivate;
-    friend class QXmppMamManager;
+    friend class QXmppMamManagerPrivate;
     friend class QXmpp::Private::EncryptedIqs;
     friend struct QXmpp::Private::IqRequests;
     friend struct QXmpp::Private::LegacyE2ee;

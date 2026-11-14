@@ -47,6 +47,10 @@ public:
     const QString &id() const { return m_id; }
     void setId(const QString &id) { m_id = id; }
 
+    // ID of the archive query the message is a result of.
+    const QString &queryId() const { return m_queryId; }
+    void setQueryId(const QString &id) { m_queryId = id; }
+
     // Real JID of the sender as reported by a MUC archive (XEP-0313), empty if there is none
     // or more than one. Not validated, see QXmppMucManagerV2.
     const QString &occupantJid() const { return m_occupantJid; }
@@ -55,6 +59,7 @@ public:
 private:
     QString m_archiveJid;
     QString m_id;
+    QString m_queryId;
     QString m_occupantJid;
 };
 

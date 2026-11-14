@@ -25,6 +25,9 @@ namespace QXmpp::Messages {
     \li Deliver: QXmppClient::messageReceived() if no handler consumed the message.
     \endlist
 
+    Messages of archive queries skip the last two phases. QXmppMamManager::retrieve() returns
+    their contexts to the caller of the query.
+
     Messages of the same conversation are processed in the order in which they were received,
     also across the asynchronous decryption.
 
@@ -149,8 +152,8 @@ namespace QXmpp::Messages {
     \value Stream Received directly from the server.
     \value CarbonReceived Copy of a message received by another own device.
     \value CarbonSent Copy of a message sent by another own device.
-    \value Mam Result of an archive query, not delivered as a live message. The context has a
-    QXmpp::Messages::ArchiveInfo attachment.
+    \value Mam Result of an archive query, only returned by QXmppMamManager::retrieve(). The
+    context has a QXmpp::Messages::ArchiveInfo attachment.
     \value Injected Injected by an extension via QXmppClientExtension::injectMessage().
 */
 
@@ -187,9 +190,8 @@ namespace QXmpp::Messages {
 
     Hook run for each incoming message after the decryption. Handlers returning
     QXmpp::HookResult::Stop consume the message, it is then not delivered via
-    QXmppClient::messageReceived(). Messages of archive queries (Origin::Mam) are never delivered
-    via QXmppClient::messageReceived(), consumed ones are not returned by
-    QXmppMamManager::retrieveMessages().
+    QXmppClient::messageReceived(). It is not run for messages of archive queries, they are only
+    returned by QXmppMamManager::retrieve().
 */
 
 /*!
