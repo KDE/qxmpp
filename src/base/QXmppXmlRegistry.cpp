@@ -5,6 +5,7 @@
 #include "QXmppXmlRegistry.h"
 
 #include "QXmppOmemoElement_p.h"
+#include "QXmppUtils_p.h"
 #include "QXmppXmlElement.h"
 
 #include "XmlWriter.h"
@@ -169,13 +170,34 @@ QStringView Registry::encryption(const QDomElement &stanza)
     ensureBuiltinElements();
     QReadLocker lock(&s_lock);
     const auto &parsers = state().parsers;
-    for (auto child = stanza.firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
+    for (const auto &child : QXmpp::Private::iterChildElements(stanza)) {
         if (auto it = parsers.find(XmlElementId { child.tagName(), child.namespaceURI() });
             it != parsers.end() && !it->second.encryption.isNull()) {
             return it->second.encryption;
         }
     }
     return {};
+}
+
+/*!
+    Returns the namespaces of the encryptions of all child elements of \a stanza registered as
+    encrypted container, in document order, see registerEncryptedContainer().
+
+    \since QXmpp 1.18
+*/
+QList<QStringView> Registry::encryptions(const QDomElement &stanza)
+{
+    ensureBuiltinElements();
+    QReadLocker lock(&s_lock);
+    const auto &parsers = state().parsers;
+    QList<QStringView> encryptions;
+    for (const auto &child : QXmpp::Private::iterChildElements(stanza)) {
+        if (auto it = parsers.find(XmlElementId { child.tagName(), child.namespaceURI() });
+            it != parsers.end() && !it->second.encryption.isNull()) {
+            encryptions.append(it->second.encryption);
+        }
+    }
+    return encryptions;
 }
 
 /*!

@@ -4,7 +4,9 @@
 
 #include "QXmppMessageContext.h"
 
+#include "QXmppConstants_p.h"
 #include "QXmppMessageContext_p.h"
+#include "QXmppMessages.h"
 #include "QXmppUtils.h"
 
 namespace QXmpp::Messages {
@@ -42,7 +44,8 @@ namespace QXmpp::Messages {
     \li Encrypt: asynchronous, via the provider of the selected encryption
         (QXmpp::E2ee::Provider). The public part of Explicit Message Encryption
         (\xep{0380}{Explicit Message Encryption}) and a fallback body are added for messages
-        with a body.
+        with a body. PrepareBodyOnly: synchronous, only if the provider encrypts the message for
+        recipients of an encryption protecting only the body (e.g. OMEMO 0.3).
     \li Send.
     \li ConfirmDelivery: asynchronous, e.g. MUC waits for the reflection of the room. The task
         returned by QXmppClient::send() finishes afterwards.
@@ -144,6 +147,71 @@ namespace QXmpp::Messages {
     (\xep{0384}{OMEMO Encryption}). The lists are retrieved before the first encrypted message
     after joining and are kept up to date afterwards. Messages to anonymous rooms can not be
     encrypted and fail.
+*/
+
+/*!
+    \class QXmpp::Messages::BodyOnlyMessage
+    \inmodule QXmpp
+
+    Input and result of the PrepareBodyOnly hook.
+
+    message() is the message for the recipients of an encryption protecting only the body. Its
+    body is encrypted. Its other sensitive elements are sent in the clear if their namespace is in
+    unprotectedNamespaces(), else they are dropped. The subject and the thread are in the
+    namespace of the stanza (\c jabber:client), which can not be allowed, so they are always
+    dropped for these recipients.
+
+    The stanza is shared with the recipients of other encryptions, e.g. OMEMO 2 in the same
+    stanza. Thus, its public elements (e.g. processing hints, the origin ID and the attributes) are
+    taken from the original message, changes of them in message() have no effect.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    Allows the elements of low privacy impact in the clear: chat states
+    (\xep{0085}{Chat State Notifications}), corrections (\xep{0308}{Last Message Correction}),
+    delivery receipts (\xep{0184}{Message Delivery Receipts}), chat markers
+    (\xep{0333}{Chat Markers}), retractions (\xep{0424}{Message Retraction}), fallback indications
+    (\xep{0428}{Fallback Indication}) and replies (\xep{0461}{Message Replies}). The server can
+    see when the user is typing and which messages are corrected, retracted, read or replied to,
+    but not their content.
+*/
+void BodyOnlyMessage::allowLowRiskElements()
+{
+    using namespace QXmpp::Private;
+    for (auto ns : { ns_chat_states, ns_message_correct, ns_message_receipts, ns_chat_markers, ns_message_retract, ns_fallback_indication, ns_reply }) {
+        if (!m_unprotectedNamespaces.contains(ns)) {
+            m_unprotectedNamespaces.append(ns.toString());
+        }
+    }
+}
+
+/*!
+    \struct QXmpp::Messages::PrepareBodyOnly
+    \inmodule QXmpp
+
+    Hook run synchronously when an outgoing message is encrypted for recipients of an encryption
+    protecting only the body (QXmpp::E2ee::ContentEncryption::BodyOnly, e.g. OMEMO 0.3), at most
+    once per message. It is not run if no such recipient is left after the provider selected the
+    devices.
+
+    Handlers adapt the message for those recipients (BodyOnlyMessage::message()), e.g. replace
+    elements by a fallback in the body, and decide which elements may be sent in the clear
+    (BodyOnlyMessage::unprotectedNamespaces()). The elements in the clear are also visible for
+    recipients of other encryptions of the same stanza, e.g. OMEMO 2. Sensitive elements in other
+    namespaces are dropped. Handlers must not have side effects, the message may be not sent
+    after all.
+
+    \code
+    client->hooks(this).add<QXmpp::Messages::PrepareBodyOnly>([](QXmpp::Messages::BodyOnlyMessage &message) {
+        message.allowLowRiskElements();
+    });
+    \endcode
+
+    The message is not sent to those recipients if a handler calls
+    BodyOnlyMessage::setUnsupported(), if it is a correction whose marker is not sent in the clear
+    (it would appear as a new message), or if it has neither a body nor elements in the clear.
 */
 
 /*!

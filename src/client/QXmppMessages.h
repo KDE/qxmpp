@@ -100,6 +100,39 @@ private:
     bool m_required = false;
 };
 
+// Input and result of PrepareBodyOnly.
+class BodyOnlyMessage
+{
+public:
+    explicit BodyOnlyMessage(const QXmppMessage &original)
+        : m_original(&original), m_message(original)
+    {
+    }
+
+    // The message as sent to the recipients of encryptions protecting more than the body.
+    const QXmppMessage &original() const { return *m_original; }
+
+    // The message for the recipients of an encryption protecting only the body: its body is
+    // encrypted, its other sensitive elements are sent in the clear if their namespace is in
+    // unprotectedNamespaces(), else they are dropped. Changes of public elements have no effect.
+    QXmppMessage &message() { return m_message; }
+    const QXmppMessage &message() const { return m_message; }
+
+    QList<QString> &unprotectedNamespaces() { return m_unprotectedNamespaces; }
+    const QList<QString> &unprotectedNamespaces() const { return m_unprotectedNamespaces; }
+    QXMPP_EXPORT void allowLowRiskElements();
+
+    // The message is not sent to the recipients of an encryption protecting only the body.
+    bool isUnsupported() const { return m_unsupported; }
+    void setUnsupported() { m_unsupported = true; }
+
+private:
+    const QXmppMessage *m_original;
+    QXmppMessage m_message;
+    QList<QString> m_unprotectedNamespaces;
+    bool m_unsupported = false;
+};
+
 // State of an outgoing message, created by the pipeline.
 class OutgoingMessage
 {
@@ -145,6 +178,11 @@ struct Prepare {
 struct ResolveRecipients {
     static constexpr QStringView Name = u"org.qxmpp.message.resolve-recipients";
     using Signature = QXmppTask<void>(OutgoingMessage &message);
+};
+
+struct PrepareBodyOnly {
+    static constexpr QStringView Name = u"org.qxmpp.message.prepare-body-only";
+    using Signature = void(BodyOnlyMessage &message);
 };
 
 struct ConfirmDelivery {

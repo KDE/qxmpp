@@ -25,14 +25,39 @@ using namespace QXmpp::Messages;
 
 namespace QXmpp::Private {
 
-static QStringView encryption(const QXmppMessage &message)
+// The provider decrypting received messages of the encryption.
+static std::optional<E2ee::Provider> findProvider(Hooks hooks, QStringView encryption)
 {
-    for (const auto &item : message.extensions()) {
-        if (auto encryption = Xml::Registry::encryption(item); !encryption.isNull()) {
-            return encryption;
+    auto provider = E2ee::Providers(std::move(hooks)).find(encryption);
+    if (provider && provider->isEnabled && !provider->isEnabled()) {
+        return {};
+    }
+    return provider;
+}
+
+// The encryption of the provider with the highest priority, the first one if there is none.
+static QStringView preferredEncryption(const QList<QStringView> &encryptions, Hooks hooks)
+{
+    QStringView preferred = encryptions.value(0);
+    std::optional<int> priority;
+    for (auto encryption : encryptions) {
+        if (auto provider = findProvider(hooks, encryption); provider && (!priority || provider->priority > *priority)) {
+            preferred = encryption;
+            priority = provider->priority;
         }
     }
-    return {};
+    return preferred;
+}
+
+static QStringView encryption(const QXmppMessage &message, Hooks hooks)
+{
+    QList<QStringView> encryptions;
+    for (const auto &item : message.extensions()) {
+        if (auto encryption = Xml::Registry::encryption(item); !encryption.isNull()) {
+            encryptions.append(encryption);
+        }
+    }
+    return preferredEncryption(encryptions, std::move(hooks));
 }
 
 static void fail(Context &context, DecryptionState state, QString errorText = {})
@@ -102,8 +127,8 @@ IncomingMessages::IncomingMessages(QXmppClient *client, Hooks hooks, const QList
 IncomingMessages::ParsedMessage IncomingMessages::parse(const QDomElement &element, QXmppE2eeExtension *legacyEncryption) const
 {
     ParsedMessage parsed;
-    parsed.encryption = Xml::Registry::encryption(element);
-    const auto provider = parsed.encryption.isNull() ? std::nullopt : E2ee::Providers(m_hooks).find(parsed.encryption);
+    parsed.encryption = preferredEncryption(Xml::Registry::encryptions(element), m_hooks);
+    const auto provider = parsed.encryption.isNull() ? std::nullopt : findProvider(m_hooks, parsed.encryption);
     if (provider && provider->contentEncryption == E2ee::ContentEncryption::BodyOnly) {
         // only the body is encrypted, the public one is its fallback
         parsed.message.parse(element, SceAll);
@@ -131,7 +156,7 @@ void IncomingMessages::processElement(const QDomElement &element, QXmppE2eeExten
 // Processes a message unwrapped or injected by an extension.
 void IncomingMessages::process(Context &&context)
 {
-    auto encryption = Private::encryption(context.message());
+    auto encryption = Private::encryption(context.message(), m_hooks);
     process(std::move(context), encryption, {});
 }
 
@@ -145,7 +170,7 @@ QXmppTask<IncomingMessages::CollectResult> IncomingMessages::collect(Context &&c
 
 void IncomingMessages::process(Context &&context, QStringView encryption, std::optional<QXmppPromise<CollectResult>> result)
 {
-    if (!encryption.isNull() && !E2ee::Providers(m_hooks).contains(encryption)) {
+    if (!encryption.isNull() && !findProvider(m_hooks, encryption)) {
         fail(context, DecryptionState::Unsupported);
         encryption = {};
     }
@@ -208,7 +233,7 @@ void IncomingMessages::finishFront(const QString &conversationJid)
 
 QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryption)
 {
-    auto provider = E2ee::Providers(m_hooks).find(encryption);
+    auto provider = findProvider(m_hooks, encryption);
     if (!provider || !provider->decryptMessage) {
         fail(context, DecryptionState::Unsupported);
         co_return context;
