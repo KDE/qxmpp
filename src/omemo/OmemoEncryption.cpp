@@ -54,12 +54,15 @@ void ManagerPrivate::registerProviders()
     }();
 
     // The stanzas are processed after the data has been loaded.
+    // Messages with elements of both versions are decrypted with OMEMO 2.
     E2ee::Providers(q->hooks()).add(E2ee::Provider {
         .encryption = E2ee::Omemo2,
         .decryptMessage = [this](E2ee::DecryptRequest request) { return afterLoading(this, &ManagerPrivate::decryptMessage2, std::move(request)); },
         .encryptMessage = [this](E2ee::EncryptRequest request) { return afterLoading(this, &ManagerPrivate::encryptMessage2, std::move(request)); },
         .encryptIq = [this](E2ee::EncryptIqRequest request) { return afterLoading(this, &ManagerPrivate::encryptIq2, std::move(request)); },
         .decryptIq = [this](E2ee::DecryptIqRequest request) { return afterLoading(this, &ManagerPrivate::decryptIq2, std::move(request)); },
+        .priority = 1,
+        .isEnabled = [this] { return isEnabled(Version::Omemo2); },
     });
     // OMEMO 0 encrypts only the body and no IQs.
     E2ee::Providers(q->hooks()).add(E2ee::Provider {
@@ -67,6 +70,13 @@ void ManagerPrivate::registerProviders()
         .contentEncryption = E2ee::ContentEncryption::BodyOnly,
         .decryptMessage = [this](E2ee::DecryptRequest request) { return afterLoading(this, &ManagerPrivate::decryptMessage0, std::move(request)); },
         .encryptMessage = [this](E2ee::EncryptRequest request) { return afterLoading(this, &ManagerPrivate::encryptMessage0, std::move(request)); },
+        .isEnabled = [this] { return isEnabled(Version::Omemo0); },
+    });
+    // The automatic version only sends elements of the other providers.
+    E2ee::Providers(q->hooks()).add(E2ee::Provider {
+        .encryption = Automatic,
+        .encryptMessage = [this](E2ee::EncryptRequest request) { return afterLoading(this, &ManagerPrivate::encryptMessageAutomatic, std::move(request)); },
+        .encryptIq = [this](E2ee::EncryptIqRequest request) { return afterLoading(this, &ManagerPrivate::encryptIq2, std::move(request)); },
     });
 }
 
@@ -133,6 +143,39 @@ QList<QByteArray> ManagerPrivate::sameIdentityKeys(Version version, const QStrin
         }
     }
     return keys;
+}
+
+// Whether the device is the same as one using OMEMO 2: by the identity key if the one of the
+// OMEMO 0 device is known, otherwise by the ID.
+static bool isSameDevice(const Storage::Device &omemo2Device, const Storage::Device &omemo0Device)
+{
+    if (omemo2Device.keyId.isEmpty()) {
+        return false;
+    }
+    return omemo0Device.keyId.isEmpty() ? omemo2Device.id == omemo0Device.id : omemo0IdentityKey(omemo2Device.keyId) == omemo0Device.keyId;
+}
+
+// Whether the OMEMO 0 device of the JID uses OMEMO 2. It is encrypted for with OMEMO 2 only then.
+bool ManagerPrivate::usesOmemo2(const QString &jid, uint32_t omemo0DeviceId) const
+{
+    const auto omemo0Devices = versions.at(Version::Omemo0).devices.value(jid);
+    const auto omemo0Device = omemo0Devices.value(omemo0DeviceId, Storage::Device { Version::Omemo0, jid, omemo0DeviceId });
+    const auto omemo2Devices = versions.at(Version::Omemo2).devices.value(jid);
+    return std::ranges::any_of(omemo2Devices, [&](const Storage::Device &device) { return isSameDevice(device, omemo0Device); });
+}
+
+// Whether the device has been removed from the OMEMO 2 device list, but is still listed in the
+// OMEMO 0 one. It stays encrypted for with OMEMO 2, so a server can not make the clients fall back
+// to OMEMO 0 by hiding the OMEMO 2 device list.
+bool ManagerPrivate::isSticky(const Storage::Device &omemo2Device) const
+{
+    if (!omemo2Device.removalFromDeviceListDate.isValid()) {
+        return false;
+    }
+    const auto omemo0Devices = versions.at(Version::Omemo0).devices.value(omemo2Device.jid);
+    return std::ranges::any_of(omemo0Devices, [&](const Storage::Device &device) {
+        return !device.removalFromDeviceListDate.isValid() && isSameDevice(omemo2Device, device);
+    });
 }
 
 // Builds a session with the device if there is none. Returns whether the device can be encrypted
@@ -204,55 +247,64 @@ QXmppTask<bool> ManagerPrivate::prepareSession(Version version, QString jid, uin
     co_return true;
 }
 
-// Encrypts the key material for all listed devices of the JIDs and the other own devices, but at
-// most for maxDevicesPerStanza devices, the own ones first.
-QXmppTask<Result<QList<Envelope>>> ManagerPrivate::encryptKey(Version version, QList<QString> jids, SecureByteArray keyMaterial, TrustLevels acceptedTrustLevels)
+// Selects the listed devices of the JIDs and the other own devices with an accepted trust level,
+// but at most maxDevicesPerStanza devices, the own ones first. With both versions (OMEMO 2 first,
+// so its devices are known when selecting the OMEMO 0 ones), each device gets the best version it
+// supports: devices using OMEMO 2 only get OMEMO 2, also if they have been removed from its device
+// list (see isSticky()).
+QXmppTask<Result<QList<Recipient>>> ManagerPrivate::selectDevices(QList<Version> usedVersions, QList<QString> jids, TrustLevels acceptedTrustLevels)
 {
     const auto own = ownJid();
     const auto hasRecipients = std::ranges::any_of(jids, [&](const QString &jid) { return jid != own; });
     jids.removeAll(own);
     jids.prepend(own);
+    const auto perDevice = usedVersions.contains(Version::Omemo0) && usedVersions.contains(Version::Omemo2);
 
-    QList<Envelope> envelopes;
-    auto hasRecipientEnvelope = false;
+    QList<Recipient> recipients;
     qsizetype skippedCount = 0;
     for (const auto &jid : std::as_const(jids)) {
-        if (envelopes.size() >= maxDevicesPerStanza) {
-            skippedCount += deviceIds(version, jid).size();
+        auto candidates = [&](Version version) {
+            auto ids = deviceIds(version, jid);
+            if (perDevice && version == Version::Omemo2) {
+                for (const auto &device : versions.at(version).devices.value(jid)) {
+                    if (isSticky(device)) {
+                        ids.append(device.id);
+                    }
+                }
+            }
+            return ids;
+        };
+
+        if (recipients.size() >= maxDevicesPerStanza) {
+            for (auto version : std::as_const(usedVersions)) {
+                skippedCount += candidates(version).size();
+            }
             continue;
         }
 
-        // Device lists of contacts are subscribed, but they are unknown before the first message
-        // or if only unlisted devices are known from their messages.
-        if (jid != own && deviceIds(version, jid).isEmpty()) {
-            auto result = co_await pubSubClient(version).requestDeviceList(jid).withContext(q);
-            if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
-                applyReceivedDeviceList(version, jid, *list);
+        for (auto version : std::as_const(usedVersions)) {
+            // Device lists of contacts are subscribed, but they are unknown before the first
+            // message or if only unlisted devices are known from their messages.
+            if (jid != own && deviceIds(version, jid).isEmpty()) {
+                auto result = co_await pubSubClient(version).requestDeviceList(jid).withContext(q);
+                if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
+                    applyReceivedDeviceList(version, jid, *list);
+                }
             }
         }
 
-        for (auto deviceId : deviceIds(version, jid)) {
-            if (envelopes.size() >= maxDevicesPerStanza) {
-                skippedCount++;
-                continue;
-            }
-            if (!co_await prepareSession(version, jid, deviceId, acceptedTrustLevels).withContext(q)) {
-                continue;
-            }
-
-            auto encrypted = versions.at(version).sessions->encrypt({ jid, deviceId }, keyMaterial);
-            if (auto *error = std::get_if<QXmppError>(&encrypted)) {
-                q->warning(u"Could not encrypt for %1/%2: %3"_s.arg(jid, QString::number(deviceId), error->description));
-                continue;
-            }
-            const auto &key = std::get<EncryptedKey>(encrypted);
-            envelopes.append({ jid, deviceId, key.data, key.isKeyExchange });
-            hasRecipientEnvelope |= jid != own;
-
-            if (auto *device = storedDevice(version, jid, deviceId)) {
-                device->unrespondedSentStanzasCount = std::min(device->unrespondedSentStanzasCount + 1, UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_IS_STOPPED);
-                device->unrespondedReceivedStanzasCount = 0;
-                storage->addDevice(*device);
+        for (auto version : std::as_const(usedVersions)) {
+            for (auto deviceId : candidates(version)) {
+                if (perDevice && version == Version::Omemo0 && usesOmemo2(jid, deviceId)) {
+                    continue;
+                }
+                if (recipients.size() >= maxDevicesPerStanza) {
+                    skippedCount++;
+                    continue;
+                }
+                if (co_await prepareSession(version, jid, deviceId, acceptedTrustLevels).withContext(q)) {
+                    recipients.append({ version, jid, deviceId });
+                }
             }
         }
     }
@@ -260,10 +312,35 @@ QXmppTask<Result<QList<Envelope>>> ManagerPrivate::encryptKey(Version version, Q
     if (skippedCount) {
         q->warning(u"Not encrypted for %1 devices above the maximum of %2 devices per stanza"_s.arg(QString::number(skippedCount), QString::number(maxDevicesPerStanza)));
     }
-    if (hasRecipients && !hasRecipientEnvelope) {
+    if (hasRecipients && std::ranges::all_of(recipients, [&](const Recipient &recipient) { return recipient.jid == own; })) {
         co_return QXmppError { u"There is no device of the recipients with an accepted trust level"_s, SendError::EncryptionError };
     }
-    co_return envelopes;
+    co_return recipients;
+}
+
+// Encrypts the key material for the recipients using the version.
+QList<Envelope> ManagerPrivate::encryptKey(Version version, const QList<Recipient> &recipients, const SecureByteArray &keyMaterial)
+{
+    QList<Envelope> envelopes;
+    for (const auto &[recipientVersion, jid, deviceId] : recipients) {
+        if (recipientVersion != version) {
+            continue;
+        }
+        auto encrypted = versions.at(version).sessions->encrypt({ jid, deviceId }, keyMaterial);
+        if (auto *error = std::get_if<QXmppError>(&encrypted)) {
+            q->warning(u"Could not encrypt for %1/%2: %3"_s.arg(jid, QString::number(deviceId), error->description));
+            continue;
+        }
+        const auto &key = std::get<EncryptedKey>(encrypted);
+        envelopes.append({ jid, deviceId, key.data, key.isKeyExchange });
+
+        if (auto *device = storedDevice(version, jid, deviceId)) {
+            device->unrespondedSentStanzasCount = std::min(device->unrespondedSentStanzasCount + 1, UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_IS_STOPPED);
+            device->unrespondedReceivedStanzasCount = 0;
+            storage->addDevice(*device);
+        }
+    }
+    return envelopes;
 }
 
 QXmppTask<Result<DecryptedKey>> ManagerPrivate::decryptKey(Version version, QString jid, uint32_t deviceId, QByteArray data, bool isKeyExchange, bool isMessage)
@@ -465,48 +542,94 @@ static QDomElement parseSceEnvelope(const QByteArray &xml)
     return envelope.tagName() == u"envelope" && envelope.namespaceURI() == ns_sce ? envelope : QDomElement();
 }
 
-static QXmppTask<E2ee::EncryptResult> encryptSce(ManagerPrivate *d, QByteArray sceEnvelope, QList<QString> recipientJids, TrustLevels acceptedTrustLevels)
+static Result<QXmppOmemoElement> encryptOmemo2(ManagerPrivate *d, const QByteArray &sceEnvelope, const QList<Recipient> &recipients)
 {
-    if (!d->isSetUp || !d->isEnabled(Version::Omemo2)) {
-        co_return QXmppError { u"OMEMO 2 is not set up"_s, SendError::EncryptionError };
-    }
-
     auto payload = PayloadCipher::encrypt(Version::Omemo2, sceEnvelope);
     if (auto *error = std::get_if<QXmppError>(&payload)) {
-        co_return std::move(*error);
+        return std::move(*error);
     }
-    auto &encrypted = std::get<PayloadCipher::Encrypted>(payload);
-
-    auto envelopes = co_await d->encryptKey(Version::Omemo2, recipientJids, encrypted.keyMaterial, acceptedTrustLevels).withContext(d->q);
-    if (auto *error = std::get_if<QXmppError>(&envelopes)) {
-        co_return std::move(*error);
-    }
+    const auto &encrypted = std::get<PayloadCipher::Encrypted>(payload);
 
     QXmppOmemoElement element;
     element.setSenderDeviceId(d->device.deviceId);
     element.setPayload(encrypted.ciphertext);
-    for (const auto &envelope : std::get<QList<Envelope>>(envelopes)) {
+    for (const auto &envelope : d->encryptKey(Version::Omemo2, recipients, encrypted.keyMaterial)) {
         QXmppOmemoEnvelope omemoEnvelope;
         omemoEnvelope.setRecipientDeviceId(envelope.deviceId);
         omemoEnvelope.setUsedForKeyExchange(envelope.isKeyExchange);
         omemoEnvelope.setData(envelope.data);
         element.addEnvelope(envelope.jid, omemoEnvelope);
     }
+    return element;
+}
+
+static Result<Omemo0::Element> encryptOmemo0(ManagerPrivate *d, const QString &body, const QList<Recipient> &recipients)
+{
+    auto payload = PayloadCipher::encrypt(Version::Omemo0, body.toUtf8());
+    if (auto *error = std::get_if<QXmppError>(&payload)) {
+        return std::move(*error);
+    }
+    const auto &encrypted = std::get<PayloadCipher::Encrypted>(payload);
+
+    Omemo0::Element element;
+    element.senderDeviceId = d->device.deviceId;
+    element.iv = encrypted.iv;
+    element.payload = encrypted.ciphertext;
+    for (const auto &envelope : d->encryptKey(Version::Omemo0, recipients, encrypted.keyMaterial)) {
+        element.envelopes.append({ envelope.deviceId, envelope.isKeyExchange, envelope.data });
+    }
+    return element;
+}
+
+static QXmppTask<E2ee::EncryptResult> encryptSce(ManagerPrivate *d, QByteArray sceEnvelope, QList<QString> recipientJids, TrustLevels acceptedTrustLevels)
+{
+    if (!d->isSetUp || !d->isEnabled(Version::Omemo2)) {
+        co_return QXmppError { u"OMEMO 2 is not set up"_s, SendError::EncryptionError };
+    }
+    auto recipients = co_await d->selectDevices({ Version::Omemo2 }, recipientJids, acceptedTrustLevels).withContext(d->q);
+    if (auto *error = std::get_if<QXmppError>(&recipients)) {
+        co_return std::move(*error);
+    }
+    auto element = encryptOmemo2(d, sceEnvelope, std::get<QList<Recipient>>(recipients));
+    if (auto *error = std::get_if<QXmppError>(&element)) {
+        co_return std::move(*error);
+    }
 
     Xml::Extensions elements;
-    elements.add(std::move(element));
+    elements.add(std::get<QXmppOmemoElement>(std::move(element)));
     E2ee::Encrypted result;
     result.setElements(std::move(elements));
     co_return result;
 }
 
-QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessage2(E2ee::EncryptRequest request)
+static QByteArray messageSceEnvelope(const QString &from, const QXmppMessage &message)
 {
-    const auto &message = request.message();
-    const auto sce = createSceEnvelope(ownJid(), QXmppUtils::jidToBareJid(message.to()), [&](QXmlStreamWriter &writer) {
+    return createSceEnvelope(from, QXmppUtils::jidToBareJid(message.to()), [&](QXmlStreamWriter &writer) {
         message.serializeExtensions(&writer, SceSensitive, staticString(ns_client));
     });
-    return encryptSce(this, sce, request.recipientJids(), request.params().acceptedTrustLevels().value_or(DEFAULT_ACCEPTED_TRUST_LEVELS));
+}
+
+// Whether the message has elements that are only sent if encrypted, apart from the body.
+static bool hasSensitiveContent(const QXmppMessage &message)
+{
+    auto withoutBody = message;
+    withoutBody.setBody({});
+    QByteArray xml;
+    QXmlStreamWriter writer(&xml);
+    withoutBody.serializeExtensions(&writer, SceSensitive, staticString(ns_client));
+    return !xml.isEmpty();
+}
+
+// Whether the body alone has the meaning of the message, for devices only receiving the body
+// (UnprotectedContent::Drop). A correction would appear as a new message.
+static bool isBodyEnough(const QXmppMessage &message)
+{
+    return !message.body().isEmpty() && message.replaceId().isEmpty();
+}
+
+QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessage2(E2ee::EncryptRequest request)
+{
+    return encryptSce(this, messageSceEnvelope(ownJid(), request.message()), request.recipientJids(), request.params().acceptedTrustLevels().value_or(DEFAULT_ACCEPTED_TRUST_LEVELS));
 }
 
 QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptIq2(E2ee::EncryptIqRequest request)
@@ -568,6 +691,12 @@ QXmppTask<E2ee::DecryptResult> ManagerPrivate::decryptMessage2(E2ee::DecryptRequ
     if (!element) {
         return makeReadyTask<E2ee::DecryptResult>(QXmppError { u"The message contains no OMEMO element"_s, {} });
     }
+    // Also encrypted with OMEMO 0, e.g. for this device if the sender does not know yet that it
+    // uses OMEMO 2. Elements sent in the clear for OMEMO 0 are not used.
+    if (request.message().extensions().get<Omemo0::Element>() && isEnabled(Version::Omemo0) &&
+        !element->searchEnvelope(ownJid(), device.deviceId)) {
+        return decryptMessage0(std::move(request));
+    }
     return decryptSce(this, std::move(*element), request.senderJid(), true);
 }
 
@@ -587,35 +716,86 @@ QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessage0(E2ee::EncryptRequ
     if (!isSetUp || !isEnabled(Version::Omemo0)) {
         co_return QXmppError { u"OMEMO 0 is not set up"_s, SendError::EncryptionError };
     }
+    const auto &message = request.message();
+    const auto drop = request.unprotectedContent().value_or(unprotectedContent) == Manager::UnprotectedContent::Drop;
+    if (drop && !isBodyEnough(message) && hasSensitiveContent(message)) {
+        co_return QXmppError { u"The message can not be encrypted with OMEMO 0 without sending unprotected content"_s, SendError::EncryptionError };
+    }
     // only the body is encrypted
-    const auto body = request.message().body();
-    if (body.isEmpty()) {
+    if (message.body().isEmpty()) {
         co_return E2ee::Encrypted();
     }
 
-    auto payload = PayloadCipher::encrypt(Version::Omemo0, body.toUtf8());
-    if (auto *error = std::get_if<QXmppError>(&payload)) {
+    auto recipients = co_await selectDevices({ Version::Omemo0 }, request.recipientJids(), request.params().acceptedTrustLevels().value_or(DEFAULT_ACCEPTED_TRUST_LEVELS)).withContext(q);
+    if (auto *error = std::get_if<QXmppError>(&recipients)) {
         co_return std::move(*error);
     }
-    auto &encrypted = std::get<PayloadCipher::Encrypted>(payload);
-
-    auto envelopes = co_await encryptKey(Version::Omemo0, request.recipientJids(), encrypted.keyMaterial, request.params().acceptedTrustLevels().value_or(DEFAULT_ACCEPTED_TRUST_LEVELS)).withContext(q);
-    if (auto *error = std::get_if<QXmppError>(&envelopes)) {
+    auto element = encryptOmemo0(this, message.body(), std::get<QList<Recipient>>(recipients));
+    if (auto *error = std::get_if<QXmppError>(&element)) {
         co_return std::move(*error);
-    }
-
-    Omemo0::Element element;
-    element.senderDeviceId = device.deviceId;
-    element.iv = encrypted.iv;
-    element.payload = encrypted.ciphertext;
-    for (const auto &envelope : std::get<QList<Envelope>>(envelopes)) {
-        element.envelopes.append({ envelope.deviceId, envelope.isKeyExchange, envelope.data });
     }
 
     Xml::Extensions elements;
-    elements.add(std::move(element));
+    elements.add(std::get<Omemo0::Element>(std::move(element)));
     E2ee::Encrypted result;
     result.setElements(std::move(elements));
+    if (drop) {
+        // only the public elements are sent
+        result.setContentEncryption(E2ee::ContentEncryption::Sce);
+    }
+    co_return result;
+}
+
+// Encrypts for each device with the best version it supports. The OMEMO 2 element contains all
+// sensitive elements, also if the other ones are sent in the clear for OMEMO 0.
+QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessageAutomatic(E2ee::EncryptRequest request)
+{
+    if (!isSetUp) {
+        co_return QXmppError { u"OMEMO is not set up"_s, SendError::EncryptionError };
+    }
+    const auto &message = request.message();
+    const auto plaintext = request.unprotectedContent().value_or(unprotectedContent) == Manager::UnprotectedContent::Plaintext;
+
+    QList<Version> usedVersions;
+    if (isEnabled(Version::Omemo2)) {
+        usedVersions.append(Version::Omemo2);
+    }
+    if (isEnabled(Version::Omemo0) && (plaintext || isBodyEnough(message))) {
+        usedVersions.append(Version::Omemo0);
+    }
+    if (usedVersions.isEmpty()) {
+        co_return QXmppError { u"The message can not be encrypted with the enabled OMEMO versions without sending unprotected content"_s, SendError::EncryptionError };
+    }
+
+    auto selected = co_await selectDevices(usedVersions, request.recipientJids(), request.params().acceptedTrustLevels().value_or(DEFAULT_ACCEPTED_TRUST_LEVELS)).withContext(q);
+    if (auto *error = std::get_if<QXmppError>(&selected)) {
+        co_return std::move(*error);
+    }
+    const auto &recipients = std::get<QList<Recipient>>(selected);
+    auto usesVersion = [&](Version version) {
+        return std::ranges::any_of(recipients, [&](const Recipient &recipient) { return recipient.version == version; });
+    };
+
+    Xml::Extensions elements;
+    E2ee::Encrypted result;
+    if (usesVersion(Version::Omemo2)) {
+        auto element = encryptOmemo2(this, messageSceEnvelope(ownJid(), message), recipients);
+        if (auto *error = std::get_if<QXmppError>(&element)) {
+            co_return std::move(*error);
+        }
+        elements.add(std::get<QXmppOmemoElement>(std::move(element)));
+    }
+    const auto usesOmemo0 = usesVersion(Version::Omemo0);
+    if (usesOmemo0 && !message.body().isEmpty()) {
+        auto element = encryptOmemo0(this, message.body(), recipients);
+        if (auto *error = std::get_if<QXmppError>(&element)) {
+            co_return std::move(*error);
+        }
+        elements.add(std::get<Omemo0::Element>(std::move(element)));
+    }
+    result.setElements(std::move(elements));
+    result.setEncryption(usesVersion(Version::Omemo2) ? E2ee::Omemo2.toString() : E2ee::Omemo0.toString());
+    result.setContentEncryption(usesOmemo0 && plaintext ? E2ee::ContentEncryption::BodyOnly : E2ee::ContentEncryption::Sce);
     co_return result;
 }
 
@@ -627,6 +807,10 @@ QXmppTask<E2ee::DecryptResult> ManagerPrivate::decryptMessage0(E2ee::DecryptRequ
     const auto element = request.message().extensions().get<Omemo0::Element>();
     if (!element) {
         co_return QXmppError { u"The message contains no OMEMO element"_s, {} };
+    }
+
+    if (isEnabled(Version::Omemo2) && !request.message().extensions().get<QXmppOmemoElement>() && usesOmemo2(request.senderJid(), element->senderDeviceId)) {
+        q->warning(u"Received a message encrypted only with OMEMO 0 from %1/%2, which uses OMEMO 2"_s.arg(request.senderJid(), QString::number(element->senderDeviceId)));
     }
 
     // The envelopes are not grouped by JID, the device ID identifies the recipient.

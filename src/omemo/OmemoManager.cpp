@@ -437,6 +437,13 @@ void ManagerPrivate::storeDeviceListChanges(Version version, const QString &jid,
             update(id);
         }
     }
+    if (version == Version::Omemo2) {
+        for (auto id : changes.removed) {
+            if (isSticky(devices.value(id))) {
+                q->warning(u"%1/%2 has been removed from the OMEMO 2 device list, but not from the OMEMO 0 one, it is still encrypted for with OMEMO 2"_s.arg(jid, QString::number(id)));
+            }
+        }
+    }
     devicesChanged(jid);
     if (!changes.added.isEmpty()) {
         buildSessions(jid);
@@ -449,7 +456,8 @@ void ManagerPrivate::removeExpiredDevices()
     for (auto version : ALL_VERSIONS) {
         auto &state = versions.at(version);
         for (auto jidIt = state.devices.begin(); jidIt != state.devices.end();) {
-            const auto expired = DeviceList::expired(deviceInfos(*jidIt), currentTime);
+            auto expired = DeviceList::expired(deviceInfos(*jidIt), currentTime);
+            expired.removeIf([&](uint32_t id) { return version == Version::Omemo2 && isSticky(jidIt->value(id)); });
             for (auto id : expired) {
                 jidIt->remove(id);
                 state.keys.sessions.remove({ jidIt.key(), id });
@@ -799,7 +807,42 @@ void ManagerPrivate::unsubscribe(const Storage::Subscription &subscription)
     A stanza is encrypted for at most 500 devices, the other own devices first, so that it stays
     below the stanza size limit of servers. Devices above the limit cannot decrypt it.
 
+    \section1 Selecting the version
+
+    Messages are encrypted with the version selected via the QXmpp::Messages::SelectEncryption
+    hook: QXmpp::E2ee::Omemo0, QXmpp::E2ee::Omemo2 or QXmpp::Omemo::Automatic. The automatic
+    mode encrypts for each device with the best version it supports, so a message contains
+    elements of both versions only if a recipient's device does not support OMEMO 2. Contacts and
+    groups can be migrated without losing devices supporting only OMEMO 0, e.g. Conversations and
+    Dino. IQs are always encrypted with OMEMO 2.
+
+    In the automatic mode, a device using OMEMO 2 is never encrypted for with OMEMO 0 later,
+    even if it is removed from the OMEMO 2 device list while it is still in the OMEMO 0 one.
+    That could be used by a server to make the clients fall back to OMEMO 0. A device that
+    disables OMEMO 2 later (see setEnabledVersions()) can therefore not decrypt the messages of
+    contacts using the automatic mode. Devices are only known to use OMEMO 2 after it has been
+    encrypted for them once, before that a server can still hide their OMEMO 2 device list.
+
+    OMEMO 0 only encrypts the body. What happens to the other sensitive elements, e.g. replies,
+    reactions and chat states, is configured via setUnprotectedContent() and can be overridden per
+    message via QXmpp::Messages::EncryptionSelection::setUnprotectedContent().
+
     \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Omemo::Automatic
+
+    Pseudo namespace for selecting the automatic OMEMO version for a message, see
+    QXmpp::Messages::EncryptionSelection::setEncryption(). It is never used in stanzas.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \typealias QXmpp::Omemo::Manager::UnprotectedContent
+
+    See QXmpp::Messages::EncryptionSelection::UnprotectedContent.
 */
 
 /*!
@@ -862,6 +905,33 @@ void Manager::setEnabledVersions(QList<Version> versions)
             }
         });
     }
+}
+
+/*!
+    Returns what happens to the sensitive elements that OMEMO 0 does not encrypt, if the
+    SelectEncryption hook does not set it for a message.
+*/
+Manager::UnprotectedContent Manager::unprotectedContent() const
+{
+    return d->unprotectedContent;
+}
+
+/*!
+    Sets what happens to the sensitive elements that OMEMO 0 does not encrypt, if the
+    SelectEncryption hook does not set it for a message. The default is
+    UnprotectedContent::Drop.
+
+    With UnprotectedContent::Drop, devices encrypted for with OMEMO 0 only receive the body.
+    Messages without a body (e.g. reactions, chat states and receipts) and corrections, which would
+    appear as new messages, are not encrypted for them at all. If there is no other device of the
+    recipients, sending fails.
+
+    With UnprotectedContent::Plaintext, the other sensitive elements are sent in the clear, so the
+    servers can read them, also if the message is additionally encrypted with OMEMO 2.
+*/
+void Manager::setUnprotectedContent(UnprotectedContent unprotectedContent)
+{
+    d->unprotectedContent = unprotectedContent;
 }
 
 /*!

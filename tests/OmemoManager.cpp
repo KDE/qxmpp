@@ -18,6 +18,7 @@
 #include "QXmppIqHandling.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
+#include "QXmppMessageReaction.h"
 #include "QXmppMessages.h"
 #include "QXmppMucForms.h"
 #include "QXmppMucManagerV2.h"
@@ -2562,9 +2563,12 @@ struct Account {
 
         // the version is selected by the test
         client.hooks(&owner).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
-            if (encryption) {
+            if (automatic) {
+                selection.setEncryption(Automatic);
+            } else if (encryption) {
                 selection.setEncryption(*encryption == Version::Omemo0 ? E2ee::Omemo0 : E2ee::Omemo2);
             }
+            selection.setUnprotectedContent(unprotectedContent);
             return QXmpp::Private::makeReadyTask();
         });
     }
@@ -2598,6 +2602,12 @@ struct Account {
         QXmppMessage message;
         message.setTo(to);
         message.setBody(body);
+        return sendMessage(std::move(message));
+    }
+
+    QString sendMessage(QXmppMessage &&message)
+    {
+        sendError.clear();
         auto task = client.send(std::move(message));
         service.process();
         // Without a stream, the task only finishes on errors.
@@ -2639,6 +2649,8 @@ struct Account {
     FakePubSubService &service;
     Manager *manager;
     std::optional<Version> encryption;
+    bool automatic = false;
+    std::optional<Manager::UnprotectedContent> unprotectedContent;
     QString sendError;
 };
 
@@ -2689,6 +2701,14 @@ private:
     Q_SLOT void ownDevicesReceiveCopies();
     Q_SLOT void maxDevicesPerStanza_data();
     Q_SLOT void maxDevicesPerStanza();
+    Q_SLOT void automaticVersion();
+    Q_SLOT void automaticMaxDevicesPerStanza();
+    Q_SLOT void automaticHiddenOmemo2Device();
+    Q_SLOT void unprotectedContent_data();
+    Q_SLOT void unprotectedContent();
+    Q_SLOT void unprotectedContentOfLegacyContact();
+    Q_SLOT void omemo0UnprotectedContent();
+    Q_SLOT void stickyOmemo2();
     Q_SLOT void heartbeat_data();
     Q_SLOT void heartbeat();
     Q_SLOT void keyExchangeWithAnotherKey_data();
@@ -3401,6 +3421,296 @@ void tst_OmemoManager2::maxDevicesPerStanza()
     QCOMPARE(alicePhone.receive(alice, message).value(0).body(), u"Hello"_s);
     QCOMPARE(first.receive(alice, message).value(0).body(), u"Hello"_s);
     QVERIFY(second.receive(alice, message).value(0).body() != u"Hello"_s);
+}
+
+static const auto OMEMO0_ELEMENT = u"<encrypted xmlns=\"eu.siacs.conversations.axolotl\""_s;
+static const auto OMEMO2_ELEMENT = u"<encrypted xmlns=\"urn:xmpp:omemo:2\""_s;
+
+// Moves the OMEMO 0 element to the beginning of the message.
+static QString withOmemo0First(QString message)
+{
+    const auto start = message.indexOf(OMEMO0_ELEMENT);
+    const auto end = message.indexOf(u"</encrypted>"_s, start) + u"</encrypted>"_s.size();
+    const auto element = message.mid(start, end - start);
+    message.remove(start, end - start);
+    return message.insert(message.indexOf(u'>') + 1, element);
+}
+
+static QString recipientAttribute(const Account &account)
+{
+    return u"rid=\"%1\""_s.arg(account.manager->ownDeviceId().value());
+}
+
+void tst_OmemoManager2::automaticVersion()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobLegacy(nullptr, &server, u"bob@builder.lit/legacy"_s);
+    Account carol(nullptr, &server, u"carol@example.org/home"_s);
+    bobLegacy.manager->setEnabledVersions({ Version::Omemo0 });
+    for (auto *account : { &alice, &bob, &bobLegacy, &carol }) {
+        expectVariant<Success>(account->setUp());
+    }
+    alice.automatic = true;
+
+    // only OMEMO 2 if all devices use it
+    auto message = alice.sendMessage(carol.jid(), u"Hello Carol"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QVERIFY(message.contains(OMEMO2_ELEMENT));
+    QVERIFY(!message.contains(OMEMO0_ELEMENT));
+    QVERIFY(!message.contains(Automatic.toString()));
+    QCOMPARE(carol.receive(alice, message).value(0).body(), u"Hello Carol"_s);
+
+    // both versions, but the device using both only gets OMEMO 2
+    message = alice.sendMessage(bob.jid(), u"Hello Bob"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QVERIFY(message.contains(OMEMO2_ELEMENT));
+    QVERIFY(message.contains(OMEMO0_ELEMENT));
+    QVERIFY(message.contains(u"<encryption xmlns=\"urn:xmpp:eme:0\" namespace=\"urn:xmpp:omemo:2\""_s));
+    QCOMPARE(message.count(recipientAttribute(bob)), 1);
+    QCOMPARE(message.count(recipientAttribute(bobLegacy)), 1);
+
+    // OMEMO 2 is preferred, also if the OMEMO 0 element comes first
+    auto received = bob.receive(alice, withOmemo0First(message));
+    QCOMPARE(received.value(0).body(), u"Hello Bob"_s);
+    QCOMPARE(received.value(0).e2eeMetadata()->encryptionNamespace(), E2ee::Omemo2.toString());
+    received = bobLegacy.receive(alice, message);
+    QCOMPARE(received.value(0).body(), u"Hello Bob"_s);
+    QCOMPARE(received.value(0).e2eeMetadata()->encryptionNamespace(), E2ee::Omemo0.toString());
+}
+
+// The limit applies to the devices of both versions together.
+void tst_OmemoManager2::automaticMaxDevicesPerStanza()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account alicePhone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobLegacy(nullptr, &server, u"bob@builder.lit/legacy"_s);
+    bobLegacy.manager->setEnabledVersions({ Version::Omemo0 });
+    for (auto *account : { &alice, &alicePhone, &bob, &bobLegacy }) {
+        expectVariant<Success>(account->setUp());
+    }
+    alice.automatic = true;
+    alice.manager->d->maxDevicesPerStanza = 2;
+
+    // the own devices first, then OMEMO 2 before OMEMO 0
+    auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    QCOMPARE(message.count(u"rid="_s), 2);
+    QVERIFY(!message.contains(OMEMO0_ELEMENT));
+    QCOMPARE(alicePhone.receive(alice, message).value(0).body(), u"Hello"_s);
+    QCOMPARE(bob.receive(alice, message).value(0).body(), u"Hello"_s);
+    QVERIFY(bobLegacy.receive(alice, message).value(0).body() != u"Hello"_s);
+
+    alice.manager->d->maxDevicesPerStanza = 3;
+    message = alice.sendMessage(bob.jid(), u"Hello again"_s);
+    QCOMPARE(message.count(u"rid="_s), 3);
+    QCOMPARE(bobLegacy.receive(alice, message).value(0).body(), u"Hello again"_s);
+}
+
+// Before a device is known to use OMEMO 2, a server can hide its OMEMO 2 device list.
+void tst_OmemoManager2::automaticHiddenOmemo2Device()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account alicePhone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(alicePhone.setUp());
+    server.setNotificationsEnabled(false);
+    expectVariant<Success>(bob.setUp());
+    server.setItem(bob.jid(), V2_DEVICE_LIST, u"current"_s, v2List({}));
+    alice.automatic = true;
+
+    // OMEMO 2 for the own device, OMEMO 0 for Bob's device
+    const auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QVERIFY(message.contains(OMEMO2_ELEMENT));
+    QVERIFY(message.contains(OMEMO0_ELEMENT));
+    QCOMPARE(alicePhone.receive(alice, message).value(0).body(), u"Hello"_s);
+    const auto received = bob.receive(alice, message);
+    QCOMPARE(received.value(0).body(), u"Hello"_s);
+    QCOMPARE(received.value(0).e2eeMetadata()->encryptionNamespace(), E2ee::Omemo0.toString());
+}
+
+void tst_OmemoManager2::unprotectedContent_data()
+{
+    QTest::addColumn<bool>("plaintext");
+    QTest::newRow("drop") << false;
+    QTest::newRow("plaintext") << true;
+}
+
+void tst_OmemoManager2::unprotectedContent()
+{
+    QFETCH(bool, plaintext);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobLegacy(nullptr, &server, u"bob@builder.lit/legacy"_s);
+    bobLegacy.manager->setEnabledVersions({ Version::Omemo0 });
+    for (auto *account : { &alice, &bob, &bobLegacy }) {
+        expectVariant<Success>(account->setUp());
+    }
+    alice.automatic = true;
+    if (plaintext) {
+        alice.unprotectedContent = Manager::UnprotectedContent::Plaintext;
+    }
+
+    // The device using only OMEMO 0 gets the body including the fallback of the reply.
+    QXmppMessage reply;
+    reply.setTo(bob.jid());
+    reply.setBody(u"> Hello\nHi"_s);
+    reply.setReply(QXmpp::Reply { bob.jid(), u"original"_s });
+    auto message = alice.sendMessage(std::move(reply));
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(message.contains(u"urn:xmpp:reply:0"_s), plaintext);
+    auto received = bob.receive(alice, message);
+    QCOMPARE(received.value(0).body(), u"> Hello\nHi"_s);
+    QCOMPARE(received.value(0).reply()->id, u"original"_s);
+    received = bobLegacy.receive(alice, message);
+    QCOMPARE(received.value(0).body(), u"> Hello\nHi"_s);
+    QCOMPARE(received.value(0).reply().has_value(), plaintext);
+
+    // A correction would appear as a new message.
+    QXmppMessage correction;
+    correction.setTo(bob.jid());
+    correction.setBody(u"Hi!"_s);
+    correction.setReplaceId(u"original"_s);
+    message = alice.sendMessage(std::move(correction));
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(message.contains(OMEMO0_ELEMENT), plaintext);
+    QCOMPARE(message.contains(u"urn:xmpp:message-correct:0"_s), plaintext);
+    QCOMPARE(bob.receive(alice, message).value(0).replaceId(), u"original"_s);
+    received = bobLegacy.receive(alice, message);
+    QCOMPARE(received.value(0).body() == u"Hi!"_s, plaintext);
+    QCOMPARE(received.value(0).replaceId() == u"original"_s, plaintext);
+
+    // without body
+    QXmppMessageReaction reaction;
+    reaction.setMessageId(u"original"_s);
+    reaction.setEmojis({ u"👍"_s });
+    QXmppMessage reactionMessage;
+    reactionMessage.setTo(bob.jid());
+    reactionMessage.setReaction(reaction);
+    message = alice.sendMessage(std::move(reactionMessage));
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QVERIFY(!message.contains(OMEMO0_ELEMENT));
+    QCOMPARE(message.contains(u"urn:xmpp:reactions:0"_s), plaintext);
+    QCOMPARE(bob.receive(alice, message).value(0).reaction()->emojis(), QList { u"👍"_s });
+    received = bobLegacy.receive(alice, message);
+    QCOMPARE(received.value(0).reaction().has_value(), plaintext);
+}
+
+void tst_OmemoManager2::unprotectedContentOfLegacyContact()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account dave(nullptr, &server, u"dave@example.org/legacy"_s);
+    dave.manager->setEnabledVersions({ Version::Omemo0 });
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(dave.setUp());
+    alice.automatic = true;
+
+    auto correction = [&] {
+        QXmppMessage message;
+        message.setTo(dave.jid());
+        message.setBody(u"Hi!"_s);
+        message.setReplaceId(u"original"_s);
+        return message;
+    };
+
+    // Dave would only get the body.
+    QVERIFY(alice.sendMessage(correction()).isEmpty());
+    QVERIFY(!alice.sendError.isEmpty());
+
+    // per message
+    alice.unprotectedContent = Manager::UnprotectedContent::Plaintext;
+    auto message = alice.sendMessage(correction());
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(dave.receive(alice, message).value(0).replaceId(), u"original"_s);
+
+    // default of the manager
+    alice.unprotectedContent.reset();
+    QCOMPARE(alice.manager->unprotectedContent(), Manager::UnprotectedContent::Drop);
+    alice.manager->setUnprotectedContent(Manager::UnprotectedContent::Plaintext);
+    QVERIFY2(!alice.sendMessage(correction()).isEmpty(), qPrintable(alice.sendError));
+    alice.unprotectedContent = Manager::UnprotectedContent::Drop;
+    QVERIFY(alice.sendMessage(correction()).isEmpty());
+}
+
+void tst_OmemoManager2::omemo0UnprotectedContent()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = Version::Omemo0;
+
+    QXmppMessage reply;
+    reply.setTo(bob.jid());
+    reply.setBody(u"> Hello\nHi"_s);
+    reply.setReply(QXmpp::Reply { bob.jid(), u"original"_s });
+    auto message = alice.sendMessage(std::move(reply));
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QVERIFY(!message.contains(u"urn:xmpp:reply:0"_s));
+    auto received = bob.receive(alice, message);
+    QCOMPARE(received.value(0).body(), u"> Hello\nHi"_s);
+    QVERIFY(!received.value(0).reply());
+
+    QXmppMessage correction;
+    correction.setTo(bob.jid());
+    correction.setBody(u"Hi!"_s);
+    correction.setReplaceId(u"original"_s);
+    QVERIFY(alice.sendMessage(QXmppMessage(correction)).isEmpty());
+    QCOMPARE(alice.sendError, u"The message can not be encrypted with OMEMO 0 without sending unprotected content"_s);
+
+    alice.unprotectedContent = Manager::UnprotectedContent::Plaintext;
+    message = alice.sendMessage(std::move(correction));
+    QVERIFY(message.contains(u"<replace xmlns=\"urn:xmpp:message-correct:0\" id=\"original\"/>"_s));
+    QCOMPARE(bob.receive(alice, message).value(0).replaceId(), u"original"_s);
+}
+
+// A server can not make the clients fall back to OMEMO 0 by hiding a device in the OMEMO 2 device
+// list.
+void tst_OmemoManager2::stickyOmemo2()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.automatic = true;
+
+    QCOMPARE(bob.receive(alice, alice.sendMessage(bob.jid(), u"Hello"_s)).value(0).body(), u"Hello"_s);
+    alice.receive(bob, bob.takeMessage());
+
+    alice.client.inject(itemsEvent(bob.jid(), V2_DEVICE_LIST, v2List({ { 1, {} } })));
+    server.process();
+    QVERIFY(!alice.manager->d->deviceIds(Version::Omemo2, bob.jid()).contains(bob.deviceId()));
+    QVERIFY(alice.manager->d->deviceIds(Version::Omemo0, bob.jid()).contains(bob.deviceId()));
+
+    auto message = alice.sendMessage(bob.jid(), u"Still OMEMO 2"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QVERIFY(!message.contains(OMEMO0_ELEMENT));
+    auto received = bob.receive(alice, message);
+    QCOMPARE(received.value(0).body(), u"Still OMEMO 2"_s);
+    QCOMPARE(received.value(0).e2eeMetadata()->encryptionNamespace(), E2ee::Omemo2.toString());
+
+    // not removed while listed for OMEMO 0
+    auto &d = *alice.manager->d;
+    d.fixedTime = QDateTime::currentDateTimeUtc().addYears(1);
+    d.removeExpiredDevices();
+    QVERIFY(d.storedDevice(Version::Omemo2, bob.jid(), bob.deviceId()));
+
+    // removed from both device lists
+    alice.client.inject(itemsEvent(bob.jid(), V0_DEVICE_LIST, v0List({ 1 })));
+    server.process();
+    d.removeExpiredDevices();
+    QVERIFY(!d.storedDevice(Version::Omemo2, bob.jid(), bob.deviceId()));
+    QVERIFY(alice.sendMessage(bob.jid(), u"Gone"_s).isEmpty());
 }
 
 void tst_OmemoManager2::heartbeat_data()

@@ -8,6 +8,7 @@
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppError.h"
+#include "QXmppMessages.h"
 #include "QXmppOmemoStorage.h"
 #include "QXmppTask.h"
 #include "QXmppTrustLevel.h"
@@ -174,6 +175,8 @@ namespace QXmpp::Omemo {
 
 class ManagerPrivate;
 
+inline constexpr QStringView Automatic = u"org.qxmpp.omemo-auto";
+
 struct Device {
     Version version = Version::Omemo2;
     QString jid;
@@ -232,6 +235,10 @@ public:
     QString deviceLabel() const;
     void setDeviceLabel(const QString &label);
     static QString defaultDeviceLabel();
+
+    using UnprotectedContent = QXmpp::Messages::EncryptionSelection::UnprotectedContent;
+    UnprotectedContent unprotectedContent() const;
+    void setUnprotectedContent(UnprotectedContent unprotectedContent);
 
     QBindable<State> state() const;
     QBindable<uint32_t> ownDeviceId() const;
