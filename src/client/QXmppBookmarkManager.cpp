@@ -77,6 +77,8 @@ QXmppBookmarkManager::QXmppBookmarkManager()
     : d(new QXmppBookmarkManagerPrivate)
 {
     hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppBookmarkManager::handleIncomingStanza));
+    hooks().add<Connection::SessionStarted>(this, &QXmppBookmarkManager::requestBookmarks);
+    hooks().add<Connection::SessionEnded>(this, &QXmppBookmarkManager::resetBookmarks);
     d->bookmarksReceived = false;
 }
 
@@ -145,32 +147,14 @@ bool QXmppBookmarkManager::handleIncomingStanza(const QDomElement &stanza)
     return false;
 }
 
-void QXmppBookmarkManager::onRegistered(QXmppClient *client)
-{
-    connect(client, &QXmppClient::connected,
-            this, &QXmppBookmarkManager::slotConnected);
-
-    connect(client, &QXmppClient::disconnected,
-            this, &QXmppBookmarkManager::slotDisconnected);
-}
-
-void QXmppBookmarkManager::onUnregistered(QXmppClient *client)
-{
-    disconnect(client, &QXmppClient::connected,
-               this, &QXmppBookmarkManager::slotConnected);
-
-    disconnect(client, &QXmppClient::disconnected,
-               this, &QXmppBookmarkManager::slotDisconnected);
-}
-
-void QXmppBookmarkManager::slotConnected()
+void QXmppBookmarkManager::requestBookmarks()
 {
     QXmppPrivateStorageIq iq;
     iq.setType(QXmppIq::Get);
     client()->send(std::move(iq));
 }
 
-void QXmppBookmarkManager::slotDisconnected()
+void QXmppBookmarkManager::resetBookmarks()
 {
     d->bookmarks = QXmppBookmarkSet();
     d->bookmarksReceived = false;

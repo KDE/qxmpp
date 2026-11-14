@@ -618,6 +618,17 @@ QXmppMucManagerV2::QXmppMucManagerV2()
     hooks().add<Messages::Prepare>(d.get(), &QXmppMucManagerV2Private::prepareMessage);
     hooks().add<Messages::ResolveRecipients>(d.get(), &QXmppMucManagerV2Private::resolveRecipients);
     hooks().add<Messages::ConfirmDelivery>(d.get(), &QXmppMucManagerV2Private::confirmDelivery);
+    hooks().add<Connection::SessionStarted>(d.get(), &QXmppMucManagerV2Private::rejoinRooms);
+    hooks().add<Connection::SessionEnded>([this] {
+        // After disconnectFromServer() the server has removed us from all rooms, and they are not
+        // rejoined. Only disconnectFromServer() (and setClientPresence() with an unavailable
+        // presence) sets the own presence to unavailable.
+        if (client()->clientPresence().type() == QXmppPresence::Unavailable) {
+            d->handleConnectionLost();
+        } else {
+            d->suspendAllRooms();
+        }
+    });
 }
 
 QXmppMucManagerV2::~QXmppMucManagerV2() = default;
@@ -1119,8 +1130,6 @@ void QXmppMucManagerV2::onRegistered(QXmppClient *client)
         return d->servicesWatch->loaded().value();
     });
 
-    connect(client, &QXmppClient::connected, this, &QXmppMucManagerV2::onConnected);
-    connect(client, &QXmppClient::disconnected, this, &QXmppMucManagerV2::onDisconnected);
     connect(client, &QXmppClient::presenceReceived, this, [this](const auto &p) { d->handlePresence(p); });
 }
 
@@ -1132,26 +1141,6 @@ void QXmppMucManagerV2::onUnregistered(QXmppClient *client)
     d->mucServicesLoaded = false;
     d->servicesWatch = {};
     disconnect(client, nullptr, this, nullptr);
-}
-
-void QXmppMucManagerV2::onConnected()
-{
-    if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->suspendAllRooms();
-        d->rejoinRooms();
-    }
-}
-
-void QXmppMucManagerV2::onDisconnected()
-{
-    // After disconnectFromServer() the server has removed us from all rooms, and they are not
-    // rejoined. The client state is DisconnectedState in both cases, only disconnectFromServer()
-    // (and setClientPresence() with an unavailable presence) sets the own presence to unavailable.
-    if (client()->clientPresence().type() == QXmppPresence::Unavailable) {
-        d->handleConnectionLost();
-    } else if (client()->streamManagementState() == QXmppClient::NoStreamManagement) {
-        d->suspendAllRooms();
-    }
 }
 
 std::optional<QXmppMucRoomV2> QXmppMucManagerV2::findRoom(const QString &jid)

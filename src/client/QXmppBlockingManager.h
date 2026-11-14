@@ -89,12 +89,9 @@ public:
     Q_SIGNAL void blocked(const QList<QString> &jids);
     Q_SIGNAL void unblocked(const QList<QString> &jids);
 
-    void onRegistered(QXmppClient *) override;
-    void onUnregistered(QXmppClient *) override;
-
 private:
     std::variant<QXmpp::Success, QXmppStanza::Error> handlePush(const QString &from, bool encrypted, const QList<QString> &jids, bool block);
-    void onConnected();
+    void onSessionEnded();
 
     std::unique_ptr<QXmppBlockingManagerPrivate> d;
 };

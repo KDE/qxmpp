@@ -170,9 +170,6 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    void onConnected();
-    void onDisconnected();
-
     QXmppTask<QXmpp::Result<QXmppMucRoomV2>> createRoomAtJid(const QString &roomJid, const QString &nickname);
 
     friend class QXmppMucManagerV2Private;

@@ -80,6 +80,19 @@ void QXmppClientPrivate::resendPresence()
     q->send(std::move(presence));
 }
 
+void QXmppClientPrivate::startSession()
+{
+    sessionActive = true;
+    q->hooks(nullptr).run<Connection::SessionStarted>();
+}
+
+void QXmppClientPrivate::endSession()
+{
+    if (std::exchange(sessionActive, false)) {
+        q->hooks(nullptr).run<Connection::SessionEnded>();
+    }
+}
+
 void QXmppClientPrivate::addProperCapability(QXmppPresence &presence)
 {
     if (auto *discoManager = q->findExtension<QXmppDiscoveryManager>()) {
@@ -413,9 +426,12 @@ QXmppClient::QXmppClient(InitialExtensions initialExtensions, QObject *parent)
     connect(d->stream, &QXmppOutgoingClient::connected,
             this, &QXmppClient::_q_streamConnected);
 
-    connect(d->stream, &QXmppOutgoingClient::disconnected,
-            this, &QXmppClient::_q_streamDisconnected);
     connect(d->stream, &QXmppOutgoingClient::disconnected, this, [this](const SessionEnd &end) {
+        if (!end.smCanResume) {
+            d->endSession();
+        }
+        _q_streamDisconnected();
+
         // e.g. the server shut down without sending a stream error
         if (end.closedByServer && configuration().autoReconnectionEnabled() && !d->receivedConflict) {
             d->scheduleBackoffReconnect();
@@ -963,6 +979,8 @@ void QXmppClient::disconnectFromServer()
     }
 
     d->stream->disconnectFromHost();
+    // also if the stream had already been disconnected for resumption
+    d->endSession();
 }
 
 /*!
@@ -1122,7 +1140,8 @@ void QXmppClient::setActive(bool active)
     Returns the current \xep{0198}{Stream Management} state of the connection.
 
     Upon connection of the client this can be used to check whether the
-    previous stream has been resumed.
+    previous stream has been resumed. Extensions should use the hooks
+    QXmpp::Connection::SessionStarted and QXmpp::Connection::SessionEnded instead.
 
     \since QXmpp 1.4
 */
@@ -1183,6 +1202,7 @@ void QXmppClient::setClientPresence(const QXmppPresence &presence)
         }
 
         d->stream->disconnectFromHost();
+        d->endSession();
     } else if (d->stream->isConnected()) {
         d->resendPresence();
     } else {
@@ -1289,6 +1309,11 @@ void QXmppClient::_q_streamConnected(const QXmpp::Private::SessionBegin &session
     // notify managers
     if (session.fastTokenChanged) {
         Q_EMIT credentialsChanged();
+    }
+    if (!session.smResumed) {
+        // resumption failed
+        d->endSession();
+        d->startSession();
     }
     Q_EMIT connected();
 

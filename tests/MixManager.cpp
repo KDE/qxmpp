@@ -95,7 +95,7 @@ void tst_QXmppMixManager::testDiscoveryFeatures()
 static void connectAndAnswerSupport(TestClient &client, const QString &response)
 {
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
 
     auto infoId = client.expectPacketRandomOrder(
         u"<iq id='qx1' to='hag66@shakespeare.example' type='get'>"
@@ -154,9 +154,9 @@ void tst_QXmppMixManager::testSupportReconnection()
     QCOMPARE(archivingSpy.size(), 1);
 
     // the values are kept until the new information arrives
-    Q_EMIT client.disconnected();
+    client.simulateDisconnected();
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
 
     QCOMPARE(manager->participantSupport(), QXmppMixManager::Support::Supported);
     QCOMPARE(manager->messageArchivingSupport(), QXmppMixManager::Support::Unsupported);
@@ -221,7 +221,7 @@ void tst_QXmppMixManager::testServiceDiscovery()
 
     // Trigger discovery via connect
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
 
     // updateSupport info query on own JID and items query from disco manager
     auto supportId = client.expectPacketRandomOrder(

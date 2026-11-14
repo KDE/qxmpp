@@ -232,7 +232,7 @@ void tst_QXmppRegistrationManager::testServiceDiscovery()
     auto watch = localManager->watchServerSupport();
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(u"<iq id='qx2' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
     test.inject(u"<iq id='qx2' from='example.org' type='result'>"
                 "<query xmlns='http://jabber.org/protocol/disco#info'><feature var='jabber:iq:register'/></query>"
@@ -244,7 +244,7 @@ void tst_QXmppRegistrationManager::testServiceDiscovery()
     context.reset();
 
     // the value is kept until the information is updated on the next connection
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     QVERIFY(localManager->supportedByServer());
     QT_WARNING_POP
 }
@@ -1214,7 +1214,7 @@ void tst_QXmppMovedManager::testSupportedByServer()
     QVERIFY(!manager->supportedByServer());
 
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
     client.expect(movedInfoRequest());
     client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
 
@@ -1222,9 +1222,9 @@ void tst_QXmppMovedManager::testSupportedByServer()
     QCOMPARE(spy.size(), 1);
 
     // the value is kept until the new information arrives
-    Q_EMIT client.disconnected();
+    client.simulateDisconnected();
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
 
     QVERIFY(manager->supportedByServer());
     QCOMPARE(spy.size(), 1);
@@ -1241,14 +1241,14 @@ void tst_QXmppMovedManager::testSupportedByServerError()
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
 
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
     client.expect(movedInfoRequest());
     client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
     QVERIFY(manager->supportedByServer());
 
-    Q_EMIT client.disconnected();
+    client.simulateDisconnected();
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
     client.expect(movedInfoRequest());
     client.inject(u"<iq id='qx1' from='shakespeare.example' type='error'>"
                   "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
@@ -1268,7 +1268,7 @@ void tst_QXmppMovedManager::testSupportedByServerDiscoveryManagerAddedLater()
 
     // the support is watched once the client is connected
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
     client.expect(movedInfoRequest());
     client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
 
@@ -1282,7 +1282,7 @@ void tst_QXmppMovedManager::testWatchServerSupport()
 
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
 
     auto watch = manager->watchServerSupport();
     QCOMPARE(watch.state().value(), QXmppDiscoInfoWatch::State::Loading);
@@ -1299,7 +1299,7 @@ void tst_QXmppMovedManager::testOnUnregistered()
     auto [client, manager] = Tester(u"hag66@shakespeare.example"_s);
 
     client.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT client.connected();
+    client.simulateConnected();
     client.expect(movedInfoRequest());
     client.inject(movedInfoResponse({ u"urn:xmpp:moved:1"_s }));
     QVERIFY(manager->supportedByServer());

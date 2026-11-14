@@ -41,6 +41,10 @@ QXmpp 1.18.0 (UNRELEASED)
  - MucManagerV2: Add `QXmppMucRoomV2::joining()`, which is true while the room is joined or waits to be rejoined (@lnj)
  - MUC: Fix decrypting the discussion history of rooms with occupant IDs: messages received while joining wait for the room's disco#info result before their sender is resolved (@lnj)
  - MucManagerV2: Rejoin joined rooms automatically after a connection loss without stream resumption and when MUC Self-Ping detects a ghosted room; room handles stay valid, only the changes of the occupants are reported, the history is requested since the last message and `joinRoom()` waits for a running rejoin (@lnj)
+ - Add the hooks `QXmpp::Connection::SessionStarted` and `SessionEnded`, run when a session starts or ends; a session continues on streams resumed via Stream Management (@lnj, !848)
+ - RosterManager: Keep the presences of contacts while the stream can be resumed (@lnj, !848)
+ - UploadRequestManager: Keep the upload services on stream resumption, they were not discovered again (@lnj, !848)
+ - Blocking, Carbons, Disco, MucManagerV2, OMEMO: Reset the state of the session also when the stream can't be resumed with Stream Management enabled, and when the client is disconnected via `disconnectFromServer()` while waiting for resumption (@lnj, !848)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

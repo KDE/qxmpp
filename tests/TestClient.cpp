@@ -49,8 +49,17 @@ void TestClient::handlePacketReceived(const QDomElement &el)
 }
 
 void TestClient::injectPresence(const QXmppPresence &presence) { Q_EMIT presenceReceived(presence); }
-void TestClient::simulateConnected() { Q_EMIT connected(); }
-void TestClient::simulateDisconnected() { Q_EMIT disconnected(); }
+// runs the session hooks like the stream, depending on the stream management state
+void TestClient::simulateConnected()
+{
+    const auto &sm = d->stream->c2sStreamManager();
+    Q_EMIT d->stream->connected(QXmpp::Private::SessionBegin { sm.enabled(), sm.streamResumed(), false, false, QXmpp::Private::AuthenticationMethod::Sasl });
+}
+
+void TestClient::simulateDisconnected()
+{
+    Q_EMIT d->stream->disconnected(QXmpp::Private::SessionEnd { d->stream->c2sStreamManager().canResume(), false });
+}
 
 void TestClient::injectMessage(const QString &xml)
 {
@@ -128,7 +137,7 @@ QString TestClient::expectPacketRandomOrder(QString &&expected)
 void TestClient::connectAndAnswerDiscoInfo(const QString &jid, const QStringList &features)
 {
     setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT connected();
+    simulateConnected();
 
     auto id = expectPacketRandomOrder(
         u"<iq id='qx1' to='" + jid + u"' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>");

@@ -189,8 +189,6 @@ private:
     std::variant<QXmpp::Success, QXmppStanza::Error> handlePush(const QString &from, bool encrypted, const QList<QXmppRosterIq::Item> &items, const QString &version);
     using RosterResult = std::variant<QXmppRosterIq, QXmppError>;
 
-    Q_SLOT void _q_connected();
-    Q_SLOT void _q_disconnected();
     Q_SLOT void _q_presenceReceived(const QXmppPresence &);
 
     void handleSubscriptionRequest(const QString &bareJid, const QXmppPresence &presence);

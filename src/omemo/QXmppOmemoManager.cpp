@@ -338,6 +338,10 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_omemo_2_devices + u"+notify";
     });
+    // the subscriptions end with the session
+    hooks().add<Connection::SessionEnded>([this] {
+        d->jidsOfManuallySubscribedDevices.clear();
+    });
 }
 
 QXmppOmemoManager::~QXmppOmemoManager() = default;
@@ -1117,11 +1121,6 @@ void Manager::onRegistered(QXmppClient *client)
         for (auto modifiedDevicesItr = modifiedDevices.cbegin(); modifiedDevicesItr != modifiedDevices.cend(); ++modifiedDevicesItr) {
             Q_EMIT deviceChanged(modifiedDevicesItr.key(), modifiedDevicesItr.value());
         }
-    });
-
-    // The subscriptions may be lost if the stream is not resumed.
-    connect(client, &QXmppClient::disconnected, this, [this] {
-        d->jidsOfManuallySubscribedDevices.clear();
     });
 }
 

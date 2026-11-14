@@ -222,6 +222,7 @@ QXmppBlockingManager::QXmppBlockingManager()
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_blocking);
     });
+    hooks().add<Connection::SessionEnded>(this, &QXmppBlockingManager::onSessionEnded);
 }
 
 QXmppBlockingManager::~QXmppBlockingManager() = default;
@@ -358,16 +359,6 @@ QXmppDiscoFeatureWatch QXmppBlockingManager::watchServerSupport() const
     return watchServerFeature(client(), QXmpp::Namespace::Blocking);
 }
 
-void QXmppBlockingManager::onRegistered(QXmppClient *client)
-{
-    connect(client, &QXmppClient::connected, this, &QXmppBlockingManager::onConnected);
-}
-
-void QXmppBlockingManager::onUnregistered(QXmppClient *oldClient)
-{
-    disconnect(oldClient, &QXmppClient::connected, this, &QXmppBlockingManager::onConnected);
-}
-
 std::variant<Success, QXmppStanza::Error> QXmppBlockingManager::handlePush(const QString &from, bool encrypted, const QList<QString> &jids, bool block)
 {
     // only the own server sends blocklist pushes, they are never end-to-end encrypted
@@ -403,9 +394,9 @@ std::variant<Success, QXmppStanza::Error> QXmppBlockingManager::handlePush(const
     return Success();
 }
 
-void QXmppBlockingManager::onConnected()
+void QXmppBlockingManager::onSessionEnded()
 {
-    if (d->blocklist && client()->streamManagementState() != QXmppClient::ResumedStream) {
+    if (d->blocklist) {
         d->blocklist.reset();
         Q_EMIT subscribedChanged();
     }

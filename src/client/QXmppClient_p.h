@@ -77,6 +77,8 @@ public:
     QXmppClientPrivate(QXmppClient *qq);
 
     void resendPresence();
+    void startSession();
+    void endSession();
 
     QXmppTask<QXmpp::SendResult> sendEncryptedMessage(QXmppTask<QXmppE2eeExtension::MessageEncryptResult> task);
     QXmppTask<QXmpp::SendResult> sendEncryptedIq(QXmppTask<QXmppE2eeExtension::IqEncryptResult> task);
@@ -103,6 +105,8 @@ public:
 
     // reconnection
     bool receivedConflict;
+    // a session continues on resumed streams
+    bool sessionActive = false;
     int reconnectionTries;
     QTimer *reconnectionTimer;
     QElapsedTimer connectedSince;

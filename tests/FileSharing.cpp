@@ -116,7 +116,7 @@ void tst_QXmppHttpUploadManager::testSupport()
     });
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QCOMPARE(manager->support(), Support::Unknown);
 
     auto itemsId = test.expectPacketRandomOrder(

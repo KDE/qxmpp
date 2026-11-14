@@ -101,6 +101,11 @@ QXmppUploadRequestManager::QXmppUploadRequestManager()
     : d(std::make_unique<QXmppUploadRequestManagerPrivate>())
 {
     hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppUploadRequestManager::handleIncomingStanza));
+    // the services are discovered again in the next session
+    hooks().add<Connection::SessionEnded>([this] {
+        d->uploadServices.clear();
+        Q_EMIT serviceFoundChanged();
+    });
 }
 
 QXmppUploadRequestManager::~QXmppUploadRequestManager() = default;
@@ -319,12 +324,6 @@ void QXmppUploadRequestManager::onRegistered(QXmppClient *client)
         connect(disco, &QXmppDiscoveryManager::infoReceived,
                 this, &QXmppUploadRequestManager::handleDiscoInfo);
         QT_WARNING_POP
-
-        // on client disconnect remove all upload services
-        connect(client, &QXmppClient::disconnected, this, [this]() {
-            d->uploadServices.clear();
-            Q_EMIT serviceFoundChanged();
-        });
     }
 }
 

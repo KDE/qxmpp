@@ -95,9 +95,24 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
     \since QXmpp 1.5
 */
 
+// Kept by the handler of QXmpp::Connection::SessionStarted.
+struct QXmppCarbonManagerV2::ConnectionState {
+    // Keeps the support known on reconnection. Created on the first session, since the
+    // QXmppDiscoveryManager may be registered after this manager.
+    std::optional<QXmppDiscoFeatureWatch> serverSupport;
+    // Counts the sessions, so that attempts of previous sessions can be dropped.
+    uint64_t sessionCount = 0;
+};
+
 QXmppCarbonManagerV2::QXmppCarbonManagerV2()
 {
     hooks().add<Connection::StanzaReceived>(Private::stanzaHandler(this, &QXmppCarbonManagerV2::handleIncomingStanza));
+    hooks().add<Connection::SessionStarted>([this, state = std::make_shared<ConnectionState>()] {
+        enableCarbons(state);
+    });
+    hooks().add<Connection::SessionEnded>([this] {
+        m_enabled = false;
+    });
 }
 
 QXmppCarbonManagerV2::~QXmppCarbonManagerV2() = default;
@@ -159,36 +174,19 @@ bool QXmppCarbonManagerV2::handleIncomingStanza(const QDomElement &element, cons
     return true;
 }
 
-// Kept by the connection to QXmppClient::connected.
-struct QXmppCarbonManagerV2::ConnectionState {
-    // Keeps the support known on reconnection. Created on connection, since the
-    // QXmppDiscoveryManager may be registered after this manager.
-    std::optional<QXmppDiscoFeatureWatch> serverSupport;
-    // Counts the new streams, so that attempts of previous streams can be dropped.
-    uint64_t streamCount = 0;
-};
-
 void QXmppCarbonManagerV2::onRegistered(QXmppClient *client)
 {
     client->stream()->carbonManager().setEnableViaBind2(true);
-    connect(client, &QXmppClient::connected, this, [this, state = std::make_shared<ConnectionState>()] {
-        enableCarbons(state);
-    });
 }
 
 void QXmppCarbonManagerV2::onUnregistered(QXmppClient *client)
 {
     client->stream()->carbonManager().setEnableViaBind2(false);
-    disconnect(client, &QXmppClient::connected, this, nullptr);
 }
 
 QXmppTask<void> QXmppCarbonManagerV2::enableCarbons(std::shared_ptr<ConnectionState> state)
 {
-    // stream resumed: carbons state is preserved from the previous session
-    if (client()->streamManagementState() == QXmppClient::ResumedStream) {
-        co_return;
-    }
-    const auto stream = ++state->streamCount;
+    const auto session = ++state->sessionCount;
 
     // carbons enabled via bind2 already
     if (client()->stream()->carbonManager().enabled()) {
@@ -196,17 +194,14 @@ QXmppTask<void> QXmppCarbonManagerV2::enableCarbons(std::shared_ptr<ConnectionSt
         co_return;
     }
 
-    // new session: reset until IQ succeeds
-    m_enabled = false;
-
     if (!state->serverSupport && client()->findExtension<QXmppDiscoveryManager>()) {
         state->serverSupport = watchServerSupport();
     }
     // without QXmppDiscoveryManager, carbons are enabled without checking the support
     if (state->serverSupport) {
         const auto supported = co_await state->serverSupport->resolve().withContext(this);
-        // a new stream has been started while waiting
-        if (stream != state->streamCount) {
+        // a new session has been started while waiting
+        if (session != state->sessionCount) {
             co_return;
         }
         if (!supported) {

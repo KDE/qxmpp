@@ -129,12 +129,8 @@ public:
     QXmppTask<QXmpp::Result<>> setBookmark(QXmppMucBookmark &&bookmark);
     QXmppTask<QXmpp::Result<>> removeBookmark(const QString &jid);
 
-protected:
-    void onRegistered(QXmppClient *client) override;
-    void onUnregistered(QXmppClient *client) override;
-
 private:
-    void onConnected();
+    void onSessionStarted();
     QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
 
     friend struct QXmppPepBookmarkManagerPrivate;

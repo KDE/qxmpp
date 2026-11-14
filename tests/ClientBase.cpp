@@ -132,6 +132,7 @@ private:
     Q_SLOT void noRetryAfterTlsFailure();
     Q_SLOT void networkLossEndsSession_data();
     Q_SLOT void networkLossEndsSession();
+    Q_SLOT void sessionHooks();
 };
 
 void tst_QXmppClient::testSendMessage()
@@ -1317,6 +1318,49 @@ void tst_QXmppClient::networkLossEndsSession()
     QCOMPARE(client.state(), QXmppClient::DisconnectedState);
 }
 
+void tst_QXmppClient::sessionHooks()
+{
+    TestClient client;
+    QStringList events;
+    client.hooks(&client).add<QXmpp::Connection::SessionStarted>([&] { events << u"started"_s; });
+    client.hooks(&client).add<QXmpp::Connection::SessionEnded>([&] { events << u"ended"_s; });
+    connect(&client, &QXmppClient::connected, &client, [&] { events << u"connected"_s; });
+    connect(&client, &QXmppClient::disconnected, &client, [&] { events << u"disconnected"_s; });
+    auto takeEvents = [&] { return std::exchange(events, {}); };
+
+    // without stream management
+    client.simulateConnected();
+    QCOMPARE(takeEvents(), (QStringList { u"started"_s, u"connected"_s }));
+    client.simulateDisconnected();
+    QCOMPARE(takeEvents(), (QStringList { u"ended"_s, u"disconnected"_s }));
+
+    // the session continues on resumed streams
+    client.setStreamManagementState(QXmppClient::NewStream);
+    client.simulateConnected();
+    QCOMPARE(takeEvents(), (QStringList { u"started"_s, u"connected"_s }));
+    client.setStreamResumable(true);
+    client.simulateDisconnected();
+    QCOMPARE(takeEvents(), (QStringList { u"disconnected"_s }));
+    client.setStreamManagementState(QXmppClient::ResumedStream);
+    client.simulateConnected();
+    QCOMPARE(takeEvents(), (QStringList { u"connected"_s }));
+
+    // failed resumption
+    client.simulateDisconnected();
+    QCOMPARE(takeEvents(), (QStringList { u"disconnected"_s }));
+    client.setStreamManagementState(QXmppClient::NewStream);
+    client.simulateConnected();
+    QCOMPARE(takeEvents(), (QStringList { u"ended"_s, u"started"_s, u"connected"_s }));
+
+    // disconnectFromServer() ends the session also while waiting for resumption
+    client.simulateDisconnected();
+    QCOMPARE(takeEvents(), (QStringList { u"disconnected"_s }));
+    client.disconnectFromServer();
+    QCOMPARE(takeEvents(), (QStringList { u"ended"_s }));
+    client.disconnectFromServer();
+    QVERIFY(events.isEmpty());
+}
+
 }  // namespace Client
 
 // ============================================================
@@ -1860,7 +1904,7 @@ void tst_QXmppDiscoveryManager::discoverServicesBasic()
 
     // Simulate new connection
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // Expect items query on server domain
     test.expect(u"<iq id='qx1' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
@@ -1907,7 +1951,7 @@ void tst_QXmppDiscoveryManager::discoverServicesWithType()
     auto watch = disco->discoverServices(Disco::Category::Conference, Disco::Type::Mix);
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.expect(u"<iq id='qx1' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
     test.inject(u"<iq id='qx1' from='example.org' type='result'>"
@@ -1945,7 +1989,7 @@ void tst_QXmppDiscoveryManager::discoverServicesWithFeatures()
     auto watch = disco->discoverServices(Disco::Category::Store, {}, { u"urn:xmpp:http:upload:0"_s });
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.expect(u"<iq id='qx1' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
     test.inject(u"<iq id='qx1' from='example.org' type='result'>"
@@ -1988,7 +2032,7 @@ void tst_QXmppDiscoveryManager::discoverServicesLifetime()
 
     // Triggering discovery should not crash even though watch was dropped
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // The items query should still not be sent since there are no live watches
     test.expectNoPacket();
@@ -2004,7 +2048,7 @@ void tst_QXmppDiscoveryManager::discoverServicesReconnect()
 
     // First connection
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.expect(u"<iq id='qx1' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
     test.inject(u"<iq id='qx1' from='example.org' type='result'>"
@@ -2024,7 +2068,7 @@ void tst_QXmppDiscoveryManager::discoverServicesReconnect()
 
     // Reconnect (new stream)
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // Watch should be reset
     QVERIFY(!watch.loaded().value());
@@ -2059,7 +2103,7 @@ void tst_QXmppDiscoveryManager::discoverServicesAfterDiscovery()
     auto watch1 = disco->discoverServices(Disco::Category::Store);
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.expect(u"<iq id='qx1' to='example.org' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
     test.inject(u"<iq id='qx1' from='example.org' type='result'>"
@@ -2100,7 +2144,7 @@ void tst_QXmppDiscoveryManager::discoverServicesWatchAddedWhileConnected()
 
     // Connect without any watch registered: discovery is skipped entirely.
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expectNoPacket();
 
     // A watch created afterwards must start discovery, not wait for the next reconnect.
@@ -2166,7 +2210,7 @@ void tst_QXmppDiscoveryManager::watchInfo()
     auto notifier = watch.state().addNotifier([&] { states.append(watch.state().value()); });
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QCOMPARE(watch.state().value(), State::Loading);
 
     test.expect(infoRequest(u"example.org"_s));
@@ -2178,7 +2222,7 @@ void tst_QXmppDiscoveryManager::watchInfo()
 
     // a resumed stream keeps the information
     test.setStreamManagementState(QXmppClient::ResumedStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expectNoPacket();
     QCOMPARE(watch.state().value(), State::Loaded);
 }
@@ -2191,7 +2235,7 @@ void tst_QXmppDiscoveryManager::watchInfoShared()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // watches on the same entity only cause one request
     auto watch1 = disco->watchServerInfo();
@@ -2234,7 +2278,7 @@ void tst_QXmppDiscoveryManager::watchInfoStale()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"muc.example.org"_s);
     test.expect(infoRequest(u"muc.example.org"_s));
@@ -2245,9 +2289,9 @@ void tst_QXmppDiscoveryManager::watchInfoStale()
     auto notifier = watch.state().addNotifier([&] { states.append(watch.state().value()); });
 
     // the old information stays available until the new response arrives
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     QCOMPARE(watch.state().value(), State::Stale);
     QCOMPARE(watchedFeatures(watch), QStringList { u"http://jabber.org/protocol/muc"_s });
@@ -2268,7 +2312,7 @@ void tst_QXmppDiscoveryManager::watchInfoError()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"room@muc.example.org"_s);
     test.expect(infoRequest(u"room@muc.example.org"_s));
@@ -2281,12 +2325,12 @@ void tst_QXmppDiscoveryManager::watchInfoError()
 
     // the error is an answer and is kept on resumption
     test.setStreamManagementState(QXmppClient::ResumedStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expectNoPacket();
 
     // the entity is asked again on a new stream
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QCOMPARE(watch.state().value(), State::Loading);
 
     test.expect(infoRequest(u"room@muc.example.org"_s));
@@ -2302,20 +2346,20 @@ void tst_QXmppDiscoveryManager::watchInfoConnectionLost()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchServerInfo();
     test.expect(infoRequest(u"example.org"_s));
     QCOMPARE(watch.state().value(), State::Loading);
 
     // a cancelled request is no answer from the entity
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     test.streamPrivate()->iqManager.cancelAll();
     QCOMPARE(watch.state().value(), State::Unknown);
 
     // the request is repeated after resumption
     test.setStreamManagementState(QXmppClient::ResumedStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QCOMPARE(watch.state().value(), State::Loading);
     test.expect(infoRequest(u"example.org"_s));
     test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:mam:2"_s));
@@ -2337,7 +2381,7 @@ void tst_QXmppDiscoveryManager::watchInfoRefresh()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"upload.example.org"_s);
     test.expect(infoRequest(u"upload.example.org"_s));
@@ -2352,13 +2396,13 @@ void tst_QXmppDiscoveryManager::watchInfoRefresh()
     QCOMPARE(watchedFeatures(watch), QStringList { u"urn:xmpp:http:upload:1"_s });
 
     // refreshing while disconnected marks the information as stale and requests it on resumption
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     watch.refresh();
     test.expectNoPacket();
     QCOMPARE(watch.state().value(), State::Stale);
 
     test.setStreamManagementState(QXmppClient::ResumedStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(infoRequest(u"upload.example.org"_s));
     test.inject(infoResponse(u"upload.example.org"_s, u"urn:xmpp:http:upload:1"_s));
     QCOMPARE(watch.state().value(), State::Loaded);
@@ -2372,7 +2416,7 @@ void tst_QXmppDiscoveryManager::watchInfoFromCache()
     test.configuration().setJid(u"alice@example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto fillCache = [&](const QString &jid) {
         disco->info(jid);
@@ -2417,7 +2461,7 @@ void tst_QXmppDiscoveryManager::watchInfoCached()
     test.configuration().setJid(u"alice@example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto cachedInfo = [&](const QString &jid) {
         auto task = disco->info(jid);
@@ -2456,7 +2500,7 @@ void tst_QXmppDiscoveryManager::watchInfoCached()
 
     // unwatched info is dropped on new streams
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(infoRequest(u"other@muc.example.org"_s));
     test.inject(infoResponse(u"other@muc.example.org"_s, u"muc_public"_s));
     QVERIFY(!cachedInfo(u"room@muc.example.org"_s));
@@ -2468,7 +2512,7 @@ void tst_QXmppDiscoveryManager::watchInfoTracked()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"room@muc.example.org"_s);
     test.expect(infoRequest(u"room@muc.example.org"_s));
@@ -2498,7 +2542,7 @@ void tst_QXmppDiscoveryManager::watchInfoTrackingEnds()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"room@muc.example.org"_s);
     test.expect(infoRequest(u"room@muc.example.org"_s));
@@ -2506,23 +2550,25 @@ void tst_QXmppDiscoveryManager::watchInfoTrackingEnds()
     DiscoInfoTracking::setTracked(&test, u"room@muc.example.org"_s, true);
 
     // tracking continues on stream resumption
-    Q_EMIT test.disconnected();
+    test.setStreamResumable(true);
+    test.simulateDisconnected();
     QVERIFY(watch.changesTracked().value());
     test.setStreamManagementState(QXmppClient::ResumedStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QVERIFY(watch.changesTracked().value());
 
     // and ends with a new stream
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QVERIFY(!watch.changesTracked().value());
     test.expect(infoRequest(u"room@muc.example.org"_s));
 
     // without stream management it ends on disconnection
     DiscoInfoTracking::setTracked(&test, u"room@muc.example.org"_s, true);
     test.setStreamManagementState(QXmppClient::NoStreamManagement);
-    Q_EMIT test.disconnected();
+    test.setStreamResumable(false);
+    test.simulateDisconnected();
     QVERIFY(!watch.changesTracked().value());
 }
 
@@ -2533,7 +2579,7 @@ void tst_QXmppDiscoveryManager::watchInfoInvalidate()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"room@muc.example.org"_s);
     test.expect(infoRequest(u"room@muc.example.org"_s));
@@ -2562,7 +2608,7 @@ void tst_QXmppDiscoveryManager::watchInfoReset()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"room@muc.example.org/nick"_s);
     test.expect(infoRequest(u"room@muc.example.org/nick"_s));
@@ -2631,7 +2677,7 @@ void tst_QXmppDiscoveryManager::watchInfoPresence()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchInfo(u"alice@example.org/phone"_s);
     test.expect(infoRequest(u"alice@example.org/phone"_s));
@@ -2698,7 +2744,7 @@ void tst_QXmppDiscoveryManager::watchInfoOutdatedResponses()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // the JID may refer to another entity once it becomes available, so the running request is
     // not reused
@@ -2743,7 +2789,7 @@ void tst_QXmppDiscoveryManager::watchInfoCaps()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // the caps node is requested
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
@@ -2768,8 +2814,8 @@ void tst_QXmppDiscoveryManager::watchInfoCaps()
 
     // also on new streams
     otherWatch = {};
-    Q_EMIT test.disconnected();
-    Q_EMIT test.connected();
+    test.simulateDisconnected();
+    test.simulateConnected();
     QCOMPARE(watch.state().value(), State::Stale);
     QVERIFY(!watch.changesTracked().value());
     test.expectNoPacket();
@@ -2792,7 +2838,7 @@ void tst_QXmppDiscoveryManager::watchInfoCapsChanged()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
     auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
@@ -2819,7 +2865,7 @@ void tst_QXmppDiscoveryManager::watchInfoCapsInvalid()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // the info is used for the entity itself
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
@@ -2851,7 +2897,7 @@ void tst_QXmppDiscoveryManager::watchInfoCapsUnknownHash()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // the info is requested, but not cached
     for (const auto &jid : { u"romeo@montague.lit/orchard"_s, u"benvolio@montague.lit/garden"_s }) {
@@ -2871,7 +2917,7 @@ void tst_QXmppDiscoveryManager::watchInfoCapsSameVer()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // only one entity is requested
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
@@ -2895,7 +2941,7 @@ void tst_QXmppDiscoveryManager::watchInfoCapsSameVerInvalid()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
     test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
@@ -2927,7 +2973,7 @@ void tst_QXmppDiscoveryManager::watchInfoAwaitPresence()
 
     // the info of full JIDs is requested once their presence has been received
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(infoRequest(u"montague.lit"_s));
     test.inject(infoResponse(u"montague.lit"_s, u"urn:xmpp:mam:2"_s));
     test.expectNoPacket();
@@ -2954,8 +3000,8 @@ void tst_QXmppDiscoveryManager::watchInfoAwaitPresence()
     test.expectNoPacket();
 
     // the known info is kept while waiting
-    Q_EMIT test.disconnected();
-    Q_EMIT test.connected();
+    test.simulateDisconnected();
+    test.simulateConnected();
     QCOMPARE(romeo.state().value(), State::Stale);
     QVERIFY(romeo.info().value());
     test.expect(infoRequest(u"montague.lit"_s));
@@ -2981,15 +3027,15 @@ void tst_QXmppDiscoveryManager::watchInfoAwaitPresenceTimeout()
     auto watch = disco->watchInfo(u"coven@chat.shakespeare.lit/firstwitch"_s);
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expectNoPacket();
 
     // the waiting continues on resumed streams
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     QVERIFY(!d->presenceTimer.isActive());
     QCOMPARE(watch.state().value(), State::Unknown);
     test.setStreamManagementState(QXmppClient::ResumedStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QCOMPARE(watch.state().value(), State::Loading);
     test.expectNoPacket();
 
@@ -3051,7 +3097,7 @@ void tst_QXmppDiscoveryManager::entityCapsStorage()
         disco->setEntityCapsStorage(storage);
         QCOMPARE(disco->entityCapsStorage(), storage);
         test.setStreamManagementState(QXmppClient::NewStream);
-        Q_EMIT test.connected();
+        test.simulateConnected();
 
         // unknown info is requested and stored once it has been verified
         test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
@@ -3083,7 +3129,7 @@ void tst_QXmppDiscoveryManager::entityCapsStorage()
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     disco->setEntityCapsStorage(storage);
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
     test.injectPresence(capsPresence(u"benvolio@montague.lit/garden"_s));
@@ -3115,7 +3161,7 @@ void tst_QXmppDiscoveryManager::entityCapsStorageInvalid()
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     disco->setEntityCapsStorage(storage);
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
     auto watch = disco->watchInfo(u"romeo@montague.lit/orchard"_s);
@@ -3131,7 +3177,7 @@ void tst_QXmppDiscoveryManager::infoCaps()
     TestClient test;
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     test.injectPresence(capsPresence(u"romeo@montague.lit/orchard"_s));
     auto task = disco->info(u"romeo@montague.lit/orchard"_s);
@@ -3165,7 +3211,7 @@ void tst_QXmppDiscoveryManager::watchAccountInfoAccountChange()
     test.configuration().setJid(u"alice@example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto watch = disco->watchAccountInfo();
     test.expect(infoRequest(u"alice@example.org"_s));
@@ -3173,10 +3219,10 @@ void tst_QXmppDiscoveryManager::watchAccountInfoAccountChange()
     QCOMPARE(watch.state().value(), State::Loaded);
 
     // information of another account is not shown as stale information
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     test.configuration().setJid(u"bob@example.net"_s);
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     QCOMPARE(watch.state().value(), State::Loading);
     QVERIFY(!watch.info().value());
@@ -3195,7 +3241,7 @@ void tst_QXmppDiscoveryManager::watchInfoLifetime()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // an unwatched entity is not requested again on a new stream
     {
@@ -3205,7 +3251,7 @@ void tst_QXmppDiscoveryManager::watchInfoLifetime()
     // done by the stream when a new stream is opened
     test.streamPrivate()->iqManager.cancelAll();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expectNoPacket();
 
     auto watch = disco->watchServerInfo();
@@ -3229,7 +3275,7 @@ void tst_QXmppDiscoveryManager::watchInfoModifiedByNotifier()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // user code destroys the notified watch and creates new ones while being notified
     constexpr qsizetype createdCount = 32;
@@ -3264,7 +3310,7 @@ void tst_QXmppDiscoveryManager::watchInfoModifiedByNotifier()
 
     test.streamPrivate()->iqManager.cancelAll();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     QCOMPARE(states, (QList { State::Loaded, State::Stale }));
     QVERIFY(!watch);
@@ -3316,7 +3362,7 @@ void tst_QXmppDiscoveryManager::watchFeature()
     QCOMPARE(mam.state().value(), State::Unknown);
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QVERIFY(!mam.supported().value());
     QCOMPARE(mam.state().value(), State::Loading);
 
@@ -3337,7 +3383,7 @@ void tst_QXmppDiscoveryManager::watchFeatures()
     test.configuration().setJid(u"alice@example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto info = disco->watchAccountInfo();
     auto mix = info.watchFeatures({ u"urn:xmpp:mix:pam:2"_s, u"urn:xmpp:mix:pam:2#archive"_s });
@@ -3366,7 +3412,7 @@ void tst_QXmppDiscoveryManager::watchFeatureStale()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto mam = disco->watchServerInfo().watchFeature(u"urn:xmpp:mam:2"_s);
     test.expect(infoRequest(u"example.org"_s));
@@ -3379,7 +3425,7 @@ void tst_QXmppDiscoveryManager::watchFeatureStale()
     // the support stays available while the information is refreshed
     test.streamPrivate()->iqManager.cancelAll();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QCOMPARE(mam.state().value(), State::Stale);
     QVERIFY(mam.supported().value());
 
@@ -3391,7 +3437,7 @@ void tst_QXmppDiscoveryManager::watchFeatureStale()
 
     // changed support is applied
     test.streamPrivate()->iqManager.cancelAll();
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(infoRequest(u"example.org"_s));
     test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:blocking"_s));
     QVERIFY(!mam.supported().value());
@@ -3406,7 +3452,7 @@ void tst_QXmppDiscoveryManager::watchFeatureError()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto muc = disco->watchInfo(u"room@muc.example.org"_s).watchFeature(u"http://jabber.org/protocol/muc"_s);
     test.expect(infoRequest(u"room@muc.example.org"_s));
@@ -3424,7 +3470,7 @@ void tst_QXmppDiscoveryManager::watchFeatureLifetime()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     // the feature watch keeps its info watch alive
     auto mam = disco->watchServerInfo().watchFeature(u"urn:xmpp:mam:2"_s);
@@ -3439,7 +3485,7 @@ void tst_QXmppDiscoveryManager::watchFeatureLifetime()
 
     test.streamPrivate()->iqManager.cancelAll();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(infoRequest(u"example.org"_s));
     test.inject(infoResponse(u"example.org"_s, u"urn:xmpp:blocking"_s));
     QVERIFY(!enabled.value());
@@ -3451,7 +3497,7 @@ void tst_QXmppDiscoveryManager::watchFeatureNamespace()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto info = disco->watchServerInfo();
     auto mam = info.watchFeature(QXmpp::Namespace::Mam2);
@@ -3486,7 +3532,7 @@ void tst_QXmppDiscoveryManager::resolveFeature()
     QVERIFY(!task.isFinished());
 
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(infoRequest(u"example.org"_s));
     QVERIFY(!task.isFinished());
 
@@ -3501,9 +3547,9 @@ void tst_QXmppDiscoveryManager::resolveFeature()
 
     // stale information is used without waiting for the new response
     auto mam = disco->watchServerInfo().watchFeature(u"urn:xmpp:mam:2"_s);
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QCOMPARE(mam.state().value(), State::Stale);
 
     auto stale = mam.resolve();
@@ -3517,7 +3563,7 @@ void tst_QXmppDiscoveryManager::resolveFeatureError()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     auto task = disco->watchInfo(u"room@muc.example.org"_s).watchFeature(u"http://jabber.org/protocol/muc"_s).resolve();
     test.expect(infoRequest(u"room@muc.example.org"_s));
@@ -3557,7 +3603,7 @@ void tst_QXmppDiscoveryManager::resolveFeatureContinuation()
     test.configuration().setDomain(u"example.org"_s);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
 
     std::optional<QXmppDiscoInfoWatch> info = disco->watchServerInfo();
     std::vector<QXmppDiscoInfoWatch> created;
@@ -3611,6 +3657,7 @@ private:
     Q_SLOT void testPushPersistsRemove();
     Q_SLOT void testClearCache();
     Q_SLOT void testRosterIqVerSerialization();
+    Q_SLOT void presencesKeptOnResumption();
 
 private:
     QXmppClient client;
@@ -3624,6 +3671,30 @@ void tst_QXmppRosterManager::initTestCase()
     client.setLogger(&logger);
 
     manager = client.findExtension<QXmppRosterManager>();
+}
+
+void tst_QXmppRosterManager::presencesKeptOnResumption()
+{
+    TestClient test;
+    auto *roster = test.addNewExtension<QXmppRosterManager>(&test);
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+
+    QXmppPresence presence;
+    presence.setFrom(u"alice@example.org/phone"_s);
+    test.injectPresence(presence);
+    QCOMPARE(roster->getResources(u"alice@example.org"_s), QStringList { u"phone"_s });
+
+    // presence changes are received after the resumption
+    test.setStreamResumable(true);
+    test.simulateDisconnected();
+    test.setStreamManagementState(QXmppClient::ResumedStream);
+    test.simulateConnected();
+    QCOMPARE(roster->getResources(u"alice@example.org"_s), QStringList { u"phone"_s });
+
+    test.setStreamResumable(false);
+    test.simulateDisconnected();
+    QVERIFY(roster->getResources(u"alice@example.org"_s).isEmpty());
 }
 
 void tst_QXmppRosterManager::testDiscoFeatures()

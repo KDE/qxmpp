@@ -26,6 +26,16 @@ struct StanzaReceived {
     using Signature = QXmpp::HookResult(const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
 };
 
+struct SessionStarted {
+    static constexpr QStringView Name = u"org.qxmpp.connection.session-started";
+    using Signature = void();
+};
+
+struct SessionEnded {
+    static constexpr QStringView Name = u"org.qxmpp.connection.session-ended";
+    using Signature = void();
+};
+
 }  // namespace QXmpp::Connection
 
 /*!

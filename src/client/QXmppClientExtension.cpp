@@ -97,6 +97,41 @@ bool QXmppClientExtension::handleStanza(const QDomElement &, const std::optional
     \since QXmpp 1.18
 */
 
+/*!
+    \struct QXmpp::Connection::SessionStarted
+    \inmodule QXmpp
+
+    Hook run when a new session has been established, before QXmppClient::connected() is
+    emitted.
+
+    A session spans all streams that continue it via \xep{0198}{Stream Management}
+    resumption, so the hook is not run when a stream has been resumed. Handlers can request the
+    state of the account here, e.g. the roster, or join rooms again.
+
+    \sa QXmpp::Connection::SessionEnded
+    \since QXmpp 1.18
+*/
+
+/*!
+    \struct QXmpp::Connection::SessionEnded
+    \inmodule QXmpp
+
+    Hook run once when the session has ended and its state on the server (e.g. presence
+    subscriptions of the session, joined rooms or pending IQ requests) is lost.
+
+    This is the case when the connection is lost and the stream cannot be resumed (it is run
+    before QXmppClient::disconnected() is emitted), when the client is disconnected via
+    QXmppClient::disconnectFromServer(), or when the stream could not be resumed on the next
+    connection (it is run before QXmpp::Connection::SessionStarted then).
+
+    Handlers should reset all state that only belongs to the session here, instead of checking
+    QXmppClient::streamManagementState() on QXmppClient::connected() and
+    QXmppClient::disconnected().
+
+    \sa QXmpp::Connection::SessionStarted
+    \since QXmpp 1.18
+*/
+
 /*! Returns the client which loaded this extension. */
 QXmppClient *QXmppClientExtension::client() const
 {

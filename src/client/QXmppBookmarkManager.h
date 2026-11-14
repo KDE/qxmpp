@@ -35,14 +35,10 @@ public:
     /*! This signal is emitted when \a bookmarks are received. */
     Q_SIGNAL void bookmarksReceived(const QXmppBookmarkSet &bookmarks);
 
-protected:
-    void onRegistered(QXmppClient *client) override;
-    void onUnregistered(QXmppClient *client) override;
-
 private:
     bool handleIncomingStanza(const QDomElement &stanza);
-    Q_SLOT void slotConnected();
-    Q_SLOT void slotDisconnected();
+    void requestBookmarks();
+    void resetBookmarks();
 
     const std::unique_ptr<QXmppBookmarkManagerPrivate> d;
 };

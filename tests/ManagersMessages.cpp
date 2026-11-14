@@ -637,9 +637,9 @@ void tst_QXmppCarbonManager::enableCarbons()
     QVERIFY(manager->enabled().value());
 
     // on reconnection the known support is used, carbons are enabled without waiting
-    Q_EMIT test.disconnected();
+    test.simulateDisconnected();
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     QVERIFY(!manager->enabled().value());
 
     id = test.expectPacketRandomOrder(QString(carbonsEnableRequest));
@@ -667,7 +667,7 @@ void tst_QXmppCarbonManager::enableCarbonsWithoutDiscoveryManager()
 
     // the support cannot be checked, so carbons are enabled anyway
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     test.expect(QString(carbonsEnableRequest));
     test.inject(u"<iq id='qx1' type='result'/>"_s);
     QVERIFY(manager->enabled().value());
@@ -695,11 +695,11 @@ void tst_QXmppCarbonManager::enableCarbonsOncePerStream()
 
     // the support is not known before the next stream
     test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
+    test.simulateConnected();
     auto id = test.expectPacketRandomOrder(
         u"<iq id='qx1' to='capulet.example' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
-    Q_EMIT test.disconnected();
-    Q_EMIT test.connected();
+    test.simulateDisconnected();
+    test.simulateConnected();
     test.expectNoPacket();
 
     // only the attempt of the new stream enables carbons

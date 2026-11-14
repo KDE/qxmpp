@@ -267,7 +267,7 @@ void tst_QXmppMuc::bookmarks2Updates()
 
     QVERIFY(!bm->bookmarks().has_value());
 
-    bm->onConnected();
+    test.simulateConnected();
     test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
     test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'>"
                 u"<item id='theplay@conference.shakespeare.lit'><conference xmlns='urn:xmpp:bookmarks:1' name='The Play&apos;s the Thing' autojoin='true'><nick>JC</nick></conference></item>"
@@ -314,7 +314,7 @@ void tst_QXmppMuc::bookmarks2FetchError()
     QSignalSpy resetSignal(bm, &QXmppPepBookmarkManager::bookmarksReset);
 
     auto fetchFails = [&]() {
-        bm->onConnected();
+        test.simulateConnected();
         test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
         test.inject(u"<iq id='qx1' type='error'>"
                     u"<error type='cancel'><internal-server-error xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
@@ -327,7 +327,7 @@ void tst_QXmppMuc::bookmarks2FetchError()
     QVERIFY(!bm->bookmarks().has_value());
 
     // a successful fetch caches the bookmarks
-    bm->onConnected();
+    test.simulateConnected();
     test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
     test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'>"
                 u"<item id='theplay@conference.shakespeare.lit'><conference xmlns='urn:xmpp:bookmarks:1' name='The Play&apos;s the Thing' autojoin='true'><nick>JC</nick></conference></item>"
@@ -381,7 +381,7 @@ void tst_QXmppMuc::bookmarks2SetUpdate()
     auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
 
     // Pre-populate the bookmark list (simulate initial fetch)
-    bm->onConnected();
+    test.simulateConnected();
     test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
     test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'>"
                 u"<items node='urn:xmpp:bookmarks:1'>"
@@ -455,7 +455,7 @@ void tst_QXmppMuc::bookmarks2OwnChangeSignals()
     QSignalSpy changedSignal(bm, &QXmppPepBookmarkManager::bookmarksChanged);
     QSignalSpy removedSignal(bm, &QXmppPepBookmarkManager::bookmarksRemoved);
 
-    bm->onConnected();
+    test.simulateConnected();
     test.expect(u"<iq id='qx1' type='get'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
     test.inject(u"<iq id='qx1' type='result'><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node='urn:xmpp:bookmarks:1'/></pubsub></iq>"_s);
 
@@ -1194,6 +1194,14 @@ void tst_QXmppMuc::joinRoomNicknameModifiedWithoutStatus210()
     auto error = expectVariant<QXmppError>(task.result());
     QCOMPARE(error.description, u"MUC modified nickname without sending status 210."_s);
     QVERIFY(!muc->d->testHasRoom(u"coven@chat.shakespeare.lit"_s));
+}
+
+static void connectWithoutServices(TestClient &test)
+{
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+    test.expect(u"<iq id='qx1' to='shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    test.inject(u"<iq id='qx1' from='shakespeare.lit' type='result'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
 }
 
 static QXmppMucRoomV2 joinedRoom(TestClient &test, QXmppMucManagerV2 *muc,
@@ -2839,8 +2847,10 @@ static auto watchRemovedFromRoom(QXmppMucManagerV2 *muc, QList<std::pair<QString
 void tst_QXmppMuc::disconnectNoStreamManagement()
 {
     TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
 
     auto room = joinedRoom(test, muc);
     QVERIFY(room.joined().value());
@@ -2873,8 +2883,10 @@ void tst_QXmppMuc::disconnectNoStreamManagement()
 void tst_QXmppMuc::disconnectFromServer()
 {
     TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
 
     auto room = joinedRoom(test, muc);
 
@@ -2892,8 +2904,10 @@ void tst_QXmppMuc::disconnectFromServer()
 void tst_QXmppMuc::disconnectResumedStream()
 {
     TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
 
     auto room = joinedRoom(test, muc);
 
@@ -2902,6 +2916,7 @@ void tst_QXmppMuc::disconnectResumedStream()
 
     // Simulate network drop (SM enabled, disconnect without clearing SM)
     test.setStreamManagementState(QXmppClient::NewStream);
+    test.setStreamResumable(true);
     test.simulateDisconnected();
 
     // Room state must be preserved (stream can potentially be resumed)
@@ -2919,9 +2934,11 @@ void tst_QXmppMuc::disconnectResumedStream()
 void tst_QXmppMuc::disconnectNewStream()
 {
     TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
 
     auto room = joinedRoom(test, muc);
 
@@ -2930,6 +2947,7 @@ void tst_QXmppMuc::disconnectNewStream()
 
     // Simulate network drop (SM enabled)
     test.setStreamManagementState(QXmppClient::NewStream);
+    test.setStreamResumable(true);
     test.simulateDisconnected();
 
     // Room preserved while resumption is possible
@@ -2966,6 +2984,7 @@ void tst_QXmppMuc::rejoinAfterConnectionLoss()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     const auto roomJid = u"coven@chat.shakespeare.lit"_s;
+    connectWithoutServices(test);
 
     auto room = joinedRoom(test, muc);
     test.injectPresence(occupantPresence(u"firstwitch"_s, u"crone1@shakespeare.lit/desktop"_s));
@@ -3058,6 +3077,7 @@ void tst_QXmppMuc::rejoinFails()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     const auto roomJid = u"coven@chat.shakespeare.lit"_s;
+    connectWithoutServices(test);
 
     auto room = joinedRoom(test, muc);
 
@@ -3097,6 +3117,7 @@ void tst_QXmppMuc::rejoinLeaveWhileDisconnected()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     const auto roomJid = u"coven@chat.shakespeare.lit"_s;
+    connectWithoutServices(test);
 
     auto room = joinedRoom(test, muc);
     test.setStreamManagementState(QXmppClient::NoStreamManagement);
@@ -3528,14 +3549,6 @@ static QString roomNotFound(const QString &id, const QString &roomJid)
 }
 
 // connects the client and answers the MUC service discovery without services
-static void connectWithoutServices(TestClient &test)
-{
-    test.setStreamManagementState(QXmppClient::NewStream);
-    Q_EMIT test.connected();
-    test.expect(u"<iq id='qx1' to='shakespeare.lit' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
-    test.inject(u"<iq id='qx1' from='shakespeare.lit' type='result'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
-}
-
 void tst_QXmppMuc::roomInfoWatchTracked()
 {
     using State = QXmppDiscoInfoWatch::State;
@@ -4316,8 +4329,10 @@ void tst_QXmppMuc::setRoomConfigCreation()
 void tst_QXmppMuc::setRoomConfigCreationDisconnected()
 {
     TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
 
     auto room = createdRoom(test, muc);
     auto task = room.setRoomConfig(QXmppMucRoomConfig {});
@@ -5720,6 +5735,7 @@ void tst_QXmppMuc::messagesContinueAfterFailedJoin()
     test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    connectWithoutServices(test);
 
     auto joinTask = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
     test.ignore();  // disco#info

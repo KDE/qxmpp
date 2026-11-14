@@ -176,6 +176,7 @@ QXmppPepBookmarkManager::QXmppPepBookmarkManager()
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_bookmarks2 + u"+notify";
     });
+    hooks().add<Connection::SessionStarted>(this, &QXmppPepBookmarkManager::onSessionStarted);
 }
 
 QXmppPepBookmarkManager::~QXmppPepBookmarkManager() = default;
@@ -252,30 +253,18 @@ HookResult QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element
     return Continue;
 }
 
-void QXmppPepBookmarkManager::onRegistered(QXmppClient *client)
+void QXmppPepBookmarkManager::onSessionStarted()
 {
-    connect(client, &QXmppClient::connected, this, &QXmppPepBookmarkManager::onConnected);
-}
+    d->pubsub()->requestItems<Bookmarks2ConferenceItem>({}, ns_bookmarks2.toString()).then(this, [this](auto &&result) {
+        if (hasError(result)) {
+            warning(u"Could not fetch bookmarks: " + getError(result).description);
+            d->resetBookmarks();
+            return;
+        }
 
-void QXmppPepBookmarkManager::onUnregistered(QXmppClient *client)
-{
-    disconnect(client, nullptr, this, nullptr);
-}
-
-void QXmppPepBookmarkManager::onConnected()
-{
-    if (client()->streamManagementState() != QXmppClient::ResumedStream) {
-        d->pubsub()->requestItems<Bookmarks2ConferenceItem>({}, ns_bookmarks2.toString()).then(this, [this](auto &&result) {
-            if (hasError(result)) {
-                warning(u"Could not fetch bookmarks: " + getError(result).description);
-                d->resetBookmarks();
-                return;
-            }
-
-            auto items = getValue(std::move(result));
-            d->setBookmarks(std::move(items.items));
-        });
-    }
+        auto items = getValue(std::move(result));
+        d->setBookmarks(std::move(items.items));
+    });
 }
 
 //

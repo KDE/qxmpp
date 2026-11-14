@@ -47,6 +47,13 @@ QXmppDiscoveryManager::QXmppDiscoveryManager()
     hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppDiscoveryManager::handleIncomingStanza));
     hooks().add<Iq::Received<Iq::Get<QXmppDiscoInfo>>>(d.get(), &QXmppDiscoveryManagerPrivate::handleInfoRequest);
     hooks().add<Iq::Received<Iq::Get<QXmppDiscoItems>>>(d.get(), &QXmppDiscoveryManagerPrivate::handleItemsRequest);
+    hooks().add<Connection::SessionEnded>([this] {
+        d->itemsCache.clear();
+        // only watched info is kept, as stale info
+        d->recentInfoEntries.clear();
+        // no changes are received until the next session
+        d->clearTracked();
+    });
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_disco_info.toString();
     });
@@ -832,20 +839,12 @@ void QXmppDiscoveryManager::onRegistered(QXmppClient *client)
         d->clientConnected = true;
         const auto newStream = client->streamManagementState() != QXmppClient::ResumedStream;
         if (newStream) {
-            d->itemsCache.clear();
-            // only watched info is kept, as stale info
-            d->recentInfoEntries.clear();
-            d->clearTracked();
             d->discoverServices();
         }
         d->refreshInfoWatches(newStream);
     });
-    connect(client, &QXmppClient::disconnected, this, [this, client]() {
+    connect(client, &QXmppClient::disconnected, this, [this]() {
         d->clientConnected = false;
-        // without stream management no changes are received until the next stream
-        if (client->streamManagementState() == QXmppClient::NoStreamManagement) {
-            d->clearTracked();
-        }
         // entries keep waiting for the presence on resumed streams
         d->presenceTimer.stop();
         for (const auto &entry : d->lockInfoEntries()) {

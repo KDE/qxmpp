@@ -260,11 +260,12 @@ QXmppRosterManager::QXmppRosterManager(QXmppClient *client)
     QXmppExportData::registerExtension<RosterData, RosterData::fromDom, serializeRosterData>(u"roster", ns_qxmpp_export);
     QXmppExportData::registerExtension<RosterData, RosterData::fromDomPie, serializeRosterDataPie>(QXmppExportData::Format::Xep0227, u"query", ns_roster);
 
-    connect(client, &QXmppClient::connected,
-            this, &QXmppRosterManager::_q_connected);
-
-    connect(client, &QXmppClient::disconnected,
-            this, &QXmppRosterManager::_q_disconnected);
+    // The cache must survive the end of a session, that is the whole point of roster
+    // versioning: the next session re-syncs via initRosterFromCacheAndSync(). On stream
+    // resumption the in-memory state is already in sync, pushes are replayed.
+    hooks().add<Connection::SessionStarted>([this] { initRosterFromCacheAndSync(); });
+    // presences are only received during the session
+    hooks().add<Connection::SessionEnded>([this] { d->presences.clear(); });
 
     connect(client, &QXmppClient::presenceReceived,
             this, &QXmppRosterManager::_q_presenceReceived);
@@ -340,18 +341,6 @@ bool QXmppRosterManager::acceptSubscription(const QString &bareJid, const QStrin
     return client()->sendLegacy(presence);
 }
 
-/*! Upon XMPP connection, load the cached roster and request the latest version from the server. */
-void QXmppRosterManager::_q_connected()
-{
-    // On stream resumption the in-memory state is already in sync (pushes that
-    // occurred during the disconnect window are replayed on resume).
-    if (client()->streamManagementState() == QXmppClient::ResumedStream) {
-        return;
-    }
-
-    initRosterFromCacheAndSync();
-}
-
 QXmppTask<void> QXmppRosterManager::initRosterFromCacheAndSync()
 {
     // Load cached roster first so we can send the versioned request with the right `ver`.
@@ -394,14 +383,6 @@ QXmppTask<void> QXmppRosterManager::initRosterFromCacheAndSync()
 
     d->isRosterReceived = true;
     Q_EMIT rosterReceived();
-}
-
-void QXmppRosterManager::_q_disconnected()
-{
-    // The cache must survive disconnects — that is the whole point of roster versioning.
-    // In-memory state is kept; the next connect re-syncs via initRosterFromCacheAndSync().
-    // Presence data is per-session, so drop it.
-    d->presences.clear();
 }
 
 std::variant<Success, QXmppStanza::Error> QXmppRosterManager::handlePush(const QString &from, bool encrypted, const QList<QXmppRosterIq::Item> &items, const QString &newVersion)
