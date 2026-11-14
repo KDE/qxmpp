@@ -172,7 +172,7 @@ public:
 QXmppMamManager::QXmppMamManager()
     : d(std::make_unique<QXmppMamManagerPrivate>())
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppMamManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppMamManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0313: Message Archive Management
         features << staticString(ns_mam);

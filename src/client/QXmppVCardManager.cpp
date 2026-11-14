@@ -90,7 +90,7 @@ public:
 QXmppVCardManager::QXmppVCardManager()
     : d(std::make_unique<QXmppVCardManagerPrivate>())
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppVCardManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppVCardManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0054: vcard-temp
         features << staticString(ns_vcard);

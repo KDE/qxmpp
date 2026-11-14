@@ -76,7 +76,7 @@ public:
 QXmppBookmarkManager::QXmppBookmarkManager()
     : d(new QXmppBookmarkManagerPrivate)
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppBookmarkManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppBookmarkManager::handleIncomingStanza));
     d->bookmarksReceived = false;
 }
 

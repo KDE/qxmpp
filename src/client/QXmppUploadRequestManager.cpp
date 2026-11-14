@@ -100,7 +100,7 @@ public:
 QXmppUploadRequestManager::QXmppUploadRequestManager()
     : d(std::make_unique<QXmppUploadRequestManagerPrivate>())
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppUploadRequestManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppUploadRequestManager::handleIncomingStanza));
 }
 
 QXmppUploadRequestManager::~QXmppUploadRequestManager() = default;

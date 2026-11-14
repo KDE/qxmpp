@@ -64,7 +64,7 @@ public:
 QXmppVersionManager::QXmppVersionManager()
     : d(std::make_unique<QXmppVersionManagerPrivate>())
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppVersionManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppVersionManager::handleIncomingStanza));
     hooks().add<Iq::Received<Iq::Get<SoftwareVersion>>>([this](Iq::Get<SoftwareVersion> &&) {
         return SoftwareVersion { d->clientName, d->clientVersion, d->clientOs };
     });

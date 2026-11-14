@@ -58,7 +58,7 @@ QList<QXmppDiscoIdentity> QXmppClientExtension::discoveryIdentities() const
     Returns true if the stanza was handled and no further processing should occur, or false to
     let other extensions process the stanza.
 
-    \deprecated since QXmpp 1.18, add a handler to the QXmpp::Client::StanzaReceived hook
+    \deprecated since QXmpp 1.18, add a handler to the QXmpp::Connection::StanzaReceived hook
     instead. Implementations are still called, after the handlers of the hook.
 
     \since QXmpp 1.5
@@ -69,16 +69,16 @@ bool QXmppClientExtension::handleStanza(const QDomElement &, const std::optional
 }
 
 /*!
-    \namespace QXmpp::Client
+    \namespace QXmpp::Connection
     \inmodule QXmpp
 
-    Hooks of QXmppClient.
+    Hooks of the connection of QXmppClient, e.g. for incoming stanzas.
 
     \since QXmpp 1.18
 */
 
 /*!
-    \struct QXmpp::Client::StanzaReceived
+    \struct QXmpp::Connection::StanzaReceived
     \inmodule QXmpp
 
     Hook run for each incoming stanza that is not handled by the stream itself, e.g. IQs,

@@ -12,7 +12,7 @@ QXmpp 1.18.0 (UNRELEASED)
    - `QXmpp::PubSub::EventReceived`: PubSub event notifications, per node
  - Deprecate `QXmppClientExtension::discoveryFeatures()`/`discoveryIdentities()`, use `QXmpp::Disco::CollectInfo` (@lnj, !839)
  - Deprecate `QXmppPubSubEventHandler`, use `QXmpp::PubSub::EventReceived` (@lnj, !839)
- - Add the `QXmpp::Client::StanzaReceived` hook; deprecate `QXmppClientExtension::handleStanza()`, use the hook, and `QXmppMessageHandler`, use `QXmpp::Messages::Received` (@lnj, !839)
+ - Add the `QXmpp::Connection::StanzaReceived` hook; deprecate `QXmppClientExtension::handleStanza()`, use the hook, and `QXmppMessageHandler`, use `QXmpp::Messages::Received` (@lnj, !839)
  - Deprecate `QXmppClient::sendSensitive()` and `reply()`, use `send()` with the `SelectEncryption` hook; deprecate `QXmppClient::setEncryptionExtension()`/`encryptionExtension()`, use `QXmpp::E2ee::Provider` (@lnj, !839)
  - Add a pipeline for incoming messages (`QXmpp::Messages`) with the hooks `ResolveSender` (asynchronous) and `Received` and the state in `QXmpp::Messages::Context` (@lnj, !839)
  - Add `QXmpp::E2ee::Provider` for end-to-end encryptions, registered via `QXmpp::E2ee::Providers`, OMEMO is a provider now (@lnj, !839)

@@ -339,7 +339,7 @@ bool QXmppClientPrivate::handleStanza(const QDomElement &element, const std::opt
     if (IqRequests::process(q, hooks, element, e2eeMetadata)) {
         return true;
     }
-    if (hooks.run<Client::StanzaReceived>(element, e2eeMetadata) == HookResult::Stop) {
+    if (hooks.run<Connection::StanzaReceived>(element, e2eeMetadata) == HookResult::Stop) {
         return true;
     }
 

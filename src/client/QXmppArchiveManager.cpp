@@ -21,7 +21,7 @@ using namespace QXmpp::Private;
 
 QXmppArchiveManager::QXmppArchiveManager()
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppArchiveManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppArchiveManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0036: Message Archiving
         features << staticString(ns_archive);

@@ -54,7 +54,7 @@ QXmppRegistrationManagerPrivate::QXmppRegistrationManagerPrivate()
 QXmppRegistrationManager::QXmppRegistrationManager()
     : d(std::make_unique<QXmppRegistrationManagerPrivate>())
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppRegistrationManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppRegistrationManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << ns_register.toString();
     });

@@ -83,7 +83,7 @@ public:
     QXmppTask<QXmppClient::IqResult> sendSensitiveIq(QXmppIq iq, std::optional<QXmppSendStanzaParams> params);
 
     // Answers IQ requests with a handler of QXmpp::Iq::Received. Runs
-    // QXmpp::Client::StanzaReceived and then the deprecated QXmppClientExtension::handleStanza()
+    // QXmpp::Connection::StanzaReceived and then the deprecated QXmppClientExtension::handleStanza()
     // implementations for other stanzas. Returns whether the stanza has been handled.
     QXMPP_PRIVATE_EXPORT bool handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata);
 

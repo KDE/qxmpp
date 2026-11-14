@@ -322,7 +322,7 @@ void QXmppOmemoDevice::setTrustLevel(TrustLevel trustLevel)
 QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     : d(new ManagerPrivate(this, omemoStorage))
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppOmemoManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppOmemoManager::handleIncomingStanza));
     d->ownDevice.label = DEVICE_LABEL;
     d->initOmemoLibrary();
     d->schedulePeriodicTasks();

@@ -44,7 +44,7 @@ QXmppEntityCapsStorage::~QXmppEntityCapsStorage() = default;
 QXmppDiscoveryManager::QXmppDiscoveryManager()
     : d(new QXmppDiscoveryManagerPrivate(this))
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppDiscoveryManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppDiscoveryManager::handleIncomingStanza));
     hooks().add<Iq::Received<Iq::Get<QXmppDiscoInfo>>>(d.get(), &QXmppDiscoveryManagerPrivate::handleInfoRequest);
     hooks().add<Iq::Received<Iq::Get<QXmppDiscoItems>>>(d.get(), &QXmppDiscoveryManagerPrivate::handleItemsRequest);
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {

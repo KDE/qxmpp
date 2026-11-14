@@ -97,7 +97,7 @@ auto parseIq(std::variant<QDomElement, QXmppError> &&sendResult) -> std::optiona
 
 QXmppCarbonManagerV2::QXmppCarbonManagerV2()
 {
-    hooks().add<Client::StanzaReceived>(Private::stanzaHandler(this, &QXmppCarbonManagerV2::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::stanzaHandler(this, &QXmppCarbonManagerV2::handleIncomingStanza));
 }
 
 QXmppCarbonManagerV2::~QXmppCarbonManagerV2() = default;

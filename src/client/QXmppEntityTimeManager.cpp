@@ -108,7 +108,7 @@ auto QXmppEntityTimeManager::requestEntityTime(const QString &jid) -> QXmppTask<
 
 QXmppEntityTimeManager::QXmppEntityTimeManager()
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppEntityTimeManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppEntityTimeManager::handleIncomingStanza));
     hooks().add<Iq::Received<Iq::Get<EntityTime>>>([](Iq::Get<EntityTime> &&) {
         return currentEntityTime();
     });

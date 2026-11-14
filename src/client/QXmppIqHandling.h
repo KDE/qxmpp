@@ -259,7 +259,7 @@ namespace QXmpp::Iq {
 
     Only one handler per type and payload is used. A handler with a lower sequence number (see
     QXmpp::HookSequence) replaces the handler of another extension. Requests without handler are
-    passed to QXmpp::Client::StanzaReceived.
+    passed to QXmpp::Connection::StanzaReceived.
 
     \since QXmpp 1.18
 */

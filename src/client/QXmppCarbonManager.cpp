@@ -23,7 +23,7 @@ using namespace QXmpp::Private;
 QXmppCarbonManager::QXmppCarbonManager()
     : m_carbonsEnabled(false)
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppCarbonManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppCarbonManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         features << staticString(ns_carbons);
     });

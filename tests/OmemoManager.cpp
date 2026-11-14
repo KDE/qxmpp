@@ -61,7 +61,7 @@ public:
         : m_requestIq(requestIq),
           m_responseIq(responseIq)
     {
-        hooks().add<QXmpp::Client::StanzaReceived>([this](const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) {
+        hooks().add<QXmpp::Connection::StanzaReceived>([this](const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) {
             return handleIncomingStanza(stanza, e2eeMetadata) ? QXmpp::HookResult::Stop : QXmpp::HookResult::Continue;
         });
     }

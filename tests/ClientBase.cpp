@@ -5524,7 +5524,7 @@ void tst_QXmppHooks::hooksStanzaReceived()
     QObject owner;
 
     QStringList calls;
-    client.hooks(&owner).add<QXmpp::Client::StanzaReceived>([&](const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) {
+    client.hooks(&owner).add<QXmpp::Connection::StanzaReceived>([&](const QDomElement &stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata) {
         calls << stanza.attribute(u"id"_s) + (e2eeMetadata ? u":encrypted"_s : QString());
         return stanza.attribute(u"id"_s) == u"hook" ? HookResult::Stop : HookResult::Continue;
     });
@@ -5604,7 +5604,7 @@ void tst_QXmppHooks::hooksIqRequest()
     QObject owner;
 
     QStringList stanzas;
-    client.hooks(&owner).add<QXmpp::Client::StanzaReceived>([&](const QDomElement &stanza, const auto &) {
+    client.hooks(&owner).add<QXmpp::Connection::StanzaReceived>([&](const QDomElement &stanza, const auto &) {
         stanzas << stanza.attribute(u"id"_s);
         return HookResult::Continue;
     });
@@ -5746,7 +5746,7 @@ void tst_QXmppHooks::hooksIqRequestInvalid()
     QObject owner;
 
     QStringList stanzas;
-    client.hooks(&owner).add<QXmpp::Client::StanzaReceived>([&](const QDomElement &stanza, const auto &) {
+    client.hooks(&owner).add<QXmpp::Connection::StanzaReceived>([&](const QDomElement &stanza, const auto &) {
         stanzas << stanza.attribute(u"id"_s);
         return HookResult::Continue;
     });

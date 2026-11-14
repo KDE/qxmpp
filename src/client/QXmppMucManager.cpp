@@ -48,7 +48,7 @@ public:
 QXmppMucManager::QXmppMucManager()
     : d(std::make_unique<QXmppMucManagerPrivate>())
 {
-    hooks().add<Client::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppMucManager::handleIncomingStanza));
+    hooks().add<Connection::StanzaReceived>(Private::unencryptedStanzaHandler(this, &QXmppMucManager::handleIncomingStanza));
     hooks().add<Disco::CollectInfo>([](QList<QString> &features, auto &) {
         // XEP-0045: Multi-User Chat
         features << staticString(ns_muc);

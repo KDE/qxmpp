@@ -38,7 +38,7 @@ using namespace QXmpp::Private;
     purpose use the new overload instead.
 
     \deprecated This is deprecated since QXmpp 1.5. Please add a handler to the
-    QXmpp::Client::StanzaReceived hook instead.
+    QXmpp::Connection::StanzaReceived hook instead.
     Currently both methods are called by the client, so only implement one!
 */
 bool QXmppClientExtension::handleStanza(const QDomElement &)

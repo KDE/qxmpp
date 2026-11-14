@@ -51,7 +51,7 @@ inline bool isIqRequest(const QDomElement &iq)
     return type == u"get" || type == u"set";
 }
 
-// Adapts a function handling incoming stanzas to the QXmpp::Client::StanzaReceived hook. It
+// Adapts a function handling incoming stanzas to the QXmpp::Connection::StanzaReceived hook. It
 // returns whether it has handled the stanza and gets no end-to-end encrypted stanzas, so it does
 // not reply unencrypted.
 template<typename Object>
@@ -63,7 +63,7 @@ auto unencryptedStanzaHandler(Object *object, bool (Object::*function)(const QDo
 }
 
 // Adapts a function handling incoming stanzas, also end-to-end encrypted ones, to the
-// QXmpp::Client::StanzaReceived hook. It returns whether it has handled the stanza.
+// QXmpp::Connection::StanzaReceived hook. It returns whether it has handled the stanza.
 template<typename Object>
 auto stanzaHandler(Object *object, bool (Object::*function)(const QDomElement &, const std::optional<QXmppE2eeMetadata> &))
 {
