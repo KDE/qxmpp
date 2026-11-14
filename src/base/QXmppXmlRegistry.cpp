@@ -179,6 +179,27 @@ QStringView Registry::encryption(const QDomElement &stanza)
 }
 
 /*!
+    Returns the namespaces of the encryptions of all child elements of \a stanza registered as
+    encrypted container, in document order, see registerEncryptedContainer().
+
+    \since QXmpp 1.18
+*/
+QList<QStringView> Registry::encryptions(const QDomElement &stanza)
+{
+    ensureBuiltinElements();
+    QReadLocker lock(&s_lock);
+    const auto &parsers = state().parsers;
+    QList<QStringView> encryptions;
+    for (auto child = stanza.firstChildElement(); !child.isNull(); child = child.nextSiblingElement()) {
+        if (auto it = parsers.find(XmlElementId { child.tagName(), child.namespaceURI() });
+            it != parsers.end() && !it->second.encryption.isNull()) {
+            encryptions.append(it->second.encryption);
+        }
+    }
+    return encryptions;
+}
+
+/*!
     Returns the namespace of the encryption if \a value is of a type registered as encrypted
     container. Returns a null string view otherwise.
 

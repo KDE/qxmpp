@@ -9,6 +9,7 @@
 #include "QXmppError.h"
 #include "QXmppHooks.h"
 #include "QXmppMessage.h"
+#include "QXmppMessages.h"
 #include "QXmppSendStanzaParams.h"
 #include "QXmppTask.h"
 
@@ -68,6 +69,14 @@ struct NoEnvelope { };
 
 using DecryptResult = std::variant<Decrypted, NoEnvelope, QXmppError>;
 
+// What an encryption encrypts of a message.
+enum class ContentEncryption {
+    // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
+    Sce,
+    // only the body, all other elements are sent in the clear, e.g. OMEMO 0.3
+    BodyOnly,
+};
+
 class EncryptRequest
 {
 public:
@@ -83,10 +92,15 @@ public:
     const QXmppSendStanzaParams &params() const { return m_params; }
     void setParams(QXmppSendStanzaParams params) { m_params = std::move(params); }
 
+    // selected by the SelectEncryption hook, unset for the default of the provider
+    std::optional<Messages::EncryptionSelection::UnprotectedContent> unprotectedContent() const { return m_unprotectedContent; }
+    void setUnprotectedContent(std::optional<Messages::EncryptionSelection::UnprotectedContent> unprotectedContent) { m_unprotectedContent = unprotectedContent; }
+
 private:
     QXmppMessage m_message;
     QList<QString> m_recipientJids;
     QXmppSendStanzaParams m_params;
+    std::optional<Messages::EncryptionSelection::UnprotectedContent> m_unprotectedContent;
 };
 
 class Encrypted
@@ -98,8 +112,20 @@ public:
     const QXmpp::Xml::Extensions &elements() const { return m_elements; }
     void setElements(QXmpp::Xml::Extensions elements) { m_elements = std::move(elements); }
 
+    // Overrides Provider::contentEncryption for this message, e.g. Sce if a body-only encryption
+    // dropped the unprotected content.
+    std::optional<ContentEncryption> contentEncryption() const { return m_contentEncryption; }
+    void setContentEncryption(std::optional<ContentEncryption> contentEncryption) { m_contentEncryption = contentEncryption; }
+
+    // Overrides the namespace announced in the EME element and the fallback, for providers
+    // registered with a namespace not used in stanzas.
+    const QString &encryption() const { return m_encryption; }
+    void setEncryption(QString encryption) { m_encryption = std::move(encryption); }
+
 private:
     QXmpp::Xml::Extensions m_elements;
+    std::optional<ContentEncryption> m_contentEncryption;
+    QString m_encryption;
 };
 
 using EncryptResult = std::variant<Encrypted, QXmppError>;
@@ -161,14 +187,6 @@ private:
     QString m_senderJid;
 };
 
-// What an encryption encrypts of a message.
-enum class ContentEncryption {
-    // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
-    Sce,
-    // only the body, all other elements are sent in the clear, e.g. OMEMO 0.3
-    BodyOnly,
-};
-
 // Registered per encryption. Function members instead of virtuals, so it can be extended without
 // breaking the ABI.
 struct Provider {
@@ -183,6 +201,12 @@ struct Provider {
     // Optional. The content of Decrypted replaces the child elements of the IQ.
     std::function<QXmppTask<EncryptResult>(EncryptIqRequest)> encryptIq;
     std::function<QXmppTask<DecryptResult>(DecryptIqRequest)> decryptIq;
+    // A received message with elements of several encryptions is decrypted by the provider with
+    // the highest priority, e.g. OMEMO 2 instead of OMEMO 0.
+    int priority = 0;
+    // Optional. Whether received messages are decrypted, e.g. false while the encryption is
+    // disabled. Messages of a disabled encryption are handled like ones of an unsupported one.
+    std::function<bool()> isEnabled;
 };
 
 // A view on the hooks of a client, e.g. Providers(hooks()) in an extension. A provider is removed

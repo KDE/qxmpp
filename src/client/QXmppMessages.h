@@ -72,6 +72,16 @@ struct Received {
 class EncryptionSelection
 {
 public:
+    // What happens to the sensitive elements of a message that an encryption encrypting only the
+    // body (e.g. OMEMO 0) can not protect.
+    enum class UnprotectedContent {
+        // Not sent. Messages whose meaning depends on them (e.g. corrections) are not encrypted
+        // for such recipients.
+        Drop,
+        // Sent in the clear next to the encrypted body.
+        Plaintext,
+    };
+
     EncryptionSelection(const QXmppMessage &message, bool required, QString encryption = {})
         : m_message(&message), m_encryption(std::move(encryption)), m_required(required)
     {
@@ -89,9 +99,14 @@ public:
     const QString &encryption() const { return m_encryption; }
     void setEncryption(QStringView encryption) { m_encryption = encryption.toString(); }
 
+    // Unset for the default of the encryption.
+    std::optional<UnprotectedContent> unprotectedContent() const { return m_unprotectedContent; }
+    void setUnprotectedContent(std::optional<UnprotectedContent> unprotectedContent) { m_unprotectedContent = unprotectedContent; }
+
 private:
     const QXmppMessage *m_message;
     QString m_encryption;
+    std::optional<UnprotectedContent> m_unprotectedContent;
     bool m_required = false;
 };
 

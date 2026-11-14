@@ -29,8 +29,11 @@ namespace QXmpp::Private {
 
 // Adds the encrypted elements and the public parts of Explicit Message Encryption (XEP-0380).
 // Returns the part of the message to be sent.
-static SceMode applyEncrypted(QXmppMessage &message, const QString &encryption, const E2ee::Encrypted &encrypted, E2ee::ContentEncryption contentEncryption)
+static SceMode applyEncrypted(QXmppMessage &message, const QString &selectedEncryption, const E2ee::Encrypted &encrypted, const E2ee::Provider &provider)
 {
+    const auto &encryption = encrypted.encryption().isEmpty() ? selectedEncryption : encrypted.encryption();
+    const auto contentEncryption = encrypted.contentEncryption().value_or(provider.contentEncryption);
+
     // encryptions unknown to QXmpp have no name
     auto fallbackBody = [&] {
         const auto name = message.encryptionName().isEmpty() ? encryption : message.encryptionName();
@@ -201,6 +204,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     request.setMessage(outgoing.message());
     request.setRecipientJids(outgoing.recipientJids());
     request.setParams(pending.params);
+    request.setUnprotectedContent(selection.unprotectedContent());
 
     auto result = co_await provider->encryptMessage(std::move(request)).withContext(m_client);
     if (auto *error = std::get_if<QXmppError>(&result)) {
@@ -209,7 +213,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     }
 
     auto &message = outgoing.message();
-    const auto part = applyEncrypted(message, outgoing.encryption(), std::get<E2ee::Encrypted>(result), provider->contentEncryption);
+    const auto part = applyEncrypted(message, outgoing.encryption(), std::get<E2ee::Encrypted>(result), *provider);
 
     QByteArray xml;
     QXmlStreamWriter writer(&xml);

@@ -15,6 +15,7 @@
 #include <typeindex>
 #include <vector>
 
+#include <QList>
 #include <QStringView>
 
 class QDomElement;
@@ -131,6 +132,7 @@ public:
 
     static Sensitivity sensitivity(const std::any &value);
     static QStringView encryption(const QDomElement &stanza);
+    static QList<QStringView> encryptions(const QDomElement &stanza);
     static QStringView encryption(const std::any &value);
 
     /*!
