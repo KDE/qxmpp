@@ -178,6 +178,9 @@ enum class Namespace {
     Reply0,
     CallInvites0,
     Fast0,
+    Mam2Extended,
+    Mam2GroupchatField,
+    Mam2GroupchatAvailable,
 };
 
 QXMPP_EXPORT QString namespaceUri(Namespace ns);

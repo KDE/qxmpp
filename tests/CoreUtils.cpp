@@ -290,7 +290,7 @@ void tst_QXmppUtils::testNamespaces()
     QCOMPARE(namespaceFromUri(u""), std::nullopt);
 
     // every namespace has a unique URI
-    for (int i = 0; i <= int(Ns::Fast0); i++) {
+    for (int i = 0; i <= int(Ns::Mam2GroupchatAvailable); i++) {
         const auto ns = Ns(i);
         QVERIFY(!namespaceUri(ns).isEmpty());
         QCOMPARE(namespaceFromUri(namespaceUri(ns)), ns);

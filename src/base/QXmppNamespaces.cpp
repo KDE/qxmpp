@@ -177,6 +177,9 @@ struct Enums::Data<Namespace> {
         { Namespace::Reply0, ns_reply },
         { Namespace::CallInvites0, ns_call_invites },
         { Namespace::Fast0, ns_fast },
+        { Namespace::Mam2Extended, ns_mam_extended },
+        { Namespace::Mam2GroupchatField, ns_mam_groupchat_field },
+        { Namespace::Mam2GroupchatAvailable, ns_mam_groupchat_available },
     });
 };
 
@@ -356,6 +359,9 @@ struct Enums::Data<Namespace> {
     \value Reply0 \xep{0461}{Message Replies}: \c{urn:xmpp:reply:0}
     \value CallInvites0 \xep{0482}{Call Invites}: \c{urn:xmpp:call-invites:0}
     \value Fast0 \xep{0484}{Fast Authentication Streamlining Tokens}: \c{urn:xmpp:fast:0}
+    \value Mam2Extended \xep{0313}{Message Archive Management}: \c{urn:xmpp:mam:2#extended} (since QXmpp 1.18)
+    \value Mam2GroupchatField \xep{0313}{Message Archive Management}: \c{urn:xmpp:mam:2#groupchat-field} (since QXmpp 1.18)
+    \value Mam2GroupchatAvailable \xep{0313}{Message Archive Management}: \c{urn:xmpp:mam:2#groupchat-available} (since QXmpp 1.18)
 
     \since QXmpp 1.17
 */

@@ -213,6 +213,9 @@ inline constexpr QStringView ns_muc_unique = u"http://jabber.org/protocol/muc#un
 inline constexpr QStringView ns_message_correct = u"urn:xmpp:message-correct:0";
 // XEP-0313: Message Archive Management
 inline constexpr QStringView ns_mam = u"urn:xmpp:mam:2";
+inline constexpr QStringView ns_mam_extended = u"urn:xmpp:mam:2#extended";
+inline constexpr QStringView ns_mam_groupchat_field = u"urn:xmpp:mam:2#groupchat-field";
+inline constexpr QStringView ns_mam_groupchat_available = u"urn:xmpp:mam:2#groupchat-available";
 // XEP-0319: Last User Interaction in Presence
 inline constexpr QStringView ns_idle = u"urn:xmpp:idle:1";
 // XEP-0320: Use of DTLS-SRTP in Jingle Sessions
