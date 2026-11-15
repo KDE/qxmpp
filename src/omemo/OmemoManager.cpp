@@ -878,6 +878,13 @@ namespace QXmpp {
     a message. Otherwise anyone could find out whether this device is online. At most 20 devices
     per JID and version that are not in its device list are stored.
 
+    For a message sent via QXmppClient::sendMessage() in the automatic mode,
+    QXmpp::Messages::Sent::encryption() is QXmpp::E2ee::Omemo2 if at least one device has been
+    encrypted for with OMEMO 2, also if other devices got OMEMO 0, and QXmpp::E2ee::Omemo0
+    otherwise. This is also the namespace announced via \xep{0380}{Explicit Message Encryption}.
+    QXmpp::Messages::Sent::contentEncryption() is QXmpp::E2ee::ContentEncryption::BodyOnly if any
+    device got OMEMO 0. The version of each device is reported in QXmpp::Omemo::EncryptionInfo.
+
     \since QXmpp 1.18
 */
 
@@ -1084,6 +1091,61 @@ QBindable<QByteArray> OmemoManager::ownKey(Version version) const
 
     Returns whether \a key is the key of the device in one of the versions (\c keyId or
     \c omemo0KeyId), e.g. the key of the sender of a message.
+*/
+
+/*!
+    \struct QXmpp::Omemo::EncryptionInfo
+    \inmodule QXmpp
+
+    \brief The devices a message has been encrypted for, available via
+    QXmpp::Messages::Sent::encryptionInfo() of messages encrypted with OMEMO.
+
+    \code
+    client->sendMessage(std::move(message)).then(this, [](QXmpp::Result<QXmpp::Messages::Sent> &&result) {
+        if (auto *sent = std::get_if<QXmpp::Messages::Sent>(&result)) {
+            if (const auto *info = std::any_cast<QXmpp::Omemo::EncryptionInfo>(&sent->encryptionInfo())) {
+                for (const auto &skipped : info->skippedDevices) {
+                    // e.g. show that the device can not decrypt the message
+                }
+            }
+        }
+    });
+    \endcode
+
+    With QXmpp::Omemo::Automatic, the version of each device is the one it has been encrypted
+    with. A message for devices of both versions is reported as OMEMO 2 by
+    QXmpp::Messages::Sent::encryption(), the devices tell which ones got OMEMO 0.
+
+    \since QXmpp 1.18
+
+    \var QXmpp::Omemo::EncryptionInfo::devices
+    devices the message has been encrypted for, also the other own devices
+    \var QXmpp::Omemo::EncryptionInfo::skippedDevices
+    listed devices of the recipients and the own JID the message has not been encrypted for
+*/
+
+/*!
+    \enum QXmpp::Omemo::EncryptionInfo::SkipReason
+
+    \value Untrusted The trust level of the device is not accepted
+    (QXmppSendStanzaParams::acceptedTrustLevels()).
+    \value NoSession No session could be built, e.g. because the bundle of the device is not
+    available or its identity key has changed.
+    \value Unresponsive The device has not responded to the messages encrypted for it for too long.
+    \value DeviceLimit The maximum number of devices a message is encrypted for has been reached.
+    \value BodyOnlyUnsupported The device only supports OMEMO 0, which only encrypts the body,
+    but the message can not be sent without its other elements, see
+    QXmpp::Messages::PrepareBodyOnly.
+*/
+
+/*!
+    \struct QXmpp::Omemo::EncryptionInfo::SkippedDevice
+    \inmodule QXmpp
+
+    \var QXmpp::Omemo::EncryptionInfo::SkippedDevice::device
+    the device, its trust level is \c Undecided if it has not been checked
+    \var QXmpp::Omemo::EncryptionInfo::SkippedDevice::reason
+    why the message has not been encrypted for it
 */
 
 /*!

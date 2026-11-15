@@ -2450,6 +2450,10 @@ struct Account {
                 prepareBodyOnly(message);
             }
         });
+        // the result of sendMessage() without waiting for the acknowledgement of the server
+        client.hooks(&owner).add<QXmpp::Messages::ConfirmDelivery>([this](const QXmpp::Messages::OutgoingMessage &message, std::optional<Result<QXmpp::Messages::Confirmation>> &) {
+            sent = message;
+        });
     }
 
     ~Account() { service.removeClient(client); }
@@ -2487,7 +2491,8 @@ struct Account {
     QString sendMessage(QXmppMessage &&message)
     {
         sendError.clear();
-        auto task = client.send(std::move(message));
+        sent.reset();
+        auto task = client.sendMessage(std::move(message));
         service.process();
         // Without a stream, the task only finishes on errors.
         if (auto *error = task.isFinished() ? std::get_if<QXmppError>(&task.result()) : nullptr) {
@@ -2496,6 +2501,8 @@ struct Account {
         }
         return takeMessage();
     }
+
+    EncryptionInfo encryptionInfo() const { return std::any_cast<EncryptionInfo>(sent.value().encryptionInfo()); }
 
     // the last message sent by the client
     QString takeMessage()
@@ -2532,6 +2539,7 @@ struct Account {
     std::function<void(QXmpp::Messages::BodyOnlyMessage &)> prepareBodyOnly;
     int bodyOnlyPrepared = 0;
     QString sendError;
+    std::optional<QXmpp::Messages::OutgoingMessage> sent;
 };
 
 static QString versionNamespace(Version version)
@@ -2588,6 +2596,9 @@ private:
     Q_SLOT void emptyDeviceListRequestedOnce();
     Q_SLOT void automaticMaxDevicesPerStanza();
     Q_SLOT void automaticHiddenOmemo2Device();
+    Q_SLOT void encryptionInfo_data();
+    Q_SLOT void encryptionInfo();
+    Q_SLOT void automaticEncryptionInfo();
     Q_SLOT void unprotectedContent_data();
     Q_SLOT void unprotectedContent();
     Q_SLOT void unprotectedContentOfLegacyContact();
@@ -3544,6 +3555,120 @@ void tst_OmemoManager2::automaticHiddenOmemo2Device()
     QCOMPARE(received.value(0).e2eeMetadata()->encryptionNamespace(), E2ee::Omemo0.toString());
     // decrypted by the provider of OMEMO 2, but only the body was encrypted
     QCOMPARE(received.value(0).e2eeMetadata()->contentEncryption(), E2ee::ContentEncryption::BodyOnly);
+}
+
+void tst_OmemoManager2::encryptionInfo_data()
+{
+    addVersions();
+}
+
+// (version, JID, ID) of the devices
+static QList<std::tuple<Version, QString, uint32_t>> deviceAddresses(const QList<Device> &devices)
+{
+    QList<std::tuple<Version, QString, uint32_t>> addresses;
+    for (const auto &device : devices) {
+        addresses.append({ device.version, device.jid, device.id });
+    }
+    std::ranges::sort(addresses);
+    return addresses;
+}
+
+void tst_OmemoManager2::encryptionInfo()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account alicePhone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobPhone(nullptr, &server, u"bob@builder.lit/phone"_s);
+    for (auto *account : { &alice, &alicePhone, &bob, &bobPhone }) {
+        expectVariant<Success>(account->setUp());
+    }
+    alice.encryption = version;
+
+    auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(alice.sent->encryption(), versionNamespace(version));
+    QCOMPARE(alice.sent->contentEncryption(), version == Version::Omemo0 ? E2ee::ContentEncryption::BodyOnly : E2ee::ContentEncryption::Sce);
+    auto info = alice.encryptionInfo();
+    QCOMPARE(deviceAddresses(info.devices),
+             deviceAddresses({ { version, alice.jid(), alicePhone.deviceId() },
+                               { version, bob.jid(), bob.deviceId() },
+                               { version, bob.jid(), bobPhone.deviceId() } }));
+    QVERIFY(info.skippedDevices.isEmpty());
+
+    // the devices of the recipients are ordered by ID
+    auto &first = alice.manager->d->deviceIds(version, bob.jid()).constFirst() == bob.deviceId() ? bob : bobPhone;
+    auto &second = &first == &bob ? bobPhone : bob;
+
+    // with the key and the trust level
+    const auto firstDevice = *std::ranges::find(info.devices, first.deviceId(), &Device::id);
+    QCOMPARE(firstDevice.keyId, first.manager->d->versions.at(version).sessions->ownIdentityKey());
+    QCOMPARE(firstDevice.trustLevel, TrustLevel::AutomaticallyTrusted);
+
+    // distrusted, the other device is not above the limit
+    alice.trust->setTrustLevel(versionNamespace(version), { { bob.jid(), firstDevice.keyId } }, TrustLevel::ManuallyDistrusted);
+    alice.manager->d->maxDevicesPerStanza = 2;
+    message = alice.sendMessage(bob.jid(), u"Hello again"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    info = alice.encryptionInfo();
+    QCOMPARE(deviceAddresses(info.devices),
+             deviceAddresses({ { version, alice.jid(), alicePhone.deviceId() },
+                               { version, bob.jid(), second.deviceId() } }));
+    QCOMPARE(info.skippedDevices.size(), 1);
+    QCOMPARE(info.skippedDevices.constFirst().device.id, first.deviceId());
+    QCOMPARE(info.skippedDevices.constFirst().device.trustLevel, TrustLevel::ManuallyDistrusted);
+    QCOMPARE(info.skippedDevices.constFirst().reason, EncryptionInfo::SkipReason::Untrusted);
+
+    // above the limit
+    alice.trust->setTrustLevel(versionNamespace(version), { { bob.jid(), firstDevice.keyId } }, TrustLevel::ManuallyTrusted);
+    message = alice.sendMessage(bob.jid(), u"Hello again"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    info = alice.encryptionInfo();
+    QCOMPARE(deviceAddresses(info.devices),
+             deviceAddresses({ { version, alice.jid(), alicePhone.deviceId() },
+                               { version, bob.jid(), first.deviceId() } }));
+    QCOMPARE(info.skippedDevices.size(), 1);
+    QCOMPARE(info.skippedDevices.constFirst().device.id, second.deviceId());
+    QCOMPARE(info.skippedDevices.constFirst().reason, EncryptionInfo::SkipReason::DeviceLimit);
+}
+
+void tst_OmemoManager2::automaticEncryptionInfo()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobLegacy(nullptr, &server, u"bob@builder.lit/legacy"_s);
+    bobLegacy.manager->setEnabledVersions({ Version::Omemo0 });
+    for (auto *account : { &alice, &bob, &bobLegacy }) {
+        expectVariant<Success>(account->setUp());
+    }
+    alice.automatic = true;
+
+    // the version used for each device
+    auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(alice.sent->encryption(), E2ee::Omemo2.toString());
+    QCOMPARE(alice.sent->contentEncryption(), E2ee::ContentEncryption::BodyOnly);
+    auto info = alice.encryptionInfo();
+    QCOMPARE(deviceAddresses(info.devices),
+             deviceAddresses({ { Version::Omemo2, bob.jid(), bob.deviceId() },
+                               { Version::Omemo0, bob.jid(), bobLegacy.deviceId() } }));
+    QVERIFY(info.skippedDevices.isEmpty());
+
+    // without a variant for OMEMO 0, only OMEMO 2 is used
+    alice.prepareBodyOnly = [](QXmpp::Messages::BodyOnlyMessage &message) { message.setUnsupported(); };
+    message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(alice.sent->encryption(), E2ee::Omemo2.toString());
+    QCOMPARE(alice.sent->contentEncryption(), E2ee::ContentEncryption::Sce);
+    info = alice.encryptionInfo();
+    QCOMPARE(deviceAddresses(info.devices), deviceAddresses({ { Version::Omemo2, bob.jid(), bob.deviceId() } }));
+    QCOMPARE(info.skippedDevices.size(), 1);
+    QCOMPARE(info.skippedDevices.constFirst().device.id, bobLegacy.deviceId());
+    QCOMPARE(info.skippedDevices.constFirst().device.version, Version::Omemo0);
+    QCOMPARE(info.skippedDevices.constFirst().reason, EncryptionInfo::SkipReason::BodyOnlyUnsupported);
 }
 
 void tst_OmemoManager2::unprotectedContent_data()

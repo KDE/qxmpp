@@ -184,6 +184,26 @@ struct Device {
     bool operator==(const Device &) const = default;
 };
 
+struct EncryptionInfo {
+    enum class SkipReason {
+        Untrusted,
+        NoSession,
+        Unresponsive,
+        DeviceLimit,
+        BodyOnlyUnsupported,
+    };
+
+    struct SkippedDevice {
+        Device device {};
+        SkipReason reason = SkipReason::NoSession;
+
+        bool operator==(const SkippedDevice &) const = default;
+    };
+
+    QList<Device> devices {};
+    QList<SkippedDevice> skippedDevices {};
+};
+
 class QXMPPOMEMO_EXPORT DeviceWatch
 {
 public:

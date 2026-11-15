@@ -71,6 +71,18 @@ struct Recipient {
     Version version;
     QString jid;
     uint32_t deviceId = 0;
+    TrustLevel trustLevel = TrustLevel::Undecided;
+};
+
+struct PreparedSession {
+    TrustLevel trustLevel = TrustLevel::Undecided;
+    // set if the device can not be encrypted for
+    std::optional<EncryptionInfo::SkipReason> skipReason;
+};
+
+struct DeviceSelection {
+    QList<Recipient> recipients;
+    QList<EncryptionInfo::SkippedDevice> skippedDevices;
 };
 
 struct DecryptedEnvelope {
@@ -173,9 +185,10 @@ public:
     QXmppTask<void> mirrorTrustLevels(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys);
     bool usesOmemo2(const QString &jid, uint32_t omemo0DeviceId) const;
     bool isSticky(const OmemoStorage::Device &omemo2Device) const;
-    QXmppTask<bool> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);
-    QXmppTask<Result<QList<Recipient>>> selectDevices(QList<Version> versions, QList<Jid> recipientJids, TrustLevels acceptedTrustLevels);
-    QList<Envelope> encryptKey(Version version, const QList<Recipient> &recipients, const SecureByteArray &keyMaterial);
+    QXmppTask<PreparedSession> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);
+    QXmppTask<Result<DeviceSelection>> selectDevices(QList<Version> versions, QList<Jid> recipientJids, TrustLevels acceptedTrustLevels);
+    Device publicDevice(Version version, const QString &jid, uint32_t deviceId, TrustLevel trustLevel);
+    QList<Envelope> encryptKey(Version version, const QList<Recipient> &recipients, const SecureByteArray &keyMaterial, EncryptionInfo &info);
     QXmppTask<Result<DecryptedEnvelope>> decryptKey(Version version, QString jid, uint32_t deviceId, QByteArray data, bool isKeyExchange, bool isMessage);
     void refreshDeviceList(Version version, const QString &jid);
     void sendEmptyMessage(Version version, const QString &jid, uint32_t deviceId);
