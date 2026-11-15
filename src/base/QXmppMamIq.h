@@ -13,6 +13,7 @@
 
 #include <optional>
 
+#include <QDateTime>
 #include <QSharedDataPointer>
 
 class QDomElement;
@@ -39,6 +40,20 @@ struct QXMPP_EXPORT QueryResult {
 
     static constexpr std::tuple XmlTag = { u"fin", QXmpp::Private::ns_mam };
     static std::optional<QueryResult> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+};
+
+struct ArchiveEntry {
+    QString id {};
+    QDateTime timestamp {};
+};
+
+struct QXMPP_EXPORT ArchiveMetadata {
+    std::optional<ArchiveEntry> start {};
+    std::optional<ArchiveEntry> end {};
+
+    static constexpr std::tuple XmlTag = { u"metadata", QXmpp::Private::ns_mam };
+    static std::optional<ArchiveMetadata> fromDom(const QDomElement &el);
     void toXml(QXmlStreamWriter *writer) const;
 };
 

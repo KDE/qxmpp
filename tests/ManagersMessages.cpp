@@ -165,6 +165,7 @@ private:
     Q_SLOT void retrieveExtended();
     Q_SLOT void retrieveUnexpectedSender();
     Q_SLOT void requestQueryForm();
+    Q_SLOT void requestMetadata();
 
     QXmppMamTestHelper m_helper;
     TestClient m_client;
@@ -391,6 +392,28 @@ void tst_QXmppMamManager::payloads()
     serializePacket(*result, unstableResultXml);
     QVERIFY(QueryResult::fromDom(xmlToDom("<fin xmlns='urn:xmpp:mam:2' stable='true'/>"))->stable);
     QVERIFY(QueryResult::fromDom(xmlToDom(emptyResultXml))->stable);
+
+    const QByteArray metadataXml =
+        "<metadata xmlns='urn:xmpp:mam:2'>"
+        "<start id='YWxwaGEg' timestamp='2008-08-22T21:09:04Z'/>"
+        "<end id='b21lZ2Eg' timestamp='2020-04-20T14:34:21Z'/>"
+        "</metadata>";
+    auto metadata = ArchiveMetadata::fromDom(xmlToDom(metadataXml));
+    QVERIFY(metadata);
+    QVERIFY(metadata->start);
+    QCOMPARE(metadata->start->id, u"YWxwaGEg"_s);
+    QCOMPARE(metadata->start->timestamp, QDateTime(QDate(2008, 8, 22), QTime(21, 9, 4), TimeZoneUTC));
+    QVERIFY(metadata->end);
+    QCOMPARE(metadata->end->id, u"b21lZ2Eg"_s);
+    QCOMPARE(metadata->end->timestamp, QDateTime(QDate(2020, 4, 20), QTime(14, 34, 21), TimeZoneUTC));
+    serializePacket(*metadata, metadataXml);
+
+    const QByteArray emptyMetadataXml = "<metadata xmlns='urn:xmpp:mam:2'/>";
+    metadata = ArchiveMetadata::fromDom(xmlToDom(emptyMetadataXml));
+    QVERIFY(metadata);
+    QVERIFY(!metadata->start);
+    QVERIFY(!metadata->end);
+    serializePacket(*metadata, emptyMetadataXml);
 }
 
 void tst_QXmppMamManager::retrieveArchivedMessages()
@@ -905,6 +928,33 @@ void tst_QXmppMamManager::requestQueryForm()
     test.expect(u"<iq id='qx1' to='pubsub.shakespeare.lit' type='get'><query xmlns='urn:xmpp:mam:2' node='fdp/submitted/capulet.lit/sonnets'/></iq>"_s);
     test.inject(u"<iq type='error' id='qx1' from='pubsub.shakespeare.lit'><error type='cancel'><feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
     expectFutureVariant<QXmppError>(task);
+}
+
+void tst_QXmppMamManager::requestMetadata()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    auto *mam = test.addNewExtension<QXmppMamManager>();
+
+    auto task = mam->requestMetadata();
+    test.expect(u"<iq id='qx1' type='get'><metadata xmlns='urn:xmpp:mam:2'/></iq>"_s);
+    test.inject(u"<iq type='result' id='qx1'>"
+                "<metadata xmlns='urn:xmpp:mam:2'>"
+                "<start id='YWxwaGEg' timestamp='2008-08-22T21:09:04Z'/>"
+                "<end id='b21lZ2Eg' timestamp='2020-04-20T14:34:21Z'/>"
+                "</metadata>"
+                "</iq>"_s);
+    auto metadata = expectFutureVariant<QXmpp::Mam::ArchiveMetadata>(task);
+    QCOMPARE(metadata.start->id, u"YWxwaGEg"_s);
+    QCOMPARE(metadata.end->id, u"b21lZ2Eg"_s);
+
+    // empty archive of a MUC
+    task = mam->requestMetadata(u"coven@chat.shakespeare.lit"_s);
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><metadata xmlns='urn:xmpp:mam:2'/></iq>"_s);
+    test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'><metadata xmlns='urn:xmpp:mam:2'/></iq>"_s);
+    metadata = expectFutureVariant<QXmpp::Mam::ArchiveMetadata>(task);
+    QVERIFY(!metadata.start);
+    QVERIFY(!metadata.end);
 }
 
 void QXmppMamTestHelper::archivedMessageReceived(const QString &queryId, const QXmppMessage &message)

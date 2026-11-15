@@ -155,6 +155,102 @@ void Mam::QueryResult::toXml(QXmlStreamWriter *writer) const
     });
 }
 
+/*!
+    \struct QXmpp::Mam::ArchiveEntry
+    \inmodule QXmpp
+
+    \brief First or last message of an archive, see QXmpp::Mam::ArchiveMetadata.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Mam::ArchiveEntry::id
+
+    ID of the message in the archive.
+*/
+
+/*!
+    \variable QXmpp::Mam::ArchiveEntry::timestamp
+
+    Time at which the message was archived.
+*/
+
+/*!
+    \struct QXmpp::Mam::ArchiveMetadata
+    \inmodule QXmpp
+
+    \brief IQ payload with the metadata of an archive (\xep{0313}{Message Archive Management}).
+
+    An empty payload is sent in an IQ of type get to request the metadata. The archive responds
+    with the first and the last message it contains:
+    \code
+    client->sendIq(QXmpp::Iq::Get<QXmpp::Mam::ArchiveMetadata> {})
+        .then(this, [](QXmpp::Result<QXmpp::Mam::ArchiveMetadata> &&result) { ... });
+    \endcode
+
+    Usually QXmppMamManager::requestMetadata() is used instead.
+
+    This requires the archive to support QXmpp::Namespace::Mam2Extended.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Mam::ArchiveMetadata::start
+
+    The first message of the archive, empty if the archive is empty.
+*/
+
+/*!
+    \variable QXmpp::Mam::ArchiveMetadata::end
+
+    The last message of the archive, empty if the archive is empty.
+*/
+
+static std::optional<Mam::ArchiveEntry> parseArchiveEntry(const QDomElement &el)
+{
+    if (el.isNull()) {
+        return {};
+    }
+    return Mam::ArchiveEntry {
+        .id = el.attribute(u"id"_s),
+        .timestamp = QXmppUtils::datetimeFromString(el.attribute(u"timestamp"_s)),
+    };
+}
+
+std::optional<Mam::ArchiveMetadata> Mam::ArchiveMetadata::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+
+    return ArchiveMetadata {
+        .start = parseArchiveEntry(firstChildElement(el, u"start", ns_mam)),
+        .end = parseArchiveEntry(firstChildElement(el, u"end", ns_mam)),
+    };
+}
+
+void Mam::ArchiveMetadata::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter w(writer);
+    auto writeEntry = [&](QStringView tag, const std::optional<ArchiveEntry> &entry) {
+        if (entry) {
+            w.write(Element {
+                tag,
+                Attribute { u"id", entry->id },
+                Attribute { u"timestamp", entry->timestamp },
+            });
+        }
+    };
+
+    w.write(Element {
+        XmlTag,
+        [&] { writeEntry(u"start", start); },
+        [&] { writeEntry(u"end", end); },
+    });
+}
+
 #if QXMPP_DEPRECATED_SINCE(1, 18)
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED

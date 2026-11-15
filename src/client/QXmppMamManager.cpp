@@ -648,6 +648,20 @@ QXmppTask<Result<QXmppDataForm>> QXmppMamManager::requestQueryForm(const QString
         [](Mam::QueryRequest &&query) { return std::move(query.form); });
 }
 
+/*!
+    Requests the metadata of an archive, i.e. its first and last message.
+
+    This requires the archive to support QXmpp::Namespace::Mam2Extended.
+
+    \a to is the archive to query, empty for the archive of the own account.
+
+    \since QXmpp 1.18
+*/
+QXmppTask<Result<Mam::ArchiveMetadata>> QXmppMamManager::requestMetadata(const QString &to)
+{
+    return client()->sendIq(Iq::Get<Mam::ArchiveMetadata> { .to = to });
+}
+
 // Checks that a result has been sent by the queried entity, so other entities can't inject
 // messages into the results (XEP-0313, "Sender Impersonation").
 bool QXmppMamManagerPrivate::isFromQueriedJid(const QString &queriedJid, const QString &from) const

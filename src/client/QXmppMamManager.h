@@ -117,6 +117,7 @@ public:
 #endif
     QXmppTask<QXmpp::Mam::RetrieveResult> retrieve(const QXmpp::Mam::Query &query);
     QXmppTask<QXmpp::Result<QXmppDataForm>> requestQueryForm(const QString &to = {}, const QString &node = {});
+    QXmppTask<QXmpp::Result<QXmpp::Mam::ArchiveMetadata>> requestMetadata(const QString &to = {});
 
     QXmppDiscoFeatureWatch watchAccountSupport() const;
 
