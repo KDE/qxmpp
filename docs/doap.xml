@@ -502,8 +502,9 @@ SPDX-License-Identifier: CC0-1.0
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0313.html'/>
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>0.5</xmpp:version>
+        <xmpp:version>1.1.3</xmpp:version>
         <xmpp:since>1.0</xmpp:since>
+        <xmpp:note>Extended queries, flipped pages, archive metadata and query forms since 1.18</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
     <implements>
