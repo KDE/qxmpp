@@ -48,6 +48,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - MAM: Add `retrieve()` returning the `QXmpp::Messages::Context` of the messages (decryption state, real sender) and the `QXmpp::Mam::MessageReceived` hook to process them while the query is running; `ArchiveInfo` has the query ID; `QXmpp::Messages::Received` is not run for archived messages (@lnj, !847)
  - ATM: Trust messages are encrypted with the encryption they refer to, independent of the `SelectEncryption` hook; it must encrypt the whole content (OMEMO 2), else sending fails (@lnj, !846)
  - ATM: Add the store hint to trust messages (@lnj, !846)
+ - Uri: Add OMEMO fingerprints in the format of Conversations (`omemo-sid-<device ID>=<key ID>`) via `QXmppUri::omemoFingerprints()`; URIs with only fingerprints and no query type can be parsed now (@lnj, !849)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

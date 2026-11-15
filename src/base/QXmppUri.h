@@ -119,6 +119,16 @@ struct TrustMessage {
     bool operator==(const TrustMessage &) const = default;
 };
 
+struct OmemoFingerprint {
+    /*! the ID of the OMEMO device, 0 for the legacy format without device ID */
+    uint32_t deviceId = 0;
+    /*! the public identity key of the device, as it is encoded in the URI (not converted) */
+    QByteArray keyId;
+
+    /*! Returns true if the two objects are equal (default comparison). */
+    bool operator==(const OmemoFingerprint &) const = default;
+};
+
 struct CustomQuery {
     /*! query name as string */
     QString query;
@@ -201,6 +211,9 @@ public:
     void setQuery(QXmpp::Uri::CustomQuery &&q) { setQuery(std::any(std::move(q))); }
     /*! Removes any query from the URI. */
     void resetQuery() { setQuery(std::any()); }
+
+    QList<QXmpp::Uri::OmemoFingerprint> omemoFingerprints() const;
+    void setOmemoFingerprints(const QList<QXmpp::Uri::OmemoFingerprint> &fingerprints);
 
 private:
     void setQuery(std::any &&);

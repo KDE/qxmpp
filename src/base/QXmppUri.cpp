@@ -11,6 +11,8 @@
 
 #include "StringLiterals.h"
 
+#include <algorithm>
+
 #include <QUrlQuery>
 
 using namespace QXmpp::Private;
@@ -19,6 +21,8 @@ using namespace QXmpp::Uri;
 constexpr QStringView SCHEME = u"xmpp";
 constexpr QChar QUERY_ITEM_DELIMITER = u';';
 constexpr QChar QUERY_ITEM_KEY_DELIMITER = u'=';
+constexpr QStringView OMEMO_FINGERPRINT_KEY_PREFIX = u"omemo-sid-";
+constexpr QStringView OMEMO_FINGERPRINT_LEGACY_KEY = u"omemo";
 
 // Adds a key-value pair to a query if the value is not empty.
 static void addKeyValuePairToQuery(QUrlQuery &query, const QString &key, QStringView value)
@@ -153,6 +157,40 @@ namespace QXmpp::Uri {
     A "trust-message" query defined in \xep{0434}{Trust Messages (TM)}.
 
     \since QXmpp 1.8
+*/
+
+/*!
+    \struct QXmpp::Uri::OmemoFingerprint
+    \inmodule QXmpp
+
+    The fingerprint of an OMEMO device in the URI format of Conversations, not formally specified.
+
+    Conversations includes the fingerprints of the devices of an account in the URIs it shares,
+    e.g. in QR codes, so that scanning them verifies the keys:
+
+    \c {xmpp:alice@example.org?omemo-sid-123456=08a6...;omemo-sid-654321=c7f1...}
+
+    Each fingerprint is a key-value pair \c {omemo-sid-<device ID>=<key>} with the key encoded as
+    Base16. The fingerprints can be the only items of the query (without a query type) or follow
+    any query, e.g. \c {xmpp:alice@example.org?message;omemo-sid-123456=08a6...}. Older versions
+    of Conversations used \c {omemo=<key>} without the device ID, it is parsed with the device ID
+    0. See QXmppUri::omemoFingerprints().
+
+    The format of the key depends on the OMEMO version, the URI doesn't tell which one is used:
+    \list
+    \li OMEMO 0.3 (\c {eu.siacs.conversations.axolotl}), used by Conversations: the Curve25519
+    public identity key (32 bytes) without the leading key type byte (0x05) of its serialization
+    in the bundle.
+    \li OMEMO 2 (\c {urn:xmpp:omemo:2}), used by QXmppOmemoManager: the Ed25519 public identity
+    key (32 bytes), as in QXmppOmemoDevice::keyId().
+    \endlist
+
+    Both are the same key in different representations: the Curve25519 key is the Montgomery form
+    of the Ed25519 key. QXmppUri doesn't convert the keys. To compare a key from a URI of
+    Conversations with an OMEMO 2 key ID, convert the Ed25519 key to its Montgomery form; the
+    other direction is ambiguous because the Curve25519 key lacks the sign bit.
+
+    \since QXmpp 1.18
 */
 
 /*!
@@ -335,9 +373,47 @@ CustomQuery parseCustomQuery(const QUrlQuery &q)
     return CustomQuery { queryName, queryItems };
 }
 
+// Whether the key is the key of an OMEMO fingerprint parameter of Conversations
+// ("omemo-sid-<device ID>=<key ID>" or legacy "omemo=<key ID>").
+static bool isOmemoFingerprintKey(const QString &key)
+{
+    return key.startsWith(OMEMO_FINGERPRINT_KEY_PREFIX) || key == OMEMO_FINGERPRINT_LEGACY_KEY;
+}
+
+// Parses an OMEMO fingerprint parameter, returns no value if it is invalid.
+static std::optional<OmemoFingerprint> parseOmemoFingerprint(const QString &key, const QString &value)
+{
+    uint32_t deviceId = 0;
+    if (key != OMEMO_FINGERPRINT_LEGACY_KEY) {
+        bool ok = false;
+        deviceId = QStringView(key).mid(OMEMO_FINGERPRINT_KEY_PREFIX.size()).toUInt(&ok);
+        if (!ok || deviceId == 0) {
+            return {};
+        }
+    }
+
+    auto isHexDigit = [](QChar c) {
+        return (c >= u'0' && c <= u'9') || (c >= u'a' && c <= u'f') || (c >= u'A' && c <= u'F');
+    };
+    if (value.isEmpty() || value.size() % 2 != 0 || !std::ranges::all_of(value, isHexDigit)) {
+        return {};
+    }
+
+    return OmemoFingerprint { deviceId, QByteArray::fromHex(value.toLatin1()) };
+}
+
+static void serializeOmemoFingerprint(const OmemoFingerprint &fingerprint, QUrlQuery &query)
+{
+    auto key = fingerprint.deviceId == 0
+        ? OMEMO_FINGERPRINT_LEGACY_KEY.toString()
+        : OMEMO_FINGERPRINT_KEY_PREFIX + QString::number(fingerprint.deviceId);
+    query.addQueryItem(key, QString::fromLatin1(fingerprint.keyId.toHex()));
+}
+
 struct QXmppUriPrivate : QSharedData {
     QString jid;
     std::any query;
+    QList<OmemoFingerprint> omemoFingerprints;
 };
 
 /*! Creates an empty XMPP URI */
@@ -368,6 +444,22 @@ std::variant<QXmppUri, QXmppError> QXmppUri::fromString(const QString &input)
         QUrlQuery urlQuery;
         urlQuery.setQueryDelimiters(QUERY_ITEM_KEY_DELIMITER, QUERY_ITEM_DELIMITER);
         urlQuery.setQuery(url.query(QUrl::FullyEncoded));
+
+        // Extract the OMEMO fingerprints of Conversations, they can be combined with any query
+        // or be the only items (not starting with a query type).
+        QList<QString> fingerprintKeys;
+        for (const auto &[key, value] : urlQuery.queryItems(QUrl::FullyDecoded)) {
+            if (isOmemoFingerprintKey(key)) {
+                // invalid fingerprints are ignored like Conversations does
+                if (auto fingerprint = parseOmemoFingerprint(key, value)) {
+                    uri.d->omemoFingerprints.append(std::move(*fingerprint));
+                }
+                fingerprintKeys.append(key);
+            }
+        }
+        for (const auto &key : std::as_const(fingerprintKeys)) {
+            urlQuery.removeAllQueryItems(key);
+        }
 
         // Check if there is at least one query item.
         if (!urlQuery.isEmpty()) {
@@ -450,6 +542,10 @@ QString QXmppUri::toString()
             serialize<CustomQuery>(d->query, urlQuery);
     }
 
+    for (const auto &fingerprint : std::as_const(d->omemoFingerprints)) {
+        serializeOmemoFingerprint(fingerprint, urlQuery);
+    }
+
     url.setQuery(urlQuery);
 
     return QString::fromUtf8(url.toEncoded(QUrl::FullyEncoded));
@@ -489,4 +585,30 @@ std::any QXmppUri::query() const
 void QXmppUri::setQuery(std::any &&query)
 {
     d->query = std::move(query);
+}
+
+/*!
+    Returns the OMEMO fingerprints of the URI in the format of Conversations (see
+    QXmpp::Uri::OmemoFingerprint).
+
+    Invalid fingerprints are ignored when parsing.
+
+    \since QXmpp 1.18
+*/
+QList<OmemoFingerprint> QXmppUri::omemoFingerprints() const
+{
+    return d->omemoFingerprints;
+}
+
+/*!
+    Sets the OMEMO fingerprints of the URI.
+
+    \a fingerprints are serialized after the query, the keys as lowercase Base16. A fingerprint
+    with device ID 0 is serialized in the legacy format \c {omemo=<key>}.
+
+    \since QXmpp 1.18
+*/
+void QXmppUri::setOmemoFingerprints(const QList<OmemoFingerprint> &fingerprints)
+{
+    d->omemoFingerprints = fingerprints;
 }
