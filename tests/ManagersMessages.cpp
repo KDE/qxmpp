@@ -130,10 +130,10 @@ public:
     }
 };
 
-static QString mamResult(const QString &id, const QString &message)
+static QString mamResult(const QString &id, const QString &message, const QString &from = {})
 {
-    return u"<message to='juliet@capulet.lit/chamber'>"
-           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s +
+    return u"<message to='juliet@capulet.lit/chamber'"_s + (from.isEmpty() ? QString() : u" from='"_s + from + u'\'') +
+        u"><result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s +
         id + u"'><forwarded xmlns='urn:xmpp:forward:0'><delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"_s +
         message + u"</forwarded></result></message>"_s;
 }
@@ -162,6 +162,7 @@ private:
     Q_SLOT void retrieve();
     Q_SLOT void retrieveLegacyEncrypted();
     Q_SLOT void retrieveError();
+    Q_SLOT void retrieveUnexpectedSender();
 
     QXmppMamTestHelper m_helper;
     TestClient m_client;
@@ -388,7 +389,8 @@ void tst_QXmppMamManager::retrieveArchivedMessages()
                 "</query>"
                 "</iq>"_s);
     TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<body>Hi</body></message>"_s)));
+                                                             "<body>Hi</body></message>"_s,
+                                                     u"mam.server.org"_s)));
     QCOMPARE(messages.size(), 1);
     QCOMPARE(messages.at(0).at(0).toString(), u"qx1"_s);
     QCOMPARE(messages.at(0).at(1).value<QXmppMessage>().body(), u"Hi"_s);
@@ -693,6 +695,61 @@ void tst_QXmppMamManager::retrieveError()
     expectVariant<QXmppError>(task.takeResult());
     // the messages received before are still processed
     QCOMPARE(processed, 1);
+}
+
+void tst_QXmppMamManager::retrieveUnexpectedSender()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    auto *mam = test.addNewExtension<QXmppMamManager>();
+
+    auto result = [](const QString &from, const QString &id) -> QString {
+        return u"<message to='juliet@capulet.lit/chamber'"_s + (from.isEmpty() ? QString() : u" from='"_s + from + u'\'') +
+            u"><result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s + id +
+            u"'><forwarded xmlns='urn:xmpp:forward:0'>"
+            "<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'><body>Hi</body></message>"
+            "</forwarded></result></message>"_s;
+    };
+
+    // archive of the own account
+    auto task = mam->retrieve({});
+    test.ignore();
+    TestClient::handleStanza(mam, xmlToDom(result(u"romeo@montague.lit"_s, u"spoofed"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result(u"juliet@capulet.lit/balcony"_s, u"spoofed"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result({}, u"1"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result(u"juliet@capulet.lit"_s, u"2"_s)));
+    test.inject(u"<iq type='result' id='qx1'><fin xmlns='urn:xmpp:mam:2' complete='true'/></iq>"_s);
+
+    auto page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
+    QCOMPARE(page.messages.size(), 2);
+    QCOMPARE(page.messages.at(0).attachment<QXmpp::Messages::ArchiveInfo>()->id(), u"1"_s);
+    QCOMPARE(page.messages.at(1).attachment<QXmpp::Messages::ArchiveInfo>()->id(), u"2"_s);
+
+    // MUC archive: occupants and the own server must not inject results
+    task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_s });
+    test.ignore();
+    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"spoofed"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result({}, u"spoofed"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit"_s, u"3"_s)));
+    test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'><fin xmlns='urn:xmpp:mam:2' complete='true'/></iq>"_s);
+
+    page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
+    QCOMPARE(page.messages.size(), 1);
+    QCOMPARE(page.messages.at(0).attachment<QXmpp::Messages::ArchiveInfo>()->id(), u"3"_s);
+
+    // signal-based API
+    QSignalSpy messages(mam, &QXmppMamManager::archivedMessageReceived);
+    mam->retrieveArchivedMessages(u"coven@chat.shakespeare.lit"_s);
+    test.ignore();
+    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"spoofed"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result({}, u"spoofed"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit"_s, u"4"_s)));
+    QCOMPARE(messages.size(), 1);
+    test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'><fin xmlns='urn:xmpp:mam:2' complete='true'/></iq>"_s);
+
+    // results of queries sent manually can't be checked
+    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"5"_s)));
+    QCOMPARE(messages.size(), 2);
 }
 
 void QXmppMamTestHelper::archivedMessageReceived(const QString &queryId, const QXmppMessage &message)

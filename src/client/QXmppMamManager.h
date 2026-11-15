@@ -116,6 +116,9 @@ public:
         This signal is emitted when an archived \a message is received
 
         \a queryId.
+
+        For queries sent via retrieveArchivedMessages(), only messages sent by the queried archive
+        are emitted (since QXmpp 1.18).
     */
     Q_SIGNAL void archivedMessageReceived(const QString &queryId, const QXmppMessage &message);
 

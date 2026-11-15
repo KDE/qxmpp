@@ -111,6 +111,8 @@ struct RetrieveRequestState {
     Mam::QueryResult result;
     // bare JID of the queried archive
     QString archiveJid;
+    // JID the query has been sent to, the results must be sent from it
+    QString queriedJid;
     // processed messages in the order of the archive, empty for dropped or consumed messages and
     // messages still being processed
     std::vector<std::optional<Context>> messages;
@@ -137,6 +139,7 @@ class QXmppMamManagerPrivate
 public:
     explicit QXmppMamManagerPrivate(QXmppMamManager *q) : q(q) { }
 
+    bool isFromQueriedJid(const QString &queriedJid, const QString &from) const;
     void processMessage(const QString &queryId, RetrieveRequestState &state, MamMessage &&message);
     QXmppTask<std::optional<Context>> decryptLegacy(QXmppE2eeExtension *e2eeExt, Context context, MamMessage message);
     void finishMessage(const QString &queryId, size_t index, std::optional<Context> &&context);
@@ -144,6 +147,8 @@ public:
     QXmppMamManager *q;
     // std::string because older Qt 5 versions don't add std::hash support for QString
     std::unordered_map<std::string, RetrieveRequestState> ongoingRequests;
+    // queried JIDs of the running queries of retrieveArchivedMessages() by query ID
+    std::unordered_map<std::string, QString> signalQueries;
 };
 
 /*!
@@ -317,9 +322,19 @@ bool QXmppMamManager::handleIncomingStanza(const QDomElement &element)
             auto itr = d->ongoingRequests.find(queryId.toStdString());
             if (itr != d->ongoingRequests.end()) {
                 // task-based API
+                if (!d->isFromQueriedJid(itr->second.queriedJid, element.attribute(u"from"_s))) {
+                    warning(u"Ignoring MAM result from unexpected sender "_s + element.attribute(u"from"_s));
+                    return true;
+                }
                 d->processMessage(queryId, itr->second, std::move(message));
             } else {
-                // signal-based API
+                // signal-based API, results of queries sent manually via QXmppMamQueryIq can't be
+                // checked
+                if (auto signalItr = d->signalQueries.find(queryId.toStdString());
+                    signalItr != d->signalQueries.end() && !d->isFromQueriedJid(signalItr->second, element.attribute(u"from"_s))) {
+                    warning(u"Ignoring MAM result from unexpected sender "_s + element.attribute(u"from"_s));
+                    return true;
+                }
                 Q_EMIT archivedMessageReceived(queryId, parseMamMessage(message, Unencrypted));
             }
             return true;
@@ -409,7 +424,9 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
             .resultSetQuery = resultSetQuery,
         },
     };
+    d->signalQueries.insert({ queryId.toStdString(), to.isEmpty() ? client()->configuration().jidBare() : to });
     client()->sendIq(std::move(request)).then(this, [this, queryId](Result<Mam::QueryResult> &&result) {
+        d->signalQueries.erase(queryId.toStdString());
         if (hasError(result)) {
             warning(u"MAM query failed: "_s + getError(result).description);
             return;
@@ -489,7 +506,8 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
 
     auto [itr, inserted] = d->ongoingRequests.insert({ queryId.toStdString(), RetrieveRequestState() });
     Q_ASSERT(inserted);
-    itr->second.archiveJid = QXmppUtils::jidToBareJid(query.to.isEmpty() ? client()->configuration().jidBare() : query.to);
+    itr->second.queriedJid = query.to.isEmpty() ? client()->configuration().jidBare() : query.to;
+    itr->second.archiveJid = QXmppUtils::jidToBareJid(itr->second.queriedJid);
 
     // create task here; promise could finish immediately after client()->sendIq()
     auto task = itr->second.promise.task();
@@ -528,6 +546,17 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
     });
 
     return task;
+}
+
+// Checks that a result has been sent by the queried entity, so other entities can't inject
+// messages into the results (XEP-0313, "Sender Impersonation").
+bool QXmppMamManagerPrivate::isFromQueriedJid(const QString &queriedJid, const QString &from) const
+{
+    if (from.isEmpty()) {
+        // sent by the server on behalf of the own account
+        return queriedJid.compare(q->client()->configuration().jidBare(), Qt::CaseInsensitive) == 0;
+    }
+    return from.compare(queriedJid, Qt::CaseInsensitive) == 0;
 }
 
 // Processes a message of a task-based query in the message pipeline, it may be decrypted
