@@ -324,16 +324,10 @@ bool QXmppMamManager::handleIncomingStanza(const QDomElement &element)
             }
             return true;
         }
-    } else {
-        QT_WARNING_PUSH
-        QT_WARNING_DISABLE_DEPRECATED
-        if (isIqElement<QXmppMamResultIq>(element)) {
-            QXmppMamResultIq result;
-            result.parse(element);
-            Q_EMIT resultsRecieved(result.id(), result.resultSetReply(), result.complete());
-            return true;
-        }
-        QT_WARNING_POP
+    } else if (auto iq = Iq::Result<Mam::QueryResult>::fromDom(element)) {
+        // results of queries not sent via retrieveArchivedMessages()
+        Q_EMIT resultsRecieved(iq->id, iq->payload.resultSetReply, iq->payload.complete);
+        return true;
     }
 
     return false;
@@ -375,26 +369,6 @@ static QXmppDataForm buildForm(const QString &jid, const QDateTime &start, const
     return form;
 }
 
-QT_WARNING_PUSH
-QT_WARNING_DISABLE_DEPRECATED
-static QXmppMamQueryIq buildRequest(const QString &to,
-                                    const QString &node,
-                                    const QString &jid,
-                                    const QDateTime &start,
-                                    const QDateTime &end,
-                                    const QXmppResultSetQuery &resultSetQuery)
-{
-    QXmppMamQueryIq queryIq;
-    QString queryId = queryIq.id(); /* reuse the IQ id as query id */
-    queryIq.setTo(to);
-    queryIq.setNode(node);
-    queryIq.setQueryId(queryId);
-    queryIq.setForm(buildForm(jid, start, end));
-    queryIq.setResultSetQuery(resultSetQuery);
-    return queryIq;
-}
-QT_WARNING_POP
-
 /*!
     Retrieves archived messages. For each received message, the
     archiveMessageReceived() signal is emitted. Once all messages are received,
@@ -422,13 +396,28 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
                                                   const QDateTime &end,
                                                   const QXmppResultSetQuery &resultSetQuery)
 {
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-    auto queryIq = buildRequest(to, node, jid, start, end, resultSetQuery);
-    auto id = queryIq.id();
-    client()->send(std::move(queryIq));
-    return id;
-    QT_WARNING_POP
+    // reuse the IQ id as query id
+    auto queryId = generateSequentialStanzaId();
+
+    Iq::Set<Mam::QueryRequest> request {
+        .id = queryId,
+        .to = to,
+        .payload = Mam::QueryRequest {
+            .queryId = queryId,
+            .node = node,
+            .form = buildForm(jid, start, end),
+            .resultSetQuery = resultSetQuery,
+        },
+    };
+    client()->sendIq(std::move(request)).then(this, [this, queryId](Result<Mam::QueryResult> &&result) {
+        if (hasError(result)) {
+            warning(u"MAM query failed: "_s + getError(result).description);
+            return;
+        }
+        const auto &queryResult = getValue(result);
+        Q_EMIT resultsRecieved(queryId, queryResult.resultSetReply, queryResult.complete);
+    });
+    return queryId;
 }
 
 /*!

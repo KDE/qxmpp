@@ -153,6 +153,8 @@ private:
     Q_SLOT void testHandleResultIq();
     Q_SLOT void payloads();
 
+    Q_SLOT void retrieveArchivedMessages();
+
     // test for task-based API
     Q_SLOT void retrieveMessagesUnencrypted();
     Q_SLOT void retrieveMessagesEncrypted();
@@ -366,6 +368,41 @@ void tst_QXmppMamManager::payloads()
     QCOMPARE(query->form.formType(), u"urn:xmpp:mam:2"_s);
     QCOMPARE(query->resultSetQuery.max(), 10);
     serializePacket(*query, queryXml);
+}
+
+void tst_QXmppMamManager::retrieveArchivedMessages()
+{
+    TestClient test;
+    auto *mam = test.addNewExtension<QXmppMamManager>();
+    QSignalSpy messages(mam, &QXmppMamManager::archivedMessageReceived);
+    QSignalSpy results(mam, &QXmppMamManager::resultsRecieved);
+
+    auto queryId = mam->retrieveArchivedMessages(u"mam.server.org"_s, {}, u"romeo@montague.lit"_s);
+    QCOMPARE(queryId, u"qx1"_s);
+    test.expect(u"<iq id='qx1' to='mam.server.org' type='set'>"
+                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
+                "<x xmlns='jabber:x:data' type='submit'>"
+                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                "<field type='text-single' var='with'><value>romeo@montague.lit</value></field>"
+                "</x>"
+                "</query>"
+                "</iq>"_s);
+    TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                             "<body>Hi</body></message>"_s)));
+    QCOMPARE(messages.size(), 1);
+    QCOMPARE(messages.at(0).at(0).toString(), u"qx1"_s);
+    QCOMPARE(messages.at(0).at(1).value<QXmppMessage>().body(), u"Hi"_s);
+    QCOMPARE(results.size(), 0);
+
+    test.inject(u"<iq type='result' id='qx1' from='mam.server.org'>"
+                "<fin xmlns='urn:xmpp:mam:2' complete='true'>"
+                "<set xmlns='http://jabber.org/protocol/rsm'><first index='0'>1</first><last>1</last></set>"
+                "</fin>"
+                "</iq>"_s);
+    QCOMPARE(results.size(), 1);
+    QCOMPARE(results.at(0).at(0).toString(), u"qx1"_s);
+    QCOMPARE(results.at(0).at(1).value<QXmppResultSetReply>().last(), u"1"_s);
+    QCOMPARE(results.at(0).at(2).toBool(), true);
 }
 
 // tests the deprecated API
