@@ -32,6 +32,7 @@ struct Query {
     QDateTime start {};
     QDateTime end {};
     QXmppResultSetQuery resultSetQuery {};
+    bool flipPage = false;
 };
 
 struct Page {

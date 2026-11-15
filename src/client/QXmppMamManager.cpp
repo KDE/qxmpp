@@ -25,6 +25,7 @@
 #include "Algorithms.h"
 #include "StringLiterals.h"
 
+#include <algorithm>
 #include <unordered_map>
 
 #include <QDomElement>
@@ -120,6 +121,10 @@ struct RetrieveRequestState {
     uint runningJobs = 0;
     // the result IQ has been received
     bool resultReceived = false;
+    // the messages have been requested in reverse order
+    bool flipPage = false;
+    // archive ID of the first message received
+    QString firstResultId;
 
     void finish()
     {
@@ -129,6 +134,12 @@ struct RetrieveRequestState {
             if (context) {
                 results.push_back(std::move(*context));
             }
+        }
+        // Archives without urn:xmpp:mam:2#extended may ignore <flip-page/>. Flipping doesn't change
+        // the result set, so the page has only been flipped if the first message received is not
+        // the first one of the result set.
+        if (flipPage && firstResultId != result.resultSetReply.first()) {
+            std::ranges::reverse(results);
         }
         promise.finish(Mam::Page { std::move(result), std::move(results) });
     }
@@ -206,6 +217,20 @@ public:
 */
 
 /*!
+    \variable QXmpp::Mam::Query::flipPage
+
+    Whether the archive should send the messages of the page in reverse order, i.e. the newest
+    message first. This can be used to show the newest messages first via the
+    QXmpp::Mam::MessageReceived hook when loading older messages. It does not change which
+    messages are returned and the messages of QXmpp::Mam::Page are still in chronological order.
+
+    This requires the archive to support QXmpp::Namespace::Mam2Extended. Other archives may ignore
+    it, the QXmpp::Mam::MessageReceived hook then gets the oldest message first. The order of
+    QXmpp::Mam::Page::messages is checked against the result set reply, so it is chronological
+    either way, unless the archive sends no result set reply.
+*/
+
+/*!
     \struct QXmpp::Mam::Page
     \inmodule QXmpp
 
@@ -223,8 +248,8 @@ public:
 /*!
     \variable QXmpp::Mam::Page::messages
 
-    The processed messages in the order of the archive. Messages consumed by a handler of
-    QXmpp::Mam::MessageReceived are not contained.
+    The processed messages in the order of the archive (also if QXmpp::Mam::Query::flipPage was
+    set). Messages consumed by a handler of QXmpp::Mam::MessageReceived are not contained.
 */
 
 /*!
@@ -244,7 +269,9 @@ public:
     This way, the messages can be shown while further ones are still retrieved. The
     QXmpp::Messages::ArchiveInfo attachment of the context contains the ID of the query.
 
-    Messages of a conversation are passed in the order of the archive. Handlers returning
+    Messages of a conversation are passed in the order they are sent by the archive, i.e. in
+    chronological order or reversed if QXmpp::Mam::Query::flipPage is set and supported by the
+    archive. Handlers returning
     QXmpp::HookResult::Stop consume the message, it is then not contained in the result of the
     query. If the query fails, the hook is still run for the messages received before.
 
@@ -508,6 +535,7 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
     Q_ASSERT(inserted);
     itr->second.queriedJid = query.to.isEmpty() ? client()->configuration().jidBare() : query.to;
     itr->second.archiveJid = QXmppUtils::jidToBareJid(itr->second.queriedJid);
+    itr->second.flipPage = query.flipPage;
 
     // create task here; promise could finish immediately after client()->sendIq()
     auto task = itr->second.promise.task();
@@ -521,6 +549,7 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
             .node = query.node,
             .form = buildForm(query.with, query.start, query.end),
             .resultSetQuery = query.resultSetQuery,
+            .flipPage = query.flipPage,
         },
     };
     client()->sendIq(std::move(request)).then(this, [this, queryId](Result<Mam::QueryResult> &&result) {
@@ -564,6 +593,9 @@ bool QXmppMamManagerPrivate::isFromQueriedJid(const QString &queriedJid, const Q
 void QXmppMamManagerPrivate::processMessage(const QString &queryId, RetrieveRequestState &state, MamMessage &&message)
 {
     const auto index = state.messages.size();
+    if (index == 0) {
+        state.firstResultId = message.id;
+    }
     state.messages.emplace_back();
     state.runningJobs++;
 

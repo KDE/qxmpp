@@ -162,6 +162,7 @@ private:
     Q_SLOT void retrieve();
     Q_SLOT void retrieveLegacyEncrypted();
     Q_SLOT void retrieveError();
+    Q_SLOT void retrieveExtended();
     Q_SLOT void retrieveUnexpectedSender();
 
     QXmppMamTestHelper m_helper;
@@ -368,7 +369,27 @@ void tst_QXmppMamManager::payloads()
     QCOMPARE(query->queryId, u"f27"_s);
     QCOMPARE(query->form.formType(), u"urn:xmpp:mam:2"_s);
     QCOMPARE(query->resultSetQuery.max(), 10);
+    QVERIFY(!query->flipPage);
     serializePacket(*query, queryXml);
+
+    const QByteArray flippedQueryXml =
+        "<query xmlns='urn:xmpp:mam:2'>"
+        "<set xmlns='http://jabber.org/protocol/rsm'><max>10</max><before/></set>"
+        "<flip-page/>"
+        "</query>";
+    query = QueryRequest::fromDom(xmlToDom(flippedQueryXml));
+    QVERIFY(query);
+    QVERIFY(query->flipPage);
+    serializePacket(*query, flippedQueryXml);
+
+    const QByteArray unstableResultXml = "<fin xmlns='urn:xmpp:mam:2' complete='true' stable='false'/>";
+    result = QueryResult::fromDom(xmlToDom(unstableResultXml));
+    QVERIFY(result);
+    QVERIFY(result->complete);
+    QVERIFY(!result->stable);
+    serializePacket(*result, unstableResultXml);
+    QVERIFY(QueryResult::fromDom(xmlToDom("<fin xmlns='urn:xmpp:mam:2' stable='true'/>"))->stable);
+    QVERIFY(QueryResult::fromDom(xmlToDom(emptyResultXml))->stable);
 }
 
 void tst_QXmppMamManager::retrieveArchivedMessages()
@@ -695,6 +716,86 @@ void tst_QXmppMamManager::retrieveError()
     expectVariant<QXmppError>(task.takeResult());
     // the messages received before are still processed
     QCOMPARE(processed, 1);
+}
+
+void tst_QXmppMamManager::retrieveExtended()
+{
+    using namespace QXmpp::Messages;
+
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    auto *mam = test.addNewExtension<QXmppMamManager>();
+
+    QObject owner;
+    QStringList processed;
+    test.hooks(&owner).add<QXmpp::Mam::MessageReceived>([&](Context &context) {
+        processed << context.attachment<ArchiveInfo>()->id();
+        return QXmpp::HookResult::Continue;
+    });
+
+    QXmppResultSetQuery rsm;
+    rsm.setMax(2);
+    rsm.setBefore(u""_s);
+
+    auto task = mam->retrieve({
+        .to = u"coven@chat.shakespeare.lit"_s,
+        .resultSetQuery = rsm,
+        .flipPage = true,
+    });
+    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
+                "<x xmlns='jabber:x:data' type='submit'>"
+                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                "</x>"
+                "<set xmlns='http://jabber.org/protocol/rsm'><max>2</max><before/></set>"
+                "<flip-page/>"
+                "</query>"
+                "</iq>"_s);
+
+    // flipped page: newest message first
+    auto result = [](const QString &id, const QString &body) {
+        return u"<message to='juliet@capulet.lit/chamber' from='coven@chat.shakespeare.lit'>"
+               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s +
+            id +
+            u"'><forwarded xmlns='urn:xmpp:forward:0'><delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
+            "<message xmlns='jabber:client' from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'><body>"_s +
+            body + u"</body></message></forwarded></result></message>"_s;
+    };
+    TestClient::handleStanza(mam, xmlToDom(result(u"2"_s, u"newer"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result(u"1"_s, u"older"_s)));
+    QCOMPARE(processed, (QStringList { u"2"_s, u"1"_s }));
+
+    test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'>"
+                "<fin xmlns='urn:xmpp:mam:2' complete='true' stable='false'>"
+                "<set xmlns='http://jabber.org/protocol/rsm'><first index='0'>1</first><last>2</last></set>"
+                "</fin>"
+                "</iq>"_s);
+
+    auto page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
+    QVERIFY(page.result.complete);
+    QVERIFY(!page.result.stable);
+    // chronological order
+    QCOMPARE(page.messages.size(), 2);
+    QCOMPARE(page.messages.at(0).message().body(), u"older"_s);
+    QCOMPARE(page.messages.at(1).message().body(), u"newer"_s);
+
+    // archive ignoring <flip-page/>: the page stays in chronological order
+    processed.clear();
+    task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_s, .flipPage = true });
+    test.ignore();
+    TestClient::handleStanza(mam, xmlToDom(result(u"1"_s, u"older"_s)));
+    TestClient::handleStanza(mam, xmlToDom(result(u"2"_s, u"newer"_s)));
+    QCOMPARE(processed, (QStringList { u"1"_s, u"2"_s }));
+    test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'>"
+                "<fin xmlns='urn:xmpp:mam:2' complete='true'>"
+                "<set xmlns='http://jabber.org/protocol/rsm'><first index='0'>1</first><last>2</last></set>"
+                "</fin>"
+                "</iq>"_s);
+
+    page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
+    QCOMPARE(page.messages.size(), 2);
+    QCOMPARE(page.messages.at(0).message().body(), u"older"_s);
+    QCOMPARE(page.messages.at(1).message().body(), u"newer"_s);
 }
 
 void tst_QXmppMamManager::retrieveUnexpectedSender()

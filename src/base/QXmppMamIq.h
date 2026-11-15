@@ -25,6 +25,7 @@ struct QXMPP_EXPORT QueryRequest {
     QString node {};
     QXmppDataForm form {};
     QXmppResultSetQuery resultSetQuery {};
+    bool flipPage = false;
 
     static constexpr std::tuple XmlTag = { u"query", QXmpp::Private::ns_mam };
     static std::optional<QueryRequest> fromDom(const QDomElement &el);
@@ -33,6 +34,7 @@ struct QXMPP_EXPORT QueryRequest {
 
 struct QXMPP_EXPORT QueryResult {
     bool complete = false;
+    bool stable = true;
     QXmppResultSetReply resultSetReply {};
 
     static constexpr std::tuple XmlTag = { u"fin", QXmpp::Private::ns_mam };

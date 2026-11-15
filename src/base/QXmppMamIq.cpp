@@ -59,6 +59,15 @@ using namespace QXmpp::Private;
 */
 
 /*!
+    \variable QXmpp::Mam::QueryRequest::flipPage
+
+    Whether the archive should send the messages of the page in reverse order, i.e. the newest
+    message first. This does not change which messages are returned.
+
+    This requires the archive to support QXmpp::Namespace::Mam2Extended.
+*/
+
+/*!
     \struct QXmpp::Mam::QueryResult
     \inmodule QXmpp
 
@@ -74,6 +83,14 @@ using namespace QXmpp::Private;
 
     Whether the last page of the results has been reached, i.e. there are no further messages
     matching the query.
+*/
+
+/*!
+    \variable QXmpp::Mam::QueryResult::stable
+
+    Whether the results are stable. Unstable results may still change in order or content, e.g.
+    because the storage of a clustered server has not converged yet. They should not be cached
+    long-term without confirming them with a later query.
 */
 
 /*!
@@ -97,6 +114,7 @@ std::optional<Mam::QueryRequest> Mam::QueryRequest::fromDom(const QDomElement &e
     if (auto setEl = firstChildElement(el, u"set", ns_rsm); !setEl.isNull()) {
         query.resultSetQuery.parse(setEl);
     }
+    query.flipPage = !firstChildElement(el, u"flip-page", ns_mam).isNull();
     return query;
 }
 
@@ -108,6 +126,7 @@ void Mam::QueryRequest::toXml(QXmlStreamWriter *writer) const
         OptionalAttribute { u"queryid", queryId },
         form,
         resultSetQuery,
+        OptionalContent { flipPage, Element { u"flip-page" } },
     });
 }
 
@@ -119,6 +138,7 @@ std::optional<Mam::QueryResult> Mam::QueryResult::fromDom(const QDomElement &el)
 
     QueryResult result;
     result.complete = parseBoolean(el.attribute(u"complete"_s)).value_or(false);
+    result.stable = parseBoolean(el.attribute(u"stable"_s)).value_or(true);
     if (auto setEl = firstChildElement(el, u"set", ns_rsm); !setEl.isNull()) {
         result.resultSetReply.parse(setEl);
     }
@@ -130,6 +150,7 @@ void Mam::QueryResult::toXml(QXmlStreamWriter *writer) const
     XmlWriter(writer).write(Element {
         XmlTag,
         OptionalAttribute { u"complete", DefaultedBool { complete, false } },
+        OptionalAttribute { u"stable", DefaultedBool { stable, true } },
         resultSetReply,
     });
 }
