@@ -228,6 +228,7 @@ QXmppAttentionManagerPrivate::QXmppAttentionManagerPrivate(QXmppAttentionManager
       allowedAttemptsTimeInterval(timeFrame),
       cleanUpTimer(new QTimer(parent))
 {
+    cleanUpTimer->setSingleShot(true);
     QObject::connect(cleanUpTimer, &QTimer::timeout, this, [this]() {
         cleanUp();
     });
@@ -251,20 +252,18 @@ bool QXmppAttentionManagerPrivate::checkRateLimit(const QString &bareJid)
     return count <= allowedAttempts;
 }
 
-// Removes the first entry and reschedules the timer to remove the next.
+// Removes the expired entries and reschedules the timer to remove the next.
 void QXmppAttentionManagerPrivate::cleanUp()
 {
-    previousRequests.removeFirst();
+    const auto now = QDateTime::currentDateTimeUtc();
+    const auto interval = allowedAttemptsTimeInterval.msecsSinceStartOfDay();
 
-    if (!previousRequests.isEmpty()) {
-        // reschedule timer for next removal
-        int next = allowedAttemptsTimeInterval.msecsSinceStartOfDay() -
-            previousRequests.first().timestamp.msecsTo(QDateTime::currentDateTimeUtc());
-
-        if (next < 1) {
-            cleanUp();
-        } else {
-            cleanUpTimer->start(next);
+    while (!previousRequests.isEmpty()) {
+        const auto next = interval - previousRequests.first().timestamp.msecsTo(now);
+        if (next > 0) {
+            cleanUpTimer->start(int(next));
+            return;
         }
+        previousRequests.removeFirst();
     }
 }

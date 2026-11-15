@@ -799,6 +799,7 @@ private:
     Q_SLOT void testReceived_data();
     Q_SLOT void testReceived();
     Q_SLOT void testRateLimiting();
+    Q_SLOT void testRateLimitingCleanUp();
     Q_SLOT void testSendRequest();
 
     void setOwnJid(const QString &jid);
@@ -915,9 +916,10 @@ void tst_QXmppAttentionManager::testRateLimiting()
     QCOMPARE(signalCalled, allowed);
     QCOMPARE(rateLimitedCalled, count - allowed);
 
-    // wait 1 s + 50 ms because of QTimer precision problems
-    QThread::currentThread()->usleep(1000e3 + 50e3);
-    QCoreApplication::processEvents();
+    // Wait until the rate limit time frame has passed. The events need to be
+    // processed while waiting so that the clean up timer is run reliably, a
+    // single processEvents() call after sleeping is not enough on Windows.
+    QTest::qWait(1500);
 
     for (int i = 0; i < count; i++) {
         Q_EMIT client.messageReceived(msg);
@@ -925,6 +927,43 @@ void tst_QXmppAttentionManager::testRateLimiting()
 
     QCOMPARE(signalCalled, allowed * 2);
     QCOMPARE(rateLimitedCalled, (count - allowed) * 2);
+}
+
+void tst_QXmppAttentionManager::testRateLimitingCleanUp()
+{
+    client.removeExtension(manager);
+    manager = new QXmppAttentionManager(1, QTime(0, 0, 0, 100));
+    client.addExtension(manager);
+
+    QObject context;
+    setOwnJid("me@qxmpp.org");
+
+    int signalCalled = 0;
+    int rateLimitedCalled = 0;
+
+    connect(manager, &QXmppAttentionManager::attentionRequested, &context, [&](const QXmppMessage &, bool) {
+        signalCalled++;
+    });
+
+    connect(manager, &QXmppAttentionManager::attentionRequestRateLimited, &context, [&](const QXmppMessage &) {
+        rateLimitedCalled++;
+    });
+
+    QXmppMessage msg;
+    msg.setAttentionRequested(true);
+
+    Q_EMIT client.messageReceived(msg);
+    Q_EMIT client.messageReceived(msg);
+    QCOMPARE(signalCalled, 1);
+    QCOMPARE(rateLimitedCalled, 1);
+
+    // The clean up timer must not fire again once all requests are removed.
+    QTest::qWait(500);
+
+    Q_EMIT client.messageReceived(msg);
+    Q_EMIT client.messageReceived(msg);
+    QCOMPARE(signalCalled, 2);
+    QCOMPARE(rateLimitedCalled, 2);
 }
 
 void tst_QXmppAttentionManager::testSendRequest()
