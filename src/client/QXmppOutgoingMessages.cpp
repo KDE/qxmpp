@@ -116,15 +116,15 @@ static void applyEncrypted(QXmppMessage &message, const QString &selectedEncrypt
 // State of a sent message until its delivery has been confirmed.
 struct OutgoingMessages::Delivery {
     std::shared_ptr<OutgoingMessage> message;
-    QXmppPromise<SendResult> promise;
+    QXmppPromise<Result<Sent>> promise;
     // set by handlers of ConfirmDelivery
-    SendResult result = SendSuccess();
+    std::optional<Result<Confirmation>> confirmation;
     // result of the stream
     std::optional<SendResult> sent;
     bool confirmed = false;
     bool finished = false;
 
-    void finish(SendResult &&value)
+    void finish(Result<Sent> &&value)
     {
         if (!finished) {
             finished = true;
@@ -137,11 +137,15 @@ struct OutgoingMessages::Delivery {
     void update()
     {
         if (sent && std::holds_alternative<QXmppError>(*sent)) {
-            finish(std::move(*sent));
-        } else if (confirmed && (std::holds_alternative<QXmppError>(result) || std::get<SendSuccess>(result).acknowledged)) {
-            finish(std::move(result));
+            finish(std::get<QXmppError>(std::move(*sent)));
+        } else if (confirmed && confirmation) {
+            if (auto *error = std::get_if<QXmppError>(&*confirmation)) {
+                finish(std::move(*error));
+            } else {
+                finish(Sent(message, DeliveryState::Confirmed, std::get<Confirmation>(std::move(*confirmation)).archiveId));
+            }
         } else if (confirmed && sent) {
-            finish(std::move(*sent));
+            finish(Sent(message, std::get<SendSuccess>(*sent).acknowledged ? DeliveryState::ServerAcknowledged : DeliveryState::Written));
         }
     }
 };
@@ -156,7 +160,7 @@ bool OutgoingMessages::isPipelineStanza(const QXmppStanza &stanza)
     return typeid(stanza) == typeid(QXmppMessage);
 }
 
-QXmppTask<SendResult> OutgoingMessages::send(QXmppMessage &&message, QXmppSendStanzaParams params, Mode mode, QString encryption)
+QXmppTask<Result<Sent>> OutgoingMessages::send(QXmppMessage &&message, QXmppSendStanzaParams params, Mode mode, QString encryption)
 {
     const auto conversationJid = QXmppUtils::jidToBareJid(message.to());
     auto &queue = m_queues[conversationJid];
@@ -168,6 +172,16 @@ QXmppTask<SendResult> OutgoingMessages::send(QXmppMessage &&message, QXmppSendSt
     return task;
 }
 
+QXmppTask<SendResult> OutgoingMessages::sendCompat(QXmppMessage &&message, QXmppSendStanzaParams params, Mode mode, QString encryption)
+{
+    return send(std::move(message), std::move(params), mode, std::move(encryption)).then(m_client, [](Result<Sent> &&result) -> SendResult {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            return std::move(*error);
+        }
+        return SendSuccess { std::get<Sent>(result).deliveryState() != DeliveryState::Written };
+    });
+}
+
 // Processes the first message of a conversation. The next message is processed after it has been
 // written to the stream, so the order is kept across asynchronous steps.
 QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
@@ -177,9 +191,14 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
 
     // Messages already containing encrypted elements (e.g. a key exchange created by a provider)
     // are sent as they are.
-    const bool encrypted = std::ranges::any_of(pending.message.extensions(), [](const std::any &item) {
-        return !Xml::Registry::encryption(item).isNull();
-    });
+    QString encryptedWith;
+    for (const auto &item : pending.message.extensions()) {
+        if (const auto encryption = Xml::Registry::encryption(item); !encryption.isNull()) {
+            encryptedWith = encryption.toString();
+            break;
+        }
+    }
+    const bool encrypted = !encryptedWith.isEmpty();
 
     const bool fixed = pending.mode == Mode::Fixed;
     const bool required = pending.mode != Mode::Default || pending.params.isEncryptionRequired();
@@ -207,7 +226,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
         }
     }
 
-    auto outgoingPtr = std::make_shared<OutgoingMessage>(std::move(pending.message), pending.params, selection.encryption());
+    auto outgoingPtr = std::make_shared<OutgoingMessage>(std::move(pending.message), pending.params, encrypted ? encryptedWith : selection.encryption());
     auto &outgoing = *outgoingPtr;
     if (m_hooks.run<Prepare>(outgoing) == HookResult::Stop || outgoing.error()) {
         auto error = outgoing.error().value_or(QXmppError { u"Sending the message has been cancelled"_s, SendError::Cancelled });
@@ -227,7 +246,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
                 QXmlStreamWriter writer(&xml);
                 const auto &encrypted = *std::get<std::unique_ptr<QXmppMessage>>(result);
                 encrypted.toXml(&writer, ScePublic);
-                outgoing.message() = encrypted;
+                outgoing.m_encryption = encrypted.encryptionMethodNs();
                 finishFront(conversationJid, m_clientPrivate->stream->streamAckManager().send(QXmppPacket(xml, true)), outgoingPtr);
             }
             co_return;
@@ -246,7 +265,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     }
     co_await m_hooks.run<ResolveRecipients>(outgoing).withContext(m_client);
     if (outgoing.error()) {
-        finishFront(conversationJid, *outgoing.error());
+        finishFront(conversationJid, QXmppError(*outgoing.error()));
         co_return;
     }
 
@@ -287,8 +306,13 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
         }
     }
 
-    auto &message = outgoing.message();
+    auto message = outgoing.message();
     applyEncrypted(message, outgoing.encryption(), encryptedResult, usedBodyOnly);
+    if (!encryptedResult.encryption().isEmpty()) {
+        outgoing.m_encryption = encryptedResult.encryption();
+    }
+    outgoing.m_contentEncryption = encryptedResult.contentEncryption().value_or(provider->contentEncryption);
+    outgoing.m_encryptionInfo = encryptedResult.info();
 
     QByteArray xml;
     QXmlStreamWriter writer(&xml);
@@ -320,7 +344,7 @@ void OutgoingMessages::confirmDelivery(std::shared_ptr<Delivery> delivery, QXmpp
     if (delivery->message) {
         // Started immediately, not after the acknowledgement of the server: a confirmation, e.g.
         // the reflection of a MUC, may arrive earlier.
-        m_hooks.run<ConfirmDelivery>(std::as_const(*delivery->message), delivery->result).then(m_client, [delivery] {
+        m_hooks.run<ConfirmDelivery>(std::as_const(*delivery->message), delivery->confirmation).then(m_client, [delivery] {
             delivery->confirmed = true;
             delivery->update();
         });
@@ -335,11 +359,11 @@ void OutgoingMessages::confirmDelivery(std::shared_ptr<Delivery> delivery, QXmpp
     });
 }
 
-void OutgoingMessages::finishFront(const QString &conversationJid, SendResult &&result)
+void OutgoingMessages::finishFront(const QString &conversationJid, QXmppError &&error)
 {
     QXmppPromise<SendResult> promise;
     auto task = promise.task();
-    promise.finish(std::move(result));
+    promise.finish(std::move(error));
     finishFront(conversationJid, std::move(task));
 }
 

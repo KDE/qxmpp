@@ -10,10 +10,31 @@
 #include "QXmppMessage.h"
 #include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
+#include "QXmppStanzaId.h"
 
+#include <any>
+#include <memory>
 #include <optional>
 
 #include <QString>
+
+namespace QXmpp::Private {
+class OutgoingMessages;
+}
+
+namespace QXmpp::E2ee {
+
+// What an encryption encrypts of a message. Defined here instead of in QXmppE2eeProvider.h, which
+// includes this header, because OutgoingMessage and Sent report it.
+enum class ContentEncryption {
+    // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
+    Sce,
+    // only the body, other sensitive elements are sent in the clear if allowed by PrepareBodyOnly
+    // or dropped, e.g. OMEMO 0.3
+    BodyOnly,
+};
+
+}  // namespace QXmpp::E2ee
 
 namespace QXmpp::Messages {
 
@@ -142,27 +163,87 @@ public:
     {
     }
 
+    // The message without end-to-end encryption.
     QXmppMessage &message() { return m_message; }
     const QXmppMessage &message() const { return m_message; }
     const QXmppSendStanzaParams &params() const { return m_params; }
 
-    // Namespace of the selected encryption, empty if the message is sent unencrypted.
+    // Namespace of the encryption, empty if the message is sent unencrypted. After encrypting,
+    // the one used, e.g. OMEMO 2 or OMEMO 0 for QXmpp::Omemo::Automatic.
     const QString &encryption() const { return m_encryption; }
 
     // Bare JIDs the message is encrypted for, see ResolveRecipients.
     QList<QString> &recipientJids() { return m_recipientJids; }
     const QList<QString> &recipientJids() const { return m_recipientJids; }
 
+    // Set after encrypting: what has been encrypted of the message.
+    std::optional<E2ee::ContentEncryption> contentEncryption() const { return m_contentEncryption; }
+
+    // Set after encrypting: information of the provider, e.g. QXmpp::Omemo::EncryptionInfo.
+    const std::any &encryptionInfo() const { return m_encryptionInfo; }
+
     // Error making sending fail, set by handlers of Prepare and ResolveRecipients.
     const std::optional<QXmppError> &error() const { return m_error; }
     void setError(QXmppError error) { m_error = std::move(error); }
 
 private:
+    friend class QXmpp::Private::OutgoingMessages;
+
     QXmppMessage m_message;
     QXmppSendStanzaParams m_params;
     QString m_encryption;
     QList<QString> m_recipientJids;
+    std::optional<E2ee::ContentEncryption> m_contentEncryption;
+    std::any m_encryptionInfo;
     std::optional<QXmppError> m_error;
+};
+
+// How far the delivery of a sent message has been confirmed.
+enum class DeliveryState {
+    // Written to the stream. Without Stream Management, it is unknown whether the server has
+    // received it.
+    Written,
+    // The own server has acknowledged it via Stream Management (XEP-0198). It may not have
+    // reached the recipient yet.
+    ServerAcknowledged,
+    // A handler of ConfirmDelivery has confirmed that the recipient has accepted it, e.g. a MUC
+    // room by reflecting it.
+    Confirmed,
+};
+
+// Confirmation of the delivery by a handler of ConfirmDelivery.
+struct Confirmation {
+    // ID of the message in the archive of the recipient, e.g. of a MUC room (XEP-0359)
+    std::optional<QXmppStanzaId> archiveId = {};
+};
+
+// Result of a message sent via QXmppClient::sendMessage().
+class Sent
+{
+public:
+    Sent(std::shared_ptr<const OutgoingMessage> message, DeliveryState deliveryState, std::optional<QXmppStanzaId> archiveId = {})
+        : m_message(std::move(message)), m_deliveryState(deliveryState), m_archiveId(std::move(archiveId))
+    {
+    }
+
+    DeliveryState deliveryState() const { return m_deliveryState; }
+    // see Confirmation
+    const std::optional<QXmppStanzaId> &archiveId() const { return m_archiveId; }
+
+    // The message as prepared by the pipeline, without end-to-end encryption.
+    const QXmppMessage &message() const { return m_message->message(); }
+    const QXmppSendStanzaParams &params() const { return m_message->params(); }
+
+    // see OutgoingMessage
+    const QString &encryption() const { return m_message->encryption(); }
+    const QList<QString> &recipientJids() const { return m_message->recipientJids(); }
+    std::optional<E2ee::ContentEncryption> contentEncryption() const { return m_message->contentEncryption(); }
+    const std::any &encryptionInfo() const { return m_message->encryptionInfo(); }
+
+private:
+    std::shared_ptr<const OutgoingMessage> m_message;
+    DeliveryState m_deliveryState;
+    std::optional<QXmppStanzaId> m_archiveId;
 };
 
 struct SelectEncryption {
@@ -187,7 +268,8 @@ struct PrepareBodyOnly {
 
 struct ConfirmDelivery {
     static constexpr QStringView Name = u"org.qxmpp.message.confirm-delivery";
-    using Signature = QXmppTask<void>(const OutgoingMessage &message, QXmpp::SendResult &result);
+    // confirmation: set if the delivery has been confirmed, an error makes sending fail
+    using Signature = QXmppTask<void>(const OutgoingMessage &message, std::optional<QXmpp::Result<Confirmation>> &confirmation);
 };
 
 }  // namespace QXmpp::Messages

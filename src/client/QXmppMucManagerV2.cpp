@@ -123,7 +123,7 @@ struct DeleteLaterDeleter {
 };
 
 struct PendingMessage {
-    QXmppPromise<Result<>> promise;
+    QXmppPromise<Result<Messages::Confirmation>> promise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> timer;
 };
 
@@ -366,6 +366,7 @@ struct MucRoomData {
 struct MucSessionRequests {
     std::vector<QXmppPromise<Result<QXmppMucRoomV2>>> joinPromises;
     std::vector<QXmppPromise<Result<>>> otherPromises;
+    std::vector<QXmppPromise<Result<Messages::Confirmation>>> messagePromises;
     std::vector<QXmppPromise<Result<QXmppMucRoomConfig>>> configWaiters;
     std::vector<QXmppPromise<void>> roomInfoWaiters;
 
@@ -389,7 +390,7 @@ struct MucSessionRequests {
             }
         }
         for (auto &[id, pending] : data.pendingMessages) {
-            otherPromises.push_back(std::move(pending.promise));
+            messagePromises.push_back(std::move(pending.promise));
         }
         data.pendingMessages.clear();
         for (auto &waiter : data.affiliationWaiters) {
@@ -412,6 +413,9 @@ struct MucSessionRequests {
             p.finish(error);
         }
         for (auto &p : otherPromises) {
+            p.finish(error);
+        }
+        for (auto &p : messagePromises) {
             p.finish(error);
         }
         // the messages continue without the room
@@ -2199,7 +2203,9 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
         if (context.origin() != Messages::Origin::Mam && QXmppUtils::jidToResource(message.from()) == data->nickname.value()) {
             auto promise = std::move(pendingItr->second.promise);
             data->pendingMessages.erase(pendingItr);
-            promise.finish(Success());
+            const auto stanzaIds = message.stanzaIds();
+            auto archiveId = std::ranges::find(stanzaIds, roomJid, &QXmppStanzaId::by);
+            promise.finish(Messages::Confirmation { archiveId == stanzaIds.end() ? std::nullopt : std::make_optional(*archiveId) });
         }
     }
     if (message.type() != QXmppMessage::GroupChat) {
@@ -2416,7 +2422,7 @@ QXmppTask<void> QXmppMucManagerV2Private::fetchAffiliations(QString roomJid, uin
 }
 
 // Waits for the reflection of a message sent to a joined room or an error.
-QXmppTask<void> QXmppMucManagerV2Private::confirmDelivery(const Messages::OutgoingMessage &outgoing, SendResult &result)
+QXmppTask<void> QXmppMucManagerV2Private::confirmDelivery(const Messages::OutgoingMessage &outgoing, std::optional<Result<Messages::Confirmation>> &confirmation)
 {
     auto *data = joinedRoom(outgoing.message());
     const auto originId = outgoing.message().originId();
@@ -2424,7 +2430,7 @@ QXmppTask<void> QXmppMucManagerV2Private::confirmDelivery(const Messages::Outgoi
         co_return;
     }
 
-    QXmppPromise<Result<>> promise;
+    QXmppPromise<Result<Messages::Confirmation>> promise;
     auto reflected = promise.task();
 
     auto *timer = new QTimer();
@@ -2435,13 +2441,8 @@ QXmppTask<void> QXmppMucManagerV2Private::confirmDelivery(const Messages::Outgoi
     data->pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
     timer->start(timeout);
 
-    // result stays valid until this has finished
-    if (auto reflectionResult = co_await reflected.withContext(q); std::holds_alternative<QXmppError>(reflectionResult)) {
-        result = std::get<QXmppError>(std::move(reflectionResult));
-    } else {
-        // the room has processed the message
-        result = SendSuccess { true };
-    }
+    // confirmation stays valid until this has finished; the room has processed the message
+    confirmation = co_await reflected.withContext(q);
 }
 
 void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, const QString &originId)

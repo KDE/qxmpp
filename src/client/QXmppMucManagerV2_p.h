@@ -88,7 +88,7 @@ struct QXmppMucManagerV2Private {
     QXmppTask<void> resolveRecipients(QXmpp::Messages::OutgoingMessage &message);
     QXmppTask<QXmpp::Result<>> requestAffiliations(QXmpp::Private::MucRoomData &data);
     QXmppTask<void> fetchAffiliations(QString roomJid, uint64_t generation);
-    QXmppTask<void> confirmDelivery(const QXmpp::Messages::OutgoingMessage &message, QXmpp::SendResult &result);
+    QXmppTask<void> confirmDelivery(const QXmpp::Messages::OutgoingMessage &message, std::optional<QXmpp::Result<QXmpp::Messages::Confirmation>> &confirmation);
 
     // XEP-0410: MUC Self-Ping
     void rescheduleSelfPing();

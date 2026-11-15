@@ -6042,6 +6042,9 @@ private:
     Q_SLOT void outgoingFixed();
     Q_SLOT void outgoingReply();
     Q_SLOT void outgoingConfirmDelivery();
+    Q_SLOT void sendMessageUnencrypted();
+    Q_SLOT void sendMessageEncrypted();
+    Q_SLOT void sendMessageConfirmed();
     Q_SLOT void iqEncrypted();
     Q_SLOT void iqEncryptedError();
     Q_SLOT void iqWithoutSelection();
@@ -6633,9 +6636,9 @@ void tst_QXmppMessages::outgoingConfirmDelivery()
     QObject owner;
 
     // e.g. waiting for a reflection
-    std::vector<std::pair<QXmppPromise<void>, SendResult *>> confirmations;
+    std::vector<std::pair<QXmppPromise<void>, std::optional<Result<Confirmation>> *>> confirmations;
     QStringList messages;
-    client.hooks(&owner).add<ConfirmDelivery>([&](const OutgoingMessage &message, SendResult &result) {
+    client.hooks(&owner).add<ConfirmDelivery>([&](const OutgoingMessage &message, std::optional<Result<Confirmation>> &result) {
         messages << message.message().body();
         confirmations.emplace_back(QXmppPromise<void>(), &result);
         return confirmations.back().first.task();
@@ -6657,13 +6660,106 @@ void tst_QXmppMessages::outgoingConfirmDelivery()
     confirmations.at(1).first.finish();
     QCOMPARE(expectFutureVariant<QXmppError>(task2).description, u"Rejected"_s);
 
-    *confirmations.at(0).second = SendSuccess { true };
+    *confirmations.at(0).second = Confirmation();
     confirmations.at(0).first.finish();
     QVERIFY(expectFutureVariant<SendSuccess>(task1).acknowledged);
 
     // without confirmation, the result of the stream is used
     confirmations.at(2).first.finish();
     QVERIFY(!task3.isFinished());
+}
+
+void tst_QXmppMessages::sendMessageUnencrypted()
+{
+    TestClient client;
+    QObject owner;
+    client.hooks(&owner).add<Prepare>([](OutgoingMessage &message) {
+        message.message().setThread(u"prepared"_s);
+        return HookResult::Continue;
+    });
+
+    auto task = client.sendMessage(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
+    QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
+    QVERIFY(!task.isFinished());
+
+    // reached the own server, not necessarily the recipient
+    client.handlePacketReceived(xmlToDom(u"<a xmlns='urn:xmpp:sm:3' h='1'/>"_s));
+    auto sent = expectFutureVariant<Sent>(task);
+    QCOMPARE(sent.deliveryState(), DeliveryState::ServerAcknowledged);
+    QCOMPARE(sent.message().body(), u"hello"_s);
+    QCOMPARE(sent.message().thread(), u"prepared"_s);
+    QVERIFY(sent.encryption().isEmpty());
+    QVERIFY(!sent.contentEncryption());
+    QVERIFY(sent.recipientJids().isEmpty());
+    QVERIFY(!sent.encryptionInfo().has_value());
+
+    // errors are reported like by send()
+    client.hooks(&owner).add<Prepare>([](OutgoingMessage &) { return HookResult::Stop; });
+    auto cancelled = client.sendMessage(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
+    QCOMPARE(expectFutureVariant<QXmppError>(cancelled).value<SendError>(), SendError::Cancelled);
+}
+
+void tst_QXmppMessages::sendMessageEncrypted()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestEncryption);
+    });
+    client.hooks(&owner).add<ResolveRecipients>([](OutgoingMessage &message) {
+        message.recipientJids().append(u"bob@example.org"_s);
+    });
+    std::optional<OutgoingMessage> confirmed;
+    client.hooks(&owner).add<ConfirmDelivery>([&](const OutgoingMessage &message, std::optional<Result<Confirmation>> &) {
+        confirmed = message;
+    });
+
+    auto task = client.sendMessage(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s));
+    // a provider combining several encryptions reports the one it has used
+    auto result = encrypted(u"ciphertext"_s);
+    result.setEncryption(u"urn:test:e2ee:used"_s);
+    result.setInfo(u"info of the provider"_s);
+    e2ee->encryptPromises.at(0).finish(std::move(result));
+    QVERIFY(client.takePacket().contains(u"data=\"ciphertext\""_s));
+
+    // also available while confirming the delivery
+    QVERIFY(confirmed);
+    QCOMPARE(confirmed->encryption(), u"urn:test:e2ee:used"_s);
+    QCOMPARE(confirmed->message().body(), u"secret"_s);
+
+    client.handlePacketReceived(xmlToDom(u"<a xmlns='urn:xmpp:sm:3' h='1'/>"_s));
+    auto sent = expectFutureVariant<Sent>(task);
+    QCOMPARE(sent.deliveryState(), DeliveryState::ServerAcknowledged);
+    // without the encrypted elements and the fallback body
+    QCOMPARE(sent.message().body(), u"secret"_s);
+    QVERIFY(sent.message().encryptionMethodNs().isEmpty());
+    QCOMPARE(sent.encryption(), u"urn:test:e2ee:used"_s);
+    QCOMPARE(sent.contentEncryption(), E2ee::ContentEncryption::Sce);
+    QCOMPARE(sent.recipientJids(), (QList<QString> { u"alice@example.org"_s, u"bob@example.org"_s }));
+    QCOMPARE(std::any_cast<QString>(sent.encryptionInfo()), u"info of the provider"_s);
+}
+
+void tst_QXmppMessages::sendMessageConfirmed()
+{
+    TestClient client;
+    QObject owner;
+    QXmppPromise<void> reflection;
+    client.hooks(&owner).add<ConfirmDelivery>([&](const OutgoingMessage &, std::optional<Result<Confirmation>> &confirmation) {
+        return reflection.task().then(&owner, [&confirmation] { confirmation = Confirmation { QXmppStanzaId { u"archive-id"_s, u"room@muc.example.org"_s } }; });
+    });
+
+    auto task = client.sendMessage(QXmppMessage(u"me@example.org/res"_s, u"room@muc.example.org"_s, u"hello"_s));
+    client.takePacket();
+    QVERIFY(!task.isFinished());
+
+    // accepted by the recipient, also before the acknowledgement of the own server
+    reflection.finish();
+    auto sent = expectFutureVariant<Sent>(task);
+    QCOMPARE(sent.deliveryState(), DeliveryState::Confirmed);
+    QVERIFY(sent.archiveId());
+    QCOMPARE(sent.archiveId()->id, u"archive-id"_s);
+    QCOMPARE(sent.archiveId()->by, u"room@muc.example.org"_s);
 }
 
 static QString encryptedIqResponse(const QString &type, const QString &payload)

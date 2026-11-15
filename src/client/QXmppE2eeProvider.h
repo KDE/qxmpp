@@ -13,6 +13,7 @@
 #include "QXmppSendStanzaParams.h"
 #include "QXmppTask.h"
 
+#include <any>
 #include <functional>
 #include <variant>
 
@@ -69,14 +70,6 @@ struct NoEnvelope { };
 
 using DecryptResult = std::variant<Decrypted, NoEnvelope, QXmppError>;
 
-// What an encryption encrypts of a message.
-enum class ContentEncryption {
-    // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
-    Sce,
-    // only the body, all other elements are sent in the clear, e.g. OMEMO 0.3
-    BodyOnly,
-};
-
 class EncryptRequest
 {
 public:
@@ -121,14 +114,22 @@ public:
     void setContentEncryption(std::optional<ContentEncryption> contentEncryption) { m_contentEncryption = contentEncryption; }
 
     // Overrides the namespace announced in the EME element and the fallback, for providers
-    // registered with a namespace not used in stanzas.
+    // registered with a namespace not used in stanzas. Providers combining several encryptions in
+    // one stanza announce one of them and document which one. Reported via
+    // QXmpp::Messages::Sent::encryption().
     const QString &encryption() const { return m_encryption; }
     void setEncryption(QString encryption) { m_encryption = std::move(encryption); }
+
+    // Information about the encryption of this message for the application, available via
+    // QXmpp::Messages::Sent::encryptionInfo(), e.g. the devices it has been encrypted for.
+    const std::any &info() const { return m_info; }
+    void setInfo(std::any info) { m_info = std::move(info); }
 
 private:
     QXmpp::Xml::Extensions m_elements;
     std::optional<ContentEncryption> m_contentEncryption;
     QString m_encryption;
+    std::any m_info;
 };
 
 using EncryptResult = std::variant<Encrypted, QXmppError>;

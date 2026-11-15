@@ -84,6 +84,7 @@ private:
     Q_SLOT void sendMessageError();
     Q_SLOT void sendMessageForgedReflection();
     Q_SLOT void sendMessageConsumedReflection();
+    Q_SLOT void sendMessageArchiveId();
     Q_SLOT void sendMessageEncrypted();
     Q_SLOT void sendMessageEncryptedMembersOnly();
     Q_SLOT void sendMessageEncryptedMembersError();
@@ -1529,6 +1530,32 @@ void tst_QXmppMuc::sendMessageConsumedReflection()
 
     test.injectMessage(reflection(u"thirdwitch"_s, originId));
     QVERIFY(expectFutureVariant<QXmpp::SendSuccess>(task).acknowledged);
+}
+
+void tst_QXmppMuc::sendMessageArchiveId()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    joinedRoom(test, muc);
+
+    QXmppMessage message(u"hag66@shakespeare.lit/pda"_s, u"coven@chat.shakespeare.lit"_s, u"Hi"_s);
+    message.setType(QXmppMessage::GroupChat);
+    auto task = test.sendMessage(std::move(message));
+    const auto originId = sentOriginId(test);
+
+    // only the stanza ID of the room identifies the message in its archive
+    test.injectMessage(u"<message from='coven@chat.shakespeare.lit/thirdwitch' type='groupchat'><body>Hi</body>"
+                       "<stanza-id xmlns='urn:xmpp:sid:0' id='forged' by='hag66@shakespeare.lit'/>"
+                       "<stanza-id xmlns='urn:xmpp:sid:0' id='room-archive-id' by='coven@chat.shakespeare.lit'/>"
+                       "<origin-id xmlns='urn:xmpp:sid:0' id='"_s +
+                       originId + u"'/></message>"_s);
+    auto sent = expectFutureVariant<QXmpp::Messages::Sent>(task);
+    QCOMPARE(sent.deliveryState(), QXmpp::Messages::DeliveryState::Confirmed);
+    QVERIFY(sent.archiveId());
+    QCOMPARE(sent.archiveId()->id, u"room-archive-id"_s);
+    QCOMPARE(sent.archiveId()->by, u"coven@chat.shakespeare.lit"_s);
 }
 
 void tst_QXmppMuc::sendMessageEncrypted()

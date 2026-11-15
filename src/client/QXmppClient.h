@@ -64,6 +64,10 @@ struct SendOptions {
 
 }  // namespace QXmpp::Iq
 
+namespace QXmpp::Messages {
+class Sent;
+}  // namespace QXmpp::Messages
+
 namespace QXmpp::Private {
 
 class EncryptedIqs;
@@ -347,6 +351,7 @@ public:
     QXmppTask<QXmpp::SendResult> sendSensitive(QXmppStanza &&, const std::optional<QXmppSendStanzaParams> & = {});
 #endif
     QXmppTask<QXmpp::SendResult> send(QXmppStanza &&, const std::optional<QXmppSendStanzaParams> & = {});
+    QXmppTask<QXmpp::Result<QXmpp::Messages::Sent>> sendMessage(QXmppMessage &&message, const QXmppSendStanzaParams &params = {});
 #if QXMPP_DEPRECATED_SINCE(1, 18)
     [[deprecated("Use send() and select the encryption via the QXmpp::Messages::SelectEncryption hook")]]
     QXmppTask<QXmpp::SendResult> reply(QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> & = {});

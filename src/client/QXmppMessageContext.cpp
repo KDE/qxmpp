@@ -33,7 +33,7 @@ namespace QXmpp::Messages {
     Messages of the same conversation are processed in the order in which they were received,
     also across the asynchronous decryption.
 
-    Messages sent via QXmppClient::send() (and the deprecated QXmppClient::sendSensitive() and
+    Messages sent via QXmppClient::sendMessage() and send() (and the deprecated QXmppClient::sendSensitive() and
     QXmppClient::reply()) run through these phases:
     \list 1
     \li SelectEncryption: asynchronous, usually the application selects the encryption with its
@@ -48,7 +48,7 @@ namespace QXmpp::Messages {
         recipients of an encryption protecting only the body (e.g. OMEMO 0.3).
     \li Send.
     \li ConfirmDelivery: asynchronous, e.g. MUC waits for the reflection of the room. The task
-        returned by QXmppClient::send() finishes afterwards.
+        returned by QXmppClient::sendMessage() or send() finishes afterwards.
     \endlist
 
     Outgoing messages to the same JID are sent in the order in which they were passed, also
@@ -78,7 +78,68 @@ namespace QXmpp::Messages {
     \class QXmpp::Messages::OutgoingMessage
     \inmodule QXmpp
 
-    State of an outgoing message in the Prepare and ResolveRecipients hooks.
+    State of an outgoing message in the Prepare, ResolveRecipients and ConfirmDelivery hooks.
+
+    The message is the one without end-to-end encryption. After encrypting, encryption() is the
+    encryption actually used and contentEncryption() and encryptionInfo() are set.
+*/
+
+/*!
+    \enum QXmpp::Messages::DeliveryState
+    \inmodule QXmpp
+
+    How far the delivery of a message sent via QXmppClient::sendMessage() has been confirmed.
+
+    \value Written The message has been written to the stream. Without Stream Management, it is
+    unknown whether the server has received it.
+    \value ServerAcknowledged The own server has acknowledged the message via
+    \xep{0198}{Stream Management}. It may not have reached the recipient yet.
+    \value Confirmed A handler of ConfirmDelivery has confirmed that the recipient has accepted
+    the message, e.g. a MUC room by reflecting it.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \class QXmpp::Messages::Sent
+    \inmodule QXmpp
+
+    Result of a message sent via QXmppClient::sendMessage(): the state of its delivery and how
+    it has been processed by the pipeline.
+
+    message() is the message as prepared by the pipeline without end-to-end encryption.
+    archiveId() is the ID of the message in the archive of the recipient (\xep{0313}{Message
+    Archive Management}) if a handler of ConfirmDelivery has reported it, e.g. the stanza ID
+    (\xep{0359}{Unique and Stable Stanza IDs}) assigned by a MUC room to the reflected message.
+    It can be used to refer to the message, e.g. for replies or reactions in groupchats.
+
+    encryption() is the namespace of the encryption actually used, e.g. OMEMO 0 or OMEMO 2 for
+    QXmpp::Omemo::Automatic, empty if the message has been sent unencrypted. It is the namespace
+    announced via \xep{0380}{Explicit Message Encryption}. If a provider combines several
+    encryptions in one stanza, e.g. OMEMO 2 and OMEMO 0 for devices of both versions, it is the
+    one chosen by the provider (see its documentation), encryptionInfo() may contain the details.
+    contentEncryption() tells whether all sensitive elements or only the body have been
+    encrypted; it is QXmpp::E2ee::ContentEncryption::BodyOnly if some recipients only got the
+    body. encryptionInfo() contains information of the encryption provider
+    (QXmpp::E2ee::Encrypted::info()), its type depends on the encryption.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \struct QXmpp::Messages::Confirmation
+    \inmodule QXmpp
+
+    Confirmation of the delivery of a message by a handler of QXmpp::Messages::ConfirmDelivery.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Messages::Confirmation::archiveId
+
+    ID of the message in the archive of the recipient, e.g. the stanza ID
+    (\xep{0359}{Unique and Stable Stanza IDs}) assigned by a MUC room to the reflection.
 */
 
 /*!
@@ -125,10 +186,12 @@ namespace QXmpp::Messages {
     Asynchronous hook run for each outgoing message right after it has been written to the
     stream, also before the server has acknowledged it, as a confirmation may arrive earlier.
 
-    Handlers wait for a confirmation of the delivery and set the result: an error makes sending
-    fail, QXmpp::SendSuccess with \c acknowledged set confirms the delivery. Without confirmation,
-    the result is the one of the stream (see QXmppClient::send()). If the stream reports an error,
-    sending fails without waiting for the handlers.
+    Handlers wait for a confirmation of the delivery and set the confirmation: an error makes
+    sending fail, a QXmpp::Messages::Confirmation confirms the delivery
+    (QXmpp::Messages::DeliveryState::Confirmed) and may contain the ID of the message in the
+    archive of the recipient (QXmpp::Messages::Sent::archiveId()).
+    Without confirmation, the result is the one of the stream (see QXmppClient::send()). If the
+    stream reports an error, sending fails without waiting for the handlers.
 
     QXmppMucManagerV2 waits for the reflection of messages sent to joined rooms.
 */

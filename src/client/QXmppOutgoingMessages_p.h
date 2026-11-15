@@ -7,6 +7,7 @@
 
 #include "QXmppHooks.h"
 #include "QXmppMessage.h"
+#include "QXmppMessages.h"
 #include "QXmppPromise.h"
 #include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
@@ -19,9 +20,6 @@
 
 class QXmppClient;
 
-namespace QXmpp::Messages {
-class OutgoingMessage;
-}
 class QXmppClientPrivate;
 class QXmppStanza;
 
@@ -47,7 +45,9 @@ public:
     // can not be copied without losing their content.
     static bool isPipelineStanza(const QXmppStanza &stanza);
 
-    QXmppTask<SendResult> send(QXmppMessage &&message, QXmppSendStanzaParams params, Mode mode, QString encryption = {});
+    QXmppTask<Result<Messages::Sent>> send(QXmppMessage &&message, QXmppSendStanzaParams params, Mode mode, QString encryption = {});
+    // for QXmppClient::send()
+    QXmppTask<SendResult> sendCompat(QXmppMessage &&message, QXmppSendStanzaParams params, Mode mode, QString encryption = {});
 
 private:
     struct Pending {
@@ -56,14 +56,14 @@ private:
         Mode mode;
         // preset encryption, e.g. of the message replied to
         QString encryption;
-        QXmppPromise<SendResult> result;
+        QXmppPromise<Result<Messages::Sent>> result;
     };
 
     struct Delivery;
 
     QXmppTask<void> processFront(QString conversationJid);
     void finishFront(const QString &conversationJid, QXmppTask<SendResult> &&sendTask, std::shared_ptr<Messages::OutgoingMessage> message = {});
-    void finishFront(const QString &conversationJid, SendResult &&result);
+    void finishFront(const QString &conversationJid, QXmppError &&error);
     void confirmDelivery(std::shared_ptr<Delivery> delivery, QXmppTask<SendResult> sendTask);
 
     QXmppClient *m_client;

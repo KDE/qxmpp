@@ -682,7 +682,7 @@ QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::sendSensitive(QXmppClie
 {
     using Private::OutgoingMessages;
     if (OutgoingMessages::isPipelineStanza(stanza)) {
-        return client->d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
+        return client->d->outgoingMessages.sendCompat(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive);
     }
     if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && client->hooks(nullptr).hasHandlers<Iq::SelectEncryption>()) {
         return client->d->encryptedIqs.send(Private::EncryptedIqs::serialize(*iq), params.value_or(QXmppSendStanzaParams()), {});
@@ -700,7 +700,7 @@ QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::sendSensitive(QXmppClie
 QXmppTask<QXmpp::SendResult> QXmpp::Private::FixedE2ee::send(QXmppClient *client, QXmppMessage &&message, QXmppSendStanzaParams params, QString encryption)
 {
     params.setEncryptionRequired(true);
-    return client->d->outgoingMessages.send(std::move(message), std::move(params), OutgoingMessages::Mode::Fixed, std::move(encryption));
+    return client->d->outgoingMessages.sendCompat(std::move(message), std::move(params), OutgoingMessages::Mode::Fixed, std::move(encryption));
 }
 
 QXmppTask<QXmpp::SendResult> QXmppClientPrivate::sendEncryptedMessage(QXmppTask<QXmppE2eeExtension::MessageEncryptResult> task)
@@ -742,9 +742,32 @@ QXmppTask<SendResult> QXmppClient::send(QXmppStanza &&stanza, const std::optiona
 {
     using Private::OutgoingMessages;
     if (OutgoingMessages::isPipelineStanza(stanza)) {
-        return d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Default);
+        return d->outgoingMessages.sendCompat(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Default);
     }
     return d->stream->streamAckManager().send(stanza);
+}
+
+/*!
+    Sends the \a message via the message pipeline (see QXmpp::Messages) like send().
+
+    The result tells how far the delivery has been confirmed (QXmpp::Messages::DeliveryState)
+    and how the message has been processed: the message as prepared by the pipeline, the
+    end-to-end encryption actually used and what it has encrypted, the recipients and
+    information of the encryption provider (QXmpp::E2ee::Encrypted::info()). For messages to
+    MUC rooms, it also contains the ID of the message in the archive of the room
+    (QXmpp::Messages::Sent::archiveId()).
+
+    The task finishes like the one of send(): after the server has acknowledged the message if
+    Stream Management is enabled, or earlier if a handler of QXmpp::Messages::ConfirmDelivery
+    confirms the delivery, e.g. by the reflection of a MUC room.
+
+    \a params.
+
+    \since QXmpp 1.18
+*/
+QXmppTask<Result<Messages::Sent>> QXmppClient::sendMessage(QXmppMessage &&message, const QXmppSendStanzaParams &params)
+{
+    return d->outgoingMessages.send(std::move(message), params, Private::OutgoingMessages::Mode::Default);
 }
 
 /*!
@@ -780,7 +803,7 @@ QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::reply(QXmppClient *clie
         if (!E2ee::Providers(client->hooks(nullptr)).contains(encryption)) {
             encryption.clear();
         }
-        return client->d->outgoingMessages.send(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive, std::move(encryption));
+        return client->d->outgoingMessages.sendCompat(std::move(static_cast<QXmppMessage &>(stanza)), params.value_or(QXmppSendStanzaParams()), OutgoingMessages::Mode::Sensitive, std::move(encryption));
     }
     if (auto *iq = dynamic_cast<QXmppIq *>(&stanza); iq && e2eeMetadata) {
         // the encryption of the request is the default of SelectEncryption
