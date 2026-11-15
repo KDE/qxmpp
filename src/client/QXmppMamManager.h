@@ -13,6 +13,7 @@
 #include "QXmppMessageContext.h"
 #include "QXmppResultSet.h"
 
+#include <optional>
 #include <variant>
 #include <vector>
 
@@ -31,6 +32,11 @@ struct Query {
     QString with {};
     QDateTime start {};
     QDateTime end {};
+    QString beforeId {};
+    QString afterId {};
+    QList<QString> ids {};
+    std::optional<bool> includeGroupchat {};
+    QList<QXmppDataForm::Field> additionalFields {};
     QXmppResultSetQuery resultSetQuery {};
     bool flipPage = false;
 };

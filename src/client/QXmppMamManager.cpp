@@ -211,6 +211,52 @@ public:
 */
 
 /*!
+    \variable QXmpp::Mam::Query::beforeId
+
+    Only returns messages before the message with this archive ID if set. In contrast to
+    QXmppResultSetQuery::before(), this does not page backwards through the results.
+
+    This requires the archive to support QXmpp::Namespace::Mam2Extended. The query fails with
+    QXmppStanza::Error::ItemNotFound if the archive does not contain the message.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::afterId
+
+    Only returns messages after the message with this archive ID if set. Together with beforeId,
+    the messages between two known messages can be retrieved.
+
+    This requires the archive to support QXmpp::Namespace::Mam2Extended. The query fails with
+    QXmppStanza::Error::ItemNotFound if the archive does not contain the message.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::ids
+
+    Only returns the messages with these archive IDs if set.
+
+    This requires the archive to support QXmpp::Namespace::Mam2Extended. The query fails with
+    QXmppStanza::Error::ItemNotFound if the archive does not contain one of the messages.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::includeGroupchat
+
+    Whether messages of type groupchat should be returned from the archive of the account. If
+    unset, it depends on the server whether they are returned.
+
+    This must only be set if the archive supports QXmpp::Namespace::Mam2GroupchatField. Servers
+    that store groupchat messages in the archive of the account support
+    QXmpp::Namespace::Mam2GroupchatAvailable.
+*/
+
+/*!
+    \variable QXmpp::Mam::Query::additionalFields
+
+    Further fields of the query form, e.g. fields specific to a server.
+*/
+
+/*!
     \variable QXmpp::Mam::Query::resultSetQuery
 
     Limits the number of results and pages through the archive (\xep{0059}{Result Set Management}).
@@ -375,35 +421,40 @@ bool QXmppMamManager::handleIncomingStanza(const QDomElement &element)
     return false;
 }
 
-static QXmppDataForm buildForm(const QString &jid, const QDateTime &start, const QDateTime &end)
+static QXmppDataForm buildForm(const Mam::Query &query)
 {
     QList<QXmppDataForm::Field> fields;
 
-    QXmppDataForm::Field hiddenField(QXmppDataForm::Field::HiddenField);
-    hiddenField.setKey(u"FORM_TYPE"_s);
-    hiddenField.setValue(staticString(ns_mam));
-    fields << hiddenField;
+    auto addField = [&](QXmppDataForm::Field::Type type, const QString &key, const QVariant &value) {
+        QXmppDataForm::Field field(type);
+        field.setKey(key);
+        field.setValue(value);
+        fields << field;
+    };
 
-    if (!jid.isEmpty()) {
-        QXmppDataForm::Field jidField;
-        jidField.setKey(u"with"_s);
-        jidField.setValue(jid);
-        fields << jidField;
+    addField(QXmppDataForm::Field::HiddenField, u"FORM_TYPE"_s, staticString(ns_mam));
+    if (!query.with.isEmpty()) {
+        addField(QXmppDataForm::Field::JidSingleField, u"with"_s, query.with);
     }
-
-    if (start.isValid()) {
-        QXmppDataForm::Field startField;
-        startField.setKey(u"start"_s);
-        startField.setValue(QXmppUtils::datetimeToString(start));
-        fields << startField;
+    if (query.start.isValid()) {
+        addField(QXmppDataForm::Field::TextSingleField, u"start"_s, QXmppUtils::datetimeToString(query.start));
     }
-
-    if (end.isValid()) {
-        QXmppDataForm::Field endField;
-        endField.setKey(u"end"_s);
-        endField.setValue(QXmppUtils::datetimeToString(end));
-        fields << endField;
+    if (query.end.isValid()) {
+        addField(QXmppDataForm::Field::TextSingleField, u"end"_s, QXmppUtils::datetimeToString(query.end));
     }
+    if (!query.beforeId.isEmpty()) {
+        addField(QXmppDataForm::Field::TextSingleField, u"before-id"_s, query.beforeId);
+    }
+    if (!query.afterId.isEmpty()) {
+        addField(QXmppDataForm::Field::TextSingleField, u"after-id"_s, query.afterId);
+    }
+    if (!query.ids.isEmpty()) {
+        addField(QXmppDataForm::Field::ListMultiField, u"ids"_s, QStringList(query.ids));
+    }
+    if (query.includeGroupchat) {
+        addField(QXmppDataForm::Field::BooleanField, u"include-groupchat"_s, *query.includeGroupchat);
+    }
+    fields << query.additionalFields;
 
     QXmppDataForm form;
     form.setType(QXmppDataForm::Submit);
@@ -447,7 +498,7 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
         .payload = Mam::QueryRequest {
             .queryId = queryId,
             .node = node,
-            .form = buildForm(jid, start, end),
+            .form = buildForm(Mam::Query { .with = jid, .start = start, .end = end }),
             .resultSetQuery = resultSetQuery,
         },
     };
@@ -490,7 +541,7 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(const QString &to, const QString &node, const QString &jid, const QDateTime &start, const QDateTime &end, const QXmppResultSetQuery &resultSetQuery)
 {
-    return retrieve(Mam::Query { to, node, jid, start, end, resultSetQuery }).then(this, [](Mam::RetrieveResult &&result) -> RetrieveResult {
+    return retrieve(Mam::Query { .to = to, .node = node, .with = jid, .start = start, .end = end, .resultSetQuery = resultSetQuery }).then(this, [](Mam::RetrieveResult &&result) -> RetrieveResult {
         if (auto *error = std::get_if<QXmppError>(&result)) {
             return std::move(*error);
         }
@@ -547,7 +598,7 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
         .payload = Mam::QueryRequest {
             .queryId = queryId,
             .node = query.node,
-            .form = buildForm(query.with, query.start, query.end),
+            .form = buildForm(query),
             .resultSetQuery = query.resultSetQuery,
             .flipPage = query.flipPage,
         },

@@ -405,7 +405,7 @@ void tst_QXmppMamManager::retrieveArchivedMessages()
                 "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
                 "<x xmlns='jabber:x:data' type='submit'>"
                 "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
-                "<field type='text-single' var='with'><value>romeo@montague.lit</value></field>"
+                "<field type='jid-single' var='with'><value>romeo@montague.lit</value></field>"
                 "</x>"
                 "</query>"
                 "</iq>"_s);
@@ -615,7 +615,7 @@ void tst_QXmppMamManager::retrieve()
                 "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
                 "<x xmlns='jabber:x:data' type='submit'>"
                 "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
-                "<field type='text-single' var='with'><value>romeo@montague.lit</value></field>"
+                "<field type='jid-single' var='with'><value>romeo@montague.lit</value></field>"
                 "</x>"
                 "</query>"
                 "</iq>"_s);
@@ -733,12 +733,21 @@ void tst_QXmppMamManager::retrieveExtended()
         return QXmpp::HookResult::Continue;
     });
 
+    QXmppDataForm::Field search;
+    search.setKey(u"{urn:example:mam}fulltext"_s);
+    search.setValue(u"balcony"_s);
+
     QXmppResultSetQuery rsm;
     rsm.setMax(2);
     rsm.setBefore(u""_s);
 
     auto task = mam->retrieve({
         .to = u"coven@chat.shakespeare.lit"_s,
+        .beforeId = u"9"_s,
+        .afterId = u"0"_s,
+        .ids = { u"1"_s, u"2"_s },
+        .includeGroupchat = false,
+        .additionalFields = { search },
         .resultSetQuery = rsm,
         .flipPage = true,
     });
@@ -746,6 +755,11 @@ void tst_QXmppMamManager::retrieveExtended()
                 "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
                 "<x xmlns='jabber:x:data' type='submit'>"
                 "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                "<field type='text-single' var='before-id'><value>9</value></field>"
+                "<field type='text-single' var='after-id'><value>0</value></field>"
+                "<field type='list-multi' var='ids'><value>1</value><value>2</value></field>"
+                "<field type='boolean' var='include-groupchat'><value>false</value></field>"
+                "<field type='text-single' var='{urn:example:mam}fulltext'><value>balcony</value></field>"
                 "</x>"
                 "<set xmlns='http://jabber.org/protocol/rsm'><max>2</max><before/></set>"
                 "<flip-page/>"
