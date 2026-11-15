@@ -69,6 +69,17 @@ struct QXMPP_PRIVATE_EXPORT LegacyE2ee {
     static void setEncryptionExtension(QXmppClient *client, QXmppE2eeExtension *extension);
 };
 
+// Sends messages of QXmpp's managers that must be encrypted with a specific encryption, e.g. trust
+// messages, which are only meaningful for the encryption they refer to.
+struct QXMPP_PRIVATE_EXPORT FixedE2ee {
+    // Encrypts \a message with \a encryption (see QXmpp::E2ee) without running the
+    // QXmpp::Messages::SelectEncryption hook. Sending fails with SendError::EncryptionError if
+    // there is no provider for \a encryption, if it only encrypts the body (e.g. OMEMO 0) or if
+    // encrypting fails. The message is never sent unencrypted. The deprecated encryption
+    // extension is not used, as it can not tell which encryption it implements.
+    static QXmppTask<SendResult> send(QXmppClient *client, QXmppMessage &&message, QXmppSendStanzaParams params, QString encryption);
+};
+
 }  // namespace QXmpp::Private
 
 class QXmppClientPrivate
