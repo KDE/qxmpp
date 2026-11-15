@@ -46,6 +46,8 @@ QXmpp 1.18.0 (UNRELEASED)
  - UploadRequestManager: Keep the upload services on stream resumption, they were not discovered again (@lnj, !848)
  - Blocking, Carbons, Disco, MucManagerV2, OMEMO: Reset the state of the session also when the stream can't be resumed with Stream Management enabled, and when the client is disconnected via `disconnectFromServer()` while waiting for resumption (@lnj, !848)
  - MAM: Add `retrieve()` returning the `QXmpp::Messages::Context` of the messages (decryption state, real sender) and the `QXmpp::Mam::MessageReceived` hook to process them while the query is running; `ArchiveInfo` has the query ID; `QXmpp::Messages::Received` is not run for archived messages (@lnj, !847)
+ - ATM: Trust messages are encrypted with the encryption they refer to, independent of the `SelectEncryption` hook; it must encrypt the whole content (OMEMO 2), else sending fails (@lnj, !846)
+ - ATM: Add the store hint to trust messages (@lnj, !846)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

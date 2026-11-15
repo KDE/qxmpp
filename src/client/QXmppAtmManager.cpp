@@ -53,6 +53,15 @@ using namespace QXmpp::Private;
 
     In addition, archiving via MAM must be enabled on the server.
 
+    Trust messages are always encrypted with the encryption they refer to, the
+    QXmpp::Messages::SelectEncryption hook is not run for them. They are only sent to keys that
+    have been authenticated.
+
+    ATM requires an encryption that encrypts the whole content via
+    \xep{0420}{Stanza Content Encryption}, i.e. OMEMO 2 (QXmpp::E2ee::Omemo2). Trust messages have
+    no body, so they can not be sent with encryptions only encrypting the body, such as OMEMO 0
+    (\c eu.siacs.conversations.axolotl). Sending them fails with QXmpp::SendError::EncryptionError.
+
     \ingroup qxmpp-managers
 
     \since QXmpp 1.5
@@ -385,6 +394,11 @@ QXmppTask<void> QXmppAtmManager::makePostponedTrustDecisions(QString encryption,
 
     \a encryption is the namespace of the encryption. \a keyOwners contains the key owners with
     the data for authentication or distrusting. \a recipientJid is the JID of the recipient.
+
+    The message is encrypted with \a encryption via its end-to-end encryption provider
+    (QXmpp::E2ee::Provider), which must encrypt the whole content. If it can not be encrypted,
+    sending fails with QXmpp::SendError::EncryptionError. The deprecated encryption extension
+    (QXmppClient::setEncryptionExtension()) is not used.
 */
 QXmppTask<QXmpp::SendResult> QXmppAtmManager::sendTrustMessage(const QString &encryption, const QList<QXmppTrustMessageKeyOwner> &keyOwners, const QString &recipientJid)
 {
@@ -396,9 +410,10 @@ QXmppTask<QXmpp::SendResult> QXmppAtmManager::sendTrustMessage(const QString &en
     QXmppMessage message;
     message.setTo(recipientJid);
     message.setTrustMessageElement(trustMessageElement);
+    message.addHint(QXmppMessage::Store);
 
     QXmppSendStanzaParams params;
     params.setAcceptedTrustLevels(TrustLevel::Authenticated);
 
-    return LegacyE2ee::sendSensitive(client(), std::move(message), params);
+    return FixedE2ee::send(client(), std::move(message), std::move(params), encryption);
 }
