@@ -23,6 +23,7 @@
 #include "QXmppUtils_p.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 
 #include <algorithm>
@@ -253,7 +254,8 @@ public:
 /*!
     \variable QXmpp::Mam::Query::additionalFields
 
-    Further fields of the query form, e.g. fields specific to a server.
+    Further fields of the query form, e.g. fields specific to a server. The fields supported by an
+    archive can be requested using QXmppMamManager::requestQueryForm().
 */
 
 /*!
@@ -626,6 +628,24 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
     });
 
     return task;
+}
+
+/*!
+    Requests the form with the fields an archive supports in queries.
+
+    Besides the fields defined by \xep{0313}{Message Archive Management}, the form may contain
+    fields specific to the server. They can be used via QXmpp::Mam::Query::additionalFields.
+
+    \a to is the archive to query, empty for the archive of the own account. \a node is the
+    PubSub node to query, usually empty.
+
+    \since QXmpp 1.18
+*/
+QXmppTask<Result<QXmppDataForm>> QXmppMamManager::requestQueryForm(const QString &to, const QString &node)
+{
+    co_return mapSuccess(
+        co_await client()->sendIq(Iq::Get<Mam::QueryRequest> { .to = to, .payload = { .node = node } }).withContext(this),
+        [](Mam::QueryRequest &&query) { return std::move(query.form); });
 }
 
 // Checks that a result has been sent by the queried entity, so other entities can't inject

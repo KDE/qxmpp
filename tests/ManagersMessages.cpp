@@ -164,6 +164,7 @@ private:
     Q_SLOT void retrieveError();
     Q_SLOT void retrieveExtended();
     Q_SLOT void retrieveUnexpectedSender();
+    Q_SLOT void requestQueryForm();
 
     QXmppMamTestHelper m_helper;
     TestClient m_client;
@@ -865,6 +866,45 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
     // results of queries sent manually can't be checked
     TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"5"_s)));
     QCOMPARE(messages.size(), 2);
+}
+
+void tst_QXmppMamManager::requestQueryForm()
+{
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    auto *mam = test.addNewExtension<QXmppMamManager>();
+
+    auto task = mam->requestQueryForm();
+    test.expect(u"<iq id='qx1' type='get'><query xmlns='urn:xmpp:mam:2'/></iq>"_s);
+    test.inject(u"<iq type='result' id='qx1'>"
+                "<query xmlns='urn:xmpp:mam:2'>"
+                "<x xmlns='jabber:x:data' type='form'>"
+                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                "<field type='jid-single' var='with'/>"
+                "<field type='text-single' var='start'/>"
+                "<field type='text-single' var='end'/>"
+                "<field type='text-single' var='before-id'/>"
+                "<field type='text-single' var='after-id'/>"
+                "<field type='list-multi' var='ids'>"
+                "<validate xmlns='http://jabber.org/protocol/xdata-validate' datatype='xs:string'><open/></validate>"
+                "</field>"
+                "<field type='boolean' var='include-groupchat'/>"
+                "<field type='text-single' var='{http://example.com/}free-text-search'/>"
+                "</x>"
+                "</query>"
+                "</iq>"_s);
+
+    auto form = expectFutureVariant<QXmppDataForm>(task);
+    QCOMPARE(form.type(), QXmppDataForm::Form);
+    QCOMPARE(form.formType(), u"urn:xmpp:mam:2"_s);
+    QCOMPARE(std::as_const(form).fields().size(), 9);
+    QCOMPARE(std::as_const(form).fields().last().key(), u"{http://example.com/}free-text-search"_s);
+
+    // archive of a pubsub node
+    task = mam->requestQueryForm(u"pubsub.shakespeare.lit"_s, u"fdp/submitted/capulet.lit/sonnets"_s);
+    test.expect(u"<iq id='qx1' to='pubsub.shakespeare.lit' type='get'><query xmlns='urn:xmpp:mam:2' node='fdp/submitted/capulet.lit/sonnets'/></iq>"_s);
+    test.inject(u"<iq type='error' id='qx1' from='pubsub.shakespeare.lit'><error type='cancel'><feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
+    expectFutureVariant<QXmppError>(task);
 }
 
 void QXmppMamTestHelper::archivedMessageReceived(const QString &queryId, const QXmppMessage &message)

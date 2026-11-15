@@ -116,6 +116,7 @@ public:
     QT_WARNING_POP
 #endif
     QXmppTask<QXmpp::Mam::RetrieveResult> retrieve(const QXmpp::Mam::Query &query);
+    QXmppTask<QXmpp::Result<QXmppDataForm>> requestQueryForm(const QString &to = {}, const QString &node = {});
 
     QXmppDiscoFeatureWatch watchAccountSupport() const;
 
