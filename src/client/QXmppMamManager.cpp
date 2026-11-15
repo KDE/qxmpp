@@ -13,7 +13,6 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppIncomingMessages_p.h"
-#include "QXmppMamIq.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
 #include "QXmppMessageContext_p.h"
@@ -109,7 +108,7 @@ static QString occupantJid(const QDomElement &messageElement)
 
 struct RetrieveRequestState {
     QXmppPromise<Mam::RetrieveResult> promise;
-    QXmppMamResultIq iq;
+    Mam::QueryResult result;
     // bare JID of the queried archive
     QString archiveJid;
     // processed messages in the order of the archive, empty for dropped or consumed messages and
@@ -129,7 +128,7 @@ struct RetrieveRequestState {
                 results.push_back(std::move(*context));
             }
         }
-        promise.finish(Mam::Page { std::move(iq), std::move(results) });
+        promise.finish(Mam::Page { std::move(result), std::move(results) });
     }
 };
 
@@ -213,7 +212,7 @@ public:
 /*!
     \variable QXmpp::Mam::Page::result
 
-    The result IQ of the query, it contains the result set reply for paging.
+    The end of the results, it contains the result set reply for paging.
 */
 
 /*!
@@ -256,6 +255,8 @@ public:
     \brief Contains all retrieved messages and the result IQ that can be used for pagination.
 
     \since QXmpp 1.5
+
+    \deprecated since QXmpp 1.18, use retrieve() and QXmpp::Mam::Page
 */
 
 /*!
@@ -276,6 +277,8 @@ public:
     Contains RetrievedMessages or an QXmppError.
 
     \since QXmpp 1.5
+
+    \deprecated since QXmpp 1.18, use retrieve() and QXmpp::Mam::RetrieveResult
 */
 
 QXmppMamManager::QXmppMamManager()
@@ -321,22 +324,22 @@ bool QXmppMamManager::handleIncomingStanza(const QDomElement &element)
             }
             return true;
         }
-    } else if (isIqElement<QXmppMamResultIq>(element)) {
-        QXmppMamResultIq result;
-        result.parse(element);
-        Q_EMIT resultsRecieved(result.id(), result.resultSetReply(), result.complete());
-        return true;
+    } else {
+        QT_WARNING_PUSH
+        QT_WARNING_DISABLE_DEPRECATED
+        if (isIqElement<QXmppMamResultIq>(element)) {
+            QXmppMamResultIq result;
+            result.parse(element);
+            Q_EMIT resultsRecieved(result.id(), result.resultSetReply(), result.complete());
+            return true;
+        }
+        QT_WARNING_POP
     }
 
     return false;
 }
 
-static QXmppMamQueryIq buildRequest(const QString &to,
-                                    const QString &node,
-                                    const QString &jid,
-                                    const QDateTime &start,
-                                    const QDateTime &end,
-                                    const QXmppResultSetQuery &resultSetQuery)
+static QXmppDataForm buildForm(const QString &jid, const QDateTime &start, const QDateTime &end)
 {
     QList<QXmppDataForm::Field> fields;
 
@@ -369,16 +372,28 @@ static QXmppMamQueryIq buildRequest(const QString &to,
     QXmppDataForm form;
     form.setType(QXmppDataForm::Submit);
     form.setFields(fields);
+    return form;
+}
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+static QXmppMamQueryIq buildRequest(const QString &to,
+                                    const QString &node,
+                                    const QString &jid,
+                                    const QDateTime &start,
+                                    const QDateTime &end,
+                                    const QXmppResultSetQuery &resultSetQuery)
+{
     QXmppMamQueryIq queryIq;
     QString queryId = queryIq.id(); /* reuse the IQ id as query id */
     queryIq.setTo(to);
     queryIq.setNode(node);
     queryIq.setQueryId(queryId);
-    queryIq.setForm(form);
+    queryIq.setForm(buildForm(jid, start, end));
     queryIq.setResultSetQuery(resultSetQuery);
     return queryIq;
 }
+QT_WARNING_POP
 
 /*!
     Retrieves archived messages. For each received message, the
@@ -388,7 +403,7 @@ static QXmppMamQueryIq buildRequest(const QString &to,
     The number of results may be limited by the server.
 
     \warning This API does not work with end-to-end encrypted messages. You can
-    use the new QFuture-based API (retrieveMessages()) for that.
+    use retrieve() for that.
 
     \a to is an optional entity that should be queried. Leave this empty to query the local
     archive. \a node is an optional node that should be queried. This is used when querying a
@@ -407,10 +422,13 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
                                                   const QDateTime &end,
                                                   const QXmppResultSetQuery &resultSetQuery)
 {
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     auto queryIq = buildRequest(to, node, jid, start, end, resultSetQuery);
     auto id = queryIq.id();
     client()->send(std::move(queryIq));
     return id;
+    QT_WARNING_POP
 }
 
 /*!
@@ -431,7 +449,12 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
     Returns the result of the query.
 
     \since QXmpp 1.5
+
+    \deprecated since QXmpp 1.18, use retrieve()
 */
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(const QString &to, const QString &node, const QString &jid, const QDateTime &start, const QDateTime &end, const QXmppResultSetQuery &resultSetQuery)
 {
     return retrieve(Mam::Query { to, node, jid, start, end, resultSetQuery }).then(this, [](Mam::RetrieveResult &&result) -> RetrieveResult {
@@ -444,9 +467,15 @@ QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(con
         for (auto &context : page.messages) {
             messages.append(std::move(context.message()));
         }
-        return RetrievedMessages { std::move(page.result), std::move(messages) };
+        QXmppMamResultIq resultIq;
+        resultIq.setType(QXmppIq::Result);
+        resultIq.setResultSetReply(page.result.resultSetReply);
+        resultIq.setComplete(page.result.complete);
+        return RetrievedMessages { std::move(resultIq), std::move(messages) };
     });
 }
+QT_WARNING_POP
+#endif
 
 /*!
     Retrieves archived messages and returns them with their context.
@@ -466,8 +495,8 @@ QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(con
 */
 QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query)
 {
-    auto queryIq = buildRequest(query.to, query.node, query.with, query.start, query.end, query.resultSetQuery);
-    auto queryId = queryIq.queryId();
+    // reuse the IQ id as query id
+    auto queryId = generateSequentialStanzaId();
 
     auto [itr, inserted] = d->ongoingRequests.insert({ queryId.toStdString(), RetrieveRequestState() });
     Q_ASSERT(inserted);
@@ -477,7 +506,17 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
     auto task = itr->second.promise.task();
 
     // the messages are processed as they arrive, see handleIncomingStanza()
-    client()->sendIq(std::move(queryIq)).then(this, [this, queryId](QXmppClient::IqResult result) {
+    Iq::Set<Mam::QueryRequest> request {
+        .id = queryId,
+        .to = query.to,
+        .payload = Mam::QueryRequest {
+            .queryId = queryId,
+            .node = query.node,
+            .form = buildForm(query.with, query.start, query.end),
+            .resultSetQuery = query.resultSetQuery,
+        },
+    };
+    client()->sendIq(std::move(request)).then(this, [this, queryId](Result<Mam::QueryResult> &&result) {
         auto itr = d->ongoingRequests.find(queryId.toStdString());
         if (itr == d->ongoingRequests.end()) {
             return;
@@ -486,12 +525,12 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
 
         // handle IQ sending errors
         if (hasError(result)) {
-            state.promise.finish(getError(result));
+            state.promise.finish(getError(std::move(result)));
             d->ongoingRequests.erase(itr);
             return;
         }
 
-        state.iq.parse(getValue(result));
+        state.result = getValue(std::move(result));
         state.resultReceived = true;
         if (state.runningJobs == 0) {
             state.finish();

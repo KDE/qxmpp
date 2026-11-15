@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: 2016 Niels Ole Salscheider <niels_ole@salscheider-online.de>
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include "QXmppMamIq.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
 #include "StringLiterals.h"
@@ -12,7 +14,129 @@
 
 #include <QDomElement>
 
+using namespace QXmpp;
 using namespace QXmpp::Private;
+
+/*!
+    \struct QXmpp::Mam::QueryRequest
+    \inmodule QXmpp
+
+    \brief IQ payload of an archive query (\xep{0313}{Message Archive Management}).
+
+    It is sent in an IQ of type set and answered with QXmpp::Mam::QueryResult:
+    \code
+    client->sendIq(QXmpp::Iq::Set<QXmpp::Mam::QueryRequest> { .payload = { .queryId = queryId, .form = form } })
+        .then(this, [](QXmpp::Result<QXmpp::Mam::QueryResult> &&result) { ... });
+    \endcode
+
+    Usually QXmppMamManager::retrieve() is used instead, it also processes the retrieved messages.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Mam::QueryRequest::queryId
+
+    ID of the query, the archive includes it in the messages of the results.
+*/
+
+/*!
+    \variable QXmpp::Mam::QueryRequest::node
+
+    The PubSub node to query, usually empty.
+*/
+
+/*!
+    \variable QXmpp::Mam::QueryRequest::form
+
+    Data form with the filters of the query (\xep{0313}{Message Archive Management} §4.1).
+*/
+
+/*!
+    \variable QXmpp::Mam::QueryRequest::resultSetQuery
+
+    Limits the number of results and pages through the archive (\xep{0059}{Result Set Management}).
+*/
+
+/*!
+    \struct QXmpp::Mam::QueryResult
+    \inmodule QXmpp
+
+    \brief IQ payload of the response to an archive query (\xep{0313}{Message Archive Management}).
+
+    It is sent after all messages of the results and is used for paging through the archive.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    \variable QXmpp::Mam::QueryResult::complete
+
+    Whether the last page of the results has been reached, i.e. there are no further messages
+    matching the query.
+*/
+
+/*!
+    \variable QXmpp::Mam::QueryResult::resultSetReply
+
+    The result set reply (\xep{0059}{Result Set Management}) for paging through the archive.
+*/
+
+std::optional<Mam::QueryRequest> Mam::QueryRequest::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+
+    QueryRequest query;
+    query.queryId = el.attribute(u"queryid"_s);
+    query.node = el.attribute(u"node"_s);
+    if (auto formEl = firstChildElement(el, u"x", ns_data); !formEl.isNull()) {
+        query.form.parse(formEl);
+    }
+    if (auto setEl = firstChildElement(el, u"set", ns_rsm); !setEl.isNull()) {
+        query.resultSetQuery.parse(setEl);
+    }
+    return query;
+}
+
+void Mam::QueryRequest::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalAttribute { u"node", node },
+        OptionalAttribute { u"queryid", queryId },
+        form,
+        resultSetQuery,
+    });
+}
+
+std::optional<Mam::QueryResult> Mam::QueryResult::fromDom(const QDomElement &el)
+{
+    if (elementXmlTag(el) != XmlTag) {
+        return {};
+    }
+
+    QueryResult result;
+    result.complete = parseBoolean(el.attribute(u"complete"_s)).value_or(false);
+    if (auto setEl = firstChildElement(el, u"set", ns_rsm); !setEl.isNull()) {
+        result.resultSetReply.parse(setEl);
+    }
+    return result;
+}
+
+void Mam::QueryResult::toXml(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
+        XmlTag,
+        OptionalAttribute { u"complete", DefaultedBool { complete, false } },
+        resultSetReply,
+    });
+}
+
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 
 class QXmppMamQueryIqPrivate : public QSharedData
 {
@@ -33,6 +157,8 @@ public:
     \ingroup qxmpp-stanzas
 
     \since QXmpp 1.0
+
+    \deprecated since QXmpp 1.18, use QXmpp::Mam::QueryRequest or QXmppMamManager::retrieve().
 */
 
 QXmppMamQueryIq::QXmppMamQueryIq()
@@ -150,6 +276,8 @@ public:
     \ingroup qxmpp-stanzas
 
     \since QXmpp 1.0
+
+    \deprecated since QXmpp 1.18, use QXmpp::Mam::QueryResult or QXmppMamManager::retrieve().
 */
 
 QXmppMamResultIq::QXmppMamResultIq()
@@ -216,3 +344,5 @@ void QXmppMamResultIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
         d->resultSetReply,
     });
 }
+QT_WARNING_POP
+#endif

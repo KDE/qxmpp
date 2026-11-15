@@ -26,17 +26,17 @@ class QXmppMamManagerPrivate;
 namespace QXmpp::Mam {
 
 struct Query {
-    QString to;
-    QString node;
-    QString with;
-    QDateTime start;
-    QDateTime end;
-    QXmppResultSetQuery resultSetQuery;
+    QString to {};
+    QString node {};
+    QString with {};
+    QDateTime start {};
+    QDateTime end {};
+    QXmppResultSetQuery resultSetQuery {};
 };
 
 struct Page {
-    QXmppMamResultIq result;
-    std::vector<QXmpp::Messages::Context> messages;
+    QueryResult result {};
+    std::vector<QXmpp::Messages::Context> messages {};
 };
 
 using RetrieveResult = std::variant<Page, QXmppError>;
@@ -74,12 +74,18 @@ class QXMPP_EXPORT QXmppMamManager : public QXmppClientExtension
     Q_OBJECT
 
 public:
-    struct QXMPP_EXPORT RetrievedMessages {
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    struct [[deprecated("Use retrieve() and QXmpp::Mam::Page")]]
+    QXMPP_EXPORT RetrievedMessages {
         QXmppMamResultIq result;
         QList<QXmppMessage> messages;
     };
 
-    using RetrieveResult = std::variant<RetrievedMessages, QXmppError>;
+    using RetrieveResult [[deprecated("Use retrieve() and QXmpp::Mam::RetrieveResult")]] = std::variant<RetrievedMessages, QXmppError>;
+    QT_WARNING_POP
+#endif
 
     QXmppMamManager();
     ~QXmppMamManager();
@@ -90,12 +96,18 @@ public:
                                      const QDateTime &start = QDateTime(),
                                      const QDateTime &end = QDateTime(),
                                      const QXmppResultSetQuery &resultSetQuery = QXmppResultSetQuery());
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    [[deprecated("Use retrieve()")]]
     QXmppTask<RetrieveResult> retrieveMessages(const QString &to = QString(),
                                                const QString &node = QString(),
                                                const QString &jid = QString(),
                                                const QDateTime &start = QDateTime(),
                                                const QDateTime &end = QDateTime(),
                                                const QXmppResultSetQuery &resultSetQuery = QXmppResultSetQuery());
+    QT_WARNING_POP
+#endif
     QXmppTask<QXmpp::Mam::RetrieveResult> retrieve(const QXmpp::Mam::Query &query);
 
     QXmppDiscoFeatureWatch watchAccountSupport() const;

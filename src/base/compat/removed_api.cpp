@@ -504,6 +504,9 @@ bool QXmppJingleIq::isJingleIq(const QDomElement &element)
 
 // MamIq
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 bool QXmppMamQueryIq::isMamQueryIq(const QDomElement &element)
 {
     return isIqType(element, u"query", ns_mam);
@@ -519,6 +522,8 @@ bool QXmppMamResultIq::isMamResultIq(const QDomElement &element)
     }
     return false;
 }
+QT_WARNING_POP
+#endif
 
 // NonSaslIq
 

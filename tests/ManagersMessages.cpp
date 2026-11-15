@@ -151,6 +151,7 @@ private:
 
     Q_SLOT void testHandleResultIq_data();
     Q_SLOT void testHandleResultIq();
+    Q_SLOT void payloads();
 
     // test for task-based API
     Q_SLOT void retrieveMessagesUnencrypted();
@@ -324,6 +325,52 @@ void tst_QXmppMamManager::testHandleResultIq()
     QCOMPARE(m_helper.m_signalTriggered, accept);
 }
 
+void tst_QXmppMamManager::payloads()
+{
+    using namespace QXmpp::Mam;
+
+    const QByteArray resultXml =
+        "<fin xmlns='urn:xmpp:mam:2' complete='true'>"
+        "<set xmlns='http://jabber.org/protocol/rsm'>"
+        "<first index='0'>28482-98726-73623</first>"
+        "<last>09af3-cc343-b409f</last>"
+        "</set>"
+        "</fin>";
+    auto result = QueryResult::fromDom(xmlToDom(resultXml));
+    QVERIFY(result);
+    QVERIFY(result->complete);
+    QCOMPARE(result->resultSetReply.first(), u"28482-98726-73623"_s);
+    QCOMPARE(result->resultSetReply.last(), u"09af3-cc343-b409f"_s);
+    serializePacket(*result, resultXml);
+
+    const QByteArray emptyResultXml = "<fin xmlns='urn:xmpp:mam:2'/>";
+    result = QueryResult::fromDom(xmlToDom(emptyResultXml));
+    QVERIFY(result);
+    QVERIFY(!result->complete);
+    QVERIFY(result->resultSetReply.isNull());
+    serializePacket(*result, emptyResultXml);
+
+    QVERIFY(!QueryResult::fromDom(xmlToDom("<fin xmlns='urn:xmpp:mam:1'/>")));
+
+    const QByteArray queryXml =
+        "<query xmlns='urn:xmpp:mam:2' node='princely_musings' queryid='f27'>"
+        "<x xmlns='jabber:x:data' type='submit'>"
+        "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+        "</x>"
+        "<set xmlns='http://jabber.org/protocol/rsm'><max>10</max></set>"
+        "</query>";
+    auto query = QueryRequest::fromDom(xmlToDom(queryXml));
+    QVERIFY(query);
+    QCOMPARE(query->node, u"princely_musings"_s);
+    QCOMPARE(query->queryId, u"f27"_s);
+    QCOMPARE(query->form.formType(), u"urn:xmpp:mam:2"_s);
+    QCOMPARE(query->resultSetQuery.max(), 10);
+    serializePacket(*query, queryXml);
+}
+
+// tests the deprecated API
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 void tst_QXmppMamManager::retrieveMessagesUnencrypted()
 {
     TestClient test;
@@ -378,9 +425,6 @@ void tst_QXmppMamManager::retrieveMessagesUnencrypted()
     QCOMPARE(retrieved.result.resultSetReply().first(), "28482-98726-73623");
 }
 
-// tests the deprecated API
-QT_WARNING_PUSH
-QT_WARNING_DISABLE_DEPRECATED
 void tst_QXmppMamManager::retrieveMessagesEncrypted()
 {
     TestClient test;
@@ -442,7 +486,6 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
     QCOMPARE(retrieved.messages.at(1).body(), "What man art thou that thus bescreen'd in night so stumblest on my counsel?");
     QCOMPARE(retrieved.result.resultSetReply().first(), "28482-98726-73623");
 }
-QT_WARNING_POP
 
 void tst_QXmppMamManager::retrieveMessagesPipeline()
 {
@@ -483,6 +526,8 @@ void tst_QXmppMamManager::retrieveMessagesPipeline()
     QCOMPARE(received, 0);
     QCOMPARE(liveMessages.size(), 0);
 }
+
+QT_WARNING_POP
 
 void tst_QXmppMamManager::retrieve()
 {
@@ -529,7 +574,7 @@ void tst_QXmppMamManager::retrieve()
     test.inject(u"<iq type='result' id='qx1'><fin xmlns='urn:xmpp:mam:2' complete='true'/></iq>"_s);
 
     auto page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
-    QVERIFY(page.result.complete());
+    QVERIFY(page.result.complete);
     QCOMPARE(page.messages.size(), 2);
 
     const auto &decrypted = page.messages.at(0);
