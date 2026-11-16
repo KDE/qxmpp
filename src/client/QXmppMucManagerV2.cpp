@@ -3403,34 +3403,36 @@ QXmppTask<SendResult> QXmppMucRoomV2::inviteUser(QXmpp::Muc::Invite invite)
 */
 QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool watch)
 {
+    // The handle may be a temporary that is gone when the coroutine resumes.
+    auto data = m_data;
     using enum MucRoomState;
-    if (m_data->state != Creating && m_data->state != Joined) {
+    if (data->state != Creating && data->state != Joined) {
         co_return QXmppError { u"Room is not in Creating or Joined state."_s };
     }
 
     // Capture wasWatching before potentially enabling watch, so we only use the cache
     // when watching was already active (status 104 was keeping it current).
     // If we're just (re-)enabling watch now, the cache may be stale — always re-fetch.
-    const bool wasWatching = m_data->watchingRoomConfig;
+    const bool wasWatching = data->watchingRoomConfig;
     if (watch) {
-        m_data->watchingRoomConfig = true;
+        data->watchingRoomConfig = true;
     }
 
     if (wasWatching) {
         // If a status-104 re-fetch is in progress, join it — its result will be fresher
         // than the current cache. Otherwise return the cache directly.
-        if (m_data->fetchingRoomConfig) {
+        if (data->fetchingRoomConfig) {
             QXmppPromise<Result<QXmppMucRoomConfig>> p;
             auto task = p.task();
-            m_data->roomConfigWaiters.push_back(std::move(p));
+            data->roomConfigWaiters.push_back(std::move(p));
             co_return co_await std::move(task);
         }
-        if (const auto &cached = m_data->roomConfig.value()) {
+        if (const auto &cached = data->roomConfig.value()) {
             co_return *cached;
         }
     }
 
-    auto result = co_await m_data->manager->client()->sendIq(Iq::Get<MucOwnerQuery> { .to = m_data->roomJid }).withContext(m_data->manager);
+    auto result = co_await data->manager->client()->sendIq(Iq::Get<MucOwnerQuery> { .to = data->roomJid }).withContext(data->manager);
     if (auto *e = std::get_if<QXmppError>(&result)) {
         co_return std::move(*e);
     }
@@ -3439,7 +3441,7 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
     if (!config) {
         co_return QXmppError { u"Server returned an invalid or missing muc#roomconfig form."_s };
     }
-    m_data->roomConfig = config;
+    data->roomConfig = config;
     co_return std::move(*config);
 }
 
@@ -3456,27 +3458,29 @@ QXmppTask<Result<QXmppMucRoomConfig>> QXmppMucRoomV2::requestRoomConfig(bool wat
 */
 QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &config)
 {
+    // The handle may be a temporary that is gone when the coroutine resumes.
+    auto data = m_data;
     using enum MucRoomState;
-    if (m_data->state != Creating && m_data->state != Joined) {
+    if (data->state != Creating && data->state != Joined) {
         co_return QXmppError { u"Room is not in Creating or Joined state."_s };
     }
 
     auto form = config.toDataForm();
     form.setType(QXmppDataForm::Submit);
 
-    const bool wasCreating = (m_data->state == Creating);
-    auto result = co_await m_data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = m_data->roomJid, .payload = MucOwnerQuery { .form = std::move(form) } }).withContext(m_data->manager);
+    const bool wasCreating = (data->state == Creating);
+    auto result = co_await data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = data->roomJid, .payload = MucOwnerQuery { .form = std::move(form) } }).withContext(data->manager);
     // Re-check the state: a disconnect during the await may have deactivated the room
     // (state reset to NotJoined), in which case we must not stomp it back to Joined.
-    if (std::holds_alternative<Success>(result) && wasCreating && m_data->state == Creating) {
+    if (std::holds_alternative<Success>(result) && wasCreating && data->state == Creating) {
         // The room is unlocked. Like with joinRoom(), it is joined once the disco#info result
         // tells whether the occupant IDs received so far are valid.
         QXmppPromise<Result<QXmppMucRoomV2>> promise;
         auto joinTask = promise.task();
-        m_data->joinPromise = std::move(promise);
-        m_data->state = JoiningRoomInfo;
-        m_data->joining = true;
-        m_data->manager->d->fetchRoomInfo(m_data->roomJid);
+        data->joinPromise = std::move(promise);
+        data->state = JoiningRoomInfo;
+        data->joining = true;
+        data->manager->d->fetchRoomInfo(data->roomJid);
 
         auto joinResult = co_await std::move(joinTask);
         if (auto *error = std::get_if<QXmppError>(&joinResult)) {
@@ -3498,20 +3502,22 @@ QXmppTask<Result<>> QXmppMucRoomV2::setRoomConfig(const QXmppMucRoomConfig &conf
 */
 QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
 {
-    if (m_data->state != MucRoomState::Creating) {
+    // The handle may be a temporary that is gone when the coroutine resumes.
+    auto data = m_data;
+    if (data->state != MucRoomState::Creating) {
         co_return QXmppError { u"Room is not in Creating state."_s };
     }
 
     QXmppDataForm cancelForm;
     cancelForm.setType(QXmppDataForm::Cancel);
 
-    auto result = co_await m_data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = m_data->roomJid, .payload = MucOwnerQuery { .form = std::move(cancelForm) } }).withContext(m_data->manager);
+    auto result = co_await data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = data->roomJid, .payload = MucOwnerQuery { .form = std::move(cancelForm) } }).withContext(data->manager);
     // Only tear down if still the creating session — a disconnect during the await may
     // have already deactivated (and a subsequent rejoin revived) the room.
-    if (std::holds_alternative<Success>(result) && m_data->state == MucRoomState::Creating) {
-        m_data->manager->d->deactivateRoom(m_data->roomJid);
-        m_data->manager->d->rescheduleSelfPing();
-        DiscoInfoTracking::invalidate(m_data->manager->client(), m_data->roomJid);
+    if (std::holds_alternative<Success>(result) && data->state == MucRoomState::Creating) {
+        data->manager->d->deactivateRoom(data->roomJid);
+        data->manager->d->rescheduleSelfPing();
+        DiscoInfoTracking::invalidate(data->manager->client(), data->roomJid);
     }
     co_return result;
 }
@@ -3530,22 +3536,24 @@ QXmppTask<Result<>> QXmppMucRoomV2::cancelRoomCreation()
 */
 QXmppTask<Result<>> QXmppMucRoomV2::destroyRoom(const QString &reason, const QString &alternateJid)
 {
-    if (m_data->state != MucRoomState::Joined) {
+    // The handle may be a temporary that is gone when the coroutine resumes.
+    auto data = m_data;
+    if (data->state != MucRoomState::Joined) {
         co_return QXmppError { u"Room is not joined."_s };
     }
 
-    m_data->destroying = true;
-    auto result = co_await m_data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = m_data->roomJid, .payload = MucOwnerQuery { .destroy = MucOwnerDestroy { .alternateJid = alternateJid, .reason = reason } } }).withContext(m_data->manager);
-    m_data->destroying = false;
+    data->destroying = true;
+    auto result = co_await data->manager->client()->sendIq(Iq::Set<MucOwnerQuery> { .to = data->roomJid, .payload = MucOwnerQuery { .destroy = MucOwnerDestroy { .alternateJid = alternateJid, .reason = reason } } }).withContext(data->manager);
+    data->destroying = false;
     // Only tear down if still joined — a disconnect during the await may have already
     // deactivated (and a subsequent rejoin revived) the room.
     if (std::holds_alternative<Success>(result)) {
         // the room may already have been left because of the destroy presence
-        if (m_data->state == MucRoomState::Joined) {
-            m_data->manager->d->deactivateRoom(m_data->roomJid);
-            m_data->manager->d->rescheduleSelfPing();
+        if (data->state == MucRoomState::Joined) {
+            data->manager->d->deactivateRoom(data->roomJid);
+            data->manager->d->rescheduleSelfPing();
         }
-        DiscoInfoTracking::invalidate(m_data->manager->client(), m_data->roomJid);
+        DiscoInfoTracking::invalidate(data->manager->client(), data->roomJid);
     }
     co_return result;
 }
