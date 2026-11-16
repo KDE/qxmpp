@@ -373,7 +373,7 @@ struct XmlReference<Struct, std::optional<Element>> {
     bool hasValue(const Struct &data) const { return (data.*member).has_value(); }
 };
 
-template<std::ranges::range Range, typename Struct>
+template<typename Struct, std::ranges::range Range>
     requires(HasXmlTag<std::ranges::range_value_t<Range>>)
 struct XmlReference<Struct, Range> {
     using Element = std::ranges::range_value_t<Range>;
