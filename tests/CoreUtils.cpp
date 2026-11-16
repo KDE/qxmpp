@@ -25,6 +25,7 @@
 #include "QXmppXmlRegistry.h"
 
 #include "StringLiterals.h"
+#include "Xml.h"
 #include "XmlWriter.h"
 #include "util.h"
 
@@ -1270,6 +1271,97 @@ void tst_QXmppXmlFormatter::elideColorized()
 
 }  // namespace XmlHelpers
 
-QXMPP_TEST_MAIN(Utils::tst_QXmppUtils, Logger::tst_QXmppLogger, XmlHelpers::tst_QXmppXmlElement, XmlHelpers::tst_QXmppXmlRegistry, XmlHelpers::tst_QXmppXmlFormatter)
+// ============================================================
+// XML specs
+// ============================================================
+
+namespace XmlSpecs {
+
+enum class Color {
+    Red,
+    Green,
+};
+
+// neither default constructible nor with a null value
+struct Name {
+    explicit Name(QString value) : value(std::move(value)) { }
+    QString value;
+};
+
+struct NameSerDe {
+    Name parse(const QString &s) const { return Name(s); }
+    QString serialize(const Name &name) const { return name.value; }
+};
+
+// member order differs from the spec order
+struct OrderTest {
+    static constexpr std::tuple XmlTag = { u"order", QStringView(u"urn:qxmpp:test") };
+
+    QString body;
+    Color color;
+    Name name;
+};
+
+}  // namespace XmlSpecs
+
+template<>
+struct QXmpp::Private::Enums::Data<XmlSpecs::Color> {
+    static constexpr auto Values = makeValues<XmlSpecs::Color>({
+        { XmlSpecs::Color::Red, u"red" },
+        { XmlSpecs::Color::Green, u"green" },
+    });
+};
+
+template<>
+struct QXmpp::Private::XmlSpec<XmlSpecs::OrderTest> {
+    static constexpr std::tuple Spec = {
+        XmlAttribute { &XmlSpecs::OrderTest::name, u"name", XmlSpecs::NameSerDe() },
+        XmlAttribute { &XmlSpecs::OrderTest::color, u"color" },
+        XmlTextElement { &XmlSpecs::OrderTest::body, u"body" },
+    };
+};
+
+namespace XmlSpecs {
+
+class tst_XmlSpec : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void memberOrder();
+    Q_SLOT void invalidEnum();
+};
+
+void tst_XmlSpec::memberOrder()
+{
+    using namespace QXmpp::Private;
+
+    static_assert(!std::is_default_constructible_v<OrderTest>);
+    static_assert(specMemberOrder<OrderTest>() == std::array<std::size_t, 3> { 2, 1, 0 });
+
+    const QByteArray xml = "<order xmlns='urn:qxmpp:test' name='alice' color='green'><body>Hi</body></order>";
+
+    auto parsed = XmlSpecParser::fromDomImpl<OrderTest>(xmlToDom(xml));
+    QVERIFY(parsed);
+    QCOMPARE(parsed->body, u"Hi"_s);
+    QCOMPARE(parsed->color, Color::Green);
+    QCOMPARE(parsed->name.value, u"alice"_s);
+
+    serializePacket(*parsed, xml);
+}
+
+void tst_XmlSpec::invalidEnum()
+{
+    using namespace QXmpp::Private;
+
+    // no null value: unknown values make the whole element invalid
+    auto parsed = XmlSpecParser::fromDomImpl<OrderTest>(
+        xmlToDom("<order xmlns='urn:qxmpp:test' name='alice' color='blue'><body>Hi</body></order>"_ba));
+    QVERIFY(!parsed);
+}
+
+}  // namespace XmlSpecs
+
+QXMPP_TEST_MAIN(Utils::tst_QXmppUtils, Logger::tst_QXmppLogger, XmlHelpers::tst_QXmppXmlElement, XmlHelpers::tst_QXmppXmlRegistry, XmlHelpers::tst_QXmppXmlFormatter, XmlSpecs::tst_XmlSpec)
 
 #include "CoreUtils.moc"

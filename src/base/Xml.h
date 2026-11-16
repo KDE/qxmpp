@@ -12,6 +12,10 @@
 #include "Algorithms.h"
 #include "XmlWriter.h"
 
+#include <algorithm>
+#include <array>
+#include <tuple>
+
 namespace QXmpp::Private {
 
 //
@@ -247,6 +251,211 @@ struct BoolDefaultSerializer {
 };
 
 //
+// Member order
+//
+// The parser constructs structs with one aggregate initialization, so members do not need to be
+// default constructible and are only set from successfully parsed values. The spec order only
+// defines the XML order, the members are passed in declaration order. That order is computed at
+// compile time by comparing the addresses of the spec's member pointers with the addresses of a
+// structured binding on an object that is only declared, never defined (same trick as
+// boost::pfr).
+//
+
+// fakeObject is intentionally never defined
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-var-template"
+#endif
+
+template<typename T>
+struct FakeObjectWrapper {
+    const T value;
+};
+
+// never defined, only used in constant evaluation
+template<typename T>
+extern const FakeObjectWrapper<T> fakeObject;
+
+// Returns the addresses of the N members of s in declaration order.
+// Fails to compile if the struct does not have exactly N members, so every member must be covered
+// by the spec.
+template<std::size_t N, typename Struct>
+consteval auto structMemberAddresses(const Struct &s)
+{
+    if constexpr (N == 1) {
+        const auto &[m0] = s;
+        return std::array<const void *, N> { &m0 };
+    } else if constexpr (N == 2) {
+        const auto &[m0, m1] = s;
+        return std::array<const void *, N> { &m0, &m1 };
+    } else if constexpr (N == 3) {
+        const auto &[m0, m1, m2] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2 };
+    } else if constexpr (N == 4) {
+        const auto &[m0, m1, m2, m3] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3 };
+    } else if constexpr (N == 5) {
+        const auto &[m0, m1, m2, m3, m4] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4 };
+    } else if constexpr (N == 6) {
+        const auto &[m0, m1, m2, m3, m4, m5] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5 };
+    } else if constexpr (N == 7) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6 };
+    } else if constexpr (N == 8) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7 };
+    } else if constexpr (N == 9) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8 };
+    } else if constexpr (N == 10) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9 };
+    } else if constexpr (N == 11) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10 };
+    } else if constexpr (N == 12) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11 };
+    } else if constexpr (N == 13) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12 };
+    } else if constexpr (N == 14) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13 };
+    } else if constexpr (N == 15) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14 };
+    } else if constexpr (N == 16) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15 };
+    } else if constexpr (N == 17) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16 };
+    } else if constexpr (N == 18) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17 };
+    } else if constexpr (N == 19) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18 };
+    } else if constexpr (N == 20) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19 };
+    } else if constexpr (N == 21) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20 };
+    } else if constexpr (N == 22) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21 };
+    } else if constexpr (N == 23) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22 };
+    } else if constexpr (N == 24) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23 };
+    } else if constexpr (N == 25) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24 };
+    } else if constexpr (N == 26) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24, &m25 };
+    } else if constexpr (N == 27) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24, &m25, &m26 };
+    } else if constexpr (N == 28) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24, &m25, &m26, &m27 };
+    } else if constexpr (N == 29) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24, &m25, &m26, &m27, &m28 };
+    } else if constexpr (N == 30) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28, m29] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24, &m25, &m26, &m27, &m28, &m29 };
+    } else if constexpr (N == 31) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28, m29, m30] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24, &m25, &m26, &m27, &m28, &m29, &m30 };
+    } else if constexpr (N == 32) {
+        const auto &[m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28, m29, m30, m31] = s;
+        return std::array<const void *, N> { &m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, &m8, &m9, &m10, &m11, &m12, &m13, &m14, &m15, &m16, &m17, &m18, &m19, &m20, &m21, &m22, &m23, &m24, &m25, &m26, &m27, &m28, &m29, &m30, &m31 };
+    } else if constexpr (N == 0) {
+        static_assert(std::is_empty_v<Struct>, "XmlSpec does not cover all members of the struct");
+        return std::array<const void *, N> {};
+    } else {
+        static_assert(N <= 32, "Structs with more than 32 members are not supported, extend structMemberAddresses()");
+        return std::array<const void *, N> {};
+    }
+}
+
+// Flattened list of the member pointers of a spec field (XmlElement contains other fields).
+template<typename Field>
+constexpr auto specFieldMembers(const Field &field)
+{
+    if constexpr (requires { field.contents; }) {
+        return std::apply([](const auto &...c) { return std::tuple_cat(specFieldMembers(c)...); }, field.contents);
+    } else {
+        return std::tuple { field.member };
+    }
+}
+
+template<typename Struct>
+constexpr auto specMembers()
+{
+    return std::apply([](const auto &...fields) { return std::tuple_cat(specFieldMembers(fields)...); }, XmlSpec<Struct>::Spec);
+}
+
+// not constexpr: calling it from constant evaluation results in a compile error with this name
+inline void specMemberNotInStruct() { }
+inline void specMemberUsedTwice() { }
+
+// Addresses of the members referenced by the spec, in spec order
+template<typename Struct>
+consteval auto specMemberAddresses()
+{
+    return std::apply(
+        [](auto... members) {
+            return std::array<const void *, sizeof...(members)> { &(fakeObject<Struct>.value.*members)... };
+        },
+        specMembers<Struct>());
+}
+
+// Returns for each member of Struct (in declaration order) the index of the flattened spec value.
+template<typename Struct>
+consteval auto specMemberOrder()
+{
+    constexpr auto specAddresses = specMemberAddresses<Struct>();
+    constexpr auto N = specAddresses.size();
+    constexpr auto structAddresses = structMemberAddresses<N>(fakeObject<Struct>.value);
+
+    std::array<std::size_t, N> order {};
+    std::array<bool, N> assigned {};
+    for (std::size_t specIndex = 0; specIndex < N; specIndex++) {
+        auto it = std::ranges::find(structAddresses, specAddresses[specIndex]);
+        if (it == structAddresses.end()) {
+            specMemberNotInStruct();
+        }
+        auto memberIndex = std::size_t(it - structAddresses.begin());
+        if (assigned[memberIndex]) {
+            specMemberUsedTwice();
+        }
+        assigned[memberIndex] = true;
+        order[memberIndex] = specIndex;
+    }
+    return order;
+}
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+template<typename Struct, typename Values, std::size_t... I>
+Struct constructInMemberOrder(Values &&values, std::index_sequence<I...>)
+{
+    static constexpr auto order = specMemberOrder<Struct>();
+    return Struct { std::get<order[I]>(std::move(values))... };
+}
+
+//
 // XML Spec Ser/Deser
 //
 
@@ -257,18 +466,15 @@ struct XmlSpecParser {
     template<typename Struct>
     static Struct parse(const QDomElement &el)
     {
-        // 1. for each spec field call parse() (returns tuple)
+        // 1. for each spec field call parse() (returns tuple), in XML order
         // 2. concat those using std::tuple_cat and then
-        // 3. use the flattened result to construct Struct
-        return std::apply(
-            [&](auto &&...fields) {
-                return std::apply(
-                    [](auto &&...values) {
-                        return Struct { std::forward<decltype(values)>(values)... };
-                    },
-                    std::tuple_cat(fields.parse(el)...));
-            },
+        // 3. construct Struct from the values in member declaration order
+        auto values = std::apply(
+            [&](auto &&...fields) { return std::tuple_cat(fields.parse(el)...); },
             XmlSpec<Struct>::Spec);
+        return constructInMemberOrder<Struct>(
+            std::move(values),
+            std::make_index_sequence<std::tuple_size_v<decltype(values)>>());
     }
 
     template<typename Struct>
