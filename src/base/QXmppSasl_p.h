@@ -23,7 +23,7 @@ class QXmppSaslServerPrivate;
 namespace QXmpp::Private {
 class SaslManager;
 class XmlWriter;
-}
+}  // namespace QXmpp::Private
 
 //
 //  W A R N I N G

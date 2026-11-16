@@ -9,8 +9,8 @@
 
 #include "QXmppError.h"
 #include "QXmppTask.h"
-
 #include "QXmppUtils_p.h"
+
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 
