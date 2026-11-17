@@ -84,7 +84,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppPubSubMetadata.h
     base/QXmppPubSubNodeConfig.h
     base/QXmppPubSubPublishOptions.h
-    base/QXmppPubSubSubscribeOptions.cpp
+    base/QXmppPubSubSubscribeOptions.h
     base/QXmppPubSubSubscription.h
     base/QXmppPubSubSubAuthorization.h
     base/QXmppPushEnableIq.h
