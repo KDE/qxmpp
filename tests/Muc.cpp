@@ -1438,13 +1438,14 @@ void tst_QXmppMuc::resolveSenderArchive()
     // the occupant has left the room
     auto task = mam->retrieve({ .to = archiveJid });
     const auto request = test.takePacket();
-    const auto id = QRegularExpression(u"id=[\"']([^\"']*)"_s).match(request).captured(1);
+    const auto id = xmlToDom(request).attribute(u"id"_s);
+    const auto queryId = xmlToDom(request).firstChildElement().attribute(u"queryid"_s);
     TestClient::handleStanza(mam, xmlToDom(u"<message to='hag66@shakespeare.lit/pda' from='"_s + archiveJid + u"'>"
                                                                                                               "<result xmlns='urn:xmpp:mam:2' queryid='"_s +
-                                           id + u"' id='1'><forwarded xmlns='urn:xmpp:forward:0'>"
-                                                "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
-                                                "<message xmlns='jabber:client' from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
-                                                "<body>Hi</body>"_s +
+                                           queryId + u"' id='1'><forwarded xmlns='urn:xmpp:forward:0'>"
+                                                     "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
+                                                     "<message xmlns='jabber:client' from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'>"
+                                                     "<body>Hi</body>"_s +
                                            items + u"</message></forwarded></result></message>"_s));
     test.inject(u"<iq type='result' id='"_s + id + u"' from='"_s + archiveJid + u"'><fin xmlns='urn:xmpp:mam:2'/></iq>"_s);
     auto page = expectVariant<QXmpp::Mam::Page>(task.takeResult());

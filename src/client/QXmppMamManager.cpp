@@ -491,11 +491,10 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
                                                   const QDateTime &end,
                                                   const QXmppResultSetQuery &resultSetQuery)
 {
-    // reuse the IQ id as query id
-    auto queryId = generateSequentialStanzaId();
+    // random, so other entities can't guess it and inject results
+    auto queryId = QXmppUtils::generateStanzaUuid();
 
     Iq::Set<Mam::QueryRequest> request {
-        .id = queryId,
         .to = to,
         .payload = Mam::QueryRequest {
             .queryId = queryId,
@@ -581,8 +580,8 @@ QT_WARNING_POP
 */
 QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query)
 {
-    // reuse the IQ id as query id
-    auto queryId = generateSequentialStanzaId();
+    // random, so other entities can't guess it and inject results
+    auto queryId = QXmppUtils::generateStanzaUuid();
 
     auto [itr, inserted] = d->ongoingRequests.insert({ queryId.toStdString(), RetrieveRequestState() });
     Q_ASSERT(inserted);
@@ -595,7 +594,6 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
 
     // the messages are processed as they arrive, see handleIncomingStanza()
     Iq::Set<Mam::QueryRequest> request {
-        .id = queryId,
         .to = query.to,
         .payload = Mam::QueryRequest {
             .queryId = queryId,

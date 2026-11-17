@@ -130,10 +130,38 @@ public:
     }
 };
 
+// Takes the MAM query sent first and returns its random query ID.
+static QString takeQueryId(TestClient &test)
+{
+    auto queryId = xmlToDom(test.takePacket()).firstChildElement().attribute(u"queryid"_s);
+    test.resetIdCount();
+    return queryId;
+}
+
+// Compares the MAM query sent first with expected, in which QUERYID stands for the random query
+// ID, and returns the query ID.
+static QString expectMamQuery(TestClient &test, QString expected)
+{
+    auto packet = test.takePacket();
+    auto queryId = xmlToDom(packet).firstChildElement().attribute(u"queryid"_s);
+    [&] {
+        QVERIFY(!queryId.isEmpty());
+        QCOMPARE(rewriteXml(packet), rewriteXml(expected.replace(u"QUERYID"_s, queryId)));
+    }();
+    test.resetIdCount();
+    return queryId;
+}
+
+// Passes a MAM result to the manager, QUERYID in xml stands for the query ID.
+static void handleMamResult(QXmppMamManager *mam, const QString &queryId, QString xml)
+{
+    TestClient::handleStanza(mam, xmlToDom(xml.replace(u"QUERYID"_s, queryId)));
+}
+
 static QString mamResult(const QString &id, const QString &message, const QString &from = {})
 {
     return u"<message to='juliet@capulet.lit/chamber'"_s + (from.isEmpty() ? QString() : u" from='"_s + from + u'\'') +
-        u"><result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s +
+        u"><result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='"_s +
         id + u"'><forwarded xmlns='urn:xmpp:forward:0'><delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"_s +
         message + u"</forwarded></result></message>"_s;
 }
@@ -424,20 +452,21 @@ void tst_QXmppMamManager::retrieveArchivedMessages()
     QSignalSpy results(mam, &QXmppMamManager::resultsRecieved);
 
     auto queryId = mam->retrieveArchivedMessages(u"mam.server.org"_s, {}, u"romeo@montague.lit"_s);
-    QCOMPARE(queryId, u"qx1"_s);
-    test.expect(u"<iq id='qx1' to='mam.server.org' type='set'>"
-                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
-                "<x xmlns='jabber:x:data' type='submit'>"
-                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
-                "<field type='jid-single' var='with'><value>romeo@montague.lit</value></field>"
-                "</x>"
-                "</query>"
-                "</iq>"_s);
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<body>Hi</body></message>"_s,
-                                                     u"mam.server.org"_s)));
+    QVERIFY(!queryId.isEmpty());
+    QCOMPARE(expectMamQuery(test, u"<iq id='qx1' to='mam.server.org' type='set'>"
+                                  "<query xmlns='urn:xmpp:mam:2' queryid='QUERYID'>"
+                                  "<x xmlns='jabber:x:data' type='submit'>"
+                                  "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                                  "<field type='jid-single' var='with'><value>romeo@montague.lit</value></field>"
+                                  "</x>"
+                                  "</query>"
+                                  "</iq>"_s),
+             queryId);
+    handleMamResult(mam, queryId, mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                    "<body>Hi</body></message>"_s,
+                                            u"mam.server.org"_s));
     QCOMPARE(messages.size(), 1);
-    QCOMPARE(messages.at(0).at(0).toString(), u"qx1"_s);
+    QCOMPARE(messages.at(0).at(0).toString(), queryId);
     QCOMPARE(messages.at(0).at(1).value<QXmppMessage>().body(), u"Hi"_s);
     QCOMPARE(results.size(), 0);
 
@@ -447,7 +476,7 @@ void tst_QXmppMamManager::retrieveArchivedMessages()
                 "</fin>"
                 "</iq>"_s);
     QCOMPARE(results.size(), 1);
-    QCOMPARE(results.at(0).at(0).toString(), u"qx1"_s);
+    QCOMPARE(results.at(0).at(0).toString(), queryId);
     QCOMPARE(results.at(0).at(1).value<QXmppResultSetReply>().last(), u"1"_s);
     QCOMPARE(results.at(0).at(2).toBool(), true);
 }
@@ -460,39 +489,39 @@ void tst_QXmppMamManager::retrieveMessagesUnencrypted()
     TestClient test;
     auto *mam = test.addNewExtension<QXmppMamManager>();
     auto task = mam->retrieveMessages("mam.server.org");
-    test.expect("<iq id='qx1' to='mam.server.org' type='set'>"
-                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
-                "<x xmlns='jabber:x:data' type='submit'>"
-                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
-                "</x>"
-                "</query>"
-                "</iq>");
-    TestClient::handleStanza(mam, xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
-                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
-                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
-                                           "<message xmlns='jabber:client'"
-                                           " to='juliet@capulet.lit/balcony'"
-                                           " from='romeo@montague.lit/orchard'"
-                                           " type='chat'>"
-                                           "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
-                                           "</message>"
-                                           "</forwarded>"
-                                           "</result>"
-                                           "</message>"));
-    TestClient::handleStanza(mam, xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
-                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
-                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
-                                           "<message xmlns='jabber:client'"
-                                           " to='romeo@montague.lit/orchard'"
-                                           " from='juliet@capulet.lit/balcony'"
-                                           " type='chat' id='8a54s'>"
-                                           "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
-                                           "</message>"
-                                           "</forwarded>"
-                                           "</result>"
-                                           "</message>"));
+    auto queryId = expectMamQuery(test, "<iq id='qx1' to='mam.server.org' type='set'>"
+                                        "<query xmlns='urn:xmpp:mam:2' queryid='QUERYID'>"
+                                        "<x xmlns='jabber:x:data' type='submit'>"
+                                        "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                                        "</x>"
+                                        "</query>"
+                                        "</iq>");
+    handleMamResult(mam, queryId, "<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                  "<result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='28482-98726-73623'>"
+                                  "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                  "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
+                                  "<message xmlns='jabber:client'"
+                                  " to='juliet@capulet.lit/balcony'"
+                                  " from='romeo@montague.lit/orchard'"
+                                  " type='chat'>"
+                                  "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
+                                  "</message>"
+                                  "</forwarded>"
+                                  "</result>"
+                                  "</message>");
+    handleMamResult(mam, queryId, "<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                  "<result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='5d398-28273-f7382'>"
+                                  "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                  "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
+                                  "<message xmlns='jabber:client'"
+                                  " to='romeo@montague.lit/orchard'"
+                                  " from='juliet@capulet.lit/balcony'"
+                                  " type='chat' id='8a54s'>"
+                                  "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
+                                  "</message>"
+                                  "</forwarded>"
+                                  "</result>"
+                                  "</message>");
     test.inject("<iq type='result' id='qx1'>"
                 "<fin xmlns='urn:xmpp:mam:2'>"
                 "<set xmlns='http://jabber.org/protocol/rsm'>"
@@ -520,40 +549,40 @@ void tst_QXmppMamManager::retrieveMessagesEncrypted()
 
     // start request
     auto task = mam->retrieveMessages("mam.server.org");
-    test.expect("<iq id='qx1' to='mam.server.org' type='set'>"
-                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
-                "<x xmlns='jabber:x:data' type='submit'>"
-                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
-                "</x>"
-                "</query>"
-                "</iq>");
-    TestClient::handleStanza(mam, xmlToDom("<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='28482-98726-73623'>"
-                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
-                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
-                                           "<message xmlns='jabber:client'"
-                                           " to='juliet@capulet.lit/balcony'"
-                                           " from='romeo@montague.lit/orchard'"
-                                           " type='chat'>"
-                                           "<test-encrypted/>"
-                                           "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
-                                           "</message>"
-                                           "</forwarded>"
-                                           "</result>"
-                                           "</message>"));
-    TestClient::handleStanza(mam, xmlToDom("<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
-                                           "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='5d398-28273-f7382'>"
-                                           "<forwarded xmlns='urn:xmpp:forward:0'>"
-                                           "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
-                                           "<message xmlns='jabber:client'"
-                                           " to='romeo@montague.lit/orchard'"
-                                           " from='juliet@capulet.lit/balcony'"
-                                           " type='chat' id='8a54s'>"
-                                           "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
-                                           "</message>"
-                                           "</forwarded>"
-                                           "</result>"
-                                           "</message>"));
+    auto queryId = expectMamQuery(test, "<iq id='qx1' to='mam.server.org' type='set'>"
+                                        "<query xmlns='urn:xmpp:mam:2' queryid='QUERYID'>"
+                                        "<x xmlns='jabber:x:data' type='submit'>"
+                                        "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                                        "</x>"
+                                        "</query>"
+                                        "</iq>");
+    handleMamResult(mam, queryId, "<message id='aeb213' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                  "<result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='28482-98726-73623'>"
+                                  "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                  "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
+                                  "<message xmlns='jabber:client'"
+                                  " to='juliet@capulet.lit/balcony'"
+                                  " from='romeo@montague.lit/orchard'"
+                                  " type='chat'>"
+                                  "<test-encrypted/>"
+                                  "<body>Call me but love, and I'll be new baptized; Henceforth I never will be Romeo.</body>"
+                                  "</message>"
+                                  "</forwarded>"
+                                  "</result>"
+                                  "</message>");
+    handleMamResult(mam, queryId, "<message id='aeb214' to='juliet@capulet.lit/chamber' from='mam.server.org'>"
+                                  "<result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='5d398-28273-f7382'>"
+                                  "<forwarded xmlns='urn:xmpp:forward:0'>"
+                                  "<delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:09:32Z'/>"
+                                  "<message xmlns='jabber:client'"
+                                  " to='romeo@montague.lit/orchard'"
+                                  " from='juliet@capulet.lit/balcony'"
+                                  " type='chat' id='8a54s'>"
+                                  "<body>What man art thou that thus bescreen'd in night so stumblest on my counsel?</body>"
+                                  "</message>"
+                                  "</forwarded>"
+                                  "</result>"
+                                  "</message>");
     test.inject("<iq type='result' id='qx1'>"
                 "<fin xmlns='urn:xmpp:mam:2'>"
                 "<set xmlns='http://jabber.org/protocol/rsm'>"
@@ -592,11 +621,11 @@ void tst_QXmppMamManager::retrieveMessagesPipeline()
     QSignalSpy liveMessages(&test, &QXmppClient::messageReceived);
 
     auto task = mam->retrieveMessages();
-    test.ignore();
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body='secret'/></message>"_s)));
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"2"_s, u"<message xmlns='jabber:client' to='romeo@montague.lit/orchard' from='juliet@capulet.lit/balcony' type='chat'>"
-                                                             "<body>sent</body></message>"_s)));
+    auto queryId = takeQueryId(test);
+    handleMamResult(mam, queryId, mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                    "<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body='secret'/></message>"_s));
+    handleMamResult(mam, queryId, mamResult(u"2"_s, u"<message xmlns='jabber:client' to='romeo@montague.lit/orchard' from='juliet@capulet.lit/balcony' type='chat'>"
+                                                    "<body>sent</body></message>"_s));
     test.inject(u"<iq type='result' id='qx1'><fin xmlns='urn:xmpp:mam:2'/></iq>"_s);
 
     auto retrieved = expectFutureVariant<QXmppMamManager::RetrievedMessages>(task);
@@ -635,23 +664,23 @@ void tst_QXmppMamManager::retrieve()
     });
 
     auto task = mam->retrieve({ .with = u"romeo@montague.lit"_s });
-    test.expect(u"<iq id='qx1' type='set'>"
-                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
-                "<x xmlns='jabber:x:data' type='submit'>"
-                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
-                "<field type='jid-single' var='with'><value>romeo@montague.lit</value></field>"
-                "</x>"
-                "</query>"
-                "</iq>"_s);
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body='secret'/></message>"_s)));
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"2"_s, u"<message xmlns='jabber:client' to='romeo@montague.lit/orchard' from='juliet@capulet.lit/balcony' type='chat'>"
-                                                             "<body>sent</body></message>"_s)));
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"3"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<body>consumed</body></message>"_s)));
+    auto queryId = expectMamQuery(test, u"<iq id='qx1' type='set'>"
+                                        "<query xmlns='urn:xmpp:mam:2' queryid='QUERYID'>"
+                                        "<x xmlns='jabber:x:data' type='submit'>"
+                                        "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                                        "<field type='jid-single' var='with'><value>romeo@montague.lit</value></field>"
+                                        "</x>"
+                                        "</query>"
+                                        "</iq>"_s);
+    handleMamResult(mam, queryId, mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                    "<body>fallback</body><encrypted xmlns='urn:test:mam-e2ee' body='secret'/></message>"_s));
+    handleMamResult(mam, queryId, mamResult(u"2"_s, u"<message xmlns='jabber:client' to='romeo@montague.lit/orchard' from='juliet@capulet.lit/balcony' type='chat'>"
+                                                    "<body>sent</body></message>"_s));
+    handleMamResult(mam, queryId, mamResult(u"3"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                    "<body>consumed</body></message>"_s));
 
     // processed before the query has finished
-    const QStringList expected { u"qx1 juliet@capulet.lit 1 romeo@montague.lit"_s, u"qx1 juliet@capulet.lit 2 romeo@montague.lit"_s, u"qx1 juliet@capulet.lit 3 romeo@montague.lit"_s };
+    const QStringList expected { queryId + u" juliet@capulet.lit 1 romeo@montague.lit"_s, queryId + u" juliet@capulet.lit 2 romeo@montague.lit"_s, queryId + u" juliet@capulet.lit 3 romeo@montague.lit"_s };
     QCOMPARE(processed, expected);
     QVERIFY(!task.isFinished());
 
@@ -699,11 +728,11 @@ void tst_QXmppMamManager::retrieveLegacyEncrypted()
     });
 
     auto task = mam->retrieve({});
-    test.ignore();
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<test-encrypted/><body>secret</body></message>"_s)));
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"2"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<body>plain</body></message>"_s)));
+    auto queryId = takeQueryId(test);
+    handleMamResult(mam, queryId, mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                    "<test-encrypted/><body>secret</body></message>"_s));
+    handleMamResult(mam, queryId, mamResult(u"2"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                    "<body>plain</body></message>"_s));
     test.inject(u"<iq type='result' id='qx1'><fin xmlns='urn:xmpp:mam:2'/></iq>"_s);
 
     auto page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
@@ -732,9 +761,9 @@ void tst_QXmppMamManager::retrieveError()
     });
 
     auto task = mam->retrieve({});
-    test.ignore();
-    TestClient::handleStanza(mam, xmlToDom(mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
-                                                             "<body>Hi</body></message>"_s)));
+    auto queryId = takeQueryId(test);
+    handleMamResult(mam, queryId, mamResult(u"1"_s, u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'>"
+                                                    "<body>Hi</body></message>"_s));
     test.inject(u"<iq type='error' id='qx1'><error type='cancel'><item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
 
     expectVariant<QXmppError>(task.takeResult());
@@ -775,32 +804,32 @@ void tst_QXmppMamManager::retrieveExtended()
         .resultSetQuery = rsm,
         .flipPage = true,
     });
-    test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
-                "<query xmlns='urn:xmpp:mam:2' queryid='qx1'>"
-                "<x xmlns='jabber:x:data' type='submit'>"
-                "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
-                "<field type='text-single' var='before-id'><value>9</value></field>"
-                "<field type='text-single' var='after-id'><value>0</value></field>"
-                "<field type='list-multi' var='ids'><value>1</value><value>2</value></field>"
-                "<field type='boolean' var='include-groupchat'><value>false</value></field>"
-                "<field type='text-single' var='{urn:example:mam}fulltext'><value>balcony</value></field>"
-                "</x>"
-                "<set xmlns='http://jabber.org/protocol/rsm'><max>2</max><before/></set>"
-                "<flip-page/>"
-                "</query>"
-                "</iq>"_s);
+    auto queryId = expectMamQuery(test, u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='set'>"
+                                        "<query xmlns='urn:xmpp:mam:2' queryid='QUERYID'>"
+                                        "<x xmlns='jabber:x:data' type='submit'>"
+                                        "<field type='hidden' var='FORM_TYPE'><value>urn:xmpp:mam:2</value></field>"
+                                        "<field type='text-single' var='before-id'><value>9</value></field>"
+                                        "<field type='text-single' var='after-id'><value>0</value></field>"
+                                        "<field type='list-multi' var='ids'><value>1</value><value>2</value></field>"
+                                        "<field type='boolean' var='include-groupchat'><value>false</value></field>"
+                                        "<field type='text-single' var='{urn:example:mam}fulltext'><value>balcony</value></field>"
+                                        "</x>"
+                                        "<set xmlns='http://jabber.org/protocol/rsm'><max>2</max><before/></set>"
+                                        "<flip-page/>"
+                                        "</query>"
+                                        "</iq>"_s);
 
     // flipped page: newest message first
     auto result = [](const QString &id, const QString &body) {
         return u"<message to='juliet@capulet.lit/chamber' from='coven@chat.shakespeare.lit'>"
-               "<result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s +
+               "<result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='"_s +
             id +
             u"'><forwarded xmlns='urn:xmpp:forward:0'><delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
             "<message xmlns='jabber:client' from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'><body>"_s +
             body + u"</body></message></forwarded></result></message>"_s;
     };
-    TestClient::handleStanza(mam, xmlToDom(result(u"2"_s, u"newer"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result(u"1"_s, u"older"_s)));
+    handleMamResult(mam, queryId, result(u"2"_s, u"newer"_s));
+    handleMamResult(mam, queryId, result(u"1"_s, u"older"_s));
     QCOMPARE(processed, (QStringList { u"2"_s, u"1"_s }));
 
     test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'>"
@@ -820,9 +849,9 @@ void tst_QXmppMamManager::retrieveExtended()
     // archive ignoring <flip-page/>: the page stays in chronological order
     processed.clear();
     task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_s, .flipPage = true });
-    test.ignore();
-    TestClient::handleStanza(mam, xmlToDom(result(u"1"_s, u"older"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result(u"2"_s, u"newer"_s)));
+    queryId = takeQueryId(test);
+    handleMamResult(mam, queryId, result(u"1"_s, u"older"_s));
+    handleMamResult(mam, queryId, result(u"2"_s, u"newer"_s));
     QCOMPARE(processed, (QStringList { u"1"_s, u"2"_s }));
     test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'>"
                 "<fin xmlns='urn:xmpp:mam:2' complete='true'>"
@@ -844,7 +873,7 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
 
     auto result = [](const QString &from, const QString &id) -> QString {
         return u"<message to='juliet@capulet.lit/chamber'"_s + (from.isEmpty() ? QString() : u" from='"_s + from + u'\'') +
-            u"><result xmlns='urn:xmpp:mam:2' queryid='qx1' id='"_s + id +
+            u"><result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='"_s + id +
             u"'><forwarded xmlns='urn:xmpp:forward:0'>"
             "<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'><body>Hi</body></message>"
             "</forwarded></result></message>"_s;
@@ -852,11 +881,11 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
 
     // archive of the own account
     auto task = mam->retrieve({});
-    test.ignore();
-    TestClient::handleStanza(mam, xmlToDom(result(u"romeo@montague.lit"_s, u"spoofed"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result(u"juliet@capulet.lit/balcony"_s, u"spoofed"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result({}, u"1"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result(u"juliet@capulet.lit"_s, u"2"_s)));
+    auto queryId = takeQueryId(test);
+    handleMamResult(mam, queryId, result(u"romeo@montague.lit"_s, u"spoofed"_s));
+    handleMamResult(mam, queryId, result(u"juliet@capulet.lit/balcony"_s, u"spoofed"_s));
+    handleMamResult(mam, queryId, result({}, u"1"_s));
+    handleMamResult(mam, queryId, result(u"juliet@capulet.lit"_s, u"2"_s));
     test.inject(u"<iq type='result' id='qx1'><fin xmlns='urn:xmpp:mam:2' complete='true'/></iq>"_s);
 
     auto page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
@@ -866,10 +895,10 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
 
     // MUC archive: occupants and the own server must not inject results
     task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_s });
-    test.ignore();
-    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"spoofed"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result({}, u"spoofed"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit"_s, u"3"_s)));
+    queryId = takeQueryId(test);
+    handleMamResult(mam, queryId, result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"spoofed"_s));
+    handleMamResult(mam, queryId, result({}, u"spoofed"_s));
+    handleMamResult(mam, queryId, result(u"coven@chat.shakespeare.lit"_s, u"3"_s));
     test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'><fin xmlns='urn:xmpp:mam:2' complete='true'/></iq>"_s);
 
     page = expectVariant<QXmpp::Mam::Page>(task.takeResult());
@@ -879,15 +908,15 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
     // signal-based API
     QSignalSpy messages(mam, &QXmppMamManager::archivedMessageReceived);
     mam->retrieveArchivedMessages(u"coven@chat.shakespeare.lit"_s);
-    test.ignore();
-    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"spoofed"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result({}, u"spoofed"_s)));
-    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit"_s, u"4"_s)));
+    queryId = takeQueryId(test);
+    handleMamResult(mam, queryId, result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"spoofed"_s));
+    handleMamResult(mam, queryId, result({}, u"spoofed"_s));
+    handleMamResult(mam, queryId, result(u"coven@chat.shakespeare.lit"_s, u"4"_s));
     QCOMPARE(messages.size(), 1);
     test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'><fin xmlns='urn:xmpp:mam:2' complete='true'/></iq>"_s);
 
     // results of queries sent manually can't be checked
-    TestClient::handleStanza(mam, xmlToDom(result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"5"_s)));
+    handleMamResult(mam, queryId, result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"5"_s));
     QCOMPARE(messages.size(), 2);
 }
 
