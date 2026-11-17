@@ -152,7 +152,7 @@ set(INSTALL_HEADER_FILES
     client/QXmppHttpFileSharingProvider.h
     client/QXmppHttpUploadManager.h
     client/QXmppInvokable.h
-    client/QXmppIqHandling.h
+    # client/QXmppIqHandling.h  TODO: includes uninstalled StringLiterals.h
     client/QXmppJingleMessageInitiationManager.h
     client/QXmppMamManager.h
     client/QXmppMessages.h
