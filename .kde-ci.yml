@@ -11,3 +11,4 @@ Options:
   # only report coverage of the library itself
   gcovr-arguments: '--exclude "tests/.*" --exclude "examples/.*"'
   clang-format-versions: [19]
+  run-installed-library-check-on: ['@all']

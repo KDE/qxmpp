@@ -473,6 +473,17 @@ install(
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${QXMPP_TARGET}"
 )
 
+if(HAVE_INSTALLED_LIBRARY_CHECK)
+    ecm_add_installed_library_check(${QXMPP_TARGET}
+        PACKAGE_NAME "${QXMPP_TARGET}"
+        PACKAGE_TARGET_NAMESPACE "QXmpp::"
+    )
+
+    ecm_installed_library_check_include_strings(${QXMPP_TARGET}
+        HEADERS ${INSTALL_HEADER_FILES}
+    )
+endif()
+
 # submodules
 if(BUILD_OMEMO)
     add_subdirectory(omemo)
