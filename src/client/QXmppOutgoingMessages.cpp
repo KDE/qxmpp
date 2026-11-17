@@ -31,6 +31,16 @@ using namespace QXmpp::Messages;
 
 namespace QXmpp::Private {
 
+void setReflectionIds(QXmppMessage &message)
+{
+    if (message.originId().isEmpty()) {
+        message.setOriginId(message.id().isEmpty() ? QXmppUtils::generateStanzaUuid() : message.id());
+    }
+    if (message.id().isEmpty()) {
+        message.setId(message.originId());
+    }
+}
+
 // The message for the recipients of an encryption protecting only the body.
 struct BodyOnly {
     QXmppMessage message;

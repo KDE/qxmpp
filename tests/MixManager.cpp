@@ -93,6 +93,7 @@ private:
     Q_SLOT void testSendMessageReflection();
     Q_SLOT void testSendMessageReflectionUnknownParticipant();
     Q_SLOT void testSendMessageReflectionError();
+    Q_SLOT void testSendMessageReflectionErrorWithoutPayload();
     Q_SLOT void testSendMessageReflectionSessionEnded();
     Q_SLOT void testSendMessageNoChannel();
 
@@ -2115,6 +2116,19 @@ void tst_QXmppMixManager::testSendMessageReflectionError()
                                 "<origin-id xmlns='urn:xmpp:sid:0' id='"_s +
                                 originId +
                                 u"'/>"
+                                "<error type='cancel'><not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                                "</message>"_s);
+    expectFutureVariant<QXmppError>(*tester.task);
+}
+
+void tst_QXmppMixManager::testSendMessageReflectionErrorWithoutPayload()
+{
+    ReflectionTester tester;
+    const auto originId = tester.send();
+
+    // the ID is the origin ID, the server may bounce errors without the original payload
+    tester.client.injectMessage(u"<message id='"_s + originId +
+                                u"' from='coven@mix.shakespeare.example' to='hag66@shakespeare.example/pda' type='error'>"
                                 "<error type='cancel'><not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
                                 "</message>"_s);
     expectFutureVariant<QXmppError>(*tester.task);

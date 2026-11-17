@@ -82,6 +82,7 @@ private:
     Q_SLOT void resolveSenderArchive();
     Q_SLOT void sendMessage();
     Q_SLOT void sendMessageError();
+    Q_SLOT void sendMessageErrorWithoutPayload();
     Q_SLOT void sendMessageForgedReflection();
     Q_SLOT void sendMessageConsumedReflection();
     Q_SLOT void sendMessageArchiveId();
@@ -1950,6 +1951,30 @@ void tst_QXmppMuc::sendMessageError()
     QVERIFY(sendTask.isFinished());
     auto error = expectVariant<QXmppError>(sendTask.result());
     QVERIFY(!error.description.isEmpty());
+}
+
+void tst_QXmppMuc::sendMessageErrorWithoutPayload()
+{
+    TestClient test(true);
+    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *muc = test.addNewExtension<QXmppMucManagerV2>();
+    auto room = joinedRoom(test, muc);
+
+    QXmppMessage message;
+    message.setBody(u"Hello!"_s);
+    auto task = sendToRoom(test, room, std::move(message));
+    QXmppMessage sent;
+    parsePacket(sent, test.takePacket().toUtf8());
+    // the ID identifies errors without the origin ID
+    QVERIFY(!sent.originId().isEmpty());
+    QCOMPARE(sent.id(), sent.originId());
+
+    test.injectMessage(u"<message id='"_s + sent.id() +
+                       u"' from='coven@chat.shakespeare.lit' type='error'>"
+                       "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                       "</message>"_s);
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<QXmppStanza::Error>()->condition(), QXmppStanza::Error::Forbidden);
 }
 
 void tst_QXmppMuc::sendPrivateMessage()

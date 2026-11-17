@@ -12,6 +12,7 @@
 #include "QXmppMessageContext.h"
 #include "QXmppMessageRetraction.h"
 #include "QXmppMucForms.h"
+#include "QXmppOutgoingMessages_p.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppStanza.h"
 #include "QXmppStanza_p.h"
@@ -115,6 +116,8 @@ enum class MucRoomState {
 };
 
 struct PendingMessage {
+    // the 'id' attribute, it identifies errors without the original payload
+    QString stanzaId;
     QXmppPromise<Result<Messages::Confirmation>> promise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> timer;
 };
@@ -2190,8 +2193,12 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
 
     // confirms the delivery of a sent message, see confirmDelivery()
     auto *data = roomItr->second.get();
-    if (auto pendingItr = data->pendingMessages.find(message.originId());
-        !message.originId().isEmpty() && pendingItr != data->pendingMessages.end()) {
+    auto pendingItr = message.originId().isEmpty() ? data->pendingMessages.end() : data->pendingMessages.find(message.originId());
+    // the server may bounce errors without the original payload, but with the 'id' (RFC 6120)
+    if (pendingItr == data->pendingMessages.end() && message.type() == QXmppMessage::Error && !message.id().isEmpty()) {
+        pendingItr = std::ranges::find_if(data->pendingMessages, [&](const auto &entry) { return entry.second.stanzaId == message.id(); });
+    }
+    if (pendingItr != data->pendingMessages.end()) {
         if (message.type() == QXmppMessage::Error) {
             auto promise = std::move(pendingItr->second.promise);
             data->pendingMessages.erase(pendingItr);
@@ -2296,10 +2303,9 @@ MucRoomData *QXmppMucManagerV2Private::joinedRoom(const QXmppMessage &message)
 
 HookResult QXmppMucManagerV2Private::prepareMessage(Messages::OutgoingMessage &outgoing)
 {
-    // the origin ID identifies the reflection of the message (XEP-0359)
     auto &message = outgoing.message();
-    if (joinedRoom(message) && message.originId().isEmpty()) {
-        message.setOriginId(QXmppUtils::generateStanzaUuid());
+    if (joinedRoom(message)) {
+        setReflectionIds(message);
     }
     return HookResult::Continue;
 }
@@ -2426,6 +2432,7 @@ QXmppTask<void> QXmppMucManagerV2Private::confirmDelivery(const Messages::Outgoi
 {
     auto *data = joinedRoom(outgoing.message());
     const auto originId = outgoing.message().originId();
+    const auto stanzaId = outgoing.message().id();
     if (!data || originId.isEmpty() || data->pendingMessages.contains(originId)) {
         co_return;
     }
@@ -2438,7 +2445,7 @@ QXmppTask<void> QXmppMucManagerV2Private::confirmDelivery(const Messages::Outgoi
     QObject::connect(timer, &QTimer::timeout, q, [this, roomJid = data->roomJid, originId]() {
         handleMessageTimeout(roomJid, originId);
     });
-    data->pendingMessages.emplace(originId, PendingMessage { std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
+    data->pendingMessages.emplace(originId, PendingMessage { stanzaId, std::move(promise), std::unique_ptr<QTimer, DeleteLaterDeleter>(timer) });
     timer->start(timeout);
 
     // confirmation stays valid until this has finished; the room has processed the message

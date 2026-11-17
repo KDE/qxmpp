@@ -25,6 +25,11 @@ class QXmppStanza;
 
 namespace QXmpp::Private {
 
+// Sets the origin ID (XEP-0359), which identifies the reflection of a groupchat message, and the
+// 'id' attribute, which identifies errors bounced without the original payload (RFC 6120). The
+// missing one is set to the other one.
+void setReflectionIds(QXmppMessage &message);
+
 // Pipeline of outgoing messages, see QXmpp::Messages.
 class OutgoingMessages
 {

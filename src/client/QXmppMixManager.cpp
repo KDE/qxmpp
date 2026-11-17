@@ -20,6 +20,7 @@
 #include "QXmppMixIq.h"
 #include "QXmppMixIq_p.h"
 #include "QXmppMucManagerV2.h"
+#include "QXmppOutgoingMessages_p.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
@@ -58,6 +59,8 @@ struct MixChannelParticipants {
 // A message sent to a channel waiting for its reflection.
 struct MixPendingMessage {
     QString channelJid;
+    // the 'id' attribute, it identifies errors without the original payload
+    QString stanzaId;
     QXmppPromise<Result<Messages::Confirmation>> promise;
     std::unique_ptr<QTimer, DeleteLaterDeleter> timer;
 };
@@ -1579,9 +1582,13 @@ QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &c
 {
     const auto &message = context.message();
     const auto channelJid = QXmppUtils::jidToBareJid(message.from());
-    const auto originId = message.originId();
-    auto pendingItr = originId.isEmpty() ? pendingMessages.end() : pendingMessages.find(originId);
+    auto pendingItr = message.originId().isEmpty() ? pendingMessages.end() : pendingMessages.find(message.originId());
+    // the server may bounce errors without the original payload, but with the 'id' (RFC 6120)
+    if (pendingItr == pendingMessages.end() && message.type() == QXmppMessage::Error && !message.id().isEmpty()) {
+        pendingItr = std::ranges::find_if(pendingMessages, [&](const auto &entry) { return entry.second.stanzaId == message.id(); });
+    }
     const bool pending = pendingItr != pendingMessages.end() && pendingItr->second.channelJid == channelJid;
+    const auto originId = pending ? pendingItr->first : QString();
 
     if (message.type() == QXmppMessage::Error) {
         if (pending && !isJoinedMucRoom(channelJid)) {
@@ -1629,12 +1636,11 @@ QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &c
     co_return HookResult::Continue;
 }
 
-// The origin ID identifies the reflection of a message sent to a channel (XEP-0359).
 HookResult QXmppMixManagerPrivate::prepareMessage(Messages::OutgoingMessage &outgoing)
 {
     auto &message = outgoing.message();
-    if (message.type() == QXmppMessage::GroupChat && message.originId().isEmpty()) {
-        message.setOriginId(QXmppUtils::generateStanzaUuid());
+    if (message.type() == QXmppMessage::GroupChat) {
+        setReflectionIds(message);
     }
     return HookResult::Continue;
 }
@@ -1644,6 +1650,7 @@ QXmppTask<void> QXmppMixManagerPrivate::confirmDelivery(const Messages::Outgoing
 {
     const auto &message = outgoing.message();
     const auto originId = message.originId();
+    const auto stanzaId = message.id();
     const auto channelJid = QXmppUtils::jidToBareJid(message.to());
     if (message.type() != QXmppMessage::GroupChat || originId.isEmpty() || pendingMessages.contains(originId) || isJoinedMucRoom(channelJid)) {
         co_return;
@@ -1658,7 +1665,7 @@ QXmppTask<void> QXmppMixManagerPrivate::confirmDelivery(const Messages::Outgoing
         finishPendingMessage(originId, QXmppError { u"Sending message timed out."_s, SendError::ConfirmationTimeout });
     });
     timer->start(MixReflectionTimeout);
-    pendingMessages.emplace(originId, MixPendingMessage { channelJid, std::move(promise), std::move(timer) });
+    pendingMessages.emplace(originId, MixPendingMessage { channelJid, stanzaId, std::move(promise), std::move(timer) });
 
     const auto joined = co_await isJoinedChannel(channelJid).withContext(q);
     if (!joined) {
