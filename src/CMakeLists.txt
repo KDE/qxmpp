@@ -426,6 +426,7 @@ target_include_directories(${QXMPP_TARGET}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<INSTALL_INTERFACE:include/${QXMPP_TARGET}>
 )
+target_compile_features(${QXMPP_TARGET} PUBLIC cxx_std_20)
 
 # qxmpp_export.h generation
 if(BUILD_SHARED)
