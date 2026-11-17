@@ -2590,6 +2590,8 @@ private:
     Q_SLOT void unlistedDevicesAreNotEncryptedFor();
     Q_SLOT void ownDevicesReceiveCopies_data();
     Q_SLOT void ownDevicesReceiveCopies();
+    Q_SLOT void sentByThisDevice_data();
+    Q_SLOT void sentByThisDevice();
     Q_SLOT void maxDevicesPerStanza_data();
     Q_SLOT void maxDevicesPerStanza();
     Q_SLOT void automaticVersion();
@@ -3378,6 +3380,43 @@ void tst_OmemoManager2::ownDevicesReceiveCopies()
     QCOMPARE(spy.size(), 1);
     QCOMPARE(spy.constFirst().at(0).value<QXmppMessage>().body(), u"Without sender"_s);
     QVERIFY(!alicePhone.manager->d->versions.at(version).devices.contains(QString()));
+}
+
+void tst_OmemoManager2::sentByThisDevice_data()
+{
+    addVersions();
+}
+
+void tst_OmemoManager2::sentByThisDevice()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account carol(nullptr, &server, u"carol@wonderland.lit/home"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    expectVariant<Success>(carol.setUp());
+    alice.encryption = version;
+    bob.encryption = version;
+
+    std::optional<QXmpp::Messages::DecryptionState> state;
+    alice.client.hooks(&alice.owner).add<QXmpp::Messages::Received>([&](QXmpp::Messages::Context &context) {
+        state = context.decryptionState();
+        return QXmpp::HookResult::Continue;
+    });
+
+    // e.g. reflected by a MUC room or retrieved via MAM
+    alice.receive(alice, alice.sendMessage(bob.jid(), u"Hello"_s));
+    QCOMPARE(state, QXmpp::Messages::DecryptionState::SentByThisDevice);
+
+    // a message of another device not encrypted for this one
+    const auto message = bob.sendMessage(carol.jid(), u"Hi"_s);
+    QVERIFY(!message.isEmpty());
+    state.reset();
+    alice.receive(bob, message);
+    QCOMPARE(state, QXmpp::Messages::DecryptionState::NoEnvelope);
 }
 
 void tst_OmemoManager2::maxDevicesPerStanza_data()

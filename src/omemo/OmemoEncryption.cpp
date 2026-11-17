@@ -682,7 +682,7 @@ static QXmppTask<E2ee::DecryptResult> decryptSce(OmemoManagerPrivate *d, QXmppOm
     }
     const auto envelope = element.searchEnvelope(d->ownJid(), d->device.deviceId);
     if (!envelope) {
-        co_return E2ee::NoEnvelope {};
+        co_return E2ee::NoEnvelope { .sentByThisDevice = d->isSentByThisDevice(senderJid, element.senderDeviceId()) };
     }
 
     auto key = co_await d->decryptKey(Version::Omemo2, senderJid, element.senderDeviceId(), envelope->data(), envelope->isUsedForKeyExchange(), isMessage).withContext(d->q);
@@ -886,7 +886,7 @@ QXmppTask<E2ee::DecryptResult> OmemoManagerPrivate::decryptMessage0(E2ee::Decryp
     // The envelopes are not grouped by JID, the device ID identifies the recipient.
     const auto envelope = std::ranges::find(element->envelopes, device.deviceId, &Omemo0::Envelope::recipientDeviceId);
     if (envelope == element->envelopes.end()) {
-        co_return E2ee::NoEnvelope {};
+        co_return E2ee::NoEnvelope { .sentByThisDevice = isSentByThisDevice(request.senderJid(), element->senderDeviceId) };
     }
 
     auto key = co_await decryptKey(Version::Omemo0, request.senderJid(), element->senderDeviceId, envelope->data, envelope->isUsedForKeyExchange, true).withContext(q);

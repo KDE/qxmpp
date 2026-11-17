@@ -129,6 +129,8 @@ public:
     OmemoManagerPrivate(OmemoManager *q, std::shared_ptr<OmemoStorage> storage, QList<Version> enabledVersions);
 
     QString ownJid() const;
+    // The device ID is the same in both versions.
+    bool isSentByThisDevice(const QString &senderJid, uint32_t senderDeviceId) const { return isSetUp && senderDeviceId == device.deviceId && senderJid == ownJid(); }
     QString ownFullJid() const;
     QList<uint32_t> deviceIds(Version version, const QString &jid) const;
     QXmppTask<QList<Device>> devices(QString jid);
