@@ -20,6 +20,16 @@
 
 namespace QXmpp::Private {
 
+// For QObjects that may be deleted while one of their signals is emitted, e.g. timers.
+struct DeleteLaterDeleter {
+    void operator()(QObject *obj) const
+    {
+        if (obj) {
+            obj->deleteLater();
+        }
+    }
+};
+
 template<typename Function>
 auto later(QObject *context, Function function)
 {

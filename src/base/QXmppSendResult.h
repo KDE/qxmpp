@@ -23,12 +23,16 @@ namespace QXmpp {
     \value EncryptionError The packet couldn't be sent because prior encryption failed.
     \value Cancelled The packet was not sent because sending has been cancelled, e.g. by a
     handler of the QXmpp::Messages::Prepare hook. (Since QXmpp 1.18)
+    \value ConfirmationTimeout The packet was sent, but its delivery has not been confirmed in
+    time, e.g. a MUC room or MIX channel has not reflected the message. It may have been
+    delivered nevertheless. (Since QXmpp 1.18)
 */
 enum class SendError : uint8_t {
     SocketWriteError,
     Disconnected,
     EncryptionError,
     Cancelled,
+    ConfirmationTimeout,
 };
 
 /*!

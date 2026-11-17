@@ -90,6 +90,11 @@ private:
     Q_SLOT void testResolveSender();
     Q_SLOT void testResolveSenderDuringRosterSync();
     Q_SLOT void testMucRoomWithChannelJid();
+    Q_SLOT void testSendMessageReflection();
+    Q_SLOT void testSendMessageReflectionUnknownParticipant();
+    Q_SLOT void testSendMessageReflectionError();
+    Q_SLOT void testSendMessageReflectionSessionEnded();
+    Q_SLOT void testSendMessageNoChannel();
 
     template<typename T>
     void testErrorFromChannel(QXmppTask<T> &task, TestClient &client);
@@ -2019,6 +2024,121 @@ void tst_QXmppMixManager::testMucRoomWithChannelJid()
     expectFutureVariant<QXmpp::Success>(leaveTask);
     QVERIFY(muc->findRoom(u"coven@mix.shakespeare.example"_s));
     QCOMPARE(receivedSender(client, u"coven@mix.shakespeare.example/123457"_s), u"hag67@shakespeare.example"_s);
+}
+
+struct ReflectionTester : Tester {
+    ReflectionTester()
+        : Tester(u"hag66@shakespeare.example/pda"_s)
+    {
+        client.addNewExtension<QXmppRosterManager>(&client);
+        client.inject(u"<iq id='push1' type='set'><query xmlns='jabber:iq:roster'>"
+                      "<item jid='coven@mix.shakespeare.example' subscription='both'>"
+                      "<channel xmlns='urn:xmpp:mix:roster:0' participant-id='123456'/>"
+                      "</item></query></iq>"_s);
+        client.ignore();
+    }
+
+    // returns the origin ID of the sent message
+    QString send(const QString &to = u"coven@mix.shakespeare.example"_s)
+    {
+        QXmppMessage message(u"hag66@shakespeare.example/pda"_s, to, u"Hi"_s);
+        message.setType(QXmppMessage::GroupChat);
+        task = client.sendMessage(std::move(message));
+        QXmppMessage sent;
+        parsePacket(sent, client.takePacket().toUtf8());
+        return sent.originId();
+    }
+
+    void injectReflection(const QString &participantId, const QString &jid, const QString &originId, const QString &stanzaIds = {})
+    {
+        client.injectMessage(u"<message from='coven@mix.shakespeare.example/"_s + participantId +
+                             u"' to='hag66@shakespeare.example' type='groupchat'><body>Hi</body>"
+                             "<mix xmlns='urn:xmpp:mix:core:1'><nick>thirdwitch</nick><jid>"_s +
+                             jid + u"</jid></mix>"_s + stanzaIds +
+                             u"<origin-id xmlns='urn:xmpp:sid:0' id='"_s + originId + u"'/></message>"_s);
+    }
+
+    std::optional<QXmppTask<QXmpp::Result<QXmpp::Messages::Sent>>> task;
+};
+
+void tst_QXmppMixManager::testSendMessageReflection()
+{
+    ReflectionTester tester;
+    const auto originId = tester.send();
+    QVERIFY(!originId.isEmpty());
+    QVERIFY(!tester.task->isFinished());
+
+    // another participant sends a message with the same origin ID
+    tester.injectReflection(u"123457"_s, u"hag67@shakespeare.example"_s, originId);
+    QVERIFY(!tester.task->isFinished());
+
+    // only the stanza ID of the channel identifies the message in its archive
+    tester.injectReflection(u"123456"_s, u"hag66@shakespeare.example"_s, originId,
+                            u"<stanza-id xmlns='urn:xmpp:sid:0' id='forged' by='hag66@shakespeare.example'/>"
+                            "<stanza-id xmlns='urn:xmpp:sid:0' id='channel-archive-id' by='coven@mix.shakespeare.example'/>"_s);
+    auto sent = expectFutureVariant<QXmpp::Messages::Sent>(*tester.task);
+    QCOMPARE(sent.deliveryState(), QXmpp::Messages::DeliveryState::Confirmed);
+    QVERIFY(sent.archiveId());
+    QCOMPARE(sent.archiveId()->id, u"channel-archive-id"_s);
+    QCOMPARE(sent.archiveId()->by, u"coven@mix.shakespeare.example"_s);
+}
+
+void tst_QXmppMixManager::testSendMessageReflectionUnknownParticipant()
+{
+    ReflectionTester tester;
+    // without the participant ID in the roster
+    tester.client.inject(u"<iq id='push2' type='set'><query xmlns='jabber:iq:roster'>"
+                         "<item jid='coven@mix.shakespeare.example' subscription='both'>"
+                         "<channel xmlns='urn:xmpp:mix:roster:0'/>"
+                         "</item></query></iq>"_s);
+    tester.client.ignore();
+    const auto originId = tester.send();
+
+    // the stamped JID identifies the own reflection
+    tester.injectReflection(u"123457"_s, u"hag67@shakespeare.example"_s, originId);
+    QVERIFY(!tester.task->isFinished());
+
+    // without the JID (e.g. hidden by the channel), the origin ID is trusted
+    tester.client.injectMessage(u"<message from='coven@mix.shakespeare.example/123456' to='hag66@shakespeare.example' type='groupchat'>"
+                                "<body>Hi</body><mix xmlns='urn:xmpp:mix:core:1'><nick>thirdwitch</nick></mix>"
+                                "<origin-id xmlns='urn:xmpp:sid:0' id='"_s +
+                                originId + u"'/></message>"_s);
+    QCOMPARE(expectFutureVariant<QXmpp::Messages::Sent>(*tester.task).deliveryState(), QXmpp::Messages::DeliveryState::Confirmed);
+}
+
+void tst_QXmppMixManager::testSendMessageReflectionError()
+{
+    ReflectionTester tester;
+    const auto originId = tester.send();
+
+    tester.client.injectMessage(u"<message from='coven@mix.shakespeare.example' to='hag66@shakespeare.example/pda' type='error'>"
+                                "<origin-id xmlns='urn:xmpp:sid:0' id='"_s +
+                                originId +
+                                u"'/>"
+                                "<error type='cancel'><not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error>"
+                                "</message>"_s);
+    expectFutureVariant<QXmppError>(*tester.task);
+}
+
+void tst_QXmppMixManager::testSendMessageReflectionSessionEnded()
+{
+    ReflectionTester tester;
+    tester.send();
+
+    // the reflection is not received in a new session
+    tester.client.simulateConnected();
+    tester.client.simulateDisconnected();
+    QCOMPARE(expectFutureVariant<QXmppError>(*tester.task).value<QXmpp::SendError>(), QXmpp::SendError::Disconnected);
+}
+
+void tst_QXmppMixManager::testSendMessageNoChannel()
+{
+    ReflectionTester tester;
+    tester.send(u"group@mix.shakespeare.example"_s);
+
+    // not a joined channel, the acknowledgement of the server is not followed by a confirmation
+    tester.client.handlePacketReceived(xmlToDom(u"<a xmlns='urn:xmpp:sm:3' h='2'/>"_s));
+    QCOMPARE(expectFutureVariant<QXmpp::Messages::Sent>(*tester.task).deliveryState(), QXmpp::Messages::DeliveryState::ServerAcknowledged);
 }
 
 template<typename T>

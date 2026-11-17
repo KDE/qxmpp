@@ -36,6 +36,7 @@
 
 #include <QDomElement>
 #include <QPointer>
+#include <QTimer>
 
 using namespace QXmpp;
 using namespace QXmpp::Private;
@@ -54,11 +55,25 @@ struct MixChannelParticipants {
     uint64_t generation = 0;
 };
 
+// A message sent to a channel waiting for its reflection.
+struct MixPendingMessage {
+    QString channelJid;
+    QXmppPromise<Result<Messages::Confirmation>> promise;
+    std::unique_ptr<QTimer, DeleteLaterDeleter> timer;
+};
+
+// the channel may need some time to distribute a message to all participants
+constexpr auto MixReflectionTimeout = std::chrono::seconds(30);
+
 class QXmppMixManagerPrivate
 {
 public:
     QXmppTask<HookResult> resolveSender(Messages::Context &context);
+    HookResult prepareMessage(Messages::OutgoingMessage &outgoing);
     QXmppTask<void> resolveRecipients(Messages::OutgoingMessage &outgoing);
+    QXmppTask<void> confirmDelivery(const Messages::OutgoingMessage &outgoing, std::optional<Result<Messages::Confirmation>> &confirmation);
+    void finishPendingMessage(const QString &originId, Result<Messages::Confirmation> &&result);
+    bool isJoinedMucRoom(const QString &jid) const;
     QXmppTask<Result<QList<QString>>> requestParticipantJids(const QString &channelJid);
     QXmppTask<void> fetchParticipantJids(QString channelJid, uint64_t generation);
     void updateParticipant(const QString &channelJid, const QString &participantId, std::optional<QString> jid);
@@ -77,6 +92,8 @@ public:
     // node.
     std::unordered_map<QString, MixChannelParticipants> channels;
     uint64_t nextGeneration = 0;
+    // messages sent to channels waiting for their reflection by origin ID (XEP-0359)
+    std::unordered_map<QString, MixPendingMessage> pendingMessages;
     QXmppDiscoveryManager *discoveryManager = nullptr;
     QXmppDiscoFeatureWatch participantSupportWatch;
     QXmppDiscoFeatureWatch messageArchivingSupportWatch;
@@ -186,10 +203,17 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
 
     Example for an unencrypted message:
     \code
-    message->setType(QXmppMessage::GroupChat);
-    message->setTo("group@mix.example.org")
-    client->send(std::move(message));
+    message.setType(QXmppMessage::GroupChat);
+    message.setTo(u"group@mix.example.org"_s);
+    client->sendMessage(std::move(message));
     \endcode
+
+    An \c origin-id (\xep{0359}{Unique and Stable Stanza IDs}) is added to messages to channels if
+    not already set and used to match the reflection of the channel to the own participant. For
+    channels in the roster, the task of QXmppClient::sendMessage() finishes when the channel has
+    reflected the message (QXmpp::Messages::DeliveryState::Confirmed), with the ID of the message in
+    the archive of the channel (QXmpp::Messages::Sent::archiveId()), or with an error if the channel
+    responds with an error or the reflection times out.
 
     If an end-to-end encryption is selected for a message to a channel via
     QXmpp::Messages::SelectEncryption, the message is encrypted for all participants of the channel.
@@ -507,6 +531,9 @@ QXmppMixManager::QXmppMixManager()
     hooks().add<Messages::ResolveSender>(d.get(), &QXmppMixManagerPrivate::resolveSender);
     // Encrypted messages are encrypted for all participants of the channel.
     hooks().add<Messages::ResolveRecipients>(d.get(), &QXmppMixManagerPrivate::resolveRecipients);
+    // The channel reflects messages to the sender (XEP-0369).
+    hooks().add<Messages::Prepare>(d.get(), &QXmppMixManagerPrivate::prepareMessage);
+    hooks().add<Messages::ConfirmDelivery>(d.get(), &QXmppMixManagerPrivate::confirmDelivery);
     // participant events may have been missed after the session
     hooks().add<Connection::SessionEnded>(d.get(), &QXmppMixManagerPrivate::removeAllChannels);
 }
@@ -1546,21 +1573,113 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
     outgoing.recipientJids() = recipients;
 }
 
-// The channel stamps the real JID of the sender of channel messages (XEP-0405).
+// The channel stamps the real JID of the sender of channel messages (XEP-0405) and reflects
+// messages to their sender (XEP-0369).
 QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &context)
 {
     const auto &message = context.message();
-    if (message.type() != QXmppMessage::GroupChat || message.mixUserJid().isEmpty()) {
+    const auto channelJid = QXmppUtils::jidToBareJid(message.from());
+    const auto originId = message.originId();
+    auto pendingItr = originId.isEmpty() ? pendingMessages.end() : pendingMessages.find(originId);
+    const bool pending = pendingItr != pendingMessages.end() && pendingItr->second.channelJid == channelJid;
+
+    if (message.type() == QXmppMessage::Error) {
+        if (pending && !isJoinedMucRoom(channelJid)) {
+            finishPendingMessage(originId, QXmppError { message.error().text(), message.error() });
+            // the error is reported to the sender
+            co_return HookResult::Stop;
+        }
         co_return HookResult::Continue;
     }
+    if (message.type() != QXmppMessage::GroupChat || (message.mixUserJid().isEmpty() && !pending)) {
+        co_return HookResult::Continue;
+    }
+    const auto senderJid = QXmppUtils::jidToBareJid(message.mixUserJid());
+    const auto participantId = QXmppUtils::jidToResource(message.from());
+    const bool fromArchive = context.origin() == Messages::Origin::Mam;
+    const auto stanzaIds = message.stanzaIds();
+    const auto stanzaId = std::ranges::find(stanzaIds, channelJid, &QXmppStanzaId::by);
+    const auto archiveId = stanzaId == stanzaIds.end() ? std::nullopt : std::make_optional(*stanzaId);
+
     // Only the channel can stamp the sender, anybody else (e.g., an occupant of a MUC room) could
     // add the element to their message.
-    const auto senderJid = QXmppUtils::jidToBareJid(message.mixUserJid());
-    const auto joined = co_await isJoinedChannel(QXmppUtils::jidToBareJid(message.from())).withContext(q);
-    if (joined) {
+    const auto joined = co_await isJoinedChannel(channelJid).withContext(q);
+    if (!joined) {
+        co_return HookResult::Continue;
+    }
+    if (!senderJid.isEmpty()) {
         context.setSenderJid(senderJid);
     }
+
+    // Other participants could send a message with the same origin ID. The own participant ID is
+    // stored in the roster, the JID of the sender is used if it is missing. If neither is known,
+    // the origin ID is trusted: the other participants only learn it from the reflection.
+    if (pending && !fromArchive) {
+        const auto ownParticipantId = rosterManager ? rosterManager->getRosterEntry(channelJid).mixParticipantId() : QString();
+        bool own = true;
+        if (!ownParticipantId.isEmpty()) {
+            own = participantId == ownParticipantId;
+        } else if (!senderJid.isEmpty()) {
+            own = senderJid == client->configuration().jidBare();
+        }
+        if (own) {
+            finishPendingMessage(originId, Messages::Confirmation { archiveId });
+        }
+    }
     co_return HookResult::Continue;
+}
+
+// The origin ID identifies the reflection of a message sent to a channel (XEP-0359).
+HookResult QXmppMixManagerPrivate::prepareMessage(Messages::OutgoingMessage &outgoing)
+{
+    auto &message = outgoing.message();
+    if (message.type() == QXmppMessage::GroupChat && message.originId().isEmpty()) {
+        message.setOriginId(QXmppUtils::generateStanzaUuid());
+    }
+    return HookResult::Continue;
+}
+
+// Waits for the reflection of a message sent to a joined channel or an error.
+QXmppTask<void> QXmppMixManagerPrivate::confirmDelivery(const Messages::OutgoingMessage &outgoing, std::optional<Result<Messages::Confirmation>> &confirmation)
+{
+    const auto &message = outgoing.message();
+    const auto originId = message.originId();
+    const auto channelJid = QXmppUtils::jidToBareJid(message.to());
+    if (message.type() != QXmppMessage::GroupChat || originId.isEmpty() || pendingMessages.contains(originId) || isJoinedMucRoom(channelJid)) {
+        co_return;
+    }
+
+    // registered before waiting for the roster, the reflection may arrive in the meantime
+    QXmppPromise<Result<Messages::Confirmation>> promise;
+    auto reflected = promise.task();
+    std::unique_ptr<QTimer, DeleteLaterDeleter> timer(new QTimer());
+    timer->setSingleShot(true);
+    QObject::connect(timer.get(), &QTimer::timeout, q, [this, originId]() {
+        finishPendingMessage(originId, QXmppError { u"Sending message timed out."_s, SendError::ConfirmationTimeout });
+    });
+    timer->start(MixReflectionTimeout);
+    pendingMessages.emplace(originId, MixPendingMessage { channelJid, std::move(promise), std::move(timer) });
+
+    const auto joined = co_await isJoinedChannel(channelJid).withContext(q);
+    if (!joined) {
+        if (auto itr = pendingMessages.find(originId); itr != pendingMessages.end() && itr->second.channelJid == channelJid) {
+            pendingMessages.erase(itr);
+        }
+        co_return;
+    }
+    // confirmation stays valid until this has finished
+    confirmation = co_await reflected.withContext(q);
+}
+
+void QXmppMixManagerPrivate::finishPendingMessage(const QString &originId, Result<Messages::Confirmation> &&result)
+{
+    auto itr = pendingMessages.find(originId);
+    if (itr == pendingMessages.end()) {
+        return;
+    }
+    auto pending = std::move(itr->second);
+    pendingMessages.erase(itr);
+    pending.promise.finish(std::move(result));
 }
 
 // Whether the own account is a participant of the MIX channel \a jid, i.e., it is in the roster.
@@ -1571,11 +1690,8 @@ QXmppTask<bool> QXmppMixManagerPrivate::isJoinedChannel(QString jid)
     if (!client) {
         co_return false;
     }
-    if (auto *mucManager = client->findExtension<QXmppMucManagerV2>()) {
-        // a handle of a left room may still exist
-        if (auto room = mucManager->findRoom(jid); room && (room->joined().value() || room->joining().value())) {
-            co_return false;
-        }
+    if (isJoinedMucRoom(jid)) {
+        co_return false;
     }
     if (!rosterManager) {
         rosterManager = client->findExtension<QXmppRosterManager>();
@@ -1594,6 +1710,17 @@ QXmppTask<bool> QXmppMixManagerPrivate::isJoinedChannel(QString jid)
         co_return false;
     }
     co_return rosterManager->getRosterEntry(jid).isMixChannel();
+}
+
+bool QXmppMixManagerPrivate::isJoinedMucRoom(const QString &jid) const
+{
+    if (auto *mucManager = client ? client->findExtension<QXmppMucManagerV2>() : nullptr) {
+        // a handle of a left room may still exist
+        if (auto room = mucManager->findRoom(jid); room && (room->joined().value() || room->joining().value())) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static QList<QString> participantJids(const std::unordered_map<QString, QString> &jids)
@@ -1694,6 +1821,13 @@ void QXmppMixManagerPrivate::removeChannel(const QString &channelJid)
 
 void QXmppMixManagerPrivate::removeAllChannels()
 {
+    // the reflections of messages sent in the previous session are not received anymore
+    auto messages = std::move(pendingMessages);
+    pendingMessages.clear();
+    for (auto &[_, pending] : messages) {
+        pending.promise.finish(QXmppError { u"The session has ended"_s, SendError::Disconnected });
+    }
+
     auto removed = std::move(channels);
     channels.clear();
     for (auto &[_, channel] : removed) {

@@ -19,6 +19,7 @@
 #include "QXmppVCardIq.h"
 #include <QXmppUtils.h>
 
+#include "Async.h"
 #include "Enums.h"
 #include "Global.h"
 #include "Ping.h"
@@ -111,15 +112,6 @@ enum class MucRoomState {
     JoiningRoomInfo,
     Creating,
     Joined,
-};
-
-struct DeleteLaterDeleter {
-    void operator()(QObject *obj) const
-    {
-        if (obj) {
-            obj->deleteLater();
-        }
-    }
 };
 
 struct PendingMessage {
@@ -2465,7 +2457,7 @@ void QXmppMucManagerV2Private::handleMessageTimeout(const QString &roomJid, cons
         return;
     }
 
-    pendingItr->second.promise.finish(QXmppError { u"Sending message timed out."_s });
+    pendingItr->second.promise.finish(QXmppError { u"Sending message timed out."_s, SendError::ConfirmationTimeout });
     itr->second->pendingMessages.erase(pendingItr);
 }
 
