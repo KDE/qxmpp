@@ -67,7 +67,11 @@ private:
 };
 
 // The message is encrypted, but not for this device.
-struct NoEnvelope { };
+struct NoEnvelope {
+    // Sent by this device, e.g. reflected by a MUC room or retrieved via MAM: the sending device
+    // does not encrypt for itself.
+    bool sentByThisDevice = false;
+};
 
 using DecryptResult = std::variant<Decrypted, NoEnvelope, QXmppError>;
 

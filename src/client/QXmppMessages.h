@@ -40,6 +40,7 @@ enum class DecryptionState {
     NotEncrypted,
     Decrypted,
     NoEnvelope,
+    SentByThisDevice,
     Failed,
     Unsupported,
 };

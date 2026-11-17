@@ -72,6 +72,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - ATM: Add the store hint to trust messages (@lnj, !846)
  - Uri: Add OMEMO fingerprints in the format of Conversations (`omemo-sid-<device ID>=<key ID>`) via `QXmppUri::omemoFingerprints()`; URIs with only fingerprints and no query type can be parsed now (@lnj, !849)
  - MixManager: Encrypt messages to joined channels for all participants, also offline ones; they are retrieved before the first encrypted message of a session and kept up to date via the participants node (@lnj, !845)
+ - Add `QXmpp::Messages::DecryptionState::SentByThisDevice` for encrypted messages of this device received again, e.g. reflected by a MUC room or retrieved via MAM, reported by E2EE providers via `E2ee::NoEnvelope::sentByThisDevice` (@lnj, !842)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

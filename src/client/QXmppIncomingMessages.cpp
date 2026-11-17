@@ -264,8 +264,8 @@ QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryp
         }
         decrypted->setMetadata(std::move(metadata));
         applyDecrypted(context, std::move(*decrypted), *provider);
-    } else if (std::holds_alternative<E2ee::NoEnvelope>(result)) {
-        fail(context, DecryptionState::NoEnvelope);
+    } else if (auto *noEnvelope = std::get_if<E2ee::NoEnvelope>(&result)) {
+        fail(context, noEnvelope->sentByThisDevice ? DecryptionState::SentByThisDevice : DecryptionState::NoEnvelope);
     } else {
         auto &d = MessageContextAccess::d(context);
         d.decryptionState = DecryptionState::Failed;

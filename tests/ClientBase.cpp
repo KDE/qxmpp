@@ -6327,6 +6327,11 @@ void tst_QXmppMessages::messagesNoEnvelope()
     client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
     e2ee->promises.at(0).finish(E2ee::NoEnvelope {});
     QCOMPARE(state, DecryptionState::NoEnvelope);
+
+    // the sending device does not encrypt for itself
+    client.injectMessage(encryptedMessage(u"me@example.org/res"_s, u"2"_s));
+    e2ee->promises.at(1).finish(E2ee::NoEnvelope { .sentByThisDevice = true });
+    QCOMPARE(state, DecryptionState::SentByThisDevice);
 }
 
 void tst_QXmppMessages::messagesDecryptRecipientMismatch()

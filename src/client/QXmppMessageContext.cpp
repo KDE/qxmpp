@@ -333,8 +333,11 @@ void BodyOnlyMessage::allowLowRiskElements()
 
     \value NotEncrypted The message was not end-to-end encrypted.
     \value Decrypted The message was decrypted.
-    \value NoEnvelope The message is encrypted, but not for this device, e.g. an own message
-        reflected by a MUC.
+    \value NoEnvelope The message is encrypted, but not for this device.
+    \value SentByThisDevice The message is encrypted and has been sent by this device, which does
+        not encrypt for itself, e.g. an own message reflected by a MUC room or MIX channel or
+        retrieved via MAM. The application can match it with the sent message, e.g. via its
+        origin ID.
     \value Failed The decryption failed, see Context::decryptionError().
     \value Unsupported There is no provider for the encryption method.
 */
