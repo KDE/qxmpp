@@ -71,6 +71,7 @@ Breaking changes:
  - The encryption of IQs is selected via `QXmpp::Iq::SelectEncryption` instead of `QXmpp::Messages::SelectEncryption`, IQs requiring encryption (`QXmppSendStanzaParams::isEncryptionRequired()`) fail without encryption (@lnj, !841)
  - Disco, version and entity time requests are also answered if end-to-end encrypted (@lnj, !841)
  - MucManagerV2: Messages of joined rooms are delivered via `QXmppClient::messageReceived()`; `QXmppMucManagerV2::messageReceived()` has been removed. Subject changes and status notifications without text are not delivered (@lnj)
+ - MucManagerV2: `QXmppMucRoomV2::sendMessage()` has been removed, messages to rooms are sent via `QXmppClient::sendMessage()`, which also waits for the reflection and reports the ID of the message in the archive of the room (@lnj, !852)
  - MucManagerV2: `removedFromRoom()` is no longer emitted with `ConnectionLost` when the connection is lost or a room is ghosted, but only when rejoining fails or after `QXmppClient::disconnectFromServer()` (@lnj)
 
 QXmpp 1.17.2 (November 9, 2026)

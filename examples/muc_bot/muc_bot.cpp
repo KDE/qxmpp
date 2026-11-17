@@ -13,6 +13,7 @@
 #include "QXmppClient.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
+#include "QXmppMessages.h"
 #include "QXmppMucManagerV2.h"
 #include "QXmppPepBookmarkManager.h"
 #include "QXmppPubSubManager.h"
@@ -131,9 +132,9 @@ private:
         qDebug() << "[" << roomJid << "]" << senderNick << ":" << message.body();
 
         // Echo the message back to the room
-        QXmppMessage reply;
-        reply.setBody(QStringLiteral("Echo: ") + message.body());
-        m_muc->findRoom(roomJid).value().sendMessage(std::move(reply)).then(this, [](Result<> result) {
+        QXmppMessage reply({}, roomJid, QStringLiteral("Echo: ") + message.body());
+        reply.setType(QXmppMessage::GroupChat);
+        m_client.sendMessage(std::move(reply)).then(this, [](Result<Messages::Sent> &&result) {
             if (const auto *error = std::get_if<QXmppError>(&result)) {
                 qWarning() << "Failed to send message:" << error->description;
             }

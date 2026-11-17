@@ -275,7 +275,6 @@ public:
     bool isWatchingAvatar() const;
     QXmppTask<QXmpp::Result<>> setAvatar(std::optional<QXmpp::Muc::Avatar> avatar);
 
-    QXmppTask<QXmpp::Result<>> sendMessage(QXmppMessage message);
     QXmppTask<QXmpp::SendResult> sendPrivateMessage(const QXmppMucParticipant &participant, QXmppMessage message);
     QXmppTask<QXmpp::Result<>> setSubject(const QString &subject);
     QXmppTask<QXmpp::Result<>> setNickname(const QString &newNick);

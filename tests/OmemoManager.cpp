@@ -523,9 +523,9 @@ void tst_QXmppOmemoManager::testMucMessage()
     }
 
     // encrypted for the members, finishes with the reflection of the room
-    QXmppMessage message;
-    message.setBody(u"Hello room!"_s);
-    expectVariant<QXmpp::Success>(awaitTask(room.sendMessage(std::move(message))));
+    QXmppMessage message(QString(), room.jid(), u"Hello room!"_s);
+    message.setType(QXmppMessage::GroupChat);
+    expectVariant<QXmpp::Messages::Sent>(awaitTask(m_alice1.client.sendMessage(std::move(message))));
 
     // Bob decrypts it with the keys of the real sender
     QTRY_VERIFY_WITH_TIMEOUT(std::ranges::any_of(bobReceivedSpy, [](const QList<QVariant> &arguments) {
@@ -542,9 +542,9 @@ void tst_QXmppOmemoManager::testMucMessage()
             bobListRequests << text;
         }
     });
-    QXmppMessage reply;
-    reply.setBody(u"Hello Alice!"_s);
-    expectVariant<QXmpp::Success>(awaitTask(bobRoom.sendMessage(std::move(reply))));
+    QXmppMessage reply(QString(), bobRoom.jid(), u"Hello Alice!"_s);
+    reply.setType(QXmppMessage::GroupChat);
+    expectVariant<QXmpp::Messages::Sent>(awaitTask(m_bob.client.sendMessage(std::move(reply))));
     QTRY_VERIFY_WITH_TIMEOUT(std::ranges::any_of(aliceReceivedSpy, [](const QList<QVariant> &arguments) {
                                  const auto message = arguments.at(0).value<QXmppMessage>();
                                  return message.e2eeMetadata() && message.body() == u"Hello Alice!";

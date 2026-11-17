@@ -1473,6 +1473,13 @@ public:
     QList<QString> recipientJids;
 };
 
+static QXmppTask<QXmpp::Result<QXmpp::Messages::Sent>> sendToRoom(TestClient &test, const QXmppMucRoomV2 &room, QXmppMessage message)
+{
+    message.setTo(room.jid());
+    message.setType(QXmppMessage::GroupChat);
+    return test.sendMessage(std::move(message));
+}
+
 static QString sentOriginId(TestClient &test)
 {
     QXmppMessage sent;
@@ -1497,7 +1504,7 @@ void tst_QXmppMuc::sendMessageForgedReflection()
 
     QXmppMessage message;
     message.setBody(u"Hi"_s);
-    auto task = room.sendMessage(std::move(message));
+    auto task = sendToRoom(test, room, std::move(message));
     const auto originId = sentOriginId(test);
 
     // another occupant sends a message with the same origin ID
@@ -1505,7 +1512,7 @@ void tst_QXmppMuc::sendMessageForgedReflection()
     QVERIFY(!task.isFinished());
 
     test.injectMessage(reflection(u"thirdwitch"_s, originId));
-    expectFutureVariant<QXmpp::Success>(task);
+    expectFutureVariant<QXmpp::Messages::Sent>(task);
 }
 
 void tst_QXmppMuc::sendMessageConsumedReflection()
@@ -1584,7 +1591,7 @@ void tst_QXmppMuc::sendMessageEncrypted()
 
     QXmppMessage message;
     message.setBody(u"Hi"_s);
-    auto task = room.sendMessage(std::move(message));
+    auto task = sendToRoom(test, room, std::move(message));
 
     // encrypted for the occupants instead of the room
     auto recipients = e2ee->recipientJids;
@@ -1595,7 +1602,7 @@ void tst_QXmppMuc::sendMessageEncrypted()
     const auto originId = sentOriginId(test);
     QVERIFY(!originId.isEmpty());
     test.injectMessage(reflection(u"thirdwitch"_s, originId));
-    expectFutureVariant<QXmpp::Success>(task);
+    expectFutureVariant<QXmpp::Messages::Sent>(task);
 }
 
 // Answers the requests of the affiliation lists sent before an encrypted message.
@@ -1659,7 +1666,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
 
     QXmppMessage message;
     message.setBody(u"Hi"_s);
-    auto task = room.sendMessage(QXmppMessage(message));
+    auto task = sendToRoom(test, room, QXmppMessage(message));
 
     // a change while the lists are retrieved is applied afterwards
     test.injectMessage(u"<message from='coven@chat.shakespeare.lit'><x xmlns='http://jabber.org/protocol/muc#user'>"
@@ -1668,7 +1675,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
     answerAffiliationLists(test, { { u"owner"_s, { u"hecate@shakespeare.lit"_s } }, { u"member"_s, { u"crone1@shakespeare.lit"_s, u"crone3@shakespeare.lit"_s, u"crone4@shakespeare.lit"_s, u"hag66@shakespeare.lit"_s } } });
     QCOMPARE(sorted(e2ee->recipientJids), (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone3@shakespeare.lit"_s, u"hecate@shakespeare.lit"_s }));
     test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
-    expectFutureVariant<QXmpp::Success>(task);
+    expectFutureVariant<QXmpp::Messages::Sent>(task);
 
     // changes announced by the room and the presences of occupants are tracked
     test.injectMessage(u"<message from='coven@chat.shakespeare.lit'><x xmlns='http://jabber.org/protocol/muc#user'>"
@@ -1680,10 +1687,10 @@ void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
     injectOccupant(test, u"secondwitch"_s, u"crone2@shakespeare.lit/laptop"_s, u"admin"_s);
 
     // the lists are not requested again
-    task = room.sendMessage(QXmppMessage(message));
+    task = sendToRoom(test, room, QXmppMessage(message));
     QCOMPARE(sorted(e2ee->recipientJids), (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone2@shakespeare.lit"_s, u"crone5@shakespeare.lit"_s, u"hecate@shakespeare.lit"_s }));
     test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
-    expectFutureVariant<QXmpp::Success>(task);
+    expectFutureVariant<QXmpp::Messages::Sent>(task);
     test.expectNoPacket();
 }
 
@@ -1704,8 +1711,8 @@ void tst_QXmppMuc::sendMessageEncryptedMembersError()
     QXmppMessage message;
     message.setBody(u"Hi"_s);
     // the second message waits for the first one
-    auto first = room.sendMessage(QXmppMessage(message));
-    auto second = room.sendMessage(QXmppMessage(message));
+    auto first = sendToRoom(test, room, QXmppMessage(message));
+    auto second = sendToRoom(test, room, QXmppMessage(message));
     answerAffiliationLists(test, {}, u"admin"_s);
 
     // not sent without all members
@@ -1716,7 +1723,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersError()
     answerAffiliationLists(test, { { u"member"_s, { u"crone1@shakespeare.lit"_s } } });
     QCOMPARE(e2ee->recipientJids, (QList<QString> { u"crone1@shakespeare.lit"_s }));
     test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
-    expectFutureVariant<QXmpp::Success>(second);
+    expectFutureVariant<QXmpp::Messages::Sent>(second);
 }
 
 void tst_QXmppMuc::sendMessageEncryptedAnonymous()
@@ -1735,7 +1742,7 @@ void tst_QXmppMuc::sendMessageEncryptedAnonymous()
 
     QXmppMessage message;
     message.setBody(u"Hi"_s);
-    auto task = room.sendMessage(std::move(message));
+    auto task = sendToRoom(test, room, std::move(message));
     QCOMPARE(expectFutureVariant<QXmppError>(task).value<QXmpp::SendError>(), QXmpp::SendError::EncryptionError);
     test.expectNoPacket();
 }
@@ -1889,7 +1896,7 @@ void tst_QXmppMuc::sendMessage()
     // Send a message
     QXmppMessage msgToSend;
     msgToSend.setBody(u"Thrice the brinded cat hath mew'd."_s);
-    auto sendTask = room.sendMessage(std::move(msgToSend));
+    auto sendTask = sendToRoom(test, room, std::move(msgToSend));
     QVERIFY(!sendTask.isFinished());
 
     // Verify the sent XML contains origin-id and correct structure
@@ -1909,7 +1916,7 @@ void tst_QXmppMuc::sendMessage()
                            .arg(sentMsg.originId()));
 
     QVERIFY(sendTask.isFinished());
-    expectVariant<QXmpp::Success>(sendTask.result());
+    expectVariant<QXmpp::Messages::Sent>(sendTask.result());
 }
 
 void tst_QXmppMuc::sendMessageError()
@@ -1924,7 +1931,7 @@ void tst_QXmppMuc::sendMessageError()
     // Send a message
     QXmppMessage msgToSend;
     msgToSend.setBody(u"Hello!"_s);
-    auto sendTask = room.sendMessage(std::move(msgToSend));
+    auto sendTask = sendToRoom(test, room, std::move(msgToSend));
     QVERIFY(!sendTask.isFinished());
 
     auto sent = test.takePacket();

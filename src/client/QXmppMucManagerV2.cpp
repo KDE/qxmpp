@@ -523,12 +523,20 @@ static QDateTime sentTime(const QXmppMessage &message)
 
     \section1 Sending messages
 
+    Messages to joined rooms are sent via QXmppClient::sendMessage() like all other messages, with
+    the type QXmppMessage::GroupChat. An \c origin-id (\xep{0359}{Unique and Stable Stanza IDs})
+    is added if not already set and used to match the reflection of the room. The task finishes
+    when the room has reflected the message (QXmpp::Messages::DeliveryState::Confirmed), with the
+    ID of the message in the archive of the room (QXmpp::Messages::Sent::archiveId()), or with an
+    error if the room responds with an error or the reflection times out.
+
     \code
-    auto r = muc->room(u"room@conference.example.org"_s);
-    QXmppMessage msg;
-    msg.setBody(u"Hello, room!"_s);
-    r.sendMessage(std::move(msg)).then(this, [](auto result) {
-        // handle result
+    QXmppMessage msg(QString(), u"room@conference.example.org"_s, u"Hello, room!"_s);
+    msg.setType(QXmppMessage::GroupChat);
+    client->sendMessage(std::move(msg)).then(this, [](QXmpp::Result<QXmpp::Messages::Sent> &&result) {
+        if (auto *sent = std::get_if<QXmpp::Messages::Sent>(&result); sent && sent->archiveId()) {
+            // e.g. use sent->archiveId()->id for reactions
+        }
     });
     \endcode
 
@@ -2976,36 +2984,6 @@ QBindable<QStringList> QXmppMucRoomV2::contactJids() const
 
 /*!
 
-    Sends the groupchat \a message to the room.
-
-    The message's \c to and \c type fields are set automatically. An \c origin-id
-    (\xep{0359}{Unique and Stable Stanza IDs}) is generated if not already set,
-    and is used to match the server's reflected message.
-
-    The returned task completes with success when the message is reflected back
-    by the MUC service, or with an error if the service responds with an error
-    or the request times out.
-*/
-QXmppTask<Result<>> QXmppMucRoomV2::sendMessage(QXmppMessage message)
-{
-    if (m_data->state != MucRoomState::Joined) {
-        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
-    }
-
-    message.setTo(m_data->roomJid);
-    message.setType(QXmppMessage::GroupChat);
-
-    // the message pipeline waits for the reflection, see QXmppMucManagerV2Private::confirmDelivery()
-    return m_data->manager->client()->send(std::move(message)).then(m_data->manager, [](SendResult &&result) -> Result<> {
-        if (auto *error = std::get_if<QXmppError>(&result)) {
-            return std::move(*error);
-        }
-        return Success();
-    });
-}
-
-/*!
-
     Sends the private \a message to a room \a participant.
 
     The message is addressed to the occupant's current room JID (room\@service/nick).
@@ -3035,9 +3013,18 @@ QXmppTask<SendResult> QXmppMucRoomV2::sendPrivateMessage(const QXmppMucParticipa
 */
 QXmppTask<Result<>> QXmppMucRoomV2::setSubject(const QString &subject)
 {
+    if (m_data->state != MucRoomState::Joined) {
+        return makeReadyTask<Result<>>(QXmppError { u"Room is not joined."_s });
+    }
+
     QXmppMessage message;
+    message.setTo(m_data->roomJid);
+    message.setType(QXmppMessage::GroupChat);
     message.setSubject(subject);
-    return sendMessage(std::move(message));
+    // the message pipeline waits for the reflection, see QXmppMucManagerV2Private::confirmDelivery()
+    return m_data->manager->client()->sendMessage(std::move(message)).then(m_data->manager, [](Result<Messages::Sent> &&result) {
+        return mapToSuccess(std::move(result));
+    });
 }
 
 /*!
