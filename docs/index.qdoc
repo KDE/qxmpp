@@ -161,7 +161,7 @@ QXmppClient and extend QXmppClient by subclassing QXmppClientExtension. See the
 \li QXmppCarbonManager — superseded by QXmppCarbonManagerV2
 \li QXmppBookmarkManager — superseded by QXmppPepBookmarkManager
 \li QXmppArchiveManager — superseded by QXmppMamManager
-\li QXmppRpcManager — RPC (\xepn{0009})
+\li \l QXmppRpcManager — RPC (\xepn{0009})
 \endlist
 
 \section1 Low-Level Stanza API
