@@ -247,8 +247,9 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     if (!provider) {
         auto *legacyEncryption = m_clientPrivate->encryptionExtension;
         if (pending.mode == Mode::Sensitive && legacyEncryption && !encrypted) {
-            // like before the pipeline existed
-            auto result = co_await legacyEncryption->encryptMessage(std::move(outgoing.message()), pending.params).withContext(m_client);
+            // like before the pipeline existed; a copy is encrypted, the message is still used by
+            // the handlers of ConfirmDelivery and returned with the result
+            auto result = co_await legacyEncryption->encryptMessage(QXmppMessage(outgoing.message()), pending.params).withContext(m_client);
             if (auto *error = std::get_if<QXmppError>(&result)) {
                 finishFront(conversationJid, std::move(*error));
             } else {

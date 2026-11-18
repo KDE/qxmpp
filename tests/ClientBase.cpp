@@ -6042,6 +6042,7 @@ private:
     Q_SLOT void outgoingFixed();
     Q_SLOT void outgoingReply();
     Q_SLOT void outgoingConfirmDelivery();
+    Q_SLOT void outgoingConfirmDeliveryLegacyEncrypted();
     Q_SLOT void sendMessageUnencrypted();
     Q_SLOT void sendMessageEncrypted();
     Q_SLOT void sendMessageConfirmed();
@@ -6627,6 +6628,58 @@ void tst_QXmppMessages::outgoingReply()
     QCOMPARE(preset, TestEncryption);
     QVERIFY(client.takePacket().contains(u"<body>hello</body>"_s));
     QCOMPARE(e2ee->encryptRequests.size(), 1);
+}
+QT_WARNING_POP
+
+// tests the deprecated API
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+void tst_QXmppMessages::outgoingConfirmDeliveryLegacyEncrypted()
+{
+    class Encrypter : public QXmppE2eeExtension
+    {
+    public:
+        QXmppTask<MessageEncryptResult> encryptMessage(QXmppMessage &&message, const std::optional<QXmppSendStanzaParams> &) override
+        {
+            message.setBody({});
+            message.setE2eeFallbackBody(u"encrypted"_s);
+            co_return std::make_unique<QXmppMessage>(std::move(message));
+        }
+        QXmppTask<MessageDecryptResult> decryptMessage(QXmppMessage &&) override
+        {
+            co_return QXmppError { u"it's only a test"_s, {} };
+        }
+        QXmppTask<IqEncryptResult> encryptIq(QXmppIq &&, const std::optional<QXmppSendStanzaParams> &) override
+        {
+            co_return QXmppError { u"it's only a test"_s, {} };
+        }
+        QXmppTask<IqDecryptResult> decryptIq(const QDomElement &) override
+        {
+            co_return QXmppError { u"it's only a test"_s, {} };
+        }
+        bool isEncrypted(const QDomElement &) override { return false; }
+        bool isEncrypted(const QXmppMessage &) override { return false; }
+    };
+
+    TestClient client;
+    Encrypter encrypter;
+    client.setEncryptionExtension(&encrypter);
+
+    // the handlers get the unencrypted message
+    QObject owner;
+    QStringList bodies;
+    client.hooks(&owner).add<ConfirmDelivery>([&](const OutgoingMessage &message, std::optional<Result<Confirmation>> &) {
+        bodies << message.message().body() << message.message().originId();
+    });
+
+    QXmppMessage message(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s);
+    message.setOriginId(u"origin"_s);
+    client.sendSensitive(std::move(message));
+    QCOMPARE(bodies, (QStringList { u"hello"_s, u"origin"_s }));
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"encrypted"_s));
+    QVERIFY(!packet.contains(u"hello"_s));
+    client.setEncryptionExtension(nullptr);
 }
 QT_WARNING_POP
 
