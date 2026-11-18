@@ -31,6 +31,7 @@ struct DeviceWatch::Data {
     QProperty<DeviceWatch::State> state { DeviceWatch::State::Loading };
     QProperty<QList<Device>> devices;
     QProperty<QList<Version>> supportedVersions;
+    QProperty<QList<Version>> usableVersions;
 
     ~Data()
     {
@@ -147,6 +148,7 @@ public:
     QXmppTask<void> refreshWatch(QString jid);
     QXmppTask<void> updateWatch(QString jid);
     void updateWatches();
+    bool isUsable(const Device &device);
     QXmppTask<void> buildSessions(QString jid);
     void releaseWatch(const QString &jid);
     void unsubscribe(const OmemoStorage::Subscription &subscription);
@@ -217,6 +219,7 @@ public:
     QDateTime fixedTime;
 
     QProperty<QList<Version>> enabledVersions;
+    QPropertyNotifier enabledVersionsNotifier;
     // the own device exists
     bool isSetUp = false;
     int maxDevicesPerStanza = MAX_DEVICES_PER_STANZA;

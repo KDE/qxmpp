@@ -2591,6 +2591,7 @@ private:
     Q_SLOT void ownDevicesReceiveCopies_data();
     Q_SLOT void ownDevicesReceiveCopies();
     Q_SLOT void sentByThisDevice_data();
+    Q_SLOT void usableVersions();
     Q_SLOT void sentByThisDevice();
     Q_SLOT void maxDevicesPerStanza_data();
     Q_SLOT void maxDevicesPerStanza();
@@ -2659,6 +2660,7 @@ void tst_OmemoManager2::readOnlyBindables()
     QVERIFY(watch.state().isReadOnly());
     QVERIFY(watch.devices().isReadOnly());
     QVERIFY(watch.supportedVersions().isReadOnly());
+    QVERIFY(watch.usableVersions().isReadOnly());
 }
 
 void tst_OmemoManager2::setUpPublishes()
@@ -3610,6 +3612,57 @@ static QList<std::tuple<Version, QString, uint32_t>> deviceAddresses(const QList
     }
     std::ranges::sort(addresses);
     return addresses;
+}
+
+void tst_OmemoManager2::usableVersions()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.automatic = true;
+    bob.automatic = true;
+    const QList bothVersions { Version::Omemo0, Version::Omemo2 };
+
+    // The keys are fetched by the watch, so the devices are usable.
+    auto watch = alice.manager->watchDevices(bob.jid());
+    QVERIFY(watch.usableVersions().value().isEmpty());
+    server.process();
+    QTRY_COMPARE(watch.usableVersions().value(), bothVersions);
+
+    // disabled versions are not used
+    alice.manager->setEnabledVersions({ Version::Omemo2 });
+    server.process();
+    QTRY_COMPARE(watch.usableVersions().value(), QList { Version::Omemo2 });
+    alice.manager->setEnabledVersions(bothVersions);
+    server.process();
+    QTRY_COMPARE(watch.usableVersions().value(), bothVersions);
+
+    // not trusted, the trust level is shared by both versions
+    const auto device = watch.devices().value().constLast();
+    alice.manager->setTrustLevel({ device }, TrustLevel::ManuallyDistrusted);
+    server.process();
+    QTRY_VERIFY(watch.usableVersions().value().isEmpty());
+    QVERIFY(alice.sendMessage(bob.jid(), u"Hello"_s).isEmpty());
+    QCOMPARE(alice.sendError, u"There is no device of the recipients with an accepted trust level"_s);
+
+    alice.manager->setTrustLevel({ device }, TrustLevel::Authenticated);
+    server.process();
+    QTRY_COMPARE(watch.usableVersions().value(), bothVersions);
+
+    // not used anymore without an answer, OMEMO 2 is used for the device
+    alice.manager->d->storedDevice(Version::Omemo2, bob.jid(), bob.deviceId())->unrespondedSentStanzasCount = QXmpp::Omemo::Private::UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS - 1;
+    const auto message = alice.sendMessage(bob.jid(), u"Hello"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QTRY_COMPARE(watch.usableVersions().value(), QList { Version::Omemo0 });
+
+    // used again after an answer
+    bob.receive(alice, message);
+    const auto answer = bob.sendMessage(alice.jid(), u"Hi"_s);
+    QVERIFY2(!answer.isEmpty(), qPrintable(bob.sendError));
+    QCOMPARE(alice.receive(bob, answer).size(), 1);
+    QTRY_COMPARE(watch.usableVersions().value(), bothVersions);
 }
 
 void tst_OmemoManager2::encryptionInfo()

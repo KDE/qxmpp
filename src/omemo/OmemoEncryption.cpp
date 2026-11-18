@@ -375,6 +375,10 @@ QList<Envelope> OmemoManagerPrivate::encryptKey(Version version, const QList<Rec
 
         if (auto *device = storedDevice(version, jid, deviceId)) {
             device->unrespondedSentStanzasCount = std::min(device->unrespondedSentStanzasCount + 1, UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS);
+            // not used anymore
+            if (device->unrespondedSentStanzasCount == UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS) {
+                updateWatch(jid);
+            }
             device->unrespondedReceivedStanzasCount = 0;
             storage->addDevice(*device);
         }
@@ -429,6 +433,11 @@ QXmppTask<Result<DecryptedEnvelope>> OmemoManagerPrivate::decryptKey(Version ver
         }
     }
 
+    // used again
+    if (device->unrespondedSentStanzasCount == UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS) {
+        device->unrespondedSentStanzasCount = 0;
+        updateWatch(jid);
+    }
     device->unrespondedSentStanzasCount = 0;
     auto sendEmpty = isKeyExchange && isMessage;
     if (++device->unrespondedReceivedStanzasCount >= UNRESPONDED_STANZAS_UNTIL_HEARTBEAT) {

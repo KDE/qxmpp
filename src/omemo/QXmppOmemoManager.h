@@ -9,7 +9,9 @@
 #include "QXmppE2eeExtension.h"
 #include "QXmppError.h"
 #include "QXmppJid.h"
+#include "QXmppMessage.h"
 #include "QXmppOmemoStorage.h"
+#include "QXmppSendStanzaParams.h"
 #include "QXmppTask.h"
 #include "QXmppTrustLevel.h"
 #include "QXmppTrustSecurityPolicy.h"
@@ -220,6 +222,7 @@ public:
     QBindable<State> state() const;
     QBindable<QList<Device>> devices() const;
     QBindable<QList<Version>> supportedVersions() const;
+    QBindable<QList<Version>> usableVersions() const;
 
 private:
     friend class Private::OmemoManagerPrivate;

@@ -751,13 +751,18 @@ QXmppTask<void> OmemoManagerPrivate::updateWatch(QString jid)
         co_return;
     }
     QList<Version> supported;
+    QList<Version> usable;
     for (const auto &device : std::as_const(devices)) {
         if (!supported.contains(device.version)) {
             supported.append(device.version);
         }
+        if (!usable.contains(device.version) && isUsable(device)) {
+            usable.append(device.version);
+        }
     }
     watch->devices = mergeVersions(devices);
     watch->supportedVersions = supported;
+    watch->usableVersions = usable;
 }
 
 void OmemoManagerPrivate::updateWatches()
@@ -766,6 +771,17 @@ void OmemoManagerPrivate::updateWatches()
     for (const auto &jid : jids) {
         updateWatch(jid);
     }
+}
+
+// Whether a message would be encrypted for the device, like checked by prepareSession() with the
+// default trust levels. Devices with unknown keys are not usable until their bundles have been
+// fetched, e.g. by a watch.
+bool OmemoManagerPrivate::isUsable(const Device &device)
+{
+    const auto *stored = storedDevice(device.version, device.jid, device.id);
+    return isEnabled(device.version) && stored && !device.keyId.isEmpty() &&
+        DEFAULT_ACCEPTED_TRUST_LEVELS.testFlag(device.trustLevel) &&
+        stored->unrespondedSentStanzasCount < UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS;
 }
 
 // Builds the missing sessions with the devices of a watched JID.
@@ -925,6 +941,9 @@ OmemoManager::OmemoManager(std::shared_ptr<OmemoStorage> storage, QList<Version>
         d->login();
     });
     d->registerProviders();
+    d->enabledVersionsNotifier = d->enabledVersions.addNotifier([this] {
+        d->updateWatches();
+    });
 }
 
 OmemoManager::~OmemoManager() = default;
@@ -1219,6 +1238,23 @@ QBindable<QList<Device>> DeviceWatch::devices() const
 QBindable<QList<Version>> DeviceWatch::supportedVersions() const
 {
     return readOnly(d->supportedVersions);
+}
+
+/*!
+    Returns the enabled versions with at least one device that messages would be encrypted for,
+    i.e. with an accepted trust level (the default ones of QXmppSendStanzaParams) and still
+    responding. A device whose key is not known yet is usable after the watch has fetched it.
+
+    It tells whether a message to the JID can be encrypted. For a group chat, a message can be
+    encrypted if a version is usable for any of its participants. Otherwise, sending fails with
+    QXmpp::SendError::NoEncryptionRecipients. The message should not be sent unencrypted without
+    asking the user: the server could hide the devices.
+
+    It is computed from the stored data, so it is also available while being disconnected.
+*/
+QBindable<QList<Version>> DeviceWatch::usableVersions() const
+{
+    return readOnly(d->usableVersions);
 }
 
 /*!

@@ -79,6 +79,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - OMEMO: Add the storage `QXmpp::OmemoStorage` with `OmemoMemoryStorage` for the new manager (@lnj, !842)
  - OMEMO: Add the new manager `QXmpp::OmemoManager` supporting OMEMO 2 and OMEMO 0 (`eu.siacs.conversations.axolotl`) with one device and one identity key for both versions, whose trust levels are shared between the versions; it sets itself up on login, and a `DeviceWatch` keeps the devices (a device using both versions once), trust levels and supported versions of a contact up to date, subscribes to its device lists if needed until the next login and builds sessions in advance; the application selects the version or `QXmpp::Omemo::Automatic`, which encrypts for each device with the best version it supports and keeps using OMEMO 2 for devices known to use it (@lnj, !842)
  - OMEMO: Report the devices a message has been encrypted for and the skipped ones with the reason via `QXmpp::Omemo::EncryptionInfo` in `QXmpp::Messages::Sent::encryptionInfo()` (@lnj, !842)
+ - OMEMO: Add `DeviceWatch::usableVersions()` telling whether messages to a contact can be encrypted, with the devices selected like when sending, also while being disconnected (@lnj, !842)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
