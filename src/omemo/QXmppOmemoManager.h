@@ -21,6 +21,7 @@ class QXmppOmemoDevicePrivate;
 class QXmppOmemoManagerPrivate;
 class QXmppOmemoOwnDevicePrivate;
 class QXmppOmemoStorage;
+class QXmppUri;
 class tst_OmemoManager2;
 
 class QXMPPOMEMO_EXPORT QXmppOmemoOwnDevice
@@ -182,6 +183,13 @@ struct Device {
     QByteArray omemo0KeyId {};
 
     bool hasKey(const QByteArray &key) const { return !key.isEmpty() && (key == keyId || key == omemo0KeyId); }
+    QByteArray fingerprint() const
+    {
+        // the Curve25519 key without its type byte
+        return version == Version::Omemo0 && keyId.size() == 33 ? keyId.mid(1) : keyId;
+    }
+    bool isDistrusted() const { return trustLevel == QXmpp::TrustLevel::AutomaticallyDistrusted || trustLevel == QXmpp::TrustLevel::ManuallyDistrusted; }
+    bool isAuthenticatable() const { return !keyId.isEmpty() && trustLevel != QXmpp::TrustLevel::Authenticated && trustLevel != QXmpp::TrustLevel::Undecided; }
 
     bool operator==(const Device &) const = default;
 };
@@ -223,6 +231,7 @@ public:
     QBindable<QList<Device>> devices() const;
     QBindable<QList<Version>> supportedVersions() const;
     QBindable<QList<Version>> usableVersions() const;
+    QBindable<QString> verificationUri() const;
 
 private:
     friend class Private::OmemoManagerPrivate;
@@ -265,6 +274,9 @@ public:
 
     Omemo::DeviceWatch watchDevices(const QXmpp::Jid &jid);
     QXmppTask<void> setTrustLevel(QList<Omemo::Device> devices, QXmpp::TrustLevel trustLevel);
+    static bool isVerificationUri(const QXmppUri &uri);
+    QXmppTask<void> verify(const QXmppUri &uri);
+    QXmppTask<void> verify(QXmpp::Jid jid, QList<QByteArray> fingerprints);
     QXmppTask<void> removeContactDevices(QXmpp::Jid jid);
 
     QXmppTask<QXmpp::Result<>> resetOwnDevice();

@@ -2,13 +2,16 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppAtmManager.h"
 #include "QXmppClient.h"
+#include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppJid_p.h"
 #include "QXmppPubSubEvent.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
 #include "QXmppTrustManager.h"
+#include "QXmppUri.h"
 
 #include "Async.h"
 #include "OmemoManager_p.h"
@@ -763,6 +766,131 @@ QXmppTask<void> OmemoManagerPrivate::updateWatch(QString jid)
     watch->devices = mergeVersions(devices);
     watch->supportedVersions = supported;
     watch->usableVersions = usable;
+    watch->verificationUri = verificationUri(jid, devices);
+}
+
+// Curve25519 keys of OMEMO 0 have a type byte, which is omitted in fingerprints.
+constexpr char OMEMO_0_KEY_TYPE = 0x05;
+constexpr qsizetype FINGERPRINT_SIZE = 32;
+
+// The trust message of a URI for OMEMO 2 keys (XEP-0434: Trust Messages)
+static std::optional<Uri::TrustMessage> omemo2TrustMessage(const QXmppUri &uri)
+{
+    if (uri.query().type() != typeid(Uri::TrustMessage)) {
+        return {};
+    }
+    auto trustMessage = std::any_cast<Uri::TrustMessage>(uri.query());
+    if (trustMessage.encryption != ns_omemo_2 || (trustMessage.trustKeyIds.isEmpty() && trustMessage.distrustKeyIds.isEmpty())) {
+        return {};
+    }
+    return trustMessage;
+}
+
+// The OMEMO 0 keys of a URI in the format of Conversations
+static QList<QByteArray> omemo0Keys(const QXmppUri &uri)
+{
+    QList<QByteArray> keys;
+    for (const auto &fingerprint : uri.omemoFingerprints()) {
+        if (fingerprint.keyId.size() == FINGERPRINT_SIZE) {
+            keys.append(OMEMO_0_KEY_TYPE + fingerprint.keyId);
+        }
+    }
+    return keys;
+}
+
+static QList<QByteArray> keysFromHex(const QList<QString> &keys)
+{
+    QList<QByteArray> decoded;
+    for (const auto &key : keys) {
+        decoded.append(QByteArray::fromHex(key.toLatin1()));
+    }
+    return decoded;
+}
+
+// The keys of jid authenticated or distrusted by the user, for OMEMO 2 as a trust message and for
+// OMEMO 0 as fingerprints in the format of Conversations, which supports only those. For the own
+// JID, the keys of this device are included.
+QString OmemoManagerPrivate::verificationUri(const QString &jid, const QList<Device> &devices) const
+{
+    QList<QString> trustedKeys;
+    QList<QString> distrustedKeys;
+    QList<Uri::OmemoFingerprint> fingerprints;
+
+    if (isSetUp && jid == ownJid()) {
+        if (isEnabled(Version::Omemo2)) {
+            trustedKeys.append(QString::fromLatin1(ownKey.value().toHex()));
+        }
+        if (const auto key = ownKeyOmemo0.value(); isEnabled(Version::Omemo0) && key.size() == FINGERPRINT_SIZE + 1) {
+            fingerprints.append({ .deviceId = device.deviceId, .keyId = key.mid(1) });
+        }
+    }
+    for (const auto &other : devices) {
+        if (other.keyId.isEmpty()) {
+            continue;
+        }
+        if (other.version == Version::Omemo2) {
+            if (other.trustLevel == TrustLevel::Authenticated) {
+                trustedKeys.append(QString::fromLatin1(other.keyId.toHex()));
+            } else if (other.trustLevel == TrustLevel::ManuallyDistrusted) {
+                distrustedKeys.append(QString::fromLatin1(other.keyId.toHex()));
+            }
+        } else if (other.trustLevel == TrustLevel::Authenticated && other.keyId.size() == FINGERPRINT_SIZE + 1) {
+            fingerprints.append({ .deviceId = other.id, .keyId = other.fingerprint() });
+        }
+    }
+
+    QXmppUri uri;
+    uri.setJid(jid);
+    // Clients not supporting trust messages ignore the query and read the fingerprints.
+    if (!trustedKeys.isEmpty() || !distrustedKeys.isEmpty()) {
+        uri.setQuery(Uri::TrustMessage { .encryption = ns_omemo_2.toString(), .trustKeyIds = trustedKeys, .distrustKeyIds = distrustedKeys });
+    }
+    uri.setOmemoFingerprints(fingerprints);
+    return uri.toString();
+}
+
+// Authenticates and distrusts keys of jid. Trust messages (XEP-0450: Automatic Trust Management)
+// are only sent for OMEMO 2 keys, so the OMEMO 2 keys of the devices whose OMEMO 0 keys are
+// authenticated are authenticated with them.
+QXmppTask<void> OmemoManagerPrivate::authenticate(QString jid, QList<QByteArray> omemo2Keys, QList<QByteArray> omemo2DistrustedKeys, QList<QByteArray> omemo0Keys)
+{
+    co_await loaded().withContext(q);
+    for (const auto &key : std::as_const(omemo0Keys)) {
+        for (const auto &sameKey : sameIdentityKeys(Version::Omemo0, jid, key)) {
+            if (!omemo2Keys.contains(sameKey)) {
+                omemo2Keys.append(sameKey);
+            }
+        }
+    }
+
+    if (!omemo2Keys.isEmpty() || !omemo2DistrustedKeys.isEmpty()) {
+        const auto encryption = trustNamespace(Version::Omemo2);
+        if (auto *atm = qobject_cast<QXmppAtmManager *>(trustManager)) {
+            co_await atm->makeTrustDecisions(encryption, jid, omemo2Keys, omemo2DistrustedKeys).withContext(q);
+        } else {
+            auto keysOf = [&](const QList<QByteArray> &keys) {
+                QMultiHash<QString, QByteArray> keysOfJid;
+                for (const auto &key : keys) {
+                    keysOfJid.insert(jid, key);
+                }
+                return keysOfJid;
+            };
+            if (!omemo2Keys.isEmpty()) {
+                co_await trustManager->setTrustLevel(encryption, keysOf(omemo2Keys), TrustLevel::Authenticated).withContext(q);
+            }
+            if (!omemo2DistrustedKeys.isEmpty()) {
+                co_await trustManager->setTrustLevel(encryption, keysOf(omemo2DistrustedKeys), TrustLevel::ManuallyDistrusted).withContext(q);
+            }
+        }
+    }
+
+    if (!omemo0Keys.isEmpty()) {
+        QMultiHash<QString, QByteArray> keys;
+        for (const auto &key : std::as_const(omemo0Keys)) {
+            keys.insert(jid, key);
+        }
+        co_await trustManager->setTrustLevel(trustNamespace(Version::Omemo0), keys, TrustLevel::Authenticated).withContext(q);
+    }
 }
 
 void OmemoManagerPrivate::updateWatches()
@@ -944,6 +1072,12 @@ OmemoManager::OmemoManager(std::shared_ptr<OmemoStorage> storage, QList<Version>
     d->enabledVersionsNotifier = d->enabledVersions.addNotifier([this] {
         d->updateWatches();
     });
+    // the own keys are part of the verification URI
+    d->ownKeyNotifier = d->ownKey.addNotifier([this] {
+        if (client()) {
+            d->updateWatch(d->ownJid());
+        }
+    });
 }
 
 OmemoManager::~OmemoManager() = default;
@@ -1113,6 +1247,32 @@ QBindable<QByteArray> OmemoManager::ownKey(Version version) const
 */
 
 /*!
+    \fn QByteArray QXmpp::Omemo::Device::fingerprint() const
+
+    Returns the key as shown to users for comparing it, e.g. as hex, and as used in URIs: the key
+    of OMEMO 2 or the Curve25519 key of OMEMO 0 without its type byte, like shown by clients only
+    supporting OMEMO 0. It is empty while the key is unknown.
+
+    \sa OmemoManager::verify()
+*/
+
+/*!
+    \fn bool QXmpp::Omemo::Device::isDistrusted() const
+
+    Returns whether the key is automatically or manually distrusted. Messages are not encrypted for
+    the device by default then.
+*/
+
+/*!
+    \fn bool QXmpp::Omemo::Device::isAuthenticatable() const
+
+    Returns whether the key can be authenticated by the user, e.g. via a QR code: it is known, its
+    trust level has been decided and it is not authenticated yet.
+
+    \sa OmemoManager::verify()
+*/
+
+/*!
     \struct QXmpp::Omemo::EncryptionInfo
     \inmodule QXmpp
 
@@ -1258,6 +1418,21 @@ QBindable<QList<Version>> DeviceWatch::usableVersions() const
 }
 
 /*!
+    Returns an \c xmpp: URI with the keys of the JID that the user has authenticated or distrusted,
+    e.g. to be shown as a QR code for verifying them by scanning it with another device (see
+    OmemoManager::verify()). For the own JID, the keys of this device are included.
+
+    The keys of OMEMO 2 are contained in a trust message (\xep{0434}{Trust Messages}), the
+    authenticated keys of OMEMO 0 as fingerprints in the format of Conversations
+    (\c omemo-sid-<device ID>=<fingerprint>), which clients only supporting OMEMO 0 read. Without
+    such keys, it contains only the JID.
+*/
+QBindable<QString> DeviceWatch::verificationUri() const
+{
+    return readOnly(d->verificationUri);
+}
+
+/*!
     Returns a watch on the devices of \a jid listed in the device lists of all versions with their
     keys and trust levels, sorted by version and ID. This device is not included.
 
@@ -1298,6 +1473,69 @@ QXmppTask<void> OmemoManager::setTrustLevel(QList<Device> devices, QXmpp::TrustL
             co_await d->trustManager->setTrustLevel(OmemoManagerPrivate::trustNamespace(version), keys, trustLevel).withContext(this);
         }
     }
+}
+
+/*!
+    Returns whether \a uri contains keys that can be verified via verify(), e.g. scanned from a QR
+    code: keys of OMEMO 2 in a trust message (\xep{0434}{Trust Messages}) or of OMEMO 0 in the
+    format of Conversations (\c omemo-sid-<device ID>=<fingerprint>).
+
+    \sa DeviceWatch::verificationUri()
+*/
+bool OmemoManager::isVerificationUri(const QXmppUri &uri)
+{
+    return omemo2TrustMessage(uri) || !omemo0Keys(uri).isEmpty();
+}
+
+/*!
+    Authenticates and distrusts the keys of the JID of \a uri as contained in it, e.g. after the
+    user has scanned a QR code of another device (see DeviceWatch::verificationUri()). The JID
+    should be checked before, e.g. whether it is the one of the chat being verified.
+
+    The keys of OMEMO 2 are authenticated via \xep{0450}{Automatic Trust Management (ATM)} if the
+    trust manager is a QXmppAtmManager, which sends trust messages to the devices with
+    authenticated keys. Since trust messages exist only for OMEMO 2, the keys of OMEMO 0 are
+    authenticated directly, together with the OMEMO 2 keys of the same devices.
+
+    \sa isVerificationUri()
+*/
+QXmppTask<void> OmemoManager::verify(const QXmppUri &uri)
+{
+    const auto jid = jidBare(uri.jid());
+    const auto trustMessage = omemo2TrustMessage(uri);
+    return d->authenticate(jid,
+                           trustMessage ? keysFromHex(trustMessage->trustKeyIds) : QList<QByteArray>(),
+                           trustMessage ? keysFromHex(trustMessage->distrustKeyIds) : QList<QByteArray>(),
+                           omemo0Keys(uri));
+}
+
+/*!
+    Authenticates the keys of \a jid with \a fingerprints, e.g. entered by the user after comparing
+    them with the ones shown by the other device (see Device::fingerprint()).
+
+    Fingerprints of known OMEMO 0 devices authenticate their keys, all others are authenticated as
+    keys of OMEMO 2, also if their devices are not known yet. Keys are authenticated like by
+    verify(const QXmppUri &).
+*/
+QXmppTask<void> OmemoManager::verify(Jid jid, QList<QByteArray> fingerprints)
+{
+    co_await d->loaded().withContext(this);
+    const auto bareJid = jid.bare().toString();
+    QList<QByteArray> omemo2Keys;
+    QList<QByteArray> omemo0Keys;
+    const auto omemo0Devices = d->versions.at(Version::Omemo0).devices.value(bareJid);
+    for (const auto &fingerprint : std::as_const(fingerprints)) {
+        const auto omemo0Key = OMEMO_0_KEY_TYPE + fingerprint;
+        const auto isOmemo0Key = std::ranges::any_of(omemo0Devices, [&](const OmemoStorage::Device &device) {
+            return device.keyId == omemo0Key;
+        });
+        if (isOmemo0Key) {
+            omemo0Keys.append(omemo0Key);
+        } else {
+            omemo2Keys.append(fingerprint);
+        }
+    }
+    co_await d->authenticate(bareJid, omemo2Keys, {}, omemo0Keys).withContext(this);
 }
 
 /*!

@@ -30,6 +30,7 @@
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
 #include "QXmppRosterStorage.h"
+#include "QXmppUri.h"
 #include "QXmppUtils.h"
 
 #include "Async.h"
@@ -2592,6 +2593,7 @@ private:
     Q_SLOT void ownDevicesReceiveCopies();
     Q_SLOT void sentByThisDevice_data();
     Q_SLOT void usableVersions();
+    Q_SLOT void verification();
     Q_SLOT void sentByThisDevice();
     Q_SLOT void maxDevicesPerStanza_data();
     Q_SLOT void maxDevicesPerStanza();
@@ -2661,6 +2663,7 @@ void tst_OmemoManager2::readOnlyBindables()
     QVERIFY(watch.devices().isReadOnly());
     QVERIFY(watch.supportedVersions().isReadOnly());
     QVERIFY(watch.usableVersions().isReadOnly());
+    QVERIFY(watch.verificationUri().isReadOnly());
 }
 
 void tst_OmemoManager2::setUpPublishes()
@@ -3663,6 +3666,100 @@ void tst_OmemoManager2::usableVersions()
     QVERIFY2(!answer.isEmpty(), qPrintable(bob.sendError));
     QCOMPARE(alice.receive(bob, answer).size(), 1);
     QTRY_COMPARE(watch.usableVersions().value(), bothVersions);
+}
+
+void tst_OmemoManager2::verification()
+{
+    using QXmpp::Uri::OmemoFingerprint;
+    using QXmpp::Uri::TrustMessage;
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account carol(nullptr, &server, u"carol@wonderland.lit/home"_s);
+    Account dave(nullptr, &server, u"dave@wonderland.lit/home"_s);
+    Account erin(nullptr, &server, u"erin@wonderland.lit/home"_s);
+    for (auto *account : { &alice, &bob, &carol, &dave, &erin }) {
+        expectVariant<Success>(account->setUp());
+    }
+    auto parse = [](const QString &uri) {
+        return expectVariant<QXmppUri>(QXmppUri::fromString(uri));
+    };
+
+    // Unknown and undecided keys can not be authenticated.
+    QVERIFY((!Device { .trustLevel = TrustLevel::AutomaticallyTrusted }.isAuthenticatable()));
+    QVERIFY((!Device { .keyId = "key" }.isAuthenticatable()));
+    QVERIFY((Device { .keyId = "key", .trustLevel = TrustLevel::ManuallyDistrusted }.isAuthenticatable()));
+    QVERIFY((Device { .trustLevel = TrustLevel::AutomaticallyDistrusted }.isDistrusted()));
+    QVERIFY((Device { .trustLevel = TrustLevel::ManuallyDistrusted }.isDistrusted()));
+    QVERIFY((!Device { .trustLevel = TrustLevel::AutomaticallyTrusted }.isDistrusted()));
+    // the trust levels of the keys of both versions
+    auto trustLevels = [](const Account &account, const DeviceWatch &watch) {
+        QList<TrustLevel> levels;
+        for (const auto &device : watch.devices().value()) {
+            levels.append(device.trustLevel);
+            if (!device.omemo0KeyId.isEmpty()) {
+                levels.append(awaitTask(account.trust->trustLevel(versionNamespace(Version::Omemo0), device.jid, device.omemo0KeyId)));
+            }
+        }
+        return levels;
+    };
+    const QList authenticated { TrustLevel::Authenticated, TrustLevel::Authenticated };
+
+    // without authenticated keys
+    auto watch = alice.manager->watchDevices(bob.jid());
+    server.process();
+    QTRY_VERIFY(!watch.devices().value().value(0).omemo0KeyId.isEmpty());
+    QCOMPARE(watch.verificationUri().value(), u"xmpp:bob@builder.lit"_s);
+    QVERIFY(!OmemoManager::isVerificationUri(parse(watch.verificationUri().value())));
+    QVERIFY(watch.devices().value().constFirst().isAuthenticatable());
+
+    // the OMEMO 2 key in a trust message, the OMEMO 0 key as fingerprint for Conversations
+    alice.manager->setTrustLevel(watch.devices().value(), TrustLevel::Authenticated);
+    server.process();
+    QTRY_COMPARE(trustLevels(alice, watch), authenticated);
+    const auto device = watch.devices().value().constFirst();
+    QVERIFY(!device.isAuthenticatable());
+    const auto omemo0Fingerprint = Device { .version = Version::Omemo0, .keyId = device.omemo0KeyId }.fingerprint();
+    QCOMPARE(omemo0Fingerprint, device.omemo0KeyId.mid(1));
+    QCOMPARE(device.fingerprint(), device.keyId);
+    auto uri = parse(watch.verificationUri().value());
+    QCOMPARE(std::any_cast<TrustMessage>(uri.query()).trustKeyIds, QList { QString::fromLatin1(device.keyId.toHex()) });
+    QCOMPARE(uri.omemoFingerprints(), (QList<OmemoFingerprint> { { bob.deviceId(), omemo0Fingerprint } }));
+
+    // The own URI contains this device.
+    auto own = bob.manager->watchDevices(bob.jid());
+    server.process();
+    QTRY_VERIFY(!own.verificationUri().value().isEmpty());
+    const auto ownUri = parse(own.verificationUri().value());
+    QCOMPARE(std::any_cast<TrustMessage>(ownUri.query()).trustKeyIds, QList { QString::fromLatin1(bob.manager->ownKey().value().toHex()) });
+    QCOMPARE(ownUri.omemoFingerprints(), (QList<OmemoFingerprint> { { bob.deviceId(), bob.manager->ownKey(Version::Omemo0).value().mid(1) } }));
+
+    // scanned, the keys of both versions are authenticated
+    auto carolWatch = carol.manager->watchDevices(bob.jid());
+    server.process();
+    QVERIFY(OmemoManager::isVerificationUri(ownUri));
+    carol.manager->verify(ownUri);
+    server.process();
+    QTRY_COMPARE(trustLevels(carol, carolWatch), authenticated);
+
+    // a URI of Conversations with only the OMEMO 0 key
+    QXmppUri conversationsUri;
+    conversationsUri.setJid(bob.jid());
+    conversationsUri.setOmemoFingerprints(ownUri.omemoFingerprints());
+    QVERIFY(OmemoManager::isVerificationUri(conversationsUri));
+    auto daveWatch = dave.manager->watchDevices(bob.jid());
+    server.process();
+    dave.manager->verify(conversationsUri);
+    server.process();
+    QTRY_COMPARE(trustLevels(dave, daveWatch), authenticated);
+
+    // an entered fingerprint of OMEMO 0
+    auto erinWatch = erin.manager->watchDevices(bob.jid());
+    server.process();
+    erin.manager->verify(bob.jid(), { omemo0Fingerprint });
+    server.process();
+    QTRY_COMPARE(trustLevels(erin, erinWatch), authenticated);
 }
 
 void tst_OmemoManager2::encryptionInfo()
