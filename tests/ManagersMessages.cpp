@@ -822,10 +822,10 @@ void tst_QXmppMamManager::retrieveExtended()
     // flipped page: newest message first
     auto result = [](const QString &id, const QString &body) {
         return u"<message to='juliet@capulet.lit/chamber' from='coven@chat.shakespeare.lit'>"
-               "<result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='"_s +
+               u"<result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='"_s +
             id +
             u"'><forwarded xmlns='urn:xmpp:forward:0'><delay xmlns='urn:xmpp:delay' stamp='2010-07-10T23:08:25Z'/>"
-            "<message xmlns='jabber:client' from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'><body>"_s +
+            u"<message xmlns='jabber:client' from='coven@chat.shakespeare.lit/firstwitch' type='groupchat'><body>"_s +
             body + u"</body></message></forwarded></result></message>"_s;
     };
     handleMamResult(mam, queryId, result(u"2"_s, u"newer"_s));
@@ -875,8 +875,8 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
         return u"<message to='juliet@capulet.lit/chamber'"_s + (from.isEmpty() ? QString() : u" from='"_s + from + u'\'') +
             u"><result xmlns='urn:xmpp:mam:2' queryid='QUERYID' id='"_s + id +
             u"'><forwarded xmlns='urn:xmpp:forward:0'>"
-            "<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'><body>Hi</body></message>"
-            "</forwarded></result></message>"_s;
+            u"<message xmlns='jabber:client' to='juliet@capulet.lit/balcony' from='romeo@montague.lit/orchard' type='chat'><body>Hi</body></message>"
+            u"</forwarded></result></message>"_s;
     };
 
     // archive of the own account
