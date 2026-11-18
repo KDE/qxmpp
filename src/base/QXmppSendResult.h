@@ -26,6 +26,10 @@ namespace QXmpp {
     \value ConfirmationTimeout The packet was sent, but its delivery has not been confirmed in
     time, e.g. a MUC room or MIX channel has not reflected the message. It may have been
     delivered nevertheless. (Since QXmpp 1.18)
+    \value NoEncryptionRecipients The packet couldn't be encrypted because it can not be encrypted
+    for any of the recipients, e.g. none of their devices has an accepted trust level. Clients
+    should not send it unencrypted without asking the user: the server could hide the devices.
+    (Since QXmpp 1.18)
 */
 enum class SendError : uint8_t {
     SocketWriteError,
@@ -33,6 +37,7 @@ enum class SendError : uint8_t {
     EncryptionError,
     Cancelled,
     ConfirmationTimeout,
+    NoEncryptionRecipients,
 };
 
 /*!
