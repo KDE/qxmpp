@@ -46,7 +46,7 @@ namespace QXmpp::Messages {
         (QXmpp::E2ee::Provider). The public part of Explicit Message Encryption
         (\xep{0380}{Explicit Message Encryption}) and a fallback body are added for messages
         with a body. PrepareBodyOnly: synchronous, only if the provider encrypts the message for
-        recipients of an encryption protecting only the body (e.g. OMEMO 0.3).
+        recipients of an encryption protecting only the body (e.g. OMEMO 0).
     \li Send.
     \li ConfirmDelivery: asynchronous, e.g. MUC waits for the reflection of the room. The task
         returned by QXmppClient::sendMessage() or send() finishes afterwards.
@@ -256,7 +256,7 @@ void BodyOnlyMessage::allowLowRiskElements()
     \inmodule QXmpp
 
     Hook run synchronously when an outgoing message is encrypted for recipients of an encryption
-    protecting only the body (QXmpp::E2ee::ContentEncryption::BodyOnly, e.g. OMEMO 0.3), at most
+    protecting only the body (QXmpp::E2ee::ContentEncryption::BodyOnly, e.g. OMEMO 0), at most
     once per message. It is not run if no such recipient is left after the provider selected the
     devices.
 

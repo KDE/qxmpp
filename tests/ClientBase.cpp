@@ -5998,7 +5998,7 @@ static QString plainMessage(const QString &from, const QString &id)
     return u"<message from='"_s + from + u"' to='me@example.org/res' type='chat' id='"_s + id + u"'><body>plain</body></message>"_s;
 }
 
-// Encrypts only the body, like OMEMO 0.3.
+// Encrypts only the body, like OMEMO 0.
 constexpr QStringView TestBodyEncryption = u"urn:test:body-e2ee";
 
 struct TestBodyEncrypted {

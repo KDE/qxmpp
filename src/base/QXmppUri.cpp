@@ -178,7 +178,7 @@ namespace QXmpp::Uri {
 
     The format of the key depends on the OMEMO version, the URI doesn't tell which one is used:
     \list
-    \li OMEMO 0.3 (\c {eu.siacs.conversations.axolotl}), used by Conversations: the Curve25519
+    \li OMEMO 0 (\c {eu.siacs.conversations.axolotl}), used by Conversations: the Curve25519
     public identity key (32 bytes) without the leading key type byte (0x05) of its serialization
     in the bundle.
     \li OMEMO 2 (\c {urn:xmpp:omemo:2}), used by QXmppOmemoManager: the Ed25519 public identity

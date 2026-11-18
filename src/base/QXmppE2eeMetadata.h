@@ -22,7 +22,7 @@ enum class ContentEncryption {
     // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
     Sce,
     // only the body, other sensitive elements are sent in the clear if allowed by PrepareBodyOnly
-    // or dropped, e.g. OMEMO 0.3
+    // or dropped, e.g. OMEMO 0
     BodyOnly,
 };
 
