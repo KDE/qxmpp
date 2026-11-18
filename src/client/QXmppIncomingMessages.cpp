@@ -62,10 +62,16 @@ static QStringView encryption(const QXmppMessage &message, Hooks hooks)
     return preferredEncryption(encryptions, std::move(hooks));
 }
 
-static void fail(Context &context, DecryptionState state, QString errorText = {})
+static void fail(Context &context, DecryptionState state, QString errorText = {}, QStringView encryption = {})
 {
     auto &d = MessageContextAccess::d(context);
     d.decryptionState = state;
+    if (!encryption.isEmpty()) {
+        // keeps the encryption of messages that could not be decrypted
+        QXmppE2eeMetadata metadata;
+        metadata.setEncryptionNamespace(encryption.toString());
+        d.e2eeMetadata = std::move(metadata);
+    }
     if (!errorText.isEmpty()) {
         d.decryptionError = QXmppError { std::move(errorText), {} };
     }
@@ -177,7 +183,7 @@ QXmppTask<IncomingMessages::CollectResult> IncomingMessages::collect(Context &&c
 void IncomingMessages::process(Context &&context, QStringView encryption, std::optional<QXmppPromise<CollectResult>> result)
 {
     if (!encryption.isNull() && !findProvider(m_hooks, encryption)) {
-        fail(context, DecryptionState::Unsupported);
+        fail(context, DecryptionState::Unsupported, {}, encryption);
         encryption = {};
     }
 
@@ -241,7 +247,7 @@ QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryp
 {
     auto provider = findProvider(m_hooks, encryption);
     if (!provider || !provider->decryptMessage) {
-        fail(context, DecryptionState::Unsupported);
+        fail(context, DecryptionState::Unsupported, {}, encryption);
         co_return context;
     }
 
@@ -265,11 +271,14 @@ QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryp
         decrypted->setMetadata(std::move(metadata));
         applyDecrypted(context, std::move(*decrypted), *provider);
     } else if (auto *noEnvelope = std::get_if<E2ee::NoEnvelope>(&result)) {
-        fail(context, noEnvelope->sentByThisDevice ? DecryptionState::SentByThisDevice : DecryptionState::NoEnvelope);
+        fail(context, noEnvelope->sentByThisDevice ? DecryptionState::SentByThisDevice : DecryptionState::NoEnvelope, {}, encryption);
     } else {
         auto &d = MessageContextAccess::d(context);
         d.decryptionState = DecryptionState::Failed;
         d.decryptionError = std::get<QXmppError>(std::move(result));
+        QXmppE2eeMetadata metadata;
+        metadata.setEncryptionNamespace(encryption.toString());
+        d.e2eeMetadata = std::move(metadata);
     }
     co_return context;
 }
