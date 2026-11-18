@@ -340,7 +340,7 @@ QXmppTask<Result<DeviceSelection>> OmemoManagerPrivate::selectDevices(QList<Vers
         q->warning(u"Not encrypted for %1 devices above the maximum of %2 devices per stanza"_s.arg(QString::number(skippedCount), QString::number(maxDevicesPerStanza)));
     }
     if (hasRecipients && std::ranges::all_of(recipients, [&](const Recipient &recipient) { return recipient.jid == own; })) {
-        co_return QXmppError { u"There is no device of the recipients with an accepted trust level"_s, SendError::EncryptionError };
+        co_return QXmppError { u"There is no device of the recipients with an accepted trust level"_s, SendError::NoEncryptionRecipients };
     }
     co_return selection;
 }
