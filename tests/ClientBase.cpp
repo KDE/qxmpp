@@ -6079,6 +6079,7 @@ private:
     Q_SLOT void outgoingPrepareStop();
     Q_SLOT void outgoingEncrypted();
     Q_SLOT void outgoingEncryptionError();
+    Q_SLOT void outgoingForcedEncryption();
     Q_SLOT void outgoingAlreadyEncrypted();
     Q_SLOT void outgoingStoreHint();
     Q_SLOT void outgoingRequired();
@@ -6092,6 +6093,7 @@ private:
     Q_SLOT void iqEncrypted();
     Q_SLOT void iqEncryptedError();
     Q_SLOT void iqWithoutSelection();
+    Q_SLOT void iqForcedEncryption();
     Q_SLOT void iqRequired();
     Q_SLOT void iqIncoming();
     Q_SLOT void iqIncomingNotDecrypted();
@@ -6562,6 +6564,52 @@ void tst_QXmppMessages::outgoingEncryptionError()
     client.expectNoPacket();
 }
 
+void tst_QXmppMessages::outgoingForcedEncryption()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    int selections = 0;
+    client.hooks(&owner).add<SelectEncryption>([&](EncryptionSelection &selection) {
+        selections++;
+        selection.setEncryption(TestEncryption);
+    });
+    const auto paramsWith = [](std::optional<QString> encryption, bool required = false) {
+        QXmppSendStanzaParams params;
+        params.setForcedEncryption(std::move(encryption));
+        params.setEncryptionRequired(required);
+        return params;
+    };
+
+    // unencrypted without running the hook
+    client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"plain"_s), paramsWith(QString()));
+    QVERIFY(client.takePacket().contains(u"<body>plain</body>"_s));
+    QCOMPARE(selections, 0);
+    QVERIFY(e2ee->encryptRequests.empty());
+
+    // encrypted with the given encryption
+    client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), paramsWith(TestEncryption.toString()));
+    QCOMPARE(selections, 0);
+    QCOMPARE(e2ee->encryptRequests.size(), 1);
+    e2ee->encryptPromises.at(0).finish(E2ee::Encrypted());
+    client.takePacket();
+
+    // unencrypted, but encryption is required
+    auto task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"plain"_s), paramsWith(QString(), true));
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+
+    // no provider
+    task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), paramsWith(u"urn:test:unknown"_s));
+    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
+    client.expectNoPacket();
+    QCOMPARE(selections, 0);
+
+    // selected by the hook if not given
+    client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s));
+    QCOMPARE(selections, 1);
+    QCOMPARE(e2ee->encryptRequests.size(), 2);
+}
+
 // tests the deprecated API
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
@@ -6961,6 +7009,39 @@ void tst_QXmppMessages::iqWithoutSelection()
     const auto packet = client.takePacket();
     QVERIFY(packet.contains(u"urn:xmpp:bob"_s));
     QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+}
+
+void tst_QXmppMessages::iqForcedEncryption()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+    int selections = 0;
+    client.hooks(&owner).add<Iq::SelectEncryption>([&](Iq::EncryptionSelection &selection) {
+        selections++;
+        selection.setEncryption(TestEncryption);
+    });
+    const auto request = [] {
+        QXmppVersionIq request;
+        request.setTo(u"alice@example.org/phone"_s);
+        return request;
+    };
+    QXmppSendStanzaParams params;
+
+    // unencrypted without running the hook
+    params.setForcedEncryption(QString());
+    client.sendSensitiveIq(request(), params);
+    QVERIFY(client.takePacket().contains(u"jabber:iq:version"_s));
+    QCOMPARE(selections, 0);
+    QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+
+    // encrypted with the given encryption
+    params.setForcedEncryption(TestEncryption.toString());
+    client.sendSensitiveIq(request(), params);
+    QCOMPARE(selections, 0);
+    QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
+    QVERIFY(client.takePacket().contains(u"urn:test:e2ee"_s));
 }
 
 void tst_QXmppMessages::iqRequired()

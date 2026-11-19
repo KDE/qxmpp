@@ -222,7 +222,11 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     const bool required = pending.mode != Mode::Default || pending.params.isEncryptionRequired();
     EncryptionSelection selection(pending.message, std::get<Jid>(to), required, pending.encryption);
     if (!encrypted && !fixed) {
-        co_await m_hooks.run<SelectEncryption>(selection).withContext(m_client);
+        if (const auto encryption = pending.params.forcedEncryption()) {
+            selection.setEncryption(*encryption);
+        } else {
+            co_await m_hooks.run<SelectEncryption>(selection).withContext(m_client);
+        }
     }
 
     if (fixed && !encrypted && selection.encryption().isEmpty()) {

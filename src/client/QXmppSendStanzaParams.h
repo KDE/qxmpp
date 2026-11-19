@@ -33,6 +33,9 @@ public:
     bool isEncryptionRequired() const;
     void setEncryptionRequired(bool required);
 
+    std::optional<QString> forcedEncryption() const;
+    void setForcedEncryption(std::optional<QString> encryption);
+
 private:
     QSharedDataPointer<QXmppSendStanzaParamsPrivate> d;
 };

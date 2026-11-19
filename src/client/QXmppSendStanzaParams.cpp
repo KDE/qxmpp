@@ -23,6 +23,7 @@ public:
     TrustLevels acceptedTrustLevels;
     QList<QString> encryptionJids;
     bool encryptionRequired = false;
+    std::optional<QString> forcedEncryption;
 };
 
 QXmppSendStanzaParams::QXmppSendStanzaParams()
@@ -115,4 +116,34 @@ bool QXmppSendStanzaParams::isEncryptionRequired() const
 void QXmppSendStanzaParams::setEncryptionRequired(bool required)
 {
     d->encryptionRequired = required;
+}
+
+/*!
+    Returns the end-to-end encryption forced for a message or IQ instead of selecting it via the
+    QXmpp::Messages::SelectEncryption hook (or QXmpp::Iq::SelectEncryption for IQs): the namespace
+    of the encryption (see QXmpp::E2ee) or an empty string for sending it unencrypted.
+
+    By default, it is not set and the encryption is selected via the hook.
+
+    \since QXmpp 1.18
+*/
+std::optional<QString> QXmppSendStanzaParams::forcedEncryption() const
+{
+    return d->forcedEncryption;
+}
+
+/*!
+    Forces the end-to-end \a encryption of a message or IQ instead of selecting it via the
+    QXmpp::Messages::SelectEncryption hook (or QXmpp::Iq::SelectEncryption for IQs): the namespace
+    of the encryption (see QXmpp::E2ee) or an empty string for sending it unencrypted, e.g. after
+    the user has confirmed that.
+
+    Sending fails if no provider of the encryption is registered or if the stanza must be encrypted
+    (isEncryptionRequired()) and an empty string is given.
+
+    \since QXmpp 1.18
+*/
+void QXmppSendStanzaParams::setForcedEncryption(std::optional<QString> encryption)
+{
+    d->forcedEncryption = std::move(encryption);
 }

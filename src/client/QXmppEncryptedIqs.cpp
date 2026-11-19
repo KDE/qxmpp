@@ -107,15 +107,19 @@ QXmppIq EncryptedIqs::deserialize(const OutgoingIq &iq)
     return result;
 }
 
-QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const OutgoingIq &iq, QString encryption, bool required)
+QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const OutgoingIq &iq, QString encryption, QXmppSendStanzaParams params)
 {
     auto to = recipient(m_client, iq);
     if (auto *error = std::get_if<QXmppError>(&to)) {
         co_return std::move(*error);
     }
 
-    Iq::EncryptionSelection selection(iq.type, std::get<Jid>(std::move(to)), required, std::move(encryption));
-    co_await m_hooks.run<Iq::SelectEncryption>(selection).withContext(m_client);
+    Iq::EncryptionSelection selection(iq.type, std::get<Jid>(std::move(to)), params.isEncryptionRequired(), std::move(encryption));
+    if (const auto encryption = params.forcedEncryption()) {
+        selection.setEncryption(*encryption);
+    } else {
+        co_await m_hooks.run<Iq::SelectEncryption>(selection).withContext(m_client);
+    }
 
     if (selection.encryption().isEmpty()) {
         co_return QString();
@@ -217,7 +221,7 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
 
 QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(OutgoingIq iq, QXmppSendStanzaParams params)
 {
-    auto selection = co_await select(iq, {}, params.isEncryptionRequired());
+    auto selection = co_await select(iq, {}, params);
     if (auto *error = std::get_if<QXmppError>(&selection)) {
         co_return std::move(*error);
     }
@@ -261,7 +265,7 @@ QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(OutgoingIq iq, QXmpp
 
 QXmppTask<SendResult> EncryptedIqs::send(OutgoingIq iq, QXmppSendStanzaParams params, QString encryption)
 {
-    auto selection = co_await select(iq, std::move(encryption), params.isEncryptionRequired());
+    auto selection = co_await select(iq, std::move(encryption), params);
     if (auto *error = std::get_if<QXmppError>(&selection)) {
         co_return std::move(*error);
     }

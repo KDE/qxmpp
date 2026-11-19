@@ -55,7 +55,7 @@ private:
     using Selection = std::variant<QString, QXmppError>;
     using Encryption = std::variant<QByteArray, QXmppError>;
 
-    QXmppTask<Selection> select(const OutgoingIq &iq, QString encryption, bool required);
+    QXmppTask<Selection> select(const OutgoingIq &iq, QString encryption, QXmppSendStanzaParams params);
     QXmppTask<Encryption> encrypt(const OutgoingIq &iq, QString encryption, QXmppSendStanzaParams params);
     QXmppTask<IqResult> decrypt(QDomElement iq, QStringView encryption);
     QXmppTask<void> processIncomingAsync(QDomElement element, QStringView encryption);
