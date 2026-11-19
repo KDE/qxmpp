@@ -57,7 +57,7 @@ class QXmppRegistrationManagerPrivate;
     qDebug() << "Couldn't change the password:" << error.text();
     });
 
-    registrationManager->changePassword(client->configuration().user(), "m1cr0$0ft");
+    registrationManager->changePassword("m1cr0$0ft");
     \endcode
 
     <h3>Unregistration with the server</h3>
@@ -109,12 +109,12 @@ class QXmppRegistrationManagerPrivate;
     \endcode
 
     After that you can start to connect to the server you want to register
-    with. No JID is set in the QXmppConfiguration for the client and instead
-    only the server is set.
+    with. The account JID in the QXmppConfiguration for the client is only the
+    domain of the server.
 
     \code
     QXmppConfiguration config;
-    config.setDomain("example.org");
+    config.setAccountJid(QXmpp::Jid::fromString(u"example.org").value());
 
     client->connectToServer(config);
     \endcode

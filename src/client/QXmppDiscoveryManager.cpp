@@ -1314,7 +1314,8 @@ QString QXmppDiscoveryManagerPrivate::resolveJid(const QXmppDiscoInfoWatch::Data
         return data.key.jid;
     }
     if (auto *client = q->client()) {
-        return data.key.target == Server ? client->configuration().domain() : client->configuration().jidBare();
+        const auto &accountJid = client->configuration().accountJid();
+        return data.key.target == Server ? accountJid.domain().toString() : accountJid.toString();
     }
     return {};
 }
@@ -1449,7 +1450,7 @@ void QXmppDiscoveryManagerPrivate::discoverServices()
         }
     }
 
-    auto serverDomain = q->client()->configuration().domain();
+    auto serverDomain = q->client()->configuration().accountJid().domain().toString();
     q->items(serverDomain).then(q, [this](auto &&result) {
         if (!hasValue(result)) {
             finalizeDiscovery();

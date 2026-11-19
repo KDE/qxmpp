@@ -366,7 +366,7 @@ std::variant<Success, QXmppStanza::Error> QXmppBlockingManager::handlePush(const
     if (encrypted) {
         return *Iq::Reply::encryptionNotSupported().error();
     }
-    if (!from.isEmpty() && from != client()->configuration().jidBare()) {
+    if (!from.isEmpty() && from != client()->configuration().accountJid().toString()) {
         return StanzaError {
             StanzaError::Cancel,
             StanzaError::Forbidden,

@@ -77,7 +77,7 @@ QT_WARNING_POP
 struct Client {
     Client(const QString &jid = {})
     {
-        test->configuration().setJid(jid);
+        test->configuration().setAccountJid(QXmpp::Jid::fromString(jid).value_or(QXmpp::Jid()));
         test->addNewExtension<QXmppDiscoveryManager>();
     }
 
@@ -244,7 +244,7 @@ void tst_QXmppPubSubManager::testRequestFeatures()
 void tst_QXmppPubSubManager::testRequestPepFeatures()
 {
     auto [test, psManager] = Client();
-    test->configuration().setJid("juliet@capulet.lit");
+    test->configuration().setAccountJid(u"juliet@capulet.lit"_jid);
 
     auto future = psManager->requestOwnPepFeatures();
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='get'>"
@@ -280,7 +280,7 @@ void tst_QXmppPubSubManager::testFetchNodes()
 void tst_QXmppPubSubManager::testFetchPepNodes()
 {
     auto [test, psManager] = Client();
-    test->configuration().setJid("juliet@capulet.lit");
+    test->configuration().setAccountJid(u"juliet@capulet.lit"_jid);
 
     auto future = psManager->requestOwnPepNodes();
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='get'>"
@@ -323,7 +323,7 @@ void tst_QXmppPubSubManager::testCreateNodes()
 
     QXmppTask<PSManager::Result> future = [=, &t = test, psM = psManager]() {
         if (isPep) {
-            t->configuration().setJid(jid);
+            t->configuration().setAccountJid(QXmpp::Jid::fromString(jid).value());
             return psM->createOwnPepNode(node);
         } else {
             return psM->createNode(jid, node);
@@ -420,7 +420,7 @@ void tst_QXmppPubSubManager::testDeleteNodes()
 
     auto [test, psManager] = Client();
     if (isPep) {
-        test->configuration().setJid(jid);
+        test->configuration().setAccountJid(QXmpp::Jid::fromString(jid).value());
     }
 
     QXmppTask<PSManager::Result> future = [=, psM = psManager]() {
@@ -519,7 +519,7 @@ void tst_QXmppPubSubManager::testPublishItems()
 
     TestClient test;
     if (isPep) {
-        test.configuration().setJid(jid);
+        test.configuration().setAccountJid(QXmpp::Jid::fromString(jid).value());
     }
     PSManager *psManager = test.addNewExtension<PSManager>();
 
@@ -642,7 +642,7 @@ void tst_QXmppPubSubManager::testRetractItem()
 
     QXmppTask<PSManager::Result> future = [=, psM = psManager, &t = test]() {
         if (isPep) {
-            t->configuration().setJid(jid);
+            t->configuration().setAccountJid(QXmpp::Jid::fromString(jid).value());
             return psM->retractOwnPepItem(node, itemId);
         } else {
             return psM->retractItem(jid, node, itemId);
@@ -660,7 +660,7 @@ void tst_QXmppPubSubManager::testRetractItem()
 void tst_QXmppPubSubManager::testRetractCurrentPepItem()
 {
     auto [test, psManager] = Client();
-    test->configuration().setJid(u"juliet@capulet.lit"_s);
+    test->configuration().setAccountJid(u"juliet@capulet.lit"_jid);
 
     auto future = psManager->retractOwnPepItem(u"princely_musings"_s, PSManager::Current);
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='set'>"
@@ -724,7 +724,7 @@ void tst_QXmppPubSubManager::testRequestItemIds()
 void tst_QXmppPubSubManager::testRequestPepItemIds()
 {
     auto [test, psManager] = Client();
-    test->configuration().setJid(u"juliet@capulet.lit"_s);
+    test->configuration().setAccountJid(u"juliet@capulet.lit"_jid);
 
     auto future = psManager->requestOwnPepItemIds(u"princely_musings"_s);
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='get'>"
@@ -898,7 +898,7 @@ void tst_QXmppPubSubManager::testRequestItems()
 void tst_QXmppPubSubManager::testRequestCurrentPepItem()
 {
     auto [test, psManager] = Client();
-    test->configuration().setJid(u"juliet@capulet.lit"_s);
+    test->configuration().setAccountJid(u"juliet@capulet.lit"_jid);
 
     auto future = psManager->requestOwnPepItem(u"princely_musings"_s, PSManager::Current);
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='get'>"
@@ -921,7 +921,7 @@ void tst_QXmppPubSubManager::testRequestCurrentPepItem()
 void tst_QXmppPubSubManager::testRequestPepItem()
 {
     auto [test, psManager] = Client();
-    test->configuration().setJid(u"juliet@capulet.lit"_s);
+    test->configuration().setAccountJid(u"juliet@capulet.lit"_jid);
 
     auto future = psManager->requestOwnPepItem(u"princely_musings"_s, u"ae890ac52d0df67ed7cfdf51b644e901"_s);
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='get'>"
@@ -944,7 +944,7 @@ void tst_QXmppPubSubManager::testRequestPepItem()
 void tst_QXmppPubSubManager::testRequestPepItems()
 {
     auto [test, psManager] = Client();
-    test->configuration().setJid(u"juliet@capulet.lit"_s);
+    test->configuration().setAccountJid(u"juliet@capulet.lit"_jid);
 
     auto future = psManager->requestOwnPepItems(u"princely_musings"_s);
     test->expect(QStringLiteral("<iq id='qx1' to='juliet@capulet.lit' type='get'>"
@@ -1081,7 +1081,7 @@ void tst_QXmppPubSubManager::testRequestOptions()
 
     testOpts(psManager->requestSubscribeOptions("pubsub.shakespeare.lit", "node1", "me@qxmpp.org"));
 
-    test.configuration().setJid("me@qxmpp.org");
+    test.configuration().setAccountJid(u"me@qxmpp.org"_jid);
     testOpts(psManager->requestSubscribeOptions("pubsub.shakespeare.lit", "node1"));
 }
 

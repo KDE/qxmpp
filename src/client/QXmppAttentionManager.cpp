@@ -203,7 +203,7 @@ void QXmppAttentionManager::handleMessageReceived(const QXmppMessage &message)
     const QString bareJid = jidBare(message.from());
 
     // ignore messages from our own bare JID (e.g. carbon or IM-NG message)
-    if (bareJid == client()->configuration().jidBare()) {
+    if (bareJid == client()->configuration().accountJid().toString()) {
         return;
     }
 

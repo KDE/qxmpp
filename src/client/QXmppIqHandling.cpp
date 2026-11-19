@@ -123,7 +123,7 @@ bool IqRequests::process(QXmppClient *client, const Hooks &hooks, const QDomElem
 
     // without 'from', the request is from the own account (RFC 6120, section 8.1.2.1)
     auto fromAttribute = element.attribute(u"from"_s);
-    auto from = fromAttribute.isEmpty() ? jidOrNull(client->configuration().jidBare()).bare() : Jid::fromString(fromAttribute);
+    auto from = fromAttribute.isEmpty() ? std::optional(client->configuration().accountJid()) : Jid::fromString(fromAttribute);
     if (!from) {
         return true;
     }

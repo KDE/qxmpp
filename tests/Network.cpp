@@ -92,10 +92,9 @@ void tst_QXmppServer::testConnect()
     connect(&client, &QXmppClient::disconnected, &loop, &QEventLoop::quit);
 
     QXmppConfiguration config;
-    config.setDomain(testDomain);
     config.setHost(testHost.toString());
     config.setPort(testPort);
-    config.setUser(username);
+    config.setAccountJid(QXmpp::Jid::fromString(QString(username + u'@' + testDomain)).value());
     config.setPassword(password);
     config.setSaslAuthMechanism(mechanism);
     config.setDisabledSaslMechanisms({});

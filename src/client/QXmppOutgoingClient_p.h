@@ -44,9 +44,7 @@ struct ProtocolError {
 };
 
 struct BoundAddress {
-    QString user;
-    QString domain;
-    QString resource;
+    Jid jid;
 };
 
 // Determines the resource to request during client-side resource binding (i.e.

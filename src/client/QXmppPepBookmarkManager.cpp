@@ -223,7 +223,7 @@ HookResult QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element
 {
     using enum HookResult;
 
-    if (d->bookmarks && pubSubService == client()->configuration().jidBare() && nodeName == ns_bookmarks2) {
+    if (d->bookmarks && pubSubService == client()->configuration().accountJid() && nodeName == ns_bookmarks2) {
         auto &bookmarks = *d->bookmarks;
 
         QXmppPubSubEvent<Bookmarks2ConferenceItem> event;

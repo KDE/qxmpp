@@ -5,6 +5,7 @@
 
 #include "QXmppOmemoManager_p.h"
 
+#include "QXmppClient_p.h"
 #include "QXmppFallback.h"
 #include "QXmppJid_p.h"
 #include "QXmppOmemoDeviceElement_p.h"
@@ -1345,7 +1346,7 @@ QByteArray ManagerPrivate::createSceEnvelope(const T &stanza)
     sceEnvelopeWriter.start();
     sceEnvelopeWriter.writeTimestamp(QDateTime::currentDateTimeUtc());
     sceEnvelopeWriter.writeTo(jidBare(stanza.to()));
-    sceEnvelopeWriter.writeFrom(q->client()->configuration().jidBare());
+    sceEnvelopeWriter.writeFrom(q->client()->configuration().accountJid());
     sceEnvelopeWriter.writeRpad(QString::fromUtf8(generateRandomBytes(SCE_RPAD_SIZE_MIN, SCE_RPAD_SIZE_MAX).toBase64()));
     sceEnvelopeWriter.writeContent([&writer, &stanza] {
         if constexpr (std::is_same_v<T, QXmppMessage>) {
@@ -3397,7 +3398,7 @@ QXmppTask<TrustLevel> ManagerPrivate::storeKey(QString keyOwnerJid, QByteArray k
 // Returns the own bare JID.
 QString ManagerPrivate::ownBareJid() const
 {
-    return q->client()->configuration().jidBare();
+    return q->client()->configuration().accountJid().toString();
 }
 
 // Returns the own full JID set in the client's configuration.
@@ -3405,7 +3406,7 @@ QString ManagerPrivate::ownBareJid() const
 // Returns the own full JID.
 QString ManagerPrivate::ownFullJid() const
 {
-    return q->client()->configuration().jid();
+    return QXmpp::Private::ownFullJid(q->client()).toString();
 }
 
 // Returns the devices with the own JID except the device of this client

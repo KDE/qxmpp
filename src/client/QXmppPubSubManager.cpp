@@ -568,7 +568,7 @@ QXmppTask<QXmppPubSubManager::AffiliationsResult> QXmppPubSubManager::requestAff
 */
 QXmppTask<QXmppPubSubManager::OptionsResult> QXmppPubSubManager::requestSubscribeOptions(const QString &service, const QString &nodeName)
 {
-    return requestSubscribeOptions(service, nodeName, client()->configuration().jidBare());
+    return requestSubscribeOptions(service, nodeName, client()->configuration().accountJid());
 }
 
 /*!
@@ -601,7 +601,7 @@ QXmppTask<QXmppPubSubManager::OptionsResult> QXmppPubSubManager::requestSubscrib
 */
 QXmppTask<QXmppPubSubManager::Result> QXmppPubSubManager::setSubscribeOptions(const QString &service, const QString &nodeName, const QXmppPubSubSubscribeOptions &options)
 {
-    return setSubscribeOptions(service, nodeName, options, client()->configuration().jidBare());
+    return setSubscribeOptions(service, nodeName, options, client()->configuration().accountJid());
 }
 
 /*!
@@ -908,7 +908,7 @@ bool QXmppPubSubManager::handleIncomingStanza(const QDomElement &element)
     if (!event.isNull()) {
         // without 'from', the event is from the own account (RFC 6120, section 8.1.2.1)
         const auto from = element.attribute(u"from"_s);
-        const auto service = jidOrNull(from.isEmpty() ? client()->configuration().jidBare() : from);
+        const auto service = from.isEmpty() ? client()->configuration().accountJid() : jidOrNull(from);
         if (service.isNull()) {
             return false;
         }

@@ -70,7 +70,7 @@ QXmppRegistrationManager::~QXmppRegistrationManager() = default;
 */
 void QXmppRegistrationManager::changePassword(const QString &newPassword)
 {
-    auto iq = QXmppRegisterIq::createChangePasswordRequest(client()->configuration().user(), newPassword);
+    auto iq = QXmppRegisterIq::createChangePasswordRequest(client()->configuration().accountJid().localpart().toString(), newPassword);
 
     d->changePasswordIqId = iq.id();
     d->newPassword = newPassword;

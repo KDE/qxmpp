@@ -43,6 +43,11 @@ void TestClient::startSasl2Auth(const QXmpp::Private::Sasl2::StreamFeature &feat
     d->stream->startSasl2Auth(feature);
 }
 
+void TestClient::startResourceBinding()
+{
+    d->stream->startResourceBinding();
+}
+
 void TestClient::handlePacketReceived(const QDomElement &el)
 {
     d->stream->handlePacketReceived(el);

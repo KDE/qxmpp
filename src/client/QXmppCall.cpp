@@ -12,6 +12,7 @@
 #include "QXmppCallStream_p.h"
 #include "QXmppCall_p.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppJingleIq.h"
 #include "QXmppStun.h"
@@ -562,7 +563,7 @@ QXmppJingleIq QXmppCallPrivate::createIq(QXmppJingleIq::Action action) const
     Q_ASSERT(manager);
 
     QXmppJingleIq iq;
-    iq.setFrom(manager->client()->configuration().jid());
+    iq.setFromJid(ownFullJid(manager->client()));
     iq.setTo(jid);
     iq.setType(QXmppIq::Set);
     iq.setAction(action);
@@ -575,7 +576,7 @@ void QXmppCallPrivate::sendInvite()
     Q_ASSERT(manager);
 
     auto iq = createIq(QXmppJingleIq::SessionInitiate);
-    iq.setInitiator(manager->client()->configuration().jid());
+    iq.setInitiator(ownFullJid(manager->client()));
     iq.addContent(localContent(q->audioStream()));
     if (auto video = q->videoStream()) {
         iq.addContent(localContent(video));
@@ -667,7 +668,7 @@ void QXmppCall::accept()
 
         // accept incoming call
         auto iq = d->createIq(QXmppJingleIq::SessionAccept);
-        iq.setResponder(d->manager->client()->configuration().jid());
+        iq.setResponder(ownFullJid(d->manager->client()));
         for (auto *stream : std::as_const(d->streams)) {
             iq.addContent(d->localContent(stream));
         }

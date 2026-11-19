@@ -112,6 +112,10 @@ private:
     Q_SLOT void csiManager();
     Q_SLOT void sasl2FastFallbackKeepsListener();
     Q_SLOT void sasl2ResumptionIgnoresStreamFeatures();
+    Q_SLOT void accountJid();
+    Q_SLOT void invalidAccountJid();
+    Q_SLOT void boundJid();
+    Q_SLOT void sasl2AuthorizationIdentifier();
 
     Q_SLOT void credentialsSerialization();
     Q_SLOT void reconnectionDelays();
@@ -593,9 +597,8 @@ void tst_QXmppClient::sasl2FastFallbackKeepsListener()
 {
     TestClient client;
     auto &config = client.stream()->configuration();
-    config.setUser(u"bowman"_s);
+    config.setAccountJid(u"bowman@example.org"_jid);
     config.setPassword(u"1234"_s);
-    config.setDomain(u"example.org"_s);
     config.setDisabledSaslMechanisms({});
     config.setSasl2UserAgent(QXmppSasl2UserAgent {
         QUuid::fromString(u"d4565fa7-4d72-4749-b3d3-740edbf87770"_s),
@@ -665,9 +668,8 @@ void tst_QXmppClient::sasl2ResumptionIgnoresStreamFeatures()
 {
     TestClient client;
     auto &config = client.stream()->configuration();
-    config.setUser(u"bowman"_s);
+    config.setAccountJid(u"bowman@example.org"_jid);
     config.setPassword(u"1234"_s);
-    config.setDomain(u"example.org"_s);
     config.setDisabledSaslMechanisms({});
 
     // previous session, then a new connection
@@ -693,6 +695,93 @@ void tst_QXmppClient::sasl2ResumptionIgnoresStreamFeatures()
     client.handlePacketReceived(xmlToDom("<stream:features xmlns:stream='http://etherx.jabber.org/streams'/>"));
     QCOMPARE(connectedSpy.size(), 1);
     QCOMPARE(client.streamManagementState(), QXmppClient::ResumedStream);
+}
+
+void tst_QXmppClient::accountJid()
+{
+    QXmppConfiguration config;
+    QVERIFY(config.accountJid().isNull());
+
+    // a full JID sets the resource
+    config.setAccountJid(u"juliet@capulet.example/balcony"_jid);
+    QCOMPARE(config.accountJid(), u"juliet@capulet.example"_jid);
+    QCOMPARE(config.resource(), u"balcony"_s);
+    config.setAccountJid(u"romeo@montague.example"_jid);
+    QCOMPARE(config.accountJid(), u"romeo@montague.example"_jid);
+    QCOMPARE(config.resource(), u"balcony"_s);
+
+    // the deprecated setters update the account JID, in any order
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QXmppConfiguration legacy;
+    legacy.setUser(u"Juliet"_s);
+    QVERIFY(legacy.accountJid().isNull());
+    legacy.setDomain(u"Capulet.example"_s);
+    QCOMPARE(legacy.accountJid(), u"juliet@capulet.example"_jid);
+    QCOMPARE(legacy.jidBare(), u"Juliet@Capulet.example"_s);
+
+    legacy.setUser(u"juliet capulet"_s);
+    QVERIFY(legacy.accountJid().isNull());
+    QCOMPARE(legacy.user(), u"juliet capulet"_s);
+
+    legacy.setJid(u"romeo@montague.example/garden"_s);
+    QCOMPARE(legacy.accountJid(), u"romeo@montague.example"_jid);
+    QCOMPARE(legacy.jid(), u"romeo@montague.example/garden"_s);
+
+    legacy.setAccountJid(u"juliet@capulet.example"_jid);
+    QCOMPARE(legacy.user(), u"juliet"_s);
+    QCOMPARE(legacy.domain(), u"capulet.example"_s);
+    QT_WARNING_POP
+}
+
+void tst_QXmppClient::invalidAccountJid()
+{
+    TestClient client;
+    QSignalSpy errorSpy(&client, &QXmppClient::errorOccurred);
+
+    client.connectToServer(u"juliet@"_s, u"1234"_s);
+    QCOMPARE(errorSpy.size(), 1);
+    QCOMPARE(errorSpy.constFirst().constFirst().value<QXmppError>().value<QXmpp::StreamError>(), QXmpp::StreamError::InvalidFrom);
+    QCOMPARE(client.state(), QXmppClient::DisconnectedState);
+    QVERIFY(!client.isReconnectionScheduled());
+}
+
+void tst_QXmppClient::boundJid()
+{
+    TestClient client;
+    auto &config = client.stream()->configuration();
+    config.setAccountJid(u"bowman@example.org"_jid);
+    config.setResource(u"HAL"_s);
+
+    client.startResourceBinding();
+    const auto request = client.takePacket();
+    QVERIFY(request.contains(u"<resource>HAL</resource>"_s));
+    const auto id = QRegularExpression(u"id=\"([^\"]+)\""_s).match(request).captured(1);
+
+    client.handlePacketReceived(xmlToDom(
+        u"<iq id='%1' type='result'><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'><jid>Bowman@Example.org/HAL.2</jid></bind></iq>"_s.arg(id)));
+    QCOMPARE(config.accountJid(), u"bowman@example.org"_jid);
+    QCOMPARE(config.resource(), u"HAL.2"_s);
+}
+
+void tst_QXmppClient::sasl2AuthorizationIdentifier()
+{
+    TestClient client;
+    auto &config = client.stream()->configuration();
+    config.setAccountJid(u"bowman@example.org"_jid);
+    config.setPassword(u"1234"_s);
+    config.setDisabledSaslMechanisms({});
+
+    client.startSasl2Auth(Sasl2::StreamFeature { { u"PLAIN"_s }, {}, {}, false });
+    QVERIFY(client.takePacket().contains(u"mechanism=\"PLAIN\""_s));
+
+    client.handlePacketReceived(xmlToDom(
+        "<success xmlns='urn:xmpp:sasl:2'>"
+        "<authorization-identifier>Bowman@Example.org/HAL</authorization-identifier>"
+        "</success>"));
+    QVERIFY(client.streamPrivate()->isAuthenticated);
+    QCOMPARE(config.accountJid(), u"bowman@example.org"_jid);
+    QCOMPARE(config.resource(), u"HAL"_s);
 }
 
 void tst_QXmppClient::credentialsSerialization()
@@ -855,6 +944,7 @@ void tst_QXmppClient::reconnectionDelayWhileResumable()
 // Lets the client connect to a local TCP server (no XMPP server behind it).
 static void useLocalServer(TestClient &client, const QTcpServer &server)
 {
+    client.configuration().setAccountJid(u"user@example.org"_jid);
     client.configuration().setHost(u"127.0.0.1"_s);
     client.configuration().setPort(server.serverPort());
     client.configuration().setStreamSecurityMode(QXmppConfiguration::TLSDisabled);
@@ -1060,7 +1150,7 @@ void tst_QXmppClient::pingOnlyWhenIdle()
 static QTcpSocket *openStream(TestClient &client, QTcpServer &server)
 {
     useLocalServer(client, server);
-    client.configuration().setJid(u"alice@example.org"_s);
+    client.configuration().setAccountJid(u"alice@example.org"_jid);
     client.stream()->connectToHost();
     auto *serverSocket = acceptConnection(server);
     if (!serverSocket) {
@@ -1149,7 +1239,7 @@ void tst_QXmppClient::disconnectDuringServerLookup()
 {
     QXmppClient client(QXmppClient::NoExtensions);
     QXmppConfiguration config;
-    config.setJid(u"user@example.invalid"_s);
+    config.setAccountJid(u"user@example.invalid"_jid);
     config.setPassword(u"password"_s);
 
     client.connectToServer(config);
@@ -1177,7 +1267,7 @@ void tst_QXmppClient::stateChangedOnlyOnChange()
 {
     QXmppClient client(QXmppClient::NoExtensions);
     QXmppConfiguration config;
-    config.setJid(u"user@example.invalid"_s);
+    config.setAccountJid(u"user@example.invalid"_jid);
     config.setPassword(u"password"_s);
     config.setHost(u"127.0.0.1"_s);
     // reserved port without a server, so that the connection is refused
@@ -1255,7 +1345,7 @@ void tst_QXmppClient::noRetryAfterTlsFailure()
 
     TestClient client;
     useLocalServer(client, server);
-    client.configuration().setJid(u"alice@example.org"_s);
+    client.configuration().setAccountJid(u"alice@example.org"_jid);
     client.configuration().setStreamSecurityMode(QXmppConfiguration::TLSRequired);
     QSignalSpy errorSpy(&client, &QXmppClient::errorOccurred);
 
@@ -1305,7 +1395,7 @@ void tst_QXmppClient::networkLossEndsSession()
 
     TestClient client;
     useLocalServer(client, server);
-    client.configuration().setJid(u"alice@example.org"_s);
+    client.configuration().setAccountJid(u"alice@example.org"_jid);
     if (tls) {
         client.configuration().setStreamSecurityMode(QXmppConfiguration::TLSRequired);
         client.configuration().setIgnoreSslErrors(true);
@@ -1800,7 +1890,7 @@ void tst_QXmppDiscoveryManager::testItems()
 void tst_QXmppDiscoveryManager::testRequests()
 {
     TestClient test;
-    test.configuration().setJid("user@qxmpp.org/a");
+    test.configuration().setAccountJid(u"user@qxmpp.org/a"_jid);
     auto *discoManager = test.addNewExtension<QXmppDiscoveryManager>();
     // the default identity name is the application name, i.e. the name of the
     // test binary, and the type depends on the platform; set both explicitly
@@ -1916,7 +2006,7 @@ void tst_QXmppDiscoveryManager::cachingInfo()
 void tst_QXmppDiscoveryManager::discoverServicesBasic()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     auto watch = disco->discoverServices(Disco::Category::Store);
@@ -1966,7 +2056,7 @@ void tst_QXmppDiscoveryManager::discoverServicesBasic()
 void tst_QXmppDiscoveryManager::discoverServicesWithType()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     auto watch = disco->discoverServices(Disco::Category::Conference, Disco::Type::Mix);
@@ -2004,7 +2094,7 @@ void tst_QXmppDiscoveryManager::discoverServicesWithType()
 void tst_QXmppDiscoveryManager::discoverServicesWithFeatures()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     auto watch = disco->discoverServices(Disco::Category::Store, {}, { u"urn:xmpp:http:upload:0"_s });
@@ -2043,7 +2133,7 @@ void tst_QXmppDiscoveryManager::discoverServicesWithFeatures()
 void tst_QXmppDiscoveryManager::discoverServicesLifetime()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     {
@@ -2062,7 +2152,7 @@ void tst_QXmppDiscoveryManager::discoverServicesLifetime()
 void tst_QXmppDiscoveryManager::discoverServicesReconnect()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     auto watch = disco->discoverServices(Disco::Category::Conference);
@@ -2117,7 +2207,7 @@ void tst_QXmppDiscoveryManager::discoverServicesReconnect()
 void tst_QXmppDiscoveryManager::discoverServicesAfterDiscovery()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     // Register a first watch and complete discovery
@@ -2160,7 +2250,7 @@ void tst_QXmppDiscoveryManager::discoverServicesAfterDiscovery()
 void tst_QXmppDiscoveryManager::discoverServicesWatchAddedWhileConnected()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     // Connect without any watch registered: discovery is skipped entirely.
@@ -2218,7 +2308,7 @@ void tst_QXmppDiscoveryManager::watchInfo()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     // nothing is requested while disconnected
@@ -2253,7 +2343,7 @@ void tst_QXmppDiscoveryManager::watchInfoShared()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -2296,7 +2386,7 @@ void tst_QXmppDiscoveryManager::watchInfoStale()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -2330,7 +2420,7 @@ void tst_QXmppDiscoveryManager::watchInfoError()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -2364,7 +2454,7 @@ void tst_QXmppDiscoveryManager::watchInfoConnectionLost()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -2399,7 +2489,7 @@ void tst_QXmppDiscoveryManager::watchInfoRefresh()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -2434,7 +2524,7 @@ void tst_QXmppDiscoveryManager::watchInfoFromCache()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setJid(u"alice@example.org"_s);
+    test.configuration().setAccountJid(u"alice@example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -2479,7 +2569,7 @@ void tst_QXmppDiscoveryManager::watchInfoFromCache()
 void tst_QXmppDiscoveryManager::watchInfoCached()
 {
     TestClient test;
-    test.configuration().setJid(u"alice@example.org"_s);
+    test.configuration().setAccountJid(u"alice@example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3229,7 +3319,7 @@ void tst_QXmppDiscoveryManager::watchAccountInfoAccountChange()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setJid(u"alice@example.org"_s);
+    test.configuration().setAccountJid(u"alice@example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3241,7 +3331,7 @@ void tst_QXmppDiscoveryManager::watchAccountInfoAccountChange()
 
     // information of another account is not shown as stale information
     test.simulateDisconnected();
-    test.configuration().setJid(u"bob@example.net"_s);
+    test.configuration().setAccountJid(u"bob@example.net"_jid);
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
 
@@ -3259,7 +3349,7 @@ void tst_QXmppDiscoveryManager::watchInfoLifetime()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3293,7 +3383,7 @@ void tst_QXmppDiscoveryManager::watchInfoModifiedByNotifier()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3374,7 +3464,7 @@ void tst_QXmppDiscoveryManager::watchFeature()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     auto mam = disco->watchServerInfo().watchFeature(u"urn:xmpp:mam:2"_s);
@@ -3401,7 +3491,7 @@ void tst_QXmppDiscoveryManager::watchFeature()
 void tst_QXmppDiscoveryManager::watchFeatures()
 {
     TestClient test;
-    test.configuration().setJid(u"alice@example.org"_s);
+    test.configuration().setAccountJid(u"alice@example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3430,7 +3520,7 @@ void tst_QXmppDiscoveryManager::watchFeatureStale()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3470,7 +3560,7 @@ void tst_QXmppDiscoveryManager::watchFeatureError()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3488,7 +3578,7 @@ void tst_QXmppDiscoveryManager::watchFeatureError()
 void tst_QXmppDiscoveryManager::watchFeatureLifetime()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3515,7 +3605,7 @@ void tst_QXmppDiscoveryManager::watchFeatureLifetime()
 void tst_QXmppDiscoveryManager::watchFeatureNamespace()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3545,7 +3635,7 @@ void tst_QXmppDiscoveryManager::resolveFeature()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     // waits for the connection and the response, the task keeps the temporary watch alive
@@ -3581,7 +3671,7 @@ void tst_QXmppDiscoveryManager::resolveFeature()
 void tst_QXmppDiscoveryManager::resolveFeatureError()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3606,7 +3696,7 @@ void tst_QXmppDiscoveryManager::resolveFeatureDefault()
 void tst_QXmppDiscoveryManager::resolveFeatureManagerDestroyed()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
 
     bool called = false;
@@ -3621,7 +3711,7 @@ void tst_QXmppDiscoveryManager::resolveFeatureManagerDestroyed()
 void tst_QXmppDiscoveryManager::resolveFeatureContinuation()
 {
     TestClient test;
-    test.configuration().setDomain(u"example.org"_s);
+    test.configuration().setAccountJid(u"example.org"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     test.setStreamManagementState(QXmppClient::NewStream);
     test.simulateConnected();
@@ -3848,7 +3938,7 @@ void tst_QXmppRosterManager::testMovedSubscriptionRequestReceived_data()
 void tst_QXmppRosterManager::testMovedSubscriptionRequestReceived()
 {
     TestClient client;
-    client.configuration().setJid(u"alice@example.org"_s);
+    client.configuration().setAccountJid(u"alice@example.org"_jid);
     auto *rosterManager = client.addNewExtension<QXmppRosterManager>(&client);
 
     QFETCH(bool, movedManagerAdded);
@@ -3901,7 +3991,7 @@ void tst_QXmppRosterManager::testMovedSubscriptionRequestReceived()
 void tst_QXmppRosterManager::testAddItem()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     auto future = rosterManager->addRosterItem("contact@example.org");
@@ -3927,7 +4017,7 @@ void tst_QXmppRosterManager::testAddItem()
 void tst_QXmppRosterManager::testRemoveItem()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     auto future = rosterManager->removeRosterItem("contact@example.org");
@@ -3953,7 +4043,7 @@ void tst_QXmppRosterManager::testRemoveItem()
 void tst_QXmppRosterManager::testUpdateGroups()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     // seed the roster with a contact that has a name (to verify it is preserved);
@@ -3998,7 +4088,7 @@ void tst_QXmppRosterManager::testUpdateGroups()
 void tst_QXmppRosterManager::testDefaultStorage()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     // The manager wires up a default in-memory storage automatically.
@@ -4008,7 +4098,7 @@ void tst_QXmppRosterManager::testDefaultStorage()
 void tst_QXmppRosterManager::testSetStorage()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     auto external = std::make_unique<QXmppRosterMemoryStorage>();
@@ -4024,7 +4114,7 @@ void tst_QXmppRosterManager::testSetStorage()
 void tst_QXmppRosterManager::testPushPersistsAdd()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     rosterManager->setStorage(std::make_unique<QXmppRosterMemoryStorage>());
@@ -4049,7 +4139,7 @@ void tst_QXmppRosterManager::testPushPersistsAdd()
 void tst_QXmppRosterManager::testPushPersistsRemove()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     rosterManager->setStorage(std::make_unique<QXmppRosterMemoryStorage>());
@@ -4081,7 +4171,7 @@ void tst_QXmppRosterManager::testPushPersistsRemove()
 void tst_QXmppRosterManager::testClearCache()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit"_jid);
     auto *rosterManager = test.addNewExtension<QXmppRosterManager>(&test);
 
     rosterManager->setStorage(std::make_unique<QXmppRosterMemoryStorage>());
@@ -5774,7 +5864,7 @@ void tst_QXmppHooks::hooksIqRequestAsync()
 void tst_QXmppHooks::hooksIqRequestSender()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     QObject owner;
 
     QList<Jid> senders;
@@ -6220,7 +6310,7 @@ void tst_QXmppMessages::messagesResolveSenderAsync()
 void tst_QXmppMessages::messagesDecrypt()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
 
@@ -6267,7 +6357,7 @@ void tst_QXmppMessages::messagesDecrypt()
 void tst_QXmppMessages::messagesDecryptSenderMismatch()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
     QSignalSpy spy(&client, &QXmppClient::messageReceived);
@@ -6297,7 +6387,7 @@ void tst_QXmppMessages::messagesDecryptSenderMismatch()
 void tst_QXmppMessages::messagesDecryptWithoutFrom()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QSignalSpy spy(&client, &QXmppClient::messageReceived);
 
@@ -6877,7 +6967,7 @@ static QString encryptedIqResponse(const QString &type, const QString &payload)
 void tst_QXmppMessages::iqEncrypted()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
     std::optional<Iq::EncryptionSelection> selected;
@@ -6916,7 +7006,7 @@ void tst_QXmppMessages::iqEncrypted()
 void tst_QXmppMessages::iqEncryptedError()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<Iq::SelectEncryption>([](Iq::EncryptionSelection &selection) {
@@ -6939,7 +7029,7 @@ void tst_QXmppMessages::iqEncryptedError()
 void tst_QXmppMessages::iqWithoutSelection()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<Iq::SelectEncryption>([](Iq::EncryptionSelection &) { });
@@ -6961,7 +7051,7 @@ void tst_QXmppMessages::iqWithoutSelection()
 void tst_QXmppMessages::iqRequired()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
     bool required = false;
@@ -6985,7 +7075,7 @@ void tst_QXmppMessages::iqRequired()
 void tst_QXmppMessages::iqIncoming()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
 
     // decrypted and processed by the handlers, unknown requests are answered with an error
@@ -7003,7 +7093,7 @@ void tst_QXmppMessages::iqIncoming()
 void tst_QXmppMessages::iqIncomingNotDecrypted()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
 
     client.injectStanza(u"<iq type='set' id='req2' from='alice@example.org/phone' to='me@example.org/res'>"
@@ -7021,7 +7111,7 @@ void tst_QXmppMessages::iqIncomingNotDecrypted()
 void tst_QXmppMessages::bodyOnlyDecrypt()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
 
     QObject owner;
@@ -7078,7 +7168,7 @@ void tst_QXmppMessages::decryptContentEncryption()
 
     const auto isBodyOnly = providerContentEncryption == E2ee::ContentEncryption::BodyOnly;
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     QObject owner;
     QXmpp::E2ee::Providers(client.hooks(&owner)).add(E2ee::Provider {
         .encryption = isBodyOnly ? TestBodyEncryption : TestEncryption,
@@ -7116,7 +7206,7 @@ void tst_QXmppMessages::decryptContentEncryption()
 void tst_QXmppMessages::bodyOnlyClearTrustMessage()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
 
     QObject owner;
@@ -7145,7 +7235,7 @@ void tst_QXmppMessages::bodyOnlyClearTrustMessage()
 void tst_QXmppMessages::bodyOnlyEncrypt()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
@@ -7179,7 +7269,7 @@ void tst_QXmppMessages::bodyOnlyEncrypt()
 void tst_QXmppMessages::bodyOnlyDrop()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
@@ -7207,7 +7297,7 @@ void tst_QXmppMessages::bodyOnlyDrop()
 void tst_QXmppMessages::bodyOnlyCorrection()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
@@ -7224,7 +7314,7 @@ void tst_QXmppMessages::bodyOnlyCorrection()
 void tst_QXmppMessages::bodyOnlyWithoutBody()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
@@ -7257,7 +7347,7 @@ void tst_QXmppMessages::bodyOnlyWithoutBody()
 void tst_QXmppMessages::bodyOnlyRewritten()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
@@ -7286,7 +7376,7 @@ void tst_QXmppMessages::bodyOnlyRewritten()
 void tst_QXmppMessages::bodyOnlyUnsupported()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     client.addNewExtension<TestBodyE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
@@ -7305,7 +7395,7 @@ void tst_QXmppMessages::bodyOnlyUnsupported()
 void tst_QXmppMessages::bodyOnlyNotRequested()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     QObject owner;
     QXmpp::E2ee::Providers(client.hooks(&owner)).add(E2ee::Provider {
         .encryption = TestEncryption,
@@ -7335,7 +7425,7 @@ void tst_QXmppMessages::bodyOnlyFixed()
     using QXmpp::Private::FixedE2ee;
 
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     QObject owner;
     std::optional<bool> hadBodyOnly;
     bool useBodyOnly = false;
@@ -7370,7 +7460,7 @@ void tst_QXmppMessages::encryptionOverride()
 {
     static constexpr QStringView pseudoEncryption = u"org.qxmpp.test.pseudo";
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     QObject owner;
     QXmpp::E2ee::Providers(client.hooks(&owner)).add(E2ee::Provider {
         .encryption = pseudoEncryption,
@@ -7410,7 +7500,7 @@ void tst_QXmppMessages::decryptPreferred()
     QFETCH(bool, bodyOnlyDecrypted);
 
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *sce = client.addNewExtension<TestE2eeManager>();
     client.addNewExtension<TestBodyE2eeManager>(priority);
 
@@ -7445,7 +7535,7 @@ void tst_QXmppMessages::decryptPreferred()
 void tst_QXmppMessages::decryptDisabled()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *sce = client.addNewExtension<TestE2eeManager>();
     auto enabled = false;
     client.addNewExtension<TestBodyE2eeManager>(1, [&] { return enabled; });
@@ -7627,7 +7717,7 @@ void tst_QXmppIqSending::responseTraits()
 void tst_QXmppIqSending::ownAccount()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
 
     // an empty recipient is the own bare JID
     auto task = client.sendIq(Iq::Set<TestQuery> {});
@@ -7639,7 +7729,7 @@ void tst_QXmppIqSending::ownAccount()
 void tst_QXmppIqSending::encrypted()
 {
     TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
+    client.configuration().setAccountJid(u"me@example.org/res"_jid);
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
     client.hooks(&owner).add<Iq::SelectEncryption>([](Iq::EncryptionSelection &selection) {

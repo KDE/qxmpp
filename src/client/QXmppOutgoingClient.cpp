@@ -144,7 +144,7 @@ void QXmppOutgoingClientPrivate::connectToHost(const ServerAddress &address)
     // respect proxy
     socket.internalSocket()->setProxy(config.networkProxy());
     // set the name the SSL certificate should match
-    socket.internalSocket()->setPeerVerifyName(config.domain());
+    socket.internalSocket()->setPeerVerifyName(config.accountJid().domain().toString());
 
     socket.connectToHost(address);
 }
@@ -266,6 +266,11 @@ void QXmppOutgoingClient::connectToHost()
 {
     d->cancelServerLookup();
 
+    if (d->config.accountJid().isNull()) {
+        setError(u"The account JID is missing or invalid."_s, StreamError::InvalidFrom);
+        return;
+    }
+
     // if a host for resumption is available, connect to it
     if (d->c2sStreamManager.hasResumeAddress()) {
         auto [host, port] = d->c2sStreamManager.resumeAddress();
@@ -291,14 +296,14 @@ void QXmppOutgoingClient::connectToHost()
         }
 
         d->connectToAddressList({
-            ServerAddress { ServerAddress::Tls, d->config.domain(), XMPPS_DEFAULT_PORT },
-            ServerAddress { ServerAddress::Tls, d->config.domain(), XMPP_DEFAULT_PORT },
+            ServerAddress { ServerAddress::Tls, d->config.accountJid().domain().toString(), XMPPS_DEFAULT_PORT },
+            ServerAddress { ServerAddress::Tls, d->config.accountJid().domain().toString(), XMPP_DEFAULT_PORT },
         });
         return;
     }
 
     // otherwise, lookup server
-    const auto domain = d->config.domain();
+    const auto domain = d->config.accountJid().domain().toString();
 
     debug(u"Looking up service records for domain %1"_s.arg(domain));
     auto recordsTask = QSslSocket::supportsSsl()
@@ -319,8 +324,8 @@ void QXmppOutgoingClient::connectToHost()
 
             // as a fallback, use domain as hostname
             d->connectToAddressList({
-                ServerAddress { ServerAddress::Tls, d->config.domain(), XMPPS_DEFAULT_PORT },
-                ServerAddress { ServerAddress::Tcp, d->config.domain(), XMPP_DEFAULT_PORT },
+                ServerAddress { ServerAddress::Tls, d->config.accountJid().domain().toString(), XMPPS_DEFAULT_PORT },
+                ServerAddress { ServerAddress::Tcp, d->config.accountJid().domain().toString(), XMPP_DEFAULT_PORT },
             });
             return;
         }
@@ -330,8 +335,8 @@ void QXmppOutgoingClient::connectToHost()
 
             // as a fallback, use domain as hostname
             d->connectToAddressList({
-                ServerAddress { ServerAddress::Tls, d->config.domain(), XMPPS_DEFAULT_PORT },
-                ServerAddress { ServerAddress::Tcp, d->config.domain(), XMPP_DEFAULT_PORT },
+                ServerAddress { ServerAddress::Tls, d->config.accountJid().domain().toString(), XMPPS_DEFAULT_PORT },
+                ServerAddress { ServerAddress::Tcp, d->config.accountJid().domain().toString(), XMPP_DEFAULT_PORT },
             });
             return;
         }
@@ -422,7 +427,7 @@ QXmppTask<IqResult> QXmppOutgoingClient::sendIq(QXmppIq &&iq)
 {
     // If 'to' is empty the user's bare JID is meant implicitly (see RFC6120, section 10.3.3.).
     auto to = iq.to();
-    return d->iqManager.sendIq(std::move(iq), to.isEmpty() ? d->config.jidBare() : to);
+    return d->iqManager.sendIq(std::move(iq), to.isEmpty() ? d->config.accountJid().toString() : to);
 }
 
 void QXmppOutgoingClient::handleSocketDisconnected()
@@ -496,7 +501,9 @@ void QXmppOutgoingClient::startSasl2Auth(const Sasl2::StreamFeature &sasl2Featur
             debug(u"Authenticated"_s);
             d->isAuthenticated = true;
             d->authenticationMethod = AuthenticationMethod::Sasl2;
-            d->config.setJid(success->authorizationIdentifier);
+            if (auto jid = Jid::fromString(success->authorizationIdentifier)) {
+                d->config.setAccountJid(*jid);
+            }
             d->bind2Bound = std::move(success->bound);
 
             // extensions
@@ -533,7 +540,7 @@ void QXmppOutgoingClient::startSasl2Auth(const Sasl2::StreamFeature &sasl2Featur
 
 void QXmppOutgoingClient::startNonSaslAuth()
 {
-    d->setListener<NonSaslAuthManager>(&d->socket).queryOptions(d->config.domain(), d->config.user()).then(this, [this](auto result) {
+    d->setListener<NonSaslAuthManager>(&d->socket).queryOptions(d->config.accountJid().domain().toString(), d->config.accountJid().localpart().toString()).then(this, [this](auto result) {
         if (auto *options = std::get_if<NonSaslAuthOptions>(&result)) {
             bool plainText = false;
 
@@ -550,7 +557,7 @@ void QXmppOutgoingClient::startNonSaslAuth()
                 return;
             }
 
-            auto task = std::get<NonSaslAuthManager>(d->listener).authenticate(plainText, d->config.user(), d->config.password(), chooseResource(d->config), d->streamId);
+            auto task = std::get<NonSaslAuthManager>(d->listener).authenticate(plainText, d->config.accountJid().localpart().toString(), d->config.password(), chooseResource(d->config), d->streamId);
             task.then(this, [this](auto result) {
                 if (hasValue(result)) {
                     // successful Non-SASL Authentication
@@ -626,9 +633,7 @@ void QXmppOutgoingClient::startResourceBinding()
 {
     d->setListener<BindManager>(&d->socket).bindAddress(chooseResource(d->config)).then(this, [this](BindManager::Result r) {
         if (auto *addr = std::get_if<BoundAddress>(&r)) {
-            d->config.setUser(addr->user);
-            d->config.setDomain(addr->domain);
-            d->config.setResource(addr->resource);
+            d->config.setAccountJid(addr->jid);
 
             if (d->c2sStreamManager.canRequestEnable()) {
                 startSmEnable();
@@ -751,8 +756,8 @@ void QXmppOutgoingClient::handleStart()
 
     // start stream
     d->socket.sendData(serializeXml(StreamOpen {
-        d->config.domain(),
-        d->config.user().isEmpty() ? QString() : d->config.jidBare(),
+        d->config.accountJid().domain().toString(),
+        d->config.accountJid().hasLocalpart() ? d->config.accountJid().toString() : QString(),
         {},
         u"1.0"_s,
         ns_client.toString(),
@@ -762,14 +767,14 @@ void QXmppOutgoingClient::handleStart()
 
 void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
 {
-    if (!jidsEqual(stream.from, d->config.domain())) {
-        setError(u"Peer serves '%1' instead of '%2' as expected."_s.arg(stream.from, d->config.domain()),
+    if (!jidsEqual(stream.from, d->config.accountJid().domain())) {
+        setError(u"Peer serves '%1' instead of '%2' as expected."_s.arg(stream.from, d->config.accountJid().domain()),
                  StreamError::HostUnknown);
         disconnectFromHost();
         return;
     }
     // If we include a 'from' attribute, the server must respond with the same 'to' attribute.
-    if (!d->config.user().isEmpty() && !jidsEqual(stream.to, d->config.jidBare())) {
+    if (d->config.accountJid().hasLocalpart() && !jidsEqual(stream.to, d->config.accountJid().toString())) {
         warning(u"Server did not include our JID in the stream 'to' attribute (violating RFC6120, allowed in RFC3920)."_s);
         // do not treat as fatal error
     }
@@ -1142,13 +1147,8 @@ HandleElementResult BindManager::handleElement(const QDomElement &el)
                         return ProtocolError { u"Server did not return JID upon resource binding."_s };
                     }
 
-                    static const QRegularExpression jidRegex(u"^([^@/]+)@([^@/]+)/(.+)$"_s);
-                    if (const auto match = jidRegex.match(bind.jid); match.hasMatch()) {
-                        return BoundAddress {
-                            match.captured(1),
-                            match.captured(2),
-                            match.captured(3),
-                        };
+                    if (auto jid = Jid::fromString(bind.jid); jid && jid->hasLocalpart() && jid->isFull()) {
+                        return BoundAddress { std::move(*jid) };
                     }
 
                     return ProtocolError { u"Bind IQ received with invalid JID"_s };
@@ -1354,7 +1354,7 @@ void PingManager::sendPing(std::chrono::milliseconds timeout)
     } else {
         // send ping packet
         QXmppPingIq ping;
-        ping.setTo(q->configuration().domain());
+        ping.setToJid(q->configuration().accountJid().domainJid());
         q->streamAckManager().send(ping);
     }
 

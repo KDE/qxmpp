@@ -651,7 +651,7 @@ void tst_QXmppMamManager::retrieve()
     auto cleanup = qScopeGuard([] { QXmpp::Xml::Registry::unregisterElement<MamTestEncrypted>(); });
 
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/chamber"_jid);
     test.addNewExtension<MamTestE2eeManager>();
     auto *mam = test.addNewExtension<QXmppMamManager>();
 
@@ -713,7 +713,7 @@ void tst_QXmppMamManager::retrieveLegacyEncrypted()
     using namespace QXmpp::Messages;
 
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/chamber"_jid);
     QT_WARNING_PUSH
     QT_WARNING_DISABLE_DEPRECATED
     auto e2ee = std::make_unique<EncryptionExtension>();
@@ -751,7 +751,7 @@ void tst_QXmppMamManager::retrieveError()
     using namespace QXmpp::Messages;
 
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/chamber"_jid);
     auto *mam = test.addNewExtension<QXmppMamManager>();
 
     int processed = 0;
@@ -777,7 +777,7 @@ void tst_QXmppMamManager::retrieveExtended()
     using namespace QXmpp::Messages;
 
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/chamber"_jid);
     auto *mam = test.addNewExtension<QXmppMamManager>();
 
     QObject owner;
@@ -869,7 +869,7 @@ void tst_QXmppMamManager::retrieveExtended()
 void tst_QXmppMamManager::retrieveUnexpectedSender()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/chamber"_jid);
     auto *mam = test.addNewExtension<QXmppMamManager>();
 
     auto result = [](const QString &from, const QString &id) -> QString {
@@ -924,7 +924,7 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
 void tst_QXmppMamManager::requestQueryForm()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/chamber"_jid);
     auto *mam = test.addNewExtension<QXmppMamManager>();
 
     auto task = mam->requestQueryForm();
@@ -963,7 +963,7 @@ void tst_QXmppMamManager::requestQueryForm()
 void tst_QXmppMamManager::requestMetadata()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/chamber"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/chamber"_jid);
     auto *mam = test.addNewExtension<QXmppMamManager>();
 
     auto task = mam->requestMetadata();
@@ -1127,7 +1127,7 @@ static const auto carbonsEnableRequest = u"<iq id='qx1' type='set'><enable xmlns
 void tst_QXmppCarbonManager::enableCarbons()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.example"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
 
@@ -1151,7 +1151,7 @@ void tst_QXmppCarbonManager::enableCarbons()
 void tst_QXmppCarbonManager::enableCarbonsUnsupported()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.example"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
 
@@ -1163,7 +1163,7 @@ void tst_QXmppCarbonManager::enableCarbonsUnsupported()
 void tst_QXmppCarbonManager::enableCarbonsWithoutDiscoveryManager()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.example"_jid);
     auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
 
     // the support cannot be checked, so carbons are enabled anyway
@@ -1177,7 +1177,7 @@ void tst_QXmppCarbonManager::enableCarbonsWithoutDiscoveryManager()
 void tst_QXmppCarbonManager::enableCarbonsDiscoveryManagerAddedLater()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.example"_jid);
     auto *manager = test.addNewExtension<QXmppCarbonManagerV2>();
     test.addNewExtension<QXmppDiscoveryManager>();
 
@@ -1190,7 +1190,7 @@ void tst_QXmppCarbonManager::enableCarbonsDiscoveryManagerAddedLater()
 void tst_QXmppCarbonManager::enableCarbonsOncePerStream()
 {
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.example"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     test.addNewExtension<QXmppCarbonManagerV2>();
 
@@ -1213,8 +1213,8 @@ void tst_QXmppCarbonManager::enableCarbonsOncePerStream()
 
 void tst_QXmppCarbonManager::initTestCase()
 {
-    client.configuration().setJid("romeo@montague.example");
-    clientV1.configuration().setJid("romeo@montague.example");
+    client.configuration().setAccountJid(u"romeo@montague.example"_jid);
+    clientV1.configuration().setAccountJid(u"romeo@montague.example"_jid);
     m_managerV1 = clientV1.addNewExtension<QXmppCarbonManager>();
     m_managerV2 = client.addNewExtension<QXmppCarbonManagerV2>();
     m_messageHandler = client.addNewExtension<MessageHandler>();
@@ -1404,7 +1404,7 @@ void tst_QXmppCarbonManager::pipeline()
     auto cleanup = qScopeGuard([] { QXmpp::Xml::Registry::unregisterElement<Mam::MamTestEncrypted>(); });
 
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<Mam::MamTestE2eeManager>();
     auto *carbons = test.addNewExtension<QXmppCarbonManagerV2>();
 

@@ -6,6 +6,7 @@
 
 #include "QXmppByteStreamIq.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppIbbIq.h"
@@ -458,7 +459,7 @@ void QXmppTransferIncomingJob::connectToNextHost()
 
     const QString hostName = streamHash(d->sid,
                                         d->jid,
-                                        d->client->configuration().jid());
+                                        ownFullJid(d->client));
 
     // try to connect to stream host
     m_candidateClient = new QXmppSocksClient(m_candidateHost.host(), m_candidateHost.port(), this);
@@ -578,7 +579,7 @@ void QXmppTransferOutgoingJob::connectToProxy()
     info(u"Connecting to proxy: %1 (%2 %3)"_s.arg(d->socksProxy.jid(), d->socksProxy.host(), QString::number(d->socksProxy.port())));
 
     const QString hostName = streamHash(d->sid,
-                                        d->client->configuration().jid(),
+                                        ownFullJid(d->client),
                                         d->jid);
 
     QXmppSocksClient *socksClient = new QXmppSocksClient(d->socksProxy.host(), d->socksProxy.port(), this);
@@ -618,7 +619,7 @@ void QXmppTransferOutgoingJob::_q_proxyReady()
     // activate stream
     QXmppByteStreamIq streamIq;
     streamIq.setType(QXmppIq::Set);
-    streamIq.setFrom(d->client->configuration().jid());
+    streamIq.setFromJid(ownFullJid(d->client));
     streamIq.setTo(d->socksProxy.jid());
     streamIq.setSid(d->sid);
     streamIq.setActivate(d->jid);
@@ -1309,7 +1310,7 @@ QXmppTransferJob *QXmppTransferManager::sendFile(const QString &jid, QIODevice *
 
 void QXmppTransferManager::_q_socksServerConnected(QTcpSocket *socket, const QString &hostName, quint16 port)
 {
-    const QString ownJid = client()->configuration().jid();
+    const QString ownJid = ownFullJid(client());
     for (auto *job : std::as_const(d->jobs)) {
         if (hostName == streamHash(job->d->sid, ownJid, job->jid()) && port == 0) {
             job->d->socksSocket = socket;
@@ -1322,7 +1323,7 @@ void QXmppTransferManager::_q_socksServerConnected(QTcpSocket *socket, const QSt
 
 void QXmppTransferManager::socksServerSendOffer(QXmppTransferJob *job)
 {
-    const auto ownJid = client()->configuration().jid();
+    const auto ownJid = ownFullJid(client()).toString();
     QList<QXmppByteStreamIq::StreamHost> streamHosts;
 
     // discover local IPs

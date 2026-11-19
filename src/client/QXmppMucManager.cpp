@@ -5,6 +5,7 @@
 #include "QXmppMucManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppJid_p.h"
@@ -576,7 +577,7 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
     const QString jid = presence.from();
 
     // if our own presence changes, reflect it in the chat room
-    if (isJoined() && jid == d->client->configuration().jid()) {
+    if (isJoined() && jid == ownFullJid(d->client).toString()) {
         QXmppPresence packet = d->client->clientPresence();
         packet.setTo(d->ownJid());
         d->client->send(std::move(packet));

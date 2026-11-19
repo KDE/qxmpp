@@ -558,7 +558,7 @@ QXmppTask<QXmppAccountMigrationManager::Result<QXmppExportData>> QXmppAccountMig
     };
 
     auto state = std::make_shared<State>();
-    state->data.setAccountJid(client()->configuration().jidBare());
+    state->data.setAccountJid(client()->configuration().accountJid());
     state->counter = d->extensions.size();
 
     // early exit

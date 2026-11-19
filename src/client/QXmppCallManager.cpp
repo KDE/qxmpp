@@ -10,6 +10,7 @@
 #include "QXmppCallManager_p.h"
 #include "QXmppCall_p.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppExternalServiceDiscoveryIq.h"
@@ -82,7 +83,7 @@ QXmppTask<StunTurnResult> QXmpp::Private::requestStunTurnConfig(QXmppClient *cli
 {
     QXmppPromise<StunTurnResult> p;
     auto task = p.task();
-    requestExternalServices(client, client->configuration().domain()).then(q, [p = std::move(p), client, q](const auto &result) mutable {
+    requestExternalServices(client, client->configuration().accountJid().domain().toString()).then(q, [p = std::move(p), client, q](const auto &result) mutable {
         if (auto *error = std::get_if<QXmppError>(&result)) {
             qWarning() << u"Could not fetch STUN/TURN external services from server: %1"_s.arg(error->description);
             p.finish(*error);
@@ -127,7 +128,7 @@ QXmppTask<StunTurnResult> QXmpp::Private::requestStunTurnConfig(QXmppClient *cli
         // request TURN credentials (if not provided already)
         if (turnServer && !credentialsAvailable) {
             // request credentials for TURN server
-            chain(requestCredentials(client, client->configuration().domain(), u"turn"_s, turnServer->server.host.toString()),
+            chain(requestCredentials(client, client->configuration().accountJid().domain().toString(), u"turn"_s, turnServer->server.host.toString()),
                   q,
                   std::move(p),
                   [q, stunServers = std::move(stunServers)](auto &&result) mutable -> StunTurnResult {
@@ -342,7 +343,7 @@ std::unique_ptr<QXmppCall> QXmppCallManager::call(const QString &jid, Media medi
         return errorCall({ u"Refusing to call an empty jid"_s, {} });
     }
 
-    if (jid == client()->configuration().jid()) {
+    if (jid == ownFullJid(client()).toString()) {
         return errorCall({ u"Refusing to call self"_s, {} });
     }
 

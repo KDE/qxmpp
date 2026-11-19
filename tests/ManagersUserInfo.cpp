@@ -74,7 +74,7 @@ void tst_QXmppVersionManager::testSendRequest()
 void tst_QXmppVersionManager::testHandleRequest()
 {
     TestClient test;
-    test.configuration().setJid("juliet@capulet.com/balcony");
+    test.configuration().setAccountJid(u"juliet@capulet.com/balcony"_jid);
 
     auto *verManager = test.addNewExtension<QXmppVersionManager>();
     verManager->setClientName("Exodus");
@@ -133,7 +133,7 @@ void tst_QXmppEntityTimeManager::testSendRequest()
 void tst_QXmppEntityTimeManager::testHandleRequest()
 {
     TestClient test;
-    test.configuration().setJid("juliet@capulet.com/balcony");
+    test.configuration().setAccountJid(u"juliet@capulet.com/balcony"_jid);
 
     auto *manager = test.addNewExtension<QXmppEntityTimeManager>();
 
@@ -203,7 +203,7 @@ void tst_QXmppUserTuneManager::testRequest()
 void tst_QXmppUserTuneManager::testPublish()
 {
     TestClient test;
-    test.configuration().setJid("stpeter@jabber.org");
+    test.configuration().setAccountJid(u"stpeter@jabber.org"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     auto *tuneManager = test.addNewExtension<QXmppUserTuneManager>();
 
@@ -236,7 +236,7 @@ void tst_QXmppUserTuneManager::testPublish()
 void tst_QXmppUserTuneManager::testEvents()
 {
     TestClient test;
-    test.configuration().setJid("stpeter@jabber.org");
+    test.configuration().setAccountJid(u"stpeter@jabber.org"_jid);
     auto *psManager = test.addNewExtension<QXmppPubSubManager>();
     auto *tuneManager = test.addNewExtension<QXmppUserTuneManager>();
 
@@ -317,7 +317,7 @@ void tst_QXmppUserLocationManager::testRequest()
 void tst_QXmppUserLocationManager::testPublish()
 {
     TestClient test;
-    test.configuration().setJid("stpeter@jabber.org");
+    test.configuration().setAccountJid(u"stpeter@jabber.org"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     auto *manager = test.addNewExtension<QXmppUserLocationManager>();
 
@@ -354,7 +354,7 @@ void tst_QXmppUserLocationManager::testPublish()
 void tst_QXmppUserLocationManager::testEvents()
 {
     TestClient test;
-    test.configuration().setJid("stpeter@jabber.org");
+    test.configuration().setAccountJid(u"stpeter@jabber.org"_jid);
     auto *psManager = test.addNewExtension<QXmppPubSubManager>();
     auto *manager = test.addNewExtension<QXmppUserLocationManager>();
 
@@ -534,7 +534,7 @@ void tst_QXmppVCardManager::fetchVCard()
 void tst_QXmppVCardManager::setVCard()
 {
     TestClient test;
-    test.configuration().setJid("stpeter@jabber.org");
+    test.configuration().setAccountJid(u"stpeter@jabber.org"_jid);
     auto *manager = test.addNewExtension<QXmppVCardManager>();
 
     QXmppVCardIq v;
@@ -581,7 +581,7 @@ void tst_QXmppVCardManager::testSetClientVCard()
 
     // check our vcard has the correct address (servers may omit it for the own account)
     const auto vCardFrom = vCardManager->clientVCard().from();
-    QVERIFY2(vCardFrom.isEmpty() || vCardFrom == client->configuration().jidBare(), qPrintable(vCardFrom));
+    QVERIFY2(vCardFrom.isEmpty() || vCardFrom == client->configuration().accountJid().toString(), qPrintable(vCardFrom));
 
     // set a new vcard
     QXmppVCardIq newVCard;
@@ -607,7 +607,7 @@ void tst_QXmppVCardManager::testSetClientVCard()
     QVERIFY(vCardSpy.wait());
 
     // check our vcard has been changed successfully
-    QVERIFY(vCardManager->clientVCard().from().isEmpty() || vCardManager->clientVCard().from() == client->configuration().jidBare());
+    QVERIFY(vCardManager->clientVCard().from().isEmpty() || vCardManager->clientVCard().from() == client->configuration().accountJid().toString());
     QCOMPARE(vCardManager->clientVCard().firstName(), u"Bob"_s);
     QCOMPARE(vCardManager->clientVCard().birthday(), QDate(01, 02, 2000));
     QCOMPARE(vCardManager->clientVCard().email(), u"bob@qxmpp.org"_s);

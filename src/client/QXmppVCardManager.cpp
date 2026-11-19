@@ -124,7 +124,7 @@ QXmppTask<QXmppVCardManager::VCardIqResult> QXmppVCardManager::fetchVCard(const 
 QXmppTask<QXmppVCardManager::Result> QXmppVCardManager::setVCard(const QXmppVCardIq &vCard)
 {
     auto vCardIq = vCard;
-    vCardIq.setTo(client()->configuration().jidBare());
+    vCardIq.setToJid(client()->configuration().accountJid());
     vCardIq.setFrom({});
     vCardIq.setType(QXmppIq::Set);
     return client()->sendGenericIq(std::move(vCardIq));
@@ -197,7 +197,7 @@ bool QXmppVCardManager::handleIncomingStanza(const QDomElement &element)
         QXmppVCardIq vCardIq;
         vCardIq.parse(element);
 
-        if (vCardIq.from().isEmpty() || vCardIq.from() == client()->configuration().jidBare()) {
+        if (vCardIq.from().isEmpty() || vCardIq.fromJid() == client()->configuration().accountJid()) {
             d->clientVCard = vCardIq;
             d->isClientVCardReceived = true;
             Q_EMIT clientVCardReceived();
@@ -222,7 +222,7 @@ void QXmppVCardManager::onRegistered(QXmppClient *client)
 
         auto exportData = [this]() -> QXmppTask<DataResult> {
             co_return mapSuccess(
-                co_await fetchVCard(this->client()->configuration().jidBare()),
+                co_await fetchVCard(this->client()->configuration().accountJid()),
                 [](const QXmppVCardIq &iq) { return VCardData { iq }; });
         };
 

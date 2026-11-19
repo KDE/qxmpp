@@ -2306,7 +2306,7 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
     }
 
     if (participant == data->selfParticipant.value()) {
-        context.setSenderJid(jidOrNull(q->client()->configuration().jidBare()));
+        context.setSenderJid(q->client()->configuration().accountJid());
     } else if (const auto jid = participant->jid.value(); !jid.isEmpty()) {
         context.setSenderJid(jidOrNull(jid).bare());
     }
@@ -2364,7 +2364,7 @@ QXmppTask<void> QXmppMucManagerV2Private::resolveRecipients(Messages::OutgoingMe
     }
     data = itr->second.get();
 
-    const auto ownJid = jidOrNull(q->client()->configuration().jidBare());
+    const auto ownJid = q->client()->configuration().accountJid();
     QList<Jid> recipients;
     auto add = [&](const QString &jidString) {
         const auto jid = jidOrNull(jidString).bare();

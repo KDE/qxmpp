@@ -14,6 +14,7 @@
 #include "QXmppBitsOfBinaryDataList.h"
 #include "QXmppBlockingManager.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDataForm.h"
 #include "QXmppDiscoveryManager.h"
@@ -216,7 +217,7 @@ void tst_QXmppRegistrationManager::testRegisterOnConnectGetSet()
 void tst_QXmppRegistrationManager::testServiceDiscovery()
 {
     TestClient test(true);
-    test.configuration().setJid(u"bob@example.org"_s);
+    test.configuration().setAccountJid(u"bob@example.org"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *localManager = test.addNewExtension<QXmppRegistrationManager>();
 
@@ -594,7 +595,7 @@ static QXmppRosterIq newRoster(TestClient *client, int version, const std::optio
     roster.setType(type.value_or(QXmppIq::Result));
 
     if (roster.type() == QXmppIq::Get) {
-        roster.setFrom(client->configuration().jid());
+        roster.setFromJid(QXmpp::Private::ownFullJid(client));
         roster.setMixAnnotate(true);
     }
 
@@ -660,7 +661,7 @@ static std::unique_ptr<TestClient> newClient(bool withManagers, bool autoResetEn
     auto client = std::make_unique<TestClient>(false, autoResetEnabled);
 
     client->addNewExtension<QXmppAccountMigrationManager>();
-    client->configuration().setJid("pasnox@xmpp.example");
+    client->configuration().setAccountJid(u"pasnox@xmpp.example"_jid);
 
     if (withManagers) {
         client->addNewExtension<QXmppVCardManager>();
@@ -1108,7 +1109,7 @@ struct Tester {
     Tester(const QString &jid)
         : Tester()
     {
-        client.configuration().setJid(jid);
+        client.configuration().setAccountJid(Jid::fromString(jid).value());
     }
 
     TestClient client;
@@ -1454,7 +1455,7 @@ void tst_QXmppBlockingManager::basic()
 void tst_QXmppBlockingManager::fetch()
 {
     TestClient t;
-    t.configuration().setJid("juliet@capulet.com");
+    t.configuration().setAccountJid(u"juliet@capulet.com"_jid);
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     QVERIFY(!m->isSubscribed());
@@ -1491,7 +1492,7 @@ void tst_QXmppBlockingManager::fetch()
 void tst_QXmppBlockingManager::block()
 {
     TestClient t;
-    t.configuration().setJid("juliet@capulet.com");
+    t.configuration().setAccountJid(u"juliet@capulet.com"_jid);
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     auto task = m->block("romeo@montague.net");
@@ -1503,7 +1504,7 @@ void tst_QXmppBlockingManager::block()
 void tst_QXmppBlockingManager::unblock()
 {
     TestClient t;
-    t.configuration().setJid("juliet@capulet.com");
+    t.configuration().setAccountJid(u"juliet@capulet.com"_jid);
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     auto task = m->unblock("romeo@montague.net");
@@ -1515,7 +1516,7 @@ void tst_QXmppBlockingManager::unblock()
 void tst_QXmppBlockingManager::reportAndBlock()
 {
     TestClient t;
-    t.configuration().setJid("juliet@capulet.com");
+    t.configuration().setAccountJid(u"juliet@capulet.com"_jid);
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     auto task = m->reportAndBlock("romeo@montague.net", QXmppSpamReport(QXmppSpamReport::Reason::Spam));
@@ -1527,7 +1528,7 @@ void tst_QXmppBlockingManager::reportAndBlock()
 void tst_QXmppBlockingManager::reportAndBlockFull()
 {
     TestClient t;
-    t.configuration().setJid("juliet@capulet.com");
+    t.configuration().setAccountJid(u"juliet@capulet.com"_jid);
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     QXmppSpamReport report(QXmppSpamReport::Reason::Abuse);
@@ -1550,7 +1551,7 @@ void tst_QXmppBlockingManager::reportAndBlockFull()
 void tst_QXmppBlockingManager::pushBlocked()
 {
     TestClient t;
-    t.configuration().setJid("juliet@capulet.com/balcony");
+    t.configuration().setAccountJid(u"juliet@capulet.com/balcony"_jid);
     auto *m = t.addNewExtension<QXmppBlockingManager>();
 
     m->fetchBlocklist();

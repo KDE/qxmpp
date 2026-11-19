@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 
     // client config
     QXmppConfiguration config;
-    config.setJid(qEnvironmentVariable("QXMPP_JID"));
+    config.setAccountJid(QXmpp::Jid::fromString(qEnvironmentVariable("QXMPP_JID")).value_or(QXmpp::Jid()));
     config.setPassword(qEnvironmentVariable("QXMPP_PASSWORD"));
     config.setResourcePrefix("Call");
     config.setIgnoreSslErrors(true);
@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
     QObject::connect(&client, &QXmppClient::connected, &app, [&] {
         // wait 1 second for presence of other clients to arrive
         QTimer::singleShot(1s, &app, [&] {
-            auto bareJid = client.configuration().jidBare();
+            auto bareJid = client.configuration().accountJid().toString();
 
             // other resources of our account
             auto otherResources = rosterManager->getResources(bareJid);

@@ -20,6 +20,7 @@
 #include <QSslSocket>
 
 using namespace QXmpp::Private;
+using QXmpp::Jid;
 
 struct QXmppCredentialsPrivate : QSharedData, Credentials { };
 
@@ -96,8 +97,12 @@ class QXmppConfigurationPrivate : public QSharedData
 public:
     QString host;
     int port = XMPP_DEFAULT_PORT;
+    // made of user and domain, null if they are no valid JID
+    Jid accountJid;
+    // as set by the deprecated setters, also if invalid
     QString user;
     QString domain;
+
     QString resource;
     QString resourcePrefix = u"QXmpp"_s;
     QXmppCredentials credentials;
@@ -129,6 +134,8 @@ public:
     QNetworkProxy networkProxy;
 
     QList<QSslCertificate> caCertificates;
+
+    void updateAccountJid();
 };
 
 /*! Creates a QXmppConfiguration object. */
@@ -144,6 +151,43 @@ QXmppConfiguration::~QXmppConfiguration() = default;
 
 /*! Assigns \a other to this QXmppConfiguration. */
 QXmppConfiguration &QXmppConfiguration::operator=(const QXmppConfiguration &other) = default;
+
+void QXmppConfigurationPrivate::updateAccountJid()
+{
+    auto jid = Jid::fromParts(user, domain);
+    accountJid = std::holds_alternative<Jid>(jid) ? std::get<Jid>(std::move(jid)) : Jid();
+}
+
+/*!
+    Returns the bare JID of the account.
+
+    The JID is null if no JID has been set or if the JID set by the deprecated setters (e.g.
+    setUser()) is invalid. Connecting fails in that case.
+
+    \since QXmpp 1.18
+*/
+const Jid &QXmppConfiguration::accountJid() const
+{
+    return d->accountJid;
+}
+
+/*!
+    Sets the JID of the account to \a jid.
+
+    If \a jid is a full JID, its resourcepart is used as resource (see setResource()),
+    otherwise the resource stays unchanged.
+
+    \since QXmpp 1.18
+*/
+void QXmppConfiguration::setAccountJid(const Jid &jid)
+{
+    d->accountJid = jid.bare();
+    d->user = jid.localpart().toString();
+    d->domain = jid.domain().toString();
+    if (jid.hasResource()) {
+        d->resource = jid.resource().toString();
+    }
+}
 
 /*!
     Sets the host name.
@@ -162,10 +206,13 @@ void QXmppConfiguration::setHost(const QString &host)
 
     \note host name and domain name can be different for google
     domain name is gmail.com and host name is talk.google.com
+
+    \deprecated since QXmpp 1.18, use setAccountJid()
 */
 void QXmppConfiguration::setDomain(const QString &domain)
 {
     d->domain = domain;
+    d->updateAccountJid();
 }
 
 /*!
@@ -183,10 +230,13 @@ void QXmppConfiguration::setPort(int port)
     \a user is the username of the account at the specified XMPP server. It should
     be the name without the domain name. E.g. "qxmpp.test1" and not
     "qxmpp.test1@gmail.com".
+
+    \deprecated since QXmpp 1.18, use setAccountJid()
 */
 void QXmppConfiguration::setUser(const QString &user)
 {
     d->user = user;
+    d->updateAccountJid();
 }
 
 /*!
@@ -257,6 +307,8 @@ void QXmppConfiguration::setResourcePrefix(const QString &resourcePrefix)
     the username and the domain will be updated.
 
     \a jid.
+
+    \deprecated since QXmpp 1.18, use setAccountJid()
 */
 void QXmppConfiguration::setJid(const QString &jid)
 {
@@ -266,6 +318,7 @@ void QXmppConfiguration::setJid(const QString &jid)
     if (!resource.isEmpty()) {
         d->resource = resource;
     }
+    d->updateAccountJid();
 }
 
 /*! Returns the custom hostname to connect to. */
@@ -274,7 +327,11 @@ QString QXmppConfiguration::host() const
     return d->host;
 }
 
-/*! Returns the domain part of the JID. */
+/*!
+    Returns the domain part of the JID.
+
+    \deprecated since QXmpp 1.18, use accountJid()
+*/
 QString QXmppConfiguration::domain() const
 {
     return d->domain;
@@ -299,7 +356,11 @@ quint16 QXmppConfiguration::port16() const
     return 0;
 }
 
-/*! Returns the localpart of the JID. */
+/*!
+    Returns the localpart of the JID.
+
+    \deprecated since QXmpp 1.18, use accountJid()
+*/
 QString QXmppConfiguration::user() const
 {
     return d->user;
@@ -326,6 +387,8 @@ QString QXmppConfiguration::resource() const
 /*!
     Returns the Jabber-ID (JID)
     (e.g. "qxmpp.test1@gmail.com/resource" or qxmpptest@jabber.org/QXmpp156).
+
+    \deprecated since QXmpp 1.18, use accountJid() and resource()
 */
 QString QXmppConfiguration::jid() const
 {
@@ -333,14 +396,16 @@ QString QXmppConfiguration::jid() const
         return d->domain;
     }
     if (d->resource.isEmpty()) {
-        return jidBare();
+        return d->user + u'@' + d->domain;
     }
-    return jidBare() + u'/' + d->resource;
+    return d->user + u'@' + d->domain + u'/' + d->resource;
 }
 
 /*!
     Returns the bare jabber id (jid), without the resource identifier
     (e.g. "qxmpp.test1@gmail.com" or qxmpptest@jabber.org).
+
+    \deprecated since QXmpp 1.18, use accountJid()
 */
 QString QXmppConfiguration::jidBare() const
 {

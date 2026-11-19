@@ -433,7 +433,7 @@ std::variant<Success, QXmppStanza::Error> QXmppRosterManager::handlePush(const Q
 
     // Security check: only the server sends roster pushes, 'from' is either empty or the bare
     // JID of the user (RFC 6121, 2.1.6)
-    if (encrypted || (!from.isEmpty() && !bareJidsEqual(from, client()->configuration().jidBare()))) {
+    if (encrypted || (!from.isEmpty() && !bareJidsEqual(from, client()->configuration().accountJid().toString()))) {
         return Error(Error::Cancel, Error::ServiceUnavailable);
     }
 
@@ -520,7 +520,7 @@ QXmppTask<QXmppRosterManager::RosterResult> QXmppRosterManager::requestRoster(st
 {
     QXmppRosterIq iq;
     iq.setType(QXmppIq::Get);
-    iq.setFrom(client()->configuration().jid());
+    iq.setFromJid(ownFullJid(client()));
 
     // RFC 6121 §2.6: Roster Versioning. Sending the `ver` attribute (even empty) signals support
     // to versioning-aware servers; servers that don't support it ignore the attribute.

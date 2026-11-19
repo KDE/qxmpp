@@ -5,6 +5,7 @@
 #include "QXmppCallInviteManager.h"
 
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppJid_p.h"
@@ -264,7 +265,7 @@ bool QXmppCallInviteManager::handleMessage(const QXmppMessage &message)
     // Only continue if the message contains a Call Invite element.
     if (auto callInviteElement = message.callInviteElement()) {
         QString senderJid {
-            callInviteElement->jingle() && callInviteElement->jingle()->jid ? callInviteElement->jingle()->jid.value() : client()->configuration().jid()
+            callInviteElement->jingle() && callInviteElement->jingle()->jid ? callInviteElement->jingle()->jid.value() : ownFullJid(client()).toString()
         };
 
         if (senderJid.isEmpty()) {

@@ -48,6 +48,9 @@ constexpr auto StableConnectionDuration = std::chrono::seconds(30);
 
 QXMPP_PRIVATE_EXPORT std::chrono::milliseconds reconnectionDelay(int tries, bool resumable);
 
+// The own full JID, or the bare JID if no resource has been set or bound.
+QXMPP_PRIVATE_EXPORT Jid ownFullJid(QXmppClient *client);
+
 struct IqRequests {
     // Runs the handler of QXmpp::Iq::Received for an IQ request and sends the reply. Returns
     // false if there is no handler.

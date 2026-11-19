@@ -322,8 +322,8 @@ void tst_QXmppOmemoManager::testSendMessage()
     auto configAlice2 = configAlice1;
     configAlice2.setResource(u"second"_s);
     const auto configBob = IntegrationTests::secondClientConfiguration();
-    const auto aliceJid = configAlice1.jidBare();
-    const auto bobJid = configBob.jidBare();
+    const auto aliceJid = configAlice1.accountJid().toString();
+    const auto bobJid = configBob.accountJid().toString();
 
     QSignalSpy alice1DeviceSpy(m_alice1.manager, &QXmppOmemoManager::deviceAdded);
 
@@ -403,15 +403,15 @@ void tst_QXmppOmemoManager::testSendIq()
     configAlice.setResource(u"first"_s);
     auto configBob = IntegrationTests::secondClientConfiguration();
     configBob.setResource(u"phone"_s);
-    const auto bobJid = configBob.jidBare();
+    const auto bobJid = configBob.accountJid().toString();
 
     QXmppBitsOfBinaryIq requestIq;
-    requestIq.setTo(configBob.jid());
+    requestIq.setTo(configBob.accountJid() + u'/' + configBob.resource());
     requestIq.setCid(QXmppBitsOfBinaryContentId::fromContentId(u"sha1+8f35fef110ffc5df08d579a50083ff9308fb6242@bob.xmpp.org"_s));
 
     QXmppBitsOfBinaryIq responseIq;
     responseIq.setType(QXmppIq::Result);
-    responseIq.setTo(configAlice.jid());
+    responseIq.setTo(configAlice.accountJid() + u'/' + configAlice.resource());
     responseIq.setData(QByteArray::fromBase64(QByteArrayLiteral(
         "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAMAAAC67D+PAAAAclBMVEUAAADYZArfaA9GIAoBAAGN"
         "QA3MXgniaAiEOgZMIATDXRXZZhHUZBHIXhDrbQ6sUQ7OYA2TRAubRwqMQQq7VQlKHgMAAAK5WRfJ"
@@ -483,10 +483,10 @@ void tst_QXmppOmemoManager::testMucMessage()
     const auto configBob = IntegrationTests::secondClientConfiguration();
     QVERIFY(connectAndSetUp(m_alice1, configAlice));
     QVERIFY(connectAndSetUp(m_bob, configBob));
-    awaitTask(m_alice1.manager->requestDeviceLists({ configBob.jidBare() }));
-    awaitTask(m_bob.manager->requestDeviceLists({ configAlice.jidBare() }));
-    QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_alice1.manager->devices({ configBob.jidBare() })).isEmpty(), 20'000);
-    QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_bob.manager->devices({ configAlice.jidBare() })).isEmpty(), 20'000);
+    awaitTask(m_alice1.manager->requestDeviceLists({ configBob.accountJid().toString() }));
+    awaitTask(m_bob.manager->requestDeviceLists({ configAlice.accountJid().toString() }));
+    QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_alice1.manager->devices({ configBob.accountJid().toString() })).isEmpty(), 20'000);
+    QTRY_VERIFY_WITH_TIMEOUT(!awaitTask(m_bob.manager->devices({ configAlice.accountJid().toString() })).isEmpty(), 20'000);
 
     // non-anonymous and members-only room, as recommended for OMEMO
     auto created = awaitTask(m_alice1.mucManager->createRoom(mucService, u"alice"_s, QXmppUtils::generateStanzaUuid().toLower()));
@@ -498,7 +498,7 @@ void tst_QXmppOmemoManager::testMucMessage()
     expectVariant<QXmpp::Success>(awaitTask(room.setRoomConfig(config)));
     auto cleanup = qScopeGuard([&] { awaitTask(room.destroyRoom()); });
     QXmpp::Muc::Item member;
-    member.setJid(configBob.jidBare());
+    member.setJid(configBob.accountJid().toString());
     member.setAffiliation(QXmpp::Muc::Affiliation::Member);
     expectVariant<QXmpp::Success>(awaitTask(room.setAffiliations({ member })));
 
@@ -533,7 +533,7 @@ void tst_QXmppOmemoManager::testMucMessage()
                                  return message.e2eeMetadata() && message.body() == u"Hello room!";
                              }),
                              20'000);
-    QCOMPARE(bobSenders, QStringList { configAlice.jidBare() });
+    QCOMPARE(bobSenders, QStringList { configAlice.accountJid().toString() });
 
     // members may retrieve the affiliation lists too
     QStringList bobListRequests;

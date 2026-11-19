@@ -259,7 +259,7 @@ static void injectRoomInfo(TestClient &test, const QString &roomJid = u"coven@ch
 void tst_QXmppMuc::bookmarks2Updates()
 {
     TestClient test(true);
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
@@ -310,7 +310,7 @@ void tst_QXmppMuc::bookmarks2Updates()
 void tst_QXmppMuc::bookmarks2FetchError()
 {
     TestClient test(true);
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
@@ -348,7 +348,7 @@ void tst_QXmppMuc::bookmarks2FetchError()
 void tst_QXmppMuc::bookmarks2Set()
 {
     TestClient test(true);
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
@@ -379,7 +379,7 @@ void tst_QXmppMuc::bookmarks2Set()
 void tst_QXmppMuc::bookmarks2SetUpdate()
 {
     TestClient test(true);
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
@@ -427,7 +427,7 @@ void tst_QXmppMuc::bookmarks2SetUpdate()
 void tst_QXmppMuc::bookmarks2Remove()
 {
     TestClient test(true);
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
@@ -450,7 +450,7 @@ void tst_QXmppMuc::bookmarks2Remove()
 void tst_QXmppMuc::bookmarks2OwnChangeSignals()
 {
     TestClient test(true);
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *bm = test.addNewExtension<QXmppPepBookmarkManager>();
@@ -519,7 +519,7 @@ void tst_QXmppMuc::bookmarks2OwnChangeSignals()
 void tst_QXmppMuc::avatarFetch()
 {
     TestClient test(true);
-    test.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -585,8 +585,8 @@ void tst_QXmppMuc::avatarFetch()
 void tst_QXmppMuc::mucServiceDiscovery()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit"_s);
-    test.configuration().setDomain(u"shakespeare.lit"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit"_jid);
+    test.configuration().setAccountJid(u"shakespeare.lit"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -642,8 +642,8 @@ void tst_QXmppMuc::mucServiceDiscovery()
 void tst_QXmppMuc::mucServicesResetOnReconnect()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit"_s);
-    test.configuration().setDomain(u"shakespeare.lit"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit"_jid);
+    test.configuration().setAccountJid(u"shakespeare.lit"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -676,7 +676,7 @@ void tst_QXmppMuc::mucServicesResetOnReconnect()
 void tst_QXmppMuc::isMucRoomTrue()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -699,7 +699,7 @@ void tst_QXmppMuc::isMucRoomTrue()
 void tst_QXmppMuc::isMucRoomWithoutRoomInfoForm()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -717,7 +717,7 @@ void tst_QXmppMuc::isMucRoomWithoutRoomInfoForm()
 void tst_QXmppMuc::isMucRoomNotFound()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -733,7 +733,7 @@ void tst_QXmppMuc::isMucRoomNotFound()
 void tst_QXmppMuc::isMucRoomMixChannel()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -751,7 +751,7 @@ void tst_QXmppMuc::isMucRoomMixChannel()
 void tst_QXmppMuc::isMucRoomService()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -764,7 +764,7 @@ void tst_QXmppMuc::isMucRoomService()
 void tst_QXmppMuc::joinRoom()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -805,7 +805,7 @@ void tst_QXmppMuc::joinRoom()
 void tst_QXmppMuc::joinRoomWithHistory()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -841,7 +841,7 @@ void tst_QXmppMuc::joinRoomWithHistory()
 void tst_QXmppMuc::joinRoomWithPassword()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -870,7 +870,7 @@ void tst_QXmppMuc::joinRoomWithPassword()
 void tst_QXmppMuc::joinRoomTimeout()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -893,7 +893,7 @@ void tst_QXmppMuc::joinRoomTimeout()
 void tst_QXmppMuc::joinRoomTimerStopped()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -934,7 +934,7 @@ void tst_QXmppMuc::joinRoomTimerStopped()
 void tst_QXmppMuc::joinRoomAlreadyInProgress()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -976,7 +976,7 @@ void tst_QXmppMuc::joinRoomAlreadyInProgress()
 void tst_QXmppMuc::joinRoomWithHistoryMessages()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1034,7 +1034,7 @@ void tst_QXmppMuc::joinRoomWithHistoryMessages()
 void tst_QXmppMuc::joinRoomPresenceError()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1067,7 +1067,7 @@ void tst_QXmppMuc::joinRoomPresenceError()
 void tst_QXmppMuc::joinRoomDuplicateNickname()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1102,7 +1102,7 @@ void tst_QXmppMuc::joinRoomDuplicateNickname()
 void tst_QXmppMuc::joinRoomDuplicateOccupantId()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1149,7 +1149,7 @@ void tst_QXmppMuc::joinRoomDuplicateOccupantId()
 void tst_QXmppMuc::joinRoomNicknameModifiedByService()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1184,7 +1184,7 @@ void tst_QXmppMuc::joinRoomNicknameModifiedByService()
 void tst_QXmppMuc::joinRoomNicknameModifiedWithoutStatus210()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1282,7 +1282,7 @@ static QXmppMucRoomV2 createdRoom(TestClient &test, QXmppMucManagerV2 *muc,
 void tst_QXmppMuc::receiveMessage()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1320,7 +1320,7 @@ void tst_QXmppMuc::receiveMessage()
 void tst_QXmppMuc::resolveSender()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     joinedRoom(test, muc);
@@ -1368,7 +1368,7 @@ void tst_QXmppMuc::resolveSender()
 void tst_QXmppMuc::resolveSenderOccupantId()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     joinedRoom(test, muc, u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s, { u"urn:xmpp:occupant-id:0"_s });
@@ -1438,7 +1438,7 @@ void tst_QXmppMuc::resolveSenderArchive()
     QFETCH(QString, expectedSender);
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto *mam = test.addNewExtension<QXmppMamManager>();
@@ -1509,7 +1509,7 @@ static QString reflection(const QString &nick, const QString &originId)
 void tst_QXmppMuc::sendMessageForgedReflection()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -1530,7 +1530,7 @@ void tst_QXmppMuc::sendMessageForgedReflection()
 void tst_QXmppMuc::sendMessageConsumedReflection()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -1554,7 +1554,7 @@ void tst_QXmppMuc::sendMessageConsumedReflection()
 void tst_QXmppMuc::sendMessageArchiveId()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     joinedRoom(test, muc);
@@ -1580,7 +1580,7 @@ void tst_QXmppMuc::sendMessageArchiveId()
 void tst_QXmppMuc::sendMessageEncrypted()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto *e2ee = test.addNewExtension<MucTestE2eeManager>();
@@ -1664,7 +1664,7 @@ static QList<QXmpp::Jid> sorted(QList<QXmpp::Jid> list)
 void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto *e2ee = test.addNewExtension<MucTestE2eeManager>();
@@ -1709,7 +1709,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
 void tst_QXmppMuc::sendMessageEncryptedMembersError()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto *e2ee = test.addNewExtension<MucTestE2eeManager>();
@@ -1741,7 +1741,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersError()
 void tst_QXmppMuc::sendMessageEncryptedAnonymous()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     test.addNewExtension<MucTestE2eeManager>();
@@ -1762,7 +1762,7 @@ void tst_QXmppMuc::sendMessageEncryptedAnonymous()
 void tst_QXmppMuc::moderateMessage()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -1783,7 +1783,7 @@ void tst_QXmppMuc::moderateMessage()
 void tst_QXmppMuc::messageRetractedReceived()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     joinedRoom(test, muc);
@@ -1817,7 +1817,7 @@ void tst_QXmppMuc::messageRetractedReceived()
 void tst_QXmppMuc::messageRetractedSpoofed()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     joinedRoom(test, muc);
@@ -1847,7 +1847,7 @@ void tst_QXmppMuc::messageRetractedSpoofed()
 void tst_QXmppMuc::canModerateMessages()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1899,7 +1899,7 @@ void tst_QXmppMuc::canModerateMessages()
 void tst_QXmppMuc::sendMessage()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1934,7 +1934,7 @@ void tst_QXmppMuc::sendMessage()
 void tst_QXmppMuc::sendMessageError()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -1967,7 +1967,7 @@ void tst_QXmppMuc::sendMessageError()
 void tst_QXmppMuc::sendMessageErrorWithoutPayload()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -1991,7 +1991,7 @@ void tst_QXmppMuc::sendMessageErrorWithoutPayload()
 void tst_QXmppMuc::sendPrivateMessage()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2052,7 +2052,7 @@ void tst_QXmppMuc::sendPrivateMessage()
 void tst_QXmppMuc::setSubject()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2087,7 +2087,7 @@ void tst_QXmppMuc::setSubject()
 void tst_QXmppMuc::changeNickname()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2121,7 +2121,7 @@ void tst_QXmppMuc::changeNickname()
 void tst_QXmppMuc::changeNicknameTimeout()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     muc->d->timeout = std::chrono::milliseconds(50);
@@ -2145,7 +2145,7 @@ void tst_QXmppMuc::changeNicknameTimeout()
 void tst_QXmppMuc::changeNicknamePresenceError()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2187,7 +2187,7 @@ void tst_QXmppMuc::changeNicknamePresenceError()
 void tst_QXmppMuc::participantNicknameChange()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2259,7 +2259,7 @@ void tst_QXmppMuc::participantNicknameChange()
 void tst_QXmppMuc::participantJoinLeave()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2317,7 +2317,7 @@ void tst_QXmppMuc::participantJoinLeave()
 void tst_QXmppMuc::participantsList()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2359,7 +2359,7 @@ void tst_QXmppMuc::participantsList()
 void tst_QXmppMuc::roomPresenceIgnored()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2401,7 +2401,7 @@ void tst_QXmppMuc::roomPresenceIgnored()
 void tst_QXmppMuc::joinRoomSelfKicked()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2437,7 +2437,7 @@ void tst_QXmppMuc::joinRoomSelfKicked()
 void tst_QXmppMuc::leaveRoomWhileJoining()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2468,7 +2468,7 @@ void tst_QXmppMuc::leaveRoomWhileJoining()
 void tst_QXmppMuc::removeExtensionWhileJoining()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2483,7 +2483,7 @@ void tst_QXmppMuc::removeExtensionWhileJoining()
 void tst_QXmppMuc::participantKicked()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2526,7 +2526,7 @@ void tst_QXmppMuc::participantKicked()
 void tst_QXmppMuc::selfBanned()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2564,7 +2564,7 @@ void tst_QXmppMuc::selfBanned()
 void tst_QXmppMuc::roomDestroyed()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2605,7 +2605,7 @@ void tst_QXmppMuc::roomDestroyed()
 void tst_QXmppMuc::roomDestroyedWithoutStatusCode()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2634,7 +2634,7 @@ void tst_QXmppMuc::roomDestroyedWithoutStatusCode()
 void tst_QXmppMuc::selfRemovedMembersOnly()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2667,7 +2667,7 @@ void tst_QXmppMuc::selfRemovedMembersOnly()
 void tst_QXmppMuc::selfRemovedServiceShutdown()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2700,7 +2700,7 @@ void tst_QXmppMuc::selfRemovedServiceShutdown()
 void tst_QXmppMuc::selfRemovedError()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2733,7 +2733,7 @@ void tst_QXmppMuc::selfRemovedError()
 void tst_QXmppMuc::changePresence()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2757,7 +2757,7 @@ void tst_QXmppMuc::changePresence()
 void tst_QXmppMuc::leaveRoom()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2788,7 +2788,7 @@ void tst_QXmppMuc::leaveRoom()
 void tst_QXmppMuc::leaveRoomTimeout()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     muc->d->timeout = std::chrono::milliseconds(50);
@@ -2811,7 +2811,7 @@ void tst_QXmppMuc::leaveRoomTimeout()
 void tst_QXmppMuc::leaveRoomPresenceError()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -2912,7 +2912,7 @@ static auto watchRemovedFromRoom(QXmppMucManagerV2 *muc, QList<std::pair<QString
 void tst_QXmppMuc::disconnectNoStreamManagement()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -2948,7 +2948,7 @@ void tst_QXmppMuc::disconnectNoStreamManagement()
 void tst_QXmppMuc::disconnectFromServer()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -2969,7 +2969,7 @@ void tst_QXmppMuc::disconnectFromServer()
 void tst_QXmppMuc::disconnectResumedStream()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -2999,7 +2999,7 @@ void tst_QXmppMuc::disconnectResumedStream()
 void tst_QXmppMuc::disconnectNewStream()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppPubSubManager>();
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
@@ -3045,7 +3045,7 @@ static QXmppPresence occupantPresence(const QString &nickname, const QString &ji
 void tst_QXmppMuc::rejoinAfterConnectionLoss()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     const auto roomJid = u"coven@chat.shakespeare.lit"_s;
@@ -3138,7 +3138,7 @@ void tst_QXmppMuc::rejoinAfterConnectionLoss()
 void tst_QXmppMuc::rejoinFails()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     const auto roomJid = u"coven@chat.shakespeare.lit"_s;
@@ -3178,7 +3178,7 @@ void tst_QXmppMuc::rejoinFails()
 void tst_QXmppMuc::rejoinLeaveWhileDisconnected()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     const auto roomJid = u"coven@chat.shakespeare.lit"_s;
@@ -3202,7 +3202,7 @@ void tst_QXmppMuc::rejoinLeaveWhileDisconnected()
 void tst_QXmppMuc::setRole()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -3239,7 +3239,7 @@ void tst_QXmppMuc::setRole()
 void tst_QXmppMuc::setRoleParticipantGone()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -3287,7 +3287,7 @@ void tst_QXmppMuc::setRoleParticipantGone()
 void tst_QXmppMuc::setRoles()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -3315,7 +3315,7 @@ void tst_QXmppMuc::setRoles()
 void tst_QXmppMuc::setAffiliation()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -3337,7 +3337,7 @@ void tst_QXmppMuc::setAffiliation()
 void tst_QXmppMuc::setAffiliations()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -3365,7 +3365,7 @@ void tst_QXmppMuc::setAffiliations()
 void tst_QXmppMuc::requestAffiliationList()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -3395,7 +3395,7 @@ void tst_QXmppMuc::requestAffiliationList()
 void tst_QXmppMuc::selfParticipant()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3411,7 +3411,7 @@ void tst_QXmppMuc::selfParticipant()
 void tst_QXmppMuc::permissions()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3446,7 +3446,7 @@ void tst_QXmppMuc::permissions()
 void tst_QXmppMuc::permissionsSubjectChangeable()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3508,7 +3508,7 @@ static const auto discoRoomInfo =
 void tst_QXmppMuc::roomInfoProperties()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3546,7 +3546,7 @@ void tst_QXmppMuc::roomInfoProperties()
 void tst_QXmppMuc::roomInfoStatus104()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3619,7 +3619,7 @@ void tst_QXmppMuc::roomInfoWatchTracked()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -3652,7 +3652,7 @@ void tst_QXmppMuc::roomInfoWatchDestroyed()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -3684,7 +3684,7 @@ void tst_QXmppMuc::roomInfoWatchCreated()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -3742,7 +3742,7 @@ void tst_QXmppMuc::occupantInfoWatch()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -3769,7 +3769,7 @@ void tst_QXmppMuc::occupantInfoWatchNickChange()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -3798,7 +3798,7 @@ void tst_QXmppMuc::occupantInfoWatchLeave()
     using State = QXmppDiscoInfoWatch::State;
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     auto *disco = test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -3828,7 +3828,7 @@ void tst_QXmppMuc::occupantInfoWatchLeave()
 void tst_QXmppMuc::roomInfoBindable()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3897,7 +3897,7 @@ static QXmppMucRoomV2 joinTestRoom(TestClient &test, QXmppMucManagerV2 *muc, con
 void tst_QXmppMuc::requestVoice()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3920,7 +3920,7 @@ void tst_QXmppMuc::requestVoice()
 void tst_QXmppMuc::voiceRequestReceived()
 {
     TestClient test(true);
-    test.configuration().setJid(u"crone1@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"crone1@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -3964,7 +3964,7 @@ void tst_QXmppMuc::voiceRequestReceived()
 void tst_QXmppMuc::answerVoiceRequest()
 {
     TestClient test(true);
-    test.configuration().setJid(u"crone1@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"crone1@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4003,7 +4003,7 @@ void tst_QXmppMuc::answerVoiceRequest()
 void tst_QXmppMuc::roomFeatureProperties()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4056,7 +4056,7 @@ void tst_QXmppMuc::roomFeatureProperties()
 void tst_QXmppMuc::roomFeatureStatus172_173()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4112,7 +4112,7 @@ void tst_QXmppMuc::joinRoomNotFound()
     // joinRoom() on a non-existent room (status 201) must fail with an error
     // and send a cancel IQ to destroy the accidentally-created locked room.
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4148,7 +4148,7 @@ void tst_QXmppMuc::joinRoomNotFound()
 void tst_QXmppMuc::createRoom()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4202,7 +4202,7 @@ void tst_QXmppMuc::createRoom()
 void tst_QXmppMuc::createRoomAlreadyExists()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4227,7 +4227,7 @@ void tst_QXmppMuc::createRoomAlreadyExists()
 void tst_QXmppMuc::createRoomNotAllowed()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4262,7 +4262,7 @@ void tst_QXmppMuc::createRoomNotAllowed()
 void tst_QXmppMuc::requestUniqueRoomName()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4285,7 +4285,7 @@ void tst_QXmppMuc::requestUniqueRoomName()
 void tst_QXmppMuc::requestUniqueRoomNameEmpty()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4305,7 +4305,7 @@ void tst_QXmppMuc::requestUniqueRoomNameEmpty()
 void tst_QXmppMuc::createRoomUnique()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4394,7 +4394,7 @@ void tst_QXmppMuc::setRoomConfigCreation()
 void tst_QXmppMuc::setRoomConfigCreationDisconnected()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -4444,7 +4444,7 @@ void tst_QXmppMuc::setRoomConfigCreationRemoved()
 void tst_QXmppMuc::cancelRoomCreation()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4465,7 +4465,7 @@ void tst_QXmppMuc::cancelRoomCreation()
 void tst_QXmppMuc::reconfigureRoom()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -4518,7 +4518,7 @@ void tst_QXmppMuc::reconfigureRoom()
 void tst_QXmppMuc::destroyRoom()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -4540,7 +4540,7 @@ void tst_QXmppMuc::destroyRoom()
 void tst_QXmppMuc::destroyRoomWithoutReason()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -4581,7 +4581,7 @@ void tst_QXmppMuc::destroyRoomWithoutReason()
 void tst_QXmppMuc::destroyRoomFromTemporaryHandle()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -4639,7 +4639,7 @@ void tst_QXmppMuc::ownerQueryDestroy()
 void tst_QXmppMuc::selfPingJoined()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4663,7 +4663,7 @@ void tst_QXmppMuc::selfPingJoined()
 void tst_QXmppMuc::selfPingStillJoinedServiceUnavailable()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4687,7 +4687,7 @@ void tst_QXmppMuc::selfPingStillJoinedServiceUnavailable()
 void tst_QXmppMuc::selfPingStillJoinedItemNotFound()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4710,7 +4710,7 @@ void tst_QXmppMuc::selfPingStillJoinedItemNotFound()
 void tst_QXmppMuc::selfPingGhosted()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4745,7 +4745,7 @@ void tst_QXmppMuc::selfPingGhosted()
 void tst_QXmppMuc::selfPingInconclusiveRetry()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4776,7 +4776,7 @@ void tst_QXmppMuc::selfPingInconclusiveRetry()
 void tst_QXmppMuc::selfPingInconclusiveRetriesExhausted()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4808,7 +4808,7 @@ void tst_QXmppMuc::selfPingInconclusiveRetriesExhausted()
 void tst_QXmppMuc::selfPingUnknownErrorCondition()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4843,7 +4843,7 @@ void tst_QXmppMuc::selfPingUnknownErrorCondition()
 void tst_QXmppMuc::selfPingSkippedDuringNickChange()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4898,7 +4898,7 @@ void tst_QXmppMuc::selfPingSkippedDuringNickChange()
 void tst_QXmppMuc::selfPingDisabledWhenZeroThreshold()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -4916,7 +4916,7 @@ void tst_QXmppMuc::selfPingDisabledWhenZeroThreshold()
 void tst_QXmppMuc::selfPingMultipleRoomsSingleTimer()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5016,7 +5016,7 @@ void tst_QXmppMuc::roomConfigForm()
 void tst_QXmppMuc::subscribeToRoomConfig()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -5098,7 +5098,7 @@ void tst_QXmppMuc::setWatchRoomConfigFetch()
 {
     // setWatchRoomConfig(true) with no prior fetch triggers a background fetch
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -5117,7 +5117,7 @@ void tst_QXmppMuc::rewatchRoomConfigStaleCache()
     // a stale cached config. The cache may have been populated while watching
     // was active, but the room config could have changed while watching was off.
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -5162,7 +5162,7 @@ void tst_QXmppMuc::requestRoomConfigJoinsInFlightFetch()
     // When a status-104 re-fetch is already in progress, requestRoomConfig() must join it
     // rather than returning the (about-to-be-superseded) cached value.
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     auto room = joinedRoom(test, muc);
@@ -5215,7 +5215,7 @@ void tst_QXmppMuc::requestRoomConfigJoinsInFlightFetch()
 void tst_QXmppMuc::inviteUser()
 {
     TestClient test(true);
-    test.configuration().setJid(u"crone1@shakespeare.lit/desktop"_s);
+    test.configuration().setAccountJid(u"crone1@shakespeare.lit/desktop"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5239,7 +5239,7 @@ void tst_QXmppMuc::inviteUser()
 void tst_QXmppMuc::invitationReceived()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.configuration().setAccountJid(u"hecate@shakespeare.lit/broom"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5271,7 +5271,7 @@ void tst_QXmppMuc::invitationReceivedUnknownRoom()
 {
     // Invitation from a room the user hasn't joined yet must still be signalled.
     TestClient test(true);
-    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.configuration().setAccountJid(u"hecate@shakespeare.lit/broom"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5299,7 +5299,7 @@ void tst_QXmppMuc::invitationReceivedUnknownRoom()
 void tst_QXmppMuc::declineInvitation()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.configuration().setAccountJid(u"hecate@shakespeare.lit/broom"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5321,7 +5321,7 @@ void tst_QXmppMuc::declineInvitation()
 void tst_QXmppMuc::invitationDeclined()
 {
     TestClient test(true);
-    test.configuration().setJid(u"crone1@shakespeare.lit/desktop"_s);
+    test.configuration().setAccountJid(u"crone1@shakespeare.lit/desktop"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5350,7 +5350,7 @@ void tst_QXmppMuc::invitationDeclined()
 void tst_QXmppMuc::directInvitationReceived()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hecate@shakespeare.lit/broom"_s);
+    test.configuration().setAccountJid(u"hecate@shakespeare.lit/broom"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5381,7 +5381,7 @@ void tst_QXmppMuc::directInvitationReceived()
 void tst_QXmppMuc::sendDirectInvitation()
 {
     TestClient test(true);
-    test.configuration().setJid(u"crone1@shakespeare.lit/desktop"_s);
+    test.configuration().setAccountJid(u"crone1@shakespeare.lit/desktop"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5402,7 +5402,7 @@ void tst_QXmppMuc::sendDirectInvitation()
 void tst_QXmppMuc::requestReservedNickname()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5425,7 +5425,7 @@ void tst_QXmppMuc::requestReservedNickname()
 void tst_QXmppMuc::requestReservedNicknameNone()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5448,7 +5448,7 @@ void tst_QXmppMuc::requestReservedNicknameNone()
 void tst_QXmppMuc::requestRegistrationForm()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5480,7 +5480,7 @@ void tst_QXmppMuc::requestRegistrationForm()
 void tst_QXmppMuc::submitRegistration()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5515,7 +5515,7 @@ void tst_QXmppMuc::submitRegistration()
 void tst_QXmppMuc::occupantIdSupported()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5577,7 +5577,7 @@ void tst_QXmppMuc::occupantIdSupported()
 void tst_QXmppMuc::occupantIdStrippedPresence()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5636,7 +5636,7 @@ void tst_QXmppMuc::occupantIdStrippedPresence()
 void tst_QXmppMuc::occupantIdStrippedMessage()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5693,7 +5693,7 @@ void tst_QXmppMuc::occupantIdStrippedMessage()
 void tst_QXmppMuc::occupantIdAccessor()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5747,7 +5747,7 @@ void tst_QXmppMuc::occupantIdAccessor()
 void tst_QXmppMuc::occupantIdMessageBeforeRoomInfo()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5820,7 +5820,7 @@ void tst_QXmppMuc::occupantIdMessageBeforeRoomInfo()
 void tst_QXmppMuc::messagesContinueAfterFailedJoin()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
     connectWithoutServices(test);
@@ -5882,7 +5882,7 @@ static void simulateLeave(TestClient &test, QXmppMucRoomV2 &room, const QString 
 void tst_QXmppMuc::handleSurvivesLeave()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5908,7 +5908,7 @@ void tst_QXmppMuc::handleSurvivesLeave()
 void tst_QXmppMuc::rejoinRevivesHandle()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5937,7 +5937,7 @@ void tst_QXmppMuc::rejoinRevivesHandle()
 void tst_QXmppMuc::participantSnapshotAfterLeave()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5983,7 +5983,7 @@ void tst_QXmppMuc::participantSnapshotAfterLeave()
 void tst_QXmppMuc::findRoomNulloptForUnknown()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -5993,7 +5993,7 @@ void tst_QXmppMuc::findRoomNulloptForUnknown()
 void tst_QXmppMuc::findRoomRevivesInactive()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -6012,7 +6012,7 @@ void tst_QXmppMuc::findRoomRevivesInactive()
 void tst_QXmppMuc::inactiveRoomsPruned()
 {
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
@@ -6042,7 +6042,7 @@ void tst_QXmppMuc::createRoomOccupantId()
     QFETCH(QString, occupantId);
 
     TestClient test(true);
-    test.configuration().setJid(u"hag66@shakespeare.lit/pda"_s);
+    test.configuration().setAccountJid(u"hag66@shakespeare.lit/pda"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 

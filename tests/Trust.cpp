@@ -12,6 +12,7 @@
 #include "QXmppCarbonManager.h"
 #include "QXmppClient.h"
 #include "QXmppClientExtension.h"
+#include "QXmppClient_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppE2eeProvider.h"
 #include "QXmppJid_p.h"
@@ -1123,7 +1124,7 @@ void tst_QXmppTrustManager::initTestCase()
     Xml::Registry::registerEncryptedContainer<TestEncrypted>(Xml::Scope::Message);
     m_e2ee = m_client.addNewExtension<TestE2ee>();
     m_client.addExtension(&m_manager);
-    m_client.configuration().setJid("alice@example.org/phone");
+    m_client.configuration().setAccountJid(u"alice@example.org/phone"_jid);
 
     m_carbonManager = new QXmppCarbonManager;
     m_carbonManager->setCarbonsEnabled(true);
@@ -1829,7 +1830,7 @@ void tst_QXmppTrustManager::testHandleMessage_data()
     trustMessageElement.setKeyOwners(keyOwners);
 
     QXmppMessage message;
-    message.setFrom(m_client.configuration().jid());
+    message.setFromJid(QXmpp::Private::ownFullJid(&m_client));
     message.setE2eeMetadata(e2eeMetadata);
     message.setTrustMessageElement(trustMessageElement);
 
@@ -1944,7 +1945,7 @@ void tst_QXmppTrustManager::testHandleMessage()
     }
 
     if (areTrustDecisionsValid) {
-        const auto isOwnMessage = senderJid == m_client.configuration().jidBare();
+        const auto isOwnMessage = senderJid == m_client.configuration().accountJid().toString();
         const auto keyOwners = message.trustMessageElement()->keyOwners();
 
         if (isSenderKeyAuthenticated) {

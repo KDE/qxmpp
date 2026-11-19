@@ -6,6 +6,7 @@
 #define QXMPPCONFIGURATION_H
 
 #include "QXmppGlobal.h"
+#include "QXmppJid.h"
 
 #include <optional>
 
@@ -73,18 +74,29 @@ public:
     ~QXmppConfiguration();
     QXmppConfiguration &operator=(const QXmppConfiguration &other);
 
+    const QXmpp::Jid &accountJid() const;
+    void setAccountJid(const QXmpp::Jid &jid);
+
     QString host() const;
     void setHost(const QString &);
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use accountJid().domain()")]]
     QString domain() const;
+    [[deprecated("Use setAccountJid()")]]
     void setDomain(const QString &);
+#endif
 
     int port() const;
     quint16 port16() const;
     void setPort(int);
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use accountJid().localpart()")]]
     QString user() const;
+    [[deprecated("Use setAccountJid()")]]
     void setUser(const QString &);
+#endif
 
     QString password() const;
     void setPassword(const QString &);
@@ -95,10 +107,14 @@ public:
     QString resourcePrefix() const;
     void setResourcePrefix(const QString &);
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use accountJid() and resource()")]]
     QString jid() const;
+    [[deprecated("Use setAccountJid()")]]
     void setJid(const QString &jid);
-
+    [[deprecated("Use accountJid()")]]
     QString jidBare() const;
+#endif
 
     QXmppCredentials credentials() const;
     void setCredentials(const QXmppCredentials &);

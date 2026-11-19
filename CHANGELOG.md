@@ -16,6 +16,8 @@ QXmpp 1.18.0 (UNRELEASED)
  - Use `QXmpp::Jid` in the APIs added in 1.18 (e.g. `QXmpp::Iq::Stanza`, `QXmpp::Iq::Context::from()`, `QXmpp::Messages::Context`, `QXmpp::E2ee` requests, `QXmpp::Mam::Query`, `QXmpp::PubSub::EventReceived`); `QXmpp::Iq::Context::from()` is the own bare JID for requests without sender (@lnj, !857)
  - Sending messages and end-to-end encrypted IQs to invalid JIDs, and joining MUC rooms with invalid JIDs, fails with a `jid-malformed` error now; MUC room JIDs are used in their canonical form (@lnj, !857)
  - Add `QXmppStanza::fromJid()`, `toJid()`, `setFromJid()` and `setToJid()` for the addresses of messages, presences and IQs as `QXmpp::Jid` (@lnj, !859)
+ - Add `QXmppConfiguration::accountJid()` and `setAccountJid()`, deprecate `user()`, `setUser()`, `domain()`, `setDomain()`, `jid()`, `setJid()` and `jidBare()`; QXmpp uses the account JID in canonical form, e.g. as SASL username (@lnj, !859)
+ - Connecting with a missing or invalid account JID fails right away with `QXmpp::StreamError::InvalidFrom` (@lnj, !859)
  - Add hooks: extensions define hooks and add handlers via `QXmppClientExtension::hooks()`, also in their constructor; hooks can be asynchronous, have keys, a single responder or be adapted to another hook (@lnj, !839)
    - `QXmpp::Disco::CollectInfo`: features and identities of the client
    - `QXmpp::PubSub::EventReceived`: PubSub event notifications, per node

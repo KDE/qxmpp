@@ -154,7 +154,7 @@ void IncomingMessages::processElement(const QDomElement &element, QXmppE2eeExten
     Context context(std::move(parsed.message), Origin::Stream);
     // Stanzas without 'from' are sent by the server on behalf of the account (RFC 6120 §8.1.2.1).
     if (context.senderJid().isNull()) {
-        context.setSenderJid(jidOrNull(m_client->configuration().jidBare()));
+        context.setSenderJid(m_client->configuration().accountJid());
     }
     process(std::move(context), parsed.encryption, {});
 }

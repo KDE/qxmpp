@@ -212,7 +212,8 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     const bool encrypted = !encryptedWith.isEmpty();
 
     // a message without 'to' is addressed to the own account (RFC 6120, section 10.3.3)
-    auto to = parseJidArgument(pending.message.to().isEmpty() ? m_client->configuration().jidBare() : pending.message.to());
+    auto to = pending.message.to().isEmpty() ? std::variant<Jid, QXmppError>(m_client->configuration().accountJid())
+                                             : parseJidArgument(pending.message.to());
     if (auto *error = std::get_if<QXmppError>(&to)) {
         finishFront(conversationJid, std::move(*error));
         co_return;

@@ -14,6 +14,7 @@
 
 #include "QXmppCallInviteManager.h"
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppExternalServiceDiscoveryManager.h"
@@ -960,7 +961,7 @@ void tst_QXmppCallInviteManager::initTestCase()
     m_client.setLogger(&m_logger);
 
     m_client.connectToServer(IntegrationTests::clientConfiguration());
-    m_client.configuration().setJid("mixer@example.com");
+    m_client.configuration().setAccountJid(u"mixer@example.com"_jid);
 
     qRegisterMetaType<QXmppCallInvite::Result>();
     qRegisterMetaType<std::shared_ptr<QXmppCallInvite>>();
@@ -1495,7 +1496,7 @@ void tst_QXmppCallManager::invalidSid()
 
     TestClient client;
     auto *manager = client.addNewExtension<QXmppCallManager>();
-    client.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    client.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
 
     // take over ownership of all incoming calls (so they are not deleted)
     std::vector<std::unique_ptr<QXmppCall>> calls;
@@ -1541,7 +1542,7 @@ void tst_QXmppCallManager::senderImpersonation()
 
     TestClient client;
     auto *manager = client.addNewExtension<QXmppCallManager>();
-    client.configuration().setJid(u"juliet@capulet.lit/balcony"_s);
+    client.configuration().setAccountJid(u"juliet@capulet.lit/balcony"_jid);
 
     // session initiate
     auto result = manager->handleIq(parseInto<QXmppJingleIq>(xmlToDom(xml.arg("abc1"))));
@@ -1598,10 +1599,9 @@ void tst_QXmppCallManager::testCall()
     auto *senderManager = sender.addNewExtension<QXmppCallManager>();
 
     QXmppConfiguration config;
-    config.setDomain(testDomain);
     config.setHost(testHost.toString());
     config.setPort(testPort);
-    config.setUser("sender");
+    config.setAccountJid(u"sender@localhost"_jid);
     config.setPassword("testpwd");
     sender.connectToServer(config);
     sender.waitForConnect();
@@ -1616,7 +1616,7 @@ void tst_QXmppCallManager::testCall()
         receiverCall->accept();
     });
 
-    config.setUser("receiver");
+    config.setAccountJid(u"receiver@localhost"_jid);
     config.setPassword("testpwd");
     receiver.connectToServer(config);
     receiver.waitForConnect();
@@ -1625,7 +1625,7 @@ void tst_QXmppCallManager::testCall()
     // connect call
     qDebug() << "======== CONNECT ========";
     QEventLoop loop;
-    auto senderCall = senderManager->call(receiver.configuration().jid());
+    auto senderCall = senderManager->call(QXmpp::Private::ownFullJid(&receiver));
     QVERIFY(senderCall);
     connect(senderCall.get(), &QXmppCall::connected, &loop, &QEventLoop::quit);
     loop.exec();

@@ -51,7 +51,7 @@ public:
     static QXmppConfiguration clientConfiguration()
     {
         QXmppConfiguration config;
-        config.setJid(environmentVariable(ENV_JID));
+        config.setAccountJid(QXmpp::Jid::fromString(environmentVariable(ENV_JID)).value_or(QXmpp::Jid()));
         config.setPassword(environmentVariable(ENV_PASSWORD));
         return config;
     }
@@ -65,7 +65,7 @@ public:
     static QXmppConfiguration secondClientConfiguration()
     {
         QXmppConfiguration config;
-        config.setJid(environmentVariable(ENV_JID_2));
+        config.setAccountJid(QXmpp::Jid::fromString(environmentVariable(ENV_JID_2)).value_or(QXmpp::Jid()));
         config.setPassword(environmentVariable(ENV_PASSWORD_2));
         return config;
     }

@@ -790,7 +790,7 @@ void tst_QXmppSasl::saslManagerNoMechanisms()
     auto &sent = test.socket.sent;
 
     QXmppConfiguration config;
-    config.setUser("marc");
+    config.setAccountJid(u"marc@example.org"_jid);
     config.setPassword("1234");
     config.setDisabledSaslMechanisms({ "SCRAM-SHA-1" });
 
@@ -808,7 +808,7 @@ void tst_QXmppSasl::sasl2ManagerPlain()
     auto &sent = test.socket.sent;
 
     QXmppConfiguration config;
-    config.setUser("bowman");
+    config.setAccountJid(u"bowman@example.org"_jid);
     config.setPassword("1234");
     // use PLAIN
     config.setSaslAuthMechanism("PLAIN");
@@ -844,7 +844,7 @@ void tst_QXmppSasl::sasl2ManagerFailure()
     auto &sent = test.socket.sent;
 
     QXmppConfiguration config;
-    config.setUser("bowman");
+    config.setAccountJid(u"bowman@example.org"_jid);
     config.setPassword("1234");
 
     auto task = test.manager.authenticate(
@@ -876,7 +876,7 @@ void tst_QXmppSasl::sasl2ManagerUnsupportedTasks()
     auto &sent = test.socket.sent;
 
     QXmppConfiguration config;
-    config.setUser("bowman");
+    config.setAccountJid(u"bowman@example.org"_jid);
     config.setPassword("1234");
 
     auto task = test.manager.authenticate(
@@ -917,7 +917,7 @@ void tst_QXmppSasl::sasl2Fast()
     auto &sent = test.socket.sent;
 
     QXmppConfiguration config;
-    config.setUser("bowman");
+    config.setAccountJid(u"bowman@example.org"_jid);
     config.setPassword("1234");
     config.setDisabledSaslMechanisms({});
     config.setSasl2UserAgent(QXmppSasl2UserAgent {
@@ -993,7 +993,7 @@ void tst_QXmppSasl::sasl2FastTokenRejected()
     auto &sent = test.socket.sent;
 
     QXmppConfiguration config;
-    config.setUser("bowman");
+    config.setAccountJid(u"bowman@example.org"_jid);
     config.setPassword("1234");
     config.setDisabledSaslMechanisms({});
     config.setSasl2UserAgent(QXmppSasl2UserAgent {
@@ -1091,7 +1091,7 @@ void tst_QXmppSasl::sasl2FastTokenRejectedNoPassword()
     auto &sent = test.socket.sent;
 
     QXmppConfiguration config;
-    config.setUser("bowman");
+    config.setAccountJid(u"bowman@example.org"_jid);
     // No password set — token-only authentication
     config.setDisabledSaslMechanisms({});
     config.setSasl2UserAgent(QXmppSasl2UserAgent {

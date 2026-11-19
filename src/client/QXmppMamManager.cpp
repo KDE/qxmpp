@@ -511,7 +511,7 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
             .resultSetQuery = resultSetQuery,
         },
     };
-    d->signalQueries.insert({ queryId.toStdString(), toJid ? *toJid : jidOrNull(client()->configuration().jidBare()) });
+    d->signalQueries.insert({ queryId.toStdString(), toJid.value_or(client()->configuration().accountJid()) });
     client()->sendIq(std::move(request)).then(this, [this, queryId](Result<Mam::QueryResult> &&result) {
         d->signalQueries.erase(queryId.toStdString());
         if (hasError(result)) {
@@ -601,7 +601,7 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
 
     auto [itr, inserted] = d->ongoingRequests.insert({ queryId.toStdString(), RetrieveRequestState() });
     Q_ASSERT(inserted);
-    itr->second.queriedJid = query.to.isNull() ? jidOrNull(client()->configuration().jidBare()).bare() : query.to;
+    itr->second.queriedJid = query.to.isNull() ? client()->configuration().accountJid() : query.to;
     itr->second.archiveJid = itr->second.queriedJid.bare();
     itr->second.flipPage = query.flipPage;
 
@@ -681,7 +681,10 @@ QXmppTask<Result<Mam::ArchiveMetadata>> QXmppMamManager::requestMetadata(const J
 bool QXmppMamManagerPrivate::isFromQueriedJid(const Jid &queriedJid, const QString &from) const
 {
     // without 'from', sent by the server on behalf of the own account
-    return Jid::fromString(from.isEmpty() ? q->client()->configuration().jidBare() : from) == queriedJid;
+    if (from.isEmpty()) {
+        return q->client()->configuration().accountJid() == queriedJid;
+    }
+    return Jid::fromString(from) == queriedJid;
 }
 
 // Processes a message of a task-based query in the message pipeline, it may be decrypted
@@ -704,7 +707,7 @@ void QXmppMamManagerPrivate::processMessage(const QString &queryId, RetrieveRequ
     }
 
     Context context(std::move(parsed.message), Origin::Mam);
-    if (context.senderJid() == jidOrNull(client->configuration().jidBare())) {
+    if (context.senderJid() == client->configuration().accountJid()) {
         // sent by this account
         context.setConversationJid(context.message().toJid().bare());
     }

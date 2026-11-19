@@ -91,7 +91,7 @@ QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QString 
 
     const auto authenticatedKeys = retrievedKeys.value(TrustLevel::Authenticated);
     const auto manuallyDistrustedKeys = retrievedKeys.value(TrustLevel::ManuallyDistrusted);
-    const auto ownJid = client()->configuration().jidBare();
+    const auto ownJid = client()->configuration().accountJid().toString();
     const auto ownAuthenticatedKeys = authenticatedKeys.values(ownJid);
 
     // Create a key owner for the keys being authenticated or
@@ -302,7 +302,7 @@ QXmppTask<void> QXmppAtmManager::handleMessage(const QXmppMessage &message)
     //    so the sender key is not one of that encryption.
     if (!trustMessageElement ||
         trustMessageElement->usage() != ns_atm ||
-        jidsEqual(message.from(), client()->configuration().jid()) ||
+        jidsEqual(message.from(), ownFullJid(client()).toString()) ||
         !e2eeMetadata ||
         e2eeMetadata->senderKey().isEmpty() ||
         e2eeMetadata->contentEncryption() != QXmpp::E2ee::ContentEncryption::Sce ||
@@ -322,7 +322,7 @@ QXmppTask<void> QXmppAtmManager::handleMessage(const QXmppMessage &message)
 
     QList<QXmppTrustMessageKeyOwner> keyOwnersForPostponedTrustDecisions;
 
-    const auto ownJid = client()->configuration().jidBare();
+    const auto ownJid = client()->configuration().accountJid().toString();
     const auto isOwnTrustMessage = senderJid == ownJid;
     const auto keyOwners = trustMessageElement->keyOwners();
 

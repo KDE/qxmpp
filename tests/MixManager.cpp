@@ -31,7 +31,7 @@ struct Tester {
     Tester(const QString &jid)
         : Tester()
     {
-        client.configuration().setJid(jid);
+        client.configuration().setAccountJid(QXmpp::Jid::fromString(jid).value());
     }
 
     TestClient client;

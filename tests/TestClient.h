@@ -31,6 +31,7 @@ public:
     // Test wrappers for the private outgoing-client entry points exercised by the SASL2 + FAST
     // listener-replacement regression test.
     void startSasl2Auth(const QXmpp::Private::Sasl2::StreamFeature &feature);
+    void startResourceBinding();
     void handlePacketReceived(const QDomElement &el);
 
     template<typename String>
@@ -93,7 +94,7 @@ template<typename Manager, typename WatchSupport>
 void checkWatchSupport(WatchSupport watchSupport, const QString &jid, const QString &feature)
 {
     TestClient client;
-    client.configuration().setJid(u"juliet@capulet.example"_s);
+    client.configuration().setAccountJid(u"juliet@capulet.example"_jid);
     client.addNewExtension<QXmppDiscoveryManager>();
     auto *manager = client.addNewExtension<Manager>();
 

@@ -89,7 +89,7 @@ bool QXmppCarbonManager::handleIncomingStanza(const QDomElement &element)
     }
 
     // carbon copies must always come from our bare JID
-    if (!jidsEqual(element.attribute(u"from"_s), client()->configuration().jidBare())) {
+    if (!jidsEqual(element.attribute(u"from"_s), client()->configuration().accountJid().toString())) {
         info(u"Received carbon copy from possible attacker trying to use CVE-2017-5603."_s);
         return false;
     }

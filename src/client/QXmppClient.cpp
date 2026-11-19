@@ -17,6 +17,7 @@
 #include "QXmppE2eeProvider.h"
 #include "QXmppEntityTimeManager.h"
 #include "QXmppIqHandling.h"
+#include "QXmppJid_p.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppMessages.h"
@@ -103,6 +104,16 @@ void QXmppClientPrivate::addProperCapability(QXmppPresence &presence)
 }
 
 namespace QXmpp::Private {
+
+Jid ownFullJid(QXmppClient *client)
+{
+    const auto &config = client->configuration();
+    if (config.resource().isEmpty()) {
+        return config.accountJid();
+    }
+    auto jid = config.accountJid().withResource(config.resource());
+    return std::holds_alternative<Jid>(jid) ? std::get<Jid>(std::move(jid)) : config.accountJid();
+}
 
 std::chrono::milliseconds reconnectionDelay(int tries, bool resumable)
 {
@@ -254,7 +265,7 @@ bool QXmppClientPrivate::isServerLoopback() const
 
     // with a proxy, the connection may go to a local proxy, but the server is elsewhere
     const auto &config = stream->configuration();
-    const auto host = config.host().isEmpty() ? config.domain() : config.host();
+    const auto host = config.host().isEmpty() ? config.accountJid().domain().toString() : config.host();
     if (usesProxy(config, host)) {
         return false;
     }
@@ -618,7 +629,7 @@ void QXmppClient::connectToServer(const QXmppConfiguration &config,
                                   const QXmppPresence &initialPresence)
 {
     // reset package cache from last connection
-    if (d->stream->configuration().jidBare() != config.jidBare()) {
+    if (d->stream->configuration().accountJid() != config.accountJid()) {
         d->stream->streamAckManager().resetCache();
     }
 
@@ -639,7 +650,7 @@ void QXmppClient::connectToServer(const QXmppConfiguration &config,
 void QXmppClient::connectToServer(const QString &jid, const QString &password)
 {
     QXmppConfiguration config;
-    config.setJid(jid);
+    config.setAccountJid(jidOrNull(jid));
     config.setPassword(password);
     connectToServer(config);
 }
@@ -985,7 +996,7 @@ QXmppTask<QXmppClient::IqResult> QXmppClient::sendOutgoingIq(OutgoingIq &&iq, Iq
     }
 
     // If 'to' is empty the user's bare JID is meant implicitly (RFC 6120, section 10.3.3).
-    const auto to = iq.to.isEmpty() ? configuration().jidBare() : iq.to;
+    const auto to = iq.to.isEmpty() ? configuration().accountJid().toString() : iq.to;
     return d->stream->iqManager().sendIq(QXmppPacket(iq.toXml(), true), iq.id, to);
 }
 

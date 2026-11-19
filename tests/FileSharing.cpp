@@ -13,6 +13,7 @@
 // WITH_ENCRYPTION.
 
 #include "QXmppClient.h"
+#include "QXmppClient_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppHttpUploadManager.h"
@@ -103,7 +104,7 @@ void tst_QXmppHttpUploadManager::testSupport()
     using Support = QXmppHttpUploadManager::Support;
 
     TestClient test;
-    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.configuration().setAccountJid(u"juliet@capulet.example"_jid);
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *manager = test.addNewExtension<QXmppHttpUploadManager>();
 
@@ -485,7 +486,7 @@ void tst_QXmppHttpUploadManager::testUpload()
     QVERIFY(test.isConnected());
 
     // get server items
-    auto items = expectVariant<QList<QXmppDiscoItem>>(wait(disco->items(test.configuration().domain()).toFuture(this)));
+    auto items = expectVariant<QList<QXmppDiscoItem>>(wait(disco->items(test.configuration().accountJid().domain().toString()).toFuture(this)));
     // request disco info for each item
     auto infoFutures = transform<std::vector<std::tuple<QString, QXmppTask<Result<QXmppDiscoInfo>>>>>(items, [disco](const auto &item) {
         return std::tuple { item.jid(), disco->info(item.jid(), item.node()) };
@@ -638,10 +639,9 @@ void tst_QXmppTransferManager::testSendFile()
     sender.setLogger(&logger);
 
     QXmppConfiguration config;
-    config.setDomain(testDomain);
     config.setHost(testHost.toString());
     config.setPort(testPort);
-    config.setUser("sender");
+    config.setAccountJid(u"sender@localhost"_jid);
     config.setPassword("testpwd");
     sender.connectToServer(config);
     sender.waitForConnect();
@@ -656,7 +656,7 @@ void tst_QXmppTransferManager::testSendFile()
     receiver.addExtension(receiverManager);
     receiver.setLogger(&logger);
 
-    config.setUser("receiver");
+    config.setAccountJid(u"receiver@localhost"_jid);
     config.setPassword("testpwd");
     receiver.connectToServer(config);
     receiver.waitForConnect();
@@ -668,7 +668,7 @@ void tst_QXmppTransferManager::testSendFile()
     timeout.setSingleShot(true);
     connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
 
-    QXmppTransferJob *senderJob = senderManager->sendFile(receiver.configuration().jid(), ":/test.svg");
+    QXmppTransferJob *senderJob = senderManager->sendFile(QXmpp::Private::ownFullJid(&receiver), ":/test.svg");
     QVERIFY(senderJob);
     QCOMPARE(senderJob->localFileUrl(), QUrl::fromLocalFile(":/test.svg"));
     connect(senderJob, &QXmppTransferJob::finished, &loop, &QEventLoop::quit);

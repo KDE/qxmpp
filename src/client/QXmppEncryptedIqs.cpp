@@ -56,7 +56,10 @@ static EncryptedIqs::IqResult mapResponse(QDomElement &&response)
 // 10.3.3).
 static std::variant<Jid, QXmppError> recipient(QXmppClient *client, const OutgoingIq &iq)
 {
-    return parseJidArgument(iq.to.isEmpty() ? client->configuration().jidBare() : iq.to);
+    if (iq.to.isEmpty()) {
+        return client->configuration().accountJid();
+    }
+    return parseJidArgument(iq.to);
 }
 
 static QXmppError notEncryptedError()
@@ -169,7 +172,7 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
         co_return QXmppError { u"No end-to-end encryption provider for IQs encrypted with "_s + encryption, SendError::EncryptionError };
     }
 
-    const auto ownJid = jidOrNull(client->configuration().jidBare()).bare();
+    const auto ownJid = client->configuration().accountJid();
     // IQs from the server on behalf of the account have no 'from'
     const auto from = iq.attribute(u"from"_s);
     const auto senderJid = from.isEmpty() ? ownJid : jidOrNull(from).bare();
@@ -223,7 +226,7 @@ QXmppTask<EncryptedIqs::IqResult> EncryptedIqs::sendRequest(OutgoingIq iq, QXmpp
     }
 
     auto *stream = m_clientPrivate->stream;
-    const auto to = iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to;
+    const auto to = iq.to.isEmpty() ? m_client->configuration().accountJid().toString() : iq.to;
 
     const auto &encryption = std::get<QString>(selection);
     if (encryption.isEmpty()) {

@@ -274,7 +274,7 @@ static void serializeMixData(const MixData &d, QXmlStreamWriter &writer)
     \code
     QXmppMixInvitation invitation;
 
-    invitation.setInviterJid(client->configuration().jidBare());
+    invitation.setInviterJid(client->configuration().accountJid());
     invitation.setInviteeJid(inviteeJid);
     invitation.setChannelJid(channelJid);
 
@@ -1142,7 +1142,7 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::leaveChannel(const QString 
 {
     QXmppMixIq iq;
     iq.setType(QXmppIq::Set);
-    iq.setTo(client()->configuration().jidBare());
+    iq.setToJid(client()->configuration().accountJid());
     iq.setActionType(QXmppMixIq::ClientLeave);
     iq.setChannelJid(channelJid);
 
@@ -1226,7 +1226,7 @@ void QXmppMixManager::onRegistered(QXmppClient *client)
 
         auto importData = [this, client, manager](const MixData &data) -> QXmppTask<std::variant<Success, QXmppError>> {
             auto tasks = transform<std::vector<QXmppTask<JoiningResult>>>(data.items, [&](const auto &item) {
-                return joinChannel(item.jid, item.nick.isEmpty() ? client->configuration().user() : item.nick);
+                return joinChannel(item.jid, item.nick.isEmpty() ? client->configuration().accountJid().localpart().toString() : item.nick);
             });
             for (auto &task : tasks) {
                 auto result = co_await task;
@@ -1480,7 +1480,7 @@ QXmppMixIq QXmppMixManager::prepareJoinIq(const QString &channelJid, const QStri
 {
     QXmppMixIq iq;
     iq.setType(QXmppIq::Set);
-    iq.setTo(client()->configuration().jidBare());
+    iq.setToJid(client()->configuration().accountJid());
     iq.setActionType(QXmppMixIq::ClientJoin);
     iq.setChannelJid(channelJid);
     iq.setNick(nickname);
@@ -1563,7 +1563,7 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
         co_return;
     }
 
-    const auto ownJid = jidOrNull(client->configuration().jidBare());
+    const auto ownJid = client->configuration().accountJid();
     QList<Jid> recipients;
     for (const auto &participantJid : std::get<QList<QString>>(result)) {
         const auto jid = jidOrNull(participantJid).bare();
@@ -1629,7 +1629,7 @@ QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &c
         if (!ownParticipantId.isEmpty()) {
             own = participantId == ownParticipantId;
         } else if (!senderJid.isEmpty()) {
-            own = senderJid == client->configuration().jidBare();
+            own = senderJid == client->configuration().accountJid().toString();
         }
         if (own) {
             finishPendingMessage(originId, Messages::Confirmation { archiveId });

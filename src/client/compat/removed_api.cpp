@@ -378,7 +378,7 @@ QT_WARNING_DISABLE_DEPRECATED
 QXmppRemoteMethod::QXmppRemoteMethod(const QString &jid, const QString &method, const QVariantList &args, QXmppClient *client) : QObject(client), m_client(client)
 {
     m_payload.setTo(jid);
-    m_payload.setFrom(client->configuration().jid());
+    m_payload.setFromJid(QXmpp::Private::ownFullJid(client));
     m_payload.setMethod(method);
     m_payload.setArguments(args);
 }

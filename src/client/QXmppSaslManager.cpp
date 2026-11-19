@@ -102,9 +102,9 @@ static InitSaslAuthResult initSaslAuthentication(const QXmppConfiguration &confi
                      AuthenticationError { AuthenticationError::ProcessingError, {}, {} });
     }
     info(u"SASL mechanism '%1' selected"_s.arg(saslClient->mechanism().toString()));
-    saslClient->setHost(config.domain());
+    saslClient->setHost(config.accountJid().domain().toString());
     saslClient->setServiceType(u"xmpp"_s);
-    saslClient->setUsername(config.user());
+    saslClient->setUsername(config.accountJid().localpart().toString());
     saslClient->setCredentials(config.credentialData());
 
     // send SASL auth request
