@@ -53,6 +53,7 @@
 #include "QXmppSendStanzaParams.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppTask.h"
+#include "QXmppTrustMessageElement.h"
 #include "QXmppVCardManager.h"
 #include "QXmppVersionIq.h"
 #include "QXmppVersionManager.h"
@@ -6097,6 +6098,7 @@ private:
     Q_SLOT void bodyOnlyDecrypt();
     Q_SLOT void decryptContentEncryption_data();
     Q_SLOT void decryptContentEncryption();
+    Q_SLOT void bodyOnlyClearTrustMessage();
     Q_SLOT void bodyOnlyEncrypt();
     Q_SLOT void bodyOnlyDrop();
     Q_SLOT void bodyOnlyCorrection();
@@ -7107,6 +7109,37 @@ void tst_QXmppMessages::decryptContentEncryption()
     QVERIFY(received);
     QCOMPARE(received->body(), u"secret"_s);
     QCOMPARE(received->e2eeMetadata()->contentEncryption(), contentEncryption);
+}
+
+// A trust message next to a body-only encryption has been sent in the clear, e.g. added by a
+// server. It must not be used with the authenticated key of the sender.
+void tst_QXmppMessages::bodyOnlyClearTrustMessage()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    client.addNewExtension<TestBodyE2eeManager>();
+
+    QObject owner;
+    std::optional<QXmppMessage> received;
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        received = context.message();
+        state = context.decryptionState();
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(u"<message from='alice@example.org/phone' to='me@example.org/res' type='chat' id='1'>"
+                         "<body>fallback</body>"
+                         "<encrypted xmlns='urn:test:body-e2ee' data='terces'/>"
+                         "<trust-message xmlns='urn:xmpp:tm:1' usage='urn:xmpp:atm:1' encryption='urn:test:body-e2ee'>"
+                         "<key-owner jid='alice@example.org'><trust>YHiLgLpE3dvoy4MayxycR+BABFY9w6D/rKZjUnu2jSY=</trust></key-owner>"
+                         "</trust-message>"
+                         "</message>"_s);
+
+    QVERIFY(received);
+    QCOMPARE(state, DecryptionState::Decrypted);
+    QCOMPARE(received->body(), u"secret"_s);
+    QVERIFY(!received->trustMessageElement());
 }
 
 void tst_QXmppMessages::bodyOnlyEncrypt()

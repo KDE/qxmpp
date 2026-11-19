@@ -14,6 +14,7 @@
 #include "QXmppMessageContext_p.h"
 #include "QXmppMessageHandler.h"
 #include "QXmppMessages.h"
+#include "QXmppTrustMessageElement.h"
 #include "QXmppUtils.h"
 #include "QXmppXmlRegistry.h"
 
@@ -105,6 +106,10 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const 
         auto markers = message.fallbackMarkers();
         markers.removeIf([&](const QXmppFallback &marker) { return marker.forNamespace() == provider.encryption; });
         message.setFallbackMarkers(markers);
+        // A trust message is only valid if it is encrypted (XEP-0434). It would be used with the
+        // authenticated key of the sender, but anyone on the path (e.g. a server) can add one in
+        // the clear next to an authentic encrypted body.
+        message.setTrustMessageElement(std::nullopt);
     } else {
         // The public part was parsed with ScePublic, so it contains no sensitive elements apart
         // from the fallback body and publicExtensions(). Fallback markers of the public part
