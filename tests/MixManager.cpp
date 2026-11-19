@@ -545,23 +545,23 @@ void tst_QXmppMixManager::testHandlePubSubEvent()
     for (const auto &node : nodes) {
         for (auto eventType : eventTypes) {
             allowedOrBannedJidsEvent.setEventType(eventType);
-            manager.handlePubSubEvent(writePacketToDom(allowedOrBannedJidsEvent), channelJid, node);
+            manager.handlePubSubEvent(writePacketToDom(allowedOrBannedJidsEvent), QXmpp::Jid::fromString(channelJid).value(), node);
         }
     }
 
     for (auto eventType : eventTypes) {
         participantEvent.setEventType(eventType);
-        manager.handlePubSubEvent(writePacketToDom(participantEvent), channelJid, participantNode);
+        manager.handlePubSubEvent(writePacketToDom(participantEvent), QXmpp::Jid::fromString(channelJid).value(), participantNode);
     }
 
     for (auto eventType : eventTypes) {
         configurationEvent.setEventType(eventType);
-        manager.handlePubSubEvent(writePacketToDom(configurationEvent), channelJid, configurationNode);
+        manager.handlePubSubEvent(writePacketToDom(configurationEvent), QXmpp::Jid::fromString(channelJid).value(), configurationNode);
     }
 
     for (auto eventType : eventTypes) {
         informationEvent.setEventType(eventType);
-        manager.handlePubSubEvent(writePacketToDom(informationEvent), channelJid, informationNode);
+        manager.handlePubSubEvent(writePacketToDom(informationEvent), QXmpp::Jid::fromString(channelJid).value(), informationNode);
     }
 
     for (const auto &spy : { &jidAllowedSpy, &jidDisallowedSpy, &jidBannedSpy, &jidUnbannedSpy, &participantLeftSpy }) {
@@ -1700,7 +1700,7 @@ public:
         });
     }
 
-    QList<QString> recipientJids;
+    QList<QXmpp::Jid> recipientJids;
 };
 
 struct EncryptionTester : Tester {
@@ -1797,7 +1797,7 @@ void tst_QXmppMixManager::testSendMessageEncrypted()
     tester.answerParticipants({ { u"123456"_s, u"hag66@shakespeare.example"_s },
                                 { u"123457"_s, u"hag67@shakespeare.example"_s },
                                 { u"123458"_s, u"hag68@shakespeare.example/desktop"_s } });
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag68@shakespeare.example"_s, u"hag69@shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"hag68@shakespeare.example"_jid, u"hag69@shakespeare.example"_jid }));
     tester.expectSent(task);
 
     // the events of the participants node are tracked
@@ -1808,7 +1808,7 @@ void tst_QXmppMixManager::testSendMessageEncrypted()
 
     // the participants are not requested again
     task = tester.send();
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag69@shakespeare.example"_s, u"hag70@shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"hag69@shakespeare.example"_jid, u"hag70@shakespeare.example"_jid }));
     tester.expectSent(task);
     client.expectNoPacket();
 
@@ -1816,7 +1816,7 @@ void tst_QXmppMixManager::testSendMessageEncrypted()
     QXmppSendStanzaParams params;
     params.setEncryptionJids({ u"hag70@shakespeare.example"_s });
     task = tester.send(u"coven@mix.shakespeare.example"_s, params);
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag70@shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"hag70@shakespeare.example"_jid }));
     tester.expectSent(task);
 
     // events may have been missed in a new session
@@ -1828,7 +1828,7 @@ void tst_QXmppMixManager::testSendMessageEncrypted()
     client.ignore();
     task = tester.send();
     tester.answerParticipants({ { u"123457"_s, u"hag67@shakespeare.example"_s } });
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag67@shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"hag67@shakespeare.example"_jid }));
     tester.expectSent(task);
 
     // the participants of a rejoined channel are requested again
@@ -1843,7 +1843,7 @@ void tst_QXmppMixManager::testSendMessageEncrypted()
     client.ignore();
     task = tester.send();
     tester.answerParticipants({ { u"123458"_s, u"hag68@shakespeare.example"_s } });
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag68@shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"hag68@shakespeare.example"_jid }));
     tester.expectSent(task);
 }
 
@@ -1854,7 +1854,7 @@ void tst_QXmppMixManager::testSendMessageEncryptedNoChannel()
 
     // not a joined channel
     auto task = tester.send(u"group@mix.shakespeare.example"_s);
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"group@mix.shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"group@mix.shakespeare.example"_jid }));
     tester.expectSent(task);
     client.expectNoPacket();
 }
@@ -1877,7 +1877,7 @@ void tst_QXmppMixManager::testSendMessageEncryptedError()
 
     // the next message retries
     tester.answerParticipants({ { u"123457"_s, u"hag67@shakespeare.example"_s } });
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"hag67@shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"hag67@shakespeare.example"_jid }));
     tester.expectSent(second);
 }
 
@@ -2008,7 +2008,7 @@ void tst_QXmppMixManager::testMucRoomWithChannelJid()
     // the room is handled by the MUC manager: the occupants are the sender and the recipients
     QCOMPARE(receivedSender(client, u"coven@mix.shakespeare.example/firstwitch"_s), u"crone1@shakespeare.example"_s);
     auto task = tester.send();
-    QCOMPARE(tester.e2ee->recipientJids, (QList<QString> { u"crone1@shakespeare.example"_s }));
+    QCOMPARE(tester.e2ee->recipientJids, (QList<QXmpp::Jid> { u"crone1@shakespeare.example"_jid }));
     tester.expectSent(task);
     client.expectNoPacket();
 

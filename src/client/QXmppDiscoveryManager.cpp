@@ -98,6 +98,10 @@ QXmppDiscoveryManager::~QXmppDiscoveryManager()
 */
 QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
+    if (auto parsed = Private::parseJidArgument(jid); std::holds_alternative<QXmppError>(parsed)) {
+        return makeReadyTask<Result<QXmppDiscoInfo>>(std::get<QXmppError>(std::move(parsed)));
+    }
+
     // XEP-0115: Entity Capabilities, the info is up to date with both policies
     if (node.isEmpty()) {
         if (auto itr = d->availableJids.constFind(jid); itr != d->availableJids.cend() && itr->has_value()) {
@@ -122,7 +126,7 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
         [this, entry](const auto &key) {
             auto &[jid, node, generation] = key;
             return chain<Result<QXmppDiscoInfo>>(
-                client()->sendIq(Iq::Get<QXmppDiscoInfo> { .to = jid, .payload = QXmppDiscoInfo { node } }),
+                client()->sendIq(Iq::Get<QXmppDiscoInfo> { .to = Private::jidOrNull(jid), .payload = QXmppDiscoInfo { node } }),
                 this,
                 [this, entry, generation](auto &&result) -> Result<QXmppDiscoInfo> {
                     // Only cache successful responses for now (permanent errors could also be
@@ -145,6 +149,10 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManager::info(const QString &jid
 */
 QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QString &jid, const QString &node, CachePolicy cachePolicy)
 {
+    if (auto parsed = Private::parseJidArgument(jid); std::holds_alternative<QXmppError>(parsed)) {
+        return makeReadyTask<Result<QList<QXmppDiscoItem>>>(std::get<QXmppError>(std::move(parsed)));
+    }
+
     if (cachePolicy == CachePolicy::Relaxed) {
         if (auto *cachedItems = d->itemsCache[{ jid, node }]) {
             return makeReadyTask<Result<QList<QXmppDiscoItem>>>(*cachedItems);
@@ -156,7 +164,7 @@ QXmppTask<Result<QList<QXmppDiscoItem>>> QXmppDiscoveryManager::items(const QStr
         [this](const auto &key) {
             auto &[jid, node] = key;
             return chain<Result<QList<QXmppDiscoItem>>>(
-                client()->sendIq(Iq::Get<QXmppDiscoItems> { .to = jid, .payload = QXmppDiscoItems { node } }),
+                client()->sendIq(Iq::Get<QXmppDiscoItems> { .to = Private::jidOrNull(jid), .payload = QXmppDiscoItems { node } }),
                 this,
                 [this, jid, node](auto &&result) -> Result<QList<QXmppDiscoItem>> {
                     if (auto *itemsPayload = std::get_if<QXmppDiscoItems>(&result)) {
@@ -1211,7 +1219,7 @@ QXmppTask<Result<QXmppDiscoInfo>> QXmppDiscoveryManagerPrivate::requestCapsInfo(
     const auto node = caps.node + u'#' + QString::fromLatin1(caps.ver.toBase64());
     return chain<Result<QXmppDiscoInfo>>(
         // the response element is needed for the verification of the caps
-        q->client()->sendIqStanza(Iq::Get<QXmppDiscoInfo> { .to = jid, .payload = QXmppDiscoInfo { node } }, {}),
+        q->client()->sendIqStanza(Iq::Get<QXmppDiscoInfo> { .to = Private::jidOrNull(jid), .payload = QXmppDiscoInfo { node } }, {}),
         q,
         [this, jid, caps](QXmppClient::IqResult &&response) -> Result<QXmppDiscoInfo> {
             const auto key = capsKey(caps);

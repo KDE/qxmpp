@@ -9,6 +9,7 @@
 #include "QXmppAsync_p.h"
 #include "QXmppClient.h"
 #include "QXmppClientExtension.h"
+#include "QXmppJid.h"
 #include "QXmppMessage.h"
 #include "QXmppPubSubIq_p.h"
 #include "QXmppPubSubPublishOptions.h"
@@ -23,7 +24,7 @@ struct EventReceived {
     static constexpr QStringView Name = u"org.qxmpp.pubsub.event-received";
     // name of the node
     using Key = QStringView;
-    using Signature = QXmpp::HookResult(const QDomElement &element, const QString &service, const QString &node);
+    using Signature = QXmpp::HookResult(const QDomElement &element, const QXmpp::Jid &service, const QString &node);
 };
 
 }  // namespace QXmpp::PubSub

@@ -68,7 +68,12 @@ QXmppTask<ServiceResult> QXmpp::Private::requestCredentials(QXmppClient *client,
     s.setHost(host);
     s.setType(type);
 
-    return chain<ServiceResult>(client->sendIq(Iq::Get<ExtDiscoCredentials> { .to = jid, .payload = { std::move(s) } }), client, [](Result<ExtDiscoCredentials> &&result) {
+    auto to = parseJidArgument(jid);
+    if (auto *error = std::get_if<QXmppError>(&to)) {
+        return makeReadyTask<ServiceResult>(std::move(*error));
+    }
+
+    return chain<ServiceResult>(client->sendIq(Iq::Get<ExtDiscoCredentials> { .to = std::get<Jid>(to), .payload = { std::move(s) } }), client, [](Result<ExtDiscoCredentials> &&result) {
         return map<ServiceResult>([](ExtDiscoCredentials &&c) { return c.service; }, std::move(result));
     });
 }

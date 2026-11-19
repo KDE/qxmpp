@@ -31,7 +31,7 @@ inline QXmppTask<GetResult<ItemT>> request(QXmppPubSubManager *pubSub, const QSt
 // NodeName is a template parameter, so the right qstring comparison overload is used
 // (if we used 'const QString &' as type, a 'const char *' string would be converted)
 template<typename ItemT, typename NodeName, typename Manager, typename ReceivedSignal>
-inline QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &eventNode, NodeName nodeName, Manager *manager, ReceivedSignal itemReceived)
+inline QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &eventNode, NodeName nodeName, Manager *manager, ReceivedSignal itemReceived)
 {
     using enum QXmpp::HookResult;
 

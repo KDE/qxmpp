@@ -39,13 +39,16 @@ class Context
 {
 public:
     /*! \internal */
-    Context(QString from, std::optional<QXmppE2eeMetadata> e2eeMetadata)
+    Context(Jid from, std::optional<QXmppE2eeMetadata> e2eeMetadata)
         : m_from(std::move(from)), m_e2eeMetadata(std::move(e2eeMetadata))
     {
     }
 
-    /*! Returns the JID of the sender of the request. */
-    const QString &from() const { return m_from; }
+    /*!
+        Returns the JID of the sender of the request, the own bare JID for requests without
+        sender, which are from the own account.
+    */
+    const Jid &from() const { return m_from; }
     /*!
         Returns the end-to-end encryption metadata of the request, if it was end-to-end encrypted.
         The reply is end-to-end encrypted the same way.
@@ -55,7 +58,7 @@ public:
     bool isEncrypted() const { return m_e2eeMetadata.has_value(); }
 
 private:
-    QString m_from;
+    Jid m_from;
     std::optional<QXmppE2eeMetadata> m_e2eeMetadata;
 };
 
@@ -103,7 +106,7 @@ class EncryptionSelection
 {
 public:
     /*! \internal */
-    EncryptionSelection(Type type, QString to, bool required, QString encryption = {})
+    EncryptionSelection(Type type, Jid to, bool required, QString encryption = {})
         : m_to(std::move(to)), m_encryption(std::move(encryption)), m_type(type), m_required(required)
     {
     }
@@ -111,7 +114,7 @@ public:
     /*! Returns the type of the IQ, requests and responses are encrypted. */
     Type type() const { return m_type; }
     /*! Returns the JID of the recipient, the own bare JID for IQs to the own account. */
-    const QString &to() const { return m_to; }
+    const Jid &to() const { return m_to; }
     /*!
         Returns whether sending fails if no encryption is selected (see
         QXmppSendStanzaParams::isEncryptionRequired()).
@@ -127,7 +130,7 @@ public:
     void setEncryption(QStringView encryption) { m_encryption = encryption.toString(); }
 
 private:
-    QString m_to;
+    Jid m_to;
     QString m_encryption;
     Type m_type;
     bool m_required;
@@ -246,7 +249,7 @@ namespace QXmpp::Iq {
         if (context.isEncrypted()) {
             co_return QXmpp::Iq::Reply::encryptionNotSupported();
         }
-        if (!isAllowed(iq.from)) {
+        if (!isAllowed(context.from())) {
             co_return QXmppStanza::Error(QXmppStanza::Error::Cancel, QXmppStanza::Error::Forbidden);
         }
         co_await store(std::move(iq.payload));

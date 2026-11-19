@@ -39,13 +39,13 @@ public:
 
     // Bare JID of the real sender. Defaults to the bare 'from' (own JID for CarbonSent).
     // Set by the ResolveSender hook, e.g. by MUC from the occupant ID. Decryption uses it.
-    const QString &senderJid() const;
-    void setSenderJid(const QString &jid);
+    const Jid &senderJid() const;
+    void setSenderJid(Jid jid);
 
     // Bare JID of the conversation (contact or room). Messages of one conversation are
     // processed in order, also across the async decryption.
-    const QString &conversationJid() const;
-    void setConversationJid(const QString &jid);
+    const Jid &conversationJid() const;
+    void setConversationJid(Jid jid);
 
     // Set by the pipeline.
     DecryptionState decryptionState() const;

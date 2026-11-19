@@ -93,7 +93,7 @@ auto QXmppUserTuneManager::publish(const QXmppTuneItem &item)
     return pubSub(client())->publishOwnPepItem(staticString(ns_tune), item);
 }
 
-HookResult QXmppUserTuneManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppUserTuneManager::handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName)
 {
     return Pep::handlePubSubEvent<Item>(element, pubSubService, nodeName, staticString(ns_tune), this, &QXmppUserTuneManager::itemReceived);
 }

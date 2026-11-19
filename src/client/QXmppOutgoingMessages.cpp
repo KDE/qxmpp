@@ -211,9 +211,16 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     }
     const bool encrypted = !encryptedWith.isEmpty();
 
+    // a message without 'to' is addressed to the own account (RFC 6120, section 10.3.3)
+    auto to = parseJidArgument(pending.message.to().isEmpty() ? m_client->configuration().jidBare() : pending.message.to());
+    if (auto *error = std::get_if<QXmppError>(&to)) {
+        finishFront(conversationJid, std::move(*error));
+        co_return;
+    }
+
     const bool fixed = pending.mode == Mode::Fixed;
     const bool required = pending.mode != Mode::Default || pending.params.isEncryptionRequired();
-    EncryptionSelection selection(pending.message, required, pending.encryption);
+    EncryptionSelection selection(pending.message, std::get<Jid>(to), required, pending.encryption);
     if (!encrypted && !fixed) {
         co_await m_hooks.run<SelectEncryption>(selection).withContext(m_client);
     }
@@ -271,9 +278,14 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
         co_return;
     }
 
-    outgoing.recipientJids() = pending.params.encryptionJids();
+    auto recipients = parseBareJidArguments(pending.params.encryptionJids());
+    if (auto *error = std::get_if<QXmppError>(&recipients)) {
+        finishFront(conversationJid, std::move(*error));
+        co_return;
+    }
+    outgoing.recipientJids() = std::get<QList<Jid>>(std::move(recipients));
     if (outgoing.recipientJids().isEmpty()) {
-        outgoing.recipientJids().append(jidBare(outgoing.message().to()));
+        outgoing.recipientJids().append(std::get<Jid>(to).bare());
     }
     co_await m_hooks.run<ResolveRecipients>(outgoing).withContext(m_client);
     if (outgoing.error()) {

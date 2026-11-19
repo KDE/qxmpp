@@ -5,7 +5,9 @@
 #ifndef QXMPPJID_P_H
 #define QXMPPJID_P_H
 
+#include "QXmppError.h"
 #include "QXmppGlobal.h"
+#include "QXmppJid.h"
 
 #include <QString>
 
@@ -34,6 +36,15 @@ QXMPP_PRIVATE_EXPORT QString jidBare(QStringView jid);
 QXMPP_PRIVATE_EXPORT QString jidLocalpart(QStringView jid);
 QXMPP_PRIVATE_EXPORT QString jidDomain(QStringView jid);
 QXMPP_PRIVATE_EXPORT QString jidResource(QStringView jid);
+
+// The parsed JID, null if it is invalid.
+inline Jid jidOrNull(QStringView jid) { return Jid::fromString(jid).value_or(Jid()); }
+
+// Parses a JID passed as QString to the API, empty strings result in a null JID. Invalid JIDs
+// result in a jid-malformed error, like the server would reply with.
+QXMPP_PRIVATE_EXPORT std::variant<Jid, QXmppError> parseJidArgument(QStringView jid);
+// Parses JIDs passed as QString to the API and returns their bare JIDs.
+QXMPP_PRIVATE_EXPORT std::variant<QList<Jid>, QXmppError> parseBareJidArguments(const QList<QString> &jids);
 
 }  // namespace QXmpp::Private
 

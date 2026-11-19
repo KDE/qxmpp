@@ -332,7 +332,7 @@ QXmppOmemoManager::QXmppOmemoManager(QXmppOmemoStorage *omemoStorage)
     E2ee::Providers(hooks()).add(E2ee::Provider {
         .encryption = E2ee::Omemo2,
         .decryptMessage = [this](E2ee::DecryptRequest request) { return d->decryptMessageContent(request.message(), request.senderJid()); },
-        .encryptMessage = [this](E2ee::EncryptRequest request) { return d->encryptMessageContent(request.message(), request.recipientJids(), request.params().acceptedTrustLevels().value_or(ACCEPTED_TRUST_LEVELS)); },
+        .encryptMessage = [this](E2ee::EncryptRequest request) { return d->encryptMessageContent(request.message(), Omemo::Private::toStrings(request.recipientJids()), request.params().acceptedTrustLevels().value_or(ACCEPTED_TRUST_LEVELS)); },
         .encryptIq = [this](E2ee::EncryptIqRequest request) { return d->encryptIqContent(request, request.params().acceptedTrustLevels().value_or(ACCEPTED_TRUST_LEVELS)); },
         .decryptIq = [this](E2ee::DecryptIqRequest request) { return d->decryptIqContent(request.iq(), request.senderJid()); },
     });
@@ -1131,7 +1131,7 @@ void Manager::onUnregistered(QXmppClient *client)
     // on removal)
 }
 
-HookResult Manager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult Manager::handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName)
 {
     using enum HookResult;
 
@@ -1151,7 +1151,7 @@ HookResult Manager::handlePubSubEvent(const QDomElement &element, const QString 
                 // contact device list is determined.
                 // In case of the own device list node, it is sctrictly processed as a recommended
                 // singleton item and changed to fit that if needed.
-                const auto isOwnDeviceListNode = jidsEqual(d->ownBareJid(), pubSubService);
+                const auto isOwnDeviceListNode = jidsEqual(d->ownBareJid(), pubSubService.toString());
                 if (isOwnDeviceListNode) {
                     const auto &deviceListItem = items.constFirst();
                     if (deviceListItem.id() == QXmppPubSubManager::standardItemIdToString(QXmppPubSubManager::Current)) {

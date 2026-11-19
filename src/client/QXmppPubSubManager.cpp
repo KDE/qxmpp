@@ -9,6 +9,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppPubSubAffiliation.h"
 #include "QXmppPubSubBaseItem.h"
 #include "QXmppPubSubEventHandler.h"
@@ -905,9 +906,11 @@ bool QXmppPubSubManager::handleIncomingStanza(const QDomElement &element)
 
     auto event = firstChildElement(element, u"event", ns_pubsub_event);
     if (!event.isNull()) {
-        auto service = element.attribute(u"from"_s);
-        if (service.isEmpty()) {
-            service = client()->configuration().jidBare();
+        // without 'from', the event is from the own account (RFC 6120, section 8.1.2.1)
+        const auto from = element.attribute(u"from"_s);
+        const auto service = jidOrNull(from.isEmpty() ? client()->configuration().jidBare() : from);
+        if (service.isNull()) {
+            return false;
         }
         const auto node = event.firstChildElement().attribute(u"node"_s);
 

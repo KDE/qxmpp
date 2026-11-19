@@ -17,8 +17,8 @@ class ContextPrivate
 public:
     QXmppMessage message;
     Origin origin;
-    QString senderJid;
-    QString conversationJid;
+    Jid senderJid;
+    Jid conversationJid;
     DecryptionState decryptionState = DecryptionState::NotEncrypted;
     std::optional<QXmppE2eeMetadata> e2eeMetadata;
     std::optional<QXmppError> decryptionError;

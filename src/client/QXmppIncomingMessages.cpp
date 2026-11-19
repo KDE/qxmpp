@@ -79,12 +79,12 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const 
     // The affixes of XEP-0420 bind the content to the sender and the recipient. In MUCs, the
     // sender is the real JID resolved by ResolveSender and the recipient is the room. Otherwise
     // the recipient is the addressee, i.e. this account or for sent carbons the contact.
-    if (!decrypted.sceFrom().isEmpty() && !jidsEqual(decrypted.sceFrom(), d.senderJid)) {
+    if (!decrypted.sceFrom().isNull() && decrypted.sceFrom() != d.senderJid) {
         fail(context, DecryptionState::Failed, u"The sender of the encrypted content does not match the sender of the message"_s);
         return;
     }
-    const auto expectedRecipient = message.type() == QXmppMessage::GroupChat ? d.conversationJid : jidBare(message.to());
-    if (!decrypted.sceTo().isEmpty() && !jidsEqual(decrypted.sceTo(), expectedRecipient)) {
+    const auto expectedRecipient = message.type() == QXmppMessage::GroupChat ? d.conversationJid : jidOrNull(message.to()).bare();
+    if (!decrypted.sceTo().isNull() && decrypted.sceTo() != expectedRecipient) {
         fail(context, DecryptionState::Failed, u"The recipient of the encrypted content does not match the recipient of the message"_s);
         return;
     }
@@ -148,8 +148,8 @@ void IncomingMessages::processElement(const QDomElement &element, QXmppE2eeExten
     auto parsed = parse(element, legacyEncryption);
     Context context(std::move(parsed.message), Origin::Stream);
     // Stanzas without 'from' are sent by the server on behalf of the account (RFC 6120 §8.1.2.1).
-    if (context.senderJid().isEmpty()) {
-        context.setSenderJid(m_client->configuration().jidBare());
+    if (context.senderJid().isNull()) {
+        context.setSenderJid(jidOrNull(m_client->configuration().jidBare()));
     }
     process(std::move(context), parsed.encryption, {});
 }

@@ -219,7 +219,7 @@ QXmppTask<Result<>> QXmppPepBookmarkManager::removeBookmark(const QString &jid)
     return d->removeBookmark(jid);
 }
 
-HookResult QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppPepBookmarkManager::handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName)
 {
     using enum HookResult;
 

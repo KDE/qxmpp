@@ -8,6 +8,7 @@
 #include "QXmppE2eeMetadata.h"
 #include "QXmppError.h"
 #include "QXmppHooks.h"
+#include "QXmppJid.h"
 #include "QXmppMessage.h"
 #include "QXmppMessages.h"
 #include "QXmppSendStanzaParams.h"
@@ -32,12 +33,12 @@ public:
     void setMessage(QXmppMessage message) { m_message = std::move(message); }
 
     // real sender resolved by the pipeline (not the room JID in MUCs)
-    const QString &senderJid() const { return m_senderJid; }
-    void setSenderJid(QString jid) { m_senderJid = std::move(jid); }
+    const Jid &senderJid() const { return m_senderJid; }
+    void setSenderJid(Jid jid) { m_senderJid = std::move(jid); }
 
 private:
     QXmppMessage m_message;
-    QString m_senderJid;
+    Jid m_senderJid;
 };
 
 class Decrypted
@@ -52,17 +53,17 @@ public:
     void setMetadata(QXmppE2eeMetadata metadata) { m_metadata = std::move(metadata); }
 
     // SCE affixes, checked by the pipeline against the sender and the recipient;
-    // empty if the method has no SCE (OMEMO 0)
-    const QString &sceFrom() const { return m_sceFrom; }
-    void setSceFrom(QString jid) { m_sceFrom = std::move(jid); }
-    const QString &sceTo() const { return m_sceTo; }
-    void setSceTo(QString jid) { m_sceTo = std::move(jid); }
+    // null if the method has no SCE (OMEMO 0)
+    const Jid &sceFrom() const { return m_sceFrom; }
+    void setSceFrom(Jid jid) { m_sceFrom = std::move(jid); }
+    const Jid &sceTo() const { return m_sceTo; }
+    void setSceTo(Jid jid) { m_sceTo = std::move(jid); }
 
 private:
     QDomElement m_content;
     QXmppE2eeMetadata m_metadata;
-    QString m_sceFrom;
-    QString m_sceTo;
+    Jid m_sceFrom;
+    Jid m_sceTo;
 };
 
 // The message is encrypted, but not for this device.
@@ -79,8 +80,8 @@ public:
     void setMessage(QXmppMessage message) { m_message = std::move(message); }
 
     // bare JIDs, for MUCs the members supplied by the ResolveRecipients hook
-    const QList<QString> &recipientJids() const { return m_recipientJids; }
-    void setRecipientJids(QList<QString> jids) { m_recipientJids = std::move(jids); }
+    const QList<Jid> &recipientJids() const { return m_recipientJids; }
+    void setRecipientJids(QList<Jid> jids) { m_recipientJids = std::move(jids); }
 
     const QXmppSendStanzaParams &params() const { return m_params; }
     void setParams(QXmppSendStanzaParams params) { m_params = std::move(params); }
@@ -93,7 +94,7 @@ public:
 
 private:
     QXmppMessage m_message;
-    QList<QString> m_recipientJids;
+    QList<Jid> m_recipientJids;
     QXmppSendStanzaParams m_params;
     std::function<std::optional<QXmppMessage>()> m_bodyOnlyMessage;
 };
@@ -138,8 +139,8 @@ class EncryptIqRequest
 {
 public:
     // JID of the recipient of the IQ, the own bare JID for IQs to the own account
-    const QString &to() const { return m_to; }
-    void setTo(QString to) { m_to = std::move(to); }
+    const Jid &to() const { return m_to; }
+    void setTo(Jid to) { m_to = std::move(to); }
 
     // Writes the payload of the IQ: at most one element, exactly one in requests. The payload is
     // only serialized when it is written.
@@ -161,17 +162,17 @@ public:
     QXMPP_EXPORT void writeContent(QXmlStreamWriter *writer) const;
 
     // bare JIDs, the addressee or QXmppSendStanzaParams::encryptionJids()
-    const QList<QString> &recipientJids() const { return m_recipientJids; }
-    void setRecipientJids(QList<QString> jids) { m_recipientJids = std::move(jids); }
+    const QList<Jid> &recipientJids() const { return m_recipientJids; }
+    void setRecipientJids(QList<Jid> jids) { m_recipientJids = std::move(jids); }
 
     const QXmppSendStanzaParams &params() const { return m_params; }
     void setParams(QXmppSendStanzaParams params) { m_params = std::move(params); }
 
 private:
-    QString m_to;
+    Jid m_to;
     std::function<void(QXmlStreamWriter *)> m_payload;
     std::optional<QXmppStanza::Error> m_error;
-    QList<QString> m_recipientJids;
+    QList<Jid> m_recipientJids;
     QXmppSendStanzaParams m_params;
 };
 
@@ -183,12 +184,12 @@ public:
     void setIq(QDomElement iq) { m_iq = std::move(iq); }
 
     // bare JID of the sender
-    const QString &senderJid() const { return m_senderJid; }
-    void setSenderJid(const QString &jid) { m_senderJid = jid; }
+    const Jid &senderJid() const { return m_senderJid; }
+    void setSenderJid(Jid jid) { m_senderJid = std::move(jid); }
 
 private:
     QDomElement m_iq;
-    QString m_senderJid;
+    Jid m_senderJid;
 };
 
 // Registered per encryption. Function members instead of virtuals, so it can be extended without

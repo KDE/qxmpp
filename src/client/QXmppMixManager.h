@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppClientExtension.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid.h"
 #include "QXmppMixConfigItem.h"
 #include "QXmppMixInfoItem.h"
 #include "QXmppMixParticipantItem.h"
@@ -141,7 +142,7 @@ protected:
     void onUnregistered(QXmppClient *client) override;
 
 private:
-    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName);
     QXmppMixIq prepareJoinIq(const QString &channelJid, const QString &nickname, QXmppMixConfigItem::Nodes nodes);
     QXmppTask<JoiningResult> joinChannel(QXmppMixIq &&iq);
     QXmppTask<JidResult> requestJids(const QString &channelJid, const QString &node);

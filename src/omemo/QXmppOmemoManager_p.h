@@ -102,6 +102,17 @@ struct PayloadEncryptionResult {
     QByteArray encryptedPayload;
 };
 
+// The bare JIDs as strings, as used by the OMEMO implementation.
+inline QList<QString> toStrings(const QList<QXmpp::Jid> &jids)
+{
+    QList<QString> strings;
+    strings.reserve(jids.size());
+    for (const auto &jid : jids) {
+        strings.append(jid.toString());
+    }
+    return strings;
+}
+
 struct DecryptionResult {
     QDomElement sceContent;
     QXmppE2eeMetadata e2eeMetadata;
@@ -114,7 +125,7 @@ struct DecryptionResult {
 struct IqContent {
     const QXmpp::E2ee::EncryptIqRequest &request;
 
-    const QString &to() const { return request.to(); }
+    QString to() const { return request.to(); }
 };
 
 struct IqDecryptionResult {

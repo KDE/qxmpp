@@ -944,16 +944,16 @@ QXmppClient::sendGenericIq(QXmppIq &&iq, const std::optional<QXmppSendStanzaPara
     for an empty result:
     \code
     // QXmppTask<QXmpp::Result<VersionQuery>>
-    client->sendIq(QXmpp::Iq::Get<VersionQuery> { .to = u"example.org"_s });
+    client->sendIq(QXmpp::Iq::Get<VersionQuery> { .to = jid });
 
     // QXmppTask<QXmpp::Result<>>
-    client->sendIq(QXmpp::Iq::Set<MyQuery> { .to = u"example.org"_s, .payload = MyQuery { ... } });
+    client->sendIq(QXmpp::Iq::Set<MyQuery> { .to = jid, .payload = MyQuery { ... } });
 
     // QXmppTask<QXmpp::Result<MyResponse>>
-    client->sendIq<MyResponse>(QXmpp::Iq::Get<MyRequest> { .to = u"example.org"_s });
+    client->sendIq<MyResponse>(QXmpp::Iq::Get<MyRequest> { .to = jid });
     \endcode
 
-    An empty id is replaced by a generated one, an empty recipient stands for the own bare JID
+    An empty id is replaced by a generated one, a null recipient stands for the own bare JID
     (\rfcsection{6120}{10.3.3}).
 
     Errors received from the other entity are returned as QXmppError containing the

@@ -83,6 +83,23 @@ void writeIqStart(QXmlStreamWriter *writer, Iq::Type type, const QString &id, co
     }
 }
 
+std::optional<StanzaAddresses> parseStanzaAddresses(const QDomElement &stanza)
+{
+    auto parse = [&](const QString &name) -> std::optional<Jid> {
+        auto address = stanza.attribute(name);
+        if (address.isEmpty()) {
+            return Jid();
+        }
+        return Jid::fromString(address);
+    };
+    auto from = parse(u"from"_s);
+    auto to = parse(u"to"_s);
+    if (!from || !to) {
+        return {};
+    }
+    return StanzaAddresses { std::move(*from), std::move(*to) };
+}
+
 void writeIqEnd(QXmlStreamWriter *writer)
 {
     writer->writeEndElement();

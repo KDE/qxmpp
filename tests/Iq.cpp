@@ -170,8 +170,8 @@ void tst_QXmppIq::stanzaRequest()
     auto set = Iq::Set<TestPayload>::fromDom(xmlToDom(u"<iq id='q2' type='set'><query xmlns='urn:test' value='y'/></iq>"_s));
     QVERIFY(set);
     QCOMPARE(set->payload.value, u"y"_s);
-    QVERIFY(set->from.isEmpty());
-    QVERIFY(set->to.isEmpty());
+    QVERIFY(set->from.isNull());
+    QVERIFY(set->to.isNull());
 }
 
 void tst_QXmppIq::stanzaRequestInvalid_data()
@@ -185,6 +185,8 @@ void tst_QXmppIq::stanzaRequestInvalid_data()
     QTest::newRow("two-payloads") << u"<iq id='q1' type='get'><query xmlns='urn:test'/><query xmlns='urn:test'/></iq>"_s;
     QTest::newRow("other-payload") << u"<iq id='q1' type='get'><query xmlns='urn:other'/></iq>"_s;
     QTest::newRow("no-iq") << u"<message id='q1' type='get'><query xmlns='urn:test'/></message>"_s;
+    QTest::newRow("invalid-from") << u"<iq id='q1' type='get' from='alice@'><query xmlns='urn:test'/></iq>"_s;
+    QTest::newRow("invalid-to") << u"<iq id='q1' type='get' to='a b@example.org'><query xmlns='urn:test'/></iq>"_s;
 }
 
 void tst_QXmppIq::stanzaRequestInvalid()

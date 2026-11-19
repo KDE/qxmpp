@@ -963,6 +963,23 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> ManagerPrivate::encryptMessa
 
 // Encrypts the sensitive content of \a message for the provider, the message pipeline adds the
 // public parts.
+// The SCE affixes are checked by the pipeline, so they must not be dropped if they are invalid.
+static E2ee::DecryptResult toDecrypted(DecryptionResult &&decrypted)
+{
+    auto sceFrom = jidOrNull(decrypted.sceFrom);
+    auto sceTo = jidOrNull(decrypted.sceTo);
+    if ((!decrypted.sceFrom.isEmpty() && sceFrom.isNull()) || (!decrypted.sceTo.isEmpty() && sceTo.isNull())) {
+        return QXmppError { u"Invalid JID in the SCE envelope"_s, {} };
+    }
+
+    E2ee::Decrypted result;
+    result.setContent(std::move(decrypted.sceContent));
+    result.setMetadata(std::move(decrypted.e2eeMetadata));
+    result.setSceFrom(std::move(sceFrom));
+    result.setSceTo(std::move(sceTo));
+    return result;
+}
+
 QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptMessageContent(QXmppMessage message, QList<QString> recipientJids, TrustLevels acceptedTrustLevels)
 {
     if (!initialized) {
@@ -998,7 +1015,7 @@ QXmppTask<E2ee::EncryptResult> ManagerPrivate::encryptIqContent(E2ee::EncryptIqR
         };
     }
 
-    auto omemoElement = co_await encryptStanza(IqContent { request }, request.recipientJids(), acceptedTrustLevels);
+    auto omemoElement = co_await encryptStanza(IqContent { request }, toStrings(request.recipientJids()), acceptedTrustLevels);
     if (!omemoElement) {
         co_return QXmppError {
             u"OMEMO element could not be created"_s,
@@ -1036,12 +1053,7 @@ QXmppTask<E2ee::DecryptResult> ManagerPrivate::decryptIqContent(QDomElement iqEl
         co_return QXmppError { u"Couldn't decrypt OMEMO IQ"_s, {} };
     }
 
-    E2ee::Decrypted result;
-    result.setContent(decrypted->sceContent);
-    result.setMetadata(decrypted->e2eeMetadata);
-    result.setSceFrom(decrypted->sceFrom);
-    result.setSceTo(decrypted->sceTo);
-    co_return result;
+    co_return toDecrypted(std::move(*decrypted));
 }
 
 // Encrypts a message or IQ stanza.
@@ -1492,12 +1504,7 @@ QXmppTask<E2ee::DecryptResult> ManagerPrivate::decryptMessageContent(QXmppMessag
         co_return QXmppError { u"Couldn't decrypt OMEMO message"_s, {} };
     }
 
-    E2ee::Decrypted result;
-    result.setContent(decrypted->sceContent);
-    result.setMetadata(decrypted->e2eeMetadata);
-    result.setSceFrom(decrypted->sceFrom);
-    result.setSceTo(decrypted->sceTo);
-    co_return result;
+    co_return toDecrypted(std::move(*decrypted));
 }
 
 // Decrypts an IQ stanza.

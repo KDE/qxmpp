@@ -91,7 +91,7 @@ auto QXmppUserLocationManager::publish(const QXmppGeolocItem &item)
     return pubSub(client())->publishOwnPepItem(ns_geoloc.toString(), item);
 }
 
-HookResult QXmppUserLocationManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppUserLocationManager::handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName)
 {
     return Pep::handlePubSubEvent<Item>(element, pubSubService, nodeName, ns_geoloc.toString(), this, &QXmppUserLocationManager::itemReceived);
 }

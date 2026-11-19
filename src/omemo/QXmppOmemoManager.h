@@ -7,6 +7,7 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
+#include "QXmppJid.h"
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
@@ -148,7 +149,7 @@ protected:
 
 private:
     bool handleIncomingStanza(const QDomElement &stanza);
-    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName);
 
     std::unique_ptr<QXmppOmemoManagerPrivate> d;
 

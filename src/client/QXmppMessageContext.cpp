@@ -358,8 +358,9 @@ Context::Context(QXmppMessage &&message, Origin origin)
     : d(std::make_unique<ContextPrivate>())
 {
     d->origin = origin;
-    d->senderJid = Private::jidBare(message.from());
-    d->conversationJid = Private::jidBare(origin == Origin::CarbonSent ? message.to() : message.from());
+    auto bareJid = [](const QString &jid) { return Private::jidOrNull(jid).bare(); };
+    d->senderJid = bareJid(message.from());
+    d->conversationJid = bareJid(origin == Origin::CarbonSent ? message.to() : message.from());
     d->message = std::move(message);
 }
 
@@ -397,7 +398,7 @@ Origin Context::origin() const
     For messages from a MUC room, it is set by the QXmpp::Messages::ResolveSender handler of
     the MUC manager if the real JID is known. The decryption uses it to look up the keys.
 */
-const QString &Context::senderJid() const
+const Jid &Context::senderJid() const
 {
     return d->senderJid;
 }
@@ -405,15 +406,15 @@ const QString &Context::senderJid() const
 /*!
     Sets the bare JID of the real sender to \a jid.
 */
-void Context::setSenderJid(const QString &jid)
+void Context::setSenderJid(Jid jid)
 {
-    d->senderJid = jid;
+    d->senderJid = std::move(jid);
 }
 
 /*!
     Returns the bare JID of the conversation, i.e. of the contact or the room.
 */
-const QString &Context::conversationJid() const
+const Jid &Context::conversationJid() const
 {
     return d->conversationJid;
 }
@@ -421,9 +422,9 @@ const QString &Context::conversationJid() const
 /*!
     Sets the bare JID of the conversation to \a jid.
 */
-void Context::setConversationJid(const QString &jid)
+void Context::setConversationJid(Jid jid)
 {
-    d->conversationJid = jid;
+    d->conversationJid = std::move(jid);
 }
 
 /*!

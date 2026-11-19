@@ -664,7 +664,7 @@ void tst_QXmppMamManager::retrieve()
         return context.message().body() == u"consumed" ? QXmpp::HookResult::Stop : QXmpp::HookResult::Continue;
     });
 
-    auto task = mam->retrieve({ .with = u"romeo@montague.lit"_s });
+    auto task = mam->retrieve({ .with = u"romeo@montague.lit"_jid });
     auto queryId = expectMamQuery(test, u"<iq id='qx1' type='set'>"
                                         "<query xmlns='urn:xmpp:mam:2' queryid='QUERYID'>"
                                         "<x xmlns='jabber:x:data' type='submit'>"
@@ -796,7 +796,7 @@ void tst_QXmppMamManager::retrieveExtended()
     rsm.setBefore(u""_s);
 
     auto task = mam->retrieve({
-        .to = u"coven@chat.shakespeare.lit"_s,
+        .to = u"coven@chat.shakespeare.lit"_jid,
         .beforeId = u"9"_s,
         .afterId = u"0"_s,
         .ids = { u"1"_s, u"2"_s },
@@ -849,7 +849,7 @@ void tst_QXmppMamManager::retrieveExtended()
 
     // archive ignoring <flip-page/>: the page stays in chronological order
     processed.clear();
-    task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_s, .flipPage = true });
+    task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_jid, .flipPage = true });
     queryId = takeQueryId(test);
     handleMamResult(mam, queryId, result(u"1"_s, u"older"_s));
     handleMamResult(mam, queryId, result(u"2"_s, u"newer"_s));
@@ -895,7 +895,7 @@ void tst_QXmppMamManager::retrieveUnexpectedSender()
     QCOMPARE(page.messages.at(1).attachment<QXmpp::Messages::ArchiveInfo>()->id(), u"2"_s);
 
     // MUC archive: occupants and the own server must not inject results
-    task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_s });
+    task = mam->retrieve({ .to = u"coven@chat.shakespeare.lit"_jid });
     queryId = takeQueryId(test);
     handleMamResult(mam, queryId, result(u"coven@chat.shakespeare.lit/firstwitch"_s, u"spoofed"_s));
     handleMamResult(mam, queryId, result({}, u"spoofed"_s));
@@ -954,7 +954,7 @@ void tst_QXmppMamManager::requestQueryForm()
     QCOMPARE(std::as_const(form).fields().last().key(), u"{http://example.com/}free-text-search"_s);
 
     // archive of a pubsub node
-    task = mam->requestQueryForm(u"pubsub.shakespeare.lit"_s, u"fdp/submitted/capulet.lit/sonnets"_s);
+    task = mam->requestQueryForm(u"pubsub.shakespeare.lit"_jid, u"fdp/submitted/capulet.lit/sonnets"_s);
     test.expect(u"<iq id='qx1' to='pubsub.shakespeare.lit' type='get'><query xmlns='urn:xmpp:mam:2' node='fdp/submitted/capulet.lit/sonnets'/></iq>"_s);
     test.inject(u"<iq type='error' id='qx1' from='pubsub.shakespeare.lit'><error type='cancel'><feature-not-implemented xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
     expectFutureVariant<QXmppError>(task);
@@ -979,7 +979,7 @@ void tst_QXmppMamManager::requestMetadata()
     QCOMPARE(metadata.end->id, u"b21lZ2Eg"_s);
 
     // empty archive of a MUC
-    task = mam->requestMetadata(u"coven@chat.shakespeare.lit"_s);
+    task = mam->requestMetadata(u"coven@chat.shakespeare.lit"_jid);
     test.expect(u"<iq id='qx1' to='coven@chat.shakespeare.lit' type='get'><metadata xmlns='urn:xmpp:mam:2'/></iq>"_s);
     test.inject(u"<iq type='result' id='qx1' from='coven@chat.shakespeare.lit'><metadata xmlns='urn:xmpp:mam:2'/></iq>"_s);
     metadata = expectFutureVariant<QXmpp::Mam::ArchiveMetadata>(task);

@@ -8,6 +8,7 @@
 #define TESTS_UTIL_H
 
 #include "QXmppError.h"
+#include "QXmppJid.h"
 #include "QXmppTask.h"
 
 #include "StringLiterals.h"
@@ -33,6 +34,24 @@
 #include <QXmlStreamWriter>
 
 struct QXmppError;
+
+// A JID from a literal, for tests only. Aborts on invalid JIDs.
+inline QXmpp::Jid operator""_jid(const char16_t *string, size_t size)
+{
+    auto jid = QXmpp::Jid::fromString(QStringView(string, qsizetype(size)));
+    if (!jid) {
+        qFatal("Invalid JID literal");
+    }
+    return *jid;
+}
+
+namespace QXmpp {
+// used by QCOMPARE
+inline char *toString(const Jid &jid)
+{
+    return QTest::toString(jid.toString());
+}
+}  // namespace QXmpp
 
 // QVERIFY2 with empty return value (return {};)
 #define QVERIFY_RV(statement, description)                                       \

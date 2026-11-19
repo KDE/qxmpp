@@ -52,6 +52,13 @@ static EncryptedIqs::IqResult mapResponse(QDomElement &&response)
     return std::move(response);
 }
 
+// The recipient of an IQ, an IQ without 'to' is addressed to the own account (RFC 6120, section
+// 10.3.3).
+static std::variant<Jid, QXmppError> recipient(QXmppClient *client, const OutgoingIq &iq)
+{
+    return parseJidArgument(iq.to.isEmpty() ? client->configuration().jidBare() : iq.to);
+}
+
 static QXmppError notEncryptedError()
 {
     return QXmppError { u"No end-to-end encryption has been selected for an IQ that must be encrypted"_s, SendError::EncryptionError };
@@ -102,8 +109,12 @@ QXmppIq EncryptedIqs::deserialize(const OutgoingIq &iq)
 
 QXmppTask<EncryptedIqs::Selection> EncryptedIqs::select(const OutgoingIq &iq, QString encryption, bool required)
 {
-    // an IQ without 'to' is addressed to the own account (RFC 6120, section 10.3.3)
-    Iq::EncryptionSelection selection(iq.type, iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to, required, std::move(encryption));
+    auto to = recipient(m_client, iq);
+    if (auto *error = std::get_if<QXmppError>(&to)) {
+        co_return std::move(*error);
+    }
+
+    Iq::EncryptionSelection selection(iq.type, std::get<Jid>(std::move(to)), required, std::move(encryption));
     co_await m_hooks.run<Iq::SelectEncryption>(selection).withContext(m_client);
 
     if (selection.encryption().isEmpty()) {
@@ -123,18 +134,24 @@ QXmppTask<EncryptedIqs::Encryption> EncryptedIqs::encrypt(const OutgoingIq &iq, 
         co_return QXmppError { u"No end-to-end encryption provider for IQs encrypted with "_s + encryption, SendError::EncryptionError };
     }
 
-    // an IQ without 'to' is addressed to the own account (RFC 6120, section 10.3.3)
-    auto to = iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to;
-    auto recipients = params.encryptionJids();
-    if (recipients.isEmpty()) {
-        recipients.append(jidBare(to));
+    auto to = recipient(m_client, iq);
+    if (auto *error = std::get_if<QXmppError>(&to)) {
+        co_return std::move(*error);
+    }
+    auto recipients = parseBareJidArguments(params.encryptionJids());
+    if (auto *error = std::get_if<QXmppError>(&recipients)) {
+        co_return std::move(*error);
+    }
+    auto &recipientJids = std::get<QList<Jid>>(recipients);
+    if (recipientJids.isEmpty()) {
+        recipientJids.append(std::get<Jid>(to).bare());
     }
 
     E2ee::EncryptIqRequest request;
-    request.setTo(std::move(to));
+    request.setTo(std::get<Jid>(std::move(to)));
     request.setPayload(iq.payload);
     request.setError(iq.error);
-    request.setRecipientJids(std::move(recipients));
+    request.setRecipientJids(std::move(recipientJids));
     request.setParams(std::move(params));
 
     auto result = co_await provider->encryptIq(std::move(request)).withContext(m_client);
@@ -152,9 +169,13 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
         co_return QXmppError { u"No end-to-end encryption provider for IQs encrypted with "_s + encryption, SendError::EncryptionError };
     }
 
-    const auto ownJid = client->configuration().jidBare();
+    const auto ownJid = jidOrNull(client->configuration().jidBare()).bare();
     // IQs from the server on behalf of the account have no 'from'
-    const auto senderJid = iq.hasAttribute(u"from"_s) ? jidBare(iq.attribute(u"from"_s)) : ownJid;
+    const auto from = iq.attribute(u"from"_s);
+    const auto senderJid = from.isEmpty() ? ownJid : jidOrNull(from).bare();
+    if (senderJid.isNull()) {
+        co_return QXmppError { u"The IQ has an invalid sender"_s, SendError::EncryptionError };
+    }
 
     E2ee::DecryptIqRequest request;
     request.setIq(iq);
@@ -170,10 +191,10 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
 
     auto &decrypted = std::get<E2ee::Decrypted>(result);
     // the affixes of XEP-0420 bind the content to the sender and the recipient
-    if (!decrypted.sceFrom().isEmpty() && decrypted.sceFrom() != senderJid) {
+    if (!decrypted.sceFrom().isNull() && decrypted.sceFrom() != senderJid) {
         co_return QXmppError { u"The sender of the encrypted content does not match the sender of the IQ"_s, SendError::EncryptionError };
     }
-    if (!decrypted.sceTo().isEmpty() && decrypted.sceTo() != ownJid) {
+    if (!decrypted.sceTo().isNull() && decrypted.sceTo() != ownJid) {
         co_return QXmppError { u"The recipient of the encrypted content does not match the recipient of the IQ"_s, SendError::EncryptionError };
     }
 

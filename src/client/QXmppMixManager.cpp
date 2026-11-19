@@ -1306,7 +1306,7 @@ void QXmppMixManager::onUnregistered(QXmppClient *client)
     }
 }
 
-HookResult QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName)
+HookResult QXmppMixManager::handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName)
 {
     using enum HookResult;
 
@@ -1548,7 +1548,7 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
     }
     const auto channelJid = jidBare(message.to());
     // recipients set by the sender are kept
-    if (outgoing.recipientJids() != QList<QString> { channelJid }) {
+    if (outgoing.recipientJids() != QList<Jid> { jidOrNull(channelJid) }) {
         co_return;
     }
     const auto joined = co_await isJoinedChannel(channelJid).withContext(q);
@@ -1563,10 +1563,11 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
         co_return;
     }
 
-    const auto ownJid = client->configuration().jidBare();
-    QList<QString> recipients;
-    for (const auto &jid : std::get<QList<QString>>(result)) {
-        if (jid.isEmpty()) {
+    const auto ownJid = jidOrNull(client->configuration().jidBare());
+    QList<Jid> recipients;
+    for (const auto &participantJid : std::get<QList<QString>>(result)) {
+        const auto jid = jidOrNull(participantJid).bare();
+        if (jid.isNull()) {
             outgoing.setError(QXmppError { u"Messages to channels hiding the JIDs of their participants cannot be encrypted"_s, SendError::EncryptionError });
             co_return;
         }
@@ -1615,8 +1616,8 @@ QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &c
     if (!joined) {
         co_return HookResult::Continue;
     }
-    if (!senderJid.isEmpty()) {
-        context.setSenderJid(senderJid);
+    if (const auto sender = jidOrNull(senderJid); !sender.isNull()) {
+        context.setSenderJid(sender);
     }
 
     // Other participants could send a message with the same origin ID. The own participant ID is

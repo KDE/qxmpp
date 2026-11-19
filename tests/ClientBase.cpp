@@ -5011,6 +5011,7 @@ private:
     Q_SLOT void hooksIqRequest();
     Q_SLOT void hooksIqRequestError();
     Q_SLOT void hooksIqRequestAsync();
+    Q_SLOT void hooksIqRequestSender();
     Q_SLOT void hooksIqRequestOwnerDestroyed();
     Q_SLOT void hooksIqRequestEncrypted();
     Q_SLOT void hooksIqRequestSequence();
@@ -5769,6 +5770,27 @@ void tst_QXmppHooks::hooksIqRequestAsync()
     client.expect(u"<iq id='a1' to='alice@example.org/a' type='result'><query xmlns='urn:test' value='later'/></iq>"_s);
 }
 
+void tst_QXmppHooks::hooksIqRequestSender()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    QObject owner;
+
+    QList<Jid> senders;
+    client.hooks(&owner).add<Iq::Received<Iq::Get<TestQuery>>>([&](Iq::Get<TestQuery> &&, const Iq::Context &context) {
+        senders << context.from();
+        return TestQuery {};
+    });
+
+    // the sender is in its canonical form, the reply goes to the address of the request
+    QVERIFY(client.handleStanza(u"<iq id='s1' type='get' from='Alice@Example.org/a'><query xmlns='urn:test'/></iq>"_s));
+    client.expect(u"<iq id='s1' to='Alice@Example.org/a' type='result'><query xmlns='urn:test'/></iq>"_s);
+    // requests without 'from' are from the own account
+    QVERIFY(client.handleStanza(u"<iq id='s2' type='get'><query xmlns='urn:test'/></iq>"_s));
+    client.expect(u"<iq id='s2' type='result'><query xmlns='urn:test'/></iq>"_s);
+    QCOMPARE(senders, (QList<Jid> { u"alice@example.org/a"_jid, u"me@example.org"_jid }));
+}
+
 void tst_QXmppHooks::hooksIqRequestOwnerDestroyed()
 {
     TestClient client;
@@ -5934,7 +5956,7 @@ public:
     }
 
     QStringList encryptedIqPayloads;
-    QList<QList<QString>> encryptedIqRecipients;
+    QList<QList<Jid>> encryptedIqRecipients;
     std::vector<E2ee::DecryptRequest> requests;
     std::vector<QXmppPromise<E2ee::DecryptResult>> promises;
     std::vector<E2ee::EncryptRequest> encryptRequests;
@@ -5950,7 +5972,7 @@ static E2ee::Encrypted encrypted(const QString &data)
     return result;
 }
 
-static E2ee::Decrypted decrypted(const QString &body, const QString &from, const QString &to)
+static E2ee::Decrypted decrypted(const QString &body, const Jid &from, const Jid &to)
 {
     E2ee::Decrypted result;
     result.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'><body xmlns='jabber:client'>"_s + body + u"</body></content>"_s));
@@ -6167,7 +6189,7 @@ void tst_QXmppMessages::messagesResolveSenderAsync()
             auto &promise = resolving.back().second;
             promise.finish(context.message().id() == u"dropped" ? HookResult::Stop : HookResult::Continue);
         } else {
-            context.setSenderJid(u"resolved@example.org"_s);
+            context.setSenderJid(u"resolved@example.org"_jid);
         }
         return resolving.back().second.task();
     });
@@ -6221,7 +6243,7 @@ void tst_QXmppMessages::messagesDecrypt()
     QCOMPARE(e2ee->requests.size(), 1);
     QCOMPARE(e2ee->requests.at(0).senderJid(), u"alice@example.org"_s);
 
-    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"alice@example.org"_s, u"me@example.org"_s));
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"alice@example.org"_jid, u"me@example.org"_jid));
 
     // the order of the conversation is kept
     QCOMPARE(delivered.size(), 3);
@@ -6255,7 +6277,7 @@ void tst_QXmppMessages::messagesDecryptSenderMismatch()
     });
 
     client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
-    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"mallory@example.org"_s, u"me@example.org"_s));
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"mallory@example.org"_jid, u"me@example.org"_jid));
 
     QCOMPARE(state, DecryptionState::Failed);
     QVERIFY(hasError);
@@ -6279,7 +6301,7 @@ void tst_QXmppMessages::messagesDecryptWithoutFrom()
                          "</message>"_s);
     QCOMPARE(e2ee->requests.size(), 1);
     QCOMPARE(e2ee->requests.at(0).senderJid(), u"me@example.org"_s);
-    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"me@example.org"_s, u"me@example.org"_s));
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"me@example.org"_jid, u"me@example.org"_jid));
 
     QCOMPARE(spy.size(), 1);
     QCOMPARE(spy.at(0).at(0).value<QXmppMessage>().body(), u"secret"_s);
@@ -6316,7 +6338,7 @@ void tst_QXmppMessages::messagesDecryptRecipientMismatch()
 
     // content encrypted for someone else and forwarded
     client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
-    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"alice@example.org"_s, u"carol@example.org"_s));
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"alice@example.org"_jid, u"carol@example.org"_jid));
     QCOMPARE(state, DecryptionState::Failed);
 }
 
@@ -6422,7 +6444,7 @@ void tst_QXmppMessages::outgoingEncrypted()
         return HookResult::Continue;
     });
     client.hooks(&owner).add<ResolveRecipients>([](OutgoingMessage &message) {
-        message.recipientJids().append(u"bob@example.org"_s);
+        message.recipientJids().append(u"bob@example.org"_jid);
     });
 
     auto message = QXmppMessage(u"me@example.org/res"_s, u"alice@example.org/phone"_s, u"secret"_s);
@@ -6443,7 +6465,7 @@ void tst_QXmppMessages::outgoingEncrypted()
     QCOMPARE(e2ee->encryptRequests.size(), 1);
     const auto &request = e2ee->encryptRequests.at(0);
     QCOMPARE(request.message().body(), u"secret"_s);
-    QCOMPARE(request.recipientJids(), (QList<QString> { u"alice@example.org"_s, u"bob@example.org"_s }));
+    QCOMPARE(request.recipientJids(), (QList<Jid> { u"alice@example.org"_jid, u"bob@example.org"_jid }));
     client.expectNoPacket();
 
     e2ee->encryptPromises.at(0).finish(encrypted(u"ciphertext"_s));
@@ -6585,7 +6607,7 @@ void tst_QXmppMessages::outgoingFixed()
     const auto &request = e2ee->encryptRequests.at(0);
     QVERIFY(request.params().isEncryptionRequired());
     QCOMPARE(request.params().acceptedTrustLevels(), TrustLevels { TrustLevel::Authenticated });
-    QCOMPARE(request.recipientJids(), QList<QString> { u"alice@example.org"_s });
+    QCOMPARE(request.recipientJids(), QList<Jid> { u"alice@example.org"_jid });
     e2ee->encryptPromises.at(0).finish(encrypted(u"ciphertext"_s));
     const auto packet = client.takePacket();
     QVERIFY(packet.contains(u"<encrypted xmlns=\"urn:test:e2ee\" data=\"ciphertext\"/>"_s));
@@ -6766,6 +6788,11 @@ void tst_QXmppMessages::sendMessageUnencrypted()
     QVERIFY(sent.recipientJids().isEmpty());
     QVERIFY(!sent.encryptionInfo().has_value());
 
+    // invalid recipients fail like on the server
+    auto malformed = client.sendMessage(QXmppMessage(u"me@example.org/res"_s, u"alice@"_s, u"hello"_s));
+    QCOMPARE(expectFutureVariant<QXmppError>(malformed).value<QXmppStanza::Error>()->condition(), QXmppStanza::Error::JidMalformed);
+    client.expectNoPacket();
+
     // errors are reported like by send()
     client.hooks(&owner).add<Prepare>([](OutgoingMessage &) { return HookResult::Stop; });
     auto cancelled = client.sendMessage(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"hello"_s));
@@ -6781,7 +6808,7 @@ void tst_QXmppMessages::sendMessageEncrypted()
         selection.setEncryption(TestEncryption);
     });
     client.hooks(&owner).add<ResolveRecipients>([](OutgoingMessage &message) {
-        message.recipientJids().append(u"bob@example.org"_s);
+        message.recipientJids().append(u"bob@example.org"_jid);
     });
     std::optional<OutgoingMessage> confirmed;
     client.hooks(&owner).add<ConfirmDelivery>([&](const OutgoingMessage &message, std::optional<Result<Confirmation>> &) {
@@ -6809,7 +6836,7 @@ void tst_QXmppMessages::sendMessageEncrypted()
     QVERIFY(sent.message().encryptionMethodNs().isEmpty());
     QCOMPARE(sent.encryption(), u"urn:test:e2ee:used"_s);
     QCOMPARE(sent.contentEncryption(), E2ee::ContentEncryption::Sce);
-    QCOMPARE(sent.recipientJids(), (QList<QString> { u"alice@example.org"_s, u"bob@example.org"_s }));
+    QCOMPARE(sent.recipientJids(), (QList<Jid> { u"alice@example.org"_jid, u"bob@example.org"_jid }));
     QCOMPARE(std::any_cast<QString>(sent.encryptionInfo()), u"info of the provider"_s);
 }
 
@@ -6867,7 +6894,7 @@ void tst_QXmppMessages::iqEncrypted()
     QVERIFY(!selected->isRequired());
     QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
     QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(cid.toContentId()));
-    QCOMPARE(e2ee->encryptedIqRecipients.at(0), QList<QString> { u"alice@example.org"_s });
+    QCOMPARE(e2ee->encryptedIqRecipients.at(0), QList<Jid> { u"alice@example.org"_jid });
 
     const auto packet = client.takePacket();
     QVERIFY(packet.contains(u"urn:test:e2ee"_s));
@@ -7313,7 +7340,7 @@ void tst_QXmppMessages::decryptPreferred()
         QCOMPARE(received->e2eeMetadata()->encryptionNamespace(), TestBodyEncryption);
     } else {
         QCOMPARE(sce->requests.size(), 1);
-        sce->promises.front().finish(decrypted(u"from sce"_s, u"alice@example.org"_s, u"me@example.org"_s));
+        sce->promises.front().finish(decrypted(u"from sce"_s, u"alice@example.org"_jid, u"me@example.org"_jid));
         QVERIFY(received);
         QCOMPARE(received->body(), u"from sce"_s);
         // the other encrypted element is not part of the message
@@ -7343,7 +7370,7 @@ void tst_QXmppMessages::decryptDisabled()
     client.injectMessage(u"<message from='alice@example.org/phone' to='me@example.org/res' type='chat' id='1'><body>fallback</body>"
                          "<encrypted xmlns='urn:test:body-e2ee' data='terces'/><encrypted xmlns='urn:test:e2ee' data='x'/></message>"_s);
     QCOMPARE(sce->requests.size(), 1);
-    sce->promises.front().finish(decrypted(u"from sce"_s, u"alice@example.org"_s, u"me@example.org"_s));
+    sce->promises.front().finish(decrypted(u"from sce"_s, u"alice@example.org"_jid, u"me@example.org"_jid));
     QCOMPARE(received->body(), u"from sce"_s);
 
     // the elements sent in the clear are parsed
@@ -7424,7 +7451,7 @@ void tst_QXmppIqSending::cleanupTestCase()
 void tst_QXmppIqSending::get()
 {
     TestClient client;
-    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s, .payload = TestQuery { u"ping"_s } });
+    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_jid, .payload = TestQuery { u"ping"_s } });
     static_assert(std::is_same_v<decltype(task), QXmppTask<Result<TestQuery>>>);
 
     client.expect(u"<iq id='qx1' to='alice@example.org/a' type='get'><query xmlns='urn:test' value='ping'/></iq>"_s);
@@ -7432,14 +7459,14 @@ void tst_QXmppIqSending::get()
     QCOMPARE(expectFutureVariant<TestQuery>(task).value, u"pong"_s);
 
     // the id is kept
-    task = client.sendIq(Iq::Get<TestQuery> { .id = u"custom"_s, .to = u"alice@example.org/a"_s });
+    task = client.sendIq(Iq::Get<TestQuery> { .id = u"custom"_s, .to = u"alice@example.org/a"_jid });
     client.expect(u"<iq id='custom' to='alice@example.org/a' type='get'><query xmlns='urn:test'/></iq>"_s);
 }
 
 void tst_QXmppIqSending::set()
 {
     TestClient client;
-    auto task = client.sendIq(Iq::Set<TestQuery> { .to = u"alice@example.org/a"_s, .payload = TestQuery { u"value"_s } });
+    auto task = client.sendIq(Iq::Set<TestQuery> { .to = u"alice@example.org/a"_jid, .payload = TestQuery { u"value"_s } });
     static_assert(std::is_same_v<decltype(task), QXmppTask<Result<>>>);
 
     client.expect(u"<iq id='qx1' to='alice@example.org/a' type='set'><query xmlns='urn:test' value='value'/></iq>"_s);
@@ -7450,7 +7477,7 @@ void tst_QXmppIqSending::set()
 void tst_QXmppIqSending::error()
 {
     TestClient client;
-    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_jid });
     client.expect(u"<iq id='qx1' to='alice@example.org/a' type='get'><query xmlns='urn:test'/></iq>"_s);
     client.inject(u"<iq id='qx1' from='alice@example.org/a' type='error'><query xmlns='urn:test'/>"
                   "<error type='cancel'><service-unavailable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"_s);
@@ -7465,7 +7492,7 @@ void tst_QXmppIqSending::invalidResult()
     TestClient client;
 
     // payload that cannot be parsed
-    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    auto task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_jid });
     client.takePacket();
     client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'><query xmlns='urn:test' invalid='1'/></iq>"_s);
     auto error = expectFutureVariant<QXmppError>(task).value<QXmppStanza::Error>();
@@ -7473,7 +7500,7 @@ void tst_QXmppIqSending::invalidResult()
     QCOMPARE(error->condition(), QXmppStanza::Error::UndefinedCondition);
 
     // missing payload
-    task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    task = client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_jid });
     client.takePacket();
     client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'/>"_s);
     expectFutureVariant<QXmppError>(task);
@@ -7484,20 +7511,20 @@ void tst_QXmppIqSending::responseTraits()
     TestClient client;
 
     // specialization of the traits
-    auto task = client.sendIq(Iq::Get<TestRequest> { .to = u"alice@example.org/a"_s });
+    auto task = client.sendIq(Iq::Get<TestRequest> { .to = u"alice@example.org/a"_jid });
     static_assert(std::is_same_v<decltype(task), QXmppTask<Result<TestQuery>>>);
     client.expect(u"<iq id='qx1' to='alice@example.org/a' type='get'><request xmlns='urn:test'/></iq>"_s);
     client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'><query xmlns='urn:test' value='response'/></iq>"_s);
     QCOMPARE(expectFutureVariant<TestQuery>(task).value, u"response"_s);
 
     // overridden on the call site
-    auto emptyTask = client.sendIq<void>(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_s });
+    auto emptyTask = client.sendIq<void>(Iq::Get<TestQuery> { .to = u"alice@example.org/a"_jid });
     static_assert(std::is_same_v<decltype(emptyTask), QXmppTask<Result<>>>);
     client.takePacket();
     client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'/>"_s);
     expectFutureVariant<Success>(emptyTask);
 
-    auto queryTask = client.sendIq<TestQuery>(Iq::Set<TestRequest> { .to = u"alice@example.org/a"_s });
+    auto queryTask = client.sendIq<TestQuery>(Iq::Set<TestRequest> { .to = u"alice@example.org/a"_jid });
     static_assert(std::is_same_v<decltype(queryTask), QXmppTask<Result<TestQuery>>>);
     client.takePacket();
     client.inject(u"<iq id='qx1' from='alice@example.org/a' type='result'><query xmlns='urn:test' value='set'/></iq>"_s);
@@ -7527,11 +7554,11 @@ void tst_QXmppIqSending::encrypted()
     });
 
     // not encrypted by default
-    auto plainTask = client.sendIq(Iq::Get<TestQuery> { .id = u"plain"_s, .to = u"alice@example.org/phone"_s });
+    auto plainTask = client.sendIq(Iq::Get<TestQuery> { .id = u"plain"_s, .to = u"alice@example.org/phone"_jid });
     client.expect(u"<iq id='plain' to='alice@example.org/phone' type='get'><query xmlns='urn:test'/></iq>"_s);
     QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
 
-    auto task = client.sendIq(Iq::Get<TestQuery> { .id = u"qx1"_s, .to = u"alice@example.org/phone"_s, .payload = TestQuery { u"secret"_s } }, { .encrypted = true });
+    auto task = client.sendIq(Iq::Get<TestQuery> { .id = u"qx1"_s, .to = u"alice@example.org/phone"_jid, .payload = TestQuery { u"secret"_s } }, { .encrypted = true });
     QCOMPARE(e2ee->encryptedIqPayloads.size(), 1);
     QVERIFY(e2ee->encryptedIqPayloads.at(0).contains(u"value=\"secret\""_s));
     const auto packet = client.takePacket();
@@ -7565,7 +7592,7 @@ void tst_QXmppIqSending::encryptedLegacy()
     QVERIFY(encrypter.iqs.at(0).contains(u"subclass-payload"_s));
 
     // typed requests
-    client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/phone"_s, .payload = TestQuery { u"typed-payload"_s } }, { .encrypted = true });
+    client.sendIq(Iq::Get<TestQuery> { .to = u"alice@example.org/phone"_jid, .payload = TestQuery { u"typed-payload"_s } }, { .encrypted = true });
     QCOMPARE(encrypter.iqs.size(), 2);
     QVERIFY(encrypter.iqs.at(1).contains(u"typed-payload"_s));
 

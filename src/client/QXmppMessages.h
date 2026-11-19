@@ -7,6 +7,7 @@
 
 #include "QXmppError.h"
 #include "QXmppHooks.h"
+#include "QXmppJid.h"
 #include "QXmppMessage.h"
 #include "QXmppSendResult.h"
 #include "QXmppSendStanzaParams.h"
@@ -61,8 +62,8 @@ class ArchiveInfo
 {
 public:
     // Bare JID of the archive, e.g. the own account or a MUC room.
-    const QString &archiveJid() const { return m_archiveJid; }
-    void setArchiveJid(const QString &jid) { m_archiveJid = jid; }
+    const Jid &archiveJid() const { return m_archiveJid; }
+    void setArchiveJid(Jid jid) { m_archiveJid = std::move(jid); }
 
     // ID of the message in the archive.
     const QString &id() const { return m_id; }
@@ -72,16 +73,16 @@ public:
     const QString &queryId() const { return m_queryId; }
     void setQueryId(const QString &id) { m_queryId = id; }
 
-    // Real JID of the sender as reported by a MUC archive (XEP-0313), empty if there is none
-    // or more than one. Not validated, see QXmppMucManagerV2.
-    const QString &occupantJid() const { return m_occupantJid; }
-    void setOccupantJid(const QString &jid) { m_occupantJid = jid; }
+    // Real JID of the sender as reported by a MUC archive (XEP-0313), null if there is none, more
+    // than one or it is invalid. Not checked against the room, see QXmppMucManagerV2.
+    const Jid &occupantJid() const { return m_occupantJid; }
+    void setOccupantJid(Jid jid) { m_occupantJid = std::move(jid); }
 
 private:
-    QString m_archiveJid;
+    Jid m_archiveJid;
     QString m_id;
     QString m_queryId;
-    QString m_occupantJid;
+    Jid m_occupantJid;
 };
 
 struct ResolveSender {
@@ -98,15 +99,15 @@ struct Received {
 class EncryptionSelection
 {
 public:
-    EncryptionSelection(const QXmppMessage &message, bool required, QString encryption = {})
-        : m_message(&message), m_encryption(std::move(encryption)), m_required(required)
+    EncryptionSelection(const QXmppMessage &message, Jid to, bool required, QString encryption = {})
+        : m_message(&message), m_to(std::move(to)), m_encryption(std::move(encryption)), m_required(required)
     {
     }
 
     // The message to be sent.
     const QXmppMessage &message() const { return *m_message; }
-    // JID of the recipient of the message.
-    QString to() const { return m_message->to(); }
+    // JID of the recipient of the message, the own bare JID for messages to the own account.
+    const Jid &to() const { return m_to; }
 
     // see QXmppSendStanzaParams::isEncryptionRequired(), also set for sensitive stanzas of managers
     bool isRequired() const { return m_required; }
@@ -117,6 +118,7 @@ public:
 
 private:
     const QXmppMessage *m_message;
+    Jid m_to;
     QString m_encryption;
     bool m_required = false;
 };
@@ -173,8 +175,8 @@ public:
     const QString &encryption() const { return m_encryption; }
 
     // Bare JIDs the message is encrypted for, see ResolveRecipients.
-    QList<QString> &recipientJids() { return m_recipientJids; }
-    const QList<QString> &recipientJids() const { return m_recipientJids; }
+    QList<Jid> &recipientJids() { return m_recipientJids; }
+    const QList<Jid> &recipientJids() const { return m_recipientJids; }
 
     // Set after encrypting: what has been encrypted of the message.
     std::optional<E2ee::ContentEncryption> contentEncryption() const { return m_contentEncryption; }
@@ -192,7 +194,7 @@ private:
     QXmppMessage m_message;
     QXmppSendStanzaParams m_params;
     QString m_encryption;
-    QList<QString> m_recipientJids;
+    QList<Jid> m_recipientJids;
     std::optional<E2ee::ContentEncryption> m_contentEncryption;
     std::any m_encryptionInfo;
     std::optional<QXmppError> m_error;
@@ -236,7 +238,7 @@ public:
 
     // see OutgoingMessage
     const QString &encryption() const { return m_message->encryption(); }
-    const QList<QString> &recipientJids() const { return m_message->recipientJids(); }
+    const QList<Jid> &recipientJids() const { return m_message->recipientJids(); }
     std::optional<E2ee::ContentEncryption> contentEncryption() const { return m_message->contentEncryption(); }
     const std::any &encryptionInfo() const { return m_message->encryptionInfo(); }
 

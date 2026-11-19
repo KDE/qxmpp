@@ -8,6 +8,7 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppError.h"
+#include "QXmppJid.h"
 
 #include <variant>
 
@@ -35,7 +36,7 @@ public:
     Q_SIGNAL void itemReceived(const QString &jid, const QXmppGeolocItem &);
 
 private:
-    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName);
 };
 
 #endif  // QXMPPUSERLOCATIONMANAGER_H

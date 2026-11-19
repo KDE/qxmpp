@@ -94,7 +94,7 @@ std::optional<std::tuple<MamMessage, QString>> parseMamMessageResult(const QDomE
 
 // Real JID of the sender reported by a MUC archive (XEP-0313). Only used if there is exactly one,
 // as a sender could add such an element to its message.
-static QString occupantJid(const QDomElement &messageElement)
+static Jid occupantJid(const QDomElement &messageElement)
 {
     QString jid;
     int count = 0;
@@ -106,16 +106,16 @@ static QString occupantJid(const QDomElement &messageElement)
             }
         }
     }
-    return count == 1 ? jid : QString();
+    return count == 1 ? jidOrNull(jid) : Jid();
 }
 
 struct RetrieveRequestState {
     QXmppPromise<Mam::RetrieveResult> promise;
     Mam::QueryResult result;
     // bare JID of the queried archive
-    QString archiveJid;
+    Jid archiveJid;
     // JID the query has been sent to, the results must be sent from it
-    QString queriedJid;
+    Jid queriedJid;
     // processed messages in the order of the archive, empty for dropped or consumed messages and
     // messages still being processed
     std::vector<std::optional<Context>> messages;
@@ -152,7 +152,7 @@ class QXmppMamManagerPrivate
 public:
     explicit QXmppMamManagerPrivate(QXmppMamManager *q) : q(q) { }
 
-    bool isFromQueriedJid(const QString &queriedJid, const QString &from) const;
+    bool isFromQueriedJid(const Jid &queriedJid, const QString &from) const;
     void processMessage(const QString &queryId, RetrieveRequestState &state, MamMessage &&message);
     QXmppTask<std::optional<Context>> decryptLegacy(QXmppE2eeExtension *e2eeExt, Context context, MamMessage message);
     void finishMessage(const QString &queryId, size_t index, std::optional<Context> &&context);
@@ -161,7 +161,7 @@ public:
     // std::string because older Qt 5 versions don't add std::hash support for QString
     std::unordered_map<std::string, RetrieveRequestState> ongoingRequests;
     // queried JIDs of the running queries of retrieveArchivedMessages() by query ID
-    std::unordered_map<std::string, QString> signalQueries;
+    std::unordered_map<std::string, Jid> signalQueries;
 };
 
 /*!
@@ -185,7 +185,7 @@ public:
 /*!
     \variable QXmpp::Mam::Query::to
 
-    The archive to query, empty for the archive of the own account.
+    The archive to query, null for the archive of the own account.
 */
 
 /*!
@@ -436,8 +436,8 @@ static QXmppDataForm buildForm(const Mam::Query &query)
     };
 
     addField(QXmppDataForm::Field::HiddenField, u"FORM_TYPE"_s, staticString(ns_mam));
-    if (!query.with.isEmpty()) {
-        addField(QXmppDataForm::Field::JidSingleField, u"with"_s, query.with);
+    if (!query.with.isNull()) {
+        addField(QXmppDataForm::Field::JidSingleField, u"with"_s, query.with.toString());
     }
     if (query.start.isValid()) {
         addField(QXmppDataForm::Field::TextSingleField, u"start"_s, QXmppUtils::datetimeToString(query.start));
@@ -495,16 +495,23 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
     // random, so other entities can't guess it and inject results
     auto queryId = QXmppUtils::generateStanzaUuid();
 
+    auto toJid = Jid::fromString(to);
+    auto withJid = Jid::fromString(jid);
+    if ((!to.isEmpty() && !toJid) || (!jid.isEmpty() && !withJid)) {
+        warning(u"MAM query failed: Invalid JID"_s);
+        return queryId;
+    }
+
     Iq::Set<Mam::QueryRequest> request {
-        .to = to,
+        .to = toJid.value_or(Jid()),
         .payload = Mam::QueryRequest {
             .queryId = queryId,
             .node = node,
-            .form = buildForm(Mam::Query { .with = jid, .start = start, .end = end }),
+            .form = buildForm(Mam::Query { .with = withJid.value_or(Jid()), .start = start, .end = end }),
             .resultSetQuery = resultSetQuery,
         },
     };
-    d->signalQueries.insert({ queryId.toStdString(), to.isEmpty() ? client()->configuration().jidBare() : to });
+    d->signalQueries.insert({ queryId.toStdString(), toJid ? *toJid : jidOrNull(client()->configuration().jidBare()) });
     client()->sendIq(std::move(request)).then(this, [this, queryId](Result<Mam::QueryResult> &&result) {
         d->signalQueries.erase(queryId.toStdString());
         if (hasError(result)) {
@@ -543,7 +550,15 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(const QString &to, const QString &node, const QString &jid, const QDateTime &start, const QDateTime &end, const QXmppResultSetQuery &resultSetQuery)
 {
-    return retrieve(Mam::Query { .to = to, .node = node, .with = jid, .start = start, .end = end, .resultSetQuery = resultSetQuery }).then(this, [](Mam::RetrieveResult &&result) -> RetrieveResult {
+    auto toJid = to.isEmpty() ? Jid() : parseJidArgument(to);
+    auto withJid = jid.isEmpty() ? Jid() : parseJidArgument(jid);
+    for (const auto *parsed : { &toJid, &withJid }) {
+        if (const auto *error = std::get_if<QXmppError>(parsed)) {
+            return makeReadyTask<RetrieveResult>(*error);
+        }
+    }
+
+    return retrieve(Mam::Query { .to = std::get<Jid>(toJid), .node = node, .with = std::get<Jid>(withJid), .start = start, .end = end, .resultSetQuery = resultSetQuery }).then(this, [](Mam::RetrieveResult &&result) -> RetrieveResult {
         if (auto *error = std::get_if<QXmppError>(&result)) {
             return std::move(*error);
         }
@@ -586,8 +601,8 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
 
     auto [itr, inserted] = d->ongoingRequests.insert({ queryId.toStdString(), RetrieveRequestState() });
     Q_ASSERT(inserted);
-    itr->second.queriedJid = query.to.isEmpty() ? client()->configuration().jidBare() : query.to;
-    itr->second.archiveJid = jidBare(itr->second.queriedJid);
+    itr->second.queriedJid = query.to.isNull() ? jidOrNull(client()->configuration().jidBare()).bare() : query.to;
+    itr->second.archiveJid = itr->second.queriedJid.bare();
     itr->second.flipPage = query.flipPage;
 
     // create task here; promise could finish immediately after client()->sendIq()
@@ -635,12 +650,12 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
     Besides the fields defined by \xep{0313}{Message Archive Management}, the form may contain
     fields specific to the server. They can be used via QXmpp::Mam::Query::additionalFields.
 
-    \a to is the archive to query, empty for the archive of the own account. \a node is the
+    \a to is the archive to query, null for the archive of the own account. \a node is the
     PubSub node to query, usually empty.
 
     \since QXmpp 1.18
 */
-QXmppTask<Result<QXmppDataForm>> QXmppMamManager::requestQueryForm(const QString &to, const QString &node)
+QXmppTask<Result<QXmppDataForm>> QXmppMamManager::requestQueryForm(const Jid &to, const QString &node)
 {
     co_return mapSuccess(
         co_await client()->sendIq(Iq::Get<Mam::QueryRequest> { .to = to, .payload = { .node = node } }).withContext(this),
@@ -652,24 +667,21 @@ QXmppTask<Result<QXmppDataForm>> QXmppMamManager::requestQueryForm(const QString
 
     This requires the archive to support QXmpp::Namespace::Mam2Extended.
 
-    \a to is the archive to query, empty for the archive of the own account.
+    \a to is the archive to query, null for the archive of the own account.
 
     \since QXmpp 1.18
 */
-QXmppTask<Result<Mam::ArchiveMetadata>> QXmppMamManager::requestMetadata(const QString &to)
+QXmppTask<Result<Mam::ArchiveMetadata>> QXmppMamManager::requestMetadata(const Jid &to)
 {
     return client()->sendIq(Iq::Get<Mam::ArchiveMetadata> { .to = to });
 }
 
 // Checks that a result has been sent by the queried entity, so other entities can't inject
 // messages into the results (XEP-0313, "Sender Impersonation").
-bool QXmppMamManagerPrivate::isFromQueriedJid(const QString &queriedJid, const QString &from) const
+bool QXmppMamManagerPrivate::isFromQueriedJid(const Jid &queriedJid, const QString &from) const
 {
-    if (from.isEmpty()) {
-        // sent by the server on behalf of the own account
-        return queriedJid.compare(q->client()->configuration().jidBare(), Qt::CaseInsensitive) == 0;
-    }
-    return from.compare(queriedJid, Qt::CaseInsensitive) == 0;
+    // without 'from', sent by the server on behalf of the own account
+    return Jid::fromString(from.isEmpty() ? q->client()->configuration().jidBare() : from) == queriedJid;
 }
 
 // Processes a message of a task-based query in the message pipeline, it may be decrypted
@@ -692,9 +704,9 @@ void QXmppMamManagerPrivate::processMessage(const QString &queryId, RetrieveRequ
     }
 
     Context context(std::move(parsed.message), Origin::Mam);
-    if (jidsEqual(context.senderJid(), client->configuration().jidBare())) {
+    if (context.senderJid() == jidOrNull(client->configuration().jidBare())) {
         // sent by this account
-        context.setConversationJid(jidBare(context.message().to()));
+        context.setConversationJid(jidOrNull(context.message().to()).bare());
     }
     ArchiveInfo info;
     info.setArchiveJid(state.archiveJid);

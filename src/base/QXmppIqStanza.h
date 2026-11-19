@@ -6,6 +6,7 @@
 #define QXMPPIQSTANZA_H
 
 #include "QXmppGlobal.h"
+#include "QXmppJid.h"
 #include "QXmppStanza.h"
 #include "QXmppUtils_p.h"
 
@@ -63,6 +64,14 @@ namespace QXmpp::Private {
 QXMPP_EXPORT void writeIqStart(QXmlStreamWriter *writer, Iq::Type type, const QString &id, const QString &from, const QString &to, const QString &lang);
 QXMPP_EXPORT void writeIqEnd(QXmlStreamWriter *writer);
 QXMPP_EXPORT bool isIq(const QDomElement &element, Iq::Type type);
+
+struct StanzaAddresses {
+    Jid from;
+    Jid to;
+};
+
+// Parses 'from' and 'to', missing addresses are null. Returns nothing if one is invalid.
+QXMPP_EXPORT std::optional<StanzaAddresses> parseStanzaAddresses(const QDomElement &stanza);
 
 // Writes payloads that are only serializable with the internal XmlWriter.
 QXMPP_EXPORT void writeXmlWriterPayload(QXmlStreamWriter *writer, const void *payload, void (*write)(XmlWriter &, const void *));
@@ -166,7 +175,7 @@ namespace QXmpp::Iq {
 
     The stanzas are aggregates, so only the needed fields can be set via designated initializers:
     \code
-    QXmpp::Iq::Get<VersionQuery> iq { .to = u"example.org"_s, .payload = VersionQuery {} };
+    QXmpp::Iq::Get<VersionQuery> iq { .to = jid, .payload = VersionQuery {} };
     \endcode
 
     The payload needs a static \c XmlTag, needs to be parsable from a QDomElement and serializable
@@ -182,9 +191,9 @@ struct Stanza {
     /*! Id of the IQ, required for serialization */
     QString id;
     /*! JID of the sender */
-    QString from;
+    Jid from;
     /*! JID of the recipient */
-    QString to;
+    Jid to;
     /*! Language of the IQ (xml:lang) */
     QString lang;
     /*! Payload of the IQ */
@@ -196,17 +205,21 @@ struct Stanza {
     /*!
         Parses the IQ from \a el.
 
-        Returns nothing if the type or the payload does not match, the id is empty or the IQ does
-        not contain exactly one child element (\rfcsection{6120}{8.2.3}).
+        Returns nothing if the type or the payload does not match, the id is empty, an address is
+        not a valid JID or the IQ does not contain exactly one child element
+        (\rfcsection{6120}{8.2.3}).
     */
     static std::optional<Stanza> fromDom(const QDomElement &el)
     {
-        if (Private::isIq(el, T)) {
+        if (!Private::isIq(el, T)) {
+            return {};
+        }
+        if (auto addresses = Private::parseStanzaAddresses(el)) {
             if (auto parsedPayload = Private::parseOptionalElement<Payload>(el.firstChildElement())) {
                 return Stanza {
                     el.attribute(QStringLiteral("id")),
-                    el.attribute(QStringLiteral("from")),
-                    el.attribute(QStringLiteral("to")),
+                    std::move(addresses->from),
+                    std::move(addresses->to),
                     el.attributeNS(QStringLiteral("http://www.w3.org/XML/1998/namespace"), QStringLiteral("lang")),
                     std::move(*parsedPayload),
                 };
@@ -227,8 +240,8 @@ struct Stanza {
 template<typename Payload>
 struct Stanza<Type::Result, Payload> {
     QString id;
-    QString from;
-    QString to;
+    Jid from;
+    Jid to;
     QString lang;
     std::conditional_t<std::is_void_v<Payload>, std::monostate, Payload> payload;
 
@@ -237,16 +250,17 @@ struct Stanza<Type::Result, Payload> {
 
     static std::optional<Stanza> fromDom(const QDomElement &el)
     {
-        if (Private::isIq(el, Type::Result)) {
+        if (!Private::isIq(el, Type::Result)) {
+            return {};
+        }
+        if (auto addresses = Private::parseStanzaAddresses(el)) {
             auto id = el.attribute(QStringLiteral("id"));
-            auto from = el.attribute(QStringLiteral("from"));
-            auto to = el.attribute(QStringLiteral("to"));
             auto lang = el.attributeNS(QStringLiteral("http://www.w3.org/XML/1998/namespace"), QStringLiteral("lang"));
 
             if constexpr (std::is_void_v<Payload>) {
-                return Stanza { std::move(id), std::move(from), std::move(to), std::move(lang), {} };
+                return Stanza { std::move(id), std::move(addresses->from), std::move(addresses->to), std::move(lang), {} };
             } else if (auto parsedPayload = Private::parseOptionalElement<Payload>(el.firstChildElement())) {
-                return Stanza { std::move(id), std::move(from), std::move(to), std::move(lang), std::move(*parsedPayload) };
+                return Stanza { std::move(id), std::move(addresses->from), std::move(addresses->to), std::move(lang), std::move(*parsedPayload) };
             }
         }
         return {};
@@ -263,8 +277,8 @@ struct Stanza<Type::Result, Payload> {
 template<typename Payload>
 struct Stanza<Type::Error, Payload> {
     QString id;
-    QString from;
-    QString to;
+    Jid from;
+    Jid to;
     QString lang;
     std::conditional_t<std::is_void_v<Payload>, std::monostate, std::optional<Payload>> payload;
     QXmppStanza::Error error;
@@ -274,15 +288,18 @@ struct Stanza<Type::Error, Payload> {
 
     static std::optional<Stanza> fromDom(const QDomElement &el)
     {
-        if (Private::isIq(el, Type::Error)) {
+        if (!Private::isIq(el, Type::Error)) {
+            return {};
+        }
+        if (auto addresses = Private::parseStanzaAddresses(el)) {
             auto errorEl = el.lastChildElement();
             auto payloadEl = errorEl.previousSiblingElement();
 
             if (auto error = Private::parseOptionalElement<QXmppStanza::Error>(errorEl)) {
                 Stanza iq {
                     el.attribute(QStringLiteral("id")),
-                    el.attribute(QStringLiteral("from")),
-                    el.attribute(QStringLiteral("to")),
+                    std::move(addresses->from),
+                    std::move(addresses->to),
                     el.attributeNS(QStringLiteral("http://www.w3.org/XML/1998/namespace"), QStringLiteral("lang")),
                     {},
                     std::move(*error),

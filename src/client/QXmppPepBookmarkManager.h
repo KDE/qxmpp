@@ -6,6 +6,7 @@
 #define QXMPPPEPBOOKMARKMANAGER_H
 
 #include "QXmppClientExtension.h"
+#include "QXmppJid.h"
 #include "QXmppTask.h"
 
 #include <optional>
@@ -131,7 +132,7 @@ public:
 
 private:
     void onSessionStarted();
-    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QString &pubSubService, const QString &nodeName);
+    QXmpp::HookResult handlePubSubEvent(const QDomElement &element, const QXmpp::Jid &pubSubService, const QString &nodeName);
 
     friend struct QXmppPepBookmarkManagerPrivate;
     friend class tst_QXmppMuc;

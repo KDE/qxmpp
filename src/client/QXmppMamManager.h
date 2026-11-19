@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppError.h"
 #include "QXmppHooks.h"
+#include "QXmppJid.h"
 #include "QXmppMamIq.h"
 #include "QXmppMessageContext.h"
 #include "QXmppResultSet.h"
@@ -27,9 +28,9 @@ class QXmppMamManagerPrivate;
 namespace QXmpp::Mam {
 
 struct Query {
-    QString to {};
+    Jid to {};
     QString node {};
-    QString with {};
+    Jid with {};
     QDateTime start {};
     QDateTime end {};
     QString beforeId {};
@@ -116,8 +117,8 @@ public:
     QT_WARNING_POP
 #endif
     QXmppTask<QXmpp::Mam::RetrieveResult> retrieve(const QXmpp::Mam::Query &query);
-    QXmppTask<QXmpp::Result<QXmppDataForm>> requestQueryForm(const QString &to = {}, const QString &node = {});
-    QXmppTask<QXmpp::Result<QXmpp::Mam::ArchiveMetadata>> requestMetadata(const QString &to = {});
+    QXmppTask<QXmpp::Result<QXmppDataForm>> requestQueryForm(const QXmpp::Jid &to = {}, const QString &node = {});
+    QXmppTask<QXmpp::Result<QXmpp::Mam::ArchiveMetadata>> requestMetadata(const QXmpp::Jid &to = {});
 
     QXmppDiscoFeatureWatch watchAccountSupport() const;
 

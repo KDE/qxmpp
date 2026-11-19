@@ -6,6 +6,7 @@
 
 #include "QXmppJid_p.h"
 #include "QXmppPrecis_p.h"
+#include "QXmppStanza.h"
 
 #include "StringLiterals.h"
 
@@ -783,6 +784,33 @@ QString jidResource(QStringView jid)
     }
     auto slash = jid.indexOf(u'/');
     return slash < 0 ? QString() : jid.sliced(slash + 1).toString();
+}
+
+std::variant<Jid, QXmppError> parseJidArgument(QStringView jid)
+{
+    if (jid.isEmpty()) {
+        return Jid();
+    }
+    auto result = Jid::parse(jid);
+    if (auto *error = std::get_if<JidParsingError>(&result)) {
+        auto text = u"Invalid JID '%1': %2"_s.arg(jid, error->description);
+        return QXmppError { text, QXmppStanza::Error(QXmppStanza::Error::Modify, QXmppStanza::Error::JidMalformed, text) };
+    }
+    return std::get<Jid>(std::move(result));
+}
+
+std::variant<QList<Jid>, QXmppError> parseBareJidArguments(const QList<QString> &jids)
+{
+    QList<Jid> result;
+    result.reserve(jids.size());
+    for (const auto &jid : jids) {
+        auto parsed = parseJidArgument(jid);
+        if (auto *error = std::get_if<QXmppError>(&parsed)) {
+            return std::move(*error);
+        }
+        result.append(std::get<Jid>(parsed).bare());
+    }
+    return result;
 }
 
 }  // namespace QXmpp::Private

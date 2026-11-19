@@ -768,7 +768,15 @@ void tst_QXmppMuc::joinRoom()
     test.addNewExtension<QXmppDiscoveryManager>();
     auto *muc = test.addNewExtension<QXmppMucManagerV2>();
 
-    auto task = muc->joinRoom(u"coven@chat.shakespeare.lit"_s, u"thirdwitch"_s);
+    // room JIDs need to be valid bare JIDs
+    auto malformed = muc->joinRoom(u"coven@"_s, u"thirdwitch"_s);
+    QCOMPARE(expectFutureVariant<QXmppError>(malformed).value<QXmppStanza::Error>()->condition(), QXmppStanza::Error::JidMalformed);
+    auto fullJid = muc->joinRoom(u"coven@chat.shakespeare.lit/thirdwitch"_s, u"thirdwitch"_s);
+    expectFutureVariant<QXmppError>(fullJid);
+    test.expectNoPacket();
+
+    // the room JID is used in its canonical form
+    auto task = muc->joinRoom(u"Coven@Chat.Shakespeare.lit"_s, u"thirdwitch"_s);
     test.ignore();  // disco#info IQ
     test.expect(u"<presence to='coven@chat.shakespeare.lit/thirdwitch'><x xmlns='http://jabber.org/protocol/muc'/></presence>"_s);
 
@@ -791,6 +799,7 @@ void tst_QXmppMuc::joinRoom()
     injectRoomInfo(test);
     auto room = expectFutureVariant<QXmppMucRoomV2>(task);
     QCOMPARE(room.subject().value(), u"Cauldron"_s);
+    QVERIFY(muc->findRoom(u"COVEN@chat.shakespeare.lit"_s));
 }
 
 void tst_QXmppMuc::joinRoomWithHistory()
@@ -1437,7 +1446,7 @@ void tst_QXmppMuc::resolveSenderArchive()
                nonAnonymous ? QStringList { u"muc_nonanonymous"_s } : QStringList());
 
     // the occupant has left the room
-    auto task = mam->retrieve({ .to = archiveJid });
+    auto task = mam->retrieve({ .to = QXmpp::Jid::fromString(archiveJid).value() });
     const auto request = test.takePacket();
     const auto id = xmlToDom(request).attribute(u"id"_s);
     const auto queryId = xmlToDom(request).firstChildElement().attribute(u"queryid"_s);
@@ -1473,7 +1482,7 @@ public:
         });
     }
 
-    QList<QString> recipientJids;
+    QList<QXmpp::Jid> recipientJids;
 };
 
 static QXmppTask<QXmpp::Result<QXmpp::Messages::Sent>> sendToRoom(TestClient &test, const QXmppMucRoomV2 &room, QXmppMessage message)
@@ -1599,7 +1608,7 @@ void tst_QXmppMuc::sendMessageEncrypted()
     // encrypted for the occupants instead of the room
     auto recipients = e2ee->recipientJids;
     std::ranges::sort(recipients);
-    QCOMPARE(recipients, (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone2@shakespeare.lit"_s }));
+    QCOMPARE(recipients, (QList<QXmpp::Jid> { u"crone1@shakespeare.lit"_jid, u"crone2@shakespeare.lit"_jid }));
 
     // the reflection is matched by the public origin ID
     const auto originId = sentOriginId(test);
@@ -1646,7 +1655,7 @@ static void injectOccupant(TestClient &test, const QString &nick, const QString 
     test.injectPresence(presence);
 }
 
-static QList<QString> sorted(QList<QString> list)
+static QList<QXmpp::Jid> sorted(QList<QXmpp::Jid> list)
 {
     std::ranges::sort(list);
     return list;
@@ -1676,7 +1685,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
                        "<item affiliation='none' jid='crone4@shakespeare.lit'/></x></message>"_s);
     // the offline members are recipients too, not this account
     answerAffiliationLists(test, { { u"owner"_s, { u"hecate@shakespeare.lit"_s } }, { u"member"_s, { u"crone1@shakespeare.lit"_s, u"crone3@shakespeare.lit"_s, u"crone4@shakespeare.lit"_s, u"hag66@shakespeare.lit"_s } } });
-    QCOMPARE(sorted(e2ee->recipientJids), (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone3@shakespeare.lit"_s, u"hecate@shakespeare.lit"_s }));
+    QCOMPARE(sorted(e2ee->recipientJids), (QList<QXmpp::Jid> { u"crone1@shakespeare.lit"_jid, u"crone3@shakespeare.lit"_jid, u"hecate@shakespeare.lit"_jid }));
     test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
     expectFutureVariant<QXmpp::Messages::Sent>(task);
 
@@ -1691,7 +1700,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersOnly()
 
     // the lists are not requested again
     task = sendToRoom(test, room, QXmppMessage(message));
-    QCOMPARE(sorted(e2ee->recipientJids), (QList<QString> { u"crone1@shakespeare.lit"_s, u"crone2@shakespeare.lit"_s, u"crone5@shakespeare.lit"_s, u"hecate@shakespeare.lit"_s }));
+    QCOMPARE(sorted(e2ee->recipientJids), (QList<QXmpp::Jid> { u"crone1@shakespeare.lit"_jid, u"crone2@shakespeare.lit"_jid, u"crone5@shakespeare.lit"_jid, u"hecate@shakespeare.lit"_jid }));
     test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
     expectFutureVariant<QXmpp::Messages::Sent>(task);
     test.expectNoPacket();
@@ -1724,7 +1733,7 @@ void tst_QXmppMuc::sendMessageEncryptedMembersError()
 
     // the next message retries
     answerAffiliationLists(test, { { u"member"_s, { u"crone1@shakespeare.lit"_s } } });
-    QCOMPARE(e2ee->recipientJids, (QList<QString> { u"crone1@shakespeare.lit"_s }));
+    QCOMPARE(e2ee->recipientJids, (QList<QXmpp::Jid> { u"crone1@shakespeare.lit"_jid }));
     test.injectMessage(reflection(u"thirdwitch"_s, sentOriginId(test)));
     expectFutureVariant<QXmpp::Messages::Sent>(second);
 }

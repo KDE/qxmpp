@@ -165,7 +165,7 @@ QXmppTask<bool> runHandlers(std::shared_ptr<const HookRegistry::EntryList> entri
     struct EventReceived {
         static constexpr QStringView Name = u"org.qxmpp.pubsub.event-received";
         using Key = QStringView;
-        using Signature = QXmpp::HookResult(const QDomElement &element, const QString &service, const QString &node);
+        using Signature = QXmpp::HookResult(const QDomElement &element, const QXmpp::Jid &service, const QString &node);
     };
 
     hooks().add<EventReceived>(u"urn:xmpp:mix:nodes:info", this, &MyManager::handleEvent);

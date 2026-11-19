@@ -7,6 +7,7 @@
 #include "QXmppClient.h"
 #include "QXmppClient_p.h"
 #include "QXmppHooks_p.h"
+#include "QXmppJid_p.h"
 
 #include "StringLiterals.h"
 
@@ -120,7 +121,14 @@ bool IqRequests::process(QXmppClient *client, const Hooks &hooks, const QDomElem
         return false;
     }
 
-    answerIqRequest(client, hooks, std::move(key), element, Iq::Context(element.attribute(u"from"_s), e2eeMetadata));
+    // without 'from', the request is from the own account (RFC 6120, section 8.1.2.1)
+    auto fromAttribute = element.attribute(u"from"_s);
+    auto from = fromAttribute.isEmpty() ? jidOrNull(client->configuration().jidBare()).bare() : Jid::fromString(fromAttribute);
+    if (!from) {
+        return true;
+    }
+
+    answerIqRequest(client, hooks, std::move(key), element, Iq::Context(std::move(*from), e2eeMetadata));
     return true;
 }
 
