@@ -218,10 +218,9 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
         co_return;
     }
 
-    const bool fixed = pending.mode == Mode::Fixed;
     const bool required = pending.mode != Mode::Default || pending.params.isEncryptionRequired();
     EncryptionSelection selection(pending.message, std::get<Jid>(to), required, pending.encryption);
-    if (!encrypted && !fixed) {
+    if (!encrypted) {
         if (const auto encryption = pending.params.forcedEncryption()) {
             selection.setEncryption(*encryption);
         } else {
@@ -229,21 +228,11 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
         }
     }
 
-    if (fixed && !encrypted && selection.encryption().isEmpty()) {
-        finishFront(conversationJid, QXmppError { u"No end-to-end encryption has been given for a message that must be encrypted"_s, SendError::EncryptionError });
-        co_return;
-    }
-
     std::optional<E2ee::Provider> provider;
     if (!selection.encryption().isEmpty()) {
         provider = E2ee::Providers(m_hooks).find(selection.encryption());
         if (!provider || !provider->encryptMessage) {
             finishFront(conversationJid, QXmppError { u"No end-to-end encryption provider for "_s + selection.encryption(), SendError::EncryptionError });
-            co_return;
-        }
-        // The whole content of messages with a fixed encryption must be encrypted.
-        if (fixed && provider->contentEncryption == E2ee::ContentEncryption::BodyOnly) {
-            finishFront(conversationJid, QXmppError { selection.encryption() + u" only encrypts the body, the message can not be encrypted with it"_s, SendError::EncryptionError });
             co_return;
         }
     }
@@ -303,11 +292,9 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
     request.setParams(pending.params);
     // created once, also if the provider requests it several times
     auto bodyOnly = std::make_shared<std::optional<std::optional<BodyOnly>>>();
-    // The whole content of messages with a fixed encryption must be encrypted, so there is no
-    // variant for recipients of an encryption protecting only the body.
-    auto getBodyOnly = [hooks = m_hooks, bodyOnly, original = outgoing.message(), fixed]() -> const std::optional<BodyOnly> & {
+    auto getBodyOnly = [hooks = m_hooks, bodyOnly, original = outgoing.message()]() -> const std::optional<BodyOnly> & {
         if (!bodyOnly->has_value()) {
-            *bodyOnly = fixed ? std::nullopt : createBodyOnly(hooks, original);
+            *bodyOnly = createBodyOnly(hooks, original);
         }
         return **bodyOnly;
     };

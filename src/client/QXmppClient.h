@@ -73,7 +73,6 @@ namespace QXmpp::Private {
 class EncryptedIqs;
 struct IqRequests;
 struct LegacyE2ee;
-struct FixedE2ee;
 struct SessionBegin;
 
 template<typename Response, typename Request>
@@ -554,7 +553,6 @@ private:
     friend class QXmpp::Private::EncryptedIqs;
     friend struct QXmpp::Private::IqRequests;
     friend struct QXmpp::Private::LegacyE2ee;
-    friend struct QXmpp::Private::FixedE2ee;
     friend class QXmppNetworkMonitor;
     friend class QXmppRegistrationManager;
     friend class TestClient;

@@ -7,7 +7,6 @@
 #include "QXmppCarbonManager.h"
 #include "QXmppCarbonManagerV2.h"
 #include "QXmppClient.h"
-#include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppJid_p.h"
@@ -428,6 +427,8 @@ QXmppTask<QXmpp::SendResult> QXmppAtmManager::sendTrustMessage(const QString &en
 
     QXmppSendStanzaParams params;
     params.setAcceptedTrustLevels(TrustLevel::Authenticated);
+    params.setForcedEncryption(encryption);
+    params.setEncryptionRequired(true);
 
-    return FixedE2ee::send(client(), std::move(message), std::move(params), encryption);
+    return client()->send(std::move(message), params);
 }

@@ -6083,7 +6083,7 @@ private:
     Q_SLOT void outgoingAlreadyEncrypted();
     Q_SLOT void outgoingStoreHint();
     Q_SLOT void outgoingRequired();
-    Q_SLOT void outgoingFixed();
+    Q_SLOT void outgoingForcedRequired();
     Q_SLOT void outgoingReply();
     Q_SLOT void outgoingConfirmDelivery();
     Q_SLOT void outgoingConfirmDeliveryLegacyEncrypted();
@@ -6108,7 +6108,6 @@ private:
     Q_SLOT void bodyOnlyRewritten();
     Q_SLOT void bodyOnlyUnsupported();
     Q_SLOT void bodyOnlyNotRequested();
-    Q_SLOT void bodyOnlyFixed();
     Q_SLOT void encryptionOverride();
     Q_SLOT void decryptPreferred_data();
     Q_SLOT void decryptPreferred();
@@ -6640,10 +6639,8 @@ QT_WARNING_POP
 // tests that the deprecated encryption extension is not used
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
-void tst_QXmppMessages::outgoingFixed()
+void tst_QXmppMessages::outgoingForcedRequired()
 {
-    using QXmpp::Private::FixedE2ee;
-
     TestClient client;
     auto *e2ee = client.addNewExtension<TestE2eeManager>();
     QObject owner;
@@ -6655,10 +6652,16 @@ void tst_QXmppMessages::outgoingFixed()
         return HookResult::Continue;
     });
 
-    // encrypted with the given encryption, the application is not asked
+    const auto forced = [](QString encryption, QXmppSendStanzaParams params = {}) {
+        params.setForcedEncryption(std::move(encryption));
+        params.setEncryptionRequired(true);
+        return params;
+    };
+
+    // encrypted with the forced encryption, the hook is not run
     QXmppSendStanzaParams params;
     params.setAcceptedTrustLevels(TrustLevel::Authenticated);
-    auto task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), params, TestEncryption.toString());
+    auto task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), forced(TestEncryption.toString(), params));
     QCOMPARE(selections, 0);
     QCOMPARE(preparedEncryption, TestEncryption);
     QCOMPARE(e2ee->encryptRequests.size(), 1);
@@ -6672,11 +6675,11 @@ void tst_QXmppMessages::outgoingFixed()
     QVERIFY(!packet.contains(u"secret"_s));
 
     // never sent unencrypted
-    task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, u"urn:test:unknown"_s);
+    task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), forced(u"urn:test:unknown"_s));
     QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
     client.expectNoPacket();
 
-    task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, {});
+    task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), forced(QString()));
     QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
     client.expectNoPacket();
     QCOMPARE(selections, 0);
@@ -6684,16 +6687,16 @@ void tst_QXmppMessages::outgoingFixed()
     // the encryption extension is not used, it may implement another encryption
     ::Client::EncryptionExtension encrypter;
     client.setEncryptionExtension(&encrypter);
-    task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, u"urn:test:unknown"_s);
+    task = client.send(QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), forced(u"urn:test:unknown"_s));
     QVERIFY(!encrypter.messageCalled);
     QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
     client.expectNoPacket();
 
-    // the whole content must be encrypted
+    // not encrypted only with the body if the message has no variant for that
     client.addNewExtension<TestBodyE2eeManager>();
     QXmppMessage withoutBody(u"me@example.org/res"_s, u"alice@example.org"_s);
     withoutBody.setReplaceId(u"secret"_s);
-    task = FixedE2ee::send(&client, std::move(withoutBody), {}, TestBodyEncryption.toString());
+    task = client.send(std::move(withoutBody), forced(TestBodyEncryption.toString()));
     QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
     client.expectNoPacket();
     client.setEncryptionExtension(nullptr);
@@ -7413,42 +7416,6 @@ void tst_QXmppMessages::bodyOnlyNotRequested()
     const auto packet = client.takePacket();
     QVERIFY(!called);
     QVERIFY(!packet.contains(u"replace"_s));
-}
-
-// Messages with a fixed encryption have no variant, e.g. OMEMO 0 devices are skipped.
-void tst_QXmppMessages::bodyOnlyFixed()
-{
-    using QXmpp::Private::FixedE2ee;
-
-    TestClient client;
-    client.configuration().setJid(u"me@example.org/res"_s);
-    QObject owner;
-    std::optional<bool> hadBodyOnly;
-    bool useBodyOnly = false;
-    QXmpp::E2ee::Providers(client.hooks(&owner)).add(E2ee::Provider {
-        .encryption = TestEncryption,
-        .encryptMessage = [&](E2ee::EncryptRequest request) {
-            hadBodyOnly = request.bodyOnlyMessage().has_value();
-            auto result = encrypted(u"x"_s);
-            if (useBodyOnly) {
-                result.setContentEncryption(E2ee::ContentEncryption::BodyOnly);
-            }
-            return makeReadyTask<E2ee::EncryptResult>(std::move(result));
-        },
-    });
-    bool called = false;
-    client.hooks(&owner).add<PrepareBodyOnly>([&](BodyOnlyMessage &) { called = true; });
-
-    auto task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, TestEncryption.toString());
-    QCOMPARE(hadBodyOnly, std::optional(false));
-    QVERIFY(!called);
-    QVERIFY(client.takePacket().contains(u"data=\"x\""_s));
-
-    useBodyOnly = true;
-    task = FixedE2ee::send(&client, QXmppMessage(u"me@example.org/res"_s, u"alice@example.org"_s, u"secret"_s), {}, TestEncryption.toString());
-    QCOMPARE(expectFutureVariant<QXmppError>(task).value<SendError>(), SendError::EncryptionError);
-    client.expectNoPacket();
-    QVERIFY(!called);
 }
 
 // A provider registered with a namespace not used in stanzas announces the one of its elements.
