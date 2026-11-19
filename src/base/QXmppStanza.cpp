@@ -542,6 +542,7 @@ public:
     // Namespace of the encryption: null for NoEncryption, empty for UnknownEncryption without
     // a namespace.
     QString encryption;
+    std::optional<QXmpp::E2ee::ContentEncryption> contentEncryption;
     QByteArray senderKey;
 
     // XEP-0420: Stanza Content Encryption
@@ -628,6 +629,48 @@ QString QXmppE2eeMetadata::encryptionNamespace() const
 void QXmppE2eeMetadata::setEncryptionNamespace(const QString &encryption)
 {
     d->encryption = encryption.isEmpty() ? QString() : encryption;
+}
+
+/*!
+    \enum QXmpp::E2ee::ContentEncryption
+
+    What an end-to-end encryption encrypts of a message.
+
+    \value Sce All sensitive elements are encrypted via \xep{0420}{Stanza Content Encryption}
+        (SCE), e.g. by OMEMO 2.
+    \value BodyOnly Only the body is encrypted, e.g. by OMEMO 0. Other elements are sent in the
+        clear, so they are not protected and can be added or changed by anyone on the path, e.g.
+        a server.
+
+    \since QXmpp 1.18
+*/
+
+/*!
+    Returns what has been encrypted of a received stanza: QXmpp::E2ee::ContentEncryption::Sce if
+    all sensitive elements have been encrypted, QXmpp::E2ee::ContentEncryption::BodyOnly if only
+    the body has been encrypted and the other elements have been received in the clear.
+
+    Elements that must be protected, e.g. trust messages, should only be used with
+    QXmpp::E2ee::ContentEncryption::Sce. Not set if unknown, e.g. by encryptions not using the
+    QXmpp::E2ee providers.
+
+    \since QXmpp 1.18
+*/
+std::optional<QXmpp::E2ee::ContentEncryption> QXmppE2eeMetadata::contentEncryption() const
+{
+    return d->contentEncryption;
+}
+
+/*!
+    Sets what has been encrypted of a received stanza to \a contentEncryption.
+
+    It is set when a message is decrypted by a QXmpp::E2ee::Provider.
+
+    \since QXmpp 1.18
+*/
+void QXmppE2eeMetadata::setContentEncryption(std::optional<QXmpp::E2ee::ContentEncryption> contentEncryption)
+{
+    d->contentEncryption = contentEncryption;
 }
 
 /*!

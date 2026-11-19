@@ -7,10 +7,26 @@
 
 #include "QXmppGlobal.h"
 
+#include <optional>
+
 #include <QSharedDataPointer>
 
 class QDateTime;
 class QXmppE2eeMetadataPrivate;
+
+namespace QXmpp::E2ee {
+
+// What an encryption encrypts of a message. Defined here instead of in QXmppE2eeProvider.h, since
+// QXmppE2eeMetadata reports it for received messages and OutgoingMessage and Sent for sent ones.
+enum class ContentEncryption {
+    // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
+    Sce,
+    // only the body, other sensitive elements are sent in the clear if allowed by PrepareBodyOnly
+    // or dropped, e.g. OMEMO 0.3
+    BodyOnly,
+};
+
+}  // namespace QXmpp::E2ee
 
 class QXMPP_EXPORT QXmppE2eeMetadata
 {
@@ -28,6 +44,9 @@ public:
     void setEncryption(QXmpp::EncryptionMethod encryption);
     QString encryptionNamespace() const;
     void setEncryptionNamespace(const QString &encryption);
+
+    std::optional<QXmpp::E2ee::ContentEncryption> contentEncryption() const;
+    void setContentEncryption(std::optional<QXmpp::E2ee::ContentEncryption> contentEncryption);
 
     QByteArray senderKey() const;
     void setSenderKey(const QByteArray &keyId);

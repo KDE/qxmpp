@@ -5,6 +5,7 @@
 #ifndef QXMPPMESSAGES_H
 #define QXMPPMESSAGES_H
 
+#include "QXmppE2eeMetadata.h"
 #include "QXmppError.h"
 #include "QXmppHooks.h"
 #include "QXmppJid.h"
@@ -22,20 +23,6 @@
 namespace QXmpp::Private {
 class OutgoingMessages;
 }
-
-namespace QXmpp::E2ee {
-
-// What an encryption encrypts of a message. Defined here instead of in QXmppE2eeProvider.h, which
-// includes this header, because OutgoingMessage and Sent report it.
-enum class ContentEncryption {
-    // Stanza Content Encryption (XEP-0420): all sensitive elements, e.g. OMEMO 2
-    Sce,
-    // only the body, other sensitive elements are sent in the clear if allowed by PrepareBodyOnly
-    // or dropped, e.g. OMEMO 0.3
-    BodyOnly,
-};
-
-}  // namespace QXmpp::E2ee
 
 namespace QXmpp::Messages {
 

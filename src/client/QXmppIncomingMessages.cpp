@@ -246,12 +246,18 @@ QXmppTask<Context> IncomingMessages::decrypt(Context context, QStringView encryp
 
     auto result = co_await provider->decryptMessage(std::move(request)).withContext(m_client);
     if (auto *decrypted = std::get_if<E2ee::Decrypted>(&result)) {
-        if (decrypted->metadata().encryption() == NoEncryption) {
+        auto metadata = decrypted->metadata();
+        if (metadata.encryption() == NoEncryption) {
             // also for providers not setting it
-            auto metadata = decrypted->metadata();
             metadata.setEncryptionNamespace(encryption.toString());
-            decrypted->setMetadata(std::move(metadata));
         }
+        // The other elements of a message of a body-only encryption have been parsed in the
+        // clear. A provider can only report that less than its content encryption has been
+        // encrypted.
+        if (!metadata.contentEncryption() || provider->contentEncryption == E2ee::ContentEncryption::BodyOnly) {
+            metadata.setContentEncryption(provider->contentEncryption);
+        }
+        decrypted->setMetadata(std::move(metadata));
         applyDecrypted(context, std::move(*decrypted), *provider);
     } else if (std::holds_alternative<E2ee::NoEnvelope>(result)) {
         fail(context, DecryptionState::NoEnvelope);

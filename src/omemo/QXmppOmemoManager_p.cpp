@@ -1494,6 +1494,7 @@ QXmppTask<E2ee::DecryptResult> ManagerPrivate::decryptMessageContent(QXmppMessag
 
         QXmppE2eeMetadata metadata;
         metadata.setEncryption(Omemo2);
+        metadata.setContentEncryption(E2ee::ContentEncryption::Sce);
         E2ee::Decrypted result;
         result.setMetadata(metadata);
         co_return result;
@@ -1601,6 +1602,7 @@ QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanz
     QXmppE2eeMetadata e2eeMetadata;
     e2eeMetadata.setSceTimestamp(sceEnvelopeReader.timestamp());
     e2eeMetadata.setEncryption(QXmpp::Omemo2);
+    e2eeMetadata.setContentEncryption(E2ee::ContentEncryption::Sce);
     const auto &senderDevice = devices.value(senderJid).value(senderDeviceId);
     e2eeMetadata.setSenderKey(senderDevice.keyId);
 

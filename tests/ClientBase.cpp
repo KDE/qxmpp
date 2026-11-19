@@ -6095,6 +6095,8 @@ private:
     Q_SLOT void iqIncoming();
     Q_SLOT void iqIncomingNotDecrypted();
     Q_SLOT void bodyOnlyDecrypt();
+    Q_SLOT void decryptContentEncryption_data();
+    Q_SLOT void decryptContentEncryption();
     Q_SLOT void bodyOnlyEncrypt();
     Q_SLOT void bodyOnlyDrop();
     Q_SLOT void bodyOnlyCorrection();
@@ -6254,6 +6256,7 @@ void tst_QXmppMessages::messagesDecrypt()
     QVERIFY(!decryptedMessage.extensions().contains<TestEncrypted>());
     QVERIFY(!decryptedMessage.extensions().contains<Xml::Element>());
     QVERIFY(decryptedMessage.publicExtensions().contains<Xml::Element>());
+    QCOMPARE(decryptedMessage.e2eeMetadata()->contentEncryption(), E2ee::ContentEncryption::Sce);
     QCOMPARE(decryptedMessage.e2eeFallbackBody(), u"fallback"_s);
     QCOMPARE(decryptedEncryption, TestEncryption);
     QCOMPARE(decryptedMessage.e2eeMetadata()->encryption(), QXmpp::UnknownEncryption);
@@ -7047,6 +7050,63 @@ void tst_QXmppMessages::bodyOnlyDecrypt()
     QCOMPARE(received->fallbackMarkers().size(), 1);
     QCOMPARE(received->fallbackMarkers().at(0).forNamespace(), u"urn:xmpp:reply:0"_s);
     QCOMPARE(received->e2eeMetadata()->encryptionNamespace(), TestBodyEncryption);
+    QCOMPARE(received->e2eeMetadata()->contentEncryption(), E2ee::ContentEncryption::BodyOnly);
+}
+
+void tst_QXmppMessages::decryptContentEncryption_data()
+{
+    using ContentEncryption = E2ee::ContentEncryption;
+    QTest::addColumn<ContentEncryption>("providerContentEncryption");
+    QTest::addColumn<std::optional<ContentEncryption>>("reportedContentEncryption");
+    QTest::addColumn<ContentEncryption>("contentEncryption");
+
+    QTest::newRow("sce") << ContentEncryption::Sce << std::optional<ContentEncryption>() << ContentEncryption::Sce;
+    QTest::newRow("sceReportingBodyOnly") << ContentEncryption::Sce << std::optional(ContentEncryption::BodyOnly) << ContentEncryption::BodyOnly;
+    QTest::newRow("bodyOnly") << ContentEncryption::BodyOnly << std::optional<ContentEncryption>() << ContentEncryption::BodyOnly;
+    // the other elements have been parsed in the clear
+    QTest::newRow("bodyOnlyReportingSce") << ContentEncryption::BodyOnly << std::optional(ContentEncryption::Sce) << ContentEncryption::BodyOnly;
+}
+
+// The content encryption of the provider is reported, a provider can only report less.
+void tst_QXmppMessages::decryptContentEncryption()
+{
+    QFETCH(E2ee::ContentEncryption, providerContentEncryption);
+    QFETCH(std::optional<E2ee::ContentEncryption>, reportedContentEncryption);
+    QFETCH(E2ee::ContentEncryption, contentEncryption);
+
+    const auto isBodyOnly = providerContentEncryption == E2ee::ContentEncryption::BodyOnly;
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    QObject owner;
+    QXmpp::E2ee::Providers(client.hooks(&owner)).add(E2ee::Provider {
+        .encryption = isBodyOnly ? TestBodyEncryption : TestEncryption,
+        .contentEncryption = providerContentEncryption,
+        .decryptMessage = [=](E2ee::DecryptRequest) {
+            auto result = decrypted(u"secret"_s, u"alice@example.org"_jid, u"me@example.org"_jid);
+            QXmppE2eeMetadata metadata;
+            metadata.setContentEncryption(reportedContentEncryption);
+            result.setMetadata(metadata);
+            return makeReadyTask<E2ee::DecryptResult>(std::move(result)); },
+    });
+
+    std::optional<QXmppMessage> received;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        received = context.message();
+        return HookResult::Continue;
+    });
+
+    if (isBodyOnly) {
+        client.injectMessage(u"<message from='alice@example.org/phone' to='me@example.org/res' type='chat' id='1'>"
+                             "<body>fallback</body>"
+                             "<encrypted xmlns='urn:test:body-e2ee' data='terces'/>"
+                             "</message>"_s);
+    } else {
+        client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    }
+
+    QVERIFY(received);
+    QCOMPARE(received->body(), u"secret"_s);
+    QCOMPARE(received->e2eeMetadata()->contentEncryption(), contentEncryption);
 }
 
 void tst_QXmppMessages::bodyOnlyEncrypt()

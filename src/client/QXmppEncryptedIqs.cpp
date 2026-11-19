@@ -208,6 +208,10 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
         // also for providers not setting it
         metadata.setEncryptionNamespace(encryption.toString());
     }
+    // The IQ consists only of the decrypted content.
+    if (!metadata.contentEncryption()) {
+        metadata.setContentEncryption(E2ee::ContentEncryption::Sce);
+    }
     co_return DecryptedIq { decryptedIq, metadata };
 }
 
