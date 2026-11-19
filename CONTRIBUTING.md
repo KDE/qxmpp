@@ -56,6 +56,31 @@ You can enable them by exporting the following environment variables:
 
 Replace `<jid>` and `<password>` with the credentials of the account for connecting to the server.
 
+## Naming of New APIs
+
+New public APIs use the `QXmpp` namespace instead of the `QXmpp` class prefix.
+The existing `QXmpp*` classes are renamed in QXmpp 2.0.
+
+1. Entry points are declared directly in `QXmpp`: the client, the managers, the storage
+   interfaces and their implementations, the top-level stanzas and types shared by several
+   features (e.g. `QXmpp::OmemoManager`, `QXmpp::OmemoStorage`, `QXmpp::OmemoMemoryStorage`,
+   `QXmpp::TrustLevel`).
+   A manager is always named `QXmpp::<Feature>Manager`, even if a namespace `QXmpp::<Feature>`
+   exists.
+1. The types of a single feature are declared in `QXmpp::<Feature>`, e.g. the types a manager
+   returns, takes or emits (`QXmpp::Omemo::Device`, `QXmpp::Omemo::DeviceWatch`,
+   `QXmpp::Muc::Role`).
+   A feature without such types does not get a namespace.
+1. Public namespaces are at most two levels deep (`QXmpp::<Feature>`).
+   The name of a namespace must not be the name of a type in `QXmpp`.
+1. A feature has the same name everywhere: in the namespace, in the manager and in the other
+   entry points (`QXmpp::Omemo`, `QXmpp::OmemoManager`, `QXmpp::OmemoStorage`).
+1. Internal code is declared in `QXmpp::Private` or `QXmpp::<Feature>::Private`; these rules do
+   not apply to it.
+
+Signals, slots and properties (`Q_PROPERTY`) need fully qualified types for moc and QML.
+Keeping the entry points in `QXmpp` keeps those types short.
+
 ## Documentation
 
 The API documentation is generated with QDoc (the Qt documentation generator)
