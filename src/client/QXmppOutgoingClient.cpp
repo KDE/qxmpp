@@ -9,6 +9,7 @@
 #include "QXmppAsync_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIqStanza.h"
+#include "QXmppJid.h"
 #include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppNonSASLAuth.h"
@@ -23,6 +24,8 @@
 #include "Stream.h"
 #include "StringLiterals.h"
 
+#include <algorithm>
+#include <array>
 #include <unordered_map>
 
 #include <QHostAddress>
@@ -830,10 +833,30 @@ void QXmppOutgoingClient::handlePacketReceived(const QDomElement &nodeRecv)
     }
 }
 
+// RFC 7622, section 4: stanzas with malformed addresses are not processed.
+static bool hasValidAddresses(const QDomElement &stanza)
+{
+    return std::ranges::all_of(std::array { u"from"_s, u"to"_s }, [&](const QString &name) {
+        auto address = stanza.attribute(name);
+        return address.isEmpty() || QXmpp::Jid::fromString(address);
+    });
+}
+
 HandleElementResult QXmppOutgoingClient::handleElement(const QDomElement &nodeRecv)
 {
-    // handle SM acks, stanza counter and IQ responses
-    if (streamAckManager().handleStanza(nodeRecv) || iqManager().handleStanza(nodeRecv)) {
+    // handle SM acks and the stanza counter
+    if (streamAckManager().handleStanza(nodeRecv)) {
+        return Accepted;
+    }
+
+    if (nodeRecv.namespaceURI() == ns_client && !hasValidAddresses(nodeRecv)) {
+        warning(u"Ignored <%1/> with malformed address (from '%2', to '%3')."_s
+                    .arg(nodeRecv.tagName(), nodeRecv.attribute(u"from"_s), nodeRecv.attribute(u"to"_s)));
+        return Accepted;
+    }
+
+    // handle IQ responses
+    if (iqManager().handleStanza(nodeRecv)) {
         return Accepted;
     }
 

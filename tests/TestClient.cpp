@@ -72,6 +72,11 @@ void TestClient::injectStanza(const QString &xml)
     _q_elementReceived(xmlToDom(xml), handled);
 }
 
+void TestClient::injectFromNetwork(const QString &xml)
+{
+    d->stream->handleElement(xmlToDom(xml));
+}
+
 void TestClient::inject(const QDomElement &element)
 {
     if (!d->stream->handleIqResponse(element)) {

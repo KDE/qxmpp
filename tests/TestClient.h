@@ -41,6 +41,8 @@ public:
     void simulateDisconnected();
 
     void inject(const QDomElement &element);
+    // passes an element through the stream like one received from the network
+    void injectFromNetwork(const QString &xml);
     // passes a stanza to the handlers of QXmpp::Connection::StanzaReceived and the extensions,
     // returns whether it has been handled
     bool handleStanza(const QDomElement &element, const std::optional<QXmppE2eeMetadata> &e2eeMetadata = {});

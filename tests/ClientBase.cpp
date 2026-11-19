@@ -100,6 +100,7 @@ private:
     Q_SLOT void testPromiseMoveAssignmentReleasesPrevious();
     Q_SLOT void testPromiseCopyAssignment();
     Q_SLOT void testChainIq();
+    Q_SLOT void malformedAddresses();
     Q_SLOT void colorGeneration();
 #if QT_GUI_LIB
     Q_SLOT void colorGenerationQColor();
@@ -469,6 +470,25 @@ void tst_QXmppClient::testChainIq()
     auto result = parsingTask.result();
     QVERIFY(std::holds_alternative<QXmppRosterIq>(result));
     QCOMPARE(std::get<QXmppRosterIq>(result).items().size(), 2);
+}
+
+void tst_QXmppClient::malformedAddresses()
+{
+    TestClient client;
+    QXmppVersionIq request;
+    request.setTo(u"romeo@example.org/garden"_s);
+    auto task = client.sendIq(std::move(request));
+    client.expect(u"<iq id='qx1' to='romeo@example.org/garden' type='get'><query xmlns='jabber:iq:version'/></iq>"_s);
+
+    // stanzas with malformed addresses are ignored
+    client.injectFromNetwork(u"<iq xmlns='jabber:client' id='qx1' from='romeo@exa mple.org/garden' type='result'/>"_s);
+    QVERIFY(!task.isFinished());
+    client.injectFromNetwork(u"<iq xmlns='jabber:client' id='qx1' from='romeo@example.org/garden' to='juliet@' type='result'/>"_s);
+    QVERIFY(!task.isFinished());
+
+    // the sender is compared as JID
+    client.injectFromNetwork(u"<iq xmlns='jabber:client' id='qx1' from='Romeo@Example.org/garden' type='result'/>"_s);
+    QVERIFY(task.isFinished());
 }
 
 void tst_QXmppClient::colorGeneration()
