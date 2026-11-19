@@ -37,6 +37,7 @@ constexpr int UNEXPECTED_TRUST_MESSAGE_WAITING_TIMEOUT = 1000;
 
 static const char *ns_atm = "urn:xmpp:atm:1";
 static const char *ns_omemo = "eu.siacs.conversations.axolotl";
+static const char *ns_omemo_2 = "urn:xmpp:omemo:2";
 static const char *ns_ox = "urn:xmpp:openpgp:0";
 
 // Element of the test encryption containing the whole message encoded in Base64.
@@ -125,6 +126,8 @@ private:
     Q_SLOT void testMakeTrustDecisions();
     Q_SLOT void testHandleMessage_data();
     Q_SLOT void testHandleMessage();
+    Q_SLOT void testHandleMessageNotDecrypted_data();
+    Q_SLOT void testHandleMessageNotDecrypted();
     Q_SLOT void testMakeTrustDecisionsNoKeys();
     Q_SLOT void testMakeTrustDecisionsOwnKeys();
     Q_SLOT void testMakeTrustDecisionsOwnKeysNoOwnEndpoints();
@@ -1814,6 +1817,8 @@ void tst_QXmppTrustManager::testHandleMessage_data()
 
     QXmppE2eeMetadata e2eeMetadata;
     e2eeMetadata.setSenderKey(QByteArray::fromBase64(QByteArrayLiteral("RwyI/3m9l4wgju9JduFxb5MEJvBNRDfPfo1Ewhl1DEI=")));
+    e2eeMetadata.setEncryptionNamespace(ns_omemo);
+    e2eeMetadata.setContentEncryption(E2ee::ContentEncryption::Sce);
 
     QList<QXmppTrustMessageKeyOwner> keyOwners;
     keyOwners << keyOwnerAlice << keyOwnerBob;
@@ -2062,6 +2067,83 @@ void tst_QXmppTrustManager::testHandleMessage()
         auto resultHash2 = futureHash2.result();
         QVERIFY(resultHash2.isEmpty());
     }
+}
+
+void tst_QXmppTrustManager::testHandleMessageNotDecrypted_data()
+{
+    QTest::addColumn<std::optional<QXmppE2eeMetadata>>("e2eeMetadata");
+
+    const auto senderKey = QByteArray::fromBase64(QByteArrayLiteral("qfNJsEMZ8jru0dS76DtYaTxZjiVQ5lpJWBiyaUj9UGU="));
+
+    QTest::newRow("unencrypted")
+        << std::optional<QXmppE2eeMetadata>();
+
+    QXmppE2eeMetadata e2eeMetadata;
+    e2eeMetadata.setEncryptionNamespace(ns_omemo);
+    e2eeMetadata.setContentEncryption(E2ee::ContentEncryption::Sce);
+
+    QTest::newRow("withoutSenderKey")
+        << std::optional(e2eeMetadata);
+
+    e2eeMetadata.setSenderKey(senderKey);
+    e2eeMetadata.setContentEncryption(E2ee::ContentEncryption::BodyOnly);
+
+    QTest::newRow("bodyOnly")
+        << std::optional(e2eeMetadata);
+
+    e2eeMetadata.setContentEncryption(std::nullopt);
+
+    QTest::newRow("contentEncryptionUnknown")
+        << std::optional(e2eeMetadata);
+
+    e2eeMetadata.setContentEncryption(E2ee::ContentEncryption::Sce);
+    e2eeMetadata.setEncryptionNamespace(ns_omemo_2);
+
+    QTest::newRow("otherEncryption")
+        << std::optional(e2eeMetadata);
+}
+
+// Trust messages that have not been encrypted completely with the encryption of their keys are not
+// used, also if the sender's key of that encryption is authenticated.
+void tst_QXmppTrustManager::testHandleMessageNotDecrypted()
+{
+    clearTrustStorage();
+
+    QFETCH(std::optional<QXmppE2eeMetadata>, e2eeMetadata);
+
+    const auto senderKey = QByteArray::fromBase64(QByteArrayLiteral("qfNJsEMZ8jru0dS76DtYaTxZjiVQ5lpJWBiyaUj9UGU="));
+    m_manager.addKeys(ns_omemo, u"bob@example.com"_s, { senderKey }, TrustLevel::Authenticated);
+
+    QXmppTrustMessageKeyOwner keyOwnerBob;
+    keyOwnerBob.setJid(u"bob@example.com"_s);
+    keyOwnerBob.setTrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("nKT6zqFRNDq6GpWQIV/CwbA65fqN9Bo4qVxMfFjwl1w=")) });
+    keyOwnerBob.setDistrustedKeys({ QByteArray::fromBase64(QByteArrayLiteral("b3EsvoNBgUpiQD9KRHmosP/rR7T+3BA84MQw4N6eZmU=")) });
+
+    QXmppTrustMessageElement trustMessageElement;
+    trustMessageElement.setUsage(ns_atm);
+    trustMessageElement.setEncryption(ns_omemo);
+    trustMessageElement.setKeyOwners({ keyOwnerBob });
+
+    QXmppMessage message;
+    message.setFrom(u"bob@example.com/notebook"_s);
+    message.setTrustMessageElement(trustMessageElement);
+    message.setE2eeMetadata(e2eeMetadata);
+
+    auto future = m_manager.handleMessage(message);
+    while (!future.isFinished()) {
+        QCoreApplication::processEvents();
+    }
+
+    // only the key of the sender
+    auto keysFuture = m_manager.keys(ns_omemo);
+    QVERIFY(keysFuture.isFinished());
+    QMultiHash<QString, QByteArray> authenticatedKeys;
+    authenticatedKeys.insert(u"bob@example.com"_s, senderKey);
+    QCOMPARE(keysFuture.result(), QHash({ std::pair(TrustLevel::Authenticated, authenticatedKeys) }));
+
+    auto postponedFuture = m_trustStorage.keysForPostponedTrustDecisions(ns_omemo);
+    QVERIFY(postponedFuture.isFinished());
+    QVERIFY(postponedFuture.result().isEmpty());
 }
 
 void tst_QXmppTrustManager::testMakeTrustDecisionsNoKeys()

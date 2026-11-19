@@ -281,24 +281,37 @@ QXmppTask<void> QXmppAtmManager::makeTrustDecisions(QString encryption, QMultiHa
     Handles incoming messages and uses included trust message elements for
     making automatic trust decisions. \a message is a message that can contain a trust message
     element.
+
+    Only trust messages that have been encrypted completely
+    (QXmpp::E2ee::ContentEncryption::Sce, see QXmppE2eeMetadata::contentEncryption()) with the
+    encryption of their keys are used, since the trust decisions depend on the key of the sender.
 */
 QXmppTask<void> QXmppAtmManager::handleMessage(const QXmppMessage &message)
 {
     const auto trustMessageElement = message.trustMessageElement();
+    const auto e2eeMetadata = message.e2eeMetadata();
 
     // Skip further processing in the following cases:
     // 1. The message does not contain an ATM trust message element.
     // 2. The trust message is sent by this endpoint and reflected via
     //    Message Carbons.
+    // 3. The trust message has not been decrypted, so there is no sender key.
+    // 4. The trust message may have been received in the clear, e.g. next to a body encrypted
+    //    with OMEMO 0, so anyone on the path could have added it.
+    // 5. The trust message has been decrypted with another encryption than the one of its keys,
+    //    so the sender key is not one of that encryption.
     if (!trustMessageElement ||
         trustMessageElement->usage() != ns_atm ||
-        jidsEqual(message.from(), client()->configuration().jid())) {
+        jidsEqual(message.from(), client()->configuration().jid()) ||
+        !e2eeMetadata ||
+        e2eeMetadata->senderKey().isEmpty() ||
+        e2eeMetadata->contentEncryption() != QXmpp::E2ee::ContentEncryption::Sce ||
+        e2eeMetadata->encryptionNamespace() != trustMessageElement->encryption()) {
         co_return;
     }
 
     const auto senderJid = jidBare(message.from());
-    const auto e2eeMetadata = message.e2eeMetadata();
-    const auto senderKey = e2eeMetadata ? e2eeMetadata->senderKey() : QByteArray();
+    const auto senderKey = e2eeMetadata->senderKey();
     const auto encryption = trustMessageElement->encryption();
 
     auto senderKeyTrustLevel = co_await trustLevel(encryption, senderJid, senderKey).withContext(this);
