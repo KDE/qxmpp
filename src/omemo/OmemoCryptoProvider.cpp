@@ -108,18 +108,20 @@ int encrypt_func(signal_buffer **output,
 {
     auto *d = managerPrivate(user_data);
 
-    const auto keyData = QByteArray(reinterpret_cast<const char *>(key), key_len);
+    // a message key of the session
+    const Crypto::SecureByteArray keyData(reinterpret_cast<const char *>(key), int(key_len));
     const auto ivData = QByteArray(reinterpret_cast<const char *>(iv), iv_len);
-    const auto plaintextData = QByteArray(reinterpret_cast<const char *>(plaintext), plaintext_len);
+    // e.g. the key material of a payload
+    const Crypto::SecureByteArray plaintextData(reinterpret_cast<const char *>(plaintext), int(plaintext_len));
 
     QByteArray encryptedData;
 
     switch (cipher) {
     case SG_CIPHER_AES_CTR_NOPADDING:
-        encryptedData = Crypto::aesCtrProcess(plaintextData, keyData, ivData);
+        encryptedData = Crypto::aesCtrProcess(plaintextData.toByteArray(), keyData.toByteArray(), ivData);
         break;
     case SG_CIPHER_AES_CBC_PKCS5:
-        encryptedData = Crypto::aesCbcEncrypt(plaintextData, keyData, ivData);
+        encryptedData = Crypto::aesCbcEncrypt(plaintextData.toByteArray(), keyData.toByteArray(), ivData);
         break;
     default:
         return -2;
@@ -148,18 +150,20 @@ int decrypt_func(signal_buffer **output,
 {
     auto *d = managerPrivate(user_data);
 
-    const auto keyData = QByteArray(reinterpret_cast<const char *>(key), key_len);
+    // a message key of the session
+    const Crypto::SecureByteArray keyData(reinterpret_cast<const char *>(key), int(key_len));
     const auto ivData = QByteArray(reinterpret_cast<const char *>(iv), iv_len);
     const auto ciphertextData = QByteArray(reinterpret_cast<const char *>(ciphertext), ciphertext_len);
 
-    QByteArray decryptedData;
+    // e.g. the key material of a payload
+    Crypto::SecureByteArray decryptedData;
 
     switch (cipher) {
     case SG_CIPHER_AES_CTR_NOPADDING:
-        decryptedData = Crypto::aesCtrProcess(ciphertextData, keyData, ivData);
+        decryptedData = Crypto::SecureByteArray(Crypto::aesCtrProcess(ciphertextData, keyData.toByteArray(), ivData));
         break;
     case SG_CIPHER_AES_CBC_PKCS5:
-        decryptedData = Crypto::aesCbcDecrypt(ciphertextData, keyData, ivData);
+        decryptedData = Crypto::SecureByteArray(Crypto::aesCbcDecrypt(ciphertextData, keyData.toByteArray(), ivData));
         break;
     default:
         return -2;
