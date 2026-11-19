@@ -587,7 +587,7 @@ QXmppTask<Mam::RetrieveResult> QXmppMamManager::retrieve(const Mam::Query &query
     auto [itr, inserted] = d->ongoingRequests.insert({ queryId.toStdString(), RetrieveRequestState() });
     Q_ASSERT(inserted);
     itr->second.queriedJid = query.to.isEmpty() ? client()->configuration().jidBare() : query.to;
-    itr->second.archiveJid = QXmppUtils::jidToBareJid(itr->second.queriedJid);
+    itr->second.archiveJid = jidBare(itr->second.queriedJid);
     itr->second.flipPage = query.flipPage;
 
     // create task here; promise could finish immediately after client()->sendIq()
@@ -694,7 +694,7 @@ void QXmppMamManagerPrivate::processMessage(const QString &queryId, RetrieveRequ
     Context context(std::move(parsed.message), Origin::Mam);
     if (jidsEqual(context.senderJid(), client->configuration().jidBare())) {
         // sent by this account
-        context.setConversationJid(QXmppUtils::jidToBareJid(context.message().to()));
+        context.setConversationJid(jidBare(context.message().to()));
     }
     ArchiveInfo info;
     info.setArchiveJid(state.archiveJid);

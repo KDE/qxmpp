@@ -911,7 +911,7 @@ QXmppTask<QXmppE2eeExtension::MessageEncryptResult> Manager::encryptMessage(QXmp
     }
 
     if (recipientJids.isEmpty()) {
-        recipientJids.append(QXmppUtils::jidToBareJid(message.to()));
+        recipientJids.append(jidBare(message.to()));
     }
 
     if (!acceptedTrustLevels) {
@@ -963,7 +963,7 @@ QXmppTask<QXmppE2eeExtension::IqEncryptResult> Manager::encryptIq(QXmppIq &&iqRe
         acceptedTrustLevels = ACCEPTED_TRUST_LEVELS;
     }
 
-    auto omemoElement = co_await d->encryptStanza(iq, { QXmppUtils::jidToBareJid(iq.to()) }, *acceptedTrustLevels);
+    auto omemoElement = co_await d->encryptStanza(iq, { jidBare(iq.to()) }, *acceptedTrustLevels);
     if (!omemoElement) {
         co_return QXmppError {
             u"OMEMO element could not be created"_s,

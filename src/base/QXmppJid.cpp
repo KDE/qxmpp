@@ -723,6 +723,12 @@ QDebug operator<<(QDebug debug, const Jid &jid)
 
 namespace QXmpp::Private {
 
+static QStringView splitBare(QStringView jid)
+{
+    auto slash = jid.indexOf(u'/');
+    return slash < 0 ? jid : jid.first(slash);
+}
+
 bool jidsEqual(QStringView a, QStringView b)
 {
     if (a == b) {
@@ -735,16 +741,48 @@ bool jidsEqual(QStringView a, QStringView b)
 
 bool bareJidsEqual(QStringView a, QStringView b)
 {
-    auto bare = [](QStringView jid) {
-        auto slash = jid.indexOf(u'/');
-        return slash < 0 ? jid : jid.first(slash);
-    };
-    if (bare(a) == bare(b)) {
+    if (splitBare(a) == splitBare(b)) {
         return true;
     }
     auto jidA = Jid::fromString(a);
     auto jidB = Jid::fromString(b);
     return jidA && jidB && jidA->bare() == jidB->bare();
+}
+
+QString jidBare(QStringView jid)
+{
+    if (auto parsed = Jid::fromString(jid)) {
+        return parsed->bare().toString();
+    }
+    return splitBare(jid).toString();
+}
+
+QString jidLocalpart(QStringView jid)
+{
+    if (auto parsed = Jid::fromString(jid)) {
+        return parsed->localpart().toString();
+    }
+    auto bare = splitBare(jid);
+    auto at = bare.indexOf(u'@');
+    return at < 0 ? QString() : bare.first(at).toString();
+}
+
+QString jidDomain(QStringView jid)
+{
+    if (auto parsed = Jid::fromString(jid)) {
+        return parsed->domain().toString();
+    }
+    auto bare = splitBare(jid);
+    return bare.sliced(bare.indexOf(u'@') + 1).toString();
+}
+
+QString jidResource(QStringView jid)
+{
+    if (auto parsed = Jid::fromString(jid)) {
+        return parsed->resource().toString();
+    }
+    auto slash = jid.indexOf(u'/');
+    return slash < 0 ? QString() : jid.sliced(slash + 1).toString();
 }
 
 }  // namespace QXmpp::Private

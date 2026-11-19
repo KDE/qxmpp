@@ -12,6 +12,7 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppIqStanza.h"
+#include "QXmppJid_p.h"
 #include "QXmppPresence.h"
 #include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
@@ -1071,7 +1072,7 @@ void QXmppDiscoveryManagerPrivate::dropInfo(const QString &jid)
 void QXmppDiscoveryManagerPrivate::handlePresence(const QXmppPresence &presence)
 {
     const auto jid = presence.from();
-    if (QXmppUtils::jidToResource(jid).isEmpty()) {
+    if (Private::jidResource(jid).isEmpty()) {
         return;
     }
 
@@ -1384,7 +1385,7 @@ void QXmppDiscoveryManagerPrivate::refreshInfoWatches(bool newStream)
         }
         // Presences are received after the connection has been established. With entity
         // capabilities, the info is often cached, so no request is needed.
-        if (newStream && entry->node.isEmpty() && !QXmppUtils::jidToResource(entry->jid).isEmpty()) {
+        if (newStream && entry->node.isEmpty() && !Private::jidResource(entry->jid).isEmpty()) {
             entry->awaitingPresence = true;
         }
         if (entry->awaitingPresence) {

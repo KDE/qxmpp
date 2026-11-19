@@ -5,6 +5,7 @@
 #include "QXmppTrustMessages.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -184,7 +185,7 @@ QString QXmppTrustMessageKeyOwner::jid() const
 */
 void QXmppTrustMessageKeyOwner::setJid(const QString &jid)
 {
-    d->jid = QXmppUtils::jidToBareJid(jid);
+    d->jid = jidBare(jid);
 }
 
 /*!

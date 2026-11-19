@@ -7,6 +7,7 @@
 
 #include "QXmppAtmTrustMemoryStorage.h"
 #include "QXmppClient.h"
+#include "QXmppJid.h"
 #include "QXmppOmemoMemoryStorage.h"
 
 #include <QSet>
@@ -30,7 +31,7 @@ private:
     QXmppOmemoManager *m_omemoManager = nullptr;
     bool m_omemoInitialized = false;
     // contacts that sent OMEMO encrypted messages
-    QSet<QString> m_omemoContacts;
+    QSet<QXmpp::Jid> m_omemoContacts;
 };
 
 #endif  // EXAMPLE_1A_ECHOCLIENTOMEMO_H

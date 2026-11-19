@@ -1195,7 +1195,7 @@ void QXmppTransferManager::_q_jobStateChanged(QXmppTransferJob::State state)
 */
 QXmppTransferJob *QXmppTransferManager::sendFile(const QString &jid, const QString &filePath, const QString &description)
 {
-    if (QXmppUtils::jidToResource(jid).isEmpty()) {
+    if (jidResource(jid).isEmpty()) {
         warning(u"The file recipient's JID must be a full JID"_s);
         return nullptr;
     }
@@ -1248,7 +1248,7 @@ QXmppTransferJob *QXmppTransferManager::sendFile(const QString &jid, const QStri
 */
 QXmppTransferJob *QXmppTransferManager::sendFile(const QString &jid, QIODevice *device, const QXmppTransferFileInfo &fileInfo, const QString &sid)
 {
-    if (QXmppUtils::jidToResource(jid).isEmpty()) {
+    if (jidResource(jid).isEmpty()) {
         warning(u"The file recipient's JID must be a full JID"_s);
         return nullptr;
     }

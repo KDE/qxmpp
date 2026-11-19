@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqHandling.h"
 #include "QXmppIqStanza.h"
+#include "QXmppJid_p.h"
 #include "QXmppSpamReport.h"
 #include "QXmppStanzaHandling_p.h"
 #include "QXmppUtils.h"
@@ -466,9 +467,9 @@ bool QXmppBlocklist::containsEntry(QStringView entry) const
 */
 QXmppBlocklist::BlockingState QXmppBlocklist::blockingState(const QString &jid) const
 {
-    auto user = QXmppUtils::jidToUser(jid);
-    auto domain = QXmppUtils::jidToDomain(jid);
-    auto resource = QXmppUtils::jidToResource(jid);
+    auto user = jidLocalpart(jid);
+    auto domain = jidDomain(jid);
+    auto resource = jidResource(jid);
 
     Q_ASSERT(!jid.isEmpty());
     Q_ASSERT(!domain.isEmpty());

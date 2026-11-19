@@ -91,7 +91,7 @@ struct MucParticipantData {
     void setBindings()
     {
         nickname.setBinding([&] {
-            return QXmppUtils::jidToResource(presence.value().from());
+            return jidResource(presence.value().from());
         });
         jid.setBinding([&] {
             return presence.value().mucParticipantItem().jid();
@@ -344,7 +344,7 @@ struct MucRoomData {
 
     void updateAffiliation(const QString &jid, Muc::Affiliation affiliation)
     {
-        const auto bareJid = QXmppUtils::jidToBareJid(jid);
+        const auto bareJid = jidBare(jid);
         if (bareJid.isEmpty()) {
             return;
         }
@@ -757,7 +757,7 @@ QXmppTask<Result<bool>> QXmppMucManagerV2::isMucRoom(const QString &jid)
 
     // A MUC service advertises the same identity and feature as a room, so require a localpart
     // to tell a room from the service hosting it (XEP-0045 §6.2 vs §6.4).
-    if (QXmppUtils::jidToUser(jid).isEmpty()) {
+    if (jidLocalpart(jid).isEmpty()) {
         co_return false;
     }
 
@@ -957,7 +957,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         return false;
     }
 
-    auto bareFrom = QXmppUtils::jidToBareJid(uncheckedMessage.from());
+    auto bareFrom = jidBare(uncheckedMessage.from());
 
     // Handle invitations from users we haven't joined a room with.
     if (type == QXmppMessage::Normal) {
@@ -1008,7 +1008,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
             }
             // Affiliation changes of users not in the room (XEP-0045 §9.3 ff.), only from the
             // room itself.
-            if (const auto &ue = message.mucUserQuery(); ue && !ue->items().isEmpty() && QXmppUtils::jidToResource(message.from()).isEmpty()) {
+            if (const auto &ue = message.mucUserQuery(); ue && !ue->items().isEmpty() && jidResource(message.from()).isEmpty()) {
                 for (const auto &item : ue->items()) {
                     if (const auto affiliation = item.affiliation()) {
                         data.updateAffiliation(item.jid(), *affiliation);
@@ -1054,7 +1054,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
             // XEP-0425 security rule: moderated retractions are only legitimate when sent by the
             // room/service itself, i.e. from the bare room JID without an occupant resource.
             // Spoofed moderated retractions are not signalled via messageRetracted().
-            if (!retraction->moderation() || QXmppUtils::jidToResource(message.from()).isEmpty()) {
+            if (!retraction->moderation() || jidResource(message.from()).isEmpty()) {
                 Q_EMIT messageRetracted(bareFrom, *retraction);
             }
         }
@@ -1075,7 +1075,7 @@ bool QXmppMucManagerV2::handleMessage(const QXmppMessage &uncheckedMessage)
         // Status notifications of the room itself (XEP-0045 §10.2.1) without text are handled
         // here, like subject changes. All other messages are delivered by the client.
         const auto isStatusNotification = userQuery && !userQuery->statusCodes().isEmpty() &&
-            message.body().isEmpty() && QXmppUtils::jidToResource(message.from()).isEmpty();
+            message.body().isEmpty() && jidResource(message.from()).isEmpty();
         return isSubjectChange || isStatusNotification;
     }
     default:
@@ -1184,7 +1184,7 @@ QXmppDiscoveryManager *QXmppMucManagerV2Private::disco()
 
 void QXmppMucManagerV2Private::handlePresence(const QXmppPresence &p)
 {
-    auto bareFrom = QXmppUtils::jidToBareJid(p.from());
+    auto bareFrom = jidBare(p.from());
     if (auto itr = activeRooms.find(bareFrom); itr != activeRooms.end()) {
         handleRoomPresence(bareFrom, *itr->second, p);
     }
@@ -1223,7 +1223,7 @@ void QXmppMucManagerV2Private::handleRoomPresence(const QString &roomJid, QXmpp:
 {
     using enum MucRoomState;
 
-    auto nickname = QXmppUtils::jidToResource(presence.from());
+    auto nickname = jidResource(presence.from());
 
     // Presences from the room itself (e.g. ejabberd's entity capabilities) are no occupants.
     if (nickname.isEmpty() && presence.type() != QXmppPresence::Error) {
@@ -1833,8 +1833,8 @@ MucOccupantChanges QXmppMucManagerV2Private::finishRejoin(MucRoomData &data, Muc
         if (!a.occupantId.isEmpty() && !b.occupantId.isEmpty()) {
             return a.occupantId == b.occupantId;
         }
-        const auto aJid = QXmppUtils::jidToBareJid(a.jid.value());
-        const auto bJid = QXmppUtils::jidToBareJid(b.jid.value());
+        const auto aJid = jidBare(a.jid.value());
+        const auto bJid = jidBare(b.jid.value());
         if (!aJid.isEmpty() && !bJid.isEmpty()) {
             return aJid == bJid;
         }
@@ -2186,7 +2186,7 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
         co_return Continue;
     }
 
-    const auto roomJid = QXmppUtils::jidToBareJid(message.from());
+    const auto roomJid = jidBare(message.from());
     auto roomItr = activeRooms.find(roomJid);
     if (roomItr == activeRooms.end()) {
         co_return Continue;
@@ -2208,7 +2208,7 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
             co_return Stop;
         }
         // only the room reflects the message with the own nickname
-        if (context.origin() != Messages::Origin::Mam && QXmppUtils::jidToResource(message.from()) == data->nickname.value()) {
+        if (context.origin() != Messages::Origin::Mam && jidResource(message.from()) == data->nickname.value()) {
             auto promise = std::move(pendingItr->second.promise);
             data->pendingMessages.erase(pendingItr);
             const auto stanzaIds = message.stanzaIds();
@@ -2223,7 +2223,7 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
 
     // The occupant of the message is looked up now: the occupants may change until the
     // disco#info result tells whether occupant IDs are valid.
-    const auto nickname = QXmppUtils::jidToResource(message.from());
+    const auto nickname = jidResource(message.from());
     std::shared_ptr<MucParticipantData> byOccupantId;
     std::shared_ptr<MucParticipantData> byNickname;
     if (!nickname.isEmpty()) {
@@ -2276,7 +2276,7 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
         const auto *archive = context.attachment<Messages::ArchiveInfo>();
         if (context.origin() == Messages::Origin::Mam && archive && jidsEqual(archive->archiveJid(), roomJid) &&
             data->isNonAnonymous.value() && !archive->occupantJid().isEmpty()) {
-            context.setSenderJid(QXmppUtils::jidToBareJid(archive->occupantJid()));
+            context.setSenderJid(jidBare(archive->occupantJid()));
         }
         co_return Continue;
     }
@@ -2284,7 +2284,7 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
     if (participant == data->selfParticipant.value()) {
         context.setSenderJid(q->client()->configuration().jidBare());
     } else if (const auto jid = participant->jid.value(); !jid.isEmpty()) {
-        context.setSenderJid(QXmppUtils::jidToBareJid(jid));
+        context.setSenderJid(jidBare(jid));
     }
     co_return Continue;
 }
@@ -2295,7 +2295,7 @@ MucRoomData *QXmppMucManagerV2Private::joinedRoom(const QXmppMessage &message)
     if (message.type() != QXmppMessage::GroupChat) {
         return nullptr;
     }
-    auto itr = activeRooms.find(QXmppUtils::jidToBareJid(message.to()));
+    auto itr = activeRooms.find(jidBare(message.to()));
     if (itr == activeRooms.end() || itr->second->state != MucRoomState::Joined) {
         return nullptr;
     }
@@ -2358,7 +2358,7 @@ QXmppTask<void> QXmppMucManagerV2Private::resolveRecipients(Messages::OutgoingMe
     const auto self = data->selfParticipant.value();
     for (const auto &[_, participant] : data->participants) {
         if (participant != self) {
-            add(QXmppUtils::jidToBareJid(participant->jid.value()));
+            add(jidBare(participant->jid.value()));
         }
     }
     outgoing.recipientJids() = recipients;
@@ -2398,7 +2398,7 @@ QXmppTask<void> QXmppMucManagerV2Private::fetchAffiliations(QString roomJid, uin
         auto result = co_await request.withContext(q);
         if (auto *adminQuery = std::get_if<MucAdminQuery>(&result)) {
             for (const auto &item : adminQuery->items) {
-                if (const auto jid = QXmppUtils::jidToBareJid(item.jid()); !jid.isEmpty()) {
+                if (const auto jid = jidBare(item.jid()); !jid.isEmpty()) {
                     affiliations.emplace(jid, affiliation);
                 }
             }

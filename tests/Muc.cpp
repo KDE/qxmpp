@@ -6,6 +6,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppE2eeProvider.h"
+#include "QXmppJid_p.h"
 #include "QXmppMamManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
@@ -1250,7 +1251,7 @@ static QXmppMucRoomV2 createdRoom(TestClient &test, QXmppMucManagerV2 *muc,
                                   const QString &roomJid = u"newroom@chat.shakespeare.lit"_s,
                                   const QString &nick = u"thirdwitch"_s)
 {
-    auto createTask = muc->createRoom(QXmppUtils::jidToDomain(roomJid), nick, QXmppUtils::jidToUser(roomJid));
+    auto createTask = muc->createRoom(jidDomain(roomJid), nick, jidLocalpart(roomJid));
     test.ignore();  // presence
     QXmppPresence selfPresence;
     parsePacket(selfPresence,

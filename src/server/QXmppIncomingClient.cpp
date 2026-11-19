@@ -7,6 +7,7 @@
 #include "QXmppBindIq.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIqStanza.h"
+#include "QXmppJid_p.h"
 #include "QXmppPasswordChecker.h"
 #include "QXmppSasl_p.h"
 #include "QXmppStreamFeatures.h"
@@ -397,7 +398,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
                     if (d->resource.isEmpty()) {
                         d->resource = QXmppUtils::generateStanzaHash();
                     }
-                    d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
+                    d->jid = u"%1/%2"_s.arg(jidBare(d->jid), d->resource);
 
                     sendData(serializeXml(Iq::Result<BindElement> {
                         bindSet->id,
@@ -423,7 +424,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
 
         // check the sender is legitimate
         const QString from = nodeRecv.attribute(u"from"_s);
-        if (!from.isEmpty() && from != d->jid && from != QXmppUtils::jidToBareJid(d->jid)) {
+        if (!from.isEmpty() && from != d->jid && from != jidBare(d->jid)) {
             warning(u"Received a stanza from unexpected JID %1"_s.arg(from));
             return;
         }
@@ -438,7 +439,7 @@ void QXmppIncomingClient::handleStanza(const QDomElement &nodeRecv)
                 if (nodeFull.tagName() == u"presence" &&
                     (nodeFull.attribute(u"type"_s) == u"subscribe" ||
                      nodeFull.attribute(u"type"_s) == u"subscribed")) {
-                    nodeFull.setAttribute(u"from"_s, QXmppUtils::jidToBareJid(d->jid));
+                    nodeFull.setAttribute(u"from"_s, jidBare(d->jid));
                 } else {
                     nodeFull.setAttribute(u"from"_s, d->jid);
                 }
@@ -574,7 +575,7 @@ void QXmppIncomingClient::onSasl2Authenticated()
         } else {
             d->resource = tag + u'.' + QXmppUtils::generateStanzaHash(RESOURCE_RANDOM_SUFFIX_LENGTH);
         }
-        d->jid = u"%1/%2"_s.arg(QXmppUtils::jidToBareJid(d->jid), d->resource);
+        d->jid = u"%1/%2"_s.arg(jidBare(d->jid), d->resource);
 
         sendData(serializeXml(Sasl2::Success { {}, d->jid, Bind2Bound {} }));
 

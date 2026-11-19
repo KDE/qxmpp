@@ -5,8 +5,8 @@
 
 #include "example_3_transferHandling.h"
 
+#include "QXmppJid.h"
 #include "QXmppMessage.h"
-#include "QXmppUtils.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -82,8 +82,9 @@ void xmppClient::slotPresenceReceived(const QXmppPresence &presence)
 {
     // if we don't have a recipient, or if the presence is not from the recipient,
     // do nothing
-    if (m_recipient.isEmpty() ||
-        QXmppUtils::jidToBareJid(presence.from()) != m_recipient ||
+    const auto from = QXmpp::Jid::fromString(presence.from());
+    if (m_recipient.isEmpty() || !from ||
+        QXmpp::Jid::fromString(m_recipient) != from->bare() ||
         presence.type() != QXmppPresence::Available) {
         return;
     }

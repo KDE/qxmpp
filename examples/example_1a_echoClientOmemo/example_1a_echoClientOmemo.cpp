@@ -11,7 +11,6 @@
 #include "QXmppMessages.h"
 #include "QXmppOmemoManager.h"
 #include "QXmppPubSubManager.h"
-#include "QXmppUtils.h"
 
 #include <QCoreApplication>
 
@@ -33,7 +32,7 @@ EchoClientOmemo::EchoClientOmemo(QObject *parent)
     // encrypted messages get OMEMO encrypted replies. A real application would use a setting of
     // the user per conversation instead.
     hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
-        if (m_omemoContacts.contains(QXmppUtils::jidToBareJid(selection.to()))) {
+        if (auto to = QXmpp::Jid::fromString(selection.to()); to && m_omemoContacts.contains(to->bare())) {
             selection.setEncryption(QXmpp::E2ee::Omemo2);
         }
     });
@@ -82,7 +81,9 @@ void EchoClientOmemo::messageReceived(const QXmppMessage &message)
     }
 
     if (const auto metadata = message.e2eeMetadata(); metadata && metadata->encryptionNamespace() == QXmpp::E2ee::Omemo2) {
-        m_omemoContacts.insert(QXmppUtils::jidToBareJid(message.from()));
+        if (auto from = QXmpp::Jid::fromString(message.from())) {
+            m_omemoContacts.insert(from->bare());
+        }
     }
 
     send(QXmppMessage({}, message.from(), u"Your message: " + message.body()));

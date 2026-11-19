@@ -6,6 +6,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppCredentials.h"
+#include "QXmppJid_p.h"
 #include "QXmppSasl2UserAgent.h"
 #include "QXmppSasl_p.h"
 #include "QXmppUtils.h"
@@ -259,9 +260,9 @@ void QXmppConfiguration::setResourcePrefix(const QString &resourcePrefix)
 */
 void QXmppConfiguration::setJid(const QString &jid)
 {
-    d->user = QXmppUtils::jidToUser(jid);
-    d->domain = QXmppUtils::jidToDomain(jid);
-    const QString resource = QXmppUtils::jidToResource(jid);
+    d->user = jidLocalpart(jid);
+    d->domain = jidDomain(jid);
+    const QString resource = jidResource(jid);
     if (!resource.isEmpty()) {
         d->resource = resource;
     }

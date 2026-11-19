@@ -10,6 +10,7 @@
 #include "QXmppEncryptedIqs_p.h"
 #include "QXmppHooks_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppJid_p.h"
 #include "QXmppLogger.h"
 #include "QXmppOutgoingClient_p.h"
 #include "QXmppPacket_p.h"
@@ -126,7 +127,7 @@ QXmppTask<EncryptedIqs::Encryption> EncryptedIqs::encrypt(const OutgoingIq &iq, 
     auto to = iq.to.isEmpty() ? m_client->configuration().jidBare() : iq.to;
     auto recipients = params.encryptionJids();
     if (recipients.isEmpty()) {
-        recipients.append(QXmppUtils::jidToBareJid(to));
+        recipients.append(jidBare(to));
     }
 
     E2ee::EncryptIqRequest request;
@@ -153,7 +154,7 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
 
     const auto ownJid = client->configuration().jidBare();
     // IQs from the server on behalf of the account have no 'from'
-    const auto senderJid = iq.hasAttribute(u"from"_s) ? QXmppUtils::jidToBareJid(iq.attribute(u"from"_s)) : ownJid;
+    const auto senderJid = iq.hasAttribute(u"from"_s) ? jidBare(iq.attribute(u"from"_s)) : ownJid;
 
     E2ee::DecryptIqRequest request;
     request.setIq(iq);

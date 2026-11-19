@@ -5,6 +5,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppGlobal_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoEnvelope_p.h"
 #include "QXmppUtils.h"
@@ -193,7 +194,7 @@ std::optional<QXmppOmemoEnvelope> QXmppOmemoElement::searchEnvelope(const QStrin
 */
 void QXmppOmemoElement::addEnvelope(const QString &recipientJid, const QXmppOmemoEnvelope &envelope)
 {
-    m_envelopes.insert(QXmppUtils::jidToBareJid(recipientJid), envelope);
+    m_envelopes.insert(jidBare(recipientJid), envelope);
 }
 
 void QXmppOmemoElement::parse(const QDomElement &element)

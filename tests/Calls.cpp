@@ -17,6 +17,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppExternalServiceDiscoveryIq.h"
 #include "QXmppExternalServiceDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppJingleMessageInitiationManager.h"
 #include "QXmppMessage.h"
 #include "QXmppServer.h"
@@ -502,7 +503,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleTieBreak()
 {
     QString callPartnerJid { "romeoHandleTieBreakExistingSession@montague.example/orchard" };
     QString jmiId { "ca3cf894-5325-482f-a412-a6e9f832298d" };
-    auto jmi = m_manager.addJmi(jmiId, QXmppUtils::jidToBareJid(callPartnerJid));
+    auto jmi = m_manager.addJmi(jmiId, QXmpp::Private::jidBare(callPartnerJid));
 
     QXmppJingleMessageInitiationElement jmiElement;
     QString newJmiId("989a46a6-f202-4910-a7c3-83c6ba3f3947");
@@ -511,10 +512,10 @@ void tst_QXmppJingleMessageInitiationManager::testHandleTieBreak()
     // Signal spy assertions depend on sends succeeding, which requires a real
     // server connection with valid JIDs. Only verify the return value here.
     jmi->setIsProceeded(true);
-    QVERIFY(m_manager.handleTieBreak(jmi, jmiElement, QXmppUtils::jidToResource(callPartnerJid)));
+    QVERIFY(m_manager.handleTieBreak(jmi, jmiElement, QXmpp::Private::jidResource(callPartnerJid)));
 
     jmi->setIsProceeded(false);
-    QVERIFY(m_manager.handleTieBreak(jmi, jmiElement, QXmppUtils::jidToResource(callPartnerJid)));
+    QVERIFY(m_manager.handleTieBreak(jmi, jmiElement, QXmpp::Private::jidResource(callPartnerJid)));
 
     m_manager.clearAll();
 }
@@ -699,7 +700,7 @@ void tst_QXmppJingleMessageInitiationManager::testHandleJmiElement()
     jmiElement = {};
     jmiElement.setType(JmiType::Ringing);
     jmiElement.setId(jmiId);
-    auto jmi = m_manager.addJmi(jmiId, QXmppUtils::jidToBareJid(callPartnerJid));
+    auto jmi = m_manager.addJmi(jmiId, QXmpp::Private::jidBare(callPartnerJid));
 
     QSignalSpy ringingSpy(jmi.get(), &QXmppJingleMessageInitiation::ringing);
     QVERIFY(m_manager.handleJmiElement(std::move(jmiElement), callPartnerJid));

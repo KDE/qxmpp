@@ -21,6 +21,7 @@
 #include "QXmppE2eeMetadata.h"
 #include "QXmppE2eeProvider.h"
 #include "QXmppHooks.h"
+#include "QXmppJid_p.h"
 #include "QXmppMamManager.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
@@ -1517,7 +1518,7 @@ void tst_QXmppAttentionManager::testReceived()
 
     connect(manager, &QXmppAttentionManager::attentionRequested, &context, [&](const QXmppMessage &receivedMsg, bool isTrusted) {
         signalCalled = true;
-        QCOMPARE(isTrusted, QXmppUtils::jidToBareJid(receivedMsg.from()) == u"contact@qxmpp.org");
+        QCOMPARE(isTrusted, QXmpp::Private::jidBare(receivedMsg.from()) == u"contact@qxmpp.org");
         QCOMPARE(receivedMsg.body(), msg.body());
     });
 

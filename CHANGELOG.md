@@ -8,6 +8,11 @@ QXmpp 1.18.0 (UNRELEASED)
 -------------------------
 
  - Add `QXmpp::Jid` for parsing, validating and comparing JIDs according to RFC 7622 (PRECIS, IDNA2008), with access to localpart, domainpart and resourcepart, XEP-0106: JID Escaping and `fromUserInput()` for JIDs entered by users (@lnj, !857)
+ - Compare JIDs according to RFC 7622 when checking senders and recipients (IQ responses, carbon copies, roster pushes, SCE affixes, MUC, Jingle, file transfers) (@lnj, !857)
+ - Ignore received stanzas with malformed `from` or `to` addresses (@lnj, !857)
+ - JIDs determined by QXmpp (e.g. `QXmpp::Messages::Context::senderJid()`, `QXmppConfiguration::user()` and `domain()` after `setJid()`) are in canonical form now (@lnj, !857)
+ - Fix `QXmppUtils::jidToUser()` for JIDs with an '@' in the resourcepart (@lnj, !857)
+ - Deprecate `QXmppUtils::jidToBareJid()`, `jidToDomain()`, `jidToUser()` and `jidToResource()`, use `QXmpp::Jid` (@lnj, !857)
  - Add hooks: extensions define hooks and add handlers via `QXmppClientExtension::hooks()`, also in their constructor; hooks can be asynchronous, have keys, a single responder or be adapted to another hook (@lnj, !839)
    - `QXmpp::Disco::CollectInfo`: features and identities of the client
    - `QXmpp::PubSub::EventReceived`: PubSub event notifications, per node

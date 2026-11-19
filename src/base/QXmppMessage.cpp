@@ -13,6 +13,7 @@
 #include "QXmppDataForm.h"
 #include "QXmppFallback.h"
 #include "QXmppFileShare.h"
+#include "QXmppJid_p.h"
 #include "QXmppJingleData.h"
 #include "QXmppMessageReaction.h"
 #include "QXmppMessageRetraction.h"
@@ -1216,7 +1217,7 @@ void QXmppMessage::setAttachId(const QString &attachId)
 */
 QString QXmppMessage::mixParticipantId() const
 {
-    return mixUserJid().isEmpty() && mixUserNick().isEmpty() ? QString() : QXmppUtils::jidToResource(from());
+    return mixUserJid().isEmpty() && mixUserNick().isEmpty() ? QString() : jidResource(from());
 }
 
 /*!

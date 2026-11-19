@@ -200,7 +200,7 @@ QXmppMucRoom::Actions QXmppMucRoom::allowedActions() const
 */
 bool QXmppMucRoom::ban(const QString &jid, const QString &reason)
 {
-    if (!QXmppUtils::jidToResource(jid).isEmpty()) {
+    if (!jidResource(jid).isEmpty()) {
         qWarning("QXmppMucRoom::ban expects a bare JID");
         return false;
     }
@@ -261,7 +261,7 @@ bool QXmppMucRoom::join()
 bool QXmppMucRoom::kick(const QString &jid, const QString &reason)
 {
     QXmppMucItem item;
-    item.setNick(QXmppUtils::jidToResource(jid));
+    item.setNick(jidResource(jid));
     item.setRole(QXmppMucItem::NoRole);
     item.setReason(reason);
 

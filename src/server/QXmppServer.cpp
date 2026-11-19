@@ -9,6 +9,7 @@
 #include "QXmppIncomingClient.h"
 #include "QXmppIncomingServer.h"
 #include "QXmppIq.h"
+#include "QXmppJid_p.h"
 #include "QXmppOutgoingServer.h"
 #include "QXmppServerExtension.h"
 #include "QXmppServerPlugin.h"
@@ -108,7 +109,7 @@ QXmppServerPrivate::QXmppServerPrivate(QXmppServer *qq)
 bool QXmppServerPrivate::routeData(const QString &to, const QByteArray &data)
 {
     // refuse to route packets to empty destination, own domain or sub-domains
-    const QString toDomain = QXmppUtils::jidToDomain(to);
+    const QString toDomain = jidDomain(to);
     if (to.isEmpty() || to == domain || toDomain.endsWith(QString(u"." + domain))) {
         return false;
     }
@@ -116,7 +117,7 @@ bool QXmppServerPrivate::routeData(const QString &to, const QByteArray &data)
     if (toDomain == domain) {
         // look for a client connection
         QList<QXmppIncomingClient *> found;
-        if (QXmppUtils::jidToResource(to).isEmpty()) {
+        if (jidResource(to).isEmpty()) {
             const auto &connections = incomingClientsByBareJid.value(to);
             for (auto *conn : connections) {
                 found << conn;
@@ -691,7 +692,7 @@ void QXmppServer::_q_clientConnected()
         old->disconnectFromHost();
     }
     d->incomingClientsByJid.insert(jid, client);
-    d->incomingClientsByBareJid[QXmppUtils::jidToBareJid(jid)].insert(client);
+    d->incomingClientsByBareJid[jidBare(jid)].insert(client);
 
     // emit signal
     Q_EMIT clientConnected(jid);
@@ -712,7 +713,7 @@ void QXmppServer::_q_clientDisconnected()
             if (d->incomingClientsByJid.value(jid) == client) {
                 d->incomingClientsByJid.remove(jid);
             }
-            const QString bareJid = QXmppUtils::jidToBareJid(jid);
+            const QString bareJid = jidBare(jid);
             if (d->incomingClientsByBareJid.contains(bareJid)) {
                 d->incomingClientsByBareJid[bareJid].remove(client);
                 if (d->incomingClientsByBareJid[bareJid].isEmpty()) {

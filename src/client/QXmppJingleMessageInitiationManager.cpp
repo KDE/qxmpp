@@ -422,7 +422,7 @@ bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageIni
     });
 
     if (itr != d->jmis.end()) {
-        return handleExistingJmi(*itr, jmiElement, QXmppUtils::jidToResource(remoteJid));
+        return handleExistingJmi(*itr, jmiElement, jidResource(remoteJid));
     }
 
     if (jmiElement.type() == JmiType::Propose) {

@@ -7,6 +7,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppPromise.h"
 #include "QXmppTask.h"
 #include "QXmppUtils.h"
@@ -372,10 +373,10 @@ void QXmppExportData::toXml(QXmlStreamWriter *writer, Format format) const
             { u"server-data", ns_pie },
             Element {
                 u"host",
-                Attribute { u"jid", QXmppUtils::jidToDomain(d->accountJid) },
+                Attribute { u"jid", jidDomain(d->accountJid) },
                 Element {
                     u"user",
-                    Attribute { u"name", QXmppUtils::jidToUser(d->accountJid) },
+                    Attribute { u"name", jidLocalpart(d->accountJid) },
                     [&] { writeExtensions(nativeExtensions); },
                     // QXmpp-only extensions (e.g. MIX) are embedded under <user/> inside a
                     // foreign <account-data/> element; standard servers ignore it, while

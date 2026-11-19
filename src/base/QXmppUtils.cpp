@@ -165,14 +165,25 @@ QString QXmppUtils::timezoneOffsetToString(int secs)
     return (secs < 0 ? u"-"_s : u"+"_s) + tzoTime.toString(u"hh:mm"_s);
 }
 
-/*! Returns the domain for the given \a jid. */
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+
+/*!
+    Returns the domain for the given \a jid.
+
+    \deprecated since QXmpp 1.18, use QXmpp::Jid::domain()
+*/
 QString QXmppUtils::jidToDomain(const QString &jid)
 {
     const auto bareJid = jidToBareJid(jid);
     return bareJid.mid(bareJid.indexOf(u'@') + 1);
 }
 
-/*! Returns the resource for the given \a jid. */
+/*!
+    Returns the resource for the given \a jid.
+
+    \deprecated since QXmpp 1.18, use QXmpp::Jid::resource()
+*/
 QString QXmppUtils::jidToResource(const QString &jid)
 {
     const int pos = jid.indexOf(u'/');
@@ -182,7 +193,11 @@ QString QXmppUtils::jidToResource(const QString &jid)
     return jid.mid(pos + 1);
 }
 
-/*! Returns the user for the given \a jid. */
+/*!
+    Returns the user for the given \a jid.
+
+    \deprecated since QXmpp 1.18, use QXmpp::Jid::localpart()
+*/
 QString QXmppUtils::jidToUser(const QString &jid)
 {
     // RFC 7622, section 3.2: the resourcepart can contain '@'
@@ -193,7 +208,11 @@ QString QXmppUtils::jidToUser(const QString &jid)
     return jid.left(pos);
 }
 
-/*! Returns the bare jid (i.e. without resource) for the given \a jid. */
+/*!
+    Returns the bare jid (i.e. without resource) for the given \a jid.
+
+    \deprecated since QXmpp 1.18, use QXmpp::Jid::bare()
+*/
 QString QXmppUtils::jidToBareJid(const QString &jid)
 {
     const int pos = jid.indexOf(u'/');
@@ -202,6 +221,8 @@ QString QXmppUtils::jidToBareJid(const QString &jid)
     }
     return jid.left(pos);
 }
+
+QT_WARNING_POP
 
 /*!
     Calculates the CRC32 checksum for the given input.

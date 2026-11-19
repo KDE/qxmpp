@@ -9,6 +9,7 @@
 #include "QXmppE2eeProvider.h"
 #include "QXmppFallback.h"
 #include "QXmppHooks_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessages.h"
 #include "QXmppOutgoingMessages_p.h"
 #include "QXmppPacket_p.h"
@@ -172,7 +173,7 @@ bool OutgoingMessages::isPipelineStanza(const QXmppStanza &stanza)
 
 QXmppTask<Result<Sent>> OutgoingMessages::send(QXmppMessage &&message, QXmppSendStanzaParams params, Mode mode, QString encryption)
 {
-    const auto conversationJid = QXmppUtils::jidToBareJid(message.to());
+    const auto conversationJid = jidBare(message.to());
     auto &queue = m_queues[conversationJid];
     queue.push_back(Pending { std::move(message), std::move(params), mode, std::move(encryption), {} });
     auto task = queue.back().result.task();
@@ -272,7 +273,7 @@ QXmppTask<void> OutgoingMessages::processFront(QString conversationJid)
 
     outgoing.recipientJids() = pending.params.encryptionJids();
     if (outgoing.recipientJids().isEmpty()) {
-        outgoing.recipientJids().append(QXmppUtils::jidToBareJid(outgoing.message().to()));
+        outgoing.recipientJids().append(jidBare(outgoing.message().to()));
     }
     co_await m_hooks.run<ResolveRecipients>(outgoing).withContext(m_client);
     if (outgoing.error()) {

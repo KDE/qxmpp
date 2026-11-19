@@ -296,7 +296,7 @@ QXmppTask<void> QXmppAtmManager::handleMessage(const QXmppMessage &message)
         co_return;
     }
 
-    const auto senderJid = QXmppUtils::jidToBareJid(message.from());
+    const auto senderJid = jidBare(message.from());
     const auto e2eeMetadata = message.e2eeMetadata();
     const auto senderKey = e2eeMetadata ? e2eeMetadata->senderKey() : QByteArray();
     const auto encryption = trustMessageElement->encryption();

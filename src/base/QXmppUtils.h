@@ -34,10 +34,16 @@ public:
     static int timezoneOffsetFromString(const QString &str);
     static QString timezoneOffsetToString(int secs);
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use QXmpp::Jid::domain()")]]
     static QString jidToDomain(const QString &jid);
+    [[deprecated("Use QXmpp::Jid::resource()")]]
     static QString jidToResource(const QString &jid);
+    [[deprecated("Use QXmpp::Jid::localpart()")]]
     static QString jidToUser(const QString &jid);
+    [[deprecated("Use QXmpp::Jid::bare()")]]
     static QString jidToBareJid(const QString &jid);
+#endif
 
     static quint32 generateCrc32(const QByteArray &input);
     static QByteArray generateHmacMd5(const QByteArray &key, const QByteArray &text);

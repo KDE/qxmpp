@@ -28,6 +28,13 @@ namespace QXmpp::Private {
 QXMPP_PRIVATE_EXPORT bool jidsEqual(QStringView a, QStringView b);
 QXMPP_PRIVATE_EXPORT bool bareJidsEqual(QStringView a, QStringView b);
 
+// Parts of a JID string. Valid JIDs are returned in canonical form (see QXmpp::Jid), strings that
+// are no valid JIDs are only split (RFC 7622, section 3.2), so that they can still be addressed.
+QXMPP_PRIVATE_EXPORT QString jidBare(QStringView jid);
+QXMPP_PRIVATE_EXPORT QString jidLocalpart(QStringView jid);
+QXMPP_PRIVATE_EXPORT QString jidDomain(QStringView jid);
+QXMPP_PRIVATE_EXPORT QString jidResource(QStringView jid);
+
 }  // namespace QXmpp::Private
 
 #endif  // QXMPPJID_P_H

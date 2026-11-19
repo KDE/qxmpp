@@ -6,6 +6,7 @@
 
 #include "QXmppConstants_p.h"
 #include "QXmppDialback.h"
+#include "QXmppJid_p.h"
 #include "QXmppOutgoingServer.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppUtils.h"
@@ -182,11 +183,11 @@ void QXmppIncomingServer::handleStanza(const QDomElement &stanza)
             Q_EMIT dialbackRequestReceived(request);
         }
 
-    } else if (d->authenticated.contains(QXmppUtils::jidToDomain(stanza.attribute(u"from"_s)))) {
+    } else if (d->authenticated.contains(jidDomain(stanza.attribute(u"from"_s)))) {
         // relay stanza if the remote party is authenticated
         Q_EMIT elementReceived(stanza);
     } else {
-        warning(u"Received an element from unverified domain '%1' on %2"_s.arg(QXmppUtils::jidToDomain(stanza.attribute(u"from"_s)), d->origin()));
+        warning(u"Received an element from unverified domain '%1' on %2"_s.arg(jidDomain(stanza.attribute(u"from"_s)), d->origin()));
         disconnectFromHost();
     }
 }

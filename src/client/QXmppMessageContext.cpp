@@ -5,6 +5,7 @@
 #include "QXmppMessageContext.h"
 
 #include "QXmppConstants_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessageContext_p.h"
 #include "QXmppMessages.h"
 #include "QXmppUtils.h"
@@ -357,8 +358,8 @@ Context::Context(QXmppMessage &&message, Origin origin)
     : d(std::make_unique<ContextPrivate>())
 {
     d->origin = origin;
-    d->senderJid = QXmppUtils::jidToBareJid(message.from());
-    d->conversationJid = QXmppUtils::jidToBareJid(origin == Origin::CarbonSent ? message.to() : message.from());
+    d->senderJid = Private::jidBare(message.from());
+    d->conversationJid = Private::jidBare(origin == Origin::CarbonSent ? message.to() : message.from());
     d->message = std::move(message);
 }
 

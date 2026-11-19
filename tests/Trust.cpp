@@ -14,6 +14,7 @@
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppE2eeProvider.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppMessages.h"
 #include "QXmppTrustMessageElement.h"
@@ -1910,7 +1911,7 @@ void tst_QXmppTrustManager::testHandleMessage()
     QFETCH(bool, areTrustDecisionsValid);
     QFETCH(bool, isSenderKeyAuthenticated);
 
-    const auto senderJid = QXmppUtils::jidToBareJid(message.from());
+    const auto senderJid = QXmpp::Private::jidBare(message.from());
     const auto senderKey = message.e2eeMetadata()->senderKey();
 
     // Add the sender key in preparation for the test.

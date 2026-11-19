@@ -12,6 +12,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppGlobal.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
 #include "QXmppMessages.h"
@@ -1157,9 +1158,9 @@ QXmppTask<QXmppClient::EmptyResult> QXmppMixManager::deleteChannel(const QString
 {
     QXmppMixIq iq;
     iq.setType(QXmppIq::Set);
-    iq.setTo(QXmppUtils::jidToDomain(channelJid));
+    iq.setTo(jidDomain(channelJid));
     iq.setActionType(QXmppMixIq::Destroy);
-    iq.setChannelId(QXmppUtils::jidToUser(channelJid));
+    iq.setChannelId(jidLocalpart(channelJid));
 
     return client()->sendGenericIq(std::move(iq));
 }
@@ -1432,7 +1433,7 @@ HookResult QXmppMixManager::handlePubSubEvent(const QDomElement &element, const 
         case QXmppPubSubEventBase::Items: {
             const auto items = event.items();
             for (const auto &item : items) {
-                d->updateParticipant(pubSubService, item.id(), QXmppUtils::jidToBareJid(item.jid()));
+                d->updateParticipant(pubSubService, item.id(), jidBare(item.jid()));
                 Q_EMIT participantReceived(pubSubService, item);
             }
             break;
@@ -1545,7 +1546,7 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
     if (message.type() != QXmppMessage::GroupChat) {
         co_return;
     }
-    const auto channelJid = QXmppUtils::jidToBareJid(message.to());
+    const auto channelJid = jidBare(message.to());
     // recipients set by the sender are kept
     if (outgoing.recipientJids() != QList<QString> { channelJid }) {
         co_return;
@@ -1581,7 +1582,7 @@ QXmppTask<void> QXmppMixManagerPrivate::resolveRecipients(Messages::OutgoingMess
 QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &context)
 {
     const auto &message = context.message();
-    const auto channelJid = QXmppUtils::jidToBareJid(message.from());
+    const auto channelJid = jidBare(message.from());
     auto pendingItr = message.originId().isEmpty() ? pendingMessages.end() : pendingMessages.find(message.originId());
     // the server may bounce errors without the original payload, but with the 'id' (RFC 6120)
     if (pendingItr == pendingMessages.end() && message.type() == QXmppMessage::Error && !message.id().isEmpty()) {
@@ -1601,8 +1602,8 @@ QXmppTask<HookResult> QXmppMixManagerPrivate::resolveSender(Messages::Context &c
     if (message.type() != QXmppMessage::GroupChat || (message.mixUserJid().isEmpty() && !pending)) {
         co_return HookResult::Continue;
     }
-    const auto senderJid = QXmppUtils::jidToBareJid(message.mixUserJid());
-    const auto participantId = QXmppUtils::jidToResource(message.from());
+    const auto senderJid = jidBare(message.mixUserJid());
+    const auto participantId = jidResource(message.from());
     const bool fromArchive = context.origin() == Messages::Origin::Mam;
     const auto stanzaIds = message.stanzaIds();
     const auto stanzaId = std::ranges::find(stanzaIds, channelJid, &QXmppStanzaId::by);
@@ -1651,7 +1652,7 @@ QXmppTask<void> QXmppMixManagerPrivate::confirmDelivery(const Messages::Outgoing
     const auto &message = outgoing.message();
     const auto originId = message.originId();
     const auto stanzaId = message.id();
-    const auto channelJid = QXmppUtils::jidToBareJid(message.to());
+    const auto channelJid = jidBare(message.to());
     if (message.type() != QXmppMessage::GroupChat || originId.isEmpty() || pendingMessages.contains(originId) || isJoinedMucRoom(channelJid)) {
         co_return;
     }
@@ -1776,7 +1777,7 @@ QXmppTask<void> QXmppMixManagerPrivate::fetchParticipantJids(QString channelJid,
 
     std::unordered_map<QString, QString> jids;
     for (const auto &participant : std::get<QList<QXmppMixParticipantItem>>(result)) {
-        jids.insert_or_assign(participant.id(), QXmppUtils::jidToBareJid(participant.jid()));
+        jids.insert_or_assign(participant.id(), jidBare(participant.jid()));
     }
     for (auto &[id, jid] : channel.changes) {
         if (jid) {
@@ -1799,7 +1800,7 @@ QXmppTask<void> QXmppMixManagerPrivate::fetchParticipantJids(QString channelJid,
 // Applies a participant event, \a jid is nullopt if the participant left.
 void QXmppMixManagerPrivate::updateParticipant(const QString &channelJid, const QString &participantId, std::optional<QString> jid)
 {
-    auto itr = channels.find(QXmppUtils::jidToBareJid(channelJid));
+    auto itr = channels.find(jidBare(channelJid));
     if (itr == channels.end() || participantId.isEmpty()) {
         return;
     }
@@ -1817,7 +1818,7 @@ void QXmppMixManagerPrivate::updateParticipant(const QString &channelJid, const 
 
 void QXmppMixManagerPrivate::removeChannel(const QString &channelJid)
 {
-    auto itr = channels.find(QXmppUtils::jidToBareJid(channelJid));
+    auto itr = channels.find(jidBare(channelJid));
     if (itr == channels.end()) {
         return;
     }

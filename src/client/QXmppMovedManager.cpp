@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryIq.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppMovedItem_p.h"
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
@@ -255,7 +256,7 @@ QXmppTask<QXmppMovedManager::Result> QXmppMovedManager::verifyStatement(QString 
 QXmppTask<QXmpp::SendResult> QXmppMovedManager::notifyContact(const QString &contactBareJid, const QString &oldBareJid, bool sensitive, const QString &reason)
 {
     QXmppPresence packet;
-    packet.setTo(QXmppUtils::jidToBareJid(contactBareJid));
+    packet.setTo(jidBare(contactBareJid));
     packet.setType(QXmppPresence::Subscribe);
     packet.setStatusText(reason);
     packet.setOldJid(oldBareJid);
@@ -321,7 +322,7 @@ QXmppTask<QXmppPresence> QXmppMovedManager::processSubscriptionRequest(QXmppPres
     switch (entry.subscriptionType()) {
     case QXmppRosterIq::Item::From:
     case QXmppRosterIq::Item::Both: {
-        auto result = co_await verifyStatement(presence.oldJid(), QXmppUtils::jidToBareJid(presence.from()));
+        auto result = co_await verifyStatement(presence.oldJid(), jidBare(presence.from()));
 
         if (hasError(result)) {
             warning(presence.from() + u" sent a presence subscription request with the invalid old JID "_s + presence.oldJid());

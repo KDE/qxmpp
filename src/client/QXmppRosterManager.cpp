@@ -463,8 +463,8 @@ std::variant<Success, QXmppStanza::Error> QXmppRosterManager::handlePush(const Q
 void QXmppRosterManager::_q_presenceReceived(const QXmppPresence &presence)
 {
     const auto jid = presence.from();
-    const auto bareJid = QXmppUtils::jidToBareJid(jid);
-    const auto resource = QXmppUtils::jidToResource(jid);
+    const auto bareJid = jidBare(jid);
+    const auto resource = jidResource(jid);
 
     if (bareJid.isEmpty()) {
         return;
@@ -651,7 +651,7 @@ QXmppTask<QXmppRosterManager::Result> QXmppRosterManager::updateRosterGroups(con
 QXmppTask<QXmpp::SendResult> QXmppRosterManager::subscribeTo(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
-    packet.setTo(QXmppUtils::jidToBareJid(bareJid));
+    packet.setTo(jidBare(bareJid));
     packet.setType(QXmppPresence::Subscribe);
     packet.setStatusText(reason);
     return LegacyE2ee::sendSensitive(client(), std::move(packet));
@@ -670,7 +670,7 @@ QXmppTask<QXmpp::SendResult> QXmppRosterManager::subscribeTo(const QString &bare
 QXmppTask<QXmpp::SendResult> QXmppRosterManager::unsubscribeFrom(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
-    packet.setTo(QXmppUtils::jidToBareJid(bareJid));
+    packet.setTo(jidBare(bareJid));
     packet.setType(QXmppPresence::Unsubscribe);
     packet.setStatusText(reason);
     return LegacyE2ee::sendSensitive(client(), std::move(packet));
@@ -771,7 +771,7 @@ bool QXmppRosterManager::renameItem(const QString &bareJid, const QString &name)
 bool QXmppRosterManager::subscribe(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
-    packet.setTo(QXmppUtils::jidToBareJid(bareJid));
+    packet.setTo(jidBare(bareJid));
     packet.setType(QXmppPresence::Subscribe);
     packet.setStatusText(reason);
     return client()->sendLegacy(packet);
@@ -788,7 +788,7 @@ bool QXmppRosterManager::subscribe(const QString &bareJid, const QString &reason
 bool QXmppRosterManager::unsubscribe(const QString &bareJid, const QString &reason)
 {
     QXmppPresence packet;
-    packet.setTo(QXmppUtils::jidToBareJid(bareJid));
+    packet.setTo(jidBare(bareJid));
     packet.setType(QXmppPresence::Unsubscribe);
     packet.setStatusText(reason);
     return client()->sendLegacy(packet);

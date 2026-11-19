@@ -84,6 +84,8 @@ void tst_QXmppUtils::testHmac()
 
 void tst_QXmppUtils::testJid()
 {
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
     QCOMPARE(QXmppUtils::jidToBareJid("foo@example.com/resource"), QLatin1String("foo@example.com"));
     QCOMPARE(QXmppUtils::jidToBareJid("foo@example.com"), QLatin1String("foo@example.com"));
     QCOMPARE(QXmppUtils::jidToBareJid("example.com"), QLatin1String("example.com"));
@@ -106,6 +108,7 @@ void tst_QXmppUtils::testJid()
     QCOMPARE(QXmppUtils::jidToUser(QString()), QString());
     QCOMPARE(QXmppUtils::jidToUser("a.example.com/b@example.net"), QString());
     QCOMPARE(QXmppUtils::jidToUser("room@muc.example.com/user@host"), QLatin1String("room"));
+    QT_WARNING_POP
 }
 
 // FIXME: how should we test MIME detection without expose getImageType?
@@ -1302,7 +1305,7 @@ private:
     Q_SLOT void userInput();
     Q_SLOT void userInputInvalid();
     Q_SLOT void display();
-    Q_SLOT void privateComparison();
+    Q_SLOT void privateHelpers();
 };
 
 static Jid parsed(QStringView string)
@@ -1648,7 +1651,7 @@ void tst_QXmppJid::display()
     QCOMPARE(debugOutput.trimmed(), u"QXmpp::Jid(juliet@example.com)"_s);
 }
 
-void tst_QXmppJid::privateComparison()
+void tst_QXmppJid::privateHelpers()
 {
     using namespace QXmpp::Private;
 
@@ -1665,6 +1668,21 @@ void tst_QXmppJid::privateComparison()
     QVERIFY(bareJidsEqual(u"juliet@example.com/balcony", u"juliet@example.com"));
     QVERIFY(!bareJidsEqual(u"juliet@example.com/balcony", u"romeo@example.com/balcony"));
     QVERIFY(!bareJidsEqual(u"juliet@example.com", {}));
+
+    // valid JIDs are canonicalized
+    QCOMPARE(jidBare(u"Juliet@Example.com/Balcony"), u"juliet@example.com"_s);
+    QCOMPARE(jidLocalpart(u"Juliet@Example.com/Balcony"), u"juliet"_s);
+    QCOMPARE(jidDomain(u"Juliet@Example.com/Balcony"), u"example.com"_s);
+    QCOMPARE(jidResource(u"Juliet@Example.com/Balcony"), u"Balcony"_s);
+    QCOMPARE(jidLocalpart(u"a.example.com/b@example.net"), QString());
+    // other strings are only split
+    QCOMPARE(jidBare(u"A_B@Exa mple.com/res"), u"A_B@Exa mple.com"_s);
+    QCOMPARE(jidLocalpart(u"A_B@Exa mple.com/res"), u"A_B"_s);
+    QCOMPARE(jidDomain(u"A_B@Exa mple.com/res"), u"Exa mple.com"_s);
+    QCOMPARE(jidResource(u"A_B@Exa mple.com/res"), u"res"_s);
+    QCOMPARE(jidDomain(u"a_b/c@d"), u"a_b"_s);
+    QCOMPARE(jidBare({}), QString());
+    QCOMPARE(jidResource({}), QString());
 }
 
 }  // namespace JidTests

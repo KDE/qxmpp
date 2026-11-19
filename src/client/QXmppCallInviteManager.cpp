@@ -315,7 +315,7 @@ void QXmppCallInviteManager::clearAll()
 bool QXmppCallInviteManager::handleCallInviteElement(QXmppCallInviteElement &&callInviteElement, const QString &senderJid)
 {
     auto callInviteElementId = callInviteElement.id();
-    auto callPartnerJid = QXmppUtils::jidToBareJid(senderJid);
+    auto callPartnerJid = jidBare(senderJid);
 
     // Check if there's already a Call Invite object with callInviteElementId and callPartnerJid in Call Invites vector.
     // That means that a Call Invite has already been created with given (J)IDs.
@@ -327,7 +327,7 @@ bool QXmppCallInviteManager::handleCallInviteElement(QXmppCallInviteElement &&ca
         });
 
     if (itr != d->callInvites.end()) {
-        return handleExistingCallInvite(*itr, callInviteElement, QXmppUtils::jidToResource(senderJid));
+        return handleExistingCallInvite(*itr, callInviteElement, jidResource(senderJid));
     }
 
     if (callInviteElement.type() == CallInviteType::Invite) {

@@ -10,6 +10,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppRosterManager.h"
 #include "QXmppUtils.h"
@@ -199,7 +200,7 @@ void QXmppAttentionManager::handleMessageReceived(const QXmppMessage &message)
         return;
     }
 
-    const QString bareJid = QXmppUtils::jidToBareJid(message.from());
+    const QString bareJid = jidBare(message.from());
 
     // ignore messages from our own bare JID (e.g. carbon or IM-NG message)
     if (bareJid == client()->configuration().jidBare()) {
