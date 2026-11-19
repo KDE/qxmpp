@@ -7,6 +7,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppStanzaHandling_p.h"
 #include "QXmppTask.h"
@@ -88,7 +89,7 @@ bool QXmppCarbonManager::handleIncomingStanza(const QDomElement &element)
     }
 
     // carbon copies must always come from our bare JID
-    if (element.attribute(u"from"_s) != client()->configuration().jidBare()) {
+    if (!jidsEqual(element.attribute(u"from"_s), client()->configuration().jidBare())) {
         info(u"Received carbon copy from possible attacker trying to use CVE-2017-5603."_s);
         return false;
     }

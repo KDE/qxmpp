@@ -13,6 +13,7 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppIncomingMessages_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext.h"
 #include "QXmppMessageContext_p.h"
@@ -691,7 +692,7 @@ void QXmppMamManagerPrivate::processMessage(const QString &queryId, RetrieveRequ
     }
 
     Context context(std::move(parsed.message), Origin::Mam);
-    if (context.senderJid() == client->configuration().jidBare()) {
+    if (jidsEqual(context.senderJid(), client->configuration().jidBare())) {
         // sent by this account
         context.setConversationJid(QXmppUtils::jidToBareJid(context.message().to()));
     }

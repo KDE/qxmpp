@@ -12,6 +12,7 @@
 #include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIqHandling.h"
+#include "QXmppJid_p.h"
 #include "QXmppMovedManager.h"
 #include "QXmppPresence.h"
 #include "QXmppRosterIq.h"
@@ -432,7 +433,7 @@ std::variant<Success, QXmppStanza::Error> QXmppRosterManager::handlePush(const Q
 
     // Security check: only the server sends roster pushes, 'from' is either empty or the bare
     // JID of the user (RFC 6121, 2.1.6)
-    if (encrypted || (!from.isEmpty() && QXmppUtils::jidToBareJid(from) != client()->configuration().jidBare())) {
+    if (encrypted || (!from.isEmpty() && !bareJidsEqual(from, client()->configuration().jidBare()))) {
         return Error(Error::Cancel, Error::ServiceUnavailable);
     }
 

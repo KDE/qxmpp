@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppPromise.h"
 #include "QXmppStanzaHandling_p.h"
@@ -394,7 +395,7 @@ void QXmppJingleMessageInitiationManager::clear(const std::shared_ptr<QXmppJingl
             d->jmis.begin(),
             d->jmis.end(),
             [&jmi](const auto &storedJmi) {
-                return jmi->id() == storedJmi->id() && jmi->remoteJid() == storedJmi->remoteJid();
+                return jmi->id() == storedJmi->id() && jidsEqual(jmi->remoteJid(), storedJmi->remoteJid());
             }),
         d->jmis.end());
 }
@@ -417,7 +418,7 @@ bool QXmppJingleMessageInitiationManager::handleJmiElement(QXmppJingleMessageIni
     // Check if there's already a JMI object with jmiElementId and remoteJid in JMIs vector.
     // That means that a JMI has already been created with given (J)IDs.
     auto itr = std::find_if(d->jmis.begin(), d->jmis.end(), [&jmiElementId, &remoteJid](const auto &jmi) {
-        return jmi->id() == jmiElementId && QXmppUtils::jidToBareJid(jmi->remoteJid()) == QXmppUtils::jidToBareJid(remoteJid);
+        return jmi->id() == jmiElementId && bareJidsEqual(jmi->remoteJid(), remoteJid);
     });
 
     if (itr != d->jmis.end()) {
@@ -494,7 +495,7 @@ bool QXmppJingleMessageInitiationManager::handleProposeJmiElement(const QXmppJin
         d->jmis.cbegin(),
         d->jmis.cend(),
         [&remoteJid](const auto &jmi) {
-            return jmi->remoteJid() == remoteJid;
+            return jidsEqual(jmi->remoteJid(), remoteJid);
         });
 
     // Tie break case or usual JMI proposal?

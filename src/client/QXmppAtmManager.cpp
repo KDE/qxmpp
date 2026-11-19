@@ -10,6 +10,7 @@
 #include "QXmppClient_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppTrustMessageKeyOwner.h"
@@ -291,7 +292,7 @@ QXmppTask<void> QXmppAtmManager::handleMessage(const QXmppMessage &message)
     //    Message Carbons.
     if (!trustMessageElement ||
         trustMessageElement->usage() != ns_atm ||
-        message.from() == client()->configuration().jid()) {
+        jidsEqual(message.from(), client()->configuration().jid())) {
         co_return;
     }
 

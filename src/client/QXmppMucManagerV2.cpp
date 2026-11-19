@@ -9,6 +9,7 @@
 #include "QXmppDiscoveryManager.h"
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppIqStanza.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessageContext.h"
 #include "QXmppMessageRetraction.h"
 #include "QXmppMucForms.h"
@@ -2273,7 +2274,7 @@ QXmppTask<HookResult> QXmppMucManagerV2Private::resolveSender(Messages::Context 
         // The archive of the room reports the real JID in non-anonymous rooms (XEP-0313), also of
         // occupants that have left. Only the room itself can be trusted for this.
         const auto *archive = context.attachment<Messages::ArchiveInfo>();
-        if (context.origin() == Messages::Origin::Mam && archive && archive->archiveJid() == roomJid &&
+        if (context.origin() == Messages::Origin::Mam && archive && jidsEqual(archive->archiveJid(), roomJid) &&
             data->isNonAnonymous.value() && !archive->occupantJid().isEmpty()) {
             context.setSenderJid(QXmppUtils::jidToBareJid(archive->occupantJid()));
         }

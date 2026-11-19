@@ -5,6 +5,7 @@
 
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoIq_p.h"
 #include "QXmppOmemoItems_p.h"
@@ -1150,7 +1151,7 @@ HookResult Manager::handlePubSubEvent(const QDomElement &element, const QString 
                 // contact device list is determined.
                 // In case of the own device list node, it is sctrictly processed as a recommended
                 // singleton item and changed to fit that if needed.
-                const auto isOwnDeviceListNode = d->ownBareJid() == pubSubService;
+                const auto isOwnDeviceListNode = jidsEqual(d->ownBareJid(), pubSubService);
                 if (isOwnDeviceListNode) {
                     const auto &deviceListItem = items.constFirst();
                     if (deviceListItem.id() == QXmppPubSubManager::standardItemIdToString(QXmppPubSubManager::Current)) {

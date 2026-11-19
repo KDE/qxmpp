@@ -9,6 +9,7 @@
 #include "QXmppFallback.h"
 #include "QXmppHooks_p.h"
 #include "QXmppIncomingMessages_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppMessageContext_p.h"
 #include "QXmppMessageHandler.h"
@@ -78,12 +79,12 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const 
     // The affixes of XEP-0420 bind the content to the sender and the recipient. In MUCs, the
     // sender is the real JID resolved by ResolveSender and the recipient is the room. Otherwise
     // the recipient is the addressee, i.e. this account or for sent carbons the contact.
-    if (!decrypted.sceFrom().isEmpty() && decrypted.sceFrom() != d.senderJid) {
+    if (!decrypted.sceFrom().isEmpty() && !jidsEqual(decrypted.sceFrom(), d.senderJid)) {
         fail(context, DecryptionState::Failed, u"The sender of the encrypted content does not match the sender of the message"_s);
         return;
     }
     const auto expectedRecipient = message.type() == QXmppMessage::GroupChat ? d.conversationJid : QXmppUtils::jidToBareJid(message.to());
-    if (!decrypted.sceTo().isEmpty() && decrypted.sceTo() != expectedRecipient) {
+    if (!decrypted.sceTo().isEmpty() && !jidsEqual(decrypted.sceTo(), expectedRecipient)) {
         fail(context, DecryptionState::Failed, u"The recipient of the encrypted content does not match the recipient of the message"_s);
         return;
     }

@@ -7,6 +7,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppPromise.h"
 #include "QXmppStanzaHandling_p.h"
@@ -300,7 +301,7 @@ void QXmppCallInviteManager::clear(const std::shared_ptr<QXmppCallInvite> &callI
             d->callInvites.end(),
             [&callInvite](const auto &storedCallInvite) {
                 return callInvite->id() == storedCallInvite->id() &&
-                    callInvite->callPartnerJid() == storedCallInvite->callPartnerJid();
+                    jidsEqual(callInvite->callPartnerJid(), storedCallInvite->callPartnerJid());
             }),
         d->callInvites.end());
 }
@@ -322,7 +323,7 @@ bool QXmppCallInviteManager::handleCallInviteElement(QXmppCallInviteElement &&ca
         d->callInvites.begin(),
         d->callInvites.end(),
         [&callInviteElementId, &callPartnerJid](const auto &callInvite) {
-            return callInvite->id() == callInviteElementId && callInvite->callPartnerJid() == callPartnerJid;
+            return callInvite->id() == callInviteElementId && jidsEqual(callInvite->callPartnerJid(), callPartnerJid);
         });
 
     if (itr != d->callInvites.end()) {

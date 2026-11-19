@@ -7,6 +7,7 @@
 #include "QXmppClient.h"
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppMucIq.h"
 #include "QXmppStanzaHandling_p.h"
@@ -556,7 +557,7 @@ void QXmppMucRoom::_q_disconnected()
 
 void QXmppMucRoom::_q_messageReceived(const QXmppMessage &message)
 {
-    if (QXmppUtils::jidToBareJid(message.from()) != d->jid) {
+    if (!bareJidsEqual(message.from(), d->jid)) {
         return;
     }
 
@@ -581,7 +582,7 @@ void QXmppMucRoom::_q_presenceReceived(const QXmppPresence &presence)
         d->client->send(std::move(packet));
     }
 
-    if (QXmppUtils::jidToBareJid(jid) != d->jid) {
+    if (!bareJidsEqual(jid, d->jid)) {
         return;
     }
 

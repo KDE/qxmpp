@@ -4,6 +4,7 @@
 
 #include "QXmppJid.h"
 
+#include "QXmppJid_p.h"
 #include "QXmppPrecis_p.h"
 
 #include "StringLiterals.h"
@@ -719,3 +720,31 @@ QDebug operator<<(QDebug debug, const Jid &jid)
 }
 
 }  // namespace QXmpp
+
+namespace QXmpp::Private {
+
+bool jidsEqual(QStringView a, QStringView b)
+{
+    if (a == b) {
+        return true;
+    }
+    auto jidA = Jid::fromString(a);
+    auto jidB = Jid::fromString(b);
+    return jidA && jidB && *jidA == *jidB;
+}
+
+bool bareJidsEqual(QStringView a, QStringView b)
+{
+    auto bare = [](QStringView jid) {
+        auto slash = jid.indexOf(u'/');
+        return slash < 0 ? jid : jid.first(slash);
+    };
+    if (bare(a) == bare(b)) {
+        return true;
+    }
+    auto jidA = Jid::fromString(a);
+    auto jidB = Jid::fromString(b);
+    return jidA && jidB && jidA->bare() == jidB->bare();
+}
+
+}  // namespace QXmpp::Private

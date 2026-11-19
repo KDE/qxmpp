@@ -14,6 +14,7 @@
 #include "QXmppHash.h"
 #include "QXmppHashing_p.h"
 #include "QXmppJid.h"
+#include "QXmppJid_p.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppNamespaces.h"
@@ -1298,6 +1299,7 @@ private:
     Q_SLOT void userInput();
     Q_SLOT void userInputInvalid();
     Q_SLOT void display();
+    Q_SLOT void privateComparison();
 };
 
 static Jid parsed(QStringView string)
@@ -1641,6 +1643,25 @@ void tst_QXmppJid::display()
     QString debugOutput;
     QDebug(&debugOutput) << parsed(u"juliet@example.com");
     QCOMPARE(debugOutput.trimmed(), u"QXmpp::Jid(juliet@example.com)"_s);
+}
+
+void tst_QXmppJid::privateComparison()
+{
+    using namespace QXmpp::Private;
+
+    QVERIFY(jidsEqual(u"Juliet@Example.com/balcony", u"juliet@example.com/balcony"));
+    QVERIFY(!jidsEqual(u"juliet@example.com/Balcony", u"juliet@example.com/balcony"));
+    QVERIFY(!jidsEqual(u"juliet@example.com/balcony", u"juliet@example.com"));
+    QVERIFY(jidsEqual(u"juliet@xn--mller-kva.de", u"juliet@m\u00FCller.de"));
+    // invalid JIDs are only equal to themselves
+    QVERIFY(jidsEqual(u"\u265A@example.com", u"\u265A@example.com"));
+    QVERIFY(!jidsEqual(u"a_b.example.com", u"A_B.example.com"));
+    QVERIFY(!jidsEqual(u"juliet@example.com", {}));
+
+    QVERIFY(bareJidsEqual(u"Juliet@Example.com/balcony", u"juliet@example.com/garden"));
+    QVERIFY(bareJidsEqual(u"juliet@example.com/balcony", u"juliet@example.com"));
+    QVERIFY(!bareJidsEqual(u"juliet@example.com/balcony", u"romeo@example.com/balcony"));
+    QVERIFY(!bareJidsEqual(u"juliet@example.com", {}));
 }
 
 }  // namespace JidTests

@@ -9,6 +9,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppIbbIq.h"
+#include "QXmppJid_p.h"
 #include "QXmppSocks.h"
 #include "QXmppStanzaHandling_p.h"
 #include "QXmppStreamInitiationIq_p.h"
@@ -754,7 +755,7 @@ void QXmppTransferManager::byteStreamIqReceived(const QXmppByteStreamIq &iq)
 {
     // handle IQ from proxy
     for (auto *job : std::as_const(d->jobs)) {
-        if (job->d->socksProxy.jid() == iq.from() && job->d->requestId == iq.id()) {
+        if (jidsEqual(job->d->socksProxy.jid(), iq.from()) && job->d->requestId == iq.id()) {
             if (iq.type() == QXmppIq::Result && iq.streamHosts().size() > 0) {
                 job->d->socksProxy = iq.streamHosts().constFirst();
                 socksServerSendOffer(job);
@@ -802,7 +803,7 @@ void QXmppTransferManager::byteStreamResultReceived(const QXmppByteStreamIq &iq)
     }
 
     // check the stream host
-    if (iq.streamHostUsed() == job->d->socksProxy.jid()) {
+    if (jidsEqual(iq.streamHostUsed(), job->d->socksProxy.jid())) {
         job->connectToProxy();
         return;
     }
@@ -1044,7 +1045,7 @@ void QXmppTransferManager::_q_iqReceived(const QXmppIq &iq)
 {
     for (auto *ptr : std::as_const(d->jobs)) {
         // handle IQ from proxy
-        if (ptr->direction() == QXmppTransferJob::OutgoingDirection && ptr->d->socksProxy.jid() == iq.from() && ptr->d->requestId == iq.id()) {
+        if (ptr->direction() == QXmppTransferJob::OutgoingDirection && jidsEqual(ptr->d->socksProxy.jid(), iq.from()) && ptr->d->requestId == iq.id()) {
             auto *job = static_cast<QXmppTransferOutgoingJob *>(ptr);
             if (job->d->socksSocket) {
                 // proxy connection activation result
@@ -1066,7 +1067,7 @@ void QXmppTransferManager::_q_iqReceived(const QXmppIq &iq)
         }
 
         // handle IQ from peer
-        else if (ptr->d->jid == iq.from() && ptr->d->requestId == iq.id()) {
+        else if (jidsEqual(ptr->d->jid, iq.from()) && ptr->d->requestId == iq.id()) {
             auto *job = ptr;
             if (job->direction() == QXmppTransferJob::OutgoingDirection &&
                 job->method() == QXmppTransferJob::InBandMethod) {

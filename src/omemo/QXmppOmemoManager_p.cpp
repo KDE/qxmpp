@@ -6,6 +6,7 @@
 #include "QXmppOmemoManager_p.h"
 
 #include "QXmppFallback.h"
+#include "QXmppJid_p.h"
 #include "QXmppOmemoDeviceElement_p.h"
 #include "QXmppOmemoElement_p.h"
 #include "QXmppOmemoEnvelope_p.h"
@@ -1564,17 +1565,17 @@ QXmppTask<std::optional<DecryptionResult>> ManagerPrivate::decryptStanza(T stanz
 #endif
     QXmppSceEnvelopeReader sceEnvelopeReader(document.documentElement());
 
-    if (sceEnvelopeReader.from() != senderJid) {
+    if (!jidsEqual(sceEnvelopeReader.from(), senderJid)) {
         q->info(u"Sender '" + senderJid + u"' of stanza does not match SCE 'from' affix element '" + sceEnvelopeReader.from() + u"'");
     }
 
     if (isMessageStanza) {
         // For messages from group chats, their "from" element corresponds to the SCE affix element "to".
-        if (const auto &message = dynamic_cast<const QXmppMessage &>(stanza); message.type() == QXmppMessage::GroupChat && (sceEnvelopeReader.to() != QXmppUtils::jidToBareJid(stanza.from()))) {
+        if (const auto &message = dynamic_cast<const QXmppMessage &>(stanza); message.type() == QXmppMessage::GroupChat && !jidsEqual(sceEnvelopeReader.to(), QXmppUtils::jidToBareJid(stanza.from()))) {
             warning(u"Recipient of group chat message does not match SCE affix element '<to/>'"_s);
             co_return {};
         }
-    } else if (sceEnvelopeReader.to() != QXmppUtils::jidToBareJid(stanza.to())) {
+    } else if (!jidsEqual(sceEnvelopeReader.to(), QXmppUtils::jidToBareJid(stanza.to()))) {
         q->info(u"Recipient of IQ does not match SCE affix element '<to/>'"_s);
     }
 
@@ -2480,7 +2481,7 @@ std::optional<QXmppOmemoDeviceListItem> QXmppOmemoManagerPrivate::updateContactD
 // containing the device list.
 void ManagerPrivate::updateDevices(const QString &deviceOwnerJid, const QXmppOmemoDeviceListItem &deviceListItem)
 {
-    const auto isOwnDeviceListNode = ownBareJid() == deviceOwnerJid;
+    const auto isOwnDeviceListNode = jidsEqual(ownBareJid(), deviceOwnerJid);
     QList<QXmppOmemoDeviceElement> deviceList = deviceListItem.deviceList();
     auto isOwnDeviceListIncorrect = false;
 
@@ -2621,7 +2622,7 @@ void ManagerPrivate::updateDevices(const QString &deviceOwnerJid, const QXmppOme
 // \a deviceOwnerJid is bare JID of the devices' owner.
 void ManagerPrivate::handleIrregularDeviceListChanges(const QString &deviceOwnerJid)
 {
-    const auto isOwnDeviceListNode = ownBareJid() == deviceOwnerJid;
+    const auto isOwnDeviceListNode = jidsEqual(ownBareJid(), deviceOwnerJid);
 
     if (isOwnDeviceListNode) {
         // Publish a new device list for the own devices if their device list

@@ -9,6 +9,7 @@
 #include "QXmppAsync_p.h"
 #include "QXmppConstants_p.h"
 #include "QXmppIqStanza.h"
+#include "QXmppJid_p.h"
 #include "QXmppMessage.h"
 #include "QXmppNonSASLAuth.h"
 #include "QXmppOutgoingClient_p.h"
@@ -758,14 +759,14 @@ void QXmppOutgoingClient::handleStart()
 
 void QXmppOutgoingClient::handleStream(const StreamOpen &stream)
 {
-    if (stream.from != d->config.domain()) {
+    if (!jidsEqual(stream.from, d->config.domain())) {
         setError(u"Peer serves '%1' instead of '%2' as expected."_s.arg(stream.from, d->config.domain()),
                  StreamError::HostUnknown);
         disconnectFromHost();
         return;
     }
     // If we include a 'from' attribute, the server must respond with the same 'to' attribute.
-    if (!d->config.user().isEmpty() && stream.to != d->config.jidBare()) {
+    if (!d->config.user().isEmpty() && !jidsEqual(stream.to, d->config.jidBare())) {
         warning(u"Server did not include our JID in the stream 'to' attribute (violating RFC6120, allowed in RFC3920)."_s);
         // do not treat as fatal error
     }
@@ -1473,7 +1474,7 @@ bool OutgoingIqManager::handleStanza(const QDomElement &stanza)
     // attribute or have it set to the user's bare JID.
     // If 'from' is empty, the IQ has been sent by the server. In this case we don't need to
     // do the check as we trust the server anyways.
-    if (auto from = stanza.attribute(u"from"_s); !from.isEmpty() && from != itr->second.jid) {
+    if (auto from = stanza.attribute(u"from"_s); !from.isEmpty() && !jidsEqual(from, itr->second.jid)) {
         warning(u"Ignored received IQ response to request '%1' because of wrong sender '%2' instead of expected sender '%3'"_s
                     .arg(id, from, itr->second.jid));
         return false;
