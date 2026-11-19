@@ -122,6 +122,23 @@ static QStringView encryptionToName(EncryptionMethod encryption)
     return ENCRYPTION_NAMES[std::size_t(encryption)];
 }
 
+/*!
+    Returns the name of the end-to-end \a encryption given by its namespace as shown to users, e.g.
+    "OMEMO 2" for QXmpp::E2ee::Omemo2, or an empty string if the encryption is not known to QXmpp.
+
+    It can be used for messages that could not be decrypted, which do not always announce the name
+    of their encryption themselves (see QXmppMessage::encryptionName()).
+
+    \since QXmpp 1.18
+*/
+QString QXmpp::E2ee::name(QStringView encryption)
+{
+    if (const auto method = Enums::fromString<EncryptionMethod>(encryption)) {
+        return encryptionToName(*method).toString();
+    }
+    return {};
+}
+
 static bool checkElement(const QDomElement &element, QStringView tagName, QStringView xmlns)
 {
     return element.tagName() == tagName && element.namespaceURI() == xmlns;

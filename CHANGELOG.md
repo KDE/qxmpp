@@ -75,6 +75,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - Add `QXmpp::Messages::DecryptionState::SentByThisDevice` for encrypted messages of this device received again, e.g. reflected by a MUC room or retrieved via MAM, reported by E2EE providers via `E2ee::NoEnvelope::sentByThisDevice` (@lnj, !842)
  - Add `QXmpp::SendError::NoEncryptionRecipients` for messages that can not be encrypted for any of the recipients, e.g. if none of their devices is trusted (@lnj, !842)
  - Add `QXmppSendStanzaParams::setForcedEncryption()` to force the end-to-end encryption of a message or IQ instead of selecting it via the `SelectEncryption` hooks, also for sending it unencrypted (@lnj, !842)
+ - Add `QXmpp::E2ee::name()` returning the name of an encryption by its namespace (@lnj, !842)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

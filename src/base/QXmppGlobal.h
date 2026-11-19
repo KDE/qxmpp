@@ -142,6 +142,8 @@ inline constexpr QStringView Omemo1 = u"urn:xmpp:omemo:1";
 /*! \xep{0384}{OMEMO Encryption} since version 0.8 \since QXmpp 1.18 */
 inline constexpr QStringView Omemo2 = u"urn:xmpp:omemo:2";
 
+QXMPP_EXPORT QString name(QStringView encryption);
+
 }  // namespace E2ee
 
 /*!

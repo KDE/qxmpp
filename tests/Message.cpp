@@ -914,6 +914,12 @@ void tst_QXmppMessage::testEme()
     QCOMPARE(message.encryptionMethod(), QXmpp::UnknownEncryption);
     QCOMPARE(message.encryptionMethodNs(), u"fancyorg:encryption:fancycrypt:0"_s);
     QCOMPARE(message.encryptionName(), u"FancyCrypt"_s);
+
+    // names by namespace
+    QCOMPARE(QXmpp::E2ee::name(QXmpp::E2ee::Omemo0), u"OMEMO"_s);
+    QCOMPARE(QXmpp::E2ee::name(QXmpp::E2ee::Omemo2), u"OMEMO 2"_s);
+    QCOMPARE(QXmpp::E2ee::name(u"fancyorg:encryption:fancycrypt:0"), QString());
+    QCOMPARE(QXmpp::E2ee::name({}), QString());
 }
 
 void tst_QXmppMessage::testSpoiler()
