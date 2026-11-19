@@ -6073,6 +6073,7 @@ private:
     Q_SLOT void messagesDecryptWithoutFrom();
     Q_SLOT void messagesNoEnvelope();
     Q_SLOT void messagesDecryptRecipientMismatch();
+    Q_SLOT void messagesDecryptGroupChatWithoutRecipient();
     Q_SLOT void messagesDecryptWithoutContent();
     Q_SLOT void messagesUnsupported();
     Q_SLOT void outgoingUnencrypted();
@@ -6351,6 +6352,32 @@ void tst_QXmppMessages::messagesDecryptRecipientMismatch()
     client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
     e2ee->promises.at(0).finish(decrypted(u"secret"_s, u"alice@example.org"_jid, u"carol@example.org"_jid));
     QCOMPARE(state, DecryptionState::Failed);
+}
+
+void tst_QXmppMessages::messagesDecryptGroupChatWithoutRecipient()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        state = context.decryptionState();
+        return HookResult::Continue;
+    });
+
+    auto groupChatMessage = [](const QString &id) {
+        return encryptedMessage(u"room@muc.example.org/alice"_s, id).replace(u"type='chat'"_s, u"type='groupchat'"_s);
+    };
+
+    // e.g. a private message turned into a group chat message by a server
+    client.injectMessage(groupChatMessage(u"1"_s));
+    e2ee->promises.at(0).finish(decrypted(u"secret"_s, {}, {}));
+    QCOMPARE(state, DecryptionState::Failed);
+
+    client.injectMessage(groupChatMessage(u"2"_s));
+    e2ee->promises.at(1).finish(decrypted(u"secret"_s, {}, u"room@muc.example.org"_jid));
+    QCOMPARE(state, DecryptionState::Decrypted);
 }
 
 void tst_QXmppMessages::messagesDecryptWithoutContent()

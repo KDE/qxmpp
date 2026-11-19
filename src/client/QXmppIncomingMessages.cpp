@@ -90,9 +90,17 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const 
         fail(context, DecryptionState::Failed, u"The sender of the encrypted content does not match the sender of the message"_s);
         return;
     }
-    const auto expectedRecipient = message.type() == QXmppMessage::GroupChat ? d.conversationJid : jidOrNull(message.to()).bare();
+    const auto isGroupChat = message.type() == QXmppMessage::GroupChat;
+    const auto expectedRecipient = isGroupChat ? d.conversationJid : jidOrNull(message.to()).bare();
     if (!decrypted.sceTo().isNull() && decrypted.sceTo() != expectedRecipient) {
         fail(context, DecryptionState::Failed, u"The recipient of the encrypted content does not match the recipient of the message"_s);
+        return;
+    }
+    // The recipient is required in group chats (XEP-0384), otherwise a server could turn a private
+    // message of a client omitting it into a group chat message.
+    if (isGroupChat && decrypted.sceTo().isNull() && !decrypted.content().isNull() &&
+        decrypted.metadata().contentEncryption() == E2ee::ContentEncryption::Sce) {
+        fail(context, DecryptionState::Failed, u"The encrypted content of the group chat message has no recipient"_s);
         return;
     }
 
