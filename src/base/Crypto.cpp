@@ -4,6 +4,7 @@
 
 #include "Crypto.h"
 
+#include <cstring>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -486,13 +487,23 @@ void SecureByteArray::resize(int size)
 
 SecureByteArray &SecureByteArray::append(const SecureByteArray &other)
 {
-    m_data.append(other.m_data);
+    // copied into a new buffer, since growing may reallocate without cleansing the old buffer
+    SecureByteArray result(m_data.size() + other.size());
+    if (!m_data.isEmpty()) {
+        std::memcpy(result.data(), m_data.constData(), m_data.size());
+    }
+    if (!other.isEmpty()) {
+        std::memcpy(result.data() + m_data.size(), other.constData(), other.size());
+    }
+    *this = std::move(result);
     return *this;
 }
 
 void SecureByteArray::cleanse()
 {
-    if (!m_data.isEmpty()) {
+    // A shared buffer is cleansed by its last owner. Writing to it would detach it, i.e. copy the
+    // data and only cleanse the copy.
+    if (!m_data.isEmpty() && m_data.isDetached()) {
         OPENSSL_cleanse(m_data.data(), m_data.size());
     }
 }

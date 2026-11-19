@@ -1382,6 +1382,7 @@ private:
     Q_SLOT void tampering();
     Q_SLOT void omemo0LegacyFormats();
     Q_SLOT void invalidSizes();
+    Q_SLOT void secureByteArray();
 };
 
 void tst_OmemoPayloadCipher::omemo0Vector()
@@ -1512,6 +1513,25 @@ void tst_OmemoPayloadCipher::invalidSizes()
     expectVariant<QXmppError>(PC::decrypt(Version::Omemo0, secure(range(0, 16)), range(0, 12), range(0, 8)));
     expectVariant<QXmppError>(PC::decrypt(Version::Omemo2, secure(range(0, 32)), {}, data));
     expectVariant<QXmppError>(PC::decrypt(Version::Omemo2, SecureByteArray(), {}, data));
+}
+
+void tst_OmemoPayloadCipher::secureByteArray()
+{
+    // copies share the buffer, so appending must not change the other one
+    auto key = secure("key");
+    const auto copy = key;
+    key.append(secure(" material"));
+    QCOMPARE(key.toByteArray(), QByteArray("key material"));
+    QCOMPARE(copy.toByteArray(), QByteArray("key"));
+
+    SecureByteArray empty;
+    empty.append(SecureByteArray());
+    QVERIFY(empty.isEmpty());
+    empty.append(copy);
+    QCOMPARE(empty, copy);
+
+    key.resize(3);
+    QCOMPARE(key, copy);
 }
 
 }  // namespace PayloadCipherTests

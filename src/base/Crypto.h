@@ -18,7 +18,9 @@ enum Direction {
     Decrypt,
 };
 
-// secure memory wrapper (OPENSSL_cleanse on destruction)
+// Secure memory wrapper (OPENSSL_cleanse on destruction). Copies share the buffer, which is
+// cleansed by the last one. Buffers shared with a QByteArray, e.g. via toByteArray(), are only
+// cleansed if the QByteArray is released first.
 class QXMPP_EXPORT SecureByteArray
 {
 public:
