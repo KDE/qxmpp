@@ -86,6 +86,120 @@ m_avatarNotifier = room.avatar().addNotifier([room]() {
 Observer lifetime, \c addNotifier() versus \c subscribe(), and how to bridge bindable state
 into classic signals are covered in \l{Reactive Properties}.
 
+\section1 IQ Requests
+
+IQ stanzas are represented by QXmpp::Iq::Stanza, usually via the aliases
+QXmpp::Iq::Get, QXmpp::Iq::Set, QXmpp::Iq::Result and QXmpp::Iq::Error. They are
+aggregates with a typed payload, so only the needed fields are set via designated initializers.
+
+QXmppClient::sendIq() sends a get or set request and returns only the payload of the response:
+for a get request the same payload type as the request, for a set request QXmpp::Success. Errors
+from the other entity are returned as QXmppError.
+
+\code
+auto result = co_await client->sendIq(QXmpp::Iq::Get<QXmppDiscoInfo> { .to = u"example.org"_s }).withContext(this);
+if (auto *info = std::get_if<QXmppDiscoInfo>(&result)) {
+    qDebug() << "Features:" << info->features();
+}
+\endcode
+
+A payload is any type with a static \c XmlTag, a static \c fromDom() and a \c toXml() function:
+
+\code
+struct StatusQuery {
+    static constexpr std::tuple XmlTag = { u"status", u"urn:example:status" };
+    static std::optional<StatusQuery> fromDom(const QDomElement &el);
+    void toXml(QXmlStreamWriter *writer) const;
+
+    QString text;
+};
+\endcode
+
+Incoming requests are answered by adding a handler to the hook QXmpp::Iq::Received for the type
+of the request. The handler returns the payload of the result, QXmpp::Success, a
+QXmppStanza::Error or a QXmppTask of them to reply asynchronously:
+
+\code
+hooks().add<QXmpp::Iq::Received<QXmpp::Iq::Get<StatusQuery>>>([this](QXmpp::Iq::Get<StatusQuery> &&iq) {
+    return StatusQuery { .text = m_status };
+});
+\endcode
+
+End-to-end encryption of IQs is opt-in via QXmpp::Iq::SendOptions and selected via the
+QXmpp::Iq::SelectEncryption hook. Replies to encrypted requests are encrypted the same way.
+
+\section1 Hooks
+
+Extensions are connected via hooks instead of virtual functions or signals. A hook is a type
+with a name and a handler signature; any extension (or the application) can add handlers to the
+hooks of the client. Handlers can run asynchronously, stop further handlers, be keyed (e.g. per
+PubSub node) or be the single responder of a hook. See QXmpp::Hooks for the details.
+
+Extensions add their handlers in their constructor via QXmppClientExtension::hooks(), the
+application via QXmppClient::hooks(). Handlers are removed when their owner is destroyed:
+
+\code
+// announce a feature via service discovery
+client->hooks(this).add<QXmpp::Disco::CollectInfo>([](QList<QString> &features, QList<QXmppDiscoIdentity> &) {
+    features.append(u"urn:example:status"_s);
+});
+\endcode
+
+Important hooks of QXmpp:
+\list
+\li QXmpp::Iq::Received: incoming IQ requests
+\li QXmpp::Messages::Received: incoming messages after decryption
+\li QXmpp::Messages::SelectEncryption, QXmpp::Iq::SelectEncryption: end-to-end encryption of
+    outgoing messages and IQs
+\li QXmpp::Disco::CollectInfo: features and identities of the client
+\li QXmpp::PubSub::EventReceived: PubSub event notifications, per node
+\li QXmpp::Mam::MessageReceived: messages of archive queries
+\li QXmpp::Connection::StanzaReceived: all other incoming stanzas
+\li QXmpp::Connection::SessionStarted, QXmpp::Connection::SessionEnded: start and end of a
+    session, also across stream resumption
+\endlist
+
+\section1 Messages and End-to-End Encryption
+
+Incoming messages from the stream, message carbons and archive queries run through the message
+pipeline (see QXmpp::Messages): the real sender is resolved (e.g. in MUC rooms), the message is
+decrypted and the QXmpp::Messages::Received hook is run with its QXmpp::Messages::Context.
+Messages not consumed by a handler are delivered via QXmppClient::messageReceived(), also those
+of rooms joined via QXmppMucManagerV2. Messages of archive queries are returned by
+QXmppMamManager::retrieve().
+
+Messages sent via QXmppClient::sendMessage() or QXmppClient::send() run through the outgoing
+pipeline. The application selects the end-to-end encryption via the
+QXmpp::Messages::SelectEncryption hook:
+
+\code
+client->hooks(this).add<QXmpp::Messages::SelectEncryption>([this](QXmpp::Messages::EncryptionSelection &selection) {
+    if (isEncryptionEnabled(selection.to())) {
+        selection.setEncryption(QXmpp::E2ee::Omemo2);
+    }
+});
+\endcode
+
+QXmppClient::sendMessage() reports in QXmpp::Messages::Sent how the message has been processed:
+the encryption actually used, the recipients, whether the delivery has been confirmed and, for
+MUC rooms and MIX channels, the ID of the message in their archive. Messages to rooms and
+channels finish after their reflection.
+
+\code
+QXmppMessage message;
+message.setTo(u"room@conference.example.org"_s);
+message.setType(QXmppMessage::GroupChat);
+message.setBody(u"Hello!"_s);
+
+auto result = co_await client->sendMessage(std::move(message)).withContext(this);
+if (auto *sent = std::get_if<QXmpp::Messages::Sent>(&result)) {
+    // sent->deliveryState(), sent->archiveId(), ...
+}
+\endcode
+
+Encryptions are implemented as providers registered via QXmpp::E2ee::Providers, which decrypt
+incoming and encrypt outgoing messages and IQs. QXmppOmemoManager is the provider for OMEMO.
+
 \section1 Managers
 
 Managers are the primary way to use XMPP features. Register them with
@@ -168,7 +282,8 @@ QXmppClient and extend QXmppClient by subclassing QXmppClientExtension. See the
 
 For direct access to XMPP stanzas:
 \list
-\li QXmppIq
+\li QXmpp::Iq::Stanza (QXmpp::Iq::Get, QXmpp::Iq::Set, QXmpp::Iq::Result,
+    QXmpp::Iq::Error): typed IQ stanzas
 \li QXmppMessage
 \li QXmppPresence
 \endlist
