@@ -20,6 +20,7 @@
 // for an explanation.
 #include "QXmppConstants_p.h"
 #include "QXmppElement.h"
+#include "QXmppJid.h"
 #include "QXmppNonza.h"
 
 #include <QXmlStreamWriter>
@@ -264,9 +265,13 @@ public:
 
     QString to() const;
     void setTo(const QString &);
+    QXmpp::Jid toJid() const;
+    void setToJid(const QXmpp::Jid &jid);
 
     QString from() const;
     void setFrom(const QString &);
+    QXmpp::Jid fromJid() const;
+    void setFromJid(const QXmpp::Jid &jid);
 
     QString id() const;
     void setId(const QString &);

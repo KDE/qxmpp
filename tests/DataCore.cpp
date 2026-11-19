@@ -43,6 +43,7 @@ class tst_QXmppStanza : public QObject
 private:
     Q_SLOT void testExtendedAddress_data();
     Q_SLOT void testExtendedAddress();
+    Q_SLOT void testAddressJids();
 
     Q_SLOT void testErrorCases_data();
     Q_SLOT void testErrorCases();
@@ -95,6 +96,26 @@ void tst_QXmppStanza::testExtendedAddress()
     QCOMPARE(address.jid(), jid);
     QCOMPARE(address.type(), type);
     serializePacket(address, xml);
+}
+
+void tst_QXmppStanza::testAddressJids()
+{
+    QXmppStanzaStub stanza;
+    QVERIFY(stanza.fromJid().isNull());
+    QVERIFY(stanza.toJid().isNull());
+
+    stanza.setFrom(u"Juliet@Example.com/Balcony"_s);
+    QCOMPARE(stanza.from(), u"Juliet@Example.com/Balcony"_s);
+    QCOMPARE(stanza.fromJid().toString(), u"juliet@example.com/Balcony"_s);
+
+    stanza.setTo(u"juliet@"_s);
+    QCOMPARE(stanza.to(), u"juliet@"_s);
+    QVERIFY(stanza.toJid().isNull());
+
+    stanza.setToJid(stanza.fromJid().bare());
+    QCOMPARE(stanza.to(), u"juliet@example.com"_s);
+    stanza.setFromJid({});
+    QVERIFY(stanza.from().isEmpty());
 }
 
 void tst_QXmppStanza::testErrorCases_data()

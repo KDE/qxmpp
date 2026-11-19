@@ -84,7 +84,7 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const 
         fail(context, DecryptionState::Failed, u"The sender of the encrypted content does not match the sender of the message"_s);
         return;
     }
-    const auto expectedRecipient = message.type() == QXmppMessage::GroupChat ? d.conversationJid : jidOrNull(message.to()).bare();
+    const auto expectedRecipient = message.type() == QXmppMessage::GroupChat ? d.conversationJid : message.toJid().bare();
     if (!decrypted.sceTo().isNull() && decrypted.sceTo() != expectedRecipient) {
         fail(context, DecryptionState::Failed, u"The recipient of the encrypted content does not match the recipient of the message"_s);
         return;

@@ -706,7 +706,7 @@ void QXmppMamManagerPrivate::processMessage(const QString &queryId, RetrieveRequ
     Context context(std::move(parsed.message), Origin::Mam);
     if (context.senderJid() == jidOrNull(client->configuration().jidBare())) {
         // sent by this account
-        context.setConversationJid(jidOrNull(context.message().to()).bare());
+        context.setConversationJid(context.message().toJid().bare());
     }
     ArchiveInfo info;
     info.setArchiveJid(state.archiveJid);

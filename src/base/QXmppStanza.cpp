@@ -11,6 +11,7 @@
 #include "QXmppConstants_p.h"
 #include "QXmppE2eeMetadata.h"
 #include "QXmppGlobal_p.h"
+#include "QXmppJid_p.h"
 #include "QXmppStanza_p.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
@@ -795,6 +796,29 @@ void QXmppStanza::setTo(const QString &to)
     d->to = to;
 }
 
+/*!
+    Returns the stanza's recipient JID in canonical form.
+
+    The JID is null if the stanza has no recipient or if the recipient is not a valid JID.
+    Use this instead of to() to compare JIDs.
+
+    \since QXmpp 1.18
+*/
+QXmpp::Jid QXmppStanza::toJid() const
+{
+    return QXmpp::Private::jidOrNull(d->to);
+}
+
+/*!
+    Sets the stanza's recipient JID to \a jid.
+
+    \since QXmpp 1.18
+*/
+void QXmppStanza::setToJid(const QXmpp::Jid &jid)
+{
+    d->to = jid.toString();
+}
+
 /*! Returns the stanza's sender JID. */
 QString QXmppStanza::from() const
 {
@@ -807,6 +831,29 @@ QString QXmppStanza::from() const
 void QXmppStanza::setFrom(const QString &from)
 {
     d->from = from;
+}
+
+/*!
+    Returns the stanza's sender JID in canonical form.
+
+    The JID is null if the stanza has no sender or if the sender is not a valid JID.
+    Use this instead of from() to compare JIDs.
+
+    \since QXmpp 1.18
+*/
+QXmpp::Jid QXmppStanza::fromJid() const
+{
+    return QXmpp::Private::jidOrNull(d->from);
+}
+
+/*!
+    Sets the stanza's sender JID to \a jid.
+
+    \since QXmpp 1.18
+*/
+void QXmppStanza::setFromJid(const QXmpp::Jid &jid)
+{
+    d->from = jid.toString();
 }
 
 /*! Returns the stanza's identifier. */
