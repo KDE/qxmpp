@@ -20,12 +20,35 @@
 #include <QProperty>
 
 class QXmppPubSubManager;
+class QXmppRosterManager;
 class QXmppTrustManager;
+
+namespace QXmpp::Omemo {
+
+struct DeviceWatch::Data {
+    QString jid;
+    std::function<void()> release;
+    QProperty<DeviceWatch::State> state { DeviceWatch::State::Loading };
+    QProperty<QList<Device>> devices;
+    QProperty<QList<Version>> supportedVersions;
+
+    ~Data()
+    {
+        if (release) {
+            release();
+        }
+    }
+};
+
+}  // namespace QXmpp::Omemo
 
 namespace QXmpp::Omemo::Private {
 
 // maximum number of devices per JID and version
 constexpr int MAX_DEVICES_PER_JID = 200;
+// Maximum number of devices per JID and version that are not in the device list, e.g. only known
+// from received stanzas. Stanzas of further unknown devices are not decrypted.
+constexpr int MAX_UNLISTED_DEVICES_PER_JID = 20;
 // Encryption for a device is stopped after this number of sent stanzas without an answer.
 constexpr int UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS = 106;
 // An empty message is sent after this number of received stanzas without sending one.
@@ -83,7 +106,25 @@ public:
     OmemoManagerPrivate(OmemoManager *q, std::shared_ptr<OmemoStorage> storage, QList<Version> enabledVersions);
 
     QString ownJid() const;
+    QString ownFullJid() const;
     QList<uint32_t> deviceIds(Version version, const QString &jid) const;
+    QXmppTask<QList<Device>> devices(QString jid);
+
+    // device watches
+    bool hasPresenceSubscription(const QString &jid) const;
+    bool isKnownJid(const QString &jid) const;
+    qsizetype unlistedDeviceCount(Version version, const QString &jid) const;
+    QXmppTask<void> login();
+    void resume();
+    void disconnected();
+    DeviceWatch watch(const QString &jid);
+    QXmppTask<void> startWatch(QString jid);
+    QXmppTask<void> refreshWatch(QString jid);
+    QXmppTask<void> updateWatch(QString jid);
+    void updateWatches();
+    QXmppTask<void> buildSessions(QString jid);
+    void releaseWatch(const QString &jid);
+    void unsubscribe(const OmemoStorage::Subscription &subscription);
     bool isEnabled(Version version) const { return enabledVersions.value().contains(version); }
     QDateTime now() const { return fixedTime.isValid() ? fixedTime : QDateTime::currentDateTimeUtc(); }
     Pep::Client pubSubClient(Version version) const { return { pubSub, version }; }
@@ -136,6 +177,7 @@ public:
     OmemoManager *q;
     std::shared_ptr<OmemoStorage> storage;
     QXmppPubSubManager *pubSub = nullptr;
+    QXmppRosterManager *roster = nullptr;
     QXmppTrustManager *trustManager = nullptr;
     SignalContext context;
     KeyMaintenance::Config keyConfig;
@@ -153,6 +195,14 @@ public:
     DeviceKeys device;
     // empty for the default label
     QString customLabel;
+
+    QHash<QString, std::weak_ptr<DeviceWatch::Data>> watches;
+    // Results of the device list requests in the current stream, also of released watches, since
+    // their device lists are still notified about until the next login.
+    QHash<QString, DeviceWatch::State> requestResults;
+    QList<OmemoStorage::Subscription> subscriptions;
+    QSet<QString> sessionBuildsRunning;
+    QSet<QString> sessionBuildsPending;
 
     QProperty<OmemoManager::State> state { OmemoManager::State::Loading };
     QProperty<uint32_t> ownDeviceId { 0 };

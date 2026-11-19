@@ -82,6 +82,9 @@ public:
     // Deletes the device list node and the bundles of the devices.
     QXmppTask<Result<Success>> deleteAll(QList<uint32_t> deviceIds) const;
 
+    QXmppTask<Result<Success>> subscribeToDeviceList(const QString &jid, const QString &subscriberJid) const;
+    QXmppTask<Result<Success>> unsubscribeFromDeviceList(const QString &jid, const QString &subscriberJid) const;
+
 private:
     template<typename Item>
     QXmppTask<Result<Success>> publish(const QString &node, const Item &item) const;

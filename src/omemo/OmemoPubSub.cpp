@@ -304,6 +304,16 @@ QXmppTask<Result<Success>> Client::deleteBundle(uint32_t deviceId) const
     co_return ignoreItemNotFound(co_await m_pubSub->retractOwnPepItem(bundleNode(m_version, deviceId), bundleItemId(m_version, deviceId)).withContext(m_pubSub));
 }
 
+QXmppTask<Result<Success>> Client::subscribeToDeviceList(const QString &jid, const QString &subscriberJid) const
+{
+    return m_pubSub->subscribeToNode(jid, deviceListNode(m_version), subscriberJid);
+}
+
+QXmppTask<Result<Success>> Client::unsubscribeFromDeviceList(const QString &jid, const QString &subscriberJid) const
+{
+    return m_pubSub->unsubscribeFromNode(jid, deviceListNode(m_version), subscriberJid);
+}
+
 QXmppTask<Result<Success>> Client::deleteAll(QList<uint32_t> deviceIds) const
 {
     QList<QString> nodes { deviceListNode(m_version) };

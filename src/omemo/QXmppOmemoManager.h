@@ -11,6 +11,7 @@
 #include "QXmppJid.h"
 #include "QXmppOmemoStorage.h"
 #include "QXmppTask.h"
+#include "QXmppTrustLevel.h"
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
@@ -167,6 +168,45 @@ class OmemoManagerPrivate;
 
 namespace QXmpp::Omemo {
 
+struct Device {
+    Version version = Version::Omemo2;
+    QXmpp::Jid jid {};
+    uint32_t id = 0;
+    QString label {};
+    QByteArray keyId {};
+    QXmpp::TrustLevel trustLevel = QXmpp::TrustLevel::Undecided;
+    QByteArray omemo0KeyId {};
+
+    bool hasKey(const QByteArray &key) const { return !key.isEmpty() && (key == keyId || key == omemo0KeyId); }
+
+    bool operator==(const Device &) const = default;
+};
+
+class QXMPPOMEMO_EXPORT DeviceWatch
+{
+public:
+    enum class State {
+        Loading,
+        Stale,
+        Loaded,
+        Error,
+    };
+
+    DeviceWatch();
+
+    QXmpp::Jid jid() const;
+    QBindable<State> state() const;
+    QBindable<QList<Device>> devices() const;
+    QBindable<QList<Version>> supportedVersions() const;
+
+private:
+    friend class Private::OmemoManagerPrivate;
+    struct Data;
+    explicit DeviceWatch(std::shared_ptr<Data> d);
+
+    std::shared_ptr<Data> d;
+};
+
 }  // namespace QXmpp::Omemo
 
 namespace QXmpp {
@@ -198,6 +238,8 @@ public:
     QBindable<uint32_t> ownDeviceId() const;
     QBindable<QByteArray> ownKey(Omemo::Version version = Omemo::Version::Omemo2) const;
 
+    Omemo::DeviceWatch watchDevices(const QXmpp::Jid &jid);
+    QXmppTask<void> setTrustLevel(QList<Omemo::Device> devices, QXmpp::TrustLevel trustLevel);
     QXmppTask<void> removeContactDevices(QXmpp::Jid jid);
 
     QXmppTask<QXmpp::Result<>> resetOwnDevice();

@@ -149,6 +149,7 @@ QXmppTask<bool> OmemoManagerPrivate::prepareSession(Version version, QString jid
     if (device->keyId.isEmpty()) {
         device->keyId = bundle.identityKey;
         storage->addDevice(*device);
+        updateWatch(jid);
     }
 
     auto &sessions = *versions.at(version).sessions;
@@ -231,8 +232,15 @@ QXmppTask<Result<DecryptedEnvelope>> OmemoManagerPrivate::decryptKey(Version ver
     const Address address { jid, deviceId };
     auto &state = versions.at(version);
     auto &sessions = *state.sessions;
+    // Each unknown device is stored, so their number is limited.
+    if (!storedDevice(version, jid, deviceId) && unlistedDeviceCount(version, jid) >= MAX_UNLISTED_DEVICES_PER_JID) {
+        co_return QXmppError { u"Too many devices of %1 are not in its device list"_s.arg(jid), {} };
+    }
     if (!isKeyExchange && !sessions.hasSession(address)) {
         // The other device sends key exchanges until it receives a message from this device.
+        if (!isKnownJid(jid)) {
+            co_return QXmppError { u"There is no session with %1/%2"_s.arg(jid, QString::number(deviceId)), {} };
+        }
         buildSessionAndSendEmptyMessage(version, jid, deviceId);
         co_return QXmppError { u"There is no session with %1/%2, a new one is built"_s.arg(jid, QString::number(deviceId)), {} };
     }
@@ -248,14 +256,18 @@ QXmppTask<Result<DecryptedEnvelope>> OmemoManagerPrivate::decryptKey(Version ver
     // the session callback has created the device if it was unknown
     auto *device = storedDevice(version, jid, deviceId);
     Q_ASSERT(device);
+    // Strangers get no automatic stanzas until the user interacts with them, e.g. by watching
+    // their devices or by sending a message.
+    const auto isKnown = isKnownJid(jid);
     // The device list may be outdated. It is requested once per login, later changes are notified.
-    if (device->removalFromDeviceListDate.isValid() && !state.refreshedDeviceLists.contains(jid)) {
+    if (isKnown && device->removalFromDeviceListDate.isValid() && !state.refreshedDeviceLists.contains(jid)) {
         state.refreshedDeviceLists.insert(jid);
         refreshDeviceList(version, jid);
     }
     if (isKeyExchange) {
         if (device->keyId.isEmpty()) {
             device->keyId = decrypted.senderIdentityKey;
+            updateWatch(jid);
         }
         if (decrypted.usedPreKeyId) {
             refillPreKeysAndPublish(version);
@@ -267,6 +279,7 @@ QXmppTask<Result<DecryptedEnvelope>> OmemoManagerPrivate::decryptKey(Version ver
     if (++device->unrespondedReceivedStanzasCount >= UNRESPONDED_STANZAS_UNTIL_HEARTBEAT) {
         sendEmpty = true;
     }
+    sendEmpty = sendEmpty && isKnown;
     if (sendEmpty) {
         device->unrespondedReceivedStanzasCount = 0;
     }

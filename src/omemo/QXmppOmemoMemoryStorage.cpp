@@ -131,6 +131,7 @@ struct OmemoMemoryStoragePrivate {
     QMap<uint32_t, OmemoStorage::SignedPreKey> signedPreKeys;
     QMap<std::pair<Version, uint32_t>, QByteArray> preKeys;
     std::map<DeviceKey, OmemoStorage::Device> devices;
+    QList<OmemoStorage::Subscription> subscriptions;
 };
 
 }  // namespace QXmpp::Omemo::Private
@@ -167,6 +168,7 @@ QXmppTask<OmemoStorage::Data> OmemoMemoryStorage::allData()
     for (const auto &[key, device] : d->devices) {
         data.devices.append(device);
     }
+    data.subscriptions = d->subscriptions;
     return makeReadyTask(std::move(data));
 }
 
@@ -217,6 +219,20 @@ QXmppTask<void> OmemoMemoryStorage::removeDevice(Version version, const QString 
 QXmppTask<void> OmemoMemoryStorage::removeDevices(const QString &jid)
 {
     std::erase_if(d->devices, [&](const auto &entry) { return entry.first.jid == jid; });
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::addSubscription(const Subscription &subscription)
+{
+    if (!d->subscriptions.contains(subscription)) {
+        d->subscriptions.append(subscription);
+    }
+    return makeReadyTask();
+}
+
+QXmppTask<void> OmemoMemoryStorage::removeSubscription(const Subscription &subscription)
+{
+    d->subscriptions.removeAll(subscription);
     return makeReadyTask();
 }
 
