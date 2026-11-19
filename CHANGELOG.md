@@ -7,6 +7,7 @@ SPDX-License-Identifier: CC0-1.0
 QXmpp 1.18.0 (UNRELEASED)
 -------------------------
 
+ - Add `QXmpp::Jid` for parsing, validating and comparing JIDs according to RFC 7622 (PRECIS, IDNA2008), with access to localpart, domainpart and resourcepart, XEP-0106: JID Escaping and `fromUserInput()` for JIDs entered by users (@lnj, !857)
  - Add hooks: extensions define hooks and add handlers via `QXmppClientExtension::hooks()`, also in their constructor; hooks can be asynchronous, have keys, a single responder or be adapted to another hook (@lnj, !839)
    - `QXmpp::Disco::CollectInfo`: features and identities of the client
    - `QXmpp::PubSub::EventReceived`: PubSub event notifications, per node

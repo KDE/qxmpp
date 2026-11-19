@@ -13,6 +13,7 @@
 #include "QXmppError.h"
 #include "QXmppHash.h"
 #include "QXmppHashing_p.h"
+#include "QXmppJid.h"
 #include "QXmppLogger.h"
 #include "QXmppMessage.h"
 #include "QXmppNamespaces.h"
@@ -1270,6 +1271,380 @@ void tst_QXmppXmlFormatter::elideColorized()
 
 }  // namespace XmlHelpers
 
-QXMPP_TEST_MAIN(Utils::tst_QXmppUtils, Logger::tst_QXmppLogger, XmlHelpers::tst_QXmppXmlElement, XmlHelpers::tst_QXmppXmlRegistry, XmlHelpers::tst_QXmppXmlFormatter)
+// ============================================================
+// QXmpp::Jid
+
+namespace JidTests {
+
+using namespace QXmpp;
+
+class tst_QXmppJid : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void valid_data();
+    Q_SLOT void valid();
+    Q_SLOT void invalid_data();
+    Q_SLOT void invalid();
+    Q_SLOT void parts();
+    Q_SLOT void comparison();
+    Q_SLOT void lengthLimits();
+    Q_SLOT void modifiers();
+    Q_SLOT void escaping_data();
+    Q_SLOT void escaping();
+    Q_SLOT void unescaping();
+    Q_SLOT void userInput_data();
+    Q_SLOT void userInput();
+    Q_SLOT void userInputInvalid();
+    Q_SLOT void display();
+};
+
+static Jid parsed(QStringView string)
+{
+    auto result = Jid::parse(string);
+    if (auto *error = std::get_if<JidParsingError>(&result)) {
+        qWarning() << "Unexpected error:" << error->description;
+        return {};
+    }
+    return std::get<Jid>(result);
+}
+
+void tst_QXmppJid::valid_data()
+{
+    QTest::addColumn<QString>("input");
+    QTest::addColumn<QString>("canonical");
+
+    // RFC 7622, section 3.5, table 1
+    QTest::newRow("rfc-1") << u"juliet@example.com"_s << u"juliet@example.com"_s;
+    QTest::newRow("rfc-2") << u"juliet@example.com/foo"_s << u"juliet@example.com/foo"_s;
+    QTest::newRow("rfc-3") << u"juliet@example.com/foo bar"_s << u"juliet@example.com/foo bar"_s;
+    QTest::newRow("rfc-4") << u"juliet@example.com/foo@bar"_s << u"juliet@example.com/foo@bar"_s;
+    QTest::newRow("rfc-5") << u"foo\\20bar@example.com"_s << u"foo\\20bar@example.com"_s;
+    QTest::newRow("rfc-6") << u"fussball@example.com"_s << u"fussball@example.com"_s;
+    QTest::newRow("rfc-7") << u"fu\u00DFball@example.com"_s << u"fu\u00DFball@example.com"_s;
+    QTest::newRow("rfc-8") << u"\u03C0@example.com"_s << u"\u03C0@example.com"_s;
+    QTest::newRow("rfc-9") << u"\u03A3@example.com/foo"_s << u"\u03C3@example.com/foo"_s;
+    QTest::newRow("rfc-10") << u"\u03C3@example.com/foo"_s << u"\u03C3@example.com/foo"_s;
+    QTest::newRow("rfc-11") << u"\u03C2@example.com/foo"_s << u"\u03C2@example.com/foo"_s;
+    QTest::newRow("rfc-12") << u"king@example.com/\u265A"_s << u"king@example.com/\u265A"_s;
+    QTest::newRow("rfc-13") << u"example.com"_s << u"example.com"_s;
+    QTest::newRow("rfc-14") << u"example.com/foobar"_s << u"example.com/foobar"_s;
+    QTest::newRow("rfc-15") << u"a.example.com/b@example.net"_s << u"a.example.com/b@example.net"_s;
+    // RFC 7622 erratum 4560: example 18 is valid
+    QTest::newRow("rfc-18") << u"juliet@example.com/ foo"_s << u"juliet@example.com/ foo"_s;
+
+    // localpart
+    QTest::newRow("case-mapping") << u"Juliet@Example.COM/Balcony"_s << u"juliet@example.com/Balcony"_s;
+    QTest::newRow("width-mapping") << u"\uFF4A\uFF55\uFF4C\uFF49\uFF45\uFF54@example.com"_s << u"juliet@example.com"_s;
+    QTest::newRow("nfc-localpart") << u"e\u0301@example.com"_s << u"\u00E9@example.com"_s;
+    QTest::newRow("special-casing") << u"\u0130@example.com"_s << u"i\u0307@example.com"_s;
+    QTest::newRow("hebrew") << u"\u05E9\u05DC\u05D5\u05DD@example.com"_s << u"\u05E9\u05DC\u05D5\u05DD@example.com"_s;
+    QTest::newRow("middle-dot") << u"l\u00B7l@example.com"_s << u"l\u00B7l@example.com"_s;
+    QTest::newRow("zwnj-after-virama") << u"\u0915\u094D\u200C\u0937@example.com"_s << u"\u0915\u094D\u200C\u0937@example.com"_s;
+    QTest::newRow("zwnj-arabic") << u"\u0628\u200C\u0628@example.com"_s << u"\u0628\u200C\u0628@example.com"_s;
+    QTest::newRow("rtl-digits") << u"\u05D0123@example.com"_s << u"\u05D0123@example.com"_s;
+    QTest::newRow("non-ascii-case-mapping") << u"\u00C4B@example.com"_s << u"\u00E4b@example.com"_s;
+    QTest::newRow("backslash") << u"a\\b@example.com"_s << u"a\\b@example.com"_s;
+
+    // resourcepart
+    QTest::newRow("nbsp-resource") << u"juliet@example.com/foo\u00A0bar"_s << u"juliet@example.com/foo bar"_s;
+    QTest::newRow("nfc-resource") << u"juliet@example.com/e\u0301"_s << u"juliet@example.com/\u00E9"_s;
+    QTest::newRow("fullwidth-resource") << u"juliet@example.com/\uFF21"_s << u"juliet@example.com/\uFF21"_s;
+    QTest::newRow("slash-in-resource") << u"juliet@example.com/a/b"_s << u"juliet@example.com/a/b"_s;
+
+    // domainpart
+    QTest::newRow("trailing-dot") << u"juliet@example.com./foo"_s << u"juliet@example.com/foo"_s;
+    QTest::newRow("idn") << u"juliet@M\u00DCLLER.de"_s << u"juliet@m\u00FCller.de"_s;
+    QTest::newRow("a-label") << u"juliet@xn--mller-kva.de"_s << u"juliet@m\u00FCller.de"_s;
+    QTest::newRow("fullwidth-domain") << u"\uFF45\uFF58\uFF41\uFF4D\uFF50\uFF4C\uFF45.com"_s << u"example.com"_s;
+    QTest::newRow("ideographic-dot") << u"\u4F8B\u3048\u3002\u30C6\u30B9\u30C8"_s << u"\u4F8B\u3048.\u30C6\u30B9\u30C8"_s;
+    QTest::newRow("unqualified") << u"juliet@localhost"_s << u"juliet@localhost"_s;
+    QTest::newRow("ipv4") << u"juliet@192.0.2.1/foo"_s << u"juliet@192.0.2.1/foo"_s;
+    QTest::newRow("ipv6") << u"juliet@[2001:DB8::0:1]"_s << u"juliet@[2001:db8::1]"_s;
+}
+
+void tst_QXmppJid::valid()
+{
+    QFETCH(QString, input);
+    QFETCH(QString, canonical);
+
+    auto jid = parsed(input);
+    QVERIFY(!jid.isNull());
+    QCOMPARE(jid.toString(), canonical);
+    // enforcement is idempotent
+    QCOMPARE(parsed(canonical), jid);
+}
+
+void tst_QXmppJid::invalid_data()
+{
+    QTest::addColumn<QString>("input");
+    QTest::addColumn<int>("type");
+
+    // RFC 7622, section 3.5, table 2
+    QTest::newRow("rfc-16") << u"\"juliet\"@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("rfc-17") << u"foo bar@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("rfc-19") << u"@example.com/"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("rfc-20") << u"henry\u2163@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("rfc-21") << u"\u265A@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("rfc-22") << u"juliet@"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("rfc-23") << u"/foobar"_s << int(JidParsingError::InvalidDomainpart);
+
+    QTest::newRow("empty") << QString() << int(JidParsingError::Empty);
+    QTest::newRow("empty-resource") << u"juliet@example.com/"_s << int(JidParsingError::InvalidResourcepart);
+
+    // localpart
+    for (auto c : { u'&', u'\'', u':', u'<', u'>' }) {
+        QTest::addRow("excluded-%c", char(c)) << u"a"_s + QChar(c) + u"b@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    }
+    QTest::newRow("fullwidth-at") << u"a\uFF20b@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("compat-ligature") << u"\uFB01@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("bidi-mixed") << u"a\u05E9@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("middle-dot-context") << u"a\u00B7b@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("zwnj-context") << u"a\u200Cb@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("rtl-mixed-digits") << u"\u05D01\u0661@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("zwj-context") << u"a\u200Db@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("arabic-digits-mixed") << u"\u0660\u06F0@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("soft-hyphen") << u"a\u00ADb@example.com"_s << int(JidParsingError::InvalidLocalpart);
+    QTest::newRow("unassigned") << u"a\u0378b@example.com"_s << int(JidParsingError::InvalidLocalpart);
+
+    // resourcepart
+    QTest::newRow("control-resource") << u"juliet@example.com/a\u0007"_s << int(JidParsingError::InvalidResourcepart);
+    QTest::newRow("zwj-resource") << u"juliet@example.com/a\u200Db"_s << int(JidParsingError::InvalidResourcepart);
+    QTest::newRow("private-use-resource") << u"juliet@example.com/\uE000"_s << int(JidParsingError::InvalidResourcepart);
+    QTest::newRow("lone-surrogate") << u"juliet@example.com/a"_s + QChar(0xD800) << int(JidParsingError::InvalidResourcepart);
+
+    // domainpart
+    QTest::newRow("at-in-domain") << u"a@b@example.com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("underscore") << u"a_b.example.com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("leading-hyphen") << u"-a.example.com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("reserved-hyphens") << u"ab--c.example.com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("bad-a-label") << u"xn--zz.example.com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("empty-label") << u"a..example.com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("space") << u"exa mple.com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("long-label") << QString(64, u'a') + u".com"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("numeric-tld") << u"1.2.3"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("bad-ipv4") << u"1.2.3.256"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("ipv6-zone") << u"[fe80::1%25eth0]"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("ipv6-unbracketed") << u"::1"_s << int(JidParsingError::InvalidDomainpart);
+    QTest::newRow("ipv4-in-brackets") << u"[192.0.2.1]"_s << int(JidParsingError::InvalidDomainpart);
+}
+
+void tst_QXmppJid::invalid()
+{
+    QFETCH(QString, input);
+    QFETCH(int, type);
+
+    auto result = Jid::parse(input);
+    QVERIFY(std::holds_alternative<JidParsingError>(result));
+    const auto &error = std::get<JidParsingError>(result);
+    QCOMPARE(int(error.type), type);
+    QVERIFY(!error.description.isEmpty());
+    QVERIFY(!Jid::fromString(input));
+}
+
+void tst_QXmppJid::parts()
+{
+    auto full = parsed(u"juliet@example.com/balcony");
+    QCOMPARE(full.localpart(), u"juliet");
+    QCOMPARE(full.domain(), u"example.com");
+    QCOMPARE(full.resource(), u"balcony");
+    QVERIFY(full.hasLocalpart());
+    QVERIFY(full.hasResource());
+    QVERIFY(full.isFull());
+    QVERIFY(!full.isBare());
+    QVERIFY(!full.isDomain());
+
+    auto domainWithResource = parsed(u"a.example.com/b@example.net");
+    QVERIFY(!domainWithResource.hasLocalpart());
+    QCOMPARE(domainWithResource.localpart(), QStringView());
+    QCOMPARE(domainWithResource.domain(), u"a.example.com");
+    QCOMPARE(domainWithResource.resource(), u"b@example.net");
+
+    auto domain = parsed(u"example.com");
+    QVERIFY(domain.isDomain());
+    QVERIFY(domain.isBare());
+    QVERIFY(!domain.isFull());
+    QCOMPARE(domain.resource(), QStringView());
+
+    Jid null;
+    QVERIFY(null.isNull());
+    QVERIFY(!null.isBare());
+    QVERIFY(!null.isFull());
+    QVERIFY(!null.isDomain());
+    QCOMPARE(null.domain(), QStringView());
+
+    QCOMPARE(parsed(u"juliet@m\u00FCller.de").domainAce(), QByteArray("xn--mller-kva.de"));
+    QCOMPARE(parsed(u"juliet@[::1]").domainAce(), QByteArray("[::1]"));
+
+    auto fromParts = Jid::fromParts(u"Juliet", u"Example.com", u"balcony");
+    QCOMPARE(std::get<Jid>(fromParts), full);
+    QCOMPARE(std::get<Jid>(Jid::fromParts({}, u"example.com")), domain);
+    QVERIFY(std::holds_alternative<JidParsingError>(Jid::fromParts(u"a@b", u"example.com")));
+    QVERIFY(std::holds_alternative<JidParsingError>(Jid::fromParts(u"juliet", {})));
+}
+
+void tst_QXmppJid::comparison()
+{
+    QCOMPARE(parsed(u"\u03A3@example.com"), parsed(u"\u03C3@example.com"));
+    QVERIFY(parsed(u"\u03C3@example.com") != parsed(u"\u03C2@example.com"));
+    QVERIFY(parsed(u"fussball@example.com") != parsed(u"fu\u00DFball@example.com"));
+    QCOMPARE(parsed(u"JULIET@EXAMPLE.COM"), parsed(u"juliet@example.com"));
+    QVERIFY(parsed(u"juliet@example.com/Foo") != parsed(u"juliet@example.com/foo"));
+    QCOMPARE(parsed(u"juliet@xn--mller-kva.de"), parsed(u"juliet@M\u00FCLLER.DE."));
+
+    QSet<Jid> set { parsed(u"Juliet@Example.com"), parsed(u"juliet@example.com"), parsed(u"romeo@example.com") };
+    QCOMPARE(set.size(), 2);
+
+    QVERIFY(parsed(u"a@example.com") < parsed(u"b@example.com"));
+    QCOMPARE(parsed(u"a@example.com") <=> parsed(u"A@example.com"), std::strong_ordering::equal);
+}
+
+void tst_QXmppJid::lengthLimits()
+{
+    QVERIFY(Jid::fromString(QString(QString(1023, u'a') + u"@example.com"_s)));
+    QVERIFY(!Jid::fromString(QString(QString(1024, u'a') + u"@example.com"_s)));
+
+    // limits are in bytes of UTF-8: U+20AC needs three
+    QVERIFY(Jid::fromString(QString(u"example.com/"_s + QString(341, QChar(0x20AC)))));
+    QVERIFY(!Jid::fromString(QString(u"example.com/"_s + QString(342, QChar(0x20AC)))));
+
+    QString longDomain;
+    for (int i = 0; i < 4; ++i) {
+        longDomain += QString(63, u'a') + u'.';
+    }
+    longDomain.chop(2);  // 4 * 64 - 2 = 254 characters
+    QVERIFY(!Jid::fromString(longDomain));
+    longDomain.chop(1);
+    QVERIFY(Jid::fromString(longDomain));
+}
+
+void tst_QXmppJid::modifiers()
+{
+    auto full = parsed(u"juliet@example.com/balcony");
+    QCOMPARE(full.bare(), parsed(u"juliet@example.com"));
+    QCOMPARE(full.bare().bare(), full.bare());
+    QCOMPARE(full.domainJid(), parsed(u"example.com"));
+    QCOMPARE(std::get<Jid>(full.withResource(u"garden")), parsed(u"juliet@example.com/garden"));
+    QCOMPARE(std::get<Jid>(parsed(u"example.com").withResource(u"x\u00A0y")), parsed(u"example.com/x y"));
+    QVERIFY(std::holds_alternative<JidParsingError>(full.withResource({})));
+    QVERIFY(std::holds_alternative<JidParsingError>(full.withResource(u"\u0007")));
+    QVERIFY(std::holds_alternative<JidParsingError>(Jid().withResource(u"foo")));
+    QVERIFY(Jid().bare().isNull());
+    QVERIFY(Jid().domainJid().isNull());
+}
+
+void tst_QXmppJid::escaping_data()
+{
+    QTest::addColumn<QString>("unescaped");
+    QTest::addColumn<QString>("escaped");
+
+    // XEP-0106, section 5
+    QTest::newRow("1") << u"space cadet"_s << u"space\\20cadet"_s;
+    QTest::newRow("2") << u"call me \"ishmael\""_s << u"call\\20me\\20\\22ishmael\\22"_s;
+    QTest::newRow("3") << u"at&t guy"_s << u"at\\26t\\20guy"_s;
+    QTest::newRow("4") << u"d'artagnan"_s << u"d\\27artagnan"_s;
+    QTest::newRow("5") << u"/.fanboy"_s << u"\\2f.fanboy"_s;
+    QTest::newRow("6") << u"::foo::"_s << u"\\3a\\3afoo\\3a\\3a"_s;
+    QTest::newRow("7") << u"<foo>"_s << u"\\3cfoo\\3e"_s;
+    QTest::newRow("8") << u"user@host"_s << u"user\\40host"_s;
+    QTest::newRow("9") << u"c:\\net"_s << u"c\\3a\\net"_s;
+    QTest::newRow("10") << u"c:\\\\net"_s << u"c\\3a\\\\net"_s;
+    QTest::newRow("11") << u"c:\\cool stuff"_s << u"c\\3a\\cool\\20stuff"_s;
+    QTest::newRow("12") << u"c:\\5commas"_s << u"c\\3a\\5c5commas"_s;
+    // XEP-0106, section 4.3
+    QTest::newRow("existing-escape") << u"\\27"_s << u"\\5c27"_s;
+    QTest::newRow("existing-backslash-escape") << u"\\5c"_s << u"\\5c5c"_s;
+    QTest::newRow("wv") << u"\\3and\\2is\\5cool"_s << u"\\5c3and\\2is\\5c5cool"_s;
+}
+
+void tst_QXmppJid::escaping()
+{
+    QFETCH(QString, unescaped);
+    QFETCH(QString, escaped);
+
+    QCOMPARE(Jid::escapeLocalpart(unescaped), escaped);
+    QCOMPARE(Jid::unescapeLocalpart(escaped), unescaped);
+
+    auto jid = Jid::fromParts(escaped, u"example.com");
+    QVERIFY(std::holds_alternative<Jid>(jid));
+    QCOMPARE(std::get<Jid>(jid).unescapedLocalpart(), unescaped);
+}
+
+void tst_QXmppJid::unescaping()
+{
+    // leading and trailing spaces cannot be escaped
+    QCOMPARE(Jid::escapeLocalpart(u"  foo bar "), u"foo\\20bar"_s);
+    // case mapping of the localpart must not turn an escape-like sequence into an escape
+    QCOMPARE(Jid::escapeLocalpart(u"\\2F"), u"\\5c2F"_s);
+    // only the specified sequences are unescaped
+    QCOMPARE(Jid::unescapeLocalpart(u"\\21\\2\\"), u"\\21\\2\\"_s);
+    QCOMPARE(Jid::unescapeLocalpart(u"\\2F"), u"\\2F"_s);
+}
+
+void tst_QXmppJid::userInput_data()
+{
+    QTest::addColumn<QString>("input");
+    QTest::addColumn<QString>("expected");
+
+    auto row = [](const char *name, QString input, QString expected) {
+        QTest::newRow(name) << input << expected;
+    };
+    row("plain", u"Juliet@Example.com/Balcony"_s, u"juliet@example.com/Balcony"_s);
+    row("whitespace", u" \tjuliet@example.com\n"_s, u"juliet@example.com"_s);
+    row("invisible", u"\u200Ejuliet@example.com\uFEFF"_s, u"juliet@example.com"_s);
+    row("whitespace-in-parts", u"Juliet @ example.com / balcony"_s, u"juliet@example.com/balcony"_s);
+    row("trailing-slash", u"example.com/"_s, u"example.com"_s);
+    row("space", u"space cadet@example.com"_s, u"space\\20cadet@example.com"_s);
+    row("apostrophe", u"d'artagnan@musketeers.lit"_s, u"d\\27artagnan@musketeers.lit"_s);
+    row("at", u"user@host@example.com"_s, u"user\\40host@example.com"_s);
+    row("colon-backslash", u"c:\\net@example.com"_s, u"c\\3a\\net@example.com"_s);
+    row("already-escaped", u"d\\27artagnan@musketeers.lit"_s, u"d\\27artagnan@musketeers.lit"_s);
+    row("resource", u"juliet@example.com/a@b/c d"_s, u"juliet@example.com/a@b/c d"_s);
+}
+
+void tst_QXmppJid::userInput()
+{
+    QFETCH(QString, input);
+    QFETCH(QString, expected);
+
+    auto result = Jid::fromUserInput(input);
+    if (auto *error = std::get_if<JidParsingError>(&result)) {
+        QFAIL(qPrintable(error->description));
+    }
+    QCOMPARE(std::get<Jid>(result).toString(), expected);
+}
+
+void tst_QXmppJid::userInputInvalid()
+{
+    using enum JidParsingError::Type;
+    auto errorType = [](QStringView input) {
+        auto result = Jid::fromUserInput(input);
+        return std::holds_alternative<JidParsingError>(result) ? std::get<JidParsingError>(result).type : JidParsingError::Type(-1);
+    };
+    QCOMPARE(errorType(u" \u200B "), Empty);
+    QCOMPARE(errorType(u"@example.com"), InvalidLocalpart);
+    QCOMPARE(errorType(u"juliet@"), InvalidDomainpart);
+    QCOMPARE(errorType(u"\u265A@example.com"), InvalidLocalpart);
+}
+
+void tst_QXmppJid::display()
+{
+    QCOMPARE(parsed(u"d\\27artagnan@musketeers.lit/Foo\\27").toDisplayString(), u"d'artagnan@musketeers.lit/Foo\\27"_s);
+    QCOMPARE(parsed(u"musketeers.lit/d\\27").toDisplayString(), u"musketeers.lit/d\\27"_s);
+    QCOMPARE(Jid().toDisplayString(), QString());
+
+    QString string = parsed(u"Juliet@Example.com");
+    QCOMPARE(string, u"juliet@example.com"_s);
+    QCOMPARE(u"xmpp:"_s + parsed(u"Juliet@Example.com") + u'?' + u"message", u"xmpp:juliet@example.com?message"_s);
+
+    QString debugOutput;
+    QDebug(&debugOutput) << parsed(u"juliet@example.com");
+    QCOMPARE(debugOutput.trimmed(), u"QXmpp::Jid(juliet@example.com)"_s);
+}
+
+}  // namespace JidTests
+
+QXMPP_TEST_MAIN(Utils::tst_QXmppUtils, Logger::tst_QXmppLogger, XmlHelpers::tst_QXmppXmlElement, XmlHelpers::tst_QXmppXmlRegistry, XmlHelpers::tst_QXmppXmlFormatter, JidTests::tst_QXmppJid)
 
 #include "CoreUtils.moc"

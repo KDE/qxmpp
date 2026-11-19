@@ -46,6 +46,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppIbbIq.h
     base/QXmppIq.h
     base/QXmppIqStanza.h
+    base/QXmppJid.h
     base/QXmppJingleIq.h
     base/QXmppJingleData.h
     base/QXmppLogger.h
@@ -218,6 +219,7 @@ set(SOURCE_FILES
     base/QXmppHashing.cpp
     base/QXmppHooks.cpp
     base/QXmppIqStanza.cpp
+    base/QXmppJid.cpp
     base/QXmppHttpFileSource.cpp
     base/QXmppHttpUploadIq.cpp
     base/QXmppIbbIq.cpp
@@ -240,6 +242,7 @@ set(SOURCE_FILES
     base/QXmppOutOfBandUrl.cpp
     base/QXmppPacket.cpp
     base/QXmppPingIq.cpp
+    base/QXmppPrecis.cpp
     base/QXmppPresence.cpp
     base/QXmppPubSubAffiliation.cpp
     base/QXmppPubSubEvent.cpp

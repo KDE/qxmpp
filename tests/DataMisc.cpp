@@ -1470,6 +1470,7 @@ class tst_QXmppUri : public QObject
 
 private:
     Q_SLOT void base();
+    Q_SLOT void escapedJid();
     Q_SLOT void queryMessage();
     Q_SLOT void queryRoster();
     Q_SLOT void queryRemove();
@@ -1483,6 +1484,24 @@ void tst_QXmppUri::base()
     auto uri = unwrap(QXmppUri::fromString(str));
     QCOMPARE(uri.jid(), u"lnj@qxmpp.org");
     QVERIFY(!uri.query().has_value());
+}
+
+void tst_QXmppUri::escapedJid()
+{
+    // XEP-0106: JID Escaping, the backslash is percent-encoded (RFC 5122, section 2.7.2)
+    auto string = u"xmpp:d%5C27artagnan@musketeers.lit/Foo%20Bar"_s;
+    auto uri = unwrap(QXmppUri::fromString(string));
+    QCOMPARE(uri.jid(), u"d\\27artagnan@musketeers.lit/Foo Bar");
+    QCOMPARE(uri.toString(), string);
+    QCOMPARE(QXmpp::Jid::fromString(uri.jid())->toDisplayString(), u"d'artagnan@musketeers.lit/Foo Bar"_s);
+
+    // RFC 5122, section 2.7.2
+    uri = unwrap(QXmppUri::fromString(u"xmpp:nasty!%23$%25()*+,-.;=%3F%5B%5C%5D%5E_%60%7B%7C%7D~node@example.com"_s));
+    QCOMPARE(uri.jid(), u"nasty!#$%()*+,-.;=?[\\]^_`{|}~node@example.com");
+
+    // internationalized JIDs are percent-encoded as UTF-8 (RFC 5122, section 2.9)
+    uri.setJid(u"m\u00FCller@example.com"_s);
+    QCOMPARE(uri.toString(), u"xmpp:m%C3%BCller@example.com"_s);
 }
 
 void tst_QXmppUri::queryMessage()
