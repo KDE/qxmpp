@@ -93,6 +93,7 @@ void tst_QXmppUtils::testJid()
     QCOMPARE(QXmppUtils::jidToDomain("foo@example.com"), QLatin1String("example.com"));
     QCOMPARE(QXmppUtils::jidToDomain("example.com"), QLatin1String("example.com"));
     QCOMPARE(QXmppUtils::jidToDomain(QString()), QString());
+    QCOMPARE(QXmppUtils::jidToDomain("a.example.com/b@example.net"), QLatin1String("a.example.com"));
 
     QCOMPARE(QXmppUtils::jidToResource("foo@example.com/resource"), QLatin1String("resource"));
     QCOMPARE(QXmppUtils::jidToResource("foo@example.com"), QString());
@@ -103,6 +104,8 @@ void tst_QXmppUtils::testJid()
     QCOMPARE(QXmppUtils::jidToUser("foo@example.com"), QLatin1String("foo"));
     QCOMPARE(QXmppUtils::jidToUser("example.com"), QString());
     QCOMPARE(QXmppUtils::jidToUser(QString()), QString());
+    QCOMPARE(QXmppUtils::jidToUser("a.example.com/b@example.net"), QString());
+    QCOMPARE(QXmppUtils::jidToUser("room@muc.example.com/user@host"), QLatin1String("room"));
 }
 
 // FIXME: how should we test MIME detection without expose getImageType?

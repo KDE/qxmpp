@@ -168,7 +168,8 @@ QString QXmppUtils::timezoneOffsetToString(int secs)
 /*! Returns the domain for the given \a jid. */
 QString QXmppUtils::jidToDomain(const QString &jid)
 {
-    return jidToBareJid(jid).split(u"@"_s).last();
+    const auto bareJid = jidToBareJid(jid);
+    return bareJid.mid(bareJid.indexOf(u'@') + 1);
 }
 
 /*! Returns the resource for the given \a jid. */
@@ -184,7 +185,8 @@ QString QXmppUtils::jidToResource(const QString &jid)
 /*! Returns the user for the given \a jid. */
 QString QXmppUtils::jidToUser(const QString &jid)
 {
-    const int pos = jid.indexOf(u'@');
+    // RFC 7622, section 3.2: the resourcepart can contain '@'
+    const auto pos = jidToBareJid(jid).indexOf(u'@');
     if (pos < 0) {
         return QString();
     }
