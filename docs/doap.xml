@@ -411,9 +411,10 @@ SPDX-License-Identifier: CC0-1.0
     <implements>
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0237.html'/>
-        <xmpp:status>partial</xmpp:status>
+        <xmpp:status>complete</xmpp:status>
         <xmpp:version>1.3</xmpp:version>
         <xmpp:since>1.0</xmpp:since>
+        <xmpp:note>Cache of the roster between sessions (QXmppRosterStorage) since 1.16</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
     <implements>
@@ -642,6 +643,7 @@ SPDX-License-Identifier: CC0-1.0
         <xmpp:status>complete</xmpp:status>
         <xmpp:version>0.8.3</xmpp:version>
         <xmpp:since>1.5</xmpp:since>
+        <xmpp:note>OMEMO 0 (version 0.3.0, eu.siacs.conversations.axolotl) since 1.18</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
     <implements>

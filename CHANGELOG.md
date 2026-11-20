@@ -132,6 +132,7 @@ QXmpp 1.17.1 (November 3, 2026)
  - Muji: Send contents in the Jingle namespace, which Dino requires (@lnj, !828)
  - Fix ODR violation of XmlElementId, which broke builds with LTO and could break hash map lookups (@lnj, !825)
  - DOAP: Bump XEP-0424 (Message Retraction) to 0.5.0 (@lnj, !830)
+ - DOAP: Mark XEP-0237 (Roster Versioning) as complete and add OMEMO 0 to XEP-0384 (OMEMO Encryption) (@lnj)
 
 QXmpp 1.17.0 (October 6, 2026)
 ------------------------------
@@ -165,7 +166,7 @@ QXmpp 1.17.0 (October 6, 2026)
    (`QXmppMessage::retraction()`/`retracted()`) and add
    `QXmppMessageRetractionLimits` data form for the advertised retraction
    limits (@lnj, !799, !811)
- - Implement [XEP-0425: Moderated Message Deletion](https://xmpp.org/extensions/xep-0425.html),
+ - Implement [XEP-0425: Moderated Message Retraction](https://xmpp.org/extensions/xep-0425.html),
    including `QXmppMucManagerV2` support for retracting messages as a
    moderator (@lnj, !798)
  - Implement [XEP-0377: Spam Reporting](https://xmpp.org/extensions/xep-0377.html)
