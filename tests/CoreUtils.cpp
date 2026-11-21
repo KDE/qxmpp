@@ -66,6 +66,7 @@ private:
     Q_SLOT void testNamespaces();
     Q_SLOT void testFindValue();
     Q_SLOT void testJoinTasks();
+    Q_SLOT void testMultiPromise();
 };
 
 void tst_QXmppUtils::testJoinTasks()
@@ -100,6 +101,32 @@ void tst_QXmppUtils::testJoinTasks()
     // without tasks
     QVERIFY(joinTasks(&context, std::vector<QXmppTask<void>>()).isFinished());
     QVERIFY(joinTasks(&context, std::vector<QXmppTask<int>>()).result().empty());
+}
+
+void tst_QXmppUtils::testMultiPromise()
+{
+    MultiPromise<int> promise;
+    QVERIFY(promise.isEmpty());
+    auto task1 = promise.generateTask();
+    auto task2 = promise.generateTask();
+    QVERIFY(!promise.isEmpty());
+    promise.finish(1);
+    QVERIFY(promise.isEmpty());
+    QCOMPARE(task1.result(), 1);
+    QCOMPARE(task2.result(), 1);
+
+    // a caller waiting again in its continuation is not finished with the same result
+    MultiPromise<void> voidPromise;
+    std::optional<QXmppTask<void>> taskAgain;
+    voidPromise.generateTask().then(this, [&] {
+        taskAgain = voidPromise.generateTask();
+    });
+    voidPromise.finish();
+    QVERIFY(taskAgain);
+    QVERIFY(!taskAgain->isFinished());
+    QVERIFY(!voidPromise.isEmpty());
+    voidPromise.finish();
+    QVERIFY(taskAgain->isFinished());
 }
 
 void tst_QXmppUtils::testFindValue()

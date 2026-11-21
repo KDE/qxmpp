@@ -569,32 +569,25 @@ void QXmppCallManager::onPresenceReceived(const QXmppPresence &presence)
 
 QXmppTask<void> QXmppCallManager::refreshStunTurnConfig()
 {
-    if (d->refreshStunTurnConfigPromise.has_value()) {
+    if (!d->refreshStunTurnConfigPromise.isEmpty()) {
         // attach to ongoing task
-        return d->refreshStunTurnConfigPromise->generateTask();
-    } else {
-        if (d->stunTurnServers.has_value()) {
-            // TODO: check expiry and refresh credentials
-            return makeReadyTask();
-        }
-
-        // initial request of STUN/TURN credentials
-        d->refreshStunTurnConfigPromise = MultiPromise<void>();
-        auto task = d->refreshStunTurnConfigPromise->generateTask();
-
-        requestStunTurnConfig(client(), this).then(this, [this](const auto &result) {
-            if (auto *error = std::get_if<QXmppError>(&result)) {
-                warning(u"Could not fetch STUN/TURN servers: %1"_s.arg(error->description));
-                d->stunTurnServers = StunTurnConfig { {}, {} };
-            } else {
-                d->stunTurnServers = std::get<StunTurnConfig>(result);
-            }
-
-            auto p = std::move(d->refreshStunTurnConfigPromise.value());
-            d->refreshStunTurnConfigPromise.reset();
-            p.finish();
-        });
-
-        return task;
+        return d->refreshStunTurnConfigPromise.generateTask();
     }
+    if (d->stunTurnServers.has_value()) {
+        // TODO: check expiry and refresh credentials
+        return makeReadyTask();
+    }
+
+    // initial request of STUN/TURN credentials
+    auto task = d->refreshStunTurnConfigPromise.generateTask();
+    requestStunTurnConfig(client(), this).then(this, [this](const auto &result) {
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            warning(u"Could not fetch STUN/TURN servers: %1"_s.arg(error->description));
+            d->stunTurnServers = StunTurnConfig { {}, {} };
+        } else {
+            d->stunTurnServers = std::get<StunTurnConfig>(result);
+        }
+        d->refreshStunTurnConfigPromise.finish();
+    });
+    return task;
 }

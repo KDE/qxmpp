@@ -70,7 +70,8 @@ public:
     QList<QXmppCall *> calls;
 
     // STUN/TURN config
-    std::optional<QXmpp::Private::MultiPromise<void>> refreshStunTurnConfigPromise;
+    // the callers waiting for the running request of the STUN/TURN servers
+    QXmpp::Private::MultiPromise<void> refreshStunTurnConfigPromise;
     std::optional<QXmpp::Private::StunTurnConfig> stunTurnServers;
     QList<QXmpp::StunServer> fallbackStunServers;
     std::optional<QXmpp::TurnServer> fallbackTurnServer;

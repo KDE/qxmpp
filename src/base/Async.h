@@ -12,9 +12,9 @@
 
 #include "Algorithms.h"
 
-#include <deque>
 #include <memory>
 #include <variant>
+#include <vector>
 
 #include <QFutureWatcher>
 
@@ -170,33 +170,53 @@ private:
     std::vector<Request> m_requests;
 };
 
+// Promises of the callers waiting for the same result.
 template<typename T>
-struct MultiPromise {
-    std::deque<QXmppPromise<T>> promises;
+class MultiPromise
+{
+public:
+    bool isEmpty() const { return m_promises.empty(); }
 
-    void finish(T &&response) { finishAll(promises, std::move(response)); }
     QXmppTask<T> generateTask()
     {
-        promises.push_back(QXmppPromise<T>());
-        return promises.back().task();
+        m_promises.push_back(QXmppPromise<T>());
+        return m_promises.back().task();
     }
+
+    // The promises are removed first, so the callers can wait again in their continuations.
+    void finish(T &&response)
+    {
+        auto promises = std::exchange(m_promises, {});
+        finishAll(promises, std::move(response));
+    }
+
+private:
+    std::vector<QXmppPromise<T>> m_promises;
 };
 
 template<>
-struct MultiPromise<void> {
-    std::vector<QXmppPromise<void>> promises;
+class MultiPromise<void>
+{
+public:
+    bool isEmpty() const { return m_promises.empty(); }
 
-    void finish()
-    {
-        for (auto &p : promises) {
-            p.finish();
-        }
-    }
     QXmppTask<void> generateTask()
     {
-        promises.push_back(QXmppPromise<void>());
-        return promises.back().task();
+        m_promises.push_back(QXmppPromise<void>());
+        return m_promises.back().task();
     }
+
+    // The promises are removed first, so the callers can wait again in their continuations.
+    void finish()
+    {
+        auto promises = std::exchange(m_promises, {});
+        for (auto &promise : promises) {
+            promise.finish();
+        }
+    }
+
+private:
+    std::vector<QXmppPromise<void>> m_promises;
 };
 
 }  // namespace QXmpp::Private
