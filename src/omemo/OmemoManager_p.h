@@ -189,7 +189,8 @@ public:
     void registerProviders();
     QXmppTask<TrustLevel> trustLevel(Version version, QString jid, QByteArray key);
     QList<QByteArray> sameIdentityKeys(Version version, const QString &jid, const QByteArray &key) const;
-    QXmppTask<void> mirrorTrustLevels(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys);
+    QXmppTask<void> handleTrustLevelChanges(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys);
+    QXmppTask<void> distrustAutomaticallyTrustedKeys(QString jid, QList<QByteArray> authenticatedKeys);
     bool usesOmemo2(const QString &jid, uint32_t omemo0DeviceId) const;
     bool isSticky(const OmemoStorage::Device &omemo2Device) const;
     QXmppTask<PreparedSession> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);

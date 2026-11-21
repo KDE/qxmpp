@@ -30,6 +30,8 @@
 #include "QXmppPubSubManager.h"
 #include "QXmppRosterManager.h"
 #include "QXmppRosterStorage.h"
+#include "QXmppTrustMessageElement.h"
+#include "QXmppTrustMessageKeyOwner.h"
 #include "QXmppUri.h"
 #include "QXmppUtils.h"
 
@@ -2600,6 +2602,8 @@ private:
     Q_SLOT void removedDevicesExpire();
     Q_SLOT void sharedTrust();
     Q_SLOT void sharedTrustOfNewKeys();
+    Q_SLOT void authenticationDistrustsAutomaticallyTrustedKeys_data();
+    Q_SLOT void authenticationDistrustsAutomaticallyTrustedKeys();
     Q_SLOT void devicesWithoutNetwork();
     Q_SLOT void watchUpdates();
     Q_SLOT void watchState();
@@ -2971,6 +2975,115 @@ void tst_OmemoManager2::sharedTrustOfNewKeys()
     server.process();
     for (const auto &device : watch.devices().value()) {
         QCOMPARE(device.trustLevel, device.id == bob2.deviceId() ? TrustLevel::ManuallyDistrusted : TrustLevel::Authenticated);
+    }
+}
+
+void tst_OmemoManager2::authenticationDistrustsAutomaticallyTrustedKeys_data()
+{
+    QTest::addColumn<int>("authenticated");
+    QTest::addColumn<QString>("method");
+
+    // devices of Bob: 0 with OMEMO 0, 1 with OMEMO 2, 2 with both
+    QTest::newRow("OMEMO 0 fingerprint") << 0 << u"fingerprint"_s;
+    QTest::newRow("OMEMO 0 URI of Conversations") << 0 << u"uri"_s;
+    QTest::newRow("OMEMO 2 fingerprint") << 1 << u"fingerprint"_s;
+    QTest::newRow("OMEMO 2 URI") << 1 << u"uri"_s;
+    QTest::newRow("both versions, OMEMO 0 fingerprint") << 2 << u"omemo0 fingerprint"_s;
+    QTest::newRow("both versions, OMEMO 2 fingerprint") << 2 << u"fingerprint"_s;
+    QTest::newRow("both versions, setTrustLevel()") << 2 << u"devices"_s;
+    QTest::newRow("OMEMO 0, trust manager") << 0 << u"trust manager"_s;
+    QTest::newRow("OMEMO 2, trust message") << 1 << u"trust message"_s;
+    QTest::newRow("both versions, trust message") << 2 << u"trust message"_s;
+}
+
+void tst_OmemoManager2::authenticationDistrustsAutomaticallyTrustedKeys()
+{
+    QFETCH(int, authenticated);
+    QFETCH(QString, method);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob0(nullptr, &server, u"bob@builder.lit/omemo0"_s);
+    Account bob2(nullptr, &server, u"bob@builder.lit/omemo2"_s);
+    Account bobBoth(nullptr, &server, u"bob@builder.lit/both"_s);
+    expectVariant<Success>(alice.setUp());
+    bob0.manager->setEnabledVersions({ Version::Omemo0 });
+    expectVariant<Success>(bob0.setUp());
+    bob2.manager->setEnabledVersions({ Version::Omemo2 });
+    expectVariant<Success>(bob2.setUp());
+    expectVariant<Success>(bobBoth.setUp());
+    const QList deviceIds { bob0.deviceId(), bob2.deviceId(), bobBoth.deviceId() };
+
+    auto watch = alice.manager->watchDevices(bob0.jid());
+    server.process();
+    const auto deviceOf = [&](int index) {
+        for (const auto &device : watch.devices().value()) {
+            if (device.id == deviceIds.at(index) && !device.keyId.isEmpty() && (index != 2 || !device.omemo0KeyId.isEmpty())) {
+                return device;
+            }
+        }
+        return Device {};
+    };
+    // the trust levels of the devices, of the OMEMO 0 key too if it is known
+    const auto trustLevels = [&](int index) {
+        const auto device = deviceOf(index);
+        QList levels { device.trustLevel };
+        if (!device.omemo0KeyId.isEmpty()) {
+            levels.append(awaitTask(alice.trust->trustLevel(versionNamespace(Version::Omemo0), device.jid, device.omemo0KeyId)));
+        }
+        return levels;
+    };
+    const auto levels = [&](TrustLevel level, int index) {
+        return index == 2 ? QList { level, level } : QList { level };
+    };
+    for (int i = 0; i < 3; i++) {
+        QTRY_VERIFY(!deviceOf(i).keyId.isEmpty());
+        QTRY_COMPARE(trustLevels(i), levels(TrustLevel::AutomaticallyTrusted, i));
+    }
+
+    const auto device = deviceOf(authenticated);
+    if (method == u"fingerprint") {
+        alice.manager->verify(bob0.jid(), { device.fingerprint() });
+    } else if (method == u"omemo0 fingerprint") {
+        alice.manager->verify(bob0.jid(), { Device { .version = Version::Omemo0, .keyId = device.omemo0KeyId }.fingerprint() });
+    } else if (method == u"uri") {
+        QXmppUri uri;
+        uri.setJid(bob0.jid());
+        if (device.version == Version::Omemo0) {
+            uri.setOmemoFingerprints({ { device.id, device.fingerprint() } });
+        } else {
+            uri.setQuery(Uri::TrustMessage { .encryption = ns_omemo_2.toString(), .trustKeyIds = { QString::fromLatin1(device.keyId.toHex()) } });
+        }
+        alice.manager->verify(uri);
+    } else if (method == u"trust manager") {
+        alice.trust->setTrustLevel(versionNamespace(device.version), { { device.jid, device.keyId } }, TrustLevel::Authenticated);
+    } else if (method == u"trust message") {
+        // received from another own device with an authenticated key (XEP-0450: Automatic Trust
+        // Management)
+        const QByteArray senderKey = "key of alice's phone";
+        awaitTask(alice.trust->setTrustLevel(ns_omemo_2.toString(), { { alice.jid(), senderKey } }, TrustLevel::Authenticated));
+        QXmppE2eeMetadata metadata;
+        metadata.setEncryptionNamespace(ns_omemo_2.toString());
+        metadata.setContentEncryption(E2ee::ContentEncryption::Sce);
+        metadata.setSenderKey(senderKey);
+        QXmppTrustMessageKeyOwner keyOwner;
+        keyOwner.setJid(device.jid);
+        keyOwner.setTrustedKeys({ device.keyId });
+        QXmppTrustMessageElement trustMessage;
+        trustMessage.setUsage(ns_atm.toString());
+        trustMessage.setEncryption(ns_omemo_2.toString());
+        trustMessage.setKeyOwners({ keyOwner });
+        QXmppMessage message(u"alice@wonderland.lit/phone"_s, u"alice@wonderland.lit/rabbithole"_s);
+        message.setE2eeMetadata(metadata);
+        message.setTrustMessageElement(trustMessage);
+        Q_EMIT alice.client.messageReceived(message);
+    } else {
+        alice.manager->setTrustLevel({ device }, TrustLevel::Authenticated);
+    }
+    server.process();
+
+    for (int i = 0; i < 3; i++) {
+        QTRY_COMPARE(trustLevels(i), levels(i == authenticated ? TrustLevel::Authenticated : TrustLevel::AutomaticallyDistrusted, i));
     }
 }
 

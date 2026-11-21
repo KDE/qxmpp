@@ -496,19 +496,26 @@ QList<uint32_t> OmemoManagerPrivate::deviceIds(Version version, const QString &j
     return ids;
 }
 
-// Applies changed trust levels to the same identity keys in the other version, so a device has to
-// be authenticated only once.
-QXmppTask<void> OmemoManagerPrivate::mirrorTrustLevels(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys)
+// Handles changed trust levels, however they have been changed (e.g. by verify(), setTrustLevel()
+// or a received trust message of QXmppAtmManager):
+// 1. They are applied to the same identity keys in the other version, so a device has to be
+//    authenticated only once.
+// 2. With TOAKAFA, the automatically trusted keys of JIDs with authenticated keys are distrusted in
+//    all versions, like new keys are distrusted after an authentication in any version.
+QXmppTask<void> OmemoManagerPrivate::handleTrustLevelChanges(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys)
 {
+    // JIDs mapped to their authenticated keys in all versions
+    QHash<QString, QList<QByteArray>> authenticatedKeys;
+
     for (auto version : ALL_VERSIONS) {
         const auto keys = modifiedKeys.value(trustNamespace(version));
         const auto otherEncryption = trustNamespace(version == Version::Omemo0 ? Version::Omemo2 : Version::Omemo0);
         for (auto it = keys.cbegin(); it != keys.cend(); ++it) {
             const auto sameKeys = sameIdentityKeys(version, it.key(), it.value());
-            if (sameKeys.isEmpty()) {
-                continue;
-            }
             const auto level = co_await trustManager->trustLevel(trustNamespace(version), it.key(), it.value()).withContext(q);
+            if (level == TrustLevel::Authenticated) {
+                authenticatedKeys[it.key()] << it.value() << sameKeys;
+            }
             for (const auto &sameKey : sameKeys) {
                 // The trust level is equal afterwards, so the resulting change is not mirrored back.
                 if (co_await trustManager->trustLevel(otherEncryption, it.key(), sameKey).withContext(q) != level) {
@@ -516,6 +523,10 @@ QXmppTask<void> OmemoManagerPrivate::mirrorTrustLevels(QHash<QString, QMultiHash
                 }
             }
         }
+    }
+
+    for (auto it = authenticatedKeys.cbegin(); it != authenticatedKeys.cend(); ++it) {
+        co_await distrustAutomaticallyTrustedKeys(it.key(), it.value()).withContext(q);
     }
 }
 
@@ -890,6 +901,29 @@ QXmppTask<void> OmemoManagerPrivate::authenticate(QString jid, QList<QByteArray>
             keys.insert(jid, key);
         }
         co_await trustManager->setTrustLevel(trustNamespace(Version::Omemo0), keys, TrustLevel::Authenticated).withContext(q);
+    }
+}
+
+// Distrusts the automatically trusted keys of jid in all versions with TOAKAFA, except the
+// authenticated keys, whose same identity keys in the other version may not have the trust level
+// mirrored yet.
+QXmppTask<void> OmemoManagerPrivate::distrustAutomaticallyTrustedKeys(QString jid, QList<QByteArray> authenticatedKeys)
+{
+    for (auto version : ALL_VERSIONS) {
+        const auto encryption = trustNamespace(version);
+        if (co_await trustManager->securityPolicy(encryption).withContext(q) != Toakafa) {
+            continue;
+        }
+        const auto keys = (co_await trustManager->keys(encryption, { jid }, TrustLevel::AutomaticallyTrusted).withContext(q)).value(jid);
+        QMultiHash<QString, QByteArray> distrustedKeys;
+        for (auto it = keys.cbegin(); it != keys.cend(); ++it) {
+            if (!authenticatedKeys.contains(it.key())) {
+                distrustedKeys.insert(jid, it.key());
+            }
+        }
+        if (!distrustedKeys.isEmpty()) {
+            co_await trustManager->setTrustLevel(encryption, distrustedKeys, TrustLevel::AutomaticallyDistrusted).withContext(q);
+        }
     }
 }
 
@@ -1459,6 +1493,9 @@ DeviceWatch OmemoManager::watchDevices(const Jid &jid)
 /*!
     Sets the trust level of the keys of \a devices to \a trustLevel, e.g. after the user has
     verified them. Devices with unknown keys are skipped.
+
+    With the security policy TOAKAFA, authenticating keys distrusts the automatically trusted keys
+    of their JIDs, see QXmpp::TrustSecurityPolicy.
 */
 QXmppTask<void> OmemoManager::setTrustLevel(QList<Device> devices, QXmpp::TrustLevel trustLevel)
 {
@@ -1496,6 +1533,9 @@ bool OmemoManager::isVerificationUri(const QXmppUri &uri)
     trust manager is a QXmppAtmManager, which sends trust messages to the devices with
     authenticated keys. Since trust messages exist only for OMEMO 2, the keys of OMEMO 0 are
     authenticated directly, together with the OMEMO 2 keys of the same devices.
+
+    With the security policy TOAKAFA, the automatically trusted keys of the JID are distrusted in
+    all versions, see QXmpp::TrustSecurityPolicy.
 
     \sa isVerificationUri()
 */
@@ -1693,7 +1733,7 @@ void OmemoManager::onRegistered(QXmppClient *client)
     d->roster = client->findExtension<QXmppRosterManager>();
 
     connect(d->trustManager, &QXmppTrustManager::trustLevelsChanged, this, [this](const QHash<QString, QMultiHash<QString, QByteArray>> &modifiedKeys) {
-        d->mirrorTrustLevels(modifiedKeys);
+        d->handleTrustLevelChanges(modifiedKeys);
         QSet<QString> jids;
         for (auto version : ALL_VERSIONS) {
             if (auto it = modifiedKeys.find(OmemoManagerPrivate::trustNamespace(version)); it != modifiedKeys.end()) {
