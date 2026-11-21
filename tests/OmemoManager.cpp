@@ -2452,6 +2452,35 @@ static QList<uint32_t> listedIds(const QString &payload)
     return ids;
 }
 
+// Trust storage whose trust levels of JIDs can be loaded later, like from a database
+class TrustStorage : public QXmppAtmTrustMemoryStorage
+{
+public:
+    using QXmppAtmTrustMemoryStorage::keys;
+
+    QXmppTask<QHash<QString, QHash<QByteArray, TrustLevel>>> keys(const QString &encryption, const QList<QString> &keyOwnerJids, TrustLevels trustLevels = {}) override
+    {
+        requestedJidKeys++;
+        auto task = QXmppAtmTrustMemoryStorage::keys(encryption, keyOwnerJids, trustLevels);
+        if (!delayed) {
+            return task;
+        }
+        QXmppPromise<QHash<QString, QHash<QByteArray, TrustLevel>>> promise;
+        auto delayedTask = promise.task();
+        auto finish = [this, promise = std::move(promise), keys = task.result()]() mutable {
+            pendingRequests--;
+            promise.finish(std::move(keys));
+        };
+        pendingRequests++;
+        QMetaObject::invokeMethod(QCoreApplication::instance(), std::move(finish), Qt::QueuedConnection);
+        return delayedTask;
+    }
+
+    bool delayed = false;
+    int pendingRequests = 0;
+    int requestedJidKeys = 0;
+};
+
 struct Account {
     Account(std::shared_ptr<OmemoStorage> storage = {}, FakePubSubService *sharedService = nullptr, const QString &jid = OWN_JID + u"/balcony"_s)
         : storage(storage ? storage : std::make_shared<OmemoMemoryStorage>()), service(sharedService ? *sharedService : ownService)
@@ -2556,7 +2585,7 @@ struct Account {
 
     TestClient client;
     QObject owner;
-    QXmppAtmTrustMemoryStorage trustStorage;
+    TrustStorage trustStorage;
     QXmppRosterManager *roster;
     QXmppAtmManager *trust;
     std::shared_ptr<OmemoStorage> storage;
@@ -2606,6 +2635,7 @@ private:
     Q_SLOT void authenticationDistrustsAutomaticallyTrustedKeys();
     Q_SLOT void devicesWithoutNetwork();
     Q_SLOT void watchUpdates();
+    Q_SLOT void watchUpdatesAreCoalesced();
     Q_SLOT void watchState();
     Q_SLOT void watchAgain();
     Q_SLOT void watchSupportedVersions();
@@ -3159,6 +3189,39 @@ void tst_OmemoManager2::watchUpdates()
 
     alice.manager->removeContactDevices(CONTACT_JID);
     QTRY_VERIFY(contact.devices().value().isEmpty());
+}
+
+// Updates requested during an update are coalesced, e.g. for the keys fetched while building sessions.
+void tst_OmemoManager2::watchUpdatesAreCoalesced()
+{
+    constexpr int DEVICE_COUNT = 10;
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    std::vector<std::unique_ptr<Account>> bobDevices;
+    for (int i = 0; i < DEVICE_COUNT; i++) {
+        bobDevices.push_back(std::make_unique<Account>(nullptr, &server, u"bob@builder.lit/device"_s + QString::number(i)));
+        expectVariant<Success>(bobDevices.back()->setUp());
+    }
+    expectVariant<Success>(alice.setUp());
+
+    alice.trustStorage.delayed = true;
+    alice.trustStorage.requestedJidKeys = 0;
+    auto watch = alice.manager->watchDevices(bobDevices.front()->jid());
+    // also the requests sent after the delayed trust levels
+    for (server.process(); alice.trustStorage.pendingRequests > 0; server.process()) {
+        QCoreApplication::processEvents();
+    }
+
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
+    QCOMPARE(watch.devices().value().size(), DEVICE_COUNT);
+    for (const auto &device : watch.devices().value()) {
+        QVERIFY(!device.keyId.isEmpty());
+        QVERIFY(!device.omemo0KeyId.isEmpty());
+        QCOMPARE(device.trustLevel, TrustLevel::AutomaticallyTrusted);
+    }
+    // Without coalescing, the watch is updated about twice per device, loading the trust levels of
+    // both versions each time (44 requests).
+    QVERIFY2(alice.trustStorage.requestedJidKeys <= 3 * DEVICE_COUNT, QByteArray::number(alice.trustStorage.requestedJidKeys).constData());
 }
 
 void tst_OmemoManager2::watchState()

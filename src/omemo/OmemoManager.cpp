@@ -737,7 +737,6 @@ QXmppTask<bool> OmemoManagerPrivate::refreshWatchedDeviceList(Version version, Q
     co_return false;
 }
 
-// Updates the devices of a watch with the current trust levels.
 // Lists a device using both versions once, with OMEMO 2 and its OMEMO 0 key. The device is the
 // same by the identity key if the one of the OMEMO 0 device is known, otherwise by the ID.
 QList<Device> OmemoManagerPrivate::mergeVersions(const QList<Device> &devices) const
@@ -762,7 +761,30 @@ QList<Device> OmemoManagerPrivate::mergeVersions(const QList<Device> &devices) c
     return omemo0Devices + omemo2Devices;
 }
 
+// Updates requested during an update are coalesced, each one loads the trust levels from the storage.
 QXmppTask<void> OmemoManagerPrivate::updateWatch(QString jid)
+{
+    if (!watchUpdates.tryStart(jid)) {
+        return requestedWatchUpdates[jid].generateTask();
+    }
+    return runWatchUpdates(std::move(jid));
+}
+
+QXmppTask<void> OmemoManagerPrivate::runWatchUpdates(QString jid)
+{
+    do {
+        // the callers waiting for this run
+        MultiPromise<void> requested;
+        if (auto node = requestedWatchUpdates.extract(jid)) {
+            requested = std::move(node.mapped());
+        }
+        co_await updateWatchOnce(jid).withContext(q);
+        requested.finish();
+    } while (watchUpdates.finish(jid) && watchUpdates.tryStart(jid));
+}
+
+// Updates the devices of a watch with the current trust levels.
+QXmppTask<void> OmemoManagerPrivate::updateWatchOnce(QString jid)
 {
     if (watches.value(jid).expired()) {
         co_return;

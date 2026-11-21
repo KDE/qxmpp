@@ -160,6 +160,8 @@ public:
     QXmppTask<void> refreshWatch(QString jid);
     QXmppTask<bool> refreshWatchedDeviceList(Version version, QString jid, bool subscribe);
     QXmppTask<void> updateWatch(QString jid);
+    QXmppTask<void> runWatchUpdates(QString jid);
+    QXmppTask<void> updateWatchOnce(QString jid);
     void updateWatches();
     QList<Device> mergeVersions(const QList<Device> &devices) const;
     bool isUsable(const Device &device);
@@ -280,6 +282,9 @@ public:
     QXmpp::Private::CoalescedRuns<QString> sessionBuilds;
     // versions whose bundle is being published
     QXmpp::Private::CoalescedRuns<Version> bundlePublications;
+    // JIDs whose watches are being updated and the callers waiting for the next update
+    QXmpp::Private::CoalescedRuns<QString> watchUpdates;
+    std::unordered_map<QString, QXmpp::Private::MultiPromise<void>> requestedWatchUpdates;
     // see omemo0Key()
     mutable std::unordered_map<QByteArray, QByteArray> omemo0KeyCache;
 
