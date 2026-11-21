@@ -1,0 +1,94 @@
+// SPDX-FileCopyrightText: 2026 Linus Jahn <lnj@kaidan.im>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+/*!
+\page qxmpp-guidelines.html
+\title API Guidelines
+
+Guidelines for code contributed to QXmpp. See also \c CONTRIBUTING.md for merge requests, tests
+and copyright headers.
+
+\section1 Naming of New APIs
+
+New public APIs use the \c QXmpp namespace instead of the \c QXmpp class prefix.
+The existing \c QXmpp* classes are renamed in QXmpp 2.0.
+
+\list 1
+\li Entry points are declared directly in \c QXmpp: the client, the managers, the storage
+    interfaces and their implementations, the top-level stanzas and types shared by several
+    features (e.g. \c QXmpp::OmemoManager, \c QXmpp::OmemoStorage, \c QXmpp::OmemoMemoryStorage,
+    \c QXmpp::TrustLevel).
+    A manager is always named \c QXmpp::<Feature>Manager, even if a namespace
+    \c QXmpp::<Feature> exists.
+\li The types of a single feature are declared in \c QXmpp::<Feature>, e.g. the types a manager
+    returns, takes or emits (\c QXmpp::Omemo::Device, \c QXmpp::Omemo::DeviceWatch,
+    \c QXmpp::Muc::Role).
+    A feature without such types does not get a namespace.
+\li Public namespaces are at most two levels deep (\c QXmpp::<Feature>).
+    The name of a namespace must not be the name of a type in \c QXmpp.
+\li A feature has the same name everywhere: in the namespace, in the manager and in the other
+    entry points (\c QXmpp::Omemo, \c QXmpp::OmemoManager, \c QXmpp::OmemoStorage).
+\li Internal code is declared in \c QXmpp::Private or \c QXmpp::<Feature>::Private; these rules
+    do not apply to it.
+\endlist
+
+Signals, slots and properties (\c Q_PROPERTY) need fully qualified types for moc and QML.
+Keeping the entry points in \c QXmpp keeps those types short.
+
+\section1 Design of New APIs
+
+\list
+\li Hooks instead of virtual functions for extension points
+\li QXmpp::Iq::Stanza with payload structs instead of QXmppIq subclasses
+\li QXmppTask<QXmpp::Result<T>> instead of signals for results
+\li QBindable for observable state
+\li QXmpp::Jid instead of QString
+\li \c u""_s for string literals, QStringView for string parameters that are only read
+\endlist
+
+Hooks are used where the handlers take part in the processing: they return a result, modify the
+arguments, stop further handlers or are awaited. Extensions also notify each other via hooks,
+which needs no common header. Notifications for applications that do not influence the
+processing are signals, or QBindable properties for state.
+
+\section1 Compatibility
+
+QXmpp is source compatible between minor versions, but not binary compatible: the ABI changes
+with every minor version.
+
+Public APIs are deprecated before they are removed. Only the declarations in the public headers
+are guarded by \c{#if QXMPP_DEPRECATED_SINCE(major, minor)}; the implementations in the \c .cpp
+files are always built. Where QXmpp uses a deprecated API itself, the warning is disabled via
+\c QT_WARNING_DISABLE_DEPRECATED.
+
+\section1 Documentation and Comments
+
+New public APIs are documented with \c{\since QXmpp X.Y}.
+
+Comments explain what cannot be seen in the code, e.g. why something is done. They do not repeat
+the code or the commit message.
+
+\section1 Containers
+
+Maps are \c std::unordered_map, in internal code and in new public APIs, not QHash. Unlike QHash,
+it takes move-only values (e.g. QXmppPromise), keeps references to its elements valid on
+insertion and never detaches. A \c std::hash specialization is only needed for custom keys; Qt
+provides it for QString and QByteArray.
+
+Lists in public APIs are QList: applications and QML use it, returning a stored list is cheap
+thanks to implicit sharing and a \c std::vector would have to be converted. \c std::vector is
+used where the elements are move-only.
+
+\section1 Internal Helpers
+
+Before writing a helper, look for an existing one, mainly in the internal headers in \c src/base:
+\c Async.h (e.g. \c AttachableRequests for sharing a running request between all callers
+requesting the same data), \c Algorithms.h, \c QXmppUtils_p.h, \c Enums.h and \c XmlWriter.h.
+If a helper does almost what is needed, extend it instead of adding a variant next to it.
+
+Enums are parsed and serialized via \c Enums.h: a specialization of \c Enums::Data lists the
+string of each value, \c Enums::fromString() and \c Enums::toString() convert them and
+\c XmlWriter writes such enums directly. Do not write \c switch statements or string tables for
+this.
+*/

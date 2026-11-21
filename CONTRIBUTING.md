@@ -37,6 +37,10 @@ After building QXmpp with `-DBUILD_TESTING=ON`, you can run QXmpp's unit tests i
 make test
 ```
 
+The tests are grouped by topic in `tests/<Topic>.cpp` (e.g. `tests/Muc.cpp`).
+Add new test classes to the existing file of their topic, each in its own namespace, and list them
+in its `QXMPP_TEST_MAIN()` instead of creating a new file.
+
 ### Internal Tests
 
 There are some additional internal tests that only work with debug builds because they are using unexported symbols from the QXmpp library.
@@ -56,30 +60,10 @@ You can enable them by exporting the following environment variables:
 
 Replace `<jid>` and `<password>` with the credentials of the account for connecting to the server.
 
-## Naming of New APIs
+## API Guidelines
 
-New public APIs use the `QXmpp` namespace instead of the `QXmpp` class prefix.
-The existing `QXmpp*` classes are renamed in QXmpp 2.0.
-
-1. Entry points are declared directly in `QXmpp`: the client, the managers, the storage
-   interfaces and their implementations, the top-level stanzas and types shared by several
-   features (e.g. `QXmpp::OmemoManager`, `QXmpp::OmemoStorage`, `QXmpp::OmemoMemoryStorage`,
-   `QXmpp::TrustLevel`).
-   A manager is always named `QXmpp::<Feature>Manager`, even if a namespace `QXmpp::<Feature>`
-   exists.
-1. The types of a single feature are declared in `QXmpp::<Feature>`, e.g. the types a manager
-   returns, takes or emits (`QXmpp::Omemo::Device`, `QXmpp::Omemo::DeviceWatch`,
-   `QXmpp::Muc::Role`).
-   A feature without such types does not get a namespace.
-1. Public namespaces are at most two levels deep (`QXmpp::<Feature>`).
-   The name of a namespace must not be the name of a type in `QXmpp`.
-1. A feature has the same name everywhere: in the namespace, in the manager and in the other
-   entry points (`QXmpp::Omemo`, `QXmpp::OmemoManager`, `QXmpp::OmemoStorage`).
-1. Internal code is declared in `QXmpp::Private` or `QXmpp::<Feature>::Private`; these rules do
-   not apply to it.
-
-Signals, slots and properties (`Q_PROPERTY`) need fully qualified types for moc and QML.
-Keeping the entry points in `QXmpp` keeps those types short.
+The naming and design of new APIs, compatibility, documentation, containers and internal helpers
+are described in the [API guidelines][guidelines] (source: `docs/guidelines.qdoc`).
 
 ## Documentation
 
@@ -124,5 +108,6 @@ If the file does not allow such a header, add a `.license` file for the copyrigh
 
 [doap-rendering]: /doc/doap-rendering/README.md
 [releasing]: /docs/RELEASING.md
+[guidelines]: https://api.kde.org/qxmpp-guidelines.html
 [invent]: https://invent.kde.org/libraries/qxmpp
 [reuse]: https://api.reuse.software/info/github.com/qxmpp-project/qxmpp

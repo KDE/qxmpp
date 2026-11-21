@@ -294,6 +294,7 @@ For direct access to XMPP stanzas:
 \li \l{https://invent.kde.org/libraries/qxmpp}{Project Page}
 \li \l{https://invent.kde.org/libraries/qxmpp/-/issues}{Report Issues}
 \li \l{https://invent.kde.org/libraries/qxmpp/-/releases}{New Releases}
+\li \l{API Guidelines} for contributors
 \endlist
 
 */
