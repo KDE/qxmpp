@@ -116,6 +116,8 @@ struct VersionState {
     QSet<QString> receivedDeviceLists;
     // devices a session is being built with after receiving a message without session
     QSet<Address> pendingSessionBuilds;
+    // devices with sessions changed while storing them is deferred (see deferDeviceStores())
+    std::optional<QSet<Address>> deferredDeviceStores;
     // running requests of contacts' data, shared by the callers requesting the same data meanwhile
     QXmpp::Private::AttachableRequests<QString, Result<QList<DeviceList::Entry>>> deviceListRequests;
     QXmpp::Private::AttachableRequests<Address, Result<Pep::PublicBundle>> bundleRequests;
@@ -219,6 +221,21 @@ public:
     void buildSessionAndSendEmptyMessage(Version version, const QString &jid, uint32_t deviceId);
     void refillPreKeysAndPublish(Version version);
     OmemoStorage::Device *storedDevice(Version version, const QString &jid, uint32_t deviceId);
+    void storeDevices(Version version, const QSet<Address> &addresses);
+
+    // Runs an operation of the session layer without storing the devices whose sessions it
+    // changes. Their addresses are added to changed, so the caller can store each device once
+    // with its further changes.
+    template<typename Operation>
+    auto deferDeviceStores(Version version, QSet<Address> &changed, Operation operation)
+    {
+        auto &deferred = versions.at(version).deferredDeviceStores;
+        deferred.emplace();
+        auto result = operation();
+        changed.unite(*deferred);
+        deferred.reset();
+        return result;
+    }
 
     QXmppTask<E2ee::EncryptResult> encryptMessage2(E2ee::EncryptRequest request);
     QXmppTask<E2ee::EncryptResult> encryptIq2(E2ee::EncryptIqRequest request);

@@ -2635,6 +2635,8 @@ private:
     Q_SLOT void sessionsArePreparedAtOnce();
     Q_SLOT void watchBuildsSessionsAtOnce();
     Q_SLOT void watchBuildsSessionsWithOtherOmemo0Devices();
+    Q_SLOT void devicesAreStoredOncePerStanza_data();
+    Q_SLOT void devicesAreStoredOncePerStanza();
     Q_SLOT void automaticMaxDevicesPerStanza();
     Q_SLOT void automaticHiddenOmemo2Device();
     Q_SLOT void encryptionInfo_data();
@@ -3842,6 +3844,49 @@ void tst_OmemoManager2::watchBuildsSessionsWithOtherOmemo0Devices()
     QVERIFY(state.at(Version::Omemo2).sessions->hasSession({ bob.jid().toString(), bob.deviceId() }));
     QVERIFY(state.at(Version::Omemo0).sessions->hasSession({ bob.jid().toString(), bob.deviceId() }));
     QCOMPARE(watch.devices().value().size(), 2);
+}
+
+class CountingStorage : public OmemoMemoryStorage
+{
+public:
+    QXmppTask<void> addDevice(const Device &device) override
+    {
+        storedDevices.append(device.id);
+        return OmemoMemoryStorage::addDevice(device);
+    }
+
+    QList<uint32_t> storedDevices;
+};
+
+void tst_OmemoManager2::devicesAreStoredOncePerStanza_data()
+{
+    addVersions();
+}
+
+// A device is stored once with its changed session and counters when encrypting or decrypting.
+void tst_OmemoManager2::devicesAreStoredOncePerStanza()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    auto aliceStorage = std::make_shared<CountingStorage>();
+    auto bobStorage = std::make_shared<CountingStorage>();
+    Account alice(aliceStorage, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(bobStorage, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = version;
+    bob.encryption = version;
+    // sessions built in both directions
+    QCOMPARE(bob.receive(alice, alice.sendMessage(bob.jid().toString(), u"Hello"_s)).value(0).body(), u"Hello"_s);
+    QCOMPARE(alice.receive(bob, bob.sendMessage(alice.jid().toString(), u"Hi"_s)).value(0).body(), u"Hi"_s);
+
+    aliceStorage->storedDevices.clear();
+    bobStorage->storedDevices.clear();
+    const auto message = alice.sendMessage(bob.jid().toString(), u"Hello again"_s);
+    QCOMPARE(aliceStorage->storedDevices, QList { bob.deviceId() });
+    QCOMPARE(bob.receive(alice, message).value(0).body(), u"Hello again"_s);
+    QCOMPARE(bobStorage->storedDevices, QList { alice.deviceId() });
 }
 
 // The limit applies to the devices of both versions together.

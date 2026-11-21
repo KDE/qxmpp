@@ -96,6 +96,15 @@ QXmppTask<Result<Pep::PublicBundle>> OmemoManagerPrivate::requestBundle(Version 
     return versions.at(version).bundleRequests.produce(Address { jid, deviceId }, [this, version](const Address &device) { return pubSubClient(version).requestBundle(device.jid, device.deviceId); }, q);
 }
 
+void OmemoManagerPrivate::storeDevices(Version version, const QSet<Address> &addresses)
+{
+    for (const auto &address : addresses) {
+        if (const auto *device = storedDevice(version, address.jid, address.deviceId)) {
+            storage->addDevice(*device);
+        }
+    }
+}
+
 OmemoStorage::Device *OmemoManagerPrivate::storedDevice(Version version, const QString &jid, uint32_t deviceId)
 {
     auto *devices = findValue(versions.at(version).devices, jid);
@@ -434,8 +443,13 @@ QList<Envelope> OmemoManagerPrivate::encryptKey(Version version, const QList<Rec
         if (recipientVersion != version) {
             continue;
         }
-        auto encrypted = versions.at(version).sessions->encrypt({ jid, deviceId }, keyMaterial);
+        // stored once with the changed session and counters
+        QSet<Address> changed;
+        auto encrypted = deferDeviceStores(version, changed, [&] {
+            return versions.at(version).sessions->encrypt({ jid, deviceId }, keyMaterial);
+        });
         if (auto *error = std::get_if<QXmppError>(&encrypted)) {
+            storeDevices(version, changed);
             q->warning(u"Could not encrypt for %1/%2: %3"_s.arg(jid, QString::number(deviceId), error->description));
             info.skippedDevices.append({ publicDevice(version, jid, deviceId, trustLevel), SkipReason::NoSession });
             continue;
@@ -451,8 +465,9 @@ QList<Envelope> OmemoManagerPrivate::encryptKey(Version version, const QList<Rec
                 updateWatch(jid);
             }
             device->unrespondedReceivedStanzasCount = 0;
-            storage->addDevice(*device);
+            changed.insert({ jid, deviceId });
         }
+        storeDevices(version, changed);
     }
     return envelopes;
 }
@@ -477,8 +492,13 @@ QXmppTask<Result<DecryptedEnvelope>> OmemoManagerPrivate::decryptKey(Version ver
 
     // The key of a device does not change, like in prepareSession().
     const auto *knownDevice = storedDevice(version, jid, deviceId);
-    auto result = sessions.decrypt(address, data, isKeyExchange, knownDevice ? knownDevice->keyId : QByteArray());
+    // stored once with the changed session and counters
+    QSet<Address> changed;
+    auto result = deferDeviceStores(version, changed, [&] {
+        return sessions.decrypt(address, data, isKeyExchange, knownDevice ? knownDevice->keyId : QByteArray());
+    });
     if (auto *error = std::get_if<QXmppError>(&result)) {
+        storeDevices(version, changed);
         co_return std::move(*error);
     }
     auto &decrypted = std::get<DecryptedKey>(result);
@@ -518,7 +538,8 @@ QXmppTask<Result<DecryptedEnvelope>> OmemoManagerPrivate::decryptKey(Version ver
     if (sendEmpty) {
         device->unrespondedReceivedStanzasCount = 0;
     }
-    storage->addDevice(*device);
+    changed.insert(address);
+    storeDevices(version, changed);
     const auto senderKey = device->keyId;
 
     if (sendEmpty) {

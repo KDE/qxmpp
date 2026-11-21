@@ -62,7 +62,11 @@ void OmemoManagerPrivate::setUpSessionLayers()
                 stored.jid = address.jid;
                 stored.id = address.deviceId;
                 stored.session = session;
-                storage->addDevice(stored); },
+                if (auto &deferred = versions.at(version).deferredDeviceStores) {
+                    deferred->insert(address);
+                } else {
+                    storage->addDevice(stored);
+                } },
             .sessionDeleted = [this, version](const Address &address) {
                 auto &devices = versions.at(version).devices;
                 if (auto it = devices.find(address.jid); it != devices.end() && it->contains(address.deviceId)) {
