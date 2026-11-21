@@ -67,6 +67,7 @@ private:
     Q_SLOT void testFindValue();
     Q_SLOT void testJoinTasks();
     Q_SLOT void testMultiPromise();
+    Q_SLOT void testCoalescedRuns();
 };
 
 void tst_QXmppUtils::testJoinTasks()
@@ -127,6 +128,27 @@ void tst_QXmppUtils::testMultiPromise()
     QVERIFY(!voidPromise.isEmpty());
     voidPromise.finish();
     QVERIFY(taskAgain->isFinished());
+}
+
+void tst_QXmppUtils::testCoalescedRuns()
+{
+    CoalescedRuns<QString> runs;
+    QVERIFY(runs.tryStart(u"a"_s));
+    // other keys run in parallel
+    QVERIFY(runs.tryStart(u"b"_s));
+    // requests while running result in one more run
+    QVERIFY(!runs.tryStart(u"a"_s));
+    QVERIFY(!runs.tryStart(u"a"_s));
+    QVERIFY(runs.finish(u"a"_s));
+    QVERIFY(runs.tryStart(u"a"_s));
+    QVERIFY(!runs.finish(u"a"_s));
+    QVERIFY(!runs.finish(u"b"_s));
+
+    QVERIFY(runs.tryStart(u"a"_s));
+    QVERIFY(!runs.tryStart(u"a"_s));
+    runs.clear();
+    QVERIFY(runs.tryStart(u"a"_s));
+    QVERIFY(!runs.finish(u"a"_s));
 }
 
 void tst_QXmppUtils::testFindValue()

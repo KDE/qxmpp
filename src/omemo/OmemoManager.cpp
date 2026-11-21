@@ -970,28 +970,25 @@ QXmppTask<void> OmemoManagerPrivate::buildSessions(QString jid)
         co_return;
     }
     // Devices added meanwhile are handled by another run.
-    if (sessionBuildsRunning.contains(jid)) {
-        sessionBuildsPending.insert(jid);
+    if (!sessionBuilds.tryStart(jid)) {
         co_return;
     }
-    sessionBuildsRunning.insert(jid);
-    do {
-        sessionBuildsPending.remove(jid);
-        // all devices of a version at once, OMEMO 2 first, so the devices using it are known
-        const auto enabled = enabledVersions.value();
-        const auto perDevice = enabled.contains(Version::Omemo0) && enabled.contains(Version::Omemo2);
-        for (auto version : { Version::Omemo2, Version::Omemo0 }) {
-            if (!enabled.contains(version) || !isSetUp || watches.value(jid).expired()) {
-                continue;
-            }
-            QList<DeviceAddress> devices;
-            for (auto id : deviceIds(version, jid)) {
-                devices.append({ version, jid, id });
-            }
-            co_await prepareSessions(devices, DEFAULT_ACCEPTED_TRUST_LEVELS, perDevice && version == Version::Omemo0).withContext(q);
+    // all devices of a version at once, OMEMO 2 first, so the devices using it are known
+    const auto enabled = enabledVersions.value();
+    const auto perDevice = enabled.contains(Version::Omemo0) && enabled.contains(Version::Omemo2);
+    for (auto version : { Version::Omemo2, Version::Omemo0 }) {
+        if (!enabled.contains(version) || !isSetUp || watches.value(jid).expired()) {
+            continue;
         }
-    } while (sessionBuildsPending.contains(jid) && isSetUp && !watches.value(jid).expired());
-    sessionBuildsRunning.remove(jid);
+        QList<DeviceAddress> devices;
+        for (auto id : deviceIds(version, jid)) {
+            devices.append({ version, jid, id });
+        }
+        co_await prepareSessions(devices, DEFAULT_ACCEPTED_TRUST_LEVELS, perDevice && version == Version::Omemo0).withContext(q);
+    }
+    if (sessionBuilds.finish(jid)) {
+        co_await buildSessions(jid).withContext(q);
+    }
 }
 
 // The subscriptions are kept until the next login, so the device lists are neither subscribed to
@@ -1679,12 +1676,11 @@ QXmppTask<void> OmemoManager::resetOwnDeviceLocally()
         auto &state = d->versions.at(version);
         state.keys = {};
         state.devices.clear();
-        state.isPublishingBundle = false;
-        state.isBundleOutdated = false;
         state.refreshedDeviceLists.clear();
         state.receivedDeviceLists.clear();
         state.pendingSessionBuilds.clear();
     }
+    d->bundlePublications.clear();
     d->requestResults.clear();
     d->isSetUp = false;
     d->device = {};

@@ -650,18 +650,14 @@ void OmemoManagerPrivate::refillPreKeysAndPublish(Version version)
     storage->addPreKeys(records);
     storage->setOwnDevice(storedOwnDevice());
 
-    if (state.isPublishingBundle) {
-        state.isBundleOutdated = true;
+    if (!bundlePublications.tryStart(version)) {
         return;
     }
-    state.isPublishingBundle = true;
     publishBundle(version).then(q, [this, version](Result<> &&result) {
-        auto &state = versions.at(version);
-        state.isPublishingBundle = false;
         if (auto *error = std::get_if<QXmppError>(&result)) {
             q->warning(u"Could not publish the bundle: "_s + error->description);
         }
-        if (std::exchange(state.isBundleOutdated, false)) {
+        if (bundlePublications.finish(version)) {
             refillPreKeysAndPublish(version);
         }
     });

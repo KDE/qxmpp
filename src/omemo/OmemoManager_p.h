@@ -107,9 +107,6 @@ struct VersionState {
     // devices of other JIDs and other own devices
     QHash<QString, QHash<uint32_t, OmemoStorage::Device>> devices;
     std::unique_ptr<SessionLayer> sessions;
-    // a bundle publication is running / another one is needed after it
-    bool isPublishingBundle = false;
-    bool isBundleOutdated = false;
     // JIDs whose device list has been requested again since the login because of an unlisted device
     QSet<QString> refreshedDeviceLists;
     // JIDs whose device list has been received since the login, also if it is empty
@@ -275,8 +272,10 @@ public:
     // their device lists are still notified about until the next login.
     QHash<QString, DeviceWatch::State> requestResults;
     QList<OmemoStorage::Subscription> subscriptions;
-    QSet<QString> sessionBuildsRunning;
-    QSet<QString> sessionBuildsPending;
+    // JIDs whose sessions are being built
+    QXmpp::Private::CoalescedRuns<QString> sessionBuilds;
+    // versions whose bundle is being published
+    QXmpp::Private::CoalescedRuns<Version> bundlePublications;
 
     QProperty<OmemoManager::State> state { OmemoManager::State::Loading };
     QProperty<uint32_t> ownDeviceId { 0 };

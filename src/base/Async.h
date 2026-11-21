@@ -219,6 +219,44 @@ private:
     std::vector<QXmppPromise<void>> m_promises;
 };
 
+// Runs of a task that are not run in parallel per key. Starting the task while it is running
+// requests one more run after it, also if it is started several times meanwhile.
+template<typename Key>
+class CoalescedRuns
+{
+public:
+    // Returns whether the run can start, otherwise another run is requested.
+    bool tryStart(const Key &key)
+    {
+        if (contains(m_running, key)) {
+            if (!contains(m_requested, key)) {
+                m_requested.push_back(key);
+            }
+            return false;
+        }
+        m_running.push_back(key);
+        return true;
+    }
+
+    // Ends the run and returns whether another one has been requested meanwhile. The caller
+    // starts that one then with tryStart().
+    bool finish(const Key &key)
+    {
+        std::erase(m_running, key);
+        return std::erase(m_requested, key) > 0;
+    }
+
+    void clear()
+    {
+        m_running.clear();
+        m_requested.clear();
+    }
+
+private:
+    std::vector<Key> m_running;
+    std::vector<Key> m_requested;
+};
+
 }  // namespace QXmpp::Private
 
 #endif  // ASYNC_H
