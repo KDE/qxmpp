@@ -17,6 +17,7 @@
 #include "OmemoSession.h"
 
 #include <array>
+#include <unordered_map>
 
 #include <QProperty>
 
@@ -160,6 +161,7 @@ public:
     QXmppTask<bool> refreshWatchedDeviceList(Version version, QString jid, bool subscribe);
     QXmppTask<void> updateWatch(QString jid);
     void updateWatches();
+    QList<Device> mergeVersions(const QList<Device> &devices) const;
     bool isUsable(const Device &device);
     QString verificationUri(const QString &jid, const QList<Device> &devices) const;
     QXmppTask<void> authenticate(QString jid, QList<QByteArray> omemo2Keys, QList<QByteArray> omemo2DistrustedKeys, QList<QByteArray> omemo0Keys);
@@ -202,6 +204,8 @@ public:
     void registerProviders();
     QXmppTask<TrustLevel> trustLevel(Version version, QString jid, QByteArray key);
     QList<QByteArray> sameIdentityKeys(Version version, const QString &jid, const QByteArray &key) const;
+    QByteArray omemo0Key(const QByteArray &omemo2Key) const;
+    bool isSameDevice(const OmemoStorage::Device &omemo2Device, const OmemoStorage::Device &omemo0Device) const;
     QXmppTask<void> handleTrustLevelChanges(QHash<QString, QMultiHash<QString, QByteArray>> modifiedKeys);
     QXmppTask<void> distrustAutomaticallyTrustedKeys(QString jid, QList<QByteArray> authenticatedKeys);
     bool usesOmemo2(const QString &jid, uint32_t omemo0DeviceId) const;
@@ -276,6 +280,8 @@ public:
     QXmpp::Private::CoalescedRuns<QString> sessionBuilds;
     // versions whose bundle is being published
     QXmpp::Private::CoalescedRuns<Version> bundlePublications;
+    // see omemo0Key()
+    mutable std::unordered_map<QByteArray, QByteArray> omemo0KeyCache;
 
     QProperty<OmemoManager::State> state { OmemoManager::State::Loading };
     QProperty<uint32_t> ownDeviceId { 0 };

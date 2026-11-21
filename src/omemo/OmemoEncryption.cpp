@@ -150,7 +150,7 @@ QXmppTask<TrustLevel> OmemoManagerPrivate::trustLevel(Version version, QString j
 // IDs are not compared, they are not authenticated.
 QList<QByteArray> OmemoManagerPrivate::sameIdentityKeys(Version version, const QString &jid, const QByteArray &key) const
 {
-    const auto curveKey = version == Version::Omemo2 ? omemo0IdentityKey(key) : key;
+    const auto curveKey = version == Version::Omemo2 ? omemo0Key(key) : key;
     if (curveKey.isEmpty()) {
         return {};
     }
@@ -158,21 +158,31 @@ QList<QByteArray> OmemoManagerPrivate::sameIdentityKeys(Version version, const Q
     QList<QByteArray> keys;
     for (const auto &device : versions.at(other).devices.value(jid)) {
         if (!device.keyId.isEmpty() && !keys.contains(device.keyId) &&
-            (other == Version::Omemo0 ? device.keyId : omemo0IdentityKey(device.keyId)) == curveKey) {
+            (other == Version::Omemo0 ? device.keyId : omemo0Key(device.keyId)) == curveKey) {
             keys.append(device.keyId);
         }
     }
     return keys;
 }
 
+// omemo0IdentityKey() with cached results, the conversion is expensive
+QByteArray OmemoManagerPrivate::omemo0Key(const QByteArray &omemo2Key) const
+{
+    auto [it, inserted] = omemo0KeyCache.try_emplace(omemo2Key);
+    if (inserted) {
+        it->second = omemo0IdentityKey(omemo2Key);
+    }
+    return it->second;
+}
+
 // Whether the device is the same as one using OMEMO 2: by the identity key if the one of the
 // OMEMO 0 device is known, otherwise by the ID.
-static bool isSameDevice(const OmemoStorage::Device &omemo2Device, const OmemoStorage::Device &omemo0Device)
+bool OmemoManagerPrivate::isSameDevice(const OmemoStorage::Device &omemo2Device, const OmemoStorage::Device &omemo0Device) const
 {
     if (omemo2Device.keyId.isEmpty()) {
         return false;
     }
-    return omemo0Device.keyId.isEmpty() ? omemo2Device.id == omemo0Device.id : omemo0IdentityKey(omemo2Device.keyId) == omemo0Device.keyId;
+    return omemo0Device.keyId.isEmpty() ? omemo2Device.id == omemo0Device.id : omemo0Key(omemo2Device.keyId) == omemo0Device.keyId;
 }
 
 // Whether the OMEMO 0 device of the JID uses OMEMO 2. It is encrypted for with OMEMO 2 only then.

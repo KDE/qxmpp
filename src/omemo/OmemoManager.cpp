@@ -740,19 +740,19 @@ QXmppTask<bool> OmemoManagerPrivate::refreshWatchedDeviceList(Version version, Q
 // Updates the devices of a watch with the current trust levels.
 // Lists a device using both versions once, with OMEMO 2 and its OMEMO 0 key. The device is the
 // same by the identity key if the one of the OMEMO 0 device is known, otherwise by the ID.
-static QList<Device> mergeVersions(const QList<Device> &devices)
+QList<Device> OmemoManagerPrivate::mergeVersions(const QList<Device> &devices) const
 {
     QList<Device> omemo0Devices;
     QList<Device> omemo2Devices;
     for (const auto &device : devices) {
         (device.version == Version::Omemo0 ? omemo0Devices : omemo2Devices).append(device);
     }
-    omemo0Devices.removeIf([&omemo2Devices](const Device &omemo0Device) {
+    omemo0Devices.removeIf([&](const Device &omemo0Device) {
         for (auto &device : omemo2Devices) {
             if (device.keyId.isEmpty() || device.jid != omemo0Device.jid) {
                 continue;
             }
-            if (omemo0Device.keyId.isEmpty() ? device.id == omemo0Device.id : omemo0IdentityKey(device.keyId) == omemo0Device.keyId) {
+            if (omemo0Device.keyId.isEmpty() ? device.id == omemo0Device.id : omemo0Key(device.keyId) == omemo0Device.keyId) {
                 device.omemo0KeyId = omemo0Device.keyId;
                 return true;
             }
