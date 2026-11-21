@@ -113,7 +113,13 @@ OmemoStorage::OwnDevice OmemoManagerPrivate::storedOwnDevice() const
 
 QString OmemoManagerPrivate::label() const
 {
-    return customLabel.isEmpty() ? OmemoManager::defaultDeviceLabel() : customLabel;
+    if (std::holds_alternative<OmemoManager::DefaultDeviceLabel>(labelSetting)) {
+        return OmemoManager::defaultDeviceLabel();
+    }
+    if (const auto *custom = std::get_if<QString>(&labelSetting)) {
+        return *custom;
+    }
+    return {};
 }
 
 // The signature of the own label for the OMEMO 2 device list. The published signature is kept if
@@ -122,7 +128,7 @@ QByteArray OmemoManagerPrivate::ownLabelSignature(const QList<DeviceList::Entry>
 {
     const auto currentLabel = label();
     const auto *sessions = versions.at(Version::Omemo2).sessions.get();
-    if (!sessions) {
+    if (!sessions || currentLabel.isEmpty()) {
         return {};
     }
 
@@ -1237,24 +1243,46 @@ void OmemoManager::setEnabledVersions(QList<Version> versions)
 }
 
 /*!
-    Returns the label of this device that is published in the OMEMO 2 device list.
+    \struct QXmpp::OmemoManager::DefaultDeviceLabel
+
+    Publishes defaultDeviceLabel() as the label of this device.
 */
-QString OmemoManager::deviceLabel() const
+
+/*!
+    \struct QXmpp::OmemoManager::NoDeviceLabel
+
+    Publishes no label for this device.
+*/
+
+/*!
+    \typealias QXmpp::OmemoManager::DeviceLabel
+
+    The label of this device: DefaultDeviceLabel, NoDeviceLabel or a custom label. An empty custom
+    label is not published.
+*/
+
+/*!
+    Returns the label of this device as set via setDeviceLabel().
+
+    \sa effectiveDeviceLabel()
+*/
+OmemoManager::DeviceLabel OmemoManager::deviceLabel() const
 {
-    return d->label();
+    return d->labelSetting;
 }
 
 /*!
-    Sets the \a label of this device that is published in the OMEMO 2 device list. An empty label
-    resets it to defaultDeviceLabel().
+    Sets the \a label of this device that is published in the OMEMO 2 device list.
 
     The label is not stored, so a custom label must be set again after each start. It is published
     with a signature created with the identity key of this device on the next login or immediately
     while being logged in.
 */
-void OmemoManager::setDeviceLabel(const QString &label)
+void OmemoManager::setDeviceLabel(const DeviceLabel &label)
 {
-    if (std::exchange(d->customLabel, label) == label) {
+    const auto previousLabel = d->label();
+    d->labelSetting = label;
+    if (d->label() == previousLabel) {
         return;
     }
     if (d->isSetUp && d->isLoggedIn && d->isEnabled(Version::Omemo2)) {
@@ -1267,9 +1295,18 @@ void OmemoManager::setDeviceLabel(const QString &label)
 }
 
 /*!
-    Returns the label used for this device if none has been set: the application name and the name
-    of the operating system without its version, e.g. "Kaidan (Debian GNU/Linux)". The application
-    name is QGuiApplication::applicationDisplayName() if set, otherwise
+    Returns the label of this device that is published in the OMEMO 2 device list. It is empty if
+    no label is published.
+*/
+QString OmemoManager::effectiveDeviceLabel() const
+{
+    return d->label();
+}
+
+/*!
+    Returns the label used for this device with DefaultDeviceLabel: the application name and the
+    name of the operating system without its version, e.g. "Kaidan (Debian GNU/Linux)". The
+    application name is QGuiApplication::applicationDisplayName() if set, otherwise
     QCoreApplication::applicationName(). The host name is not used, because the device list can be
     read by everyone.
 */

@@ -17,6 +17,8 @@
 #include "QXmppTrustSecurityPolicy.h"
 #include "qxmppomemo_export.h"
 
+#include <variant>
+
 class QXmppOmemoDevicePrivate;
 class QXmppOmemoManagerPrivate;
 class QXmppOmemoOwnDevicePrivate;
@@ -267,14 +269,19 @@ public:
     };
     Q_ENUM(State)
 
+    struct DefaultDeviceLabel { };
+    struct NoDeviceLabel { };
+    using DeviceLabel = std::variant<DefaultDeviceLabel, NoDeviceLabel, QString>;
+
     explicit OmemoManager(std::shared_ptr<OmemoStorage> storage, QList<Omemo::Version> versions = { Omemo::Version::Omemo0, Omemo::Version::Omemo2 });
     ~OmemoManager() override;
 
     QBindable<QList<Omemo::Version>> enabledVersions() const;
     void setEnabledVersions(QList<Omemo::Version> versions);
 
-    QString deviceLabel() const;
-    void setDeviceLabel(const QString &label);
+    DeviceLabel deviceLabel() const;
+    void setDeviceLabel(const DeviceLabel &label);
+    QString effectiveDeviceLabel() const;
     static QString defaultDeviceLabel();
 
     QBindable<State> state() const;

@@ -4816,13 +4816,22 @@ void tst_OmemoManager2::deviceLabel()
     {
         Account account(storage, &server);
         expectVariant<Success>(account.setUp());
-        QCOMPARE(account.manager->deviceLabel(), OmemoManager::defaultDeviceLabel());
+        QCOMPARE(account.manager->effectiveDeviceLabel(), OmemoManager::defaultDeviceLabel());
         QVERIFY(published().contains(u"label=\""_s + OmemoManager::defaultDeviceLabel() + u'"'));
 
         // published immediately while being logged in
         account.manager->setDeviceLabel(u"Laptop"_s);
         server.process();
         QVERIFY(published().contains(u"label=\"Laptop\""_s));
+
+        account.manager->setDeviceLabel(OmemoManager::NoDeviceLabel());
+        server.process();
+        QVERIFY(account.manager->effectiveDeviceLabel().isEmpty());
+        QVERIFY(!published().contains(u"label"_s));
+
+        account.manager->setDeviceLabel(OmemoManager::DefaultDeviceLabel());
+        server.process();
+        QVERIFY(published().contains(u"label=\""_s + OmemoManager::defaultDeviceLabel() + u'"'));
     }
 
     // The label is not stored, the default label is published again on the next login.

@@ -276,8 +276,7 @@ public:
     QXmpp::Private::MultiPromise<void> loadPromises;
     // deviceId is 0 until set up
     DeviceKeys device;
-    // empty for the default label
-    QString customLabel;
+    OmemoManager::DeviceLabel labelSetting = OmemoManager::DefaultDeviceLabel();
     // the own label and its signature, see ownLabelSignature()
     std::pair<QString, QByteArray> signedLabel;
 
