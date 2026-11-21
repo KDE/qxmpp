@@ -114,80 +114,67 @@ auto joinTasks(QObject *context, std::vector<QXmppTask<T>> tasks) -> QXmppTask<s
     }
 }
 
+// Finishes the promises with the response, copied for all but the last one.
+template<typename Promises, typename Response>
+void finishAll(Promises &promises, Response &&response)
+{
+    for (auto it = promises.begin(); it != promises.end(); ++it) {
+        it->finish(std::next(it) == promises.end() ? std::move(response) : response);
+    }
+}
+
+// Requests shared by the callers requesting the same data while they are running.
 template<typename Params, typename Response>
-struct AttachableRequests {
-    struct Request {
-        Params params;
-        std::vector<QXmppPromise<Response>> promises;
-    };
-
-    std::vector<Request> requests;
-
-    /*! Find existing request and attach if found. */
-    std::optional<QXmppTask<Response>> attach(const Params &key)
+class AttachableRequests
+{
+public:
+    // Starts the request unless one with the same parameters is running, and returns its response.
+    template<typename RequestFunction>
+    QXmppTask<Response> produce(Params key, RequestFunction requestFunction, QObject *context)
     {
-        auto itr = std::ranges::find(requests, key, &Request::params);
-        if (itr != requests.end()) {
-            QXmppPromise<Response> p;
-            auto task = p.task();
-            itr->promises.push_back(std::move(p));
+        QXmppPromise<Response> promise;
+        auto task = promise.task();
+        if (auto itr = std::ranges::find(m_requests, key, &Request::params); itr != m_requests.end()) {
+            itr->promises.push_back(std::move(promise));
             return task;
         }
 
-        return std::nullopt;
-    }
-
-    QXmppTask<Response> makeNew(Params key)
-    {
-        Q_ASSERT(!contains(requests, key, &Request::params));
-
-        QXmppPromise<Response> p;
-        auto task = p.task();
-        requests.push_back(Request { key, { std::move(p) } });
-        return task;
-    }
-
-    void finish(const Params &key, Response &&response)
-    {
-        auto itr = std::ranges::find(requests, key, &Request::params);
-        Q_ASSERT(itr != requests.end());
-        if (itr == requests.end()) {
-            return;
-        }
-
-        auto promises = std::move(itr->promises);
-        requests.erase(itr);
-
-        for (auto it = promises.begin(); it != promises.end(); ++it) {
-            // copy unless this is the last iteration (then do move)
-            it->finish(std::next(it) == promises.end() ? std::move(response) : response);
-        }
-    }
-
-    QXmppTask<Response> produce(Params key, std::function<QXmppTask<Response>(Params)> requestFunction, QObject *context)
-    {
-        if (auto task = attach(key)) {
-            return std::move(*task);
-        }
-        auto task = makeNew(key);
+        m_requests.push_back(Request { key, {} });
+        m_requests.back().promises.push_back(std::move(promise));
         requestFunction(key).then(context, [this, key](auto &&response) {
             finish(key, std::move(response));
         });
         return task;
     }
+
+private:
+    struct Request {
+        Params params;
+        std::vector<QXmppPromise<Response>> promises;
+    };
+
+    void finish(const Params &key, Response &&response)
+    {
+        auto itr = std::ranges::find(m_requests, key, &Request::params);
+        Q_ASSERT(itr != m_requests.end());
+        if (itr == m_requests.end()) {
+            return;
+        }
+
+        // removed first, so the callers can start the same request again
+        auto promises = std::move(itr->promises);
+        m_requests.erase(itr);
+        finishAll(promises, std::move(response));
+    }
+
+    std::vector<Request> m_requests;
 };
 
 template<typename T>
 struct MultiPromise {
     std::deque<QXmppPromise<T>> promises;
 
-    void finish(T &&response)
-    {
-        for (auto it = promises.begin(); it != promises.end(); ++it) {
-            // copy unless this is the last iteration (then do move)
-            it->finish(std::next(it) == promises.end() ? std::move(response) : response);
-        }
-    }
+    void finish(T &&response) { finishAll(promises, std::move(response)); }
     QXmppTask<T> generateTask()
     {
         promises.push_back(QXmppPromise<T>());
