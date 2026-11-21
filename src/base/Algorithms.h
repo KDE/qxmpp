@@ -115,6 +115,19 @@ auto find(const Container &container, Args &&...args) -> std::optional<typename 
     return {};
 }
 
+// The value of the key in the map (e.g. QHash or std::unordered_map) or nullptr. Like an iterator,
+// the pointer is invalidated by modifying the map.
+template<typename Map, typename Key>
+auto findValue(Map &map, const Key &key)
+{
+    auto it = map.find(key);
+    if constexpr (requires { it->second; }) {
+        return it == map.end() ? nullptr : &it->second;
+    } else {
+        return it == map.end() ? nullptr : &it.value();
+    }
+}
+
 template<typename Container, typename... Args>
 auto removeIf(Container &container, Args &&...args)
 {

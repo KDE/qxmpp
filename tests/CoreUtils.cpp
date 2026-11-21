@@ -26,9 +26,13 @@
 #include "QXmppXmlFormatter_p.h"
 #include "QXmppXmlRegistry.h"
 
+#include "Algorithms.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 #include "util.h"
+
+#include <memory>
+#include <unordered_map>
 
 #include <QCoreApplication>
 #include <QFile>
@@ -59,7 +63,26 @@ private:
     Q_SLOT void testParseHostAddress_data();
     Q_SLOT void testParseHostAddress();
     Q_SLOT void testNamespaces();
+    Q_SLOT void testFindValue();
 };
+
+void tst_QXmppUtils::testFindValue()
+{
+    QHash<QString, int> hash { { u"a"_s, 1 } };
+    QCOMPARE(*findValue(hash, u"a"_s), 1);
+    QVERIFY(!findValue(hash, u"b"_s));
+    *findValue(hash, u"a"_s) = 2;
+    QCOMPARE(hash.value(u"a"_s), 2);
+
+    const std::unordered_map<int, std::unique_ptr<int>> map = [] {
+        std::unordered_map<int, std::unique_ptr<int>> map;
+        map.emplace(1, std::make_unique<int>(3));
+        return map;
+    }();
+    static_assert(std::is_same_v<decltype(findValue(map, 1)), const std::unique_ptr<int> *>);
+    QCOMPARE(**findValue(map, 1), 3);
+    QVERIFY(!findValue(map, 2));
+}
 
 void tst_QXmppUtils::testCrc32()
 {

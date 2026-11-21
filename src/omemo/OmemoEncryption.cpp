@@ -85,13 +85,8 @@ void OmemoManagerPrivate::registerProviders()
 
 OmemoStorage::Device *OmemoManagerPrivate::storedDevice(Version version, const QString &jid, uint32_t deviceId)
 {
-    auto &devices = versions.at(version).devices;
-    auto jidIt = devices.find(jid);
-    if (jidIt == devices.end()) {
-        return nullptr;
-    }
-    auto it = jidIt->find(deviceId);
-    return it == jidIt->end() ? nullptr : &*it;
+    auto *devices = findValue(versions.at(version).devices, jid);
+    return devices ? findValue(*devices, deviceId) : nullptr;
 }
 
 static Version otherVersion(Version version)
