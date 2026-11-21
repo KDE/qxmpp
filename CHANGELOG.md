@@ -106,6 +106,7 @@ Breaking changes:
  - MucManagerV2: `removedFromRoom()` is no longer emitted with `ConnectionLost` when the connection is lost or a room is ghosted, but only when rejoining fails or after `QXmppClient::disconnectFromServer()` (@lnj)
  - Update XEP-0424 (Message Retraction) to 0.6.0: add `QXmppMessageRetraction::reason()` and `QXmppMessageRetracted::reason()`, add the id of the retraction message to tombstones (`QXmppMessageRetracted::retractionId()`) and make the id of `<retract/>` optional (@lnj, !866)
  - Deprecate `QXmppMessageModeration::reason()`/`setReason()`, use `QXmppMessageRetraction::reason()` or `QXmppMessageRetracted::reason()` (@lnj, !866)
+ - DOAP: Bump XEP-0425 (Moderated Message Retraction) to 0.3.2 (@lnj, !866)
 
 QXmpp 1.17.2 (November 9, 2026)
 -------------------------------
