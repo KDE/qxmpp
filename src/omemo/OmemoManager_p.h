@@ -10,6 +10,7 @@
 #include "QXmppPromise.h"
 #include "QXmppTrustLevel.h"
 
+#include "Async.h"
 #include "OmemoDeviceList.h"
 #include "OmemoKeyMaintenance.h"
 #include "OmemoPubSub.h"
@@ -108,6 +109,9 @@ struct VersionState {
     QSet<QString> receivedDeviceLists;
     // devices a session is being built with after receiving a message without session
     QSet<Address> pendingSessionBuilds;
+    // running requests of contacts' data, shared by the callers requesting the same data meanwhile
+    QXmpp::Private::AttachableRequests<QString, Result<QList<DeviceList::Entry>>> deviceListRequests;
+    QXmpp::Private::AttachableRequests<Address, Result<Pep::PublicBundle>> bundleRequests;
 };
 
 // states of all versions, indexed by the version
@@ -158,6 +162,8 @@ public:
     bool isEnabled(Version version) const { return enabledVersions.value().contains(version); }
     QDateTime now() const { return fixedTime.isValid() ? fixedTime : QDateTime::currentDateTimeUtc(); }
     Pep::Client pubSubClient(Version version) const { return { pubSub, version }; }
+    QXmppTask<Result<QList<DeviceList::Entry>>> requestDeviceList(Version version, const QString &jid);
+    QXmppTask<Result<Pep::PublicBundle>> requestBundle(Version version, const QString &jid, uint32_t deviceId);
 
     void setUpSessionLayers();
     QXmppTask<void> setOwnTrustKey(Version version, QByteArray key);

@@ -703,7 +703,7 @@ QXmppTask<void> OmemoManagerPrivate::refreshWatch(QString jid)
             }
         }
 
-        auto list = co_await client.requestDeviceList(jid).withContext(q);
+        auto list = co_await requestDeviceList(version, jid).withContext(q);
         if (watches.value(jid).expired()) {
             co_return;
         }

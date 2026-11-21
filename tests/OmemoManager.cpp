@@ -2629,6 +2629,8 @@ private:
     Q_SLOT void maxDevicesPerStanza();
     Q_SLOT void automaticVersion();
     Q_SLOT void emptyDeviceListRequestedOnce();
+    Q_SLOT void requestsAreShared_data();
+    Q_SLOT void requestsAreShared();
     Q_SLOT void automaticMaxDevicesPerStanza();
     Q_SLOT void automaticHiddenOmemo2Device();
     Q_SLOT void encryptionInfo_data();
@@ -3682,6 +3684,46 @@ void tst_OmemoManager2::emptyDeviceListRequestedOnce()
     message = alice.sendMessage(bob.jid(), u"Hello"_s);
     QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
     QCOMPARE(server.requestCount(u"items"_s), 1);
+}
+
+void tst_OmemoManager2::requestsAreShared_data()
+{
+    addVersions();
+}
+
+// Requests of the same device list or bundle running at the same time, e.g. by a device watch and a
+// message, are sent once.
+void tst_OmemoManager2::requestsAreShared()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    server.resetRequestCounts();
+
+    auto *d = alice.manager->d.get();
+    const auto bobJid = bob.jid().toString();
+    auto list1 = d->requestDeviceList(version, bobJid);
+    auto list2 = d->requestDeviceList(version, bobJid);
+    auto bundle1 = d->requestBundle(version, bobJid, bob.deviceId());
+    auto bundle2 = d->requestBundle(version, bobJid, bob.deviceId());
+    server.process();
+
+    QCOMPARE(server.requestCount(u"items"_s, Pep::deviceListNode(version)), 1);
+    QCOMPARE(server.requestCount(u"items"_s, Pep::bundleNode(version, bob.deviceId())), 1);
+    QVERIFY(list1.isFinished() && list2.isFinished() && bundle1.isFinished() && bundle2.isFinished());
+    QCOMPARE(expectVariant<QList<DeviceList::Entry>>(list1.result()).size(), 1);
+    QCOMPARE(expectVariant<QList<DeviceList::Entry>>(list2.result()), expectVariant<QList<DeviceList::Entry>>(list1.result()));
+    QCOMPARE(expectVariant<Pep::PublicBundle>(bundle2.result()), expectVariant<Pep::PublicBundle>(bundle1.result()));
+
+    // requested again once finished
+    auto list3 = d->requestDeviceList(version, bobJid);
+    server.process();
+    QCOMPARE(server.requestCount(u"items"_s, Pep::deviceListNode(version)), 2);
+    QVERIFY(list3.isFinished());
 }
 
 // The limit applies to the devices of both versions together.

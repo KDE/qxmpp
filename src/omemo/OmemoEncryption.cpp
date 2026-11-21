@@ -83,6 +83,19 @@ void OmemoManagerPrivate::registerProviders()
     });
 }
 
+// The device list of a contact. A running request for it is shared, e.g. by a device watch and a
+// message encrypted meanwhile.
+QXmppTask<Result<QList<DeviceList::Entry>>> OmemoManagerPrivate::requestDeviceList(Version version, const QString &jid)
+{
+    return versions.at(version).deviceListRequests.produce(jid, [this, version](const QString &jid) { return pubSubClient(version).requestDeviceList(jid); }, q);
+}
+
+// The bundle of a device. A running request for it is shared, so the bundle is fetched once.
+QXmppTask<Result<Pep::PublicBundle>> OmemoManagerPrivate::requestBundle(Version version, const QString &jid, uint32_t deviceId)
+{
+    return versions.at(version).bundleRequests.produce(Address { jid, deviceId }, [this, version](const Address &device) { return pubSubClient(version).requestBundle(device.jid, device.deviceId); }, q);
+}
+
 OmemoStorage::Device *OmemoManagerPrivate::storedDevice(Version version, const QString &jid, uint32_t deviceId)
 {
     auto *devices = findValue(versions.at(version).devices, jid);
@@ -198,7 +211,7 @@ QXmppTask<PreparedSession> OmemoManagerPrivate::prepareSession(Version version, 
         co_return checkTrust(co_await trustLevel(version, jid, device->keyId).withContext(q));
     }
 
-    auto result = co_await pubSubClient(version).requestBundle(jid, deviceId).withContext(q);
+    auto result = co_await requestBundle(version, jid, deviceId).withContext(q);
     if (auto *error = std::get_if<QXmppError>(&result)) {
         q->warning(u"Could not fetch the bundle of %1/%2: %3"_s.arg(jid, QString::number(deviceId), error->description));
         co_return PreparedSession { TrustLevel::Undecided, SkipReason::NoSession };
@@ -308,7 +321,7 @@ QXmppTask<Result<DeviceSelection>> OmemoManagerPrivate::selectDevices(QList<Vers
             // without devices are requested once per login, e.g. the OMEMO 2 one of contacts using
             // only OMEMO 0.
             if (jid != own && deviceIds(version, jid).isEmpty() && !versions.at(version).receivedDeviceLists.contains(jid)) {
-                auto result = co_await pubSubClient(version).requestDeviceList(jid).withContext(q);
+                auto result = co_await requestDeviceList(version, jid).withContext(q);
                 if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
                     applyReceivedDeviceList(version, jid, *list);
                 }
@@ -457,7 +470,7 @@ QXmppTask<Result<DecryptedEnvelope>> OmemoManagerPrivate::decryptKey(Version ver
 
 void OmemoManagerPrivate::refreshDeviceList(Version version, const QString &jid)
 {
-    pubSubClient(version).requestDeviceList(jid).then(q, [this, version, jid](Result<QList<DeviceList::Entry>> &&result) {
+    requestDeviceList(version, jid).then(q, [this, version, jid](Result<QList<DeviceList::Entry>> &&result) {
         if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
             applyReceivedDeviceList(version, jid, *list);
         }

@@ -110,7 +110,12 @@ public:
 
     // number of requests per type, e.g. "publish" or "items"
     int requestCount(const QString &type) const { return m_requestCounts.value(type); }
-    void resetRequestCounts() { m_requestCounts.clear(); }
+    int requestCount(const QString &type, const QString &node) const { return m_nodeRequestCounts.value({ type, node }); }
+    void resetRequestCounts()
+    {
+        m_requestCounts.clear();
+        m_nodeRequestCounts.clear();
+    }
 
 private:
     static QString serialize(const QDomElement &element)
@@ -160,6 +165,7 @@ private:
         const auto request = pubsub.firstChildElement();
         const auto nodeName = request.attribute(u"node"_s);
         m_requestCounts[request.tagName()]++;
+        m_nodeRequestCounts[{ request.tagName(), nodeName }]++;
 
         if (auto failure = m_failures.take(nodeName); !failure.isEmpty()) {
             replyError(id, jid, failure);
@@ -297,6 +303,7 @@ private:
     QMap<std::pair<QString, QString>, QSet<QString>> m_subscriptions;
     QMap<QString, QString> m_failures;
     QMap<QString, int> m_requestCounts;
+    QMap<std::pair<QString, QString>, int> m_nodeRequestCounts;
     bool m_notify = true;
 };
 
