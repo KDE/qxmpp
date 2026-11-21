@@ -95,25 +95,23 @@ auto mapToSuccess(std::variant<T, Err> &&var)
     });
 }
 
-// Creates a task for multiple tasks without a return value.
+// Awaits running tasks, e.g. requests sent at once. Returns their results in the order of the tasks,
+// or nothing for tasks without a return value.
 template<typename T>
-QXmppTask<void> joinVoidTasks(QObject *context, std::vector<QXmppTask<T>> &&tasks)
+auto joinTasks(QObject *context, std::vector<QXmppTask<T>> tasks) -> QXmppTask<std::conditional_t<std::is_void_v<T>, void, std::vector<T>>>
 {
-    int taskCount = tasks.size();
-    auto finishedTaskCount = std::make_shared<int>();
-
-    auto promise = std::make_shared<QXmppPromise<void>>();
-    auto result = promise->task();
-
-    for (auto &task : tasks) {
-        task.then(context, [=]() mutable {
-            if (++(*finishedTaskCount) == taskCount) {
-                promise->finish();
-            }
-        });
+    if constexpr (std::is_void_v<T>) {
+        for (auto &task : tasks) {
+            co_await task.withContext(context);
+        }
+    } else {
+        std::vector<T> results;
+        results.reserve(tasks.size());
+        for (auto &task : tasks) {
+            results.push_back(co_await task.withContext(context));
+        }
+        co_return results;
     }
-
-    return result;
 }
 
 template<typename Params, typename Response>

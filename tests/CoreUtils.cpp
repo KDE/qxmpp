@@ -27,6 +27,7 @@
 #include "QXmppXmlRegistry.h"
 
 #include "Algorithms.h"
+#include "Async.h"
 #include "StringLiterals.h"
 #include "XmlWriter.h"
 #include "util.h"
@@ -64,7 +65,42 @@ private:
     Q_SLOT void testParseHostAddress();
     Q_SLOT void testNamespaces();
     Q_SLOT void testFindValue();
+    Q_SLOT void testJoinTasks();
 };
+
+void tst_QXmppUtils::testJoinTasks()
+{
+    QObject context;
+
+    // results in the order of the tasks, also if they finish in another order
+    std::vector<QXmppPromise<int>> promises(3);
+    std::vector<QXmppTask<int>> tasks;
+    for (auto &promise : promises) {
+        tasks.push_back(promise.task());
+    }
+    auto joined = joinTasks(&context, std::move(tasks));
+    promises[2].finish(3);
+    promises[0].finish(1);
+    QVERIFY(!joined.isFinished());
+    promises[1].finish(2);
+    QVERIFY(joined.isFinished());
+    QCOMPARE(joined.result(), (std::vector { 1, 2, 3 }));
+
+    std::vector<QXmppPromise<void>> voidPromises(2);
+    std::vector<QXmppTask<void>> voidTasks;
+    for (auto &promise : voidPromises) {
+        voidTasks.push_back(promise.task());
+    }
+    auto joinedVoid = joinTasks(&context, std::move(voidTasks));
+    voidPromises[1].finish();
+    QVERIFY(!joinedVoid.isFinished());
+    voidPromises[0].finish();
+    QVERIFY(joinedVoid.isFinished());
+
+    // without tasks
+    QVERIFY(joinTasks(&context, std::vector<QXmppTask<void>>()).isFinished());
+    QVERIFY(joinTasks(&context, std::vector<QXmppTask<int>>()).result().empty());
+}
 
 void tst_QXmppUtils::testFindValue()
 {
