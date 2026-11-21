@@ -20,6 +20,9 @@ public:
     QXmppEncryptedFileSharingProvider(QXmppFileSharingManager *manager, std::shared_ptr<QXmppFileSharingProvider> uploadBaseProvider);
     ~QXmppEncryptedFileSharingProvider() override;
 
+    QXmpp::Cipher cipher() const;
+    void setCipher(QXmpp::Cipher cipher);
+
     auto downloadFile(const std::any &source,
                       std::unique_ptr<QIODevice> target,
                       std::function<void(quint64, quint64)> reportProgress,

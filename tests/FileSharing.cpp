@@ -727,6 +727,11 @@ private:
     Q_SLOT void deviceEncryptReadAfterEnd();
     Q_SLOT void deviceDecryptFinishTwice();
     Q_SLOT void errorQueueCleared();
+    Q_SLOT void gcmTag();
+    Q_SLOT void gcmTagMismatch_data();
+    Q_SLOT void gcmTagMismatch();
+    Q_SLOT void gcmWithoutTag();
+    Q_SLOT void gcmChunked();
 };
 
 void tst_QXmppFileEncryption::basic()
@@ -885,6 +890,116 @@ void tst_QXmppFileEncryption::errorQueueCleared()
 
     // errors must not be left in the thread's error queue (would break QSslSocket)
     QCOMPARE(ERR_peek_error(), 0UL);
+}
+
+static QByteArray encryptWithDevice(const QByteArray &data, Cipher cipher, const QByteArray &key, const QByteArray &iv)
+{
+    auto input = data;
+    auto buffer = std::make_unique<QBuffer>(&input);
+    buffer->open(QIODevice::ReadOnly);
+    EncryptionDevice device(std::move(buffer), cipher, key, iv);
+    auto size = device.size();
+    auto encrypted = device.readAll();
+    [&] { QCOMPARE(encrypted.size(), size); }();
+    return encrypted;
+}
+
+static std::optional<QByteArray> decryptWithDevice(const QByteArray &data, Cipher cipher, const QByteArray &key, const QByteArray &iv, qsizetype chunkSize)
+{
+    QByteArray decrypted;
+    auto buffer = std::make_unique<QBuffer>(&decrypted);
+    buffer->open(QIODevice::WriteOnly);
+    DecryptionDevice device(std::move(buffer), cipher, key, iv);
+    for (qsizetype i = 0; i < data.size(); i += chunkSize) {
+        device.write(data.mid(i, chunkSize));
+    }
+    if (device.finish() != DecryptionDevice::Success) {
+        return {};
+    }
+    return decrypted;
+}
+
+void tst_QXmppFileEncryption::gcmTag()
+{
+    // test case 14 of the GCM specification (McGrew, Viega)
+    auto key = QByteArray(32, '\0');
+    auto iv = QByteArray(12, '\0');
+    auto data = QByteArray(16, '\0');
+    auto expected = QByteArray::fromHex("cea7403d4d606b6e074ec5d3baf39d18"
+                                        "d0d1c8a799996bf0265b98b5d48ab919");
+
+    QCOMPARE(process(data, Aes256GcmNoPad, Encode, key, iv), expected);
+    QCOMPARE(encryptWithDevice(data, Aes256GcmNoPad, key, iv), expected);
+    QCOMPARE(process(expected, Aes256GcmNoPad, Decode, key, iv), data);
+    QCOMPARE(decryptWithDevice(expected, Aes256GcmNoPad, key, iv, 1024), data);
+}
+
+void tst_QXmppFileEncryption::gcmTagMismatch_data()
+{
+    QTest::addColumn<int>("position");
+
+    QTest::newRow("ciphertext") << 0;
+    QTest::newRow("tag") << -1;
+}
+
+void tst_QXmppFileEncryption::gcmTagMismatch()
+{
+    QFETCH(int, position);
+
+    auto key = generateKey(Aes256GcmNoPad);
+    auto iv = generateInitializationVector(Aes256GcmNoPad);
+    auto encrypted = encryptWithDevice("This is an example text message", Aes256GcmNoPad, key, iv);
+    QVERIFY(decryptWithDevice(encrypted, Aes256GcmNoPad, key, iv, 1024));
+
+    auto &byte = encrypted[position < 0 ? encrypted.size() + position : position];
+    byte = char(byte ^ 1);
+    QVERIFY(!decryptWithDevice(encrypted, Aes256GcmNoPad, key, iv, 1024));
+    QVERIFY(process(encrypted, Aes256GcmNoPad, Decode, key, iv).isEmpty());
+
+    // without (complete) tag
+    QVERIFY(!decryptWithDevice(encrypted.left(10), Aes256GcmNoPad, key, iv, 1024));
+    QVERIFY(!decryptWithDevice({}, Aes256GcmNoPad, key, iv, 1024));
+    QCOMPARE(ERR_peek_error(), 0UL);
+}
+
+// Without a tag, all data is decrypted but reported as unauthenticated.
+void tst_QXmppFileEncryption::gcmWithoutTag()
+{
+    const auto key = generateKey(Aes256GcmNoPad);
+    const auto iv = generateInitializationVector(Aes256GcmNoPad);
+    for (auto size : { 0, 1, 15, 16, 17, 1000 }) {
+        const QByteArray data(size, 'a');
+        const auto encrypted = encryptWithDevice(data, Aes256GcmNoPad, key, iv).chopped(16);
+
+        QByteArray decrypted;
+        auto buffer = std::make_unique<QBuffer>(&decrypted);
+        buffer->open(QIODevice::WriteOnly);
+        DecryptionDevice device(std::move(buffer), Aes256GcmNoPad, key, iv);
+        device.write(encrypted);
+        device.close();
+        QCOMPARE(device.finish(), DecryptionDevice::Unauthenticated);
+        QCOMPARE(decrypted, data);
+    }
+    QCOMPARE(ERR_peek_error(), 0UL);
+}
+
+void tst_QXmppFileEncryption::gcmChunked()
+{
+    QByteArray data;
+    for (int i = 0; i < 1000; i++) {
+        data.append(char(i));
+    }
+
+    // legacy IV size of OMEMO Media Sharing
+    for (auto ivSize : { 12, 16 }) {
+        auto key = generateKey(Aes256GcmNoPad);
+        auto iv = QByteArray(ivSize, 'i');
+        auto encrypted = encryptWithDevice(data, Aes256GcmNoPad, key, iv);
+        QCOMPARE(encrypted.size(), data.size() + 16);
+        for (auto chunkSize : { 1, 7, 16, 17, 1000, 1016 }) {
+            QCOMPARE(decryptWithDevice(encrypted, Aes256GcmNoPad, key, iv, chunkSize), data);
+        }
+    }
 }
 
 }  // namespace FileEncryption

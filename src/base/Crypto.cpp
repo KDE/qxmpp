@@ -15,6 +15,8 @@
 
 namespace QXmpp::Private::Crypto {
 
+constexpr int GCM_TAG_SIZE = 16;
+
 // OpenSSL's error queue is per thread and shared with everything else using OpenSSL in that
 // thread, including QSslSocket. QSslSocket expects the queue to be empty when it reads from the
 // socket and aborts the connection with any error left over from here. All errors are reported
@@ -92,51 +94,76 @@ static QByteArray aesProcess(const QByteArray &data, const QByteArray &key, cons
     return output;
 }
 
+static const EVP_CIPHER *aesGcm(int keySize)
+{
+    switch (keySize) {
+    case 16:
+        return EVP_aes_128_gcm();
+    case 32:
+        return EVP_aes_256_gcm();
+    default:
+        return nullptr;
+    }
+}
+
+static EVP_CIPHER_CTX *createGcmContext(const EVP_CIPHER *cipher, bool encrypt, const QByteArray &key, const QByteArray &iv)
+{
+    auto *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        return nullptr;
+    }
+    const int enc = encrypt ? 1 : 0;
+    if (EVP_CipherInit_ex(ctx, cipher, nullptr, nullptr, nullptr, enc) != 1 ||
+        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv.size(), nullptr) != 1 ||
+        EVP_CipherInit_ex(ctx, nullptr, nullptr,
+                          reinterpret_cast<const unsigned char *>(key.constData()),
+                          reinterpret_cast<const unsigned char *>(iv.constData()),
+                          enc) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        return nullptr;
+    }
+    return ctx;
+}
+
+// Checks the tag and finalizes the decryption.
+static bool finalizeGcmDecryption(EVP_CIPHER_CTX *ctx, const QByteArray &tag)
+{
+    if (tag.size() != GCM_TAG_SIZE) {
+        return false;
+    }
+    // GCM does not output data on finalization
+    unsigned char unused[EVP_MAX_BLOCK_LENGTH];
+    int outLen = 0;
+    return EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, GCM_TAG_SIZE, const_cast<char *>(tag.constData())) == 1 &&
+        EVP_DecryptFinal_ex(ctx, unused, &outLen) == 1;
+}
+
 QByteArray aesGcmEncrypt(const QByteArray &data, const QByteArray &key, const QByteArray &iv)
 {
     ErrorQueueGuard errorQueueGuard;
 
-    // GCM encryption without auth tag (matching existing QCA behavior for compatibility)
-    auto *ctx = EVP_CIPHER_CTX_new();
+    const auto *cipher = aesGcm(key.size());
+    if (!cipher) {
+        return {};
+    }
+    auto *ctx = createGcmContext(cipher, true, key, iv);
     if (!ctx) {
         return {};
     }
 
-    const auto *evp = key.size() == 16 ? EVP_aes_128_gcm() : EVP_aes_256_gcm();
-
-    if (EVP_EncryptInit_ex(ctx, evp, nullptr, nullptr, nullptr) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
-        return {};
-    }
-
-    // set IV length
-    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv.size(), nullptr) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
-        return {};
-    }
-
-    if (EVP_EncryptInit_ex(ctx, nullptr, nullptr,
-                           reinterpret_cast<const unsigned char *>(key.constData()),
-                           reinterpret_cast<const unsigned char *>(iv.constData())) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
-        return {};
-    }
-
-    QByteArray output(data.size() + 16, '\0');
+    QByteArray output(data.size() + GCM_TAG_SIZE, Qt::Uninitialized);
     int outLen = 0;
-
-    if (EVP_EncryptUpdate(ctx,
-                          reinterpret_cast<unsigned char *>(output.data()), &outLen,
-                          reinterpret_cast<const unsigned char *>(data.constData()), data.size()) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
+    int finalLen = 0;
+    const auto success = EVP_EncryptUpdate(ctx,
+                                           reinterpret_cast<unsigned char *>(output.data()), &outLen,
+                                           reinterpret_cast<const unsigned char *>(data.constData()), data.size()) == 1 &&
+        EVP_EncryptFinal_ex(ctx, reinterpret_cast<unsigned char *>(output.data()) + outLen, &finalLen) == 1 &&
+        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, GCM_TAG_SIZE, output.data() + outLen + finalLen) == 1;
+    EVP_CIPHER_CTX_free(ctx);
+    if (!success) {
         return {};
     }
-
-    // Skip EVP_EncryptFinal_ex and tag - matching existing behavior where cipher.final() was
-    // skipped for GCM modes. The auth tag is not appended for compatibility with existing
-    // encrypted files.
-    output.resize(outLen);
-    EVP_CIPHER_CTX_free(ctx);
+    output.resize(outLen + finalLen + GCM_TAG_SIZE);
     return output;
 }
 
@@ -144,44 +171,27 @@ QByteArray aesGcmDecrypt(const QByteArray &data, const QByteArray &key, const QB
 {
     ErrorQueueGuard errorQueueGuard;
 
-    // GCM decryption without auth tag verification (matching existing QCA behavior)
-    auto *ctx = EVP_CIPHER_CTX_new();
+    const auto *cipher = aesGcm(key.size());
+    if (!cipher || data.size() < GCM_TAG_SIZE) {
+        return {};
+    }
+    auto *ctx = createGcmContext(cipher, false, key, iv);
     if (!ctx) {
         return {};
     }
 
-    const auto *evp = key.size() == 16 ? EVP_aes_128_gcm() : EVP_aes_256_gcm();
-
-    if (EVP_DecryptInit_ex(ctx, evp, nullptr, nullptr, nullptr) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
-        return {};
-    }
-
-    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv.size(), nullptr) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
-        return {};
-    }
-
-    if (EVP_DecryptInit_ex(ctx, nullptr, nullptr,
-                           reinterpret_cast<const unsigned char *>(key.constData()),
-                           reinterpret_cast<const unsigned char *>(iv.constData())) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
-        return {};
-    }
-
-    QByteArray output(data.size(), '\0');
+    const auto ciphertextSize = data.size() - GCM_TAG_SIZE;
+    QByteArray output(ciphertextSize, Qt::Uninitialized);
     int outLen = 0;
-
-    if (EVP_DecryptUpdate(ctx,
-                          reinterpret_cast<unsigned char *>(output.data()), &outLen,
-                          reinterpret_cast<const unsigned char *>(data.constData()), data.size()) != 1) {
-        EVP_CIPHER_CTX_free(ctx);
+    const auto success = EVP_DecryptUpdate(ctx,
+                                           reinterpret_cast<unsigned char *>(output.data()), &outLen,
+                                           reinterpret_cast<const unsigned char *>(data.constData()), ciphertextSize) == 1 &&
+        finalizeGcmDecryption(ctx, data.right(GCM_TAG_SIZE));
+    EVP_CIPHER_CTX_free(ctx);
+    if (!success) {
         return {};
     }
-
-    // Skip EVP_DecryptFinal_ex - no auth tag to verify (matching existing behavior)
     output.resize(outLen);
-    EVP_CIPHER_CTX_free(ctx);
     return output;
 }
 
@@ -318,49 +328,28 @@ QByteArray randomBytes(int count)
 // CipherContext
 
 CipherContext::CipherContext(Cipher cipher, Direction direction, const QByteArray &key, const QByteArray &iv)
-    : m_cipher(cipher)
+    : m_cipher(cipher), m_direction(direction)
 {
     ErrorQueueGuard errorQueueGuard;
+
+    const auto *evp = evpCipher(cipher);
+    if (isGcm(cipher)) {
+        m_ctx = createGcmContext(evp, direction == Encrypt, key, iv);
+        return;
+    }
 
     m_ctx = EVP_CIPHER_CTX_new();
     if (!m_ctx) {
         return;
     }
-
-    const auto *evp = evpCipher(cipher);
-    const int enc = direction == Encrypt ? 1 : 0;
-
-    if (isGcm(cipher)) {
-        if (EVP_CipherInit_ex(m_ctx, evp, nullptr, nullptr, nullptr, enc) != 1) {
-            EVP_CIPHER_CTX_free(m_ctx);
-            m_ctx = nullptr;
-            return;
-        }
-        if (EVP_CIPHER_CTX_ctrl(m_ctx, EVP_CTRL_GCM_SET_IVLEN, iv.size(), nullptr) != 1) {
-            EVP_CIPHER_CTX_free(m_ctx);
-            m_ctx = nullptr;
-            return;
-        }
-        if (EVP_CipherInit_ex(m_ctx, nullptr, nullptr,
-                              reinterpret_cast<const unsigned char *>(key.constData()),
-                              reinterpret_cast<const unsigned char *>(iv.constData()),
-                              enc) != 1) {
-            EVP_CIPHER_CTX_free(m_ctx);
-            m_ctx = nullptr;
-            return;
-        }
-    } else {
-        if (EVP_CipherInit_ex(m_ctx, evp, nullptr,
-                              reinterpret_cast<const unsigned char *>(key.constData()),
-                              reinterpret_cast<const unsigned char *>(iv.constData()),
-                              enc) != 1) {
-            EVP_CIPHER_CTX_free(m_ctx);
-            m_ctx = nullptr;
-            return;
-        }
+    if (EVP_CipherInit_ex(m_ctx, evp, nullptr,
+                          reinterpret_cast<const unsigned char *>(key.constData()),
+                          reinterpret_cast<const unsigned char *>(iv.constData()),
+                          direction == Encrypt ? 1 : 0) != 1) {
+        EVP_CIPHER_CTX_free(m_ctx);
+        m_ctx = nullptr;
+        return;
     }
-
-    // enable PKCS7 padding for CBC, disable for GCM
     EVP_CIPHER_CTX_set_padding(m_ctx, isCbc(cipher) ? 1 : 0);
 }
 
@@ -392,7 +381,7 @@ QByteArray CipherContext::update(const QByteArray &data)
     return output;
 }
 
-QByteArray CipherContext::finalize()
+std::optional<QByteArray> CipherContext::finalize(const QByteArray &tag)
 {
     if (!m_ctx) {
         return {};
@@ -400,9 +389,12 @@ QByteArray CipherContext::finalize()
 
     ErrorQueueGuard errorQueueGuard;
 
-    // For GCM modes, skip finalization (matching existing behavior)
-    if (isGcm(m_cipher)) {
-        return {};
+    if (isGcm(m_cipher) && m_direction == Decrypt) {
+        // a copy, so the decryption can be continued if the tag does not match
+        auto *ctx = EVP_CIPHER_CTX_new();
+        const auto success = ctx && EVP_CIPHER_CTX_copy(ctx, m_ctx) == 1 && finalizeGcmDecryption(ctx, tag);
+        EVP_CIPHER_CTX_free(ctx);
+        return success ? std::optional(QByteArray()) : std::nullopt;
     }
 
     QByteArray output(EVP_CIPHER_CTX_block_size(m_ctx), '\0');
@@ -412,8 +404,15 @@ QByteArray CipherContext::finalize()
                            reinterpret_cast<unsigned char *>(output.data()), &outLen) != 1) {
         return {};
     }
-
     output.resize(outLen);
+
+    if (isGcm(m_cipher)) {
+        QByteArray gcmTag(GCM_TAG_SIZE, Qt::Uninitialized);
+        if (EVP_CIPHER_CTX_ctrl(m_ctx, EVP_CTRL_GCM_GET_TAG, GCM_TAG_SIZE, gcmTag.data()) != 1) {
+            return {};
+        }
+        output += gcmTag;
+    }
     return output;
 }
 

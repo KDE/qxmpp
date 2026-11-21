@@ -5,9 +5,13 @@
 #include "QXmppFileEncryption.h"
 
 #include "Crypto.h"
+#include "StringLiterals.h"
+
+#include <algorithm>
 
 #include <QByteArray>
 
+#undef max
 #undef min
 
 using namespace QXmpp::Private::Crypto;
@@ -26,6 +30,19 @@ static std::size_t blockSize(QXmpp::Cipher cipher)
     case Aes256GcmNoPad:
     case Aes256CbcPkcs7:
         return AES256_BLOCK_SIZE;
+    }
+    Q_UNREACHABLE();
+}
+
+// size of the authentication tag at the end of the encrypted data
+static qsizetype tagSize(QXmpp::Cipher cipher)
+{
+    switch (cipher) {
+    case Aes128GcmNoPad:
+    case Aes256GcmNoPad:
+        return 16;
+    case Aes256CbcPkcs7:
+        return 0;
     }
     Q_UNREACHABLE();
 }
@@ -113,7 +130,7 @@ qint64 EncryptionDevice::size() const
     switch (m_cipherConfig) {
     case Aes128GcmNoPad:
     case Aes256GcmNoPad:
-        return m_input->size();
+        return m_input->size() + tagSize(m_cipherConfig);
     case Aes256CbcPkcs7: {
         // padding is done with 128 bits blocks
         return roundUpToBlockSize(m_input->size(), 128 / 8);
@@ -153,7 +170,12 @@ qint64 EncryptionDevice::readData(char *data, qint64 len)
         auto processed = m_cipher->update(inputBuffer);
         if (!m_finalized && m_input->atEnd()) {
             m_finalized = true;
-            processed += m_cipher->finalize();
+            auto finalized = m_cipher->finalize();
+            if (!finalized) {
+                setErrorString(u"Could not finalize the encryption"_s);
+                return -1;
+            }
+            processed += *finalized;
         }
 
         // split up into part for user and put rest into output buffer
@@ -234,23 +256,36 @@ qint64 DecryptionDevice::readData(char *, qint64)
 
 qint64 DecryptionDevice::writeData(const char *data, qint64 len)
 {
-    auto decrypted = m_cipher->update(QByteArray(data, len));
+    // The last bytes may be the authentication tag, this is only known in finish().
+    m_pending.append(data, len);
+    const auto size = std::max<qsizetype>(m_pending.size() - tagSize(m_cipherConfig), 0);
+
+    const auto decrypted = m_cipher->update(m_pending.first(size));
+    m_pending.remove(0, size);
     m_output->write(decrypted.constData(), decrypted.size());
     return len;
 }
 
-void DecryptionDevice::finish()
+DecryptionDevice::Result DecryptionDevice::finish()
 {
     // the cipher can only be finalized once
     if (m_finished) {
-        return;
+        return m_result;
     }
     m_finished = true;
 
-    auto finalized = m_cipher->finalize();
-    if (!finalized.isEmpty()) {
-        m_output->write(finalized.constData(), finalized.size());
+    // without a tag, e.g. for AES-CBC, nothing is pending
+    auto output = m_cipher->finalize(m_pending);
+    if (output) {
+        m_result = Success;
+    } else if (tagSize(m_cipherConfig) > 0) {
+        m_result = Unauthenticated;
+        output = m_cipher->update(m_pending);
     }
+    if (output && !output->isEmpty()) {
+        m_output->write(output->constData(), output->size());
+    }
+    return m_result;
 }
 
 }  // namespace QXmpp::Private::Encryption

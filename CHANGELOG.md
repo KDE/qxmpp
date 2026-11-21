@@ -86,6 +86,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - OMEMO: Update to XEP-0384 version 0.9.1: `QXmpp::OmemoManager` signs the device label with the identity key and shows labels of other devices only with a valid signature (`OmemoStorage::Device::labelSignature`) (@lnj, !868)
  - OMEMO: Allow publishing no device label: `OmemoManager::setDeviceLabel()` takes `DefaultDeviceLabel`, `NoDeviceLabel` or a custom label, `effectiveDeviceLabel()` returns the published label (@lnj, !869)
  - Disable Nagle's algorithm on the XMPP socket, which delayed requests by up to the server's delayed ACK (e.g. 40 ms) (@lnj, !862)
+ - EncryptedFileSharingProvider: Add `setCipher()` to choose the cipher of uploaded files (@lnj, !873)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)
@@ -109,6 +110,7 @@ Breaking changes:
  - Update XEP-0424 (Message Retraction) to 0.6.0: add `QXmppMessageRetraction::reason()` and `QXmppMessageRetracted::reason()`, add the id of the retraction message to tombstones (`QXmppMessageRetracted::retractionId()`) and make the id of `<retract/>` optional (@lnj, !866)
  - Deprecate `QXmppMessageModeration::reason()`/`setReason()`, use `QXmppMessageRetraction::reason()` or `QXmppMessageRetracted::reason()` (@lnj, !866)
  - DOAP: Bump XEP-0425 (Moderated Message Retraction) to 0.3.2 (@lnj, !866)
+ - EncryptedFileSharingProvider: Files are encrypted with AES-256-GCM instead of AES-256-CBC by default; the authentication tag is appended to files encrypted with AES-GCM (recommended by XEP-0448); when downloading them, a valid tag or a matching strong hash is required. Older versions of QXmpp do not remove the tag and report a wrong checksum (@lnj, !873)
 
 QXmpp 1.17.2 (November 9, 2026)
 -------------------------------

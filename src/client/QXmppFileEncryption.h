@@ -19,6 +19,10 @@ namespace QXmpp::Private::Encryption {
 
 using CipherContext = Crypto::CipherContext;
 
+// Error of downloads of unauthenticated data, see DecryptionDevice::Unauthenticated
+struct UnauthenticatedDataError {
+};
+
 enum Direction {
     Encode,
     Decode,
@@ -63,11 +67,25 @@ public:
     qint64 size() const override;
     qint64 readData(char *data, qint64 maxlen) override;
     qint64 writeData(const char *data, qint64 len) override;
-    void finish();
+
+    enum Result {
+        Success,
+        // The data does not end with the authentication tag of AES-GCM: there is no tag or the data
+        // has been modified. The data has been written to the output as if there is no tag, it must
+        // only be used if its integrity is verified otherwise.
+        Unauthenticated,
+        Failure,
+    };
+
+    // Finalizes the decryption.
+    Result finish();
 
 private:
     Cipher m_cipherConfig;
     bool m_finished = false;
+    Result m_result = Failure;
+    // end of the data written so far, not decrypted yet because it may be the authentication tag
+    QByteArray m_pending;
     std::vector<char> m_outputBuffer;
     std::unique_ptr<QIODevice> m_output;
     std::unique_ptr<CipherContext> m_cipher;

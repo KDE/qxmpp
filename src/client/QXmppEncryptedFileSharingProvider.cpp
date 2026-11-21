@@ -20,13 +20,18 @@
 using namespace QXmpp;
 using namespace QXmpp::Private;
 
-constexpr auto ENCRYPTION_DEFAULT_CIPHER = Aes256CbcPkcs7;
-
 /*!
     \class QXmppEncryptedFileSharingProvider
     \inmodule QXmpp
 
     Encrypts or decrypts files on the fly when uploading or downloading.
+
+    Since QXmpp 1.18, files are encrypted with AES-256-GCM by default and the authentication tag
+    is appended to files encrypted with AES-GCM, as recommended by
+    \xep{0448}{Encryption for stateless file sharing}. Downloaded files encrypted with AES-GCM must
+    either end with a valid tag or match a strong hash of the file share (only checked when
+    downloading into a QFile). Older versions of QXmpp do not remove the tag, so the hashes of the
+    file do not match there.
 
     \since QXmpp 1.5
 */
@@ -36,6 +41,7 @@ class QXmppEncryptedFileSharingProviderPrivate
 public:
     QXmppFileSharingManager *manager;
     std::shared_ptr<QXmppFileSharingProvider> uploadBaseProvider;
+    Cipher cipher = Aes256GcmNoPad;
 };
 
 /*!
@@ -56,6 +62,30 @@ QXmppEncryptedFileSharingProvider::QXmppEncryptedFileSharingProvider(
 
 QXmppEncryptedFileSharingProvider::~QXmppEncryptedFileSharingProvider() = default;
 
+/*!
+    Returns the cipher used to encrypt uploaded files.
+
+    \since QXmpp 1.18
+*/
+Cipher QXmppEncryptedFileSharingProvider::cipher() const
+{
+    return d->cipher;
+}
+
+/*!
+    Sets the \a cipher used to encrypt uploaded files, by default QXmpp::Aes256GcmNoPad.
+
+    Recipients of an encryption protecting only the body of messages (e.g. OMEMO 0) can only
+    receive files encrypted with QXmpp::Aes256GcmNoPad, as an \c aesgcm:// URL in the body
+    (\xep{0454}{OMEMO Media Sharing}), see QXmppFileSharingManager.
+
+    \since QXmpp 1.18
+*/
+void QXmppEncryptedFileSharingProvider::setCipher(Cipher cipher)
+{
+    d->cipher = cipher;
+}
+
 auto QXmppEncryptedFileSharingProvider::downloadFile(const std::any &source,
                                                      std::unique_ptr<QIODevice> target,
                                                      std::function<void(quint64, quint64)> reportProgress,
@@ -75,7 +105,16 @@ auto QXmppEncryptedFileSharingProvider::downloadFile(const std::any &source,
     std::any httpSource = encryptedSource.httpSources().front();
     if (auto provider = d->manager->providerForSource(httpSource)) {
         auto onFinished = [decryptDevice = output.get(), reportFinished = std::move(reportFinished)](DownloadResult result) {
-            decryptDevice->finish();
+            const auto decryptResult = decryptDevice->finish();
+            if (std::holds_alternative<Success>(result) && decryptResult != Encryption::DecryptionDevice::Success) {
+                std::any error;
+                if (decryptResult == Encryption::DecryptionDevice::Unauthenticated) {
+                    // accepted by the manager if a hash matches
+                    error = Encryption::UnauthenticatedDataError {};
+                }
+                reportFinished(QXmppError { u"Could not decrypt the downloaded file: the data is invalid or has been modified."_s, std::move(error) });
+                return;
+            }
             reportFinished(std::move(result));
         };
 
@@ -92,7 +131,7 @@ auto QXmppEncryptedFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> da
                                                    std::function<void(UploadResult)> reportFinished)
     -> std::shared_ptr<Upload>
 {
-    auto cipher = ENCRYPTION_DEFAULT_CIPHER;
+    auto cipher = d->cipher;
     auto key = Encryption::generateKey(cipher);
     auto iv = Encryption::generateInitializationVector(cipher);
 
@@ -115,7 +154,7 @@ auto QXmppEncryptedFileSharingProvider::uploadFile(std::unique_ptr<QIODevice> da
                 auto encryptedResult = map<UploadResult>(
                     [&](std::any httpSourceAny) {
                         QXmppEncryptedFileSource encryptedSource;
-                        encryptedSource.setCipher(ENCRYPTION_DEFAULT_CIPHER);
+                        encryptedSource.setCipher(cipher);
                         encryptedSource.setKey(key);
                         encryptedSource.setIv(iv);
                         encryptedSource.setHttpSources({ std::any_cast<QXmppHttpFileSource>(std::move(httpSourceAny)) });

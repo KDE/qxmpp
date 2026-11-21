@@ -7,6 +7,7 @@
 
 #include "QXmppBitsOfBinaryContentId.h"
 #include "QXmppBitsOfBinaryData.h"
+#include "QXmppFileEncryption.h"
 #include "QXmppFileMetadata.h"
 #include "QXmppFileShare.h"
 #include "QXmppHashing_p.h"
@@ -520,9 +521,15 @@ std::shared_ptr<QXmppFileDownload> QXmppFileSharingManager::downloadFile(
             download->reportFinished(Cancelled());
             return;
         }
-        if (std::holds_alternative<QXmppError>(result)) {
-            download->reportFinished(std::get<QXmppError>(std::move(result)));
-            return;
+        // Files encrypted with AES-GCM do not need to end with the authentication tag if a hash of the
+        // file is known (XEP-0448).
+        std::optional<QXmppError> unauthenticatedError;
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            if (filePath.isEmpty() || !error->holdsType<Encryption::UnauthenticatedDataError>()) {
+                download->reportFinished(std::move(*error));
+                return;
+            }
+            unauthenticatedError = std::move(*error);
         }
 
         // try to do hash verification
@@ -542,7 +549,11 @@ std::shared_ptr<QXmppFileDownload> QXmppFileSharingManager::downloadFile(
             std::move(file),
             transform<std::vector<QXmppHash>>(download->d->hashes, [](auto hash) { return hash; }));
 
-        await(download->d->hashesFuture, this, [download](HashVerificationResultPtr hashResult) {
+        await(download->d->hashesFuture, this, [download, unauthenticatedError](HashVerificationResultPtr hashResult) {
+            if (unauthenticatedError && !std::holds_alternative<HashVerificationResult::Verified>(hashResult->result)) {
+                download->reportFinished(*unauthenticatedError);
+                return;
+            }
             auto convert = overloaded {
                 [](HashVerificationResult::NoStrongHashes) {
                     return QXmppFileDownload::Downloaded {

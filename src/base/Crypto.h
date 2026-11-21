@@ -7,6 +7,8 @@
 
 #include "QXmppGlobal.h"
 
+#include <optional>
+
 #include <QByteArray>
 
 struct evp_cipher_ctx_st;
@@ -55,7 +57,7 @@ private:
     QByteArray m_data;
 };
 
-// one-shot symmetric encryption/decryption
+// one-shot symmetric encryption/decryption, AES-GCM with the authentication tag appended
 QXMPP_EXPORT QByteArray aesGcmEncrypt(const QByteArray &data, const QByteArray &key, const QByteArray &iv);
 QXMPP_EXPORT QByteArray aesGcmDecrypt(const QByteArray &data, const QByteArray &key, const QByteArray &iv);
 QXMPP_EXPORT QByteArray aesCbcEncrypt(const QByteArray &data, const QByteArray &key, const QByteArray &iv);
@@ -85,12 +87,16 @@ public:
     CipherContext &operator=(const CipherContext &) = delete;
 
     QByteArray update(const QByteArray &data);
-    QByteArray finalize();
+    // Returns the remaining output, for AES-GCM encryption the authentication tag. AES-GCM
+    // decryption requires the expected tag. nullopt on errors, e.g. if the tag does not match
+    // (update() can still be called then).
+    std::optional<QByteArray> finalize(const QByteArray &tag = {});
     bool validKeyLength(int length) const;
 
 private:
     evp_cipher_ctx_st *m_ctx = nullptr;
     Cipher m_cipher;
+    Direction m_direction;
 };
 
 }  // namespace QXmpp::Private::Crypto
