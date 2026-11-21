@@ -128,10 +128,7 @@ QXmppTask<void> OmemoManagerPrivate::loaded()
     if (state.value() != OmemoManager::State::Loading) {
         return makeReadyTask();
     }
-    QXmppPromise<void> promise;
-    auto task = promise.task();
-    loadPromises.append(std::move(promise));
-    return task;
+    return loadPromises.generateTask();
 }
 
 QXmppTask<void> OmemoManagerPrivate::load()
@@ -176,10 +173,7 @@ QXmppTask<void> OmemoManagerPrivate::load()
         state = OmemoManager::State::NotSetUp;
     }
 
-    for (auto &promise : loadPromises) {
-        promise.finish();
-    }
-    loadPromises.clear();
+    loadPromises.finish();
 }
 
 void OmemoManagerPrivate::setOwnDevice(DeviceKeys &&keys)

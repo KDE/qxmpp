@@ -261,7 +261,7 @@ public:
     bool isSettingUp = false;
     bool isLoggedIn = false;
     bool isLoadStarted = false;
-    QList<QXmppPromise<void>> loadPromises;
+    QXmpp::Private::MultiPromise<void> loadPromises;
     // deviceId is 0 until set up
     DeviceKeys device;
     // empty for the default label
