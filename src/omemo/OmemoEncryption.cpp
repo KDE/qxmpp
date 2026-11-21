@@ -29,6 +29,9 @@ namespace QXmpp::Omemo::Private {
 
 // OMEMO 2 empty messages encrypt this number of zero bytes
 constexpr qsizetype EMPTY_MESSAGE_KEY_SIZE = 32;
+// The content is padded to a minimum size, so short contents (e.g. reactions or short messages)
+// can't be told apart by their length, and then by a random number of characters (XEP-0420).
+constexpr qsizetype SCE_PADDED_SIZE_MIN = 256;
 constexpr uint32_t SCE_RPAD_SIZE_MAX = 200;
 
 QString OmemoManagerPrivate::trustNamespace(Version version)
@@ -693,9 +696,13 @@ static QByteArray createSceEnvelope(const QString &from, const QString &to, auto
     envelope.writeTimestamp(QDateTime::currentDateTimeUtc());
     envelope.writeTo(to);
     envelope.writeFrom(from);
-    const auto rpadSize = QRandomGenerator::system()->bounded(SCE_RPAD_SIZE_MAX);
-    envelope.writeRpad(QString::fromUtf8(QXmppUtils::generateRandomBytes(rpadSize).toBase64()));
+    const auto sizeBeforeContent = xml.size();
     envelope.writeContent([&] { writeContent(writer); });
+    const auto contentSize = xml.size() - sizeBeforeContent;
+    const auto rpadSize = std::max<qsizetype>(0, SCE_PADDED_SIZE_MIN - contentSize) + QRandomGenerator::system()->bounded(SCE_RPAD_SIZE_MAX + 1);
+    // base64 encoded random bytes cut to the size
+    const auto rpad = QXmppUtils::generateRandomBytes(int(rpadSize * 3 / 4 + 3)).toBase64().left(rpadSize);
+    envelope.writeRpad(QString::fromLatin1(rpad));
     envelope.end();
     return xml;
 }

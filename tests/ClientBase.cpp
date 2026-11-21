@@ -54,6 +54,7 @@
 #include "QXmppStreamFeatures.h"
 #include "QXmppTask.h"
 #include "QXmppTrustMessageElement.h"
+#include "QXmppUtils.h"
 #include "QXmppVCardManager.h"
 #include "QXmppVersionIq.h"
 #include "QXmppVersionManager.h"
@@ -5969,6 +5970,9 @@ public:
                 }
                 E2ee::Decrypted decrypted;
                 decrypted.setContent(xmlToDom(u"<content xmlns='urn:xmpp:sce:1'>"_s + data + u"</content>"_s));
+                QXmppE2eeMetadata metadata;
+                metadata.setSceTimestamp(QXmppUtils::datetimeFromString(request.iq().firstChildElement(u"encrypted"_s).attribute(u"time"_s)));
+                decrypted.setMetadata(metadata);
                 return makeReadyTask<E2ee::DecryptResult>(std::move(decrypted)); },
         });
     }
@@ -6091,6 +6095,7 @@ private:
     Q_SLOT void messagesNoEnvelope();
     Q_SLOT void messagesDecryptRecipientMismatch();
     Q_SLOT void messagesDecryptGroupChatWithoutRecipient();
+    Q_SLOT void messagesDecryptTimeMismatch();
     Q_SLOT void messagesDecryptWithoutContent();
     Q_SLOT void messagesUnsupported();
     Q_SLOT void outgoingUnencrypted();
@@ -6115,6 +6120,7 @@ private:
     Q_SLOT void iqRequired();
     Q_SLOT void iqIncoming();
     Q_SLOT void iqIncomingNotDecrypted();
+    Q_SLOT void iqIncomingTimeMismatch();
     Q_SLOT void bodyOnlyDecrypt();
     Q_SLOT void decryptContentEncryption_data();
     Q_SLOT void decryptContentEncryption();
@@ -6394,6 +6400,53 @@ void tst_QXmppMessages::messagesDecryptGroupChatWithoutRecipient()
 
     client.injectMessage(groupChatMessage(u"2"_s));
     e2ee->promises.at(1).finish(decrypted(u"secret"_s, {}, u"room@muc.example.org"_jid));
+    QCOMPARE(state, DecryptionState::Decrypted);
+}
+
+void tst_QXmppMessages::messagesDecryptTimeMismatch()
+{
+    TestClient client;
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+    QObject owner;
+
+    std::optional<DecryptionState> state;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        state = context.decryptionState();
+        return HookResult::Continue;
+    });
+
+    const auto encryptedAt = [](const QDateTime &time) {
+        auto result = decrypted(u"secret"_s, u"alice@example.org"_jid, u"me@example.org"_jid);
+        QXmppE2eeMetadata metadata;
+        metadata.setSceTimestamp(time);
+        result.setMetadata(metadata);
+        return result;
+    };
+    const auto delayed = [](const QString &id, const QDateTime &stamp) {
+        return encryptedMessage(u"alice@example.org/phone"_s, id)
+            .replace(u"</message>"_s, u"<delay xmlns='urn:xmpp:delay' stamp='"_s + QXmppUtils::datetimeToString(stamp) + u"'/></message>"_s);
+    };
+    const auto now = QDateTime::currentDateTimeUtc();
+
+    // e.g. an old message replayed by a server
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"1"_s));
+    e2ee->promises.at(0).finish(encryptedAt(now.addDays(-2)));
+    QCOMPARE(state, DecryptionState::Failed);
+
+    // compared with the time the message has been stored, e.g. while being offline
+    client.injectMessage(delayed(u"2"_s, now.addDays(-30)));
+    e2ee->promises.at(1).finish(encryptedAt(now.addDays(-30).addSecs(-60)));
+    QCOMPARE(state, DecryptionState::Decrypted);
+    client.injectMessage(delayed(u"3"_s, now));
+    e2ee->promises.at(2).finish(encryptedAt(now.addDays(-30)));
+    QCOMPARE(state, DecryptionState::Failed);
+
+    // small differences of the clocks and missing affixes are accepted
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"4"_s));
+    e2ee->promises.at(3).finish(encryptedAt(now.addSecs(3600)));
+    QCOMPARE(state, DecryptionState::Decrypted);
+    client.injectMessage(encryptedMessage(u"alice@example.org/phone"_s, u"5"_s));
+    e2ee->promises.at(4).finish(encryptedAt({}));
     QCOMPARE(state, DecryptionState::Decrypted);
 }
 
@@ -7148,6 +7201,24 @@ void tst_QXmppMessages::iqIncomingNotDecrypted()
                   "<not-acceptable xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
                   "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas' xml:lang='en'>The end-to-end encrypted request could not be decrypted.</text>"
                   "</error></iq>"_s);
+    QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
+}
+
+void tst_QXmppMessages::iqIncomingTimeMismatch()
+{
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    auto *e2ee = client.addNewExtension<TestE2eeManager>();
+
+    const auto old = QXmppUtils::datetimeToString(QDateTime::currentDateTimeUtc().addDays(-2));
+    client.injectStanza(u"<iq type='get' id='req3' from='alice@example.org/phone' to='me@example.org/res'>"
+                        "<encrypted xmlns='urn:test:e2ee' time='"_s +
+                        old + u"' data='&lt;query xmlns=&quot;urn:test:unknown&quot;/&gt;'/></iq>"_s);
+
+    // rejected like a request that could not be decrypted
+    const auto packet = client.takePacket();
+    QVERIFY(packet.contains(u"req3"_s));
+    QVERIFY(packet.contains(u"not-acceptable"_s));
     QVERIFY(e2ee->encryptedIqPayloads.isEmpty());
 }
 

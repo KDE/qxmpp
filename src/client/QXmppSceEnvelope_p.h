@@ -19,8 +19,21 @@
 
 #include "QXmppUtils.h"
 
+#include <chrono>
+#include <cstdlib>
+
 #include <QDateTime>
 #include <QDomElement>
+
+// Maximum difference between the time affix and the time a stanza has been sent (XEP-0420). Larger
+// differences are caused by replays of old stanzas or by misconfigured clocks.
+constexpr std::chrono::hours SCE_TIME_TOLERANCE { 24 };
+
+// Whether the time affix matches the time the stanza has been sent. A missing affix matches.
+inline bool isSceTimeValid(const QDateTime &sceTime, const QDateTime &sendTime)
+{
+    return !sceTime.isValid() || std::abs(sceTime.secsTo(sendTime)) <= std::chrono::seconds(SCE_TIME_TOLERANCE).count();
+}
 
 class QXmppSceEnvelopeReader
 {

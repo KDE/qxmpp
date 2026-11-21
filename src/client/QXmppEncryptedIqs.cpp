@@ -14,6 +14,7 @@
 #include "QXmppLogger.h"
 #include "QXmppOutgoingClient_p.h"
 #include "QXmppPacket_p.h"
+#include "QXmppSceEnvelope_p.h"
 #include "QXmppStreamManagement_p.h"
 #include "QXmppUtils.h"
 #include "QXmppXmlRegistry.h"
@@ -200,6 +201,9 @@ static QXmppTask<std::variant<DecryptedIq, QXmppError>> decryptIq(QXmppClient *c
     }
     if (!decrypted.sceTo().isNull() && decrypted.sceTo() != ownJid) {
         co_return QXmppError { u"The recipient of the encrypted content does not match the recipient of the IQ"_s, SendError::EncryptionError };
+    }
+    if (!isSceTimeValid(decrypted.metadata().sceTimestamp(), QDateTime::currentDateTimeUtc())) {
+        co_return QXmppError { u"The time of the encrypted content does not match the time the IQ has been sent"_s, SendError::EncryptionError };
     }
 
     auto decryptedIq = iq.cloneNode(false).toElement();

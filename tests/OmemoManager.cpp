@@ -2656,6 +2656,7 @@ private:
     Q_SLOT void contactDeviceLists();
     Q_SLOT void removedDevicesExpire();
     Q_SLOT void sharedTrust();
+    Q_SLOT void scePadding();
     Q_SLOT void sharedTrustOfNewKeys();
     Q_SLOT void authenticationDistrustsAutomaticallyTrustedKeys_data();
     Q_SLOT void authenticationDistrustsAutomaticallyTrustedKeys();
@@ -3001,6 +3002,38 @@ void tst_OmemoManager2::removedDevicesExpire()
     const auto devices = storage->allData().result().devices;
     QCOMPARE(std::ranges::count(devices, CONTACT_JID, &OmemoStorage::Device::jid), 1);
     QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, CONTACT_JID), QList<uint32_t> { 2 });
+}
+
+void tst_OmemoManager2::scePadding()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    alice.encryption = Version::Omemo2;
+
+    // size of the encrypted SCE envelope
+    const auto payloadSize = [](const QString &xml) {
+        const auto payload = xmlToDom(xml).firstChildElement(u"encrypted"_s).firstChildElement(u"payload"_s);
+        return QByteArray::fromBase64(payload.text().toLatin1()).size();
+    };
+
+    // The content and the padding have at least 256 characters, the affixes about 150 more.
+    for (int i = 0; i < 10; i++) {
+        const auto message = alice.sendMessage(bob.jid(), u"Hi"_s);
+        QVERIFY(payloadSize(message) >= 256 + 140);
+        const auto received = bob.receive(alice, message);
+        QCOMPARE(received.size(), 1);
+        QCOMPARE(received.constFirst().body(), u"Hi"_s);
+        bob.takeMessage();
+    }
+
+    // longer contents are padded by up to 200 characters
+    const QString body(1000, u'x');
+    for (int i = 0; i < 10; i++) {
+        QVERIFY(payloadSize(alice.sendMessage(bob.jid(), body)) <= 1000 + 200 + 300);
+    }
 }
 
 void tst_OmemoManager2::sharedTrust()

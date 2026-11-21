@@ -716,8 +716,9 @@ SPDX-License-Identifier: CC0-1.0
       <xmpp:SupportedXep>
         <xmpp:xep rdf:resource='https://xmpp.org/extensions/xep-0420.html'/>
         <xmpp:status>complete</xmpp:status>
-        <xmpp:version>0.4.1</xmpp:version>
+        <xmpp:version>0.5.0</xmpp:version>
         <xmpp:since>1.5</xmpp:since>
+        <xmpp:note>Messages with a body still get a fallback body</xmpp:note>
       </xmpp:SupportedXep>
     </implements>
     <implements>

@@ -14,6 +14,7 @@
 #include "QXmppMessageContext_p.h"
 #include "QXmppMessageHandler.h"
 #include "QXmppMessages.h"
+#include "QXmppSceEnvelope_p.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppUtils.h"
 #include "QXmppXmlRegistry.h"
@@ -94,6 +95,12 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const 
     const auto expectedRecipient = isGroupChat ? d.conversationJid : jidOrNull(message.to()).bare();
     if (!decrypted.sceTo().isNull() && decrypted.sceTo() != expectedRecipient) {
         fail(context, DecryptionState::Failed, u"The recipient of the encrypted content does not match the recipient of the message"_s);
+        return;
+    }
+    // The delay stamp is the time the server received the message, e.g. for messages stored while
+    // this client was offline or retrieved from an archive.
+    if (!isSceTimeValid(decrypted.metadata().sceTimestamp(), message.stamp().isValid() ? message.stamp() : QDateTime::currentDateTimeUtc())) {
+        fail(context, DecryptionState::Failed, u"The time of the encrypted content does not match the time the message has been sent"_s);
         return;
     }
     // The recipient is required in group chats (XEP-0384), otherwise a server could turn a private
