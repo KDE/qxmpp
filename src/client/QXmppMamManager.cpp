@@ -545,7 +545,6 @@ QString QXmppMamManager::retrieveArchivedMessages(const QString &to,
 
     \deprecated since QXmpp 1.18, use retrieve()
 */
-#if QXMPP_DEPRECATED_SINCE(1, 18)
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(const QString &to, const QString &node, const QString &jid, const QDateTime &start, const QDateTime &end, const QXmppResultSetQuery &resultSetQuery)
@@ -576,7 +575,6 @@ QXmppTask<QXmppMamManager::RetrieveResult> QXmppMamManager::retrieveMessages(con
     });
 }
 QT_WARNING_POP
-#endif
 
 /*!
     Retrieves archived messages and returns them with their context.

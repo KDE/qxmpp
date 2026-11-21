@@ -251,7 +251,6 @@ void Mam::ArchiveMetadata::toXml(QXmlStreamWriter *writer) const
     });
 }
 
-#if QXMPP_DEPRECATED_SINCE(1, 18)
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 
@@ -462,4 +461,3 @@ void QXmppMamResultIq::toXmlElementFromChild(QXmlStreamWriter *writer) const
     });
 }
 QT_WARNING_POP
-#endif

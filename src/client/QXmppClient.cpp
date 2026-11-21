@@ -541,12 +541,10 @@ bool QXmppClient::removeExtension(QXmppClientExtension *extension)
 
     \since QXmpp 1.5
 */
-#if QXMPP_DEPRECATED_SINCE(1, 18)
 QXmppE2eeExtension *QXmppClient::encryptionExtension() const
 {
     return d->encryptionExtension;
 }
-#endif
 
 QXmppE2eeExtension *QXmpp::Private::LegacyE2ee::encryptionExtension(QXmppClient *client)
 {
@@ -570,12 +568,10 @@ void QXmpp::Private::LegacyE2ee::setEncryptionExtension(QXmppClient *client, QXm
 
     \a extension.
 */
-#if QXMPP_DEPRECATED_SINCE(1, 18)
 void QXmppClient::setEncryptionExtension(QXmppE2eeExtension *extension)
 {
     d->encryptionExtension = extension;
 }
-#endif
 
 /*! Returns a list containing all the client's extensions. */
 QList<QXmppClientExtension *> QXmppClient::extensions() const
@@ -671,12 +667,10 @@ void QXmppClient::connectToServer(const QString &jid, const QString &password)
 
     \a params and \a stanza.
 */
-#if QXMPP_DEPRECATED_SINCE(1, 18)
 QXmppTask<QXmpp::SendResult> QXmppClient::sendSensitive(QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
     return Private::LegacyE2ee::sendSensitive(this, std::move(stanza), params);
 }
-#endif
 
 QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::sendSensitive(QXmppClient *client, QXmppStanza &&stanza, const std::optional<QXmppSendStanzaParams> &params)
 {
@@ -781,12 +775,10 @@ QXmppTask<Result<Messages::Sent>> QXmppClient::sendMessage(QXmppMessage &&messag
 
     \a params and \a stanza.
 */
-#if QXMPP_DEPRECATED_SINCE(1, 18)
 QXmppTask<QXmpp::SendResult> QXmppClient::reply(QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> &params)
 {
     return Private::LegacyE2ee::reply(this, std::move(stanza), e2eeMetadata, params);
 }
-#endif
 
 QXmppTask<QXmpp::SendResult> QXmpp::Private::LegacyE2ee::reply(QXmppClient *client, QXmppStanza &&stanza, const std::optional<QXmppE2eeMetadata> &e2eeMetadata, const std::optional<QXmppSendStanzaParams> &params)
 {

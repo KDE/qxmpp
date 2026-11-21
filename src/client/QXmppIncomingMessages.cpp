@@ -305,7 +305,6 @@ void IncomingMessages::finish(Context &&context, std::optional<QXmppPromise<Coll
         return;
     }
 
-#if QXMPP_DEPRECATED_SINCE(1, 18)
     // extensions still implementing the deprecated interface
     QT_WARNING_PUSH
     QT_WARNING_DISABLE_DEPRECATED
@@ -318,7 +317,6 @@ void IncomingMessages::finish(Context &&context, std::optional<QXmppPromise<Coll
         }
     }
     QT_WARNING_POP
-#endif
 
     if (context.origin() != Origin::Mam) {
         Q_EMIT m_client->messageReceived(context.message());

@@ -918,7 +918,6 @@ bool QXmppPubSubManager::handleIncomingStanza(const QDomElement &element)
             return true;
         }
 
-#if QXMPP_DEPRECATED_SINCE(1, 18)
         QT_WARNING_PUSH
         QT_WARNING_DISABLE_DEPRECATED
         const auto extensions = client()->extensions();
@@ -930,7 +929,6 @@ bool QXmppPubSubManager::handleIncomingStanza(const QDomElement &element)
             }
         }
         QT_WARNING_POP
-#endif
     }
     return false;
 }
