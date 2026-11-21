@@ -43,6 +43,7 @@ set(INSTALL_HEADER_FILES
     base/QXmppHooks.h
     base/QXmppHttpFileSource.h
     base/QXmppHttpUploadIq.h
+    base/QXmppHttpUploadIq_p.h
     base/QXmppIbbIq.h
     base/QXmppIq.h
     base/QXmppIqStanza.h

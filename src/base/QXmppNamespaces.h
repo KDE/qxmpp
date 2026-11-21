@@ -181,6 +181,7 @@ enum class Namespace {
     Mam2Extended,
     Mam2GroupchatField,
     Mam2GroupchatAvailable,
+    HttpUploadPurpose0,
 };
 
 QXMPP_EXPORT QString namespaceUri(Namespace ns);

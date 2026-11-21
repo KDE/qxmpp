@@ -8,6 +8,7 @@
 
 #include "QXmppClientExtension.h"
 #include "QXmppError.h"
+#include "QXmppHttpUploadIq.h"
 
 #include <optional>
 #include <variant>
@@ -17,7 +18,6 @@
 class QFileInfo;
 class QNetworkAccessManager;
 class QXmppHttpUploadServicePrivate;
-class QXmppHttpUploadSlotIq;
 template<typename T>
 class QXmppTask;
 struct QXmppHttpUploadPrivate;
@@ -34,6 +34,9 @@ public:
 
     std::optional<quint64> sizeLimit() const;
     void setSizeLimit(std::optional<quint64> sizeLimit);
+
+    QList<QXmpp::HttpUpload::Purpose> purposes() const;
+    void setPurposes(const QList<QXmpp::HttpUpload::Purpose> &purposes);
 
     bool operator==(const QXmppHttpUploadService &other) const;
 
@@ -106,8 +109,8 @@ public:
     Support support() const;
     Q_SIGNAL void supportChanged();
 
-    std::shared_ptr<QXmppHttpUpload> uploadFile(std::unique_ptr<QIODevice> data, const QString &filename, const QMimeType &mimeType, qint64 fileSize = -1, const QString &uploadServiceJid = {});
-    std::shared_ptr<QXmppHttpUpload> uploadFile(const QFileInfo &fileInfo, const QString &filename = {}, const QString &uploadServiceJid = {});
+    std::shared_ptr<QXmppHttpUpload> uploadFile(std::unique_ptr<QIODevice> data, const QString &filename, const QMimeType &mimeType, qint64 fileSize = -1, const QString &uploadServiceJid = {}, std::optional<QXmpp::HttpUpload::Purpose> purpose = {}, const QDateTime &expireBefore = {});
+    std::shared_ptr<QXmppHttpUpload> uploadFile(const QFileInfo &fileInfo, const QString &filename = {}, const QString &uploadServiceJid = {}, std::optional<QXmpp::HttpUpload::Purpose> purpose = {}, const QDateTime &expireBefore = {});
 
 protected:
     void onRegistered(QXmppClient *client) override;
@@ -123,7 +126,9 @@ private:
     QXmppTask<SlotResult> requestSlot(const QString &fileName,
                                       qint64 fileSize,
                                       const QMimeType &mimeType,
-                                      const QString &uploadService = {});
+                                      const QString &uploadService = {},
+                                      std::optional<QXmpp::HttpUpload::Purpose> purpose = {},
+                                      const QDateTime &expireBefore = {});
 
     friend struct QXmppHttpUploadManagerPrivate;
 

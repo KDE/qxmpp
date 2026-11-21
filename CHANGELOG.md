@@ -86,6 +86,8 @@ QXmpp 1.18.0 (UNRELEASED)
  - OMEMO: Update to XEP-0384 version 0.9.1: `QXmpp::OmemoManager` signs the device label with the identity key and shows labels of other devices only with a valid signature (`OmemoStorage::Device::labelSignature`) (@lnj, !868)
  - OMEMO: Allow publishing no device label: `OmemoManager::setDeviceLabel()` takes `DefaultDeviceLabel`, `NoDeviceLabel` or a custom label, `effectiveDeviceLabel()` returns the published label (@lnj, !869)
  - Disable Nagle's algorithm on the XMPP socket, which delayed requests by up to the server's delayed ACK (e.g. 40 ms) (@lnj, !862)
+ - Update XEP-0363 (HTTP File Upload) to 1.2.0: add the upload purpose (`QXmpp::HttpUpload::Purpose`) to `QXmppHttpUploadRequestIq`, `QXmppHttpUploadManager::uploadFile()` and the supported purposes to `QXmppHttpUploadService::purposes()`; PUT headers may occur multiple times (`QXmppHttpUploadSlotIq::headers()`) and newlines are removed; multiple Cookie headers are combined, of Authorization and Expires only the first value is used (@lnj, !872)
+ - Deprecate `QXmppHttpUploadSlotIq::putHeaders()`/`setPutHeaders()`, use `headers()`/`setHeaders()` (@lnj, !872)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

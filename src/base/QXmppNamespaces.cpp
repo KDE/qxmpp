@@ -180,6 +180,7 @@ struct Enums::Data<Namespace> {
         { Namespace::Mam2Extended, ns_mam_extended },
         { Namespace::Mam2GroupchatField, ns_mam_groupchat_field },
         { Namespace::Mam2GroupchatAvailable, ns_mam_groupchat_available },
+        { Namespace::HttpUploadPurpose0, ns_http_upload_purpose },
     });
 };
 
@@ -362,6 +363,7 @@ struct Enums::Data<Namespace> {
     \value Mam2Extended \xep{0313}{Message Archive Management}: \c{urn:xmpp:mam:2#extended} (since QXmpp 1.18)
     \value Mam2GroupchatField \xep{0313}{Message Archive Management}: \c{urn:xmpp:mam:2#groupchat-field} (since QXmpp 1.18)
     \value Mam2GroupchatAvailable \xep{0313}{Message Archive Management}: \c{urn:xmpp:mam:2#groupchat-available} (since QXmpp 1.18)
+    \value HttpUploadPurpose0 \xep{0363}{HTTP File Upload}: \c{urn:xmpp:http:upload:purpose:0} (since QXmpp 1.18)
 
     \since QXmpp 1.17
 */

@@ -234,6 +234,7 @@ inline constexpr QStringView ns_push = u"urn:xmpp:push:0";
 inline constexpr QStringView ns_sid = u"urn:xmpp:sid:0";
 // XEP-0363: HTTP File Upload
 inline constexpr QStringView ns_http_upload = u"urn:xmpp:http:upload:0";
+inline constexpr QStringView ns_http_upload_purpose = u"urn:xmpp:http:upload:purpose:0";
 // XEP-0364: Current Off-the-Record Messaging Usage
 inline constexpr QStringView ns_otr = u"urn:xmpp:otr:0";
 // XEP-0367: Message Attaching

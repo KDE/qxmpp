@@ -19,6 +19,7 @@
 #include "QXmppServer.h"
 #include "QXmppTransferManager.h"
 #include "QXmppUploadRequestManager.h"
+#include "QXmppUtils.h"
 
 #ifdef WITH_ENCRYPTION
 #include "QXmppFileEncryption.h"
@@ -26,6 +27,7 @@
 #include <openssl/err.h>
 #endif
 
+#include "QXmppHttpUploadIq_p.h"
 #include "QXmppStreamInitiationIq_p.h"
 
 #include "Algorithms.h"
@@ -96,6 +98,7 @@ private:
     // HttpUploadManager
     Q_SLOT void testUpload();
     Q_SLOT void testSupport();
+    Q_SLOT void testPurpose();
 };
 
 void tst_QXmppHttpUploadManager::testSupport()
@@ -138,6 +141,84 @@ void tst_QXmppHttpUploadManager::testSupport()
     // supported before the discovery of the other service has finished
     QCOMPARE(manager->support(), Support::Supported);
     QCOMPARE(supportWithServices, QList { Support::Supported });
+}
+
+void tst_QXmppHttpUploadManager::testPurpose()
+{
+    using enum QXmpp::HttpUpload::Purpose;
+
+    TestClient test;
+    test.configuration().setJid(u"juliet@capulet.example"_s);
+    test.addNewExtension<QXmppDiscoveryManager>();
+    auto *manager = test.addNewExtension<QXmppHttpUploadManager>();
+
+    test.setStreamManagementState(QXmppClient::NewStream);
+    test.simulateConnected();
+
+    auto itemsId = test.expectPacketRandomOrder(
+        u"<iq id='qx1' to='capulet.example' type='get'><query xmlns='http://jabber.org/protocol/disco#items'/></iq>"_s);
+    test.inject(u"<iq id='" + itemsId + u"' from='capulet.example' type='result'>"
+                                        "<query xmlns='http://jabber.org/protocol/disco#items'>"
+                                        "<item jid='upload.capulet.example'/>"
+                                        "<item jid='profile.capulet.example'/>"
+                                        "</query></iq>");
+
+    auto uploadId = test.expectPacketRandomOrder(
+        u"<iq id='qx1' to='upload.capulet.example' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='" + uploadId + u"' from='upload.capulet.example' type='result'>"
+                                         "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                         "<identity category='store' type='file'/>"
+                                         "<feature var='urn:xmpp:http:upload:0'/>"
+                                         "</query></iq>");
+    auto profileId = test.expectPacketRandomOrder(
+        u"<iq id='qx1' to='profile.capulet.example' type='get'><query xmlns='http://jabber.org/protocol/disco#info'/></iq>"_s);
+    test.inject(u"<iq id='" + profileId + u"' from='profile.capulet.example' type='result'>"
+                                          "<query xmlns='http://jabber.org/protocol/disco#info'>"
+                                          "<identity category='store' type='file'/>"
+                                          "<feature var='urn:xmpp:http:upload:0'/>"
+                                          "<feature var='urn:xmpp:http:upload:purpose:0#ephemeral'/>"
+                                          "<feature var='urn:xmpp:http:upload:purpose:0#profile'/>"
+                                          "</query></iq>");
+
+    auto services = manager->services();
+    QCOMPARE(services.size(), 2);
+    auto profileService = std::ranges::find(services, u"profile.capulet.example"_s, &QXmppHttpUploadService::jid);
+    QVERIFY(profileService != services.end());
+    QCOMPARE(profileService->purposes(), (QList { Profile, Ephemeral }));
+    auto uploadService = std::ranges::find(services, u"upload.capulet.example"_s, &QXmppHttpUploadService::jid);
+    QVERIFY(uploadService != services.end());
+    QVERIFY(uploadService->purposes().isEmpty());
+
+    auto upload = [&](std::optional<QXmpp::HttpUpload::Purpose> purpose, const QDateTime &expireBefore = {}) {
+        auto buffer = std::make_unique<QBuffer>();
+        buffer->setData("avatar");
+        buffer->open(QIODevice::ReadOnly);
+        manager->uploadFile(std::move(buffer), u"avatar.png"_s, QMimeDatabase().mimeTypeForName(u"image/png"_s), -1, {}, purpose, expireBefore);
+
+        QXmppHttpUploadRequestIq iq;
+        parsePacket(iq, test.takeLastPacket().toUtf8());
+        return iq;
+    };
+
+    // the service supporting the purpose is selected
+    auto iq = upload(Profile);
+    QCOMPARE(iq.to(), u"profile.capulet.example"_s);
+    QCOMPARE(iq.purpose(), Profile);
+
+    const auto expireBefore = QXmppUtils::datetimeFromString(u"2025-09-10T23:08:25Z");
+    iq = upload(Ephemeral, expireBefore);
+    QCOMPARE(iq.to(), u"profile.capulet.example"_s);
+    QCOMPARE(iq.purpose(), Ephemeral);
+    QCOMPARE(iq.expireBefore(), expireBefore);
+
+    // without a service supporting the purpose or without purpose, the first service is used
+    iq = upload(Permanent);
+    QCOMPARE(iq.to(), services.first().jid());
+    QCOMPARE(iq.purpose(), Permanent);
+
+    iq = upload({});
+    QCOMPARE(iq.to(), services.first().jid());
+    QCOMPARE(iq.purpose(), std::nullopt);
 }
 
 void tst_QXmppHttpUploadManager::testHandleStanza_data()
@@ -445,9 +526,7 @@ void tst_QXmppHttpUploadManager::testSendingFuture()
     QCOMPARE(slot.getUrl(), QUrl("https://download.montague.tld/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg"));
     QCOMPARE(slot.putUrl(), QUrl("https://upload.montague.tld/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg"));
     // checks that the disallowed 'Content-type' header is not set
-    QCOMPARE(slot.putHeaders().size(), 2);
-    QCOMPARE(slot.putHeaders().keys()[0], u"Authorization"_s);
-    QCOMPARE(slot.putHeaders().keys()[1], u"Cookie"_s);
+    QCOMPARE(slot.headers(), (QList<QXmpp::HttpUpload::Header> { { u"Authorization"_s, u"Basic Base64String=="_s }, { u"Cookie"_s, u"foo=bar; user=romeo"_s } }));
 }
 
 void tst_QXmppHttpUploadManager::testUploadService()
@@ -901,9 +980,12 @@ class tst_QXmppHttpUploadIq : public QObject
 
 private:
     Q_SLOT void httpUploadRequest();
+    Q_SLOT void httpUploadRequestPurpose_data();
+    Q_SLOT void httpUploadRequestPurpose();
     Q_SLOT void httpUploadIsRequest_data();
     Q_SLOT void httpUploadIsRequest();
     Q_SLOT void httpUploadSlot();
+    Q_SLOT void httpUploadSlotHeaders();
     Q_SLOT void httpUploadIsSlot_data();
     Q_SLOT void httpUploadIsSlot();
 };
@@ -926,6 +1008,7 @@ void tst_QXmppHttpUploadIq::httpUploadRequest()
     QCOMPARE(iq.fileName(), u"très cool.jpg"_s);
     QCOMPARE(iq.size(), 23456);
     QCOMPARE(iq.contentType().name(), u"image/jpeg"_s);
+    QCOMPARE(iq.purpose(), std::nullopt);
     serializePacket(iq, xml);
 
     // test setters
@@ -935,6 +1018,53 @@ void tst_QXmppHttpUploadIq::httpUploadRequest()
     QCOMPARE(iq.size(), 23421337);
     iq.setContentType(QMimeDatabase().mimeTypeForName("image/png"));
     QCOMPARE(iq.contentType().name(), u"image/png"_s);
+}
+
+void tst_QXmppHttpUploadIq::httpUploadRequestPurpose_data()
+{
+    using enum QXmpp::HttpUpload::Purpose;
+
+    QTest::addColumn<QByteArray>("xml");
+    QTest::addColumn<std::optional<QXmpp::HttpUpload::Purpose>>("purpose");
+    QTest::addColumn<QDateTime>("expireBefore");
+
+    auto row = [](const char *name, const QByteArray &purposeXml, QXmpp::HttpUpload::Purpose purpose, const QDateTime &expireBefore = {}) {
+        QTest::newRow(name)
+            << "<iq id=\"step_03\" to=\"upload.montague.tld\" type=\"get\">"
+               "<request xmlns=\"urn:xmpp:http:upload:0\" filename=\"avatar.jpg\" size=\"100\">" +
+                purposeXml + "</request></iq>"
+            << std::optional(purpose) << expireBefore;
+    };
+
+    row("message", "<message xmlns=\"urn:xmpp:http:upload:purpose:0\"/>", Message);
+    row("profile", "<profile xmlns=\"urn:xmpp:http:upload:purpose:0\"/>", Profile);
+    row("ephemeral",
+        "<ephemeral xmlns=\"urn:xmpp:http:upload:purpose:0\" expire-before=\"2025-09-10T23:08:25Z\"/>",
+        Ephemeral,
+        QXmppUtils::datetimeFromString(u"2025-09-10T23:08:25Z"));
+    row("permanent", "<permanent xmlns=\"urn:xmpp:http:upload:purpose:0\"/>", Permanent);
+}
+
+void tst_QXmppHttpUploadIq::httpUploadRequestPurpose()
+{
+    QFETCH(QByteArray, xml);
+    QFETCH(std::optional<QXmpp::HttpUpload::Purpose>, purpose);
+    QFETCH(QDateTime, expireBefore);
+
+    QXmppHttpUploadRequestIq iq;
+    parsePacket(iq, xml);
+    QCOMPARE(iq.purpose(), purpose);
+    QCOMPARE(iq.expireBefore(), expireBefore);
+    serializePacket(iq, xml);
+
+    QXmppHttpUploadRequestIq built;
+    built.setId(u"step_03"_s);
+    built.setTo(u"upload.montague.tld"_s);
+    built.setFileName(u"avatar.jpg"_s);
+    built.setSize(100);
+    built.setPurpose(purpose);
+    built.setExpireBefore(expireBefore);
+    serializePacket(built, xml);
 }
 
 void tst_QXmppHttpUploadIq::httpUploadIsRequest_data()
@@ -988,10 +1118,7 @@ void tst_QXmppHttpUploadIq::httpUploadSlot()
                                "-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg"));
     QCOMPARE(iq.getUrl(), QUrl("https://download.montague.tld/4a771ac1-f0b2-4a"
                                "4a-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg"));
-    QMap<QString, QString> headers;
-    headers["Authorization"] = "Basic Base64String==";
-    headers["Cookie"] = "foo=bar; user=romeo";
-    QCOMPARE(iq.putHeaders(), headers);
+    QCOMPARE(iq.headers(), (QList<QXmpp::HttpUpload::Header> { { u"Authorization"_s, u"Basic Base64String=="_s }, { u"Cookie"_s, u"foo=bar; user=romeo"_s } }));
     serializePacket(iq, xml);
 
     // test setters
@@ -999,9 +1126,61 @@ void tst_QXmppHttpUploadIq::httpUploadSlot()
     QCOMPARE(iq.getUrl(), QUrl("https://dl.example.org/user/file"));
     iq.setPutUrl(QUrl("https://ul.example.org/user/file"));
     QCOMPARE(iq.putUrl(), QUrl("https://ul.example.org/user/file"));
-    QMap<QString, QString> emptyMap;
-    iq.setPutHeaders(emptyMap);
-    QCOMPARE(iq.putHeaders(), emptyMap);
+    iq.setHeaders({});
+    QVERIFY(iq.headers().isEmpty());
+
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QMap<QString, QString> headers;
+    headers["Authorization"] = "Basic Base64String==";
+    headers["Content-Type"] = "text/plain";
+    iq.setPutHeaders(headers);
+    headers.remove("Content-Type");
+    QCOMPARE(iq.putHeaders(), headers);
+    QT_WARNING_POP
+}
+
+void tst_QXmppHttpUploadIq::httpUploadSlotHeaders()
+{
+    using QXmpp::HttpUpload::Header;
+
+    QXmppHttpUploadSlotIq iq;
+    parsePacket(iq,
+                "<iq id=\"step_03\" type=\"result\">"
+                "<slot xmlns=\"urn:xmpp:http:upload:0\">"
+                "<put url=\"https://upload.montague.tld/file.jpg\">"
+                "<header name=\"cookie\">ignored</header>"
+                "<header name=\"Cookie\">a=1</header>"
+                "<header name=\"Content-Type\">text/plain</header>"
+                "<header name=\"Expires\">Wed, 21 Oct 2015&#10; 07:28:00 GMT</header>"
+                "<header name=\"eXpires\">ignored</header>"
+                "<header name=\"Cookie\">b=2</header>"
+                "<header name=\"Authorization\">Bearer one</header>"
+                "<header name=\"Authorization\">Bearer two</header>"
+                "</put>"
+                "<get url=\"https://download.montague.tld/file.jpg\"/>"
+                "</slot>"
+                "</iq>");
+
+    // case-sensitive, in order, without newlines and disallowed headers
+    const QList<Header> expected {
+        { u"Cookie"_s, u"a=1"_s },
+        { u"Expires"_s, u"Wed, 21 Oct 2015 07:28:00 GMT"_s },
+        { u"Cookie"_s, u"b=2"_s },
+        { u"Authorization"_s, u"Bearer one"_s },
+        { u"Authorization"_s, u"Bearer two"_s },
+    };
+    QCOMPARE(iq.headers(), expected);
+
+    iq.setHeaders({ { u"Cook\r\nie"_s, u"c=3\n"_s }, { u"X-Custom"_s, u"value"_s } });
+    QCOMPARE(iq.headers(), (QList<Header> { { u"Cookie"_s, u"c=3"_s } }));
+
+    const QList<std::pair<QByteArray, QByteArray>> merged {
+        { "Cookie", "a=1; b=2" },
+        { "Expires", "Wed, 21 Oct 2015 07:28:00 GMT" },
+        { "Authorization", "Bearer one" },
+    };
+    QCOMPARE(QXmpp::Private::mergeHttpUploadHeaders(expected), merged);
 }
 
 void tst_QXmppHttpUploadIq::httpUploadIsSlot_data()

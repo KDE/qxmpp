@@ -8,6 +8,7 @@
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
 #include "QXmppHttpUploadIq.h"
+#include "QXmppHttpUploadIq_p.h"
 #include "QXmppTask.h"
 #include "QXmppUtils_p.h"
 
@@ -45,6 +46,7 @@ class QXmppHttpUploadServicePrivate : public QSharedData
 public:
     QString jid;
     std::optional<quint64> sizeLimit;
+    QList<HttpUpload::Purpose> purposes;
 };
 
 /*!
@@ -99,13 +101,36 @@ void QXmppHttpUploadService::setSizeLimit(std::optional<quint64> sizeLimit)
 }
 
 /*!
-    Returns true if \a other has the same JID and size limit.
+    Returns the upload purposes the service announces explicitly.
+
+    Services support HttpUpload::Purpose::Message, the default purpose, even if it is not
+    contained.
+
+    \since QXmpp 1.18
+*/
+QList<HttpUpload::Purpose> QXmppHttpUploadService::purposes() const
+{
+    return d->purposes;
+}
+
+/*!
+    Sets the upload \a purposes the service supports.
+
+    \since QXmpp 1.18
+*/
+void QXmppHttpUploadService::setPurposes(const QList<HttpUpload::Purpose> &purposes)
+{
+    d->purposes = purposes;
+}
+
+/*!
+    Returns true if \a other has the same JID, size limit and purposes.
 
     \since QXmpp 1.17
 */
 bool QXmppHttpUploadService::operator==(const QXmppHttpUploadService &other) const
 {
-    return d->jid == other.d->jid && d->sizeLimit == other.d->sizeLimit;
+    return d->jid == other.d->jid && d->sizeLimit == other.d->sizeLimit && d->purposes == other.d->purposes;
 }
 
 struct QXmppHttpUploadPrivate {
@@ -313,6 +338,13 @@ struct QXmppHttpUploadManagerPrivate {
                         service.setSizeLimit(parseInt<uint64_t>(maxSizeValue->toString()));
                     }
                 }
+                QList<HttpUpload::Purpose> purposes;
+                for (const auto &[purpose, _] : Enums::Data<HttpUpload::Purpose>::Values) {
+                    if (s.info.features().contains(httpUploadPurposeFeature(purpose))) {
+                        purposes.append(purpose);
+                    }
+                }
+                service.setPurposes(purposes);
                 result.append(std::move(service));
             }
             return result;
@@ -412,6 +444,13 @@ QXmppHttpUploadManager::~QXmppHttpUploadManager() = default;
     \a mimeType is the mime type of the file.
     \a uploadServiceJid optionally specifies the jid from which an upload url can be requested
     (upload service).
+    \a purpose optionally specifies the purpose of the upload (since QXmpp 1.18), the service may
+    use a different retention period depending on it. If no upload service is specified, the
+    first service announcing support for the purpose is used, otherwise the first one.
+    \a expireBefore is the point in time after which the file must not be available anymore, it
+    is required for QXmpp::HttpUpload::Purpose::Ephemeral (since QXmpp 1.18). Check
+    QXmppHttpUploadService::purposes() whether the service supports a purpose; services without
+    support may ignore it.
 
     Returns an object representing the ongoing upload.
     The object is passed as a shared_ptr,
@@ -432,7 +471,7 @@ QXmppHttpUploadManager::~QXmppHttpUploadManager() = default;
     });
     \endcode
 */
-std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_ptr<QIODevice> data, const QString &filename, const QMimeType &mimeType, qint64 fileSize, const QString &uploadServiceJid)
+std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_ptr<QIODevice> data, const QString &filename, const QMimeType &mimeType, qint64 fileSize, const QString &uploadServiceJid, std::optional<HttpUpload::Purpose> purpose, const QDateTime &expireBefore)
 {
     std::shared_ptr<QXmppHttpUpload> upload(new QXmppHttpUpload);
 
@@ -453,7 +492,7 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
         }
     }
 
-    auto future = requestSlot(filename, fileSize, mimeType, uploadServiceJid);
+    auto future = requestSlot(filename, fileSize, mimeType, uploadServiceJid, purpose, expireBefore);
     // TODO: rawSourceDevice: could this lead to a memory leak if the "then lambda" is never executed?
     future.then(this, [this, upload, rawSourceDevice = data.release(), mimeType](SlotResult result) mutable {
         // first check whether upload was cancelled in the meantime
@@ -479,9 +518,8 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
 
             QNetworkRequest request(slot.putUrl());
             request.setHeader(QNetworkRequest::ContentTypeHeader, mimeType.name());
-            auto headers = slot.putHeaders();
-            for (auto itr = headers.cbegin(); itr != headers.cend(); ++itr) {
-                request.setRawHeader(itr.key().toUtf8(), itr.value().toUtf8());
+            for (const auto &[name, value] : mergeHttpUploadHeaders(slot.headers())) {
+                request.setRawHeader(name, value);
             }
 
             auto *reply = d->netManager->put(request, rawSourceDevice);
@@ -521,6 +559,7 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
     This is commonly used as last part of the resulting url.
     \a uploadServiceJid optionally specifies the jid from which an upload url can be requested
     (upload service).
+    \a purpose and \a expireBefore are described in the other overload (since QXmpp 1.18).
 
     Returns an object representing the ongoing upload.
     The object is passed as a shared_ptr,
@@ -541,7 +580,7 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(std::unique_
     });
     \endcode
 */
-std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(const QFileInfo &fileInfo, const QString &filename, const QString &uploadServiceJid)
+std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(const QFileInfo &fileInfo, const QString &filename, const QString &uploadServiceJid, std::optional<HttpUpload::Purpose> purpose, const QDateTime &expireBefore)
 {
     auto file = std::make_unique<QFile>(fileInfo.absoluteFilePath());
     if (!file->open(QIODevice::ReadOnly)) {
@@ -556,7 +595,9 @@ std::shared_ptr<QXmppHttpUpload> QXmppHttpUploadManager::uploadFile(const QFileI
         filename.isEmpty() ? fileInfo.fileName() : filename,
         QMimeDatabase().mimeTypeForFile(fileInfo),
         -1,
-        uploadServiceJid);
+        uploadServiceJid,
+        purpose,
+        expireBefore);
     return upload;
 }
 
@@ -618,14 +659,17 @@ QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlo
     \a mimeType is the content-type of the file. This can be used by the
     server to set the HTTP MIME-type of the URL.
     \a uploadService is the HTTP File Upload service that is used to request
-    the upload slot. If this is empty, the first discovered one is used.
+    the upload slot. If this is empty, the first discovered one supporting \a purpose is used.
+    \a purpose and \a expireBefore are optionally sent with the request.
 
     \since QXmpp 1.13
 */
 QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlot(const QString &fileName,
                                                                                   qint64 fileSize,
                                                                                   const QMimeType &mimeType,
-                                                                                  const QString &uploadService)
+                                                                                  const QString &uploadService,
+                                                                                  std::optional<HttpUpload::Purpose> purpose,
+                                                                                  const QDateTime &expireBefore)
 {
     if (support() != Support::Supported && uploadService.isEmpty()) {
         co_return SlotResult(QXmppError {
@@ -634,7 +678,11 @@ QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlo
 
     QXmppHttpUploadRequestIq iq;
     if (uploadService.isEmpty()) {
-        iq.setTo(d->services.value().first().jid());
+        const auto services = d->services.value();
+        auto itr = std::ranges::find_if(services, [&](const auto &service) {
+            return purpose && service.purposes().contains(*purpose);
+        });
+        iq.setTo((itr != services.end() ? *itr : services.first()).jid());
     } else {
         iq.setTo(uploadService);
     }
@@ -642,6 +690,8 @@ QXmppTask<QXmppHttpUploadManager::SlotResult> QXmppHttpUploadManager::requestSlo
     iq.setFileName(fileName);
     iq.setSize(fileSize);
     iq.setContentType(mimeType);
+    iq.setPurpose(purpose);
+    iq.setExpireBefore(expireBefore);
 
     co_return parseIq<QXmppHttpUploadSlotIq>(co_await client()->sendIq(std::move(iq)));
 }
