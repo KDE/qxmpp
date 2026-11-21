@@ -207,8 +207,8 @@ public:
     QXmppTask<void> distrustAutomaticallyTrustedKeys(QString jid, QList<QByteArray> authenticatedKeys);
     bool usesOmemo2(const QString &jid, uint32_t omemo0DeviceId) const;
     bool isSticky(const OmemoStorage::Device &omemo2Device) const;
-    QXmppTask<PreparedSession> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);
-    QXmppTask<QList<std::pair<DeviceAddress, PreparedSession>>> prepareSessions(QList<DeviceAddress> devices, TrustLevels acceptedTrustLevels);
+    QXmppTask<PreparedSession> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels, bool onlyKeyIfUsingOmemo2 = false);
+    QXmppTask<QList<std::pair<DeviceAddress, PreparedSession>>> prepareSessions(QList<DeviceAddress> devices, TrustLevels acceptedTrustLevels, bool onlyKeyIfUsingOmemo2 = false);
     QXmppTask<void> requestMissingDeviceLists(QList<Version> usedVersions, QList<QString> jids);
     QXmppTask<Result<DeviceSelection>> selectDevices(QList<Version> versions, QList<Jid> recipientJids, TrustLevels acceptedTrustLevels);
     Device publicDevice(Version version, const QString &jid, uint32_t deviceId, TrustLevel trustLevel);

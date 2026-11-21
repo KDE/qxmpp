@@ -192,8 +192,9 @@ bool OmemoManagerPrivate::isSticky(const OmemoStorage::Device &omemo2Device) con
 using SkipReason = EncryptionInfo::SkipReason;
 
 // Builds a session with the device if there is none. Returns its trust level and why it can not be
-// encrypted for, if so.
-QXmppTask<PreparedSession> OmemoManagerPrivate::prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels)
+// encrypted for, if so. With onlyKeyIfUsingOmemo2, only the key of an OMEMO 0 device is fetched if
+// the device uses OMEMO 2 by that key.
+QXmppTask<PreparedSession> OmemoManagerPrivate::prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels, bool onlyKeyIfUsingOmemo2)
 {
     const Address address { jid, deviceId };
     auto *device = storedDevice(version, jid, deviceId);
@@ -209,6 +210,13 @@ QXmppTask<PreparedSession> OmemoManagerPrivate::prepareSession(Version version, 
     };
     if (versions.at(version).sessions->hasSession(address) && !device->keyId.isEmpty()) {
         co_return checkTrust(co_await trustLevel(version, jid, device->keyId).withContext(q));
+    }
+    // Without session, it can not be encrypted for with OMEMO 0, but it gets OMEMO 2 when encrypting
+    // with both versions, so it is no candidate of OMEMO 0 in selectDevices().
+    auto onlyKey = [&] { return onlyKeyIfUsingOmemo2 && usesOmemo2(jid, deviceId); };
+    if (!device->keyId.isEmpty() && onlyKey()) {
+        const auto trust = co_await trustLevel(version, jid, device->keyId).withContext(q);
+        co_return PreparedSession { trust, SkipReason::NoSession };
     }
 
     auto result = co_await requestBundle(version, jid, deviceId).withContext(q);
@@ -243,6 +251,9 @@ QXmppTask<PreparedSession> OmemoManagerPrivate::prepareSession(Version version, 
         storage->addDevice(*device);
         updateWatch(jid);
     }
+    if (onlyKey()) {
+        co_return PreparedSession { trust, SkipReason::NoSession };
+    }
     if (!acceptedTrustLevels.testFlag(trust)) {
         co_return PreparedSession { trust, SkipReason::Untrusted };
     }
@@ -271,12 +282,12 @@ QXmppTask<PreparedSession> OmemoManagerPrivate::prepareSession(Version version, 
     co_return PreparedSession { trust };
 }
 
-// Prepares the sessions with the devices at once.
-QXmppTask<QList<std::pair<DeviceAddress, PreparedSession>>> OmemoManagerPrivate::prepareSessions(QList<DeviceAddress> devices, TrustLevels acceptedTrustLevels)
+// Prepares the sessions with the devices at once, see prepareSession().
+QXmppTask<QList<std::pair<DeviceAddress, PreparedSession>>> OmemoManagerPrivate::prepareSessions(QList<DeviceAddress> devices, TrustLevels acceptedTrustLevels, bool onlyKeyIfUsingOmemo2)
 {
     std::vector<QXmppTask<PreparedSession>> tasks;
     for (const auto &device : std::as_const(devices)) {
-        tasks.push_back(prepareSession(device.version, device.jid, device.deviceId, acceptedTrustLevels));
+        tasks.push_back(prepareSession(device.version, device.jid, device.deviceId, acceptedTrustLevels, onlyKeyIfUsingOmemo2));
     }
     auto results = co_await joinTasks(q, std::move(tasks));
 

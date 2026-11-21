@@ -2634,6 +2634,7 @@ private:
     Q_SLOT void sessionsArePreparedAtOnce_data();
     Q_SLOT void sessionsArePreparedAtOnce();
     Q_SLOT void watchBuildsSessionsAtOnce();
+    Q_SLOT void watchBuildsSessionsWithOtherOmemo0Devices();
     Q_SLOT void automaticMaxDevicesPerStanza();
     Q_SLOT void automaticHiddenOmemo2Device();
     Q_SLOT void encryptionInfo_data();
@@ -3775,7 +3776,8 @@ void tst_OmemoManager2::sessionsArePreparedAtOnce()
     }
 }
 
-// A device watch requests the device lists of both versions and then all bundles at once.
+// A device watch requests the device lists of both versions and then the bundles of each version at
+// once. Of the devices using OMEMO 2, only the keys of OMEMO 0 are fetched.
 void tst_OmemoManager2::watchBuildsSessionsAtOnce()
 {
     FakePubSubService server;
@@ -3794,17 +3796,52 @@ void tst_OmemoManager2::watchBuildsSessionsAtOnce()
     server.releaseRequests();
     QCOMPARE(server.heldRequestNodes().size(), 2);
     server.releaseRequests();
-    // the bundles of both devices in both versions
-    QCOMPARE(server.heldRequestNodes().size(), 4);
+    QCOMPARE(server.heldRequestNodes(), (QList { V2_BUNDLES, V2_BUNDLES }));
+    server.releaseRequests();
+    auto held = server.heldRequestNodes();
+    std::ranges::sort(held);
+    QList expected { v0Bundles(bob.deviceId()), v0Bundles(bobPhone.deviceId()) };
+    std::ranges::sort(expected);
+    QCOMPARE(held, expected);
     server.stopHolding();
 
     QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
     const auto devices = watch.devices().value();
     QCOMPARE(devices.size(), 2);
+    const auto &state = alice.manager->d->versions;
     for (const auto &device : devices) {
         QVERIFY(!device.keyId.isEmpty());
-        QVERIFY(!device.omemo0KeyId.isEmpty());
+        QCOMPARE(device.omemo0KeyId, QXmpp::Omemo::Private::omemo0IdentityKey(device.keyId));
+        QVERIFY(state.at(Version::Omemo2).sessions->hasSession({ bob.jid().toString(), device.id }));
+        QVERIFY(!state.at(Version::Omemo0).sessions->hasSession({ bob.jid().toString(), device.id }));
     }
+}
+
+// An OMEMO 0 device with the ID of an OMEMO 2 device but another key is another device, a session is
+// built with it.
+void tst_OmemoManager2::watchBuildsSessionsWithOtherOmemo0Devices()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobLegacy(nullptr, &server, u"bob@builder.lit/legacy"_s);
+    bob.manager->setEnabledVersions({ Version::Omemo2 });
+    bobLegacy.manager->setEnabledVersions({ Version::Omemo0 });
+    for (auto *account : { &alice, &bob, &bobLegacy }) {
+        expectVariant<Success>(account->setUp());
+    }
+    // the OMEMO 0 device of Bob is listed with the ID of his OMEMO 2 device
+    const auto legacyBundle = server.itemPayload(bob.jid().toString(), v0Bundles(bobLegacy.deviceId()), u"current"_s);
+    server.setNotificationsEnabled(false);
+    server.setItem(bob.jid().toString(), v0Bundles(bob.deviceId()), u"current"_s, legacyBundle);
+    server.setItem(bob.jid().toString(), V0_DEVICE_LIST, u"current"_s, v0List({ bob.deviceId() }));
+
+    auto watch = alice.manager->watchDevices(bob.jid());
+    server.process();
+    const auto &state = alice.manager->d->versions;
+    QVERIFY(state.at(Version::Omemo2).sessions->hasSession({ bob.jid().toString(), bob.deviceId() }));
+    QVERIFY(state.at(Version::Omemo0).sessions->hasSession({ bob.jid().toString(), bob.deviceId() }));
+    QCOMPARE(watch.devices().value().size(), 2);
 }
 
 // The limit applies to the devices of both versions together.
@@ -4551,13 +4588,13 @@ void tst_OmemoManager2::watchDevices()
     auto watch = alice.manager->watchDevices(bob.jid());
     server.process();
 
-    // The sessions are built in advance, so the keys are known. The device is listed once with
-    // the keys of both versions.
+    // The sessions are built in advance, so the keys are known. Of the device using OMEMO 2, only
+    // the key of OMEMO 0 is fetched. The device is listed once with the keys of both versions.
     const auto bobId = bob.deviceId();
     const auto bobKey = bob.manager->d->versions.at(Version::Omemo2).sessions->ownIdentityKey();
     const auto bobOmemo0Key = bob.manager->d->versions.at(Version::Omemo0).sessions->ownIdentityKey();
     QCOMPARE(watch.devices().value(), (QList<Device> { { Version::Omemo2, bob.jid(), bobId, u"Workshop"_s, bobKey, TrustLevel::AutomaticallyTrusted, bobOmemo0Key } }));
-    QVERIFY(alice.manager->d->versions.at(version).sessions->hasSession({ bob.jid(), bobId }));
+    QCOMPARE(alice.manager->d->versions.at(version).sessions->hasSession({ bob.jid(), bobId }), version == Version::Omemo2);
 
     // updated on trust changes
     alice.manager->setTrustLevel(watch.devices().value(), TrustLevel::Authenticated);

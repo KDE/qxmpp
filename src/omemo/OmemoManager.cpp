@@ -957,7 +957,9 @@ bool OmemoManagerPrivate::isUsable(const Device &device)
         stored->unrespondedSentStanzasCount < UNRESPONDED_STANZAS_UNTIL_ENCRYPTION_STOPS;
 }
 
-// Builds the missing sessions with the devices of a watched JID.
+// Builds the missing sessions with the devices of a watched JID. Devices using OMEMO 2 are only
+// encrypted for with OMEMO 2 if both versions are enabled (see selectDevices()), so only the keys of
+// their OMEMO 0 devices are fetched, e.g. for Device::omemo0KeyId.
 QXmppTask<void> OmemoManagerPrivate::buildSessions(QString jid)
 {
     if (!isSetUp || !isLoggedIn || watches.value(jid).expired()) {
@@ -971,14 +973,19 @@ QXmppTask<void> OmemoManagerPrivate::buildSessions(QString jid)
     sessionBuildsRunning.insert(jid);
     do {
         sessionBuildsPending.remove(jid);
-        // all devices at once
-        QList<DeviceAddress> devices;
-        for (auto version : enabledVersions.value()) {
+        // all devices of a version at once, OMEMO 2 first, so the devices using it are known
+        const auto enabled = enabledVersions.value();
+        const auto perDevice = enabled.contains(Version::Omemo0) && enabled.contains(Version::Omemo2);
+        for (auto version : { Version::Omemo2, Version::Omemo0 }) {
+            if (!enabled.contains(version) || !isSetUp || watches.value(jid).expired()) {
+                continue;
+            }
+            QList<DeviceAddress> devices;
             for (auto id : deviceIds(version, jid)) {
                 devices.append({ version, jid, id });
             }
+            co_await prepareSessions(devices, DEFAULT_ACCEPTED_TRUST_LEVELS, perDevice && version == Version::Omemo0).withContext(q);
         }
-        co_await prepareSessions(devices, DEFAULT_ACCEPTED_TRUST_LEVELS).withContext(q);
     } while (sessionBuildsPending.contains(jid) && isSetUp && !watches.value(jid).expired());
     sessionBuildsRunning.remove(jid);
 }
@@ -1274,7 +1281,7 @@ QBindable<QByteArray> OmemoManager::ownKey(Version version) const
     label of the device, only available with OMEMO 2
     \var QXmpp::Omemo::Device::keyId
     public identity key in the format of the version (Curve25519 for OMEMO 0, Ed25519 for OMEMO
-    2), empty until a session has been built with the device
+    2), empty until the bundle of the device has been fetched, e.g. for building a session
     \var QXmpp::Omemo::Device::trustLevel
     trust level of the key, \c Undecided while the key is unknown
     \var QXmpp::Omemo::Device::omemo0KeyId
@@ -1486,7 +1493,9 @@ QBindable<QString> DeviceWatch::verificationUri() const
     device lists of the enabled versions are subscribed to explicitly. The subscriptions are kept
     until the next login, so the device lists are not requested again if \a jid is watched again
     in the same session. Sessions with the devices with accepted trust levels are built in advance,
-    so the first message can be encrypted faster and the keys of the devices become known.
+    so the first message can be encrypted faster and the keys of the devices become known. With
+    both versions enabled, only the key of OMEMO 0 is fetched for a device using OMEMO 2, since it
+    gets messages only with OMEMO 2.
 
     The explicit subscriptions use the full JID of this client. The service of \a jid, and
     possibly \a jid itself, can therefore see the resource and that its devices have been watched,
