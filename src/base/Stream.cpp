@@ -305,6 +305,9 @@ void XmppSocket::setSocket(QSslSocket *socket)
     }
 
     connect(socket, &QAbstractSocket::connected, this, [this]() {
+        // Stanzas are written as a whole, so Nagle's algorithm only delays them.
+        m_socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+
         info(u"Socket connected to %1 %2"_s
                  .arg(m_socket->peerAddress().toString(),
                       QString::number(m_socket->peerPort())));
@@ -332,6 +335,10 @@ void XmppSocket::setSocket(QSslSocket *socket)
         processData(QString::fromUtf8(m_socket->readAll()));
     });
     connect(socket, &QSslSocket::stateChanged, this, &XmppSocket::internalSocketStateChanged);
+
+    if (socket->state() == QAbstractSocket::ConnectedState) {
+        socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+    }
 }
 
 bool XmppSocket::isConnected() const

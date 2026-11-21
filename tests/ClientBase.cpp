@@ -124,6 +124,7 @@ private:
     Q_SLOT void reconnectNow();
     Q_SLOT void checkConnection();
     Q_SLOT void pingOnlyWhenIdle();
+    Q_SLOT void lowDelaySocket();
     Q_SLOT void reconnectAfterTemporaryStreamError();
     Q_SLOT void reconnectAfterServerClosedStream();
     Q_SLOT void noReconnectAfterPermanentStreamError();
@@ -1018,6 +1019,22 @@ void tst_QXmppClient::checkConnection()
     QVERIFY(!serverSocket->readAll().contains("</stream:stream>"));
     QVERIFY(client.stream()->c2sStreamManager().canResume());
     QVERIFY(client.isReconnectionScheduled());
+}
+
+void tst_QXmppClient::lowDelaySocket()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    TestClient client;
+    useLocalServer(client, server);
+    client.stream()->connectToHost();
+    QVERIFY(acceptConnection(server));
+    QTRY_VERIFY(client.stream()->xmppSocket().isConnected());
+
+    auto *socket = client.stream()->xmppSocket().internalSocket();
+    // FreeBSD reports the raw flag bit instead of 1
+    QVERIFY(socket->socketOption(QAbstractSocket::LowDelayOption).toInt() != 0);
 }
 
 void tst_QXmppClient::pingOnlyWhenIdle()
