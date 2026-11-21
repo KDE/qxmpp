@@ -73,8 +73,12 @@ private:
     Q_SLOT void testTrustMessageElement();
     Q_SLOT void testReaction();
     Q_SLOT void testRetraction();
+    Q_SLOT void testRetractionReason();
+    Q_SLOT void testRetractionWithoutId();
     Q_SLOT void testModeratedRetraction();
     Q_SLOT void testTombstone();
+    Q_SLOT void testTombstoneReason();
+    Q_SLOT void testModeratedTombstone();
     Q_SLOT void testE2eeFallbackBody();
     Q_SLOT void testFileSharing();
     Q_SLOT void testEncryptedFileSource();
@@ -1363,6 +1367,7 @@ void tst_QXmppMessage::testRetraction()
     parsePacket(message1, xml);
     QVERIFY(message1.retraction());
     QCOMPARE(message1.retraction()->retractedId(), u"origin-id-1"_s);
+    QVERIFY(message1.retraction()->reason().isEmpty());
     QVERIFY(!message1.retraction()->moderation());
     QVERIFY(!message1.retracted());
     serializePacket(message1, xml);
@@ -1371,6 +1376,41 @@ void tst_QXmppMessage::testRetraction()
     message2.setRetraction(QXmppMessageRetraction(u"origin-id-1"_s));
     QVERIFY(message2.retraction());
     serializePacket(message2, xml);
+}
+
+void tst_QXmppMessage::testRetractionReason()
+{
+    const QByteArray xml(
+        "<message type=\"chat\">"
+        "<retract xmlns=\"urn:xmpp:message-retract:1\" id=\"wrong-recipient-1\">"
+        "<reason>Sent to the wrong person</reason>"
+        "</retract>"
+        "</message>");
+
+    QXmppMessage message1;
+    parsePacket(message1, xml);
+    QVERIFY(message1.retraction());
+    QCOMPARE(message1.retraction()->retractedId(), u"wrong-recipient-1"_s);
+    QCOMPARE(message1.retraction()->reason(), u"Sent to the wrong person"_s);
+    QVERIFY(!message1.retraction()->moderation());
+    serializePacket(message1, xml);
+
+    QXmppMessageRetraction retraction(u"wrong-recipient-1"_s);
+    retraction.setReason(u"Sent to the wrong person"_s);
+    QXmppMessage message2;
+    message2.setRetraction(retraction);
+    serializePacket(message2, xml);
+}
+
+void tst_QXmppMessage::testRetractionWithoutId()
+{
+    // other specifications (e.g. XEP-0425) embed <retract/> without 'id'
+    const QByteArray xml("<retract xmlns=\"urn:xmpp:message-retract:1\"/>");
+
+    QXmppMessageRetraction retraction;
+    parsePacket(retraction, xml);
+    QVERIFY(retraction.retractedId().isEmpty());
+    serializePacket(retraction, xml);
 }
 
 void tst_QXmppMessage::testModeratedRetraction()
@@ -1392,8 +1432,33 @@ void tst_QXmppMessage::testModeratedRetraction()
     QVERIFY(message.retraction()->moderation());
     QCOMPARE(message.retraction()->moderation()->moderatorJid(), u"room@muc.example.com/macbeth"_s);
     QCOMPARE(message.retraction()->moderation()->moderatorOccupantId(), u"dd72603d"_s);
-    QCOMPARE(message.retraction()->moderation()->reason(), u"This message contains inappropriate content."_s);
+    QCOMPARE(message.retraction()->reason(), u"This message contains inappropriate content."_s);
     serializePacket(message, xml);
+
+    QXmppMessageModeration moderation;
+    moderation.setModeratorJid(u"room@muc.example.com/macbeth"_s);
+    moderation.setModeratorOccupantId(u"dd72603d"_s);
+    QXmppMessageRetraction retraction(u"stanza-id-1"_s);
+    retraction.setReason(u"This message contains inappropriate content."_s);
+    retraction.setModeration(moderation);
+    QXmppMessage message2;
+    message2.setType(QXmppMessage::GroupChat);
+    message2.setRetraction(retraction);
+    serializePacket(message2, xml);
+
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    QT_WARNING_PUSH
+    QT_WARNING_DISABLE_DEPRECATED
+    QCOMPARE(message.retraction()->moderation()->reason(), u"This message contains inappropriate content."_s);
+
+    // the reason set via the deprecated API is still serialized
+    moderation.setReason(u"This message contains inappropriate content."_s);
+    retraction.setReason({});
+    retraction.setModeration(moderation);
+    message2.setRetraction(retraction);
+    serializePacket(message2, xml);
+    QT_WARNING_POP
+#endif
 }
 
 void tst_QXmppMessage::testTombstone()
@@ -1407,8 +1472,65 @@ void tst_QXmppMessage::testTombstone()
     parsePacket(message, xml);
     QVERIFY(message.retracted());
     QCOMPARE(message.retracted()->stamp(), QDateTime(QDate(2019, 9, 20), QTime(23, 9, 32), TimeZoneUTC));
+    QVERIFY(message.retracted()->retractionId().isEmpty());
+    QVERIFY(message.retracted()->reason().isEmpty());
     QVERIFY(!message.retracted()->moderation());
     QVERIFY(!message.retraction());
+    serializePacket(message, xml);
+}
+
+void tst_QXmppMessage::testTombstoneReason()
+{
+    // tombstone of a retracted correction, which keeps its <replace/> element
+    const QByteArray xml(
+        "<message id=\"wrong-recipient-2\" type=\"chat\">"
+        "<replace xmlns=\"urn:xmpp:message-correct:0\" id=\"wrong-recipient-1\"/>"
+        "<retracted xmlns=\"urn:xmpp:message-retract:1\" id=\"retract-message-2\" stamp=\"2019-09-20T23:09:32Z\">"
+        "<reason>Sent to the wrong person</reason>"
+        "</retracted>"
+        "</message>");
+
+    QXmppMessage message;
+    parsePacket(message, xml);
+    QCOMPARE(message.replaceId(), u"wrong-recipient-1"_s);
+    QVERIFY(message.retracted());
+    QCOMPARE(message.retracted()->retractionId(), u"retract-message-2"_s);
+    QCOMPARE(message.retracted()->stamp(), QDateTime(QDate(2019, 9, 20), QTime(23, 9, 32), TimeZoneUTC));
+    QCOMPARE(message.retracted()->reason(), u"Sent to the wrong person"_s);
+    QVERIFY(!message.retracted()->moderation());
+    serializePacket(message, xml);
+
+    QXmppMessageRetracted retracted;
+    retracted.setRetractionId(u"retract-message-2"_s);
+    retracted.setStamp(QDateTime(QDate(2019, 9, 20), QTime(23, 9, 32), TimeZoneUTC));
+    retracted.setReason(u"Sent to the wrong person"_s);
+    QXmppMessage message2;
+    message2.setId(u"wrong-recipient-2"_s);
+    message2.setType(QXmppMessage::Chat);
+    message2.setReplaceId(u"wrong-recipient-1"_s);
+    message2.setRetracted(retracted);
+    serializePacket(message2, xml);
+}
+
+void tst_QXmppMessage::testModeratedTombstone()
+{
+    const QByteArray xml(
+        "<message type=\"groupchat\">"
+        "<retracted xmlns=\"urn:xmpp:message-retract:1\" stamp=\"2019-09-20T23:19:12Z\">"
+        "<moderated xmlns=\"urn:xmpp:message-moderate:1\" by=\"witch@shakespeare.example\">"
+        "<occupant-id xmlns=\"urn:xmpp:occupant-id:0\" id=\"dd72603d\"/>"
+        "</moderated>"
+        "<reason>This message contains inappropriate content.</reason>"
+        "</retracted>"
+        "</message>");
+
+    QXmppMessage message;
+    parsePacket(message, xml);
+    QVERIFY(message.retracted());
+    QCOMPARE(message.retracted()->reason(), u"This message contains inappropriate content."_s);
+    QVERIFY(message.retracted()->moderation());
+    QCOMPARE(message.retracted()->moderation()->moderatorJid(), u"witch@shakespeare.example"_s);
+    QCOMPARE(message.retracted()->moderation()->moderatorOccupantId(), u"dd72603d"_s);
     serializePacket(message, xml);
 }
 

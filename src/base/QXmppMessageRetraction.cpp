@@ -23,8 +23,9 @@ using namespace QXmpp::Private;
     \brief The QXmppMessageModeration class represents the moderation information of a moderated
     message retraction or tombstone as defined by \xep{0425}{Moderated Message Retraction}.
 
-    This is the \c {<moderated/>} element (and its accompanying \c {<reason/>}) that a
-    \xep{0045}{Multi-User Chat} service adds when a moderator retracts another occupant's message.
+    This is the \c {<moderated/>} element that a \xep{0045}{Multi-User Chat} service adds when a
+    moderator retracts another occupant's message. The reason of the moderation is available via
+    QXmppMessageRetraction::reason() and QXmppMessageRetracted::reason().
 
     \ingroup qxmpp-stanzas
 
@@ -65,19 +66,29 @@ void QXmppMessageModeration::setModeratorOccupantId(const QString &id)
 
 /*!
     Returns the optional human-readable reason for the moderation.
+
+    \deprecated since QXmpp 1.18, the reason is part of the retraction, use
+    QXmppMessageRetraction::reason() or QXmppMessageRetracted::reason().
 */
+#if QXMPP_DEPRECATED_SINCE(1, 18)
 QString QXmppMessageModeration::reason() const
 {
     return m_reason;
 }
+#endif
 
 /*!
     Sets the optional human-readable \a reason for the moderation.
+
+    \deprecated since QXmpp 1.18, the reason is part of the retraction, use
+    QXmppMessageRetraction::setReason() or QXmppMessageRetracted::setReason().
 */
+#if QXMPP_DEPRECATED_SINCE(1, 18)
 void QXmppMessageModeration::setReason(const QString &reason)
 {
     m_reason = reason;
 }
+#endif
 
 void QXmppMessageModeration::parse(const QDomElement &parentElement)
 {
@@ -88,14 +99,20 @@ void QXmppMessageModeration::parse(const QDomElement &parentElement)
         m_moderatorOccupantId = occupantEl.attribute(u"id"_s);
     }
 
-    // <reason/> is a sibling of <moderated/>, inheriting the parent's namespace.
-    m_reason = firstChildElement(parentElement, u"reason").text();
+    // <reason/> is a sibling of <moderated/>
+    m_reason = firstChildElement(parentElement, u"reason", ns_message_retract).text();
 }
 
 void QXmppMessageModeration::toXml(QXmlStreamWriter *writer) const
 {
-    XmlWriter w(writer);
-    w.write(Element {
+    writeModerated(writer);
+    // <reason/> is a sibling of <moderated/>, inheriting the parent's namespace
+    XmlWriter(writer).write(OptionalTextElement { u"reason", m_reason });
+}
+
+void QXmppMessageModeration::writeModerated(QXmlStreamWriter *writer) const
+{
+    XmlWriter(writer).write(Element {
         { u"moderated", ns_message_moderate },
         OptionalAttribute { u"by", m_moderatorJid },
         OptionalContent {
@@ -106,8 +123,6 @@ void QXmppMessageModeration::toXml(QXmlStreamWriter *writer) const
             },
         },
     });
-    // <reason/> sits next to <moderated/>, inheriting the parent's namespace.
-    w.write(OptionalTextElement { u"reason", m_reason });
 }
 
 /*!
@@ -117,17 +132,23 @@ void QXmppMessageModeration::toXml(QXmlStreamWriter *writer) const
     \brief The QXmppMessageRetraction class represents a message retraction as defined by
     \xep{0424}{Message Retraction}.
 
-    Indicates that a previously sent message should be removed. The retracted message is referenced
-    by its id: the \xep{0359}{Unique and Stable Stanza IDs} origin id in 1:1 chats, or the stanza id
-    assigned by the room in group chats.
+    Indicates that a previously sent message should be removed, together with all of its
+    \xep{0308}{Last Message Correction} corrections. The retracted message is referenced by its id
+    (see retractedId()).
+
+    To make messages retractable, applications need to set a globally unique 'id' on them, e.g. a
+    UUID (see QXmppUtils::generateStanzaUuid()).
 
     If the retraction was performed by a \xep{0045}{Multi-User Chat} moderator
-    (\xep{0425}{Moderated Message Retraction}), moderation() carries information about the moderator
-    and the reason.
+    (\xep{0425}{Moderated Message Retraction}), moderation() carries information about the moderator.
 
-    When sending a retraction, you are responsible for adding a \xep{0428}{Fallback Indication}
-    marker, a human-readable fallback body and the \xep{0334}{Message Processing Hints} \c store
-    hint (see QXmppMessage::setFallbackMarkers() and QXmppMessage::Store).
+    When sending a retraction, you should add the \xep{0334}{Message Processing Hints} \c store hint
+    (QXmppMessage::Store). A human-readable fallback body is optional; if you add one, mark it with a
+    \xep{0428}{Fallback Indication} marker (see QXmppMessage::setFallbackMarkers()).
+
+    Clients must not display the body of a received retraction, even if no message with the
+    retracted id is known. Received retractions containing a \xep{0308}{Last Message Correction}
+    \c {<replace/>} element must only be processed as retractions.
 
     \ingroup qxmpp-stanzas
 
@@ -143,7 +164,14 @@ QXmppMessageRetraction::QXmppMessageRetraction(QString retractedId)
 }
 
 /*!
-    Returns the id of the message being retracted (origin id in 1:1 chats, stanza id in MUCs).
+    Returns the id of the message being retracted.
+
+    This is the 'id' attribute of the original message in 1:1 chats, or the
+    \xep{0359}{Unique and Stable Stanza IDs} stanza id assigned by the room in group chats. It
+    always refers to the original message, not to one of its corrections.
+
+    The id is empty if the retraction is embedded into another element that identifies the message
+    differently, e.g. a \xep{0425}{Moderated Message Retraction} request.
 */
 QString QXmppMessageRetraction::retractedId() const
 {
@@ -151,11 +179,39 @@ QString QXmppMessageRetraction::retractedId() const
 }
 
 /*!
-    Sets the \a id of the message being retracted (origin id in 1:1 chats, stanza id in MUCs).
+    Sets the \a id of the message being retracted.
+
+    \sa retractedId()
 */
 void QXmppMessageRetraction::setRetractedId(const QString &id)
 {
     m_retractedId = id;
+}
+
+/*!
+    Returns the optional human-readable reason for the retraction.
+
+    The reason must only be displayed together with the retracted message, after the retraction has
+    been processed, i.e. it refers to a known message and has been sent by its author or a
+    moderator.
+
+    \since QXmpp 1.18
+*/
+QString QXmppMessageRetraction::reason() const
+{
+    return m_reason;
+}
+
+/*!
+    Sets the optional human-readable \a reason for the retraction.
+
+    The reason should not repeat the content of the retracted message.
+
+    \since QXmpp 1.18
+*/
+void QXmppMessageRetraction::setReason(const QString &reason)
+{
+    m_reason = reason;
 }
 
 /*!
@@ -178,6 +234,7 @@ void QXmppMessageRetraction::setModeration(const std::optional<QXmppMessageModer
 void QXmppMessageRetraction::parse(const QDomElement &element)
 {
     m_retractedId = element.attribute(u"id"_s);
+    m_reason = firstChildElement(element, u"reason", ns_message_retract).text();
 
     if (!firstChildElement<QXmppMessageModeration>(element).isNull()) {
         QXmppMessageModeration moderation;
@@ -193,12 +250,14 @@ void QXmppMessageRetraction::toXml(QXmlStreamWriter *writer) const
     XmlWriter w(writer);
     w.write(Element {
         { u"retract", ns_message_retract },
-        Attribute { u"id", m_retractedId },
+        OptionalAttribute { u"id", m_retractedId },
         [&] {
             if (m_moderation) {
-                m_moderation->toXml(writer);
+                m_moderation->writeModerated(writer);
             }
         },
+        // fall back to the reason set via the deprecated QXmppMessageModeration::setReason()
+        OptionalTextElement { u"reason", m_reason.isEmpty() && m_moderation ? m_moderation->m_reason : m_reason },
     });
 }
 
@@ -210,13 +269,39 @@ void QXmppMessageRetraction::toXml(QXmlStreamWriter *writer) const
     \xep{0424}{Message Retraction}.
 
     Archiving services (\xep{0313}{Message Archive Management}) replace the body of a retracted
-    message with a \c {<retracted/>} tombstone. It records when the message was retracted and, for
-    \xep{0425}{Moderated Message Retraction}, by whom.
+    message with a \c {<retracted/>} tombstone. It references the retraction message and records
+    when the message was retracted, optionally why and, for \xep{0425}{Moderated Message Retraction},
+    by whom.
+
+    If the retracted message has been corrected (\xep{0308}{Last Message Correction}), the original
+    message and each correction are replaced by a tombstone. The tombstones of the corrections keep
+    their \c {<replace/>} element (QXmppMessage::replaceId()), so that they can be shown as a single
+    retracted message.
 
     \ingroup qxmpp-stanzas
 
     \since QXmpp 1.17
 */
+
+/*!
+    Returns the id of the retraction message, which is stored in the archive as well.
+
+    \since QXmpp 1.18
+*/
+QString QXmppMessageRetracted::retractionId() const
+{
+    return m_retractionId;
+}
+
+/*!
+    Sets the \a id of the retraction message.
+
+    \since QXmpp 1.18
+*/
+void QXmppMessageRetracted::setRetractionId(const QString &id)
+{
+    m_retractionId = id;
+}
 
 /*!
     Returns the timestamp at which the message was retracted.
@@ -251,6 +336,26 @@ void QXmppMessageRetracted::setBy(const QString &by)
 }
 
 /*!
+    Returns the optional human-readable reason of the retraction, copied from the retraction message.
+
+    \since QXmpp 1.18
+*/
+QString QXmppMessageRetracted::reason() const
+{
+    return m_reason;
+}
+
+/*!
+    Sets the optional human-readable \a reason of the retraction.
+
+    \since QXmpp 1.18
+*/
+void QXmppMessageRetracted::setReason(const QString &reason)
+{
+    m_reason = reason;
+}
+
+/*!
     Returns the moderation information, set only for \xep{0425}{Moderated Message Retraction}
     tombstones.
 */
@@ -269,8 +374,10 @@ void QXmppMessageRetracted::setModeration(const std::optional<QXmppMessageModera
 
 void QXmppMessageRetracted::parse(const QDomElement &element)
 {
+    m_retractionId = element.attribute(u"id"_s);
     m_stamp = QXmppUtils::datetimeFromString(element.attribute(u"stamp"_s));
     m_by = element.attribute(u"by"_s);
+    m_reason = firstChildElement(element, u"reason", ns_message_retract).text();
 
     if (!firstChildElement<QXmppMessageModeration>(element).isNull()) {
         QXmppMessageModeration moderation;
@@ -286,13 +393,16 @@ void QXmppMessageRetracted::toXml(QXmlStreamWriter *writer) const
     XmlWriter w(writer);
     w.write(Element {
         { u"retracted", ns_message_retract },
+        OptionalAttribute { u"id", m_retractionId },
         OptionalAttribute { u"stamp", m_stamp },
         OptionalAttribute { u"by", m_by },
         [&] {
             if (m_moderation) {
-                m_moderation->toXml(writer);
+                m_moderation->writeModerated(writer);
             }
         },
+        // fall back to the reason set via the deprecated QXmppMessageModeration::setReason()
+        OptionalTextElement { u"reason", m_reason.isEmpty() && m_moderation ? m_moderation->m_reason : m_reason },
     });
 }
 

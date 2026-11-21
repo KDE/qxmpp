@@ -1810,7 +1810,7 @@ void tst_QXmppMuc::messageRetractedReceived()
     QCOMPARE(retracted->retractedId(), u"stanza-id-1"_s);
     QVERIFY(retracted->moderation());
     QCOMPARE(retracted->moderation()->moderatorJid(), u"coven@chat.shakespeare.lit/secondwitch"_s);
-    QCOMPARE(retracted->moderation()->reason(), u"Spam"_s);
+    QCOMPARE(retracted->reason(), u"Spam"_s);
     QVERIFY(gotMessage);
 }
 

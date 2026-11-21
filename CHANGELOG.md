@@ -104,6 +104,8 @@ Breaking changes:
  - MucManagerV2: Messages of joined rooms are delivered via `QXmppClient::messageReceived()`; `QXmppMucManagerV2::messageReceived()` has been removed. Subject changes and status notifications without text are not delivered (@lnj)
  - MucManagerV2: `QXmppMucRoomV2::sendMessage()` has been removed, messages to rooms are sent via `QXmppClient::sendMessage()`, which also waits for the reflection and reports the ID of the message in the archive of the room (@lnj, !852)
  - MucManagerV2: `removedFromRoom()` is no longer emitted with `ConnectionLost` when the connection is lost or a room is ghosted, but only when rejoining fails or after `QXmppClient::disconnectFromServer()` (@lnj)
+ - Update XEP-0424 (Message Retraction) to 0.6.0: add `QXmppMessageRetraction::reason()` and `QXmppMessageRetracted::reason()`, add the id of the retraction message to tombstones (`QXmppMessageRetracted::retractionId()`) and make the id of `<retract/>` optional (@lnj, !866)
+ - Deprecate `QXmppMessageModeration::reason()`/`setReason()`, use `QXmppMessageRetraction::reason()` or `QXmppMessageRetracted::reason()` (@lnj, !866)
 
 QXmpp 1.17.2 (November 9, 2026)
 -------------------------------

@@ -30,14 +30,23 @@ public:
     QString moderatorOccupantId() const;
     void setModeratorOccupantId(const QString &id);
 
+#if QXMPP_DEPRECATED_SINCE(1, 18)
+    [[deprecated("Use QXmppMessageRetraction::reason() or QXmppMessageRetracted::reason()")]]
     QString reason() const;
+    [[deprecated("Use QXmppMessageRetraction::setReason() or QXmppMessageRetracted::setReason()")]]
     void setReason(const QString &reason);
+#endif
 
     void parse(const QDomElement &parentElement);
     void toXml(QXmlStreamWriter *writer) const;
     static constexpr std::tuple XmlTag = { u"moderated", QXmpp::Private::ns_message_moderate };
 
 private:
+    friend class QXmppMessageRetraction;
+    friend class QXmppMessageRetracted;
+
+    void writeModerated(QXmlStreamWriter *writer) const;
+
     QString m_moderatorJid;
     QString m_moderatorOccupantId;
     QString m_reason;
@@ -52,6 +61,9 @@ public:
     QString retractedId() const;
     void setRetractedId(const QString &id);
 
+    QString reason() const;
+    void setReason(const QString &reason);
+
     const std::optional<QXmppMessageModeration> &moderation() const;
     void setModeration(const std::optional<QXmppMessageModeration> &moderation);
 
@@ -61,6 +73,7 @@ public:
 
 private:
     QString m_retractedId;
+    QString m_reason;
     std::optional<QXmppMessageModeration> m_moderation;
 };
 
@@ -69,11 +82,17 @@ class QXMPP_EXPORT QXmppMessageRetracted
 public:
     QXmppMessageRetracted() = default;
 
+    QString retractionId() const;
+    void setRetractionId(const QString &id);
+
     QDateTime stamp() const;
     void setStamp(const QDateTime &stamp);
 
     QString by() const;
     void setBy(const QString &by);
+
+    QString reason() const;
+    void setReason(const QString &reason);
 
     const std::optional<QXmppMessageModeration> &moderation() const;
     void setModeration(const std::optional<QXmppMessageModeration> &moderation);
@@ -83,8 +102,10 @@ public:
     static constexpr std::tuple XmlTag = { u"retracted", QXmpp::Private::ns_message_retract };
 
 private:
+    QString m_retractionId;
     QDateTime m_stamp;
     QString m_by;
+    QString m_reason;
     std::optional<QXmppMessageModeration> m_moderation;
 };
 

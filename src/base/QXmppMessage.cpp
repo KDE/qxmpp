@@ -1543,7 +1543,10 @@ void QXmppMessage::setMucOccupantId(const QString &id)
     retracts a previously sent message.
 
     For moderated retractions (\xep{0425}{Moderated Message Retraction}), the returned object's
-    QXmppMessageRetraction::moderation() carries information about the moderator and reason.
+    QXmppMessageRetraction::moderation() carries information about the moderator.
+
+    The body of a retraction is only a fallback for clients that do not support retractions and
+    must not be displayed.
 
     \since QXmpp 1.17
 */
@@ -1555,9 +1558,10 @@ std::optional<QXmppMessageRetraction> QXmppMessage::retraction() const
 /*!
     Sets the message \a retraction as defined by \xep{0424}{Message Retraction}.
 
-    When sending a retraction you should also add a \xep{0428}{Fallback Indication} marker (see
-    setFallbackMarkers()), a human-readable fallback body and the \c store hint
-    (\xep{0334}{Message Processing Hints}, see QXmppMessage::Store).
+    When sending a retraction you should also add the \c store hint
+    (\xep{0334}{Message Processing Hints}, see QXmppMessage::Store). A human-readable fallback body
+    is optional; if you add one, also add a \xep{0428}{Fallback Indication} marker (see
+    setFallbackMarkers()).
 
     \since QXmpp 1.17
 */
