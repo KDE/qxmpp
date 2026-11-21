@@ -116,6 +116,8 @@ struct VersionState {
     QSet<Address> pendingSessionBuilds;
     // devices with sessions changed while storing them is deferred (see deferDeviceStores())
     std::optional<QSet<Address>> deferredDeviceStores;
+    // devices to be stored in the next event loop iteration (see storeDevices())
+    QSet<Address> pendingDeviceStores;
     // running requests of contacts' data, shared by the callers requesting the same data meanwhile
     QXmpp::Private::AttachableRequests<QString, Result<QList<DeviceList::Entry>>> deviceListRequests;
     QXmpp::Private::AttachableRequests<Address, Result<Pep::PublicBundle>> bundleRequests;
@@ -225,6 +227,7 @@ public:
     void refillPreKeysAndPublish(Version version);
     OmemoStorage::Device *storedDevice(Version version, const QString &jid, uint32_t deviceId);
     void storeDevices(Version version, const QSet<Address> &addresses);
+    void storePendingDevices();
 
     // Runs an operation of the session layer without storing the devices whose sessions it
     // changes. Their addresses are added to changed, so the caller can store each device once
@@ -287,6 +290,8 @@ public:
     std::unordered_map<QString, QXmpp::Private::MultiPromise<void>> requestedWatchUpdates;
     // see omemo0Key()
     mutable std::unordered_map<QByteArray, QByteArray> omemo0KeyCache;
+    // see storeDevices()
+    QXmpp::Private::CoalescedLater deviceStore { q, [this] { storePendingDevices(); } };
 
     QProperty<OmemoManager::State> state { OmemoManager::State::Loading };
     QProperty<uint32_t> ownDeviceId { 0 };

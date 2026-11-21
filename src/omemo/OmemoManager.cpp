@@ -1148,7 +1148,10 @@ OmemoManager::OmemoManager(std::shared_ptr<OmemoStorage> storage, QList<Version>
     });
 }
 
-OmemoManager::~OmemoManager() = default;
+OmemoManager::~OmemoManager()
+{
+    d->storePendingDevices();
+}
 
 /*!
     Returns the versions used for publishing and receiving. The bindable is read-only, the

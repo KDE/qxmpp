@@ -2665,8 +2665,8 @@ private:
     Q_SLOT void sessionsArePreparedAtOnce();
     Q_SLOT void watchBuildsSessionsAtOnce();
     Q_SLOT void watchBuildsSessionsWithOtherOmemo0Devices();
-    Q_SLOT void devicesAreStoredOncePerStanza_data();
-    Q_SLOT void devicesAreStoredOncePerStanza();
+    Q_SLOT void devicesAreStoredOncePerIteration_data();
+    Q_SLOT void devicesAreStoredOncePerIteration();
     Q_SLOT void automaticMaxDevicesPerStanza();
     Q_SLOT void automaticHiddenOmemo2Device();
     Q_SLOT void encryptionInfo_data();
@@ -3921,13 +3921,14 @@ public:
     QList<uint32_t> storedDevices;
 };
 
-void tst_OmemoManager2::devicesAreStoredOncePerStanza_data()
+void tst_OmemoManager2::devicesAreStoredOncePerIteration_data()
 {
     addVersions();
 }
 
-// A device is stored once with its changed session and counters when encrypting or decrypting.
-void tst_OmemoManager2::devicesAreStoredOncePerStanza()
+// A device is stored once per event loop iteration with its changed session and counters, e.g. once
+// for all messages received in one read from the socket.
+void tst_OmemoManager2::devicesAreStoredOncePerIteration()
 {
     QFETCH(Version, version);
 
@@ -3944,11 +3945,25 @@ void tst_OmemoManager2::devicesAreStoredOncePerStanza()
     QCOMPARE(bob.receive(alice, alice.sendMessage(bob.jid().toString(), u"Hello"_s)).value(0).body(), u"Hello"_s);
     QCOMPARE(alice.receive(bob, bob.sendMessage(alice.jid().toString(), u"Hi"_s)).value(0).body(), u"Hi"_s);
 
+    QCoreApplication::processEvents();
+
     aliceStorage->storedDevices.clear();
     bobStorage->storedDevices.clear();
-    const auto message = alice.sendMessage(bob.jid().toString(), u"Hello again"_s);
-    QCOMPARE(aliceStorage->storedDevices, QList { bob.deviceId() });
-    QCOMPARE(bob.receive(alice, message).value(0).body(), u"Hello again"_s);
+    QList<QString> messages;
+    for (int i = 0; i < 3; i++) {
+        messages.append(alice.sendMessage(bob.jid().toString(), u"Hello again"_s));
+        QCoreApplication::processEvents();
+        QCOMPARE(aliceStorage->storedDevices.size(), i + 1);
+    }
+    QCOMPARE(aliceStorage->storedDevices, (QList { bob.deviceId(), bob.deviceId(), bob.deviceId() }));
+
+    QSignalSpy received(&bob.client, &QXmppClient::messageReceived);
+    for (auto message : std::as_const(messages)) {
+        bob.client.injectMessage(message.replace(u"<message "_s, u"<message from='alice@wonderland.lit/rabbithole' "_s));
+    }
+    QCOMPARE(received.size(), 3);
+    QVERIFY(bobStorage->storedDevices.isEmpty());
+    QCoreApplication::processEvents();
     QCOMPARE(bobStorage->storedDevices, QList { alice.deviceId() });
 }
 

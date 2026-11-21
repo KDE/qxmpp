@@ -96,11 +96,22 @@ QXmppTask<Result<Pep::PublicBundle>> OmemoManagerPrivate::requestBundle(Version 
     return versions.at(version).bundleRequests.produce(Address { jid, deviceId }, [this, version](const Address &device) { return pubSubClient(version).requestBundle(device.jid, device.deviceId); }, q);
 }
 
+// Stores the devices in the next event loop iteration, so each one is stored once for all stanzas
+// processed meanwhile, e.g. for a page of archived messages.
 void OmemoManagerPrivate::storeDevices(Version version, const QSet<Address> &addresses)
 {
-    for (const auto &address : addresses) {
-        if (const auto *device = storedDevice(version, address.jid, address.deviceId)) {
-            storage->addDevice(*device);
+    versions.at(version).pendingDeviceStores.unite(addresses);
+    deviceStore.schedule();
+}
+
+// Devices removed meanwhile are not stored.
+void OmemoManagerPrivate::storePendingDevices()
+{
+    for (auto &state : versions.states) {
+        for (const auto &address : std::exchange(state.pendingDeviceStores, {})) {
+            if (const auto *device = storedDevice(state.version, address.jid, address.deviceId)) {
+                storage->addDevice(*device);
+            }
         }
     }
 }

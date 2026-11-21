@@ -68,6 +68,7 @@ private:
     Q_SLOT void testJoinTasks();
     Q_SLOT void testMultiPromise();
     Q_SLOT void testCoalescedRuns();
+    Q_SLOT void testCoalescedLater();
 };
 
 void tst_QXmppUtils::testJoinTasks()
@@ -149,6 +150,23 @@ void tst_QXmppUtils::testCoalescedRuns()
     runs.clear();
     QVERIFY(runs.tryStart(u"a"_s));
     QVERIFY(!runs.finish(u"a"_s));
+}
+
+void tst_QXmppUtils::testCoalescedLater()
+{
+    QObject context;
+    int calls = 0;
+    CoalescedLater coalesced(&context, [&] { calls++; });
+    coalesced.schedule();
+    coalesced.schedule();
+    QCOMPARE(calls, 0);
+    QCoreApplication::processEvents();
+    QCOMPARE(calls, 1);
+
+    // scheduling again after the call
+    coalesced.schedule();
+    QCoreApplication::processEvents();
+    QCOMPARE(calls, 2);
 }
 
 void tst_QXmppUtils::testFindValue()

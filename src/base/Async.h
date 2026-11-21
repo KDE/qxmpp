@@ -12,7 +12,9 @@
 
 #include "Algorithms.h"
 
+#include <functional>
 #include <memory>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -255,6 +257,32 @@ public:
 private:
     std::vector<Key> m_running;
     std::vector<Key> m_requested;
+};
+
+// Calls a function in the next event loop iteration, once for all calls scheduled until then.
+// Must not outlive the context.
+class CoalescedLater
+{
+public:
+    CoalescedLater(QObject *context, std::function<void()> function)
+        : m_context(context), m_function(std::move(function))
+    {
+    }
+
+    void schedule()
+    {
+        if (!std::exchange(m_scheduled, true)) {
+            later(m_context, [this] {
+                m_scheduled = false;
+                m_function();
+            });
+        }
+    }
+
+private:
+    QObject *m_context;
+    std::function<void()> m_function;
+    bool m_scheduled = false;
 };
 
 }  // namespace QXmpp::Private
