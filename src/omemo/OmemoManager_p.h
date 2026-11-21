@@ -77,6 +77,13 @@ struct Recipient {
     TrustLevel trustLevel = TrustLevel::Undecided;
 };
 
+// a device in a version
+struct DeviceAddress {
+    Version version;
+    QString jid;
+    uint32_t deviceId = 0;
+};
+
 struct PreparedSession {
     TrustLevel trustLevel = TrustLevel::Undecided;
     // set if the device can not be encrypted for
@@ -151,6 +158,7 @@ public:
     DeviceWatch watch(const QString &jid);
     QXmppTask<void> startWatch(QString jid);
     QXmppTask<void> refreshWatch(QString jid);
+    QXmppTask<bool> refreshWatchedDeviceList(Version version, QString jid, bool subscribe);
     QXmppTask<void> updateWatch(QString jid);
     void updateWatches();
     bool isUsable(const Device &device);
@@ -200,6 +208,8 @@ public:
     bool usesOmemo2(const QString &jid, uint32_t omemo0DeviceId) const;
     bool isSticky(const OmemoStorage::Device &omemo2Device) const;
     QXmppTask<PreparedSession> prepareSession(Version version, QString jid, uint32_t deviceId, TrustLevels acceptedTrustLevels);
+    QXmppTask<QList<std::pair<DeviceAddress, PreparedSession>>> prepareSessions(QList<DeviceAddress> devices, TrustLevels acceptedTrustLevels);
+    QXmppTask<void> requestMissingDeviceLists(QList<Version> usedVersions, QList<QString> jids);
     QXmppTask<Result<DeviceSelection>> selectDevices(QList<Version> versions, QList<Jid> recipientJids, TrustLevels acceptedTrustLevels);
     Device publicDevice(Version version, const QString &jid, uint32_t deviceId, TrustLevel trustLevel);
     QList<Envelope> encryptKey(Version version, const QList<Recipient> &recipients, const SecureByteArray &keyMaterial, EncryptionInfo &info);

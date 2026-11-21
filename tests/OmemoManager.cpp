@@ -2631,6 +2631,9 @@ private:
     Q_SLOT void emptyDeviceListRequestedOnce();
     Q_SLOT void requestsAreShared_data();
     Q_SLOT void requestsAreShared();
+    Q_SLOT void sessionsArePreparedAtOnce_data();
+    Q_SLOT void sessionsArePreparedAtOnce();
+    Q_SLOT void watchBuildsSessionsAtOnce();
     Q_SLOT void automaticMaxDevicesPerStanza();
     Q_SLOT void automaticHiddenOmemo2Device();
     Q_SLOT void encryptionInfo_data();
@@ -3724,6 +3727,84 @@ void tst_OmemoManager2::requestsAreShared()
     server.process();
     QCOMPARE(server.requestCount(u"items"_s, Pep::deviceListNode(version)), 2);
     QVERIFY(list3.isFinished());
+}
+
+void tst_OmemoManager2::sessionsArePreparedAtOnce_data()
+{
+    addVersions();
+}
+
+// The device lists and then the bundles needed for a message are requested at once.
+void tst_OmemoManager2::sessionsArePreparedAtOnce()
+{
+    QFETCH(Version, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account alicePhone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobPhone(nullptr, &server, u"bob@builder.lit/phone"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(alicePhone.setUp());
+    // Bob's device list is unknown
+    server.setNotificationsEnabled(false);
+    expectVariant<Success>(bob.setUp());
+    expectVariant<Success>(bobPhone.setUp());
+    alice.encryption = version;
+
+    server.holdRequests();
+    auto task = alice.client.sendMessage(QXmppMessage({}, bob.jid().toString(), u"Hello"_s));
+    server.process();
+    QCOMPARE(server.heldRequestNodes(), QList { Pep::deviceListNode(version) });
+
+    server.releaseRequests();
+    QList<QString> bundleNodes;
+    for (const auto *account : { &alicePhone, &bob, &bobPhone }) {
+        bundleNodes.append(Pep::bundleNode(version, account->deviceId()));
+    }
+    auto held = server.heldRequestNodes();
+    std::ranges::sort(held);
+    std::ranges::sort(bundleNodes);
+    QCOMPARE(held, bundleNodes);
+
+    server.stopHolding();
+    const auto message = alice.takeMessage();
+    QVERIFY(!message.isEmpty());
+    for (auto *account : { &alicePhone, &bob, &bobPhone }) {
+        QCOMPARE(account->receive(alice, message).value(0).body(), u"Hello"_s);
+    }
+}
+
+// A device watch requests the device lists of both versions and then all bundles at once.
+void tst_OmemoManager2::watchBuildsSessionsAtOnce()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    Account bobPhone(nullptr, &server, u"bob@builder.lit/phone"_s);
+    for (auto *account : { &alice, &bob, &bobPhone }) {
+        expectVariant<Success>(account->setUp());
+    }
+
+    server.holdRequests();
+    auto watch = alice.manager->watchDevices(bob.jid());
+    server.process();
+    // subscriptions to both device lists
+    QCOMPARE(server.heldRequestNodes().size(), 2);
+    server.releaseRequests();
+    QCOMPARE(server.heldRequestNodes().size(), 2);
+    server.releaseRequests();
+    // the bundles of both devices in both versions
+    QCOMPARE(server.heldRequestNodes().size(), 4);
+    server.stopHolding();
+
+    QCOMPARE(watch.state().value(), DeviceWatch::State::Loaded);
+    const auto devices = watch.devices().value();
+    QCOMPARE(devices.size(), 2);
+    for (const auto &device : devices) {
+        QVERIFY(!device.keyId.isEmpty());
+        QVERIFY(!device.omemo0KeyId.isEmpty());
+    }
 }
 
 // The limit applies to the devices of both versions together.

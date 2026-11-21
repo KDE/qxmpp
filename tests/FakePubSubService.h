@@ -117,6 +117,33 @@ public:
         m_nodeRequestCounts.clear();
     }
 
+    // Keeps the requests unanswered, e.g. to check which ones are sent at once.
+    void holdRequests() { m_holding = true; }
+    // nodes of the held requests
+    QList<QString> heldRequestNodes() const
+    {
+        QList<QString> nodes;
+        for (const auto &held : m_heldRequests) {
+            nodes.append(held.node);
+        }
+        return nodes;
+    }
+    // Answers the held requests. The requests sent afterwards are held until stopHolding().
+    void releaseRequests()
+    {
+        const auto held = std::exchange(m_heldRequests, {});
+        for (const auto &request : held) {
+            handle(*request.client, request.packet, false);
+            QCoreApplication::processEvents();
+        }
+        process();
+    }
+    void stopHolding()
+    {
+        m_holding = false;
+        releaseRequests();
+    }
+
 private:
     static QString serialize(const QDomElement &element)
     {
@@ -148,7 +175,7 @@ private:
         }
     }
 
-    void handle(TestClient &client, const QString &packet)
+    void handle(TestClient &client, const QString &packet, bool canHold = true)
     {
         // without namespace processing, so payloads can be serialized as they are
         const auto iq = xmlToDomDoc(packet, false).documentElement();
@@ -158,12 +185,17 @@ private:
             return;
         }
 
+        const auto request = pubsub.firstChildElement();
+        const auto nodeName = request.attribute(u"node"_s);
+        if (m_holding && canHold) {
+            m_heldRequests.append({ &client, packet, nodeName });
+            return;
+        }
+
         m_current = &client;
         const auto id = iq.attribute(u"id"_s);
         // like a server, the canonical form of the JID is used
         const auto jid = QXmpp::Private::jidBare(iq.attribute(u"to"_s, client.configuration().jidBare()));
-        const auto request = pubsub.firstChildElement();
-        const auto nodeName = request.attribute(u"node"_s);
         m_requestCounts[request.tagName()]++;
         m_nodeRequestCounts[{ request.tagName(), nodeName }]++;
 
@@ -304,6 +336,13 @@ private:
     QMap<QString, QString> m_failures;
     QMap<QString, int> m_requestCounts;
     QMap<std::pair<QString, QString>, int> m_nodeRequestCounts;
+    struct HeldRequest {
+        TestClient *client;
+        QString packet;
+        QString node;
+    };
+    QList<HeldRequest> m_heldRequests;
+    bool m_holding = false;
     bool m_notify = true;
 };
 

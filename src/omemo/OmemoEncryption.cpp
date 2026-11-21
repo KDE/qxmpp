@@ -271,11 +271,52 @@ QXmppTask<PreparedSession> OmemoManagerPrivate::prepareSession(Version version, 
     co_return PreparedSession { trust };
 }
 
+// Prepares the sessions with the devices at once.
+QXmppTask<QList<std::pair<DeviceAddress, PreparedSession>>> OmemoManagerPrivate::prepareSessions(QList<DeviceAddress> devices, TrustLevels acceptedTrustLevels)
+{
+    std::vector<QXmppTask<PreparedSession>> tasks;
+    for (const auto &device : std::as_const(devices)) {
+        tasks.push_back(prepareSession(device.version, device.jid, device.deviceId, acceptedTrustLevels));
+    }
+    auto results = co_await joinTasks(q, std::move(tasks));
+
+    QList<std::pair<DeviceAddress, PreparedSession>> prepared;
+    for (qsizetype i = 0; i < devices.size(); i++) {
+        prepared.append({ devices.at(i), results.at(i) });
+    }
+    co_return prepared;
+}
+
+// Requests the unknown device lists of the contacts at once. Device lists of contacts are
+// subscribed, but they are unknown before the first message or if only unlisted devices are known
+// from their messages. Device lists without devices are requested once per login, e.g. the OMEMO 2
+// one of contacts using only OMEMO 0.
+QXmppTask<void> OmemoManagerPrivate::requestMissingDeviceLists(QList<Version> usedVersions, QList<QString> jids)
+{
+    QList<std::pair<Version, QString>> requested;
+    std::vector<QXmppTask<Result<QList<DeviceList::Entry>>>> requests;
+    for (const auto &jid : std::as_const(jids)) {
+        for (auto version : std::as_const(usedVersions)) {
+            if (jid != ownJid() && deviceIds(version, jid).isEmpty() && !versions.at(version).receivedDeviceLists.contains(jid)) {
+                requested.append({ version, jid });
+                requests.push_back(requestDeviceList(version, jid));
+            }
+        }
+    }
+
+    const auto lists = co_await joinTasks(q, std::move(requests));
+    for (qsizetype i = 0; i < requested.size(); i++) {
+        if (const auto *list = std::get_if<QList<DeviceList::Entry>>(&lists.at(i))) {
+            applyReceivedDeviceList(requested.at(i).first, requested.at(i).second, *list);
+        }
+    }
+}
+
 // Selects the listed devices of the JIDs and the other own devices with an accepted trust level,
 // but at most maxDevicesPerStanza devices, the own ones first. With both versions (OMEMO 2 first,
 // so its devices are known when selecting the OMEMO 0 ones), each device gets the best version it
 // supports: devices using OMEMO 2 only get OMEMO 2, also if they have been removed from its device
-// list (see isSticky()).
+// list (see isSticky()). The missing device lists and bundles are requested at once.
 QXmppTask<Result<DeviceSelection>> OmemoManagerPrivate::selectDevices(QList<Version> usedVersions, QList<Jid> recipientJids, TrustLevels acceptedTrustLevels)
 {
     const auto own = ownJid();
@@ -290,55 +331,66 @@ QXmppTask<Result<DeviceSelection>> OmemoManagerPrivate::selectDevices(QList<Vers
     auto skip = [&](Version version, const QString &jid, uint32_t deviceId, TrustLevel trustLevel, SkipReason reason) {
         selection.skippedDevices.append({ publicDevice(version, jid, deviceId, trustLevel), reason });
     };
-    for (const auto &jid : std::as_const(jids)) {
-        auto candidates = [&](Version version) {
-            auto ids = deviceIds(version, jid);
-            if (perDevice && version == Version::Omemo2) {
-                for (const auto &device : versions.at(version).devices.value(jid)) {
-                    if (isSticky(device)) {
-                        ids.append(device.id);
-                    }
+    auto apply = [&](const DeviceAddress &device, const PreparedSession &prepared) {
+        if (prepared.skipReason) {
+            skip(device.version, device.jid, device.deviceId, prepared.trustLevel, *prepared.skipReason);
+        } else {
+            recipients.append({ device.version, device.jid, device.deviceId, prepared.trustLevel });
+        }
+    };
+    auto candidateIds = [&](Version version, const QString &jid) {
+        auto ids = deviceIds(version, jid);
+        if (perDevice && version == Version::Omemo2) {
+            for (const auto &device : versions.at(version).devices.value(jid)) {
+                if (isSticky(device)) {
+                    ids.append(device.id);
                 }
             }
-            if (perDevice && version == Version::Omemo0) {
-                ids.removeIf([&](uint32_t id) { return usesOmemo2(jid, id); });
+        }
+        if (perDevice && version == Version::Omemo0) {
+            ids.removeIf([&](uint32_t id) { return usesOmemo2(jid, id); });
+        }
+        return ids;
+    };
+    auto candidates = [&](Version version) {
+        QList<DeviceAddress> devices;
+        for (const auto &jid : std::as_const(jids)) {
+            for (auto deviceId : candidateIds(version, jid)) {
+                devices.append({ version, jid, deviceId });
             }
-            return ids;
-        };
+        }
+        return devices;
+    };
 
-        if (recipients.size() >= maxDevicesPerStanza) {
+    co_await requestMissingDeviceLists(usedVersions, jids).withContext(q);
+
+    // The sessions are prepared at once if all devices fit into the limit. Removing the OMEMO 0
+    // devices using OMEMO 2 can only lower the number of candidates.
+    qsizetype candidateCount = 0;
+    for (auto version : std::as_const(usedVersions)) {
+        candidateCount += candidates(version).size();
+    }
+    if (candidateCount <= maxDevicesPerStanza) {
+        QList<std::pair<DeviceAddress, PreparedSession>> prepared;
+        for (auto version : std::as_const(usedVersions)) {
+            prepared += co_await prepareSessions(candidates(version), acceptedTrustLevels).withContext(q);
+        }
+        // in the order of the limit: the own devices first, each JID with OMEMO 2 first
+        std::ranges::stable_sort(prepared, {}, [&](const auto &device) { return jids.indexOf(device.first.jid); });
+        for (const auto &[device, session] : std::as_const(prepared)) {
+            apply(device, session);
+        }
+    } else {
+        // one after another, so the devices above the limit get no session
+        for (const auto &jid : std::as_const(jids)) {
             for (auto version : std::as_const(usedVersions)) {
-                for (auto deviceId : candidates(version)) {
-                    skip(version, jid, deviceId, TrustLevel::Undecided, SkipReason::DeviceLimit);
-                }
-            }
-            continue;
-        }
-
-        for (auto version : std::as_const(usedVersions)) {
-            // Device lists of contacts are subscribed, but they are unknown before the first
-            // message or if only unlisted devices are known from their messages. Device lists
-            // without devices are requested once per login, e.g. the OMEMO 2 one of contacts using
-            // only OMEMO 0.
-            if (jid != own && deviceIds(version, jid).isEmpty() && !versions.at(version).receivedDeviceLists.contains(jid)) {
-                auto result = co_await requestDeviceList(version, jid).withContext(q);
-                if (auto *list = std::get_if<QList<DeviceList::Entry>>(&result)) {
-                    applyReceivedDeviceList(version, jid, *list);
-                }
-            }
-        }
-
-        for (auto version : std::as_const(usedVersions)) {
-            for (auto deviceId : candidates(version)) {
-                if (recipients.size() >= maxDevicesPerStanza) {
-                    skip(version, jid, deviceId, TrustLevel::Undecided, SkipReason::DeviceLimit);
-                    continue;
-                }
-                const auto prepared = co_await prepareSession(version, jid, deviceId, acceptedTrustLevels).withContext(q);
-                if (prepared.skipReason) {
-                    skip(version, jid, deviceId, prepared.trustLevel, *prepared.skipReason);
-                } else {
-                    recipients.append({ version, jid, deviceId, prepared.trustLevel });
+                for (auto deviceId : candidateIds(version, jid)) {
+                    if (recipients.size() >= maxDevicesPerStanza) {
+                        skip(version, jid, deviceId, TrustLevel::Undecided, SkipReason::DeviceLimit);
+                        continue;
+                    }
+                    const auto result = co_await prepareSession(version, jid, deviceId, acceptedTrustLevels).withContext(q);
+                    apply({ version, jid, deviceId }, result);
                 }
             }
         }

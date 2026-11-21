@@ -684,35 +684,20 @@ QXmppTask<void> OmemoManagerPrivate::refreshWatch(QString jid)
 
     const auto isOwnJid = jid == ownJid();
     const auto subscribe = !isOwnJid && !hasPresenceSubscription(jid);
-    auto failed = false;
+    // both versions at once
+    std::vector<QXmppTask<bool>> requests;
     for (auto version : ALL_VERSIONS) {
         // The own device lists of disabled versions would be republished with this device.
         if (isOwnJid && (!isSetUp || !isEnabled(version))) {
             continue;
         }
-
-        const auto client = pubSubClient(version);
-        const OmemoStorage::Subscription subscription { version, jid, ownFullJid() };
-        if (subscribe && isEnabled(version) && !subscriptions.contains(subscription)) {
-            auto result = co_await client.subscribeToDeviceList(jid, subscription.subscriberJid).withContext(q);
-            if (auto *error = std::get_if<QXmppError>(&result)) {
-                q->warning(u"Could not subscribe to the device list of %1: %2"_s.arg(jid, error->description));
-            } else {
-                subscriptions.append(subscription);
-                storage->addSubscription(subscription);
-            }
-        }
-
-        auto list = co_await requestDeviceList(version, jid).withContext(q);
-        if (watches.value(jid).expired()) {
-            co_return;
-        }
-        if (auto *entries = std::get_if<QList<DeviceList::Entry>>(&list)) {
-            applyReceivedDeviceList(version, jid, *entries);
-        } else {
-            failed = true;
-        }
+        requests.push_back(refreshWatchedDeviceList(version, jid, subscribe));
     }
+    const auto received = co_await joinTasks(q, std::move(requests));
+    if (watches.value(jid).expired()) {
+        co_return;
+    }
+    const auto failed = contains(received, false);
 
     if (auto watch = watches.value(jid).lock()) {
         // Requests fail on disconnection, they are sent again after resuming the stream.
@@ -726,6 +711,32 @@ QXmppTask<void> OmemoManagerPrivate::refreshWatch(QString jid)
     }
     co_await updateWatch(jid).withContext(q);
     co_await buildSessions(jid).withContext(q);
+}
+
+// Subscribes to the device list of a watched JID if needed and requests it. Returns whether it has
+// been received.
+QXmppTask<bool> OmemoManagerPrivate::refreshWatchedDeviceList(Version version, QString jid, bool subscribe)
+{
+    const OmemoStorage::Subscription subscription { version, jid, ownFullJid() };
+    if (subscribe && isEnabled(version) && !subscriptions.contains(subscription)) {
+        auto result = co_await pubSubClient(version).subscribeToDeviceList(jid, subscription.subscriberJid).withContext(q);
+        if (auto *error = std::get_if<QXmppError>(&result)) {
+            q->warning(u"Could not subscribe to the device list of %1: %2"_s.arg(jid, error->description));
+        } else {
+            subscriptions.append(subscription);
+            storage->addSubscription(subscription);
+        }
+    }
+
+    auto list = co_await requestDeviceList(version, jid).withContext(q);
+    if (watches.value(jid).expired()) {
+        co_return false;
+    }
+    if (auto *entries = std::get_if<QList<DeviceList::Entry>>(&list)) {
+        applyReceivedDeviceList(version, jid, *entries);
+        co_return true;
+    }
+    co_return false;
 }
 
 // Updates the devices of a watch with the current trust levels.
@@ -960,16 +971,15 @@ QXmppTask<void> OmemoManagerPrivate::buildSessions(QString jid)
     sessionBuildsRunning.insert(jid);
     do {
         sessionBuildsPending.remove(jid);
-        const auto enabled = enabledVersions.value();
-        for (auto version : enabled) {
+        // all devices at once
+        QList<DeviceAddress> devices;
+        for (auto version : enabledVersions.value()) {
             for (auto id : deviceIds(version, jid)) {
-                if (!isSetUp || watches.value(jid).expired()) {
-                    break;
-                }
-                co_await prepareSession(version, jid, id, DEFAULT_ACCEPTED_TRUST_LEVELS).withContext(q);
+                devices.append({ version, jid, id });
             }
         }
-    } while (sessionBuildsPending.contains(jid));
+        co_await prepareSessions(devices, DEFAULT_ACCEPTED_TRUST_LEVELS).withContext(q);
+    } while (sessionBuildsPending.contains(jid) && isSetUp && !watches.value(jid).expired());
     sessionBuildsRunning.remove(jid);
 }
 
