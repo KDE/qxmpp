@@ -133,15 +133,23 @@ void tst_QXmppOmemoData::testOmemoDeviceElement_data()
     QTest::addColumn<QByteArray>("xml");
     QTest::addColumn<uint32_t>("id");
     QTest::addColumn<QString>("label");
+    QTest::addColumn<QByteArray>("labelSignature");
 
     QTest::newRow("id")
         << QByteArrayLiteral("<device id=\"12345\"/>")
         << uint32_t(12345)
-        << QString();
+        << QString()
+        << QByteArray();
     QTest::newRow("idAndLabel")
         << QByteArrayLiteral("<device id=\"4223\" label=\"Gajim on Ubuntu Linux\"/>")
         << uint32_t(4223)
-        << u"Gajim on Ubuntu Linux"_s;
+        << u"Gajim on Ubuntu Linux"_s
+        << QByteArray();
+    QTest::newRow("idAndSignedLabel")
+        << QByteArrayLiteral("<device id=\"4223\" label=\"Gajim on Ubuntu Linux\" labelsig=\"c2lnbmF0dXJl\"/>")
+        << uint32_t(4223)
+        << u"Gajim on Ubuntu Linux"_s
+        << QByteArrayLiteral("signature");
 }
 
 void tst_QXmppOmemoData::testOmemoDeviceElement()
@@ -149,18 +157,22 @@ void tst_QXmppOmemoData::testOmemoDeviceElement()
     QFETCH(QByteArray, xml);
     QFETCH(uint32_t, id);
     QFETCH(QString, label);
+    QFETCH(QByteArray, labelSignature);
 
     QXmppOmemoDeviceElement deviceElement1;
     parsePacket(deviceElement1, xml);
     QCOMPARE(deviceElement1.id(), id);
     QCOMPARE(deviceElement1.label(), label);
+    QCOMPARE(deviceElement1.labelSignature(), labelSignature);
     serializePacket(deviceElement1, xml);
 
     QXmppOmemoDeviceElement deviceElement2;
     deviceElement2.setId(id);
     deviceElement2.setLabel(label);
+    deviceElement2.setLabelSignature(labelSignature);
     QCOMPARE(deviceElement2.id(), id);
     QCOMPARE(deviceElement2.label(), label);
+    QCOMPARE(deviceElement2.labelSignature(), labelSignature);
     serializePacket(deviceElement2, xml);
 }
 

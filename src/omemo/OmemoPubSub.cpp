@@ -57,7 +57,7 @@ static QList<DeviceList::Entry> toEntries(const QXmppOmemoDeviceList &list)
 {
     QList<DeviceList::Entry> entries;
     for (const auto &device : list) {
-        entries.append({ device.id(), device.label() });
+        entries.append({ device.id(), device.label(), device.labelSignature() });
     }
     return entries;
 }
@@ -246,6 +246,7 @@ QXmppTask<Result<Success>> Client::publishDeviceList(const QList<DeviceList::Ent
         QXmppOmemoDeviceElement element;
         element.setId(device.id);
         element.setLabel(device.label);
+        element.setLabelSignature(device.labelSignature);
         list.append(element);
     }
     QXmppOmemoDeviceListItem item;

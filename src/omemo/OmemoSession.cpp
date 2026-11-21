@@ -167,6 +167,16 @@ QByteArray omemo0IdentityKey(const QByteArray &omemo2Key)
     return {};
 }
 
+bool isLabelSignatureValid(const QByteArray &identityKey, const QString &label, const QByteArray &signature)
+{
+    const auto key = decodeIdentityKey(identityKey, Version::Omemo2, nullptr);
+    if (!key) {
+        return false;
+    }
+    const auto message = label.toUtf8();
+    return curve_verify_signature(key.get(), bytes(message), size_t(message.size()), bytes(signature), size_t(signature.size())) == 1;
+}
+
 SignalContext::SignalContext()
 {
     if (signal_context_create(m_context.ptrRef(), this) < 0) {
@@ -508,6 +518,20 @@ bool SessionLayer::isSignedPreKeyValid(const QByteArray &identityKey, const QByt
     // signed in the serialized form of the version, like libomemo-c checks it
     const auto serialized = serializePreKey(decodedSignedPreKey.get(), m_version);
     return curve_verify_signature(decodedIdentityKey.get(), bytes(serialized), size_t(serialized.size()), bytes(signature), size_t(signature.size())) == 1;
+}
+
+QByteArray SessionLayer::signLabel(const QString &label) const
+{
+    const auto identityKeyPair = deserializeIdentityKeyPair(m_device.identity, m_context.get());
+    if (!identityKeyPair) {
+        return {};
+    }
+    const auto message = label.toUtf8();
+    BufferPtr signature;
+    if (curve_calculate_signature(m_context.get(), signature.ptrRef(), ratchet_identity_key_pair_get_private(identityKeyPair.get()), bytes(message), size_t(message.size())) < 0) {
+        return {};
+    }
+    return signature.toByteArray();
 }
 
 std::variant<Success, QXmppError> SessionLayer::buildSession(const Address &address, const Bundle &bundle)

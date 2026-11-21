@@ -1828,6 +1828,10 @@ void tst_OmemoDeviceList::addAndChange()
     changes = apply(devices, { { 1, u"Laptop"_s }, { 2, {} } }, start, 10);
     QCOMPARE(changes.changed, Ids { 1 });
     QCOMPARE(devices.value(1).label, u"Laptop"_s);
+    // new signature, e.g. signed again by the device
+    changes = apply(devices, { { 1, u"Laptop"_s, "signature" }, { 2, {} } }, start, 10);
+    QCOMPARE(changes.changed, Ids { 1 });
+    QCOMPARE(devices.value(1).labelSignature, QByteArray("signature"));
 }
 
 void tst_OmemoDeviceList::removalAndReturn()
@@ -1890,11 +1894,14 @@ void tst_OmemoDeviceList::ownList_data()
     QTest::addColumn<std::optional<QString>>("ownLabel");
     QTest::addColumn<bool>("republish");
 
-    const auto own = Entry { 7, u"This"_s };
+    const auto own = Entry { 7, u"This"_s, "signature" };
     QTest::newRow("correct") << QList<Entry> { { 1, {} }, own } << std::optional<QString>(u"This"_s) << false;
     QTest::newRow("missing") << QList<Entry> { { 1, {} } } << std::optional<QString>(u"This"_s) << true;
     QTest::newRow("empty") << QList<Entry> {} << std::optional<QString>(u"This"_s) << true;
-    QTest::newRow("wrong-label") << QList<Entry> { { 7, u"Other"_s } } << std::optional<QString>(u"This"_s) << true;
+    QTest::newRow("wrong-label") << QList<Entry> { { 7, u"Other"_s, "signature" } } << std::optional<QString>(u"This"_s) << true;
+    // e.g. removed by a client not supporting signed labels when it published the list
+    QTest::newRow("missing-signature") << QList<Entry> { { 7, u"This"_s } } << std::optional<QString>(u"This"_s) << true;
+    QTest::newRow("wrong-signature") << QList<Entry> { { 7, u"This"_s, "other" } } << std::optional<QString>(u"This"_s) << true;
     QTest::newRow("duplicate") << QList<Entry> { own, { 1, {} }, { 1, {} } } << std::optional<QString>(u"This"_s) << true;
     QTest::newRow("duplicate-own") << QList<Entry> { own, own } << std::optional<QString>(u"This"_s) << true;
     QTest::newRow("omemo0-label-ignored") << QList<Entry> { { 7, {} } } << std::optional<QString>() << false;
@@ -1907,7 +1914,7 @@ void tst_OmemoDeviceList::ownList()
     QFETCH(bool, republish);
 
     Devices devices;
-    const auto changes = apply(devices, list, start, 10, OwnDevice { 7, ownLabel });
+    const auto changes = apply(devices, list, start, 10, OwnDevice { 7, ownLabel, ownLabel ? QByteArray("signature") : QByteArray() });
     QCOMPARE(changes.republishOwnList, republish);
     QVERIFY(!devices.contains(7));
 }
@@ -1943,11 +1950,12 @@ void tst_OmemoDeviceList::expiry()
 void tst_OmemoDeviceList::listToPublish()
 {
     Devices devices;
-    apply(devices, { { 9, u"Tablet"_s }, { 3, u"Laptop"_s }, { 4, {} } }, start, 10, OwnDevice { 7, u"Phone"_s });
-    apply(devices, { { 9, u"Tablet"_s }, { 3, u"Laptop"_s } }, after(1 * week), 10, OwnDevice { 7, u"Phone"_s });
+    apply(devices, { { 9, u"Tablet"_s, "tablet signature" }, { 3, u"Laptop"_s }, { 4, {} } }, start, 10, OwnDevice { 7, u"Phone"_s });
+    apply(devices, { { 9, u"Tablet"_s, "tablet signature" }, { 3, u"Laptop"_s } }, after(1 * week), 10, OwnDevice { 7, u"Phone"_s });
 
-    QCOMPARE(DeviceList::ownList(devices, OwnDevice { 7, u"Phone"_s }),
-             (QList<Entry> { { 7, u"Phone"_s }, { 3, u"Laptop"_s }, { 9, u"Tablet"_s } }));
+    // The labels of other devices are listed with their signatures as received.
+    QCOMPARE(DeviceList::ownList(devices, OwnDevice { 7, u"Phone"_s, "phone signature" }),
+             (QList<Entry> { { 7, u"Phone"_s, "phone signature" }, { 3, u"Laptop"_s }, { 9, u"Tablet"_s, "tablet signature" } }));
     QCOMPARE(DeviceList::ownList({}, OwnDevice { 7, std::nullopt }), (QList<Entry> { { 7, {} } }));
 }
 
@@ -2024,9 +2032,9 @@ void tst_OmemoStorage::preKeysPerVersion()
 void tst_OmemoStorage::devicesPerVersion()
 {
     OmemoMemoryStorage storage;
-    const StorageDevice alice0 { Version::Omemo0, u"alice@example.org"_s, 1, {}, "key", "session 0", 1, 2, {} };
-    const StorageDevice alice2 { Version::Omemo2, u"alice@example.org"_s, 1, u"Phone"_s, "key", "session 2", 0, 0, {} };
-    const StorageDevice bob2 { Version::Omemo2, u"bob@example.org"_s, 5, {}, "bob key", {}, 0, 0, start };
+    const StorageDevice alice0 { Version::Omemo0, u"alice@example.org"_s, 1, {}, {}, "key", "session 0", 1, 2, {} };
+    const StorageDevice alice2 { Version::Omemo2, u"alice@example.org"_s, 1, u"Phone"_s, "signature", "key", "session 2", 0, 0, {} };
+    const StorageDevice bob2 { Version::Omemo2, u"bob@example.org"_s, 5, {}, {}, "bob key", {}, 0, 0, start };
 
     storage.addDevice(alice0);
     storage.addDevice(alice2);
@@ -2160,9 +2168,14 @@ void tst_OmemoPubSub::deviceListItem()
     QCOMPARE(v0.version, std::optional(Version::Omemo0));
     QCOMPARE(v0.devices, (Entries { { 1, {} }, { 2, {} } }));
 
-    const auto v2 = parse(u"<item id='current'><devices xmlns='urn:xmpp:omemo:2'><device id='1' label='Phone'/></devices></item>"_s);
+    const auto v2 = parse(u"<item id='current'><devices xmlns='urn:xmpp:omemo:2'><device id='1' label='Phone' labelsig='c2lnbmF0dXJl'/><device id='2'/></devices></item>"_s);
     QCOMPARE(v2.version, std::optional(Version::Omemo2));
-    QCOMPARE(v2.devices, (Entries { { 1, u"Phone"_s } }));
+    QCOMPARE(v2.devices, (Entries { { 1, u"Phone"_s, "signature" }, { 2, {} } }));
+
+    // XEP-0384 0.9 allows empty device lists
+    const auto empty = parse(u"<item id='current'><devices xmlns='urn:xmpp:omemo:2'/></item>"_s);
+    QCOMPARE(empty.version, std::optional(Version::Omemo2));
+    QVERIFY(empty.devices.isEmpty());
 
     QVERIFY(!parse(u"<item id='current'><list xmlns='urn:xmpp:omemo:2'/></item>"_s).version);
 }
@@ -2452,6 +2465,18 @@ static QList<uint32_t> listedIds(const QString &payload)
     return ids;
 }
 
+// label and label signature of a device in a device list payload
+static std::pair<QString, QByteArray> signedLabel(const QString &payload, uint32_t id)
+{
+    const auto list = xmlToDom(payload);
+    for (auto device = list.firstChildElement(u"device"_s); !device.isNull(); device = device.nextSiblingElement(u"device"_s)) {
+        if (device.attribute(u"id"_s).toUInt() == id) {
+            return { device.attribute(u"label"_s), QByteArray::fromBase64(device.attribute(u"labelsig"_s).toLatin1()) };
+        }
+    }
+    return {};
+}
+
 // Trust storage whose trust levels of JIDs can be loaded later, like from a database
 class TrustStorage : public QXmppAtmTrustMemoryStorage
 {
@@ -2625,6 +2650,7 @@ private:
     Q_SLOT void setUpReconfiguresNodes();
     Q_SLOT void load();
     Q_SLOT void ownDeviceIsRelisted();
+    Q_SLOT void ownLabelSignature();
     Q_SLOT void ownJidNotCanonical();
     Q_SLOT void ownDeviceListIsRepublishedAfterDeletion();
     Q_SLOT void contactDeviceLists();
@@ -2691,6 +2717,7 @@ private:
     Q_SLOT void watchDevices_data();
     Q_SLOT void watchDevices();
     Q_SLOT void deviceLabel();
+    Q_SLOT void signedDeviceLabels();
     Q_SLOT void enabledVersionsAtRuntime();
     Q_SLOT void defaultSecurityPolicy();
     Q_SLOT void removeContactDevices();
@@ -2748,7 +2775,9 @@ void tst_OmemoManager2::setUpPublishes()
     auto &service = account.service;
     QCOMPARE(listedIds(service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), QList { id });
     QCOMPARE(listedIds(service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), QList { id });
-    QVERIFY(service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s).contains(u"label=\"Phone\""_s));
+    const auto [label, labelSignature] = signedLabel(service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s), id);
+    QCOMPARE(label, u"Phone"_s);
+    QVERIFY(QXmpp::Omemo::Private::isLabelSignatureValid(account.manager->ownKey().value(), label, labelSignature));
     QCOMPARE(service.node(OWN_JID, V0_DEVICE_LIST)->accessModel, u"open"_s);
     QCOMPARE(service.node(OWN_JID, V2_DEVICE_LIST)->accessModel, u"open"_s);
 
@@ -2794,14 +2823,15 @@ void tst_OmemoManager2::setUpKeepsOtherOwnDevices()
 {
     Account account;
     account.service.setItem(OWN_JID, V0_DEVICE_LIST, u"current"_s, v0List({ 1111 }));
-    account.service.setItem(OWN_JID, V2_DEVICE_LIST, u"current"_s, v2List({ { 2222, u"Laptop"_s } }));
+    account.service.setItem(OWN_JID, V2_DEVICE_LIST, u"current"_s, u"<devices xmlns='urn:xmpp:omemo:2'><device id='2222' label='Laptop' labelsig='c2lnbmF0dXJl'/></devices>"_s);
     expectVariant<Success>(account.setUp());
 
     const auto id = account.manager->ownDeviceId().value();
     QVERIFY(id != 1111 && id != 2222);
     QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V0_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 1111 }));
     QCOMPARE(listedIds(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s)), (QList<uint32_t> { id, 2222 }));
-    QVERIFY(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s).contains(u"label=\"Laptop\""_s));
+    // only the other device can sign its label
+    QCOMPARE(signedLabel(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s), 2222), std::pair(u"Laptop"_s, QByteArray("signature")));
     QCOMPARE(account.manager->d->deviceIds(Version::Omemo0, OWN_JID), QList<uint32_t> { 1111 });
     QCOMPARE(account.manager->d->deviceIds(Version::Omemo2, OWN_JID), QList<uint32_t> { 2222 });
 }
@@ -2858,6 +2888,39 @@ void tst_OmemoManager2::ownDeviceIsRelisted()
     account.service.resetRequestCounts();
     account.service.process();
     QCOMPARE(account.service.requestCount(u"publish"_s), 0);
+}
+
+void tst_OmemoManager2::ownLabelSignature()
+{
+    Account account;
+    expectVariant<Success>(account.setUp(u"Phone"_s));
+    const auto id = account.manager->ownDeviceId().value();
+    const auto published = account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s);
+
+    // A valid published signature is kept, although signing again creates another signature.
+    account.service.resetRequestCounts();
+    expectVariant<Success>(account.setUp(u"Phone"_s));
+    QCOMPARE(account.service.requestCount(u"publish"_s, V2_DEVICE_LIST), 0);
+    QCOMPARE(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s), published);
+
+    // a client not supporting signed labels publishes the list without the signature
+    const auto unsigned_ = u"<devices xmlns='urn:xmpp:omemo:2'><device id='"_s + QString::number(id) + u"' label='Phone'/><device id='1111'/></devices>"_s;
+    account.service.setItem(OWN_JID, V2_DEVICE_LIST, u"current"_s, unsigned_);
+    account.client.inject(itemsEvent(OWN_JID, V2_DEVICE_LIST, unsigned_));
+    account.service.process();
+
+    const auto republished = account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s);
+    QCOMPARE(listedIds(republished), (QList<uint32_t> { id, 1111 }));
+    const auto [label, labelSignature] = signedLabel(republished, id);
+    QCOMPARE(label, u"Phone"_s);
+    QVERIFY(QXmpp::Omemo::Private::isLabelSignatureValid(account.manager->ownKey().value(), label, labelSignature));
+
+    // a new label is signed
+    account.manager->setDeviceLabel(u"Tablet"_s);
+    account.service.process();
+    const auto [newLabel, newSignature] = signedLabel(account.service.itemPayload(OWN_JID, V2_DEVICE_LIST, u"current"_s), id);
+    QCOMPARE(newLabel, u"Tablet"_s);
+    QVERIFY(QXmpp::Omemo::Private::isLabelSignatureValid(account.manager->ownKey().value(), newLabel, newSignature));
 }
 
 void tst_OmemoManager2::ownJidNotCanonical()
@@ -3140,7 +3203,8 @@ void tst_OmemoManager2::devicesWithoutNetwork()
 
     const QList<Device> contactDevices {
         { Version::Omemo0, CONTACT_JID, 1, {}, "key 1", TrustLevel::Authenticated },
-        { Version::Omemo2, CONTACT_JID, 2, u"Phone"_s, {}, TrustLevel::Undecided },
+        // the label is not shown without a signature
+        { Version::Omemo2, CONTACT_JID, 2, {}, {}, TrustLevel::Undecided },
     };
     // A watch has the known devices without being logged in.
     auto watch = account.manager->watchDevices(u"romeo@montague.lit/balcony"_jid);
@@ -4765,6 +4829,52 @@ void tst_OmemoManager2::deviceLabel()
     Account account(storage, &server);
     expectVariant<Success>(account.setUp());
     QVERIFY(published().contains(u"label=\""_s + OmemoManager::defaultDeviceLabel() + u'"'));
+}
+
+void tst_OmemoManager2::signedDeviceLabels()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp(u"Phone"_s));
+    const auto bobJid = bob.jid().toString();
+    const auto bobId = QString::number(bob.deviceId());
+
+    auto watch = alice.manager->watchDevices(bob.jid());
+    server.process();
+    const auto labels = [&] {
+        QList<QString> labels;
+        for (const auto &device : watch.devices().value()) {
+            labels.append(device.label);
+        }
+        return labels;
+    };
+    QTRY_COMPARE(labels(), QList { u"Phone"_s });
+
+    // A label is ignored if its signature is missing or invalid, e.g. inserted by the server.
+    const auto [label, signature] = signedLabel(server.itemPayload(bobJid, V2_DEVICE_LIST, u"current"_s), bob.deviceId());
+    QCOMPARE(label, u"Phone"_s);
+    const auto list = [&](const QString &attributes) {
+        return u"<devices xmlns='urn:xmpp:omemo:2'><device id='"_s + bobId + u"' "_s + attributes + u"/></devices>"_s;
+    };
+    alice.client.inject(itemsEvent(bobJid, V2_DEVICE_LIST, list(u"label='Evil'"_s)));
+    QTRY_COMPARE(labels(), QList { QString() });
+    alice.client.inject(itemsEvent(bobJid, V2_DEVICE_LIST, list(u"label='Evil' labelsig='"_s + QString::fromLatin1(signature.toBase64()) + u"'"_s)));
+    server.process();
+    QCOMPARE(labels(), QList { QString() });
+    // the valid signature and label shifted by some bytes
+    alice.client.inject(itemsEvent(bobJid, V2_DEVICE_LIST, list(u"label='one' labelsig='"_s + QString::fromLatin1(QByteArray(signature + "Ph").toBase64()) + u"'"_s)));
+    server.process();
+    QCOMPARE(labels(), QList { QString() });
+
+    alice.client.inject(itemsEvent(bobJid, V2_DEVICE_LIST, list(u"label='Phone' labelsig='"_s + QString::fromLatin1(signature.toBase64()) + u"'"_s)));
+    QTRY_COMPARE(labels(), QList { u"Phone"_s });
+    // OMEMO 0 has no labels
+    const auto devices = awaitTask(alice.manager->d->devices(bobJid));
+    QCOMPARE(devices.size(), 2);
+    QCOMPARE(devices.at(0).label, QString());
+    QCOMPARE(devices.at(1).label, u"Phone"_s);
 }
 
 void tst_OmemoManager2::enabledVersionsAtRuntime()

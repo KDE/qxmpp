@@ -217,7 +217,9 @@ public:
         Omemo::Version version = Omemo::Version::Omemo2;
         QString jid {};
         uint32_t id = 0;
+        // as listed in the device list, only shown if labelSignature is valid for keyId
         QString label {};
+        QByteArray labelSignature {};
         // in the format of the version: Curve25519 for OMEMO 0, Ed25519 for OMEMO 2
         QByteArray keyId {};
         QByteArray session {};

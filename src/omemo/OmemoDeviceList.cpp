@@ -29,7 +29,7 @@ Changes apply(QHash<uint32_t, DeviceInfo> &devices, const QList<Entry> &list, co
 
         if (ownDevice && entry.id == ownDevice->id) {
             isOwnDeviceListed = true;
-            if (ownDevice->label && entry.label != *ownDevice->label) {
+            if (ownDevice->label && (entry.label != *ownDevice->label || entry.labelSignature != ownDevice->labelSignature)) {
                 changes.republishOwnList = true;
             }
             continue;
@@ -51,10 +51,11 @@ Changes apply(QHash<uint32_t, DeviceInfo> &devices, const QList<Entry> &list, co
 
         auto it = devices.find(entry.id);
         if (it == devices.end()) {
-            devices.insert(entry.id, { entry.label, {} });
+            devices.insert(entry.id, { entry.label, entry.labelSignature, {} });
             changes.added.append(entry.id);
-        } else if (it->label != entry.label || it->removalDate.isValid()) {
+        } else if (it->label != entry.label || it->labelSignature != entry.labelSignature || it->removalDate.isValid()) {
             it->label = entry.label;
+            it->labelSignature = entry.labelSignature;
             it->removalDate = {};
             changes.changed.append(entry.id);
         }
@@ -108,7 +109,7 @@ QDateTime nextExpiry(const QHash<uint32_t, DeviceInfo> &devices, std::chrono::se
 
 QList<Entry> ownList(const QHash<uint32_t, DeviceInfo> &otherOwnDevices, const OwnDevice &ownDevice)
 {
-    QList<Entry> list { { ownDevice.id, ownDevice.label.value_or(QString()) } };
+    QList<Entry> list { { ownDevice.id, ownDevice.label.value_or(QString()), ownDevice.labelSignature } };
 
     QList<uint32_t> ids;
     for (auto it = otherOwnDevices.cbegin(); it != otherOwnDevices.cend(); ++it) {
@@ -119,7 +120,9 @@ QList<Entry> ownList(const QHash<uint32_t, DeviceInfo> &otherOwnDevices, const O
     }
     std::ranges::sort(ids);
     for (const auto id : std::as_const(ids)) {
-        list.append({ id, otherOwnDevices.value(id).label });
+        // Labels of other devices are listed with their signatures, which only they can create.
+        const auto info = otherOwnDevices.value(id);
+        list.append({ id, info.label, info.labelSignature });
     }
     return list;
 }

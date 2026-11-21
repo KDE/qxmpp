@@ -55,6 +55,8 @@ struct Bundle {
 };
 
 QByteArray omemo0IdentityKey(const QByteArray &omemo2Key);
+// Whether the UTF-8 encoded device label has been signed with the OMEMO 2 identity key.
+bool isLabelSignatureValid(const QByteArray &identityKey, const QString &label, const QByteArray &signature);
 
 // Owns the libomemo-c context. All sessions using it must be destroyed before.
 class SignalContext
@@ -143,6 +145,8 @@ public:
     // Whether the signed pre key (in the format of the version) has been signed with the identity
     // key, as checked when building a session. A bundle with an invalid signature can not be used.
     bool isSignedPreKeyValid(const QByteArray &identityKey, const QByteArray &signedPreKey, const QByteArray &signature) const;
+    // Signature of the UTF-8 encoded device label with the own identity key, empty on errors
+    QByteArray signLabel(const QString &label) const;
     std::variant<QXmpp::Success, QXmppError> buildSession(const Address &address, const Bundle &bundle);
     bool hasSession(const Address &address) const;
 

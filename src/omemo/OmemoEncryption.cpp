@@ -450,7 +450,7 @@ Device OmemoManagerPrivate::publicDevice(Version version, const QString &jid, ui
 {
     Device device { .version = version, .jid = jidOrNull(jid), .id = deviceId, .trustLevel = trustLevel };
     if (const auto *stored = storedDevice(version, jid, deviceId)) {
-        device.label = stored->label;
+        device.label = verifiedLabel(version, *stored);
         device.keyId = stored->keyId;
     }
     return device;

@@ -17,6 +17,7 @@
 #include "OmemoSession.h"
 
 #include <array>
+#include <map>
 #include <unordered_map>
 
 #include <QProperty>
@@ -182,6 +183,8 @@ public:
     QXmppTask<void> setOwnTrustKey(Version version, QByteArray key);
     OmemoStorage::OwnDevice storedOwnDevice() const;
     QString label() const;
+    QByteArray ownLabelSignature(const QList<DeviceList::Entry> &list);
+    QString verifiedLabel(Version version, const OmemoStorage::Device &device) const;
 
     QXmppTask<void> loaded();
     QXmppTask<void> load();
@@ -275,6 +278,8 @@ public:
     DeviceKeys device;
     // empty for the default label
     QString customLabel;
+    // the own label and its signature, see ownLabelSignature()
+    std::pair<QString, QByteArray> signedLabel;
 
     QHash<QString, std::weak_ptr<DeviceWatch::Data>> watches;
     // Results of the device list requests in the current stream, also of released watches, since
@@ -290,6 +295,8 @@ public:
     std::unordered_map<QString, QXmpp::Private::MultiPromise<void>> requestedWatchUpdates;
     // see omemo0Key()
     mutable std::unordered_map<QByteArray, QByteArray> omemo0KeyCache;
+    // see verifiedLabel()
+    mutable std::map<std::tuple<QByteArray, QByteArray, QString>, bool> labelSignatureCache;
     // see storeDevices()
     QXmpp::Private::CoalescedLater deviceStore { q, [this] { storePendingDevices(); } };
 

@@ -116,6 +116,40 @@ QString OmemoManagerPrivate::label() const
     return customLabel.isEmpty() ? OmemoManager::defaultDeviceLabel() : customLabel;
 }
 
+// The signature of the own label for the OMEMO 2 device list. The published signature is kept if
+// it is valid, so the list is not republished only because each signature is different.
+QByteArray OmemoManagerPrivate::ownLabelSignature(const QList<DeviceList::Entry> &list)
+{
+    const auto currentLabel = label();
+    const auto *sessions = versions.at(Version::Omemo2).sessions.get();
+    if (!sessions) {
+        return {};
+    }
+
+    const auto published = std::ranges::find(list, device.deviceId, &DeviceList::Entry::id);
+    if (published != list.end() && published->label == currentLabel &&
+        isLabelSignatureValid(sessions->ownIdentityKey(), currentLabel, published->labelSignature)) {
+        signedLabel = { currentLabel, published->labelSignature };
+    } else if (signedLabel.first != currentLabel || signedLabel.second.isEmpty()) {
+        signedLabel = { currentLabel, sessions->signLabel(currentLabel) };
+    }
+    return signedLabel.second;
+}
+
+// The label of a device if it has been signed with the identity key of the device, so labels are
+// only available after the key has been received, e.g. with the bundle.
+QString OmemoManagerPrivate::verifiedLabel(Version version, const OmemoStorage::Device &device) const
+{
+    if (version != Version::Omemo2 || device.label.isEmpty() || device.keyId.isEmpty()) {
+        return {};
+    }
+    auto [it, inserted] = labelSignatureCache.try_emplace({ device.keyId, device.labelSignature, device.label });
+    if (inserted) {
+        it->second = isLabelSignatureValid(device.keyId, device.label, device.labelSignature);
+    }
+    return it->second ? device.label : QString();
+}
+
 void OmemoManagerPrivate::reportError(const QString &context, const QXmppError &error)
 {
     q->warning(context + u": "_s + error.description);
@@ -179,6 +213,7 @@ QXmppTask<void> OmemoManagerPrivate::load()
 void OmemoManagerPrivate::setOwnDevice(DeviceKeys &&keys)
 {
     device = std::move(keys);
+    signedLabel = {};
     setUpSessionLayers();
     isSetUp = true;
     ownDeviceId = device.deviceId;
@@ -363,7 +398,7 @@ static QHash<uint32_t, DeviceList::DeviceInfo> deviceInfos(const QHash<uint32_t,
 {
     QHash<uint32_t, DeviceList::DeviceInfo> infos;
     for (auto it = devices.cbegin(); it != devices.cend(); ++it) {
-        infos.insert(it.key(), { it->label, it->removalFromDeviceListDate });
+        infos.insert(it.key(), { it->label, it->labelSignature, it->removalFromDeviceListDate });
     }
     return infos;
 }
@@ -377,7 +412,11 @@ QXmppTask<Result<>> OmemoManagerPrivate::applyDeviceList(Version version, const 
 
     std::optional<DeviceList::OwnDevice> ownDevice;
     if (isOwnJid) {
-        ownDevice = DeviceList::OwnDevice { device.deviceId, version == Version::Omemo2 ? std::optional(label()) : std::nullopt };
+        ownDevice = DeviceList::OwnDevice { device.deviceId };
+        if (version == Version::Omemo2) {
+            ownDevice->label = label();
+            ownDevice->labelSignature = ownLabelSignature(list);
+        }
     }
 
     const auto changes = DeviceList::apply(infos, list, now(), MAX_DEVICES_PER_JID, ownDevice);
@@ -431,8 +470,10 @@ void OmemoManagerPrivate::storeDeviceListChanges(Version version, const QString 
         stored.version = version;
         stored.jid = jid;
         stored.id = id;
-        stored.label = infos.value(id).label;
-        stored.removalFromDeviceListDate = infos.value(id).removalDate;
+        const auto info = infos.value(id);
+        stored.label = info.label;
+        stored.labelSignature = info.labelSignature;
+        stored.removalFromDeviceListDate = info.removalDate;
         storage->addDevice(stored);
     };
     for (const auto ids : { &changes.added, &changes.changed, &changes.removed }) {
@@ -550,7 +591,7 @@ QXmppTask<QList<Device>> OmemoManagerPrivate::devices(QString jid)
         for (auto id : deviceIds(version, jid)) {
             const auto &device = stored[id];
             const auto trustLevel = device.keyId.isEmpty() ? TrustLevel::Undecided : keys.value(device.keyId, TrustLevel::Undecided);
-            devices.append({ version, deviceJid, id, device.label, device.keyId, trustLevel });
+            devices.append({ version, deviceJid, id, verifiedLabel(version, device), device.keyId, trustLevel });
         }
     }
     co_return devices;
@@ -1208,7 +1249,8 @@ QString OmemoManager::deviceLabel() const
     resets it to defaultDeviceLabel().
 
     The label is not stored, so a custom label must be set again after each start. It is published
-    on the next login or immediately while being logged in.
+    with a signature created with the identity key of this device on the next login or immediately
+    while being logged in.
 */
 void OmemoManager::setDeviceLabel(const QString &label)
 {
@@ -1298,7 +1340,8 @@ QBindable<QByteArray> OmemoManager::ownKey(Version version) const
     \var QXmpp::Omemo::Device::id
     device ID
     \var QXmpp::Omemo::Device::label
-    label of the device, only available with OMEMO 2
+    label of the device, only available with OMEMO 2 and if it has been signed with the identity
+    key of the device, i.e., not before the key is known
     \var QXmpp::Omemo::Device::keyId
     public identity key in the format of the version (Curve25519 for OMEMO 0, Ed25519 for OMEMO
     2), empty until the bundle of the device has been fetched, e.g. for building a session

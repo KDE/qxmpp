@@ -80,10 +80,29 @@ void QXmppOmemoDeviceElement::setLabel(const QString &label)
     m_label = label;
 }
 
+/*!
+    Returns the signature of the label created with the identity key of the device.
+
+    A label without a valid signature must be ignored.
+*/
+QByteArray QXmppOmemoDeviceElement::labelSignature() const
+{
+    return m_labelSignature;
+}
+
+/*!
+    Sets the \a signature of the label created with the identity key of the device.
+*/
+void QXmppOmemoDeviceElement::setLabelSignature(const QByteArray &signature)
+{
+    m_labelSignature = signature;
+}
+
 void QXmppOmemoDeviceElement::parse(const QDomElement &element)
 {
     m_id = element.attribute(u"id"_s).toInt();
     m_label = element.attribute(u"label"_s);
+    m_labelSignature = parseBase64(element.attribute(u"labelsig"_s)).value_or(QByteArray());
 }
 
 void QXmppOmemoDeviceElement::toXml(QXmlStreamWriter *writer) const
@@ -92,6 +111,7 @@ void QXmppOmemoDeviceElement::toXml(QXmlStreamWriter *writer) const
         u"device",
         Attribute { u"id", m_id },
         OptionalAttribute { u"label", m_label },
+        OptionalAttribute { u"labelsig", Base64 { m_labelSignature } },
     });
 }
 

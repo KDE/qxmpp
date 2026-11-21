@@ -8,6 +8,7 @@
 #include <chrono>
 #include <optional>
 
+#include <QByteArray>
 #include <QDateTime>
 #include <QHash>
 #include <QList>
@@ -26,6 +27,8 @@ constexpr std::chrono::seconds REMOVAL_INTERVAL = 24h * 7 * 12;
 struct Entry {
     uint32_t id = 0;
     QString label;
+    // created with the identity key of the device, checked when the key is known
+    QByteArray labelSignature;
 
     bool operator==(const Entry &) const = default;
 };
@@ -33,6 +36,7 @@ struct Entry {
 // What the device list contains about a known device.
 struct DeviceInfo {
     QString label;
+    QByteArray labelSignature;
     // set while the device is not in the device list
     QDateTime removalDate;
 
@@ -43,18 +47,19 @@ struct OwnDevice {
     uint32_t id = 0;
     // not compared for OMEMO 0, which has no labels
     std::optional<QString> label;
+    QByteArray labelSignature;
 };
 
 struct Changes {
     QList<uint32_t> added;
-    // label changed or listed again after its removal
+    // label or its signature changed or listed again after its removal
     QList<uint32_t> changed;
     // not in the list anymore, the removal date has been set
     QList<uint32_t> removed;
     // devices beyond the maximum that were ignored
     int ignoredCount = 0;
     // Own device list only: the list must be republished because the own device is missing,
-    // has a wrong label or IDs are listed multiple times.
+    // has a wrong label or label signature or IDs are listed multiple times.
     bool republishOwnList = false;
 
     bool isEmpty() const { return added.isEmpty() && changed.isEmpty() && removed.isEmpty(); }

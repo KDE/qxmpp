@@ -23,6 +23,9 @@ public:
     QString label() const;
     void setLabel(const QString &label);
 
+    QByteArray labelSignature() const;
+    void setLabelSignature(const QByteArray &signature);
+
     static constexpr std::tuple XmlTag = { u"device", QXmpp::Private::ns_omemo_2 };
     void parse(const QDomElement &element);
     void toXml(QXmlStreamWriter *writer) const;
@@ -32,6 +35,7 @@ public:
 private:
     uint32_t m_id = 0;
     QString m_label;
+    QByteArray m_labelSignature;
 };
 
 Q_DECLARE_TYPEINFO(QXmppOmemoDeviceElement, Q_MOVABLE_TYPE);

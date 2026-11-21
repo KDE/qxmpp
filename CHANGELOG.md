@@ -83,6 +83,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - OMEMO: Add `DeviceWatch::usableVersions()` telling whether messages to a contact can be encrypted, with the devices selected like when sending, also while being disconnected (@lnj, !842)
  - OMEMO: Add verification of keys via URIs and fingerprints for both versions: `DeviceWatch::verificationUri()` with the authenticated and distrusted keys for QR codes, also readable by Conversations, `OmemoManager::verify()` for scanned URIs and entered fingerprints, authenticating OMEMO 2 keys via ATM, and `Device::fingerprint()`, `isAuthenticatable()` and `isDistrusted()` (@lnj, !842)
  - OMEMO: Deprecate `QXmppOmemoManager`, `QXmppOmemoDevice`, `QXmppOmemoOwnDevice`, `QXmppOmemoStorage` and `QXmppOmemoMemoryStorage`, use `QXmpp::OmemoManager`, `QXmpp::OmemoStorage` and `QXmpp::OmemoMemoryStorage` (@lnj, !842)
+ - OMEMO: Update to XEP-0384 version 0.9.1: `QXmpp::OmemoManager` signs the device label with the identity key and shows labels of other devices only with a valid signature (`OmemoStorage::Device::labelSignature`) (@lnj, !868)
  - Disable Nagle's algorithm on the XMPP socket, which delayed requests by up to the server's delayed ACK (e.g. 40 ms) (@lnj, !862)
 
 Breaking changes:
