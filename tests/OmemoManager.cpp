@@ -2720,6 +2720,7 @@ private:
     Q_SLOT void signedDeviceLabels();
     Q_SLOT void enabledVersionsAtRuntime();
     Q_SLOT void defaultSecurityPolicy();
+    Q_SLOT void setSecurityPolicy();
     Q_SLOT void removeContactDevices();
     Q_SLOT void resetOwnDevice();
     Q_SLOT void resetAll();
@@ -4922,6 +4923,56 @@ void tst_OmemoManager2::defaultSecurityPolicy()
     // a policy chosen by the user is kept
     account.trust->setSecurityPolicy(E2ee::Omemo2.toString(), NoSecurityPolicy);
     account.manager->d->load();
+    QCOMPARE(account.trust->securityPolicy(E2ee::Omemo2.toString()).result(), NoSecurityPolicy);
+}
+
+void tst_OmemoManager2::setSecurityPolicy()
+{
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    Account bob(nullptr, &server, u"bob@builder.lit/site"_s);
+
+    // set before the first setup
+    QCOMPARE(bob.manager->securityPolicy().result(), Toakafa);
+    bob.manager->setSecurityPolicy(NoSecurityPolicy);
+    QCOMPARE(bob.manager->securityPolicy().result(), NoSecurityPolicy);
+    expectVariant<Success>(alice.setUp());
+    expectVariant<Success>(bob.setUp());
+    QCOMPARE(bob.trust->securityPolicy(E2ee::Omemo0.toString()).result(), NoSecurityPolicy);
+    QCOMPARE(bob.trust->securityPolicy(E2ee::Omemo2.toString()).result(), NoSecurityPolicy);
+    QCOMPARE(bob.manager->securityPolicy().result(), NoSecurityPolicy);
+
+    // new keys are distrusted
+    alice.encryption = Version::Omemo2;
+    const auto message = alice.sendMessage(bob.jid(), u"Hello Bob"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(bob.receive(alice, message).size(), 1);
+    const auto aliceKey = alice.manager->d->versions.at(Version::Omemo2).sessions->ownIdentityKey();
+    QCOMPARE(bob.trust->trustLevel(E2ee::Omemo2.toString(), alice.jid(), aliceKey).result(), TrustLevel::AutomaticallyDistrusted);
+
+    // changed in both versions
+    bob.manager->setSecurityPolicy(Toakafa);
+    QCOMPARE(bob.trust->securityPolicy(E2ee::Omemo0.toString()).result(), Toakafa);
+    QCOMPARE(bob.trust->securityPolicy(E2ee::Omemo2.toString()).result(), Toakafa);
+    QCOMPARE(bob.manager->securityPolicy().result(), Toakafa);
+
+    // used for the new trust data after a reset
+    bob.manager->setSecurityPolicy(NoSecurityPolicy);
+    bob.manager->resetOwnDeviceLocally();
+    QCOMPARE(bob.manager->securityPolicy().result(), NoSecurityPolicy);
+    expectVariant<Success>(bob.setUp());
+    QCOMPARE(bob.trust->securityPolicy(E2ee::Omemo0.toString()).result(), NoSecurityPolicy);
+    QCOMPARE(bob.trust->securityPolicy(E2ee::Omemo2.toString()).result(), NoSecurityPolicy);
+
+    // kept after a reset if it was set before a restart
+    Account account;
+    expectVariant<Success>(account.setUp());
+    account.trust->setSecurityPolicy(E2ee::Omemo0.toString(), NoSecurityPolicy);
+    account.trust->setSecurityPolicy(E2ee::Omemo2.toString(), NoSecurityPolicy);
+    account.manager->resetOwnDeviceLocally();
+    QCOMPARE(account.manager->securityPolicy().result(), NoSecurityPolicy);
+    expectVariant<Success>(account.setUp());
+    QCOMPARE(account.trust->securityPolicy(E2ee::Omemo0.toString()).result(), NoSecurityPolicy);
     QCOMPARE(account.trust->securityPolicy(E2ee::Omemo2.toString()).result(), NoSecurityPolicy);
 }
 

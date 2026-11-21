@@ -83,12 +83,12 @@ void OmemoManagerPrivate::setUpSessionLayers()
     }
 }
 
-// Without an own key, the trust data of the version is new: TOAKAFA is used by default.
+// Without an own key, the trust data of the version is new and gets the security policy.
 QXmppTask<void> OmemoManagerPrivate::setOwnTrustKey(Version version, QByteArray key)
 {
     const auto encryption = trustNamespace(version);
     if ((co_await trustManager->ownKey(encryption).withContext(q)).isEmpty()) {
-        co_await trustManager->setSecurityPolicy(encryption, Toakafa).withContext(q);
+        co_await trustManager->setSecurityPolicy(encryption, securityPolicy).withContext(q);
     }
     co_await trustManager->setOwnKey(encryption, key).withContext(q);
 }
@@ -1095,8 +1095,24 @@ namespace QXmpp {
     stream), it renews the keys and publishes the data again.
 
     QXmppPubSubManager and a QXmppTrustManager must be added to the client before this manager.
-    New trust data uses the security policy TOAKAFA, see QXmpp::TrustSecurityPolicy. The trust
-    manager can be used to change it.
+
+    \section1 Trust
+
+    The trust levels of the keys are stored by the trust manager, separately for each version.
+    Since a device uses the same identity key in both versions, a trust decision for a key is
+    applied to the key of the same device in the other version, so a device has to be
+    authenticated only once. Keys are authenticated via verify() or setTrustLevel().
+
+    The security policy (see QXmpp::TrustSecurityPolicy) decides the trust level of new keys. By
+    default, TOAKAFA is used: New keys of a JID are trusted automatically until a key of the JID
+    has been authenticated in either version. Then its automatically trusted keys are distrusted in
+    both versions and its new keys are distrusted automatically. With QXmpp::NoSecurityPolicy, new
+    keys are distrusted automatically and must be trusted manually. Messages are only encrypted
+    for keys with trust levels accepted by QXmppSendStanzaParams::acceptedTrustLevels().
+
+    The security policy can be changed via setSecurityPolicy(). For authenticating keys via
+    \xep{0450}{Automatic Trust Management (ATM)}, a QXmppAtmManager should be used as the trust
+    manager. It is recommended to use TOAKAFA with it.
 
     A stanza is encrypted for at most 500 devices, the other own devices first, so that it stays
     below the stanza size limit of servers. Devices above the limit cannot decrypt it.
@@ -1610,6 +1626,43 @@ DeviceWatch OmemoManager::watchDevices(const Jid &jid)
 }
 
 /*!
+    Returns the security policy deciding the trust level of new keys, the one of OMEMO 2 if it has
+    been set differently per version via the trust manager.
+
+    \sa setSecurityPolicy()
+*/
+QXmppTask<TrustSecurityPolicy> OmemoManager::securityPolicy()
+{
+    const auto encryption = OmemoManagerPrivate::trustNamespace(Version::Omemo2);
+    // before the first setup, there is no trust data yet
+    if ((co_await d->trustManager->ownKey(encryption).withContext(this)).isEmpty()) {
+        co_return d->securityPolicy;
+    }
+    co_return co_await d->trustManager->securityPolicy(encryption).withContext(this);
+}
+
+/*!
+    Sets the security policy deciding the trust level of new keys in both versions to
+    \a securityPolicy. The default is QXmpp::Toakafa.
+
+    The security policy is stored by the trust manager and kept after a restart and after resetting
+    the own device. It can also be set before the first setup.
+
+    The trust levels of known keys are not changed.
+
+    The manager must have been added to the client.
+
+    \sa QXmpp::TrustSecurityPolicy
+*/
+QXmppTask<void> OmemoManager::setSecurityPolicy(TrustSecurityPolicy securityPolicy)
+{
+    d->securityPolicy = securityPolicy;
+    for (auto version : ALL_VERSIONS) {
+        co_await d->trustManager->setSecurityPolicy(OmemoManagerPrivate::trustNamespace(version), securityPolicy).withContext(this);
+    }
+}
+
+/*!
     Sets the trust level of the keys of \a devices to \a trustLevel, e.g. after the user has
     verified them. Devices with unknown keys are skipped.
 
@@ -1788,6 +1841,8 @@ QXmppTask<void> OmemoManager::resetOwnDeviceLocally()
     d->state = State::NotSetUp;
 
     co_await d->storage->resetAll().withContext(this);
+    // may have been set in an earlier session
+    d->securityPolicy = co_await securityPolicy().withContext(this);
     for (auto version : ALL_VERSIONS) {
         co_await d->trustManager->resetAll(OmemoManagerPrivate::trustNamespace(version)).withContext(this);
     }

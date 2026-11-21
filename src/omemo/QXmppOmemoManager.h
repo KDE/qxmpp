@@ -288,6 +288,9 @@ public:
     QBindable<uint32_t> ownDeviceId() const;
     QBindable<QByteArray> ownKey(Omemo::Version version = Omemo::Version::Omemo2) const;
 
+    QXmppTask<QXmpp::TrustSecurityPolicy> securityPolicy();
+    QXmppTask<void> setSecurityPolicy(QXmpp::TrustSecurityPolicy securityPolicy);
+
     Omemo::DeviceWatch watchDevices(const QXmpp::Jid &jid);
     QXmppTask<void> setTrustLevel(QList<Omemo::Device> devices, QXmpp::TrustLevel trustLevel);
     static bool isVerificationUri(const QXmppUri &uri);

@@ -259,6 +259,7 @@ public:
     QXmppPubSubManager *pubSub = nullptr;
     QXmppRosterManager *roster = nullptr;
     QXmppTrustManager *trustManager = nullptr;
+    TrustSecurityPolicy securityPolicy = Toakafa;
     SignalContext context;
     KeyMaintenance::Config keyConfig;
     // replaces the current time in tests

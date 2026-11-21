@@ -18,7 +18,7 @@ namespace QXmpp {
     \since QXmpp 1.5
 
     \value NoSecurityPolicy New keys must be trusted manually.
-    \value Toakafa New keys are trusted automatically until the first authentication but automatically distrusted afterwards (\xep{0450}{Automatic Trust Management (ATM)}).
+    \value Toakafa New keys are trusted automatically until the first authentication but automatically distrusted afterwards. Authenticating keys also distrusts the automatically trusted keys of their owner (\xep{0450}{Automatic Trust Management (ATM)}).
 */
 enum TrustSecurityPolicy {
     NoSecurityPolicy,
