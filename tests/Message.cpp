@@ -920,6 +920,16 @@ void tst_QXmppMessage::testEme()
     QCOMPARE(QXmpp::E2ee::name(QXmpp::E2ee::Omemo2), u"OMEMO 2"_s);
     QCOMPARE(QXmpp::E2ee::name(u"fancyorg:encryption:fancycrypt:0"), QString());
     QCOMPARE(QXmpp::E2ee::name({}), QString());
+
+    // conversion between namespaces and methods
+    QCOMPARE(QXmpp::E2ee::toMethod(QXmpp::E2ee::Omemo0), QXmpp::Omemo0);
+    QCOMPARE(QXmpp::E2ee::toMethod(QXmpp::E2ee::Omemo2), QXmpp::Omemo2);
+    QCOMPARE(QXmpp::E2ee::toMethod(u"fancyorg:encryption:fancycrypt:0"), QXmpp::UnknownEncryption);
+    QCOMPARE(QXmpp::E2ee::toMethod({}), QXmpp::NoEncryption);
+    QCOMPARE(QXmpp::E2ee::fromMethod(QXmpp::Omemo0), QXmpp::E2ee::Omemo0);
+    QCOMPARE(QXmpp::E2ee::fromMethod(QXmpp::Omemo2), QXmpp::E2ee::Omemo2);
+    QCOMPARE(QXmpp::E2ee::fromMethod(QXmpp::UnknownEncryption), QStringView());
+    QCOMPARE(QXmpp::E2ee::fromMethod(QXmpp::NoEncryption), QStringView());
 }
 
 void tst_QXmppMessage::testSpoiler()

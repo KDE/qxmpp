@@ -139,6 +139,37 @@ QString QXmpp::E2ee::name(QStringView encryption)
     return {};
 }
 
+/*!
+    Returns the end-to-end encryption method of the \a encryption given by its namespace, e.g.
+    QXmpp::Omemo2 for QXmpp::E2ee::Omemo2.
+
+    An empty namespace results in QXmpp::NoEncryption and a namespace of an encryption not known to
+    QXmpp in QXmpp::UnknownEncryption.
+
+    It can be used to store the encryption as a number, e.g. the one of a sent message reported by
+    QXmpp::Messages::Sent::encryption().
+
+    \since QXmpp 1.18
+*/
+EncryptionMethod QXmpp::E2ee::toMethod(QStringView encryption)
+{
+    if (encryption.isEmpty()) {
+        return NoEncryption;
+    }
+    return Enums::fromString<EncryptionMethod>(encryption).value_or(UnknownEncryption);
+}
+
+/*!
+    Returns the namespace of the end-to-end encryption \a method, e.g. QXmpp::E2ee::Omemo2 for
+    QXmpp::Omemo2, or an empty string for QXmpp::NoEncryption and QXmpp::UnknownEncryption.
+
+    \since QXmpp 1.18
+*/
+QStringView QXmpp::E2ee::fromMethod(EncryptionMethod method)
+{
+    return Enums::toStringView(method);
+}
+
 static bool checkElement(const QDomElement &element, QStringView tagName, QStringView xmlns)
 {
     return element.tagName() == tagName && element.namespaceURI() == xmlns;

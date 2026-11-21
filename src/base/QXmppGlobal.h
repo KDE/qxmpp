@@ -143,6 +143,8 @@ inline constexpr QStringView Omemo1 = u"urn:xmpp:omemo:1";
 inline constexpr QStringView Omemo2 = u"urn:xmpp:omemo:2";
 
 QXMPP_EXPORT QString name(QStringView encryption);
+QXMPP_EXPORT EncryptionMethod toMethod(QStringView encryption);
+QXMPP_EXPORT QStringView fromMethod(EncryptionMethod method);
 
 }  // namespace E2ee
 
