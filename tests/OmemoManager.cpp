@@ -2679,7 +2679,7 @@ private:
     Q_SLOT void ownDevicesReceiveCopies();
     Q_SLOT void sentByThisDevice_data();
     Q_SLOT void usableVersions();
-    Q_SLOT void verification();
+    Q_SLOT void authentication();
     Q_SLOT void sentByThisDevice();
     Q_SLOT void maxDevicesPerStanza_data();
     Q_SLOT void maxDevicesPerStanza();
@@ -2759,7 +2759,7 @@ void tst_OmemoManager2::readOnlyBindables()
     QVERIFY(watch.devices().isReadOnly());
     QVERIFY(watch.supportedVersions().isReadOnly());
     QVERIFY(watch.usableVersions().isReadOnly());
-    QVERIFY(watch.verificationUri().isReadOnly());
+    QVERIFY(watch.authenticationUri().isReadOnly());
 }
 
 void tst_OmemoManager2::setUpPublishes()
@@ -3145,9 +3145,9 @@ void tst_OmemoManager2::authenticationDistrustsAutomaticallyTrustedKeys()
 
     const auto device = deviceOf(authenticated);
     if (method == u"fingerprint") {
-        alice.manager->verify(bob0.jid(), { device.fingerprint() });
+        alice.manager->authenticate(bob0.jid(), { device.fingerprint() });
     } else if (method == u"omemo0 fingerprint") {
-        alice.manager->verify(bob0.jid(), { Device { .version = Version::Omemo0, .keyId = device.omemo0KeyId }.fingerprint() });
+        alice.manager->authenticate(bob0.jid(), { Device { .version = Version::Omemo0, .keyId = device.omemo0KeyId }.fingerprint() });
     } else if (method == u"uri") {
         QXmppUri uri;
         uri.setJid(bob0.jid());
@@ -3156,7 +3156,7 @@ void tst_OmemoManager2::authenticationDistrustsAutomaticallyTrustedKeys()
         } else {
             uri.setQuery(Uri::TrustMessage { .encryption = ns_omemo_2.toString(), .trustKeyIds = { QString::fromLatin1(device.keyId.toHex()) } });
         }
-        alice.manager->verify(uri);
+        alice.manager->authenticate(uri);
     } else if (method == u"trust manager") {
         alice.trust->setTrustLevel(versionNamespace(device.version), { { device.jid, device.keyId } }, TrustLevel::Authenticated);
     } else if (method == u"trust message") {
@@ -4155,7 +4155,7 @@ void tst_OmemoManager2::usableVersions()
     QTRY_COMPARE(watch.usableVersions().value(), bothVersions);
 }
 
-void tst_OmemoManager2::verification()
+void tst_OmemoManager2::authentication()
 {
     using QXmpp::Uri::OmemoFingerprint;
     using QXmpp::Uri::TrustMessage;
@@ -4197,8 +4197,8 @@ void tst_OmemoManager2::verification()
     auto watch = alice.manager->watchDevices(bob.jid());
     server.process();
     QTRY_VERIFY(!watch.devices().value().value(0).omemo0KeyId.isEmpty());
-    QCOMPARE(watch.verificationUri().value(), u"xmpp:bob@builder.lit"_s);
-    QVERIFY(!OmemoManager::isVerificationUri(parse(watch.verificationUri().value())));
+    QCOMPARE(watch.authenticationUri().value(), u"xmpp:bob@builder.lit"_s);
+    QVERIFY(!OmemoManager::isAuthenticationUri(parse(watch.authenticationUri().value())));
     QVERIFY(watch.devices().value().constFirst().isAuthenticatable());
 
     // the OMEMO 2 key in a trust message, the OMEMO 0 key as fingerprint for Conversations
@@ -4210,23 +4210,23 @@ void tst_OmemoManager2::verification()
     const auto omemo0Fingerprint = Device { .version = Version::Omemo0, .keyId = device.omemo0KeyId }.fingerprint();
     QCOMPARE(omemo0Fingerprint, device.omemo0KeyId.mid(1));
     QCOMPARE(device.fingerprint(), device.keyId);
-    auto uri = parse(watch.verificationUri().value());
+    auto uri = parse(watch.authenticationUri().value());
     QCOMPARE(std::any_cast<TrustMessage>(uri.query()).trustKeyIds, QList { QString::fromLatin1(device.keyId.toHex()) });
     QCOMPARE(uri.omemoFingerprints(), (QList<OmemoFingerprint> { { bob.deviceId(), omemo0Fingerprint } }));
 
     // The own URI contains this device.
     auto own = bob.manager->watchDevices(bob.jid());
     server.process();
-    QTRY_VERIFY(!own.verificationUri().value().isEmpty());
-    const auto ownUri = parse(own.verificationUri().value());
+    QTRY_VERIFY(!own.authenticationUri().value().isEmpty());
+    const auto ownUri = parse(own.authenticationUri().value());
     QCOMPARE(std::any_cast<TrustMessage>(ownUri.query()).trustKeyIds, QList { QString::fromLatin1(bob.manager->ownKey().value().toHex()) });
     QCOMPARE(ownUri.omemoFingerprints(), (QList<OmemoFingerprint> { { bob.deviceId(), bob.manager->ownKey(Version::Omemo0).value().mid(1) } }));
 
     // scanned, the keys of both versions are authenticated
     auto carolWatch = carol.manager->watchDevices(bob.jid());
     server.process();
-    QVERIFY(OmemoManager::isVerificationUri(ownUri));
-    carol.manager->verify(ownUri);
+    QVERIFY(OmemoManager::isAuthenticationUri(ownUri));
+    carol.manager->authenticate(ownUri);
     server.process();
     QTRY_COMPARE(trustLevels(carol, carolWatch), authenticated);
 
@@ -4234,17 +4234,17 @@ void tst_OmemoManager2::verification()
     QXmppUri conversationsUri;
     conversationsUri.setJid(bob.jid());
     conversationsUri.setOmemoFingerprints(ownUri.omemoFingerprints());
-    QVERIFY(OmemoManager::isVerificationUri(conversationsUri));
+    QVERIFY(OmemoManager::isAuthenticationUri(conversationsUri));
     auto daveWatch = dave.manager->watchDevices(bob.jid());
     server.process();
-    dave.manager->verify(conversationsUri);
+    dave.manager->authenticate(conversationsUri);
     server.process();
     QTRY_COMPARE(trustLevels(dave, daveWatch), authenticated);
 
     // an entered fingerprint of OMEMO 0
     auto erinWatch = erin.manager->watchDevices(bob.jid());
     server.process();
-    erin.manager->verify(bob.jid(), { omemo0Fingerprint });
+    erin.manager->authenticate(bob.jid(), { omemo0Fingerprint });
     server.process();
     QTRY_COMPARE(trustLevels(erin, erinWatch), authenticated);
 }

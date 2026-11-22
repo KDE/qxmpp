@@ -242,7 +242,7 @@ public:
     QBindable<QList<Device>> devices() const;
     QBindable<QList<Version>> supportedVersions() const;
     QBindable<QList<Version>> usableVersions() const;
-    QBindable<QString> verificationUri() const;
+    QBindable<QString> authenticationUri() const;
 
 private:
     friend class Private::OmemoManagerPrivate;
@@ -293,9 +293,9 @@ public:
 
     Omemo::DeviceWatch watchDevices(const QXmpp::Jid &jid);
     QXmppTask<void> setTrustLevel(QList<Omemo::Device> devices, QXmpp::TrustLevel trustLevel);
-    static bool isVerificationUri(const QXmppUri &uri);
-    QXmppTask<void> verify(const QXmppUri &uri);
-    QXmppTask<void> verify(QXmpp::Jid jid, QList<QByteArray> fingerprints);
+    static bool isAuthenticationUri(const QXmppUri &uri);
+    QXmppTask<void> authenticate(const QXmppUri &uri);
+    QXmppTask<void> authenticate(QXmpp::Jid jid, QList<QByteArray> fingerprints);
     QXmppTask<void> removeContactDevices(QXmpp::Jid jid);
 
     QXmppTask<QXmpp::Result<>> resetOwnDevice();

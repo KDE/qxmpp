@@ -541,8 +541,8 @@ QList<uint32_t> OmemoManagerPrivate::deviceIds(Version version, const QString &j
     return ids;
 }
 
-// Handles changed trust levels, however they have been changed (e.g. by verify(), setTrustLevel()
-// or a received trust message of QXmppAtmManager):
+// Handles changed trust levels, however they have been changed (e.g. by authenticate(),
+// setTrustLevel() or a received trust message of QXmppAtmManager):
 // 1. They are applied to the same identity keys in the other version, so a device has to be
 //    authenticated only once.
 // 2. With TOAKAFA, the automatically trusted keys of JIDs with authenticated keys are distrusted in
@@ -855,7 +855,7 @@ QXmppTask<void> OmemoManagerPrivate::updateWatchOnce(QString jid)
     watch->devices = mergeVersions(devices);
     watch->supportedVersions = supported;
     watch->usableVersions = usable;
-    watch->verificationUri = verificationUri(jid, devices);
+    watch->authenticationUri = authenticationUri(jid, devices);
 }
 
 // Curve25519 keys of OMEMO 0 have a type byte, which is omitted in fingerprints.
@@ -899,7 +899,7 @@ static QList<QByteArray> keysFromHex(const QList<QString> &keys)
 // The keys of jid authenticated or distrusted by the user, for OMEMO 2 as a trust message and for
 // OMEMO 0 as fingerprints in the format of Conversations, which supports only those. For the own
 // JID, the keys of this device are included.
-QString OmemoManagerPrivate::verificationUri(const QString &jid, const QList<Device> &devices) const
+QString OmemoManagerPrivate::authenticationUri(const QString &jid, const QList<Device> &devices) const
 {
     QList<QString> trustedKeys;
     QList<QString> distrustedKeys;
@@ -1101,7 +1101,7 @@ namespace QXmpp {
     The trust levels of the keys are stored by the trust manager, separately for each version.
     Since a device uses the same identity key in both versions, a trust decision for a key is
     applied to the key of the same device in the other version, so a device has to be
-    authenticated only once. Keys are authenticated via verify() or setTrustLevel().
+    authenticated only once. Keys are authenticated via authenticate() or setTrustLevel().
 
     The security policy (see QXmpp::TrustSecurityPolicy) decides the trust level of new keys. By
     default, TOAKAFA is used: New keys of a JID are trusted automatically until a key of the JID
@@ -1203,7 +1203,7 @@ OmemoManager::OmemoManager(std::shared_ptr<OmemoStorage> storage, QList<Version>
     d->enabledVersionsNotifier = d->enabledVersions.addNotifier([this] {
         d->updateWatches();
     });
-    // the own keys are part of the verification URI
+    // the own keys are part of the authentication URI
     d->ownKeyNotifier = d->ownKey.addNotifier([this] {
         if (client()) {
             d->updateWatch(d->ownJid());
@@ -1420,7 +1420,7 @@ QBindable<QByteArray> OmemoManager::ownKey(Version version) const
     of OMEMO 2 or the Curve25519 key of OMEMO 0 without its type byte, like shown by clients only
     supporting OMEMO 0. It is empty while the key is unknown.
 
-    \sa OmemoManager::verify()
+    \sa OmemoManager::authenticate()
 */
 
 /*!
@@ -1436,7 +1436,7 @@ QBindable<QByteArray> OmemoManager::ownKey(Version version) const
     Returns whether the key can be authenticated by the user, e.g. via a QR code: it is known, its
     trust level has been decided and it is not authenticated yet.
 
-    \sa OmemoManager::verify()
+    \sa OmemoManager::authenticate()
 */
 
 /*!
@@ -1586,17 +1586,17 @@ QBindable<QList<Version>> DeviceWatch::usableVersions() const
 
 /*!
     Returns an \c xmpp: URI with the keys of the JID that the user has authenticated or distrusted,
-    e.g. to be shown as a QR code for verifying them by scanning it with another device (see
-    OmemoManager::verify()). For the own JID, the keys of this device are included.
+    e.g. to be shown as a QR code for authenticating them by scanning it with another device (see
+    OmemoManager::authenticate()). For the own JID, the keys of this device are included.
 
     The keys of OMEMO 2 are contained in a trust message (\xep{0434}{Trust Messages}), the
     authenticated keys of OMEMO 0 as fingerprints in the format of Conversations
     (\c omemo-sid-<device ID>=<fingerprint>), which clients only supporting OMEMO 0 read. Without
     such keys, it contains only the JID.
 */
-QBindable<QString> DeviceWatch::verificationUri() const
+QBindable<QString> DeviceWatch::authenticationUri() const
 {
-    return readOnly(d->verificationUri);
+    return readOnly(d->authenticationUri);
 }
 
 /*!
@@ -1664,7 +1664,7 @@ QXmppTask<void> OmemoManager::setSecurityPolicy(TrustSecurityPolicy securityPoli
 
 /*!
     Sets the trust level of the keys of \a devices to \a trustLevel, e.g. after the user has
-    verified them. Devices with unknown keys are skipped.
+    authenticated them. Devices with unknown keys are skipped.
 
     With the security policy TOAKAFA, authenticating keys distrusts the automatically trusted keys
     of their JIDs, see QXmpp::TrustSecurityPolicy.
@@ -1685,21 +1685,21 @@ QXmppTask<void> OmemoManager::setTrustLevel(QList<Device> devices, QXmpp::TrustL
 }
 
 /*!
-    Returns whether \a uri contains keys that can be verified via verify(), e.g. scanned from a QR
-    code: keys of OMEMO 2 in a trust message (\xep{0434}{Trust Messages}) or of OMEMO 0 in the
-    format of Conversations (\c omemo-sid-<device ID>=<fingerprint>).
+    Returns whether \a uri contains keys that can be authenticated via authenticate(), e.g.
+    scanned from a QR code: keys of OMEMO 2 in a trust message (\xep{0434}{Trust Messages}) or of
+    OMEMO 0 in the format of Conversations (\c omemo-sid-<device ID>=<fingerprint>).
 
-    \sa DeviceWatch::verificationUri()
+    \sa DeviceWatch::authenticationUri()
 */
-bool OmemoManager::isVerificationUri(const QXmppUri &uri)
+bool OmemoManager::isAuthenticationUri(const QXmppUri &uri)
 {
     return omemo2TrustMessage(uri) || !omemo0Keys(uri).isEmpty();
 }
 
 /*!
     Authenticates and distrusts the keys of the JID of \a uri as contained in it, e.g. after the
-    user has scanned a QR code of another device (see DeviceWatch::verificationUri()). The JID
-    should be checked before, e.g. whether it is the one of the chat being verified.
+    user has scanned a QR code of another device (see DeviceWatch::authenticationUri()). The JID
+    should be checked before, e.g. whether it is the one of the chat whose keys are authenticated.
 
     The keys of OMEMO 2 are authenticated via \xep{0450}{Automatic Trust Management (ATM)} if the
     trust manager is a QXmppAtmManager, which sends trust messages to the devices with
@@ -1709,9 +1709,9 @@ bool OmemoManager::isVerificationUri(const QXmppUri &uri)
     With the security policy TOAKAFA, the automatically trusted keys of the JID are distrusted in
     all versions, see QXmpp::TrustSecurityPolicy.
 
-    \sa isVerificationUri()
+    \sa isAuthenticationUri()
 */
-QXmppTask<void> OmemoManager::verify(const QXmppUri &uri)
+QXmppTask<void> OmemoManager::authenticate(const QXmppUri &uri)
 {
     const auto jid = jidBare(uri.jid());
     const auto trustMessage = omemo2TrustMessage(uri);
@@ -1727,9 +1727,9 @@ QXmppTask<void> OmemoManager::verify(const QXmppUri &uri)
 
     Fingerprints of known OMEMO 0 devices authenticate their keys, all others are authenticated as
     keys of OMEMO 2, also if their devices are not known yet. Keys are authenticated like by
-    verify(const QXmppUri &).
+    authenticate(const QXmppUri &).
 */
-QXmppTask<void> OmemoManager::verify(Jid jid, QList<QByteArray> fingerprints)
+QXmppTask<void> OmemoManager::authenticate(Jid jid, QList<QByteArray> fingerprints)
 {
     co_await d->loaded().withContext(this);
     const auto bareJid = jid.bare().toString();

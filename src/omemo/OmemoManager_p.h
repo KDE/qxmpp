@@ -35,7 +35,7 @@ struct DeviceWatch::Data {
     QProperty<QList<Device>> devices;
     QProperty<QList<Version>> supportedVersions;
     QProperty<QList<Version>> usableVersions;
-    QProperty<QString> verificationUri;
+    QProperty<QString> authenticationUri;
 
     ~Data()
     {
@@ -168,7 +168,7 @@ public:
     void updateWatches();
     QList<Device> mergeVersions(const QList<Device> &devices) const;
     bool isUsable(const Device &device);
-    QString verificationUri(const QString &jid, const QList<Device> &devices) const;
+    QString authenticationUri(const QString &jid, const QList<Device> &devices) const;
     QXmppTask<void> authenticate(QString jid, QList<QByteArray> omemo2Keys, QList<QByteArray> omemo2DistrustedKeys, QList<QByteArray> omemo0Keys);
     QXmppTask<void> buildSessions(QString jid);
     void releaseWatch(const QString &jid);
