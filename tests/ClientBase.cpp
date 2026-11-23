@@ -24,9 +24,13 @@
 #include "QXmppDiscoveryManager_p.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeProvider.h"
+#include "QXmppEncryptedFileSource.h"
 #include "QXmppEntityCapsStorage.h"
 #include "QXmppFallback.h"
+#include "QXmppFileMetadata.h"
+#include "QXmppFileSharingManager.h"
 #include "QXmppHooks.h"
+#include "QXmppHttpFileSource.h"
 #include "QXmppIqHandling.h"
 #include "QXmppIqStanza.h"
 #include "QXmppLogger.h"
@@ -53,6 +57,7 @@
 #include "QXmppSendStanzaParams.h"
 #include "QXmppStreamFeatures.h"
 #include "QXmppTask.h"
+#include "QXmppThumbnail.h"
 #include "QXmppTrustMessageElement.h"
 #include "QXmppVCardManager.h"
 #include "QXmppVersionIq.h"
@@ -6126,6 +6131,10 @@ private:
     Q_SLOT void bodyOnlyRewritten();
     Q_SLOT void bodyOnlyUnsupported();
     Q_SLOT void bodyOnlyNotRequested();
+    Q_SLOT void bodyOnlyMediaSharingSend_data();
+    Q_SLOT void bodyOnlyMediaSharingSend();
+    Q_SLOT void bodyOnlyMediaSharingReceive_data();
+    Q_SLOT void bodyOnlyMediaSharingReceive();
     Q_SLOT void encryptionOverride();
     Q_SLOT void decryptPreferred_data();
     Q_SLOT void decryptPreferred();
@@ -7460,6 +7469,173 @@ void tst_QXmppMessages::bodyOnlyNotRequested()
     const auto packet = client.takePacket();
     QVERIFY(!called);
     QVERIFY(!packet.contains(u"replace"_s));
+}
+
+static QXmppFileShare encryptedFileShare(Cipher cipher, const QString &url)
+{
+    QXmppEncryptedFileSource source;
+    source.setCipher(cipher);
+    source.setKey(QByteArray(32, 'k'));
+    source.setIv(QByteArray(12, 'i'));
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(url)) });
+    QXmppFileShare file;
+    file.setEncryptedSourecs({ source });
+    return file;
+}
+
+static QXmppFileSourcesAttachment sourcesAttachment(const QXmppFileShare &file)
+{
+    QXmppFileSourcesAttachment attachment;
+    attachment.setEncryptedSources(file.encryptedSources());
+    return attachment;
+}
+
+void tst_QXmppMessages::bodyOnlyMediaSharingSend_data()
+{
+    QTest::addColumn<QXmppMessage>("message");
+    QTest::addColumn<QString>("body");
+
+    const auto ivAndKey = QString::fromLatin1(QByteArray(QByteArray(12, 'i') + QByteArray(32, 'k')).toHex());
+    const auto url1 = u"https://upload.example.org/a/my%20photo.jpg"_s;
+    const auto url2 = u"https://upload.example.org/b/2.jpg"_s;
+    const auto aesGcmUrl1 = u"aesgcm://upload.example.org/a/my%20photo.jpg#"_s + ivAndKey;
+    const auto aesGcmUrl2 = u"aesgcm://upload.example.org/b/2.jpg#"_s + ivAndKey;
+    const auto file1 = encryptedFileShare(Aes256GcmNoPad, url1);
+    const auto file2 = encryptedFileShare(Aes256GcmNoPad, url2);
+    const QXmppFallback sfsFallback { ns_sfs.toString(), { { QXmppFallback::Body, {} } } };
+
+    auto add = [&](const char *name, const QString &body, const QList<QXmppFileShare> &files, const QList<QXmppFileSourcesAttachment> &attachments, const QList<QXmppFallback> &markers, const QString &expected) {
+        QXmppMessage message(u"me@example.org/res"_s, u"alice@example.org"_s, body);
+        message.setSharedFiles(files);
+        message.setFileSourcesAttachments(attachments);
+        message.setFallbackMarkers(markers);
+        QTest::newRow(name) << message << expected;
+    };
+
+    add("aesgcm", url1, { file1 }, {}, { sfsFallback }, aesGcmUrl1);
+    add("without-fallback-body", {}, { file1 }, {}, {}, aesGcmUrl1);
+    add("cbc", url1, { encryptedFileShare(Aes256CbcPkcs7, url1) }, {}, { sfsFallback }, url1);
+    add("http", u"http://upload.example.org/a"_s, { encryptedFileShare(Aes256GcmNoPad, u"http://upload.example.org/a"_s) }, {}, { sfsFallback }, u"http://upload.example.org/a"_s);
+    // XEP-0454 does not allow a text, receiving the file is more important
+    add("text", u"Look at this"_s, { file1 }, {}, {}, aesGcmUrl1);
+    add("text-cbc", u"Look at this"_s, { encryptedFileShare(Aes256CbcPkcs7, url1) }, {}, {}, u"Look at this"_s);
+    add("reply", u"> quote\n"_s, { file1 }, {}, { QXmppFallback { u"urn:xmpp:reply:0"_s, { { QXmppFallback::Body, QXmppFallback::Range { 0, 8 } } } } }, aesGcmUrl1);
+    // several files: the one in the body, otherwise the first one
+    add("two-files-first", url1, { file1, file2 }, {}, { sfsFallback }, aesGcmUrl1);
+    add("two-files-second", url2, { file1, file2 }, {}, { sfsFallback }, aesGcmUrl2);
+    add("two-files-aesgcm", aesGcmUrl2, { file1, file2 }, {}, { sfsFallback }, aesGcmUrl2);
+    add("two-files-unrelated", u"2 files"_s, { file1, file2 }, {}, { sfsFallback }, aesGcmUrl1);
+    add("attached-source", url2, {}, { sourcesAttachment(file2) }, { sfsFallback }, aesGcmUrl2);
+}
+
+// The file sharing manager replaces the body by the aesgcm:// URL (XEP-0454: OMEMO Media Sharing).
+void tst_QXmppMessages::bodyOnlyMediaSharingSend()
+{
+    QFETCH(QXmppMessage, message);
+    QFETCH(QString, body);
+
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    client.addNewExtension<TestBodyE2eeManager>();
+    client.addNewExtension<QXmppFileSharingManager>();
+    QObject owner;
+    client.hooks(&owner).add<SelectEncryption>([](EncryptionSelection &selection) {
+        selection.setEncryption(TestBodyEncryption);
+    });
+    // keys are not sent in the clear, even if the namespace is allowed
+    client.hooks(&owner).add<PrepareBodyOnly>([](BodyOnlyMessage &message) {
+        message.allowLowRiskElements();
+        message.unprotectedNamespaces() << ns_sfs.toString();
+    });
+
+    const auto hasSfsMarker = std::ranges::any_of(message.fallbackMarkers(), [](const auto &marker) { return marker.forNamespace() == ns_sfs; });
+    client.send(std::move(message));
+
+    const auto packet = client.takePacket();
+    QVERIFY2(packet.contains(u"<encrypted xmlns=\"urn:test:body-e2ee\" data=\""_s + reversed(body).toHtmlEscaped() + u"\"/>"_s), qPrintable(packet));
+    QVERIFY2(!packet.contains(u"urn:xmpp:esfs:0"_s), qPrintable(packet));
+    QVERIFY2(!packet.contains(QString::fromLatin1(QByteArray(32, 'k').toBase64())), qPrintable(packet));
+    // the marker refers to the body, which has been replaced
+    QCOMPARE(packet.contains(u"for=\"urn:xmpp:sfs:0\""_s), hasSfsMarker && !body.startsWith(u"aesgcm"));
+}
+
+void tst_QXmppMessages::bodyOnlyMediaSharingReceive_data()
+{
+    QTest::addColumn<QString>("body");
+    QTest::addColumn<bool>("valid");
+    QTest::addColumn<bool>("thumbnail");
+
+    const auto url = u"aesgcm://upload.example.org/a/my%20photo.jpg#"_s + QString::fromLatin1(QByteArray(QByteArray(12, 'i') + QByteArray(32, 'k')).toHex());
+    QTest::newRow("url") << url << true << false;
+    QTest::newRow("thumbnail") << url + u"\ndata:image/jpeg;base64,/9j/4AAQSkZJRgABAQ=="_s << true << true;
+    QTest::newRow("text") << u"Look: "_s + url << false << false;
+    QTest::newRow("text-after") << url + u"\nnice"_s << false << false;
+}
+
+void tst_QXmppMessages::bodyOnlyMediaSharingReceive()
+{
+    QFETCH(QString, body);
+    QFETCH(bool, valid);
+    QFETCH(bool, thumbnail);
+
+    TestClient client;
+    client.configuration().setJid(u"me@example.org/res"_s);
+    client.addNewExtension<TestBodyE2eeManager>();
+    QObject owner;
+    std::optional<QXmppMessage> received;
+    client.hooks(&owner).add<Received>([&](Context &context) {
+        received = context.message();
+        return HookResult::Continue;
+    });
+
+    client.injectMessage(u"<message from='alice@example.org/phone' to='me@example.org/res' type='chat' id='1'>"
+                         "<body>fallback</body>"
+                         "<encrypted xmlns='urn:test:body-e2ee' data='"_s +
+                         reversed(body).toHtmlEscaped().replace(u'\n', u"&#10;"_s) +
+                         u"'/>"
+                         // in the clear, not authenticated
+                         "<file-sharing xmlns='urn:xmpp:sfs:0'><file xmlns='urn:xmpp:file:metadata:0'><name>evil.exe</name></file>"
+                         "<sources><url-data xmlns='http://jabber.org/protocol/url-data' target='https://evil.example/evil.exe'/></sources></file-sharing>"
+                         "<attach-to xmlns='urn:xmpp:message-attaching:1' id='other'/>"
+                         "<sources xmlns='urn:xmpp:sfs:0' id='file1'><url-data xmlns='http://jabber.org/protocol/url-data' target='https://evil.example/evil.exe'/></sources>"
+                         "</message>"_s);
+
+    QVERIFY(received);
+    QCOMPARE(received->body(), body);
+    if (!valid) {
+        // only the file in the clear
+        QCOMPARE(received->sharedFiles().size(), 1);
+        QVERIFY(received->sharedFiles().constFirst().encryptedSources().isEmpty());
+        QVERIFY(received->fallbackMarkers().isEmpty());
+        return;
+    }
+
+    QCOMPARE(received->sharedFiles().size(), 1);
+    const auto &file = received->sharedFiles().constFirst();
+    QVERIFY(received->fileSourcesAttachments().isEmpty());
+    QCOMPARE(file.metadata().filename(), u"my photo.jpg"_s);
+    QCOMPARE(file.metadata().mediaType()->name(), u"image/jpeg"_s);
+    QVERIFY(file.httpSources().isEmpty());
+    QCOMPARE(file.encryptedSources().size(), 1);
+    const auto &source = file.encryptedSources().constFirst();
+    QCOMPARE(source.cipher(), Aes256GcmNoPad);
+    QCOMPARE(source.key(), QByteArray(32, 'k'));
+    QCOMPARE(source.iv(), QByteArray(12, 'i'));
+    QCOMPARE(source.httpSources().size(), 1);
+    QCOMPARE(source.httpSources().constFirst().url(), QUrl(u"https://upload.example.org/a/my%20photo.jpg"_s));
+
+    // the body is the fallback of the shared file
+    QCOMPARE(received->fallbackMarkers().size(), 1);
+    QCOMPARE(received->fallbackMarkers().constFirst().forNamespace(), ns_sfs.toString());
+    QVERIFY(received->readFallbackRemovedText(QXmppFallback::Body, { ns_sfs.toString() }).isEmpty());
+
+    QCOMPARE(file.metadata().thumbnails().size(), thumbnail ? 1 : 0);
+    QCOMPARE(received->bitsOfBinaryData().size(), thumbnail ? 1 : 0);
+    if (thumbnail) {
+        const auto &data = received->bitsOfBinaryData().constFirst();
+        QCOMPARE(data.data(), QByteArray::fromBase64("/9j/4AAQSkZJRgABAQ=="));
+        QCOMPARE(file.metadata().thumbnails().constFirst().uri(), data.cid().toCidUrl());
+    }
 }
 
 // A provider registered with a namespace not used in stanzas announces the one of its elements.

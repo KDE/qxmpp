@@ -7,10 +7,15 @@
 
 #include "QXmppBitsOfBinaryContentId.h"
 #include "QXmppBitsOfBinaryData.h"
+#include "QXmppConstants_p.h"
+#include "QXmppEncryptedFileSource.h"
 #include "QXmppFileEncryption.h"
 #include "QXmppFileMetadata.h"
 #include "QXmppFileShare.h"
+#include "QXmppFileShare_p.h"
 #include "QXmppHashing_p.h"
+#include "QXmppHttpFileSource.h"
+#include "QXmppMessages.h"
 #include "QXmppThumbnail.h"
 #include "QXmppUtils_p.h"
 
@@ -18,6 +23,7 @@
 #include "Async.h"
 #include "StringLiterals.h"
 
+#include <algorithm>
 #include <any>
 #include <unordered_map>
 #include <utility>
@@ -337,12 +343,102 @@ public:
 
     The file sharing manager allows to easily send and retrieve files in a chat.
 
+    \section1 Encryptions protecting only the body
+
+    Recipients of an encryption protecting only the body of messages (e.g. OMEMO 0) do not receive
+    the elements of shared files (\xep{0447}{Stateless file sharing}). For them, the manager
+    replaces the body by the \c aesgcm:// URL of a file (\xep{0454}{OMEMO Media Sharing}) via
+    QXmpp::Messages::PrepareBodyOnly and removes all encrypted file sources, which contain the keys.
+    This requires an encrypted source with QXmpp::Aes256GcmNoPad and an HTTPS URL, see
+    QXmppEncryptedFileSharingProvider::setCipher().
+
+    Such a body can only contain one file and no text, so a text (e.g. a caption) is not sent to
+    those recipients. If the message contains several files, the one whose URL is the body is used,
+    otherwise the first one. To share several files or files with a text, send an additional message
+    for each remaining file, with its source attached (QXmppMessage::setFileSourcesAttachments()),
+    as recommended by \xep{0447}{Stateless file sharing}. Applications doing so for all files of a
+    message can restore its text in an own handler of QXmpp::Messages::PrepareBodyOnly:
+
+    \code
+    client->hooks(this).add<QXmpp::Messages::PrepareBodyOnly>([](QXmpp::Messages::BodyOnlyMessage &message) {
+        const auto &original = message.original();
+        if (!original.readFallbackRemovedText(QXmppFallback::Body, { u"urn:xmpp:sfs:0"_s }).isEmpty()) {
+            message.message().setBody(original.body());
+            message.message().setFallbackMarkers(original.fallbackMarkers());
+        }
+    });
+    \endcode
+
+    Received messages encrypted that way with a body consisting only of an \c aesgcm:// URL
+    (and optionally a thumbnail) contain the file in QXmppMessage::sharedFiles(), also without
+    this manager. The body is marked as fallback for \c urn:xmpp:sfs:0 (QXmppFallback).
+
     \since QXmpp 1.5
 */
+
+// XEP-0454: the aesgcm:// URL replacing the body
+static std::optional<QString> bodyOnlyUrl(const QXmppMessage &message)
+{
+    QList<QXmppEncryptedFileSource> sources;
+    for (const auto &file : message.sharedFiles()) {
+        sources.append(file.encryptedSources());
+    }
+    const auto attachments = message.fileSourcesAttachments();
+    for (const auto &attachment : attachments) {
+        sources.append(attachment.encryptedSources());
+    }
+
+    const auto body = message.body().trimmed();
+    std::optional<QString> firstUrl;
+    for (const auto &source : std::as_const(sources)) {
+        auto url = OmemoMediaSharing::aesGcmUrl(source);
+        if (!url) {
+            continue;
+        }
+        const auto httpSources = source.httpSources();
+        if (body == *url || std::ranges::any_of(httpSources, [&](const auto &httpSource) { return QUrl(body) == httpSource.url(); })) {
+            return url;
+        }
+        if (!firstUrl) {
+            firstUrl = std::move(url);
+        }
+    }
+    return firstUrl;
+}
+
+static void prepareBodyOnly(Messages::BodyOnlyMessage &bodyOnly)
+{
+    auto &message = bodyOnly.message();
+
+    if (auto url = bodyOnlyUrl(message)) {
+        message.setBody(*url);
+        // the markers of the body refer to the previous one
+        auto markers = message.fallbackMarkers();
+        for (auto &marker : markers) {
+            auto references = marker.references();
+            references.removeIf([](const QXmppFallback::Reference &reference) {
+                return reference.element == QXmppFallback::Body;
+            });
+            marker.setReferences(references);
+        }
+        markers.removeIf([](const QXmppFallback &marker) { return marker.references().isEmpty(); });
+        message.setFallbackMarkers(markers);
+    }
+
+    // must not be sent in the clear, even if an application allows the namespace
+    auto files = message.sharedFiles();
+    files.removeIf([](const auto &file) { return !file.encryptedSources().isEmpty(); });
+    message.setSharedFiles(files);
+    auto attachments = message.fileSourcesAttachments();
+    attachments.removeIf([](const auto &attachment) { return !attachment.encryptedSources().isEmpty(); });
+    message.setFileSourcesAttachments(attachments);
+}
 
 QXmppFileSharingManager::QXmppFileSharingManager()
     : d(std::make_unique<QXmppFileSharingManagerPrivate>())
 {
+    // before handlers of applications, so they can adapt the result
+    hooks().add<Messages::PrepareBodyOnly>(&prepareBodyOnly, HookSequence::Early);
 }
 
 QXmppFileSharingManager::~QXmppFileSharingManager() = default;

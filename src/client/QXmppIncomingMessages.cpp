@@ -2,11 +2,14 @@
 //
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include "QXmppBitsOfBinaryDataList.h"
 #include "QXmppClient.h"
 #include "QXmppClientExtension.h"
 #include "QXmppE2eeExtension.h"
 #include "QXmppE2eeProvider.h"
+#include "QXmppEncryptedFileSource.h"
 #include "QXmppFallback.h"
+#include "QXmppFileShare_p.h"
 #include "QXmppHooks_p.h"
 #include "QXmppIncomingMessages_p.h"
 #include "QXmppJid_p.h"
@@ -77,6 +80,26 @@ static void fail(Context &context, DecryptionState state, QString errorText = {}
     }
 }
 
+// XEP-0454: OMEMO Media Sharing, a file shared as aesgcm:// URL in the body
+static void applyOmemoMediaSharing(QXmppMessage &message)
+{
+    auto parsed = OmemoMediaSharing::parseBody(message.body());
+    if (!parsed) {
+        return;
+    }
+    // the elements in the clear are not authenticated, e.g. added by a server
+    message.setSharedFiles({ parsed->fileShare });
+    message.setFileSourcesAttachments({});
+    QXmppBitsOfBinaryDataList thumbnails;
+    if (parsed->thumbnail) {
+        thumbnails.append(*parsed->thumbnail);
+    }
+    message.setBitsOfBinaryData(thumbnails);
+    auto markers = message.fallbackMarkers();
+    markers.append(QXmppFallback(ns_sfs.toString(), { { QXmppFallback::Body, {} } }));
+    message.setFallbackMarkers(markers);
+}
+
 // Merges the decrypted content into the message of the context.
 static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const E2ee::Provider &provider)
 {
@@ -132,6 +155,9 @@ static void applyDecrypted(Context &context, E2ee::Decrypted &&decrypted, const 
     }
     message.parseExtensions(decrypted.content(), SceSensitive);
     message.setE2eeMetadata(decrypted.metadata());
+    if (provider.contentEncryption == E2ee::ContentEncryption::BodyOnly) {
+        applyOmemoMediaSharing(message);
+    }
 
     d.e2eeMetadata = decrypted.metadata();
     d.decryptionState = DecryptionState::Decrypted;

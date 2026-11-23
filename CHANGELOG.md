@@ -87,6 +87,7 @@ QXmpp 1.18.0 (UNRELEASED)
  - OMEMO: Allow publishing no device label: `OmemoManager::setDeviceLabel()` takes `DefaultDeviceLabel`, `NoDeviceLabel` or a custom label, `effectiveDeviceLabel()` returns the published label (@lnj, !869)
  - Disable Nagle's algorithm on the XMPP socket, which delayed requests by up to the server's delayed ACK (e.g. 40 ms) (@lnj, !862)
  - EncryptedFileSharingProvider: Add `setCipher()` to choose the cipher of uploaded files (@lnj, !873)
+ - Implement XEP-0454: OMEMO Media Sharing: `QXmppFileSharingManager` replaces the fallback body of messages with files encrypted with AES-256-GCM (shared files or attached sources) by an `aesgcm://` URL for recipients of OMEMO 0; such bodies of received OMEMO 0 messages are parsed into `QXmppMessage::sharedFiles()` with a fallback marker for the body (@lnj, !873)
 
 Breaking changes:
  - `QXmppClient::addExtension()`/`insertExtension()` fail for an extension added to another client (@lnj, !839)

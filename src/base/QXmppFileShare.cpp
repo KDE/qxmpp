@@ -4,10 +4,14 @@
 
 #include "QXmppFileShare.h"
 
+#include "QXmppBitsOfBinaryContentId.h"
+#include "QXmppBitsOfBinaryData.h"
 #include "QXmppConstants_p.h"
 #include "QXmppEncryptedFileSource.h"
 #include "QXmppFileMetadata.h"
+#include "QXmppFileShare_p.h"
 #include "QXmppHttpFileSource.h"
+#include "QXmppThumbnail.h"
 #include "QXmppUtils.h"
 #include "QXmppUtils_p.h"
 
@@ -17,6 +21,7 @@
 #include <optional>
 
 #include <QDomElement>
+#include <QMimeDatabase>
 #include <QUrl>
 #include <QXmlStreamWriter>
 
@@ -355,3 +360,131 @@ void QXmppFileShare::toXml(QXmlStreamWriter *writer) const
         Element { u"sources", d->sources },
     });
 }
+
+namespace QXmpp::Private::OmemoMediaSharing {
+
+constexpr qsizetype KEY_SIZE = 32;
+constexpr qsizetype IV_SIZE = 12;
+// used by early implementations, still accepted by most clients
+constexpr qsizetype LEGACY_IV_SIZE = 16;
+
+constexpr QStringView AESGCM_SCHEME = u"aesgcm";
+constexpr QStringView HTTPS_SCHEME = u"https";
+
+std::optional<QString> aesGcmUrl(const QXmppEncryptedFileSource &source)
+{
+    if (source.cipher() != Aes256GcmNoPad || source.key().size() != KEY_SIZE ||
+        (source.iv().size() != IV_SIZE && source.iv().size() != LEGACY_IV_SIZE)) {
+        return {};
+    }
+    for (const auto &httpSource : source.httpSources()) {
+        auto url = httpSource.url();
+        if (!url.isValid() || url.scheme() != HTTPS_SCHEME || url.host().isEmpty()) {
+            continue;
+        }
+        url.setScheme(AESGCM_SCHEME.toString());
+        url.setFragment(QString::fromLatin1(QByteArray(source.iv() + source.key()).toHex()));
+        return url.toString(QUrl::FullyEncoded);
+    }
+    return {};
+}
+
+static std::optional<QByteArray> parseHex(QStringView text)
+{
+    for (auto c : text) {
+        if (!((c >= u'0' && c <= u'9') || (c >= u'a' && c <= u'f') || (c >= u'A' && c <= u'F'))) {
+            return {};
+        }
+    }
+    return QByteArray::fromHex(text.toLatin1());
+}
+
+static std::optional<QXmppEncryptedFileSource> parseUrl(QStringView text)
+{
+    QUrl url(text.toString(), QUrl::StrictMode);
+    if (!url.isValid() || url.scheme() != AESGCM_SCHEME || url.host().isEmpty() || !url.hasFragment()) {
+        return {};
+    }
+    // key and IV must not be decoded from percent-encodings
+    auto fragment = url.fragment(QUrl::FullyEncoded);
+    if (fragment.size() != 2 * (IV_SIZE + KEY_SIZE) && fragment.size() != 2 * (LEGACY_IV_SIZE + KEY_SIZE)) {
+        return {};
+    }
+    auto ivAndKey = parseHex(fragment);
+    if (!ivAndKey) {
+        return {};
+    }
+
+    url.setScheme(HTTPS_SCHEME.toString());
+    url.setFragment({});
+
+    QXmppEncryptedFileSource source;
+    source.setCipher(Aes256GcmNoPad);
+    source.setIv(ivAndKey->left(ivAndKey->size() - KEY_SIZE));
+    source.setKey(ivAndKey->right(KEY_SIZE));
+    source.setHttpSources({ QXmppHttpFileSource(url) });
+    return source;
+}
+
+static std::optional<QXmppBitsOfBinaryData> parseThumbnail(QStringView text)
+{
+    // XEP-0454 shows the base64 data without ";base64", clients write both
+    QByteArray data;
+    for (auto prefix : { u"data:image/jpeg;base64,", u"data:image/jpeg," }) {
+        if (text.startsWith(QStringView(prefix))) {
+            auto decoded = QByteArray::fromBase64Encoding(text.mid(QStringView(prefix).size()).toLatin1(),
+                                                          QByteArray::AbortOnBase64DecodingErrors);
+            if (!decoded || decoded.decoded.isEmpty()) {
+                return {};
+            }
+            data = std::move(decoded.decoded);
+            break;
+        }
+    }
+    if (data.isEmpty()) {
+        return {};
+    }
+
+    auto bobData = QXmppBitsOfBinaryData::fromByteArray(data);
+    bobData.setContentType(QMimeDatabase().mimeTypeForName(u"image/jpeg"_s));
+    return bobData;
+}
+
+std::optional<Body> parseBody(QStringView body)
+{
+    body = body.trimmed();
+    auto lineEnd = body.indexOf(u'\n');
+    auto source = parseUrl(body.left(lineEnd));
+    if (!source) {
+        return {};
+    }
+
+    Body result;
+    if (lineEnd >= 0) {
+        result.thumbnail = parseThumbnail(body.mid(lineEnd + 1));
+        if (!result.thumbnail) {
+            return {};
+        }
+    }
+
+    QXmppFileMetadata metadata;
+    const auto fileName = source->httpSources().constFirst().url().fileName();
+    if (!fileName.isEmpty()) {
+        metadata.setFilename(fileName);
+        if (auto mediaType = QMimeDatabase().mimeTypeForFile(fileName, QMimeDatabase::MatchExtension); !mediaType.isDefault()) {
+            metadata.setMediaType(mediaType);
+        }
+    }
+    if (result.thumbnail) {
+        QXmppThumbnail thumbnail;
+        thumbnail.setUri(result.thumbnail->cid().toCidUrl());
+        thumbnail.setMediaType(result.thumbnail->contentType());
+        metadata.setThumbnails({ thumbnail });
+    }
+
+    result.fileShare.setMetadata(metadata);
+    result.fileShare.setEncryptedSourecs({ *source });
+    return result;
+}
+
+}  // namespace QXmpp::Private::OmemoMediaSharing

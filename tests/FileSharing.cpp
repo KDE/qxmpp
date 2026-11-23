@@ -12,16 +12,25 @@
 // Encrypted file sharing requires OpenSSL, so those tests are guarded by
 // WITH_ENCRYPTION.
 
+#include "QXmppBitsOfBinaryContentId.h"
 #include "QXmppClient.h"
 #include "QXmppDiscoveryManager.h"
+#include "QXmppEncryptedFileSource.h"
+#include "QXmppFileMetadata.h"
+#include "QXmppFileShare_p.h"
+#include "QXmppHash.h"
+#include "QXmppHttpFileSource.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppHttpUploadManager.h"
 #include "QXmppServer.h"
+#include "QXmppThumbnail.h"
 #include "QXmppTransferManager.h"
 #include "QXmppUploadRequestManager.h"
 
 #ifdef WITH_ENCRYPTION
+#include "QXmppEncryptedFileSharingProvider.h"
 #include "QXmppFileEncryption.h"
+#include "QXmppFileSharingManager.h"
 
 #include <openssl/err.h>
 #endif
@@ -36,10 +45,12 @@
 
 #include <QBuffer>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QMimeDatabase>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QObject>
+#include <QTemporaryDir>
 #include <QTimer>
 
 namespace HttpUpload {
@@ -706,6 +717,134 @@ void tst_QXmppTransferManager::testSendFile()
 
 // ============================================================
 
+namespace OmemoMediaSharing {
+
+using namespace QXmpp;
+using namespace QXmpp::Private::OmemoMediaSharing;
+
+class tst_OmemoMediaSharing : public QObject
+{
+    Q_OBJECT
+
+private:
+    Q_SLOT void aesGcmUrl_data();
+    Q_SLOT void aesGcmUrl();
+    Q_SLOT void parseBody_data();
+    Q_SLOT void parseBody();
+};
+
+// example of XEP-0454
+constexpr auto EXAMPLE_URL = u"https://download.montague.tld/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg";
+constexpr auto EXAMPLE_IV = "8c3d050e9386ec173861778f";
+constexpr auto EXAMPLE_KEY = "68e9af38a97aaf82faa4063b4d0878a61261534410c8a84331eaac851759f587";
+constexpr auto EXAMPLE_AESGCM_URL = u"aesgcm://download.montague.tld/4a771ac1-f0b2-4a4a-9700-f2a26fa2bb67/tr%C3%A8s%20cool.jpg#8c3d050e9386ec173861778f68e9af38a97aaf82faa4063b4d0878a61261534410c8a84331eaac851759f587";
+
+static QXmppEncryptedFileSource exampleSource()
+{
+    QXmppEncryptedFileSource source;
+    source.setCipher(Aes256GcmNoPad);
+    source.setIv(QByteArray::fromHex(EXAMPLE_IV));
+    source.setKey(QByteArray::fromHex(EXAMPLE_KEY));
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(QString(EXAMPLE_URL))) });
+    return source;
+}
+
+void tst_OmemoMediaSharing::aesGcmUrl_data()
+{
+    QTest::addColumn<QXmppEncryptedFileSource>("source");
+    QTest::addColumn<std::optional<QString>>("url");
+
+    QTest::newRow("example") << exampleSource() << std::optional<QString>(EXAMPLE_AESGCM_URL);
+
+    auto source = exampleSource();
+    source.setCipher(Aes256CbcPkcs7);
+    QTest::newRow("cbc") << source << std::optional<QString>();
+
+    source = exampleSource();
+    source.setCipher(Aes128GcmNoPad);
+    source.setKey(QByteArray(16, 'k'));
+    QTest::newRow("aes128") << source << std::optional<QString>();
+
+    source = exampleSource();
+    source.setIv(QByteArray(32, 'i'));
+    QTest::newRow("iv-size") << source << std::optional<QString>();
+
+    source = exampleSource();
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(u"http://download.montague.tld/file.jpg"_s)) });
+    QTest::newRow("http") << source << std::optional<QString>();
+
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(u"http://download.montague.tld/file.jpg"_s)), QXmppHttpFileSource(QUrl(QString(EXAMPLE_URL))) });
+    QTest::newRow("https-second") << source << std::optional<QString>(EXAMPLE_AESGCM_URL);
+}
+
+void tst_OmemoMediaSharing::aesGcmUrl()
+{
+    QFETCH(QXmppEncryptedFileSource, source);
+    QFETCH(std::optional<QString>, url);
+
+    QCOMPARE(OmemoMediaSharing::aesGcmUrl(source), url);
+}
+
+void tst_OmemoMediaSharing::parseBody_data()
+{
+    QTest::addColumn<QString>("body");
+    QTest::addColumn<bool>("valid");
+
+    const auto url = QString(EXAMPLE_AESGCM_URL);
+    QTest::newRow("example") << url << true;
+    QTest::newRow("trailing-newline") << url + u"\n"_s << true;
+    QTest::newRow("thumbnail") << url + u"\ndata:image/jpeg;base64,/9j/4AAQSkZJRgABAQ=="_s << true;
+    QTest::newRow("thumbnail-xep") << url + u"\ndata:image/jpeg,/9j/4AAQSkZJRgABAQ=="_s << true;
+    QTest::newRow("thumbnail-png") << url + u"\ndata:image/png;base64,iVBORw0KGgo="_s << false;
+    QTest::newRow("thumbnail-invalid") << url + u"\ndata:image/jpeg;base64,%%%"_s << false;
+    QTest::newRow("text-before") << u"Look: "_s + url << false;
+    QTest::newRow("text-after") << url + u" nice"_s << false;
+    QTest::newRow("two-urls") << url + u"\n"_s + url << false;
+    QTest::newRow("https") << QString(EXAMPLE_URL) + u"#8c3d050e9386ec173861778f68e9af38a97aaf82faa4063b4d0878a61261534410c8a84331eaac851759f587"_s << false;
+    QTest::newRow("no-fragment") << url.left(url.indexOf(u'#')) << false;
+    QTest::newRow("short-fragment") << url.chopped(2) << false;
+    QTest::newRow("no-hex") << url.chopped(1) + u"x"_s << false;
+    QTest::newRow("percent-encoded") << url.chopped(2) + u"%41"_s << false;
+    QTest::newRow("legacy-iv") << url.left(url.indexOf(u'#') + 1) + u"8c3d050e9386ec173861778f00000000"_s + QString::fromLatin1(EXAMPLE_KEY) << true;
+}
+
+void tst_OmemoMediaSharing::parseBody()
+{
+    QFETCH(QString, body);
+    QFETCH(bool, valid);
+
+    auto parsed = OmemoMediaSharing::parseBody(body);
+    QCOMPARE(parsed.has_value(), valid);
+    if (!parsed) {
+        return;
+    }
+
+    const auto &file = parsed->fileShare;
+    QCOMPARE(file.metadata().filename(), u"très cool.jpg"_s);
+    QCOMPARE(file.metadata().mediaType()->name(), u"image/jpeg"_s);
+    QCOMPARE(file.encryptedSources().size(), 1);
+    const auto &source = file.encryptedSources().constFirst();
+    const auto url = body.trimmed().section(u'\n', 0, 0);
+    QCOMPARE(source.cipher(), Aes256GcmNoPad);
+    QCOMPARE(source.iv(), QByteArray::fromHex(url.section(u'#', 1).toLatin1()).chopped(32));
+    QCOMPARE(source.key(), QByteArray::fromHex(EXAMPLE_KEY));
+    QCOMPARE(source.httpSources().size(), 1);
+    QCOMPARE(source.httpSources().constFirst().url(), QUrl(QString(EXAMPLE_URL)));
+    QCOMPARE(OmemoMediaSharing::aesGcmUrl(source), url);
+
+    QCOMPARE(parsed->thumbnail.has_value(), body.contains(u"data:"));
+    if (parsed->thumbnail) {
+        QCOMPARE(parsed->thumbnail->data(), QByteArray::fromBase64("/9j/4AAQSkZJRgABAQ=="));
+        QCOMPARE(parsed->thumbnail->contentType().name(), u"image/jpeg"_s);
+        QCOMPARE(file.metadata().thumbnails().size(), 1);
+        QCOMPARE(file.metadata().thumbnails().constFirst().uri(), parsed->thumbnail->cid().toCidUrl());
+    }
+}
+
+}  // namespace OmemoMediaSharing
+
+// ============================================================
+
 #ifdef WITH_ENCRYPTION
 
 namespace FileEncryption {
@@ -732,6 +871,11 @@ private:
     Q_SLOT void gcmTagMismatch();
     Q_SLOT void gcmWithoutTag();
     Q_SLOT void gcmChunked();
+    Q_SLOT void downloadAesGcm_data();
+    Q_SLOT void downloadAesGcm();
+    Q_SLOT void downloadAesGcmHash_data();
+    Q_SLOT void downloadAesGcmHash();
+    Q_SLOT void uploadDefaultCipher();
 };
 
 void tst_QXmppFileEncryption::basic()
@@ -990,6 +1134,26 @@ void tst_QXmppFileEncryption::gcmChunked()
         data.append(char(i));
     }
 
+    // encryption, read like an upload
+    for (auto size : { 0, 1, 15, 16, 17, 1000 }) {
+        const auto key = generateKey(Aes256GcmNoPad);
+        const auto iv = generateInitializationVector(Aes256GcmNoPad);
+        auto input = data.left(size);
+        const auto expected = encryptWithDevice(input, Aes256GcmNoPad, key, iv);
+        QCOMPARE(expected, process(input, Aes256GcmNoPad, Encode, key, iv));
+        for (auto chunkSize : { 1, 7, 16, 17, 1000 }) {
+            auto buffer = std::make_unique<QBuffer>(&input);
+            buffer->open(QIODevice::ReadOnly);
+            EncryptionDevice device(std::move(buffer), Aes256GcmNoPad, key, iv);
+            QByteArray encrypted;
+            for (auto chunk = device.read(chunkSize); !chunk.isEmpty(); chunk = device.read(chunkSize)) {
+                encrypted += chunk;
+            }
+            QCOMPARE(encrypted, expected);
+        }
+        QCOMPARE(decryptWithDevice(expected, Aes256GcmNoPad, key, iv, 7), data.left(size));
+    }
+
     // legacy IV size of OMEMO Media Sharing
     for (auto ivSize : { 12, 16 }) {
         auto key = generateKey(Aes256GcmNoPad);
@@ -1000,6 +1164,173 @@ void tst_QXmppFileEncryption::gcmChunked()
             QCOMPARE(decryptWithDevice(encrypted, Aes256GcmNoPad, key, iv, chunkSize), data);
         }
     }
+}
+
+// serves fixed data for all HTTP sources
+class FakeHttpProvider : public QXmppFileSharingProvider
+{
+public:
+    using SourceType = QXmppHttpFileSource;
+
+    explicit FakeHttpProvider(QByteArray data) : m_data(std::move(data)) { }
+
+    auto downloadFile(const std::any &, std::unique_ptr<QIODevice> target, std::function<void(quint64, quint64)>, std::function<void(DownloadResult)> reportFinished) -> std::shared_ptr<Download> override
+    {
+        // in chunks like a network reply
+        for (qsizetype i = 0; i < m_data.size(); i += 100) {
+            target->write(m_data.mid(i, 100));
+        }
+        target->close();
+        reportFinished(Success {});
+        return {};
+    }
+    auto uploadFile(std::unique_ptr<QIODevice> source, const QXmppFileMetadata &, std::function<void(quint64, quint64)>, std::function<void(UploadResult)> reportFinished) -> std::shared_ptr<Upload> override
+    {
+        m_data = source->readAll();
+        reportFinished(std::any(QXmppHttpFileSource(QUrl(u"https://upload.example.org/file"_s))));
+        return {};
+    }
+    const QByteArray &data() const { return m_data; }
+
+private:
+    QByteArray m_data;
+};
+
+void tst_QXmppFileEncryption::downloadAesGcm_data()
+{
+    QTest::addColumn<bool>("modified");
+
+    QTest::newRow("valid") << false;
+    QTest::newRow("modified") << true;
+}
+
+// A file shared via OMEMO Media Sharing is downloaded and its authentication tag checked.
+void tst_QXmppFileEncryption::downloadAesGcm()
+{
+    QFETCH(bool, modified);
+
+    const QByteArray data(1000, 'a');
+    const auto key = generateKey(Aes256GcmNoPad);
+    const auto iv = generateInitializationVector(Aes256GcmNoPad);
+    auto encrypted = process(data, Aes256GcmNoPad, Encode, key, iv);
+    if (modified) {
+        encrypted[500] = char(encrypted[500] ^ 1);
+    }
+
+    QString body = u"aesgcm://upload.example.org/file.txt#"_s + QString::fromLatin1(QByteArray(iv + key).toHex());
+    auto parsed = QXmpp::Private::OmemoMediaSharing::parseBody(body);
+    QVERIFY(parsed);
+
+    QXmppFileSharingManager manager;
+    auto httpProvider = std::make_shared<FakeHttpProvider>(encrypted);
+    manager.registerProvider(httpProvider);
+    manager.registerProvider(std::make_shared<QXmppEncryptedFileSharingProvider>(&manager, httpProvider));
+
+    QByteArray output;
+    auto buffer = std::make_unique<QBuffer>(&output);
+    buffer->open(QIODevice::WriteOnly);
+    auto download = manager.downloadFile(parsed->fileShare, std::move(buffer));
+    QVERIFY(download->isFinished());
+
+    if (modified) {
+        QVERIFY(std::holds_alternative<QXmppError>(download->result()));
+    } else {
+        QVERIFY(std::holds_alternative<QXmppFileDownload::Downloaded>(download->result()));
+        QCOMPARE(output, data);
+    }
+}
+
+void tst_QXmppFileEncryption::downloadAesGcmHash_data()
+{
+    QTest::addColumn<bool>("tag");
+    QTest::addColumn<bool>("modified");
+    QTest::addColumn<std::optional<HashAlgorithm>>("hashAlgorithm");
+    QTest::addColumn<bool>("success");
+
+    const std::optional<HashAlgorithm> noHash;
+    const std::optional strong(HashAlgorithm::Sha256);
+    const std::optional weak(HashAlgorithm::Md5);
+    QTest::newRow("tag") << true << false << noHash << true;
+    QTest::newRow("tag+hash") << true << false << strong << true;
+    QTest::newRow("no-tag") << false << false << noHash << false;
+    QTest::newRow("no-tag+hash") << false << false << strong << true;
+    QTest::newRow("no-tag+weak-hash") << false << false << weak << false;
+    QTest::newRow("no-tag+hash+modified") << false << true << strong << false;
+    QTest::newRow("tag+hash+modified") << true << true << strong << false;
+}
+
+// The authentication tag is not needed if there is a strong hash (XEP-0448).
+void tst_QXmppFileEncryption::downloadAesGcmHash()
+{
+    QFETCH(bool, tag);
+    QFETCH(bool, modified);
+    QFETCH(std::optional<HashAlgorithm>, hashAlgorithm);
+    QFETCH(bool, success);
+
+    const QByteArray data(1000, 'a');
+    QXmppEncryptedFileSource source;
+    source.setCipher(Aes256GcmNoPad);
+    source.setKey(generateKey(Aes256GcmNoPad));
+    source.setIv(generateInitializationVector(Aes256GcmNoPad));
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(u"https://upload.example.org/file"_s)) });
+
+    QXmppFileMetadata metadata;
+    if (hashAlgorithm) {
+        QXmppHash hash;
+        hash.setAlgorithm(*hashAlgorithm);
+        hash.setHash(QCryptographicHash::hash(data, *hashAlgorithm == HashAlgorithm::Md5 ? QCryptographicHash::Md5 : QCryptographicHash::Sha256));
+        metadata.setHashes({ hash });
+    }
+    QXmppFileShare file;
+    file.setMetadata(metadata);
+    file.setEncryptedSourecs({ source });
+
+    auto encrypted = process(data, Aes256GcmNoPad, Encode, source.key(), source.iv());
+    if (!tag) {
+        encrypted.chop(16);
+    }
+    if (modified) {
+        encrypted[500] = char(encrypted[500] ^ 1);
+    }
+
+    QXmppFileSharingManager manager;
+    auto httpProvider = std::make_shared<FakeHttpProvider>(encrypted);
+    manager.registerProvider(httpProvider);
+    manager.registerProvider(std::make_shared<QXmppEncryptedFileSharingProvider>(&manager, httpProvider));
+
+    QTemporaryDir dir;
+    const auto path = dir.filePath(u"file"_s);
+    auto output = std::make_unique<QFile>(path);
+    QVERIFY(output->open(QIODevice::WriteOnly));
+    auto download = manager.downloadFile(file, std::move(output));
+    QTRY_VERIFY(download->isFinished());
+
+    QCOMPARE(std::holds_alternative<QXmppFileDownload::Downloaded>(download->result()), success);
+    if (success) {
+        QFile result(path);
+        QVERIFY(result.open(QIODevice::ReadOnly));
+        QCOMPARE(result.readAll(), data);
+    }
+}
+
+// By default, uploaded files can be shared via OMEMO Media Sharing.
+void tst_QXmppFileEncryption::uploadDefaultCipher()
+{
+    QXmppFileSharingManager manager;
+    auto httpProvider = std::make_shared<FakeHttpProvider>(QByteArray());
+    QXmppEncryptedFileSharingProvider provider(&manager, httpProvider);
+
+    QByteArray data(1000, 'a');
+    auto buffer = std::make_unique<QBuffer>(&data);
+    buffer->open(QIODevice::ReadOnly);
+    std::optional<QXmppFileSharingProvider::UploadResult> result;
+    provider.uploadFile(std::move(buffer), {}, {}, [&](auto r) { result = std::move(r); });
+
+    QVERIFY(result && std::holds_alternative<std::any>(*result));
+    const auto source = std::any_cast<QXmppEncryptedFileSource>(std::get<std::any>(*result));
+    QCOMPARE(source.cipher(), Aes256GcmNoPad);
+    QVERIFY(QXmpp::Private::OmemoMediaSharing::aesGcmUrl(source));
+    QCOMPARE(process(httpProvider->data(), Aes256GcmNoPad, Decode, source.key(), source.iv()), data);
 }
 
 }  // namespace FileEncryption
@@ -1266,7 +1597,7 @@ void tst_QXmppStreamInitiationIq::streamInitiationResult()
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
-    int status = runTests<HttpUpload::tst_QXmppHttpUploadManager, Transfer::tst_QXmppTransferManager, HttpUploadIq::tst_QXmppHttpUploadIq, StreamInitiationIq::tst_QXmppStreamInitiationIq>(argc, argv);
+    int status = runTests<HttpUpload::tst_QXmppHttpUploadManager, Transfer::tst_QXmppTransferManager, HttpUploadIq::tst_QXmppHttpUploadIq, StreamInitiationIq::tst_QXmppStreamInitiationIq, OmemoMediaSharing::tst_OmemoMediaSharing>(argc, argv);
 #ifdef WITH_ENCRYPTION
     status |= runTests<FileEncryption::tst_QXmppFileEncryption>(argc, argv);
 #endif
