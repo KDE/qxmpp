@@ -102,7 +102,7 @@ bool QXmppFileMetadata::parse(const QDomElement &el)
         d->name = nameEl.text();
     }
     if (auto sizeEl = firstChildElement(el, u"size"); !sizeEl.isNull()) {
-        d->size = sizeEl.text().toULong();
+        d->size = parseInt<uint64_t>(sizeEl.text());
     }
     d->thumbnails = parseChildElements<QList<QXmppThumbnail>>(el);
     if (auto widthEl = firstChildElement(el, u"width"); !widthEl.isNull()) {

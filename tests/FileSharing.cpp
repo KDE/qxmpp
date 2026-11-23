@@ -19,6 +19,7 @@
 #include "QXmppFileMetadata.h"
 #include "QXmppFileShare_p.h"
 #include "QXmppHash.h"
+#include "QXmppHttpFileSharingProvider.h"
 #include "QXmppHttpFileSource.h"
 #include "QXmppHttpUploadIq.h"
 #include "QXmppHttpUploadManager.h"
@@ -50,6 +51,8 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QObject>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTimer>
 
@@ -875,6 +878,14 @@ private:
     Q_SLOT void downloadAesGcm();
     Q_SLOT void downloadAesGcmHash_data();
     Q_SLOT void downloadAesGcmHash();
+    Q_SLOT void downloadCutOff_data();
+    Q_SLOT void downloadCutOff();
+    Q_SLOT void downloadCutOffLarge_data();
+    Q_SLOT void downloadCutOffLarge();
+    Q_SLOT void downloadAbortTooLarge();
+    Q_SLOT void downloadUnencryptedNotCutOff();
+    Q_SLOT void metadataSize_data();
+    Q_SLOT void metadataSize();
     Q_SLOT void uploadDefaultCipher();
 };
 
@@ -1177,8 +1188,15 @@ public:
     auto downloadFile(const std::any &, std::unique_ptr<QIODevice> target, std::function<void(quint64, quint64)>, std::function<void(DownloadResult)> reportFinished) -> std::shared_ptr<Download> override
     {
         // in chunks like a network reply
-        for (qsizetype i = 0; i < m_data.size(); i += 100) {
-            target->write(m_data.mid(i, 100));
+        constexpr qsizetype CHUNK_SIZE = 10'000;
+        for (qsizetype i = 0; i < m_data.size(); i += CHUNK_SIZE) {
+            const auto chunk = m_data.mid(i, CHUNK_SIZE);
+            if (target->write(chunk) != chunk.size()) {
+                auto error = QXmppError::fromIoDevice(*target);
+                target->close();
+                reportFinished(std::move(error));
+                return {};
+            }
         }
         target->close();
         reportFinished(Success {});
@@ -1311,6 +1329,224 @@ void tst_QXmppFileEncryption::downloadAesGcmHash()
         QVERIFY(result.open(QIODevice::ReadOnly));
         QCOMPARE(result.readAll(), data);
     }
+}
+
+void tst_QXmppFileEncryption::downloadCutOff_data()
+{
+    QTest::addColumn<int>("cipherId");
+    QTest::addColumn<bool>("tag");
+    QTest::addColumn<int>("padding");
+    QTest::addColumn<std::optional<uint64_t>>("size");
+    QTest::addColumn<bool>("success");
+    QTest::addColumn<int>("outputSize");
+
+    const std::optional<uint64_t> noSize;
+    const std::optional<uint64_t> size(1000);
+    QTest::newRow("gcm") << int(Aes256GcmNoPad) << true << 0 << size << true << 1000;
+    QTest::newRow("gcm-padding") << int(Aes256GcmNoPad) << true << 300 << size << true << 1000;
+    QTest::newRow("gcm-no-tag") << int(Aes256GcmNoPad) << false << 0 << size << true << 1000;
+    QTest::newRow("gcm-no-tag-padding") << int(Aes256GcmNoPad) << false << 300 << size << true << 1000;
+    // padding smaller than the tag
+    QTest::newRow("gcm-no-tag-small-padding") << int(Aes256GcmNoPad) << false << 7 << size << true << 1000;
+    QTest::newRow("cbc") << int(Aes256CbcPkcs7) << true << 0 << size << true << 1000;
+    QTest::newRow("cbc-padding") << int(Aes256CbcPkcs7) << true << 300 << size << true << 1000;
+    // up to 1 MiB is tolerated for small files
+    QTest::newRow("gcm-max-padding") << int(Aes256GcmNoPad) << true << 1024 * 1024 << size << true << 1000;
+    QTest::newRow("gcm-too-large") << int(Aes256GcmNoPad) << true << 1024 * 1024 + 1 << size << false << 1000;
+    QTest::newRow("cbc-too-large") << int(Aes256CbcPkcs7) << true << 2 * 1024 * 1024 << size << false << 1000;
+    // the size is unknown: the padding is kept and the hash does not match
+    QTest::newRow("gcm-no-size") << int(Aes256GcmNoPad) << true << 0 << noSize << true << 1000;
+    QTest::newRow("gcm-padding-no-size") << int(Aes256GcmNoPad) << true << 300 << noSize << false << 1300;
+    // wrong size: the hash does not match
+    QTest::newRow("gcm-size-too-small") << int(Aes256GcmNoPad) << true << 0 << std::optional<uint64_t>(999) << false << 999;
+    QTest::newRow("gcm-size-too-large") << int(Aes256GcmNoPad) << true << 0 << std::optional<uint64_t>(2000) << true << 1000;
+}
+
+// Additional bytes of decrypted files are cut off (XEP-0448).
+void tst_QXmppFileEncryption::downloadCutOff()
+{
+    QFETCH(int, cipherId);
+    QFETCH(bool, tag);
+    QFETCH(int, padding);
+    QFETCH(std::optional<uint64_t>, size);
+    QFETCH(bool, success);
+    QFETCH(int, outputSize);
+    const auto cipher = Cipher(cipherId);
+
+    const QByteArray data(1000, 'a');
+    QXmppEncryptedFileSource source;
+    source.setCipher(cipher);
+    source.setKey(generateKey(cipher));
+    source.setIv(generateInitializationVector(cipher));
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(u"https://upload.example.org/file"_s)) });
+
+    QXmppHash hash;
+    hash.setAlgorithm(HashAlgorithm::Sha256);
+    hash.setHash(QCryptographicHash::hash(data, QCryptographicHash::Sha256));
+    QXmppFileMetadata metadata;
+    metadata.setSize(size);
+    metadata.setHashes({ hash });
+    QXmppFileShare file;
+    file.setMetadata(metadata);
+    file.setEncryptedSourecs({ source });
+
+    auto encrypted = process(data + QByteArray(padding, '\0'), cipher, Encode, source.key(), source.iv());
+    if (!tag) {
+        encrypted.chop(16);
+    }
+
+    QXmppFileSharingManager manager;
+    auto httpProvider = std::make_shared<FakeHttpProvider>(encrypted);
+    manager.registerProvider(httpProvider);
+    manager.registerProvider(std::make_shared<QXmppEncryptedFileSharingProvider>(&manager, httpProvider));
+
+    QTemporaryDir dir;
+    const auto path = dir.filePath(u"file"_s);
+    auto output = std::make_unique<QFile>(path);
+    QVERIFY(output->open(QIODevice::WriteOnly));
+    auto download = manager.downloadFile(file, std::move(output));
+    QTRY_VERIFY(download->isFinished());
+
+    QCOMPARE(std::holds_alternative<QXmppFileDownload::Downloaded>(download->result()), success);
+    QCOMPARE(QFileInfo(path).size(), outputSize);
+}
+
+// For large files, the tolerance is 10 % of their size.
+void tst_QXmppFileEncryption::downloadCutOffLarge_data()
+{
+    QTest::addColumn<int>("padding");
+    QTest::addColumn<bool>("success");
+
+    QTest::newRow("max-padding") << 2 * 1024 * 1024 << true;
+    QTest::newRow("too-large") << 2 * 1024 * 1024 + 1 << false;
+}
+
+void tst_QXmppFileEncryption::downloadCutOffLarge()
+{
+    QFETCH(int, padding);
+    QFETCH(bool, success);
+
+    const QByteArray data(20 * 1024 * 1024, 'a');
+    QXmppEncryptedFileSource source;
+    source.setCipher(Aes256GcmNoPad);
+    source.setKey(generateKey(Aes256GcmNoPad));
+    source.setIv(generateInitializationVector(Aes256GcmNoPad));
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(u"https://upload.example.org/file"_s)) });
+    QXmppFileMetadata metadata;
+    metadata.setSize(data.size());
+    QXmppFileShare file;
+    file.setMetadata(metadata);
+    file.setEncryptedSourecs({ source });
+
+    QXmppFileSharingManager manager;
+    auto httpProvider = std::make_shared<FakeHttpProvider>(process(data + QByteArray(padding, '\0'), Aes256GcmNoPad, Encode, source.key(), source.iv()));
+    manager.registerProvider(httpProvider);
+    manager.registerProvider(std::make_shared<QXmppEncryptedFileSharingProvider>(&manager, httpProvider));
+
+    QByteArray output;
+    auto buffer = std::make_unique<QBuffer>(&output);
+    buffer->open(QIODevice::WriteOnly);
+    auto download = manager.downloadFile(file, std::move(buffer));
+    QVERIFY(download->isFinished());
+    QCOMPARE(std::holds_alternative<QXmppFileDownload::Downloaded>(download->result()), success);
+    if (success) {
+        QCOMPARE(output, data);
+    }
+}
+
+// The HTTP download is aborted if the file is much larger than its size.
+void tst_QXmppFileEncryption::downloadAbortTooLarge()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+    bool disconnected = false;
+    qint64 sent = 0;
+    connect(&server, &QTcpServer::newConnection, this, [&] {
+        auto *socket = server.nextPendingConnection();
+        connect(socket, &QTcpSocket::disconnected, &server, [&] { disconnected = true; });
+        connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+            socket->readAll();
+            socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n");
+        });
+        // endless response
+        connect(socket, &QTcpSocket::bytesWritten, socket, [&, socket] {
+            if (socket->bytesToWrite() == 0) {
+                sent += socket->write(QByteArray(65536, 'x'));
+            }
+        });
+    });
+
+    QXmppEncryptedFileSource source;
+    source.setCipher(Aes256GcmNoPad);
+    source.setKey(generateKey(Aes256GcmNoPad));
+    source.setIv(generateInitializationVector(Aes256GcmNoPad));
+    source.setHttpSources({ QXmppHttpFileSource(QUrl(u"http://127.0.0.1:%1/file"_s.arg(server.serverPort()))) });
+    QXmppFileMetadata metadata;
+    metadata.setSize(1000);
+    QXmppFileShare file;
+    file.setMetadata(metadata);
+    file.setEncryptedSourecs({ source });
+
+    QNetworkAccessManager network;
+    QXmppFileSharingManager manager;
+    QXmppHttpUploadManager uploadManager(&network);
+    auto httpProvider = std::make_shared<QXmppHttpFileSharingProvider>(&uploadManager, &network);
+    manager.registerProvider(httpProvider);
+    manager.registerProvider(std::make_shared<QXmppEncryptedFileSharingProvider>(&manager, httpProvider));
+
+    QByteArray output;
+    auto buffer = std::make_unique<QBuffer>(&output);
+    buffer->open(QIODevice::WriteOnly);
+    auto download = manager.downloadFile(file, std::move(buffer));
+    QTRY_VERIFY(download->isFinished());
+    const auto result = download->result();
+    QVERIFY(std::holds_alternative<QXmppError>(result));
+    QCOMPARE(std::get<QXmppError>(result).description, u"The file is much larger than its specified size."_s);
+    QTRY_VERIFY(disconnected);
+    QVERIFY(sent < 20 * 1024 * 1024);
+}
+
+void tst_QXmppFileEncryption::downloadUnencryptedNotCutOff()
+{
+    const QByteArray data(1000, 'a');
+    QXmppFileMetadata metadata;
+    metadata.setSize(900);
+    QXmppFileShare file;
+    file.setMetadata(metadata);
+    file.setHttpSources({ QXmppHttpFileSource(QUrl(u"https://upload.example.org/file"_s)) });
+
+    QXmppFileSharingManager manager;
+    manager.registerProvider(std::make_shared<FakeHttpProvider>(data));
+
+    QByteArray output;
+    auto buffer = std::make_unique<QBuffer>(&output);
+    buffer->open(QIODevice::WriteOnly);
+    auto download = manager.downloadFile(file, std::move(buffer));
+    QVERIFY(download->isFinished());
+    QCOMPARE(output, data);
+}
+
+void tst_QXmppFileEncryption::metadataSize_data()
+{
+    QTest::addColumn<QString>("text");
+    QTest::addColumn<std::optional<uint64_t>>("size");
+
+    QTest::newRow("zero") << u"0"_s << std::optional<uint64_t>(0);
+    QTest::newRow("large") << u"5000000000"_s << std::optional<uint64_t>(5000000000);
+    QTest::newRow("invalid") << u"abc"_s << std::optional<uint64_t>();
+    QTest::newRow("negative") << u"-1"_s << std::optional<uint64_t>();
+    QTest::newRow("empty") << QString() << std::optional<uint64_t>();
+}
+
+// An invalid size must not be parsed as 0, the file would be cut off completely.
+void tst_QXmppFileEncryption::metadataSize()
+{
+    QFETCH(QString, text);
+    QFETCH(std::optional<uint64_t>, size);
+
+    QXmppFileMetadata metadata;
+    QVERIFY(metadata.parse(xmlToDom(u"<file xmlns='urn:xmpp:file:metadata:0'><size>"_s + text + u"</size></file>"_s)));
+    QCOMPARE(metadata.size(), size);
 }
 
 // By default, uploaded files can be shared via OMEMO Media Sharing.

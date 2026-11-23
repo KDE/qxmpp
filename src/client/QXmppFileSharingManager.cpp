@@ -47,6 +47,49 @@ static std::vector<HashAlgorithm> hashAlgorithms()
     return { HashAlgorithm::Sha256, HashAlgorithm::Blake2b_256 };
 }
 
+// Writes only the first bytes to the output and discards the rest. Fails if there are far more bytes
+// than expected, so e.g. a server can't cause endless downloads. Some are allowed, since files may be
+// padded to hide their size.
+class TruncatingDevice : public QIODevice
+{
+public:
+    TruncatingDevice(std::unique_ptr<QIODevice> output, quint64 size)
+        : m_output(std::move(output)), m_remaining(size), m_allowedExcess(std::max(size / 10, MIN_ALLOWED_EXCESS))
+    {
+        setOpenMode(m_output->openMode());
+    }
+
+    void close() override
+    {
+        QIODevice::close();
+        m_output->close();
+    }
+    qint64 readData(char *, qint64) override { return -1; }
+    qint64 writeData(const char *data, qint64 len) override
+    {
+        const auto writtenLen = qint64(std::min(quint64(len), m_remaining));
+        const auto excess = quint64(len - writtenLen);
+        if (excess > m_allowedExcess) {
+            setErrorString(u"The file is much larger than its specified size."_s);
+            return -1;
+        }
+        if (writtenLen > 0 && m_output->write(data, writtenLen) != writtenLen) {
+            setErrorString(m_output->errorString());
+            return -1;
+        }
+        m_remaining -= quint64(writtenLen);
+        m_allowedExcess -= excess;
+        return len;
+    }
+
+private:
+    static constexpr quint64 MIN_ALLOWED_EXCESS = 1024 * 1024;
+
+    std::unique_ptr<QIODevice> m_output;
+    quint64 m_remaining;
+    quint64 m_allowedExcess;
+};
+
 class QXmppFileUploadPrivate
 {
 public:
@@ -588,6 +631,10 @@ std::shared_ptr<QXmppFileUpload> QXmppFileSharingManager::uploadFile(std::shared
     \a fileShare is the file share object which you want to download. \a output is an open
     QIODevice that the data should be written into, in most cases a QFile.
 
+    Decrypted files larger than the size in the metadata of the file share are cut off
+    (\xep{0448}{Encryption for stateless file sharing}). The download fails if the additional bytes
+    are more than 10 % of the size and more than 1 MiB.
+
     Returns an object that allows to track the progress of the download.
 */
 std::shared_ptr<QXmppFileDownload> QXmppFileSharingManager::downloadFile(
@@ -674,6 +721,10 @@ std::shared_ptr<QXmppFileDownload> QXmppFileSharingManager::downloadFile(
 
     fileShare.visitSources([&](const std::any &source) {
         if (auto provider = providerForSource(source)) {
+            // additional bytes of decrypted files must be cut off (XEP-0448), e.g. a padding
+            if (const auto size = fileShare.metadata().size(); size && source.type() == typeid(QXmppEncryptedFileSource)) {
+                output = std::make_unique<TruncatingDevice>(std::move(output), *size);
+            }
             download->d->providerDownload = provider->downloadFile(source, std::move(output), std::move(onProgress), std::move(onFinished));
             return true;
         }
