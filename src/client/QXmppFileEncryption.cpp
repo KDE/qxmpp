@@ -262,7 +262,10 @@ qint64 DecryptionDevice::writeData(const char *data, qint64 len)
 
     const auto decrypted = m_cipher->update(m_pending.first(size));
     m_pending.remove(0, size);
-    m_output->write(decrypted.constData(), decrypted.size());
+    if (m_output->write(decrypted) != decrypted.size()) {
+        setErrorString(m_output->errorString());
+        return -1;
+    }
     return len;
 }
 
@@ -282,8 +285,9 @@ DecryptionDevice::Result DecryptionDevice::finish()
         m_result = Unauthenticated;
         output = m_cipher->update(m_pending);
     }
-    if (output && !output->isEmpty()) {
-        m_output->write(output->constData(), output->size());
+    if (output && m_output->write(*output) != output->size()) {
+        setErrorString(m_output->errorString());
+        m_result = Failure;
     }
     return m_result;
 }

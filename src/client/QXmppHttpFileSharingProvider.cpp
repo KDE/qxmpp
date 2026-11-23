@@ -110,9 +110,13 @@ auto QXmppHttpFileSharingProvider::downloadFile(const std::any &source,
     QObject::connect(state->reply, &QNetworkReply::readyRead, [state]() {
         Q_ASSERT(state->output);
 
+        if (state->error) {
+            return;
+        }
         auto data = state->reply->readAll();
         if (state->output->write(data) != data.size()) {
             state->error = QXmppError::fromIoDevice(*state->output);
+            state->reply->abort();
         }
     });
 
@@ -126,7 +130,7 @@ auto QXmppHttpFileSharingProvider::downloadFile(const std::any &source,
                      [state](QNetworkReply::NetworkError) {
                          // Qt doc: the finished() signal will "probably" follow
                          // => we can't be sure that finished() is going to be called
-                         state->finish(QXmppError::fromNetworkReply(*state->reply));
+                         state->finish(state->error ? *state->error : QXmppError::fromNetworkReply(*state->reply));
                      });
 
     return std::dynamic_pointer_cast<QXmppFileSharingProvider::Download>(state);
