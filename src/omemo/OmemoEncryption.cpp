@@ -443,6 +443,11 @@ QXmppTask<Result<DeviceSelection>> OmemoManagerPrivate::selectDevices(QList<Vers
     if (hasRecipients && std::ranges::all_of(recipients, [&](const Recipient &recipient) { return recipient.jid == own; })) {
         co_return QXmppError { u"There is no device of the recipients with an accepted trust level"_s, SendError::NoEncryptionRecipients };
     }
+    // e.g. a message to the own JID if this device is the only one, which would be sent without
+    // encrypted content
+    if (recipients.isEmpty()) {
+        co_return QXmppError { u"There is no other own device with an accepted trust level"_s, SendError::NoEncryptionRecipients };
+    }
     co_return selection;
 }
 

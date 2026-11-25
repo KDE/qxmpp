@@ -1109,6 +1109,9 @@ namespace QXmpp {
     both versions and its new keys are distrusted automatically. With QXmpp::NoSecurityPolicy, new
     keys are distrusted automatically and must be trusted manually. Messages are only encrypted
     for keys with trust levels accepted by QXmppSendStanzaParams::acceptedTrustLevels().
+    Sending fails with QXmpp::SendError::NoEncryptionRecipients if no device of the recipients
+    has such a key, and for a message to the own JID if there is no other own device with such
+    a key.
 
     The security policy can be changed via setSecurityPolicy(). For authenticating keys via
     \xep{0450}{Automatic Trust Management (ATM)}, a QXmppAtmManager should be used as the trust

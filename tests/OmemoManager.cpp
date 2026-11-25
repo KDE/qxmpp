@@ -2677,6 +2677,8 @@ private:
     Q_SLOT void unlistedDevicesAreNotEncryptedFor();
     Q_SLOT void ownDevicesReceiveCopies_data();
     Q_SLOT void ownDevicesReceiveCopies();
+    Q_SLOT void onlyDeviceOfOwnJid_data();
+    Q_SLOT void onlyDeviceOfOwnJid();
     Q_SLOT void sentByThisDevice_data();
     Q_SLOT void usableVersions();
     Q_SLOT void authentication();
@@ -3660,6 +3662,35 @@ void tst_OmemoManager2::ownDevicesReceiveCopies()
     QCOMPARE(spy.size(), 1);
     QCOMPARE(spy.constFirst().at(0).value<QXmppMessage>().body(), u"Without sender"_s);
     QVERIFY(!alicePhone.manager->d->versions.at(version).devices.contains(QString()));
+}
+
+void tst_OmemoManager2::onlyDeviceOfOwnJid_data()
+{
+    QTest::addColumn<std::optional<Version>>("version");
+    QTest::newRow("omemo0") << std::optional(Version::Omemo0);
+    QTest::newRow("omemo2") << std::optional(Version::Omemo2);
+    QTest::newRow("automatic") << std::optional<Version>();
+}
+
+// A message to the own JID is not sent without encrypted content if there is no other own device.
+void tst_OmemoManager2::onlyDeviceOfOwnJid()
+{
+    QFETCH(std::optional<Version>, version);
+
+    FakePubSubService server;
+    Account alice(nullptr, &server, u"alice@wonderland.lit/rabbithole"_s);
+    expectVariant<Success>(alice.setUp());
+    alice.encryption = version;
+    alice.automatic = !version;
+
+    QVERIFY(alice.sendMessage(alice.jid(), u"Note"_s).isEmpty());
+    QCOMPARE(alice.sendError, u"There is no other own device with an accepted trust level"_s);
+
+    Account alicePhone(nullptr, &server, u"alice@wonderland.lit/phone"_s);
+    expectVariant<Success>(alicePhone.setUp());
+    const auto message = alice.sendMessage(alice.jid(), u"Note"_s);
+    QVERIFY2(!message.isEmpty(), qPrintable(alice.sendError));
+    QCOMPARE(alicePhone.receive(alice, message).value(0).body(), u"Note"_s);
 }
 
 void tst_OmemoManager2::sentByThisDevice_data()
