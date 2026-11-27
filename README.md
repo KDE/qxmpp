@@ -128,6 +128,30 @@ Before [reporting a bug][issues], please check if the issue is already known at.
 
 If you are interested in contributing to QXmpp, please have a look at our [contribution guidelines][contributing].
 
+## Funding
+
+Parts of QXmpp's development have been funded by [NLnet](https://nlnet.nl/foundation/) through the
+following programmes of the [Next Generation Internet](https://ngi.eu/) initiative of the European
+Commission:
+
+<p>
+    <a href="https://nlnet.nl/foundation/">
+        <img alt="NLnet" src="https://nlnet.nl/logo/banner.svg" height="60">
+    </a>
+    <a href="https://nlnet.nl/PET/">
+        <img alt="NGI Zero PET" src="https://nlnet.nl/image/logos/NGI0PET_tag.svg" height="60">
+    </a>
+    <a href="https://nlnet.nl/assure/">
+        <img alt="NGI Assure" src="https://nlnet.nl/image/logos/NGIAssure_tag.svg" height="60">
+    </a>
+    <a href="https://nlnet.nl/entrust/">
+        <img alt="NGI Zero Entrust" src="https://nlnet.nl/image/logos/NGI0Entrust_tag.svg" height="60">
+    </a>
+    <a href="https://nlnet.nl/commonsfund/">
+        <img alt="NGI Zero Commons Fund" src="https://nlnet.nl/image/logos/NGI0CommonsFund_tag.svg" height="60">
+    </a>
+</p>
+
 [xeps]: https://doc.qxmpp.org/qxmpp-1/xep.html
 [contributing]: /CONTRIBUTING.md
 [examples]: /examples
